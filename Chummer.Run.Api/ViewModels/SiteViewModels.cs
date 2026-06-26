@@ -521,6 +521,7 @@ public sealed record BlackLedgerWorldTurnBriefingViewModel(
     IReadOnlyList<string> ValidationChecks,
     string ValidationJsonHref,
     BlackLedgerNewsreelBroadcastViewModel? Broadcast = null,
+    SharedArtifactSurfaceRoutesViewModel? SharedArtifacts = null,
     PublicHorizonCapabilityViewModel? ArtifactCapability = null);
 
 public sealed record BlackLedgerActionBeatViewModel(
@@ -581,6 +582,7 @@ public sealed record BlackLedgerWorldTickValidationPacketViewModel(
     string Summary,
     IReadOnlyList<string> Checks,
     IReadOnlyList<string> Links,
+    SharedArtifactSurfaceRoutesViewModel? SharedArtifacts = null,
     PublicHorizonCapabilityViewModel? ArtifactCapability = null);
 
 public sealed record BlackLedgerFactionPromoArtifactViewModel(
@@ -1117,6 +1119,15 @@ public sealed record PublicHorizonCapabilityViewModel(
     bool QuotaTracked,
     string SourceRef,
     string Visibility);
+
+public sealed record SharedArtifactSurfaceRoutesViewModel(
+    string PublicCapabilityCatalogHref,
+    string? PublicCapabilityHealthHref,
+    string? PublicRequestReceiptDetailHrefTemplate,
+    string? SignedInCapabilityCatalogHref,
+    string? SignedInQuotaCatalogHref,
+    string? SignedInRequestReceiptHref,
+    string? SignedInRequestReceiptDetailHrefTemplate);
 
 public sealed record StatusPageViewModel(
     SiteChromeViewModel Chrome,

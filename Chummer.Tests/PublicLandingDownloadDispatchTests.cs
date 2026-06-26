@@ -421,6 +421,14 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("public_bulletin_media", capability.GetProperty("CapabilitySlot").GetString());
         Assert.Equal("available", capability.GetProperty("Status").GetString());
         Assert.Equal("black-ledger:turn-1:newsroom", capability.GetProperty("SourceRef").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-newsroom", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-newsroom", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement broadcast = payload.RootElement.GetProperty("Broadcast");
         AssertProtectedMediaUrl(broadcast.GetProperty("VideoMp4Href").GetString(), "/media/ledger/newsreels/turn-1-newsreel.mp4");
         AssertProtectedMediaUrl(broadcast.GetProperty("VideoWebmHref").GetString(), "/media/ledger/newsreels/turn-1-newsreel.webm");
@@ -3139,6 +3147,14 @@ public sealed class PublicLandingDownloadDispatchTests
         AssertProtectedMediaUrl(payload.RootElement.GetProperty("video_mp4_href").GetString(), "/media/ledger/factions/ashline-circle-promo-mobile.mp4");
         AssertProtectedMediaUrl(payload.RootElement.GetProperty("video_webm_href").GetString(), "/media/ledger/factions/ashline-circle-promo.webm");
         AssertProtectedMediaUrl(payload.RootElement.GetProperty("poster_href").GetString(), "/media/ledger/factions/ashline-circle-promo-poster.png");
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-faction-promo", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-faction-promo", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
         Assert.Equal("black-ledger-faction-promo", capability.GetProperty("CapabilityId").GetString());
         Assert.Equal("faction_promo", capability.GetProperty("ArtifactKind").GetString());
@@ -3416,12 +3432,46 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Contains(
             payload.RootElement.GetProperty("Links").EnumerateArray().Select(item => item.GetString()),
             item => string.Equals(item, "/account/ledger/factions/ashline-circle/leader-briefing", StringComparison.Ordinal));
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
+        Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-digest", sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-digest", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-digest", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("black-ledger-digest", capability.GetProperty("CapabilityId").GetString());
         Assert.Equal("black-ledger:turn-1:validation", capability.GetProperty("SourceRef").GetString());
         Assert.DoesNotContain("Emailit", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Signitic", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("vidBoard", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task LedgerNewsroomEpisodeReceiptsReturnSharedArtifactContract()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.LedgerNewsroomEpisodeReceipts("turn-1-newsreel", CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-newsroom", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-newsroom", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("black-ledger-newsroom", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("black-ledger:turn-1:newsroom", capability.GetProperty("SourceRef").GetString());
     }
 
     [Fact]

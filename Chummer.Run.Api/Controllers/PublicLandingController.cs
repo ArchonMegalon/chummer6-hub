@@ -5499,6 +5499,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return Ok(briefing with
         {
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("black-ledger", "newsroom_bulletin"),
             ArtifactCapability = BuildPublicHorizonCapability(
                 "black-ledger",
                 "newsroom_bulletin",
@@ -5610,6 +5611,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ? NotFound()
             : Ok(packet with
             {
+                SharedArtifacts = BuildSharedArtifactSurfaceRoutes("black-ledger", "newsroom_bulletin"),
                 ArtifactCapability = BuildPublicHorizonCapability(
                     "black-ledger",
                     "newsroom_bulletin",
@@ -5760,6 +5762,7 @@ document.addEventListener('DOMContentLoaded', function () {
             poster_href = publicPromo.PosterHref,
             video_mp4_href = publicPromo.VideoMp4Href,
             video_webm_href = publicPromo.VideoWebmHref,
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("black-ledger", "faction_promo"),
             artifact_capability = BuildPublicHorizonCapability(
                 "black-ledger",
                 "faction_promo",
@@ -5953,6 +5956,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? NotFound()
                 : Ok(packet with
                 {
+                    SharedArtifacts = BuildSharedArtifactSurfaceRoutes("black-ledger", "world_tick_digest"),
                     ArtifactCapability = BuildPublicHorizonCapability(
                         "black-ledger",
                         "world_tick_digest",
@@ -11936,7 +11940,7 @@ Boundary:
 
     private JsonObject BuildSharedArtifactSurfaceRoutesNode(string horizonId, string artifactKindOrCapabilityId)
     {
-        SharedArtifactSurfaceRoutes routes = ResolveSharedArtifactSurfaceRoutes(horizonId, artifactKindOrCapabilityId);
+        SharedArtifactSurfaceRoutesViewModel routes = ResolveSharedArtifactSurfaceRoutes(horizonId, artifactKindOrCapabilityId);
         return new JsonObject
         {
             ["public_capability_catalog_href"] = routes.PublicCapabilityCatalogHref,
@@ -11949,16 +11953,16 @@ Boundary:
         };
     }
 
-    private object BuildSharedArtifactSurfaceRoutes(string horizonId, string artifactKindOrCapabilityId)
+    private SharedArtifactSurfaceRoutesViewModel BuildSharedArtifactSurfaceRoutes(string horizonId, string artifactKindOrCapabilityId)
         => ResolveSharedArtifactSurfaceRoutes(horizonId, artifactKindOrCapabilityId);
 
-    private SharedArtifactSurfaceRoutes ResolveSharedArtifactSurfaceRoutes(string horizonId, string artifactKindOrCapabilityId)
+    private SharedArtifactSurfaceRoutesViewModel ResolveSharedArtifactSurfaceRoutes(string horizonId, string artifactKindOrCapabilityId)
     {
         HorizonCapabilityDefinition capability = _horizonCapabilities.GetCapability(horizonId, artifactKindOrCapabilityId);
         string encodedHorizonId = Uri.EscapeDataString(capability.HorizonId);
         string encodedCapabilityId = Uri.EscapeDataString(capability.CapabilityId);
         bool publicReceiptEligible = capability.PublicVisible && !capability.RequiresAuthentication;
-        return new SharedArtifactSurfaceRoutes(
+        return new SharedArtifactSurfaceRoutesViewModel(
             PublicCapabilityCatalogHref: "/api/v1/public/horizons/capabilities",
             PublicCapabilityHealthHref: capability.PublicVisible
                 ? $"/api/v1/public/horizons/capabilities?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
@@ -17217,15 +17221,6 @@ echo "Help: ${HELP_URL}"
         string ExecutableName,
         string LauncherName,
         string DesktopEntryName);
-
-    private sealed record SharedArtifactSurfaceRoutes(
-        string PublicCapabilityCatalogHref,
-        string? PublicCapabilityHealthHref,
-        string? PublicRequestReceiptDetailHrefTemplate,
-        string? SignedInCapabilityCatalogHref,
-        string? SignedInQuotaCatalogHref,
-        string? SignedInRequestReceiptHref,
-        string? SignedInRequestReceiptDetailHrefTemplate);
 
     private sealed record GuidedBootstrapScriptContext(
         PublicReleaseManifestDto Manifest,
