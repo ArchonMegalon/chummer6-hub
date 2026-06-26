@@ -1,8 +1,9 @@
 @model BillingMembershipPageViewModel
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
-    Layout = null;
-    var title = Model.Heading;
+    ViewData["Title"] = "Billing";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-billing surface-minimal";
     var free = Model.FreePlan;
     var supporter = Model.SupporterPlan;
     var hasUserId = !string.IsNullOrWhiteSpace(Model.UserId);
@@ -10,167 +11,80 @@
     var quota = Model.CurrentMyFirstBookQuota;
     var hasManageMembershipHref = !string.IsNullOrWhiteSpace(Model.ManageMembershipHref);
     var antiForgery = Antiforgery.GetAndStoreTokens(Context);
+    var signedInLabel = string.IsNullOrWhiteSpace(Model.SignedInLabel) ? Model.Email ?? Model.UserId : Model.SignedInLabel;
 }
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@title</title>
-    <style>
-        :root {
-            color-scheme: dark;
-            --bg: #171716;
-            --surface: #1b1b19;
-            --surface-alt: #1f1e1b;
-            --border: rgba(243, 234, 219, 0.13);
-            --text: #f3eadb;
-            --muted: rgba(243, 234, 219, 0.68);
-            --accent: #d6b763;
-            --accent-strong: #e3c979;
-        }
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: Inter, system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-        }
-        main {
-            max-width: 34rem;
-            margin: 0 auto;
-            padding: 1.2rem 1rem 1.6rem;
-        }
-        h1, h2, p { margin: 0; }
-        h1 { font-size: clamp(1.55rem, 4vw, 2rem); line-height: 1.08; letter-spacing: 0; }
-        h2 { font-size: 1rem; }
-        .stack { display: grid; gap: 0.65rem; }
-        .hero { display: grid; gap: 0.65rem; margin-bottom: 0.25rem; }
-        .eyebrow { color: var(--accent); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; }
-        .summary { color: var(--muted); line-height: 1.42; max-width: 32rem; }
-        .grid { display: grid; gap: 0.65rem; }
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0.8rem;
-            display: grid;
-            gap: 0.6rem;
-        }
-        .card--accent { background: var(--surface-alt); }
-        .label {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            color: var(--accent);
-            font-size: 0.82rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-        ul { margin: 0; padding-left: 1rem; color: var(--muted); display: grid; gap: 0.35rem; }
-        .note, .field-help { color: var(--muted); font-size: 0.95rem; line-height: 1.5; }
-        .action-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
-        a.button, button.button {
-            appearance: none;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--text);
-            text-decoration: none;
-            border-radius: 999px;
-            padding: 0.7rem 1rem;
-            font: inherit;
-            cursor: pointer;
-        }
-        a.button--primary, button.button--primary { background: var(--accent); color: #171716; border-color: transparent; }
-        a.button--primary:hover, button.button--primary:hover { background: var(--accent-strong); }
-        .form-grid { display: grid; gap: 0.85rem; }
-        .quiet-list { list-style: none; padding: 0; }
-        label { display: grid; gap: 0.4rem; font-size: 0.95rem; }
-        input {
-            width: 100%;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: #151514;
-            color: var(--text);
-            padding: 0.7rem 0.8rem;
-            font: inherit;
-        }
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            padding: 0.42rem 0.65rem;
-            color: var(--muted);
-            width: fit-content;
-            font-size: 0.92rem;
-        }
-        .meter { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-        .tier-row { display: grid; gap: 0.7rem; }
-        .tier-line { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
-        .tier-line strong { font-size: 1.05rem; }
-        .divider { height: 1px; background: var(--border); margin: 0.1rem 0; }
-    </style>
-</head>
-<body>
-<main class="stack">
-    <section class="hero">
+<section class="minimal-page-hero">
+    <div>
         <p class="eyebrow">Membership</p>
         <h1>@Model.Heading</h1>
-        <p class="summary">@Model.Summary</p>
-        <div class="meter">
-            <div class="pill">Same app.</div>
-            <div class="pill">Origin books: 1/month free. 2/month supporter.</div>
-        </div>
-        @if (usingSignedInAccount)
-        {
-            <div class="pill">Signed in as @(string.IsNullOrWhiteSpace(Model.SignedInLabel) ? Model.Email ?? Model.UserId : Model.SignedInLabel)</div>
-        }
-        @if (quota is not null)
-        {
-            <div class="pill">This month: @quota.MonthlyUsed / @quota.MonthlyLimit books</div>
-        }
-    </section>
+        <p>@Model.Summary</p>
+        <ul class="minimal-hero__points">
+            <li>Same app.</li>
+            <li>Origin books: 1/month free. 2/month supporter.</li>
+            @if (usingSignedInAccount)
+            {
+                <li>Signed in as @signedInLabel</li>
+            }
+            @if (quota is not null)
+            {
+                <li>This month: @quota.MonthlyUsed / @quota.MonthlyLimit books</li>
+            }
+        </ul>
+    </div>
+</section>
 
-    @if (Model.Unavailable)
-    {
-        <section class="card card--accent">
-            <h2>Membership</h2>
-            <p class="note">Supporter checkout is unavailable right now. Free access stays the same.</p>
-            <div class="action-row">
-                @if (!hasUserId)
-                {
-                    <a class="button" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
-                }
-                <a class="button button--primary" href="/downloads">Downloads</a>
-            </div>
-        </section>
-    }
-    else
-    {
-        <section class="card card--accent">
-            <div class="tier-row">
+@if (Model.Unavailable)
+{
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-lane-grid minimal-platform-list">
+            <article class="minimal-lane-card billing-plan-card">
+                <span class="tag">Unavailable</span>
+                <h2>Free access stays the same</h2>
+                <p>Supporter checkout is unavailable right now.</p>
+                <div class="minimal-actions">
+                    @if (!hasUserId)
+                    {
+                        <a class="button-like button-like--secondary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
+                    }
+                    <a class="button-like button-like--primary" href="/downloads">Downloads</a>
+                </div>
+            </article>
+        </div>
+    </section>
+}
+else
+{
+    <section class="minimal-section">
+        <div class="minimal-section__lead">
+            <p class="eyebrow">Plans</p>
+            <h2>Only the monthly book allowance changes</h2>
+            <p>No extra app features right now.</p>
+        </div>
+        <div class="minimal-lane-grid minimal-platform-list">
             @if (free is not null)
             {
-                <div>
-                    <div class="tier-line">
-                        <span class="label">Free</span>
-                        <strong>@free.Name</strong>
+                <article class="minimal-lane-card billing-plan-card">
+                    <span class="tag">Free</span>
+                    <h2>@free.Name</h2>
+                    <p>Default. Full current app access. 1 Origin Book each month.</p>
+                    <div class="route-choice-card__details">
+                        <span>Default</span>
+                        <span>1 book/month</span>
+                        <span>Everything else stays the same</span>
                     </div>
-                    <p class="note">Default. Full current app access. 1 Origin Book each month.</p>
-                </div>
+                </article>
             }
             @if (supporter is not null)
             {
-                <div class="divider" aria-hidden="true"></div>
-                <div>
-                    <div class="tier-line">
-                        <span class="label">Supporter</span>
-                        <strong>@supporter.Name</strong>
+                <article class="minimal-lane-card billing-plan-card">
+                    <span class="tag">Supporter</span>
+                    <h2>@supporter.Name</h2>
+                    <p>Same app. No extra app features right now. 2 Origin Books each month and direct support for Chummer.</p>
+                    <div class="route-choice-card__details">
+                        <span>2 books/month</span>
+                        <span>Same app</span>
                     </div>
-                    <p class="note">Same app. No extra app features right now. 2 Origin Books each month and direct support for Chummer.</p>
-                    <form class="form-grid" method="post" action="/account/billing/supporter">
+                    <form class="billing-plan-form" method="post" action="/account/billing/supporter">
                         <input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken">
                         @if (hasUserId)
                         {
@@ -179,33 +93,30 @@
                             {
                                 <input type="hidden" name="email" value="@Model.Email">
                             }
-                            <div class="pill">Checkout stays attached to this account.</div>
+                            <p class="muted-copy">Checkout stays attached to this account.</p>
                         }
                         else
                         {
-                            <p class="field-help">Continue with email first. Chummer attaches supporter status after sign-in.</p>
+                            <p class="muted-copy">Continue with email first. Chummer attaches supporter status after sign-in.</p>
                         }
-                        <p class="field-help">Supporter changes the monthly Origin Book limit only. The app stays the same.</p>
-                        <div class="action-row">
+                        <p class="muted-copy">Supporter changes the monthly Origin Book limit only. The app stays the same.</p>
+                        <div class="minimal-actions">
                             @if (hasUserId)
                             {
-                                <button class="button button--primary" type="submit">Support Chummer</button>
+                                <button class="button-like button-like--primary" type="submit">Support Chummer</button>
                             }
                             else
                             {
-                                <a class="button button--primary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
+                                <a class="button-like button-like--primary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
                             }
                             @if (hasManageMembershipHref)
                             {
-                                <a class="button" href="@Model.ManageMembershipHref">Manage billing</a>
+                                <a class="button-like button-like--ghost" href="@Model.ManageMembershipHref">Manage billing</a>
                             }
                         </div>
                     </form>
-                </div>
+                </article>
             }
-            </div>
-        </section>
-    }
-</main>
-</body>
-</html>
+        </div>
+    </section>
+}

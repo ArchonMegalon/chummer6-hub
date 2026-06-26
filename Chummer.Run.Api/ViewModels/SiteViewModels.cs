@@ -103,6 +103,7 @@ public sealed record PublicAccessPostureViewModel(
     string AccountFaqAnswer);
 
 public sealed record BillingMembershipPageViewModel(
+    SiteChromeViewModel Chrome,
     Chummer.Run.Contracts.Billing.BrilliantDirectoriesBillingPageDto? Page,
     Chummer.Run.Contracts.Billing.BillingPlanCardDto? FreePlan,
     Chummer.Run.Contracts.Billing.BillingPlanCardDto? SupporterPlan,

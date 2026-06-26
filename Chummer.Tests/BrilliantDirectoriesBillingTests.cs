@@ -57,18 +57,21 @@ public sealed class BrilliantDirectoriesBillingTests
     {
         string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Billing", "Membership.cshtml"));
 
+        Assert.Contains("ViewData[\"Chrome\"] = Model.Chrome;", view, StringComparison.Ordinal);
+        Assert.Contains("ViewData[\"SurfaceClass\"] = \"surface-billing surface-minimal\";", view, StringComparison.Ordinal);
         Assert.Contains("Same app.", view, StringComparison.Ordinal);
         Assert.Contains("Origin books: 1/month free. 2/month supporter.", view, StringComparison.Ordinal);
         Assert.Contains("Continue with email", view, StringComparison.Ordinal);
-        Assert.Contains("<h2>Membership</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("<h2>Only the monthly book allowance changes</h2>", view, StringComparison.Ordinal);
         Assert.Contains("Supporter checkout is unavailable right now.", view, StringComparison.Ordinal);
         Assert.Contains("Chummer attaches supporter status after sign-in.", view, StringComparison.Ordinal);
         Assert.Contains("Checkout stays attached to this account.", view, StringComparison.Ordinal);
         Assert.Contains("Support Chummer", view, StringComparison.Ordinal);
-        Assert.Contains("--bg: #171716;", view, StringComparison.Ordinal);
-        Assert.Contains("--accent: #d6b763;", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("--bg: #0d1016;", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("--accent: #9fe8d5;", view, StringComparison.Ordinal);
+        Assert.Contains("minimal-page-hero", view, StringComparison.Ordinal);
+        Assert.Contains("minimal-lane-grid minimal-platform-list", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Layout = null;", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<!doctype html>", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<style>", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Account ID", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Required to continue", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("temporarily unavailable", view, StringComparison.OrdinalIgnoreCase);
@@ -258,6 +261,8 @@ public sealed class BrilliantDirectoriesBillingTests
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
+        Assert.True(model.Chrome.Authenticated);
+        Assert.Equal("/account/billing", model.Chrome.CurrentPath);
         Assert.Equal(user.UserId, model.UserId);
         Assert.NotNull(model.CurrentMyFirstBookQuota);
         Assert.Equal(2, model.CurrentMyFirstBookQuota!.MonthlyLimit);
@@ -506,6 +511,8 @@ public sealed class BrilliantDirectoriesBillingTests
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
+        Assert.False(model.Chrome.Authenticated);
+        Assert.Equal("/account/billing", model.Chrome.CurrentPath);
         Assert.False(model.UsingSignedInAccount);
         Assert.Null(model.CurrentMyFirstBookQuota);
         Assert.Equal("Supporter", model.SupporterPlan?.Name);
@@ -534,6 +541,7 @@ public sealed class BrilliantDirectoriesBillingTests
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
+        Assert.False(model.Chrome.Authenticated);
         Assert.True(model.Unavailable);
     }
 
@@ -555,6 +563,7 @@ public sealed class BrilliantDirectoriesBillingTests
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.Equal(StatusCodes.Status200OK, controller.Response.StatusCode);
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
+        Assert.True(model.Chrome.Authenticated);
         Assert.True(model.Unavailable);
         Assert.Equal("Support Chummer", model.Heading);
         Assert.Contains("supporter checkout is unavailable right now", model.Summary, StringComparison.OrdinalIgnoreCase);

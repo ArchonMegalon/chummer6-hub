@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Logging.Abstractions;
+using Chummer.Run.Contracts.PublicSurface;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -16,17 +17,20 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     private readonly HubIdentityClient? _identity;
     private readonly AccountService? _accounts;
     private readonly ILogger<BrilliantDirectoriesBillingController> _logger;
+    private readonly HubPageChromeService? _chrome;
 
     public BrilliantDirectoriesBillingController(
         BrilliantDirectoriesBillingService billing,
         HubIdentityClient? identity = null,
         AccountService? accounts = null,
-        ILogger<BrilliantDirectoriesBillingController>? logger = null)
+        ILogger<BrilliantDirectoriesBillingController>? logger = null,
+        HubPageChromeService? chrome = null)
     {
         _billing = billing;
         _identity = identity;
         _accounts = accounts;
         _logger = logger ?? NullLogger<BrilliantDirectoriesBillingController>.Instance;
+        _chrome = chrome;
     }
 
     [HttpGet("/account/billing")]
@@ -45,11 +49,15 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             var quota = string.IsNullOrWhiteSpace(resolvedUserId)
                 ? null
                 : _billing.GetMyFirstBookQuota(resolvedUserId, email: resolvedEmail);
-            return View("~/Views/Billing/Membership.cshtml", BuildViewModel(page, quota, resolvedUserId, resolvedEmail, currentUser));
+            return View(
+                "~/Views/Billing/Membership.cshtml",
+                BuildViewModel(page, quota, resolvedUserId, resolvedEmail, currentUser, BuildChrome(currentUser)));
         }
         catch (BrilliantDirectoriesBillingUnavailableException)
         {
-            return View("~/Views/Billing/Membership.cshtml", BuildUnavailableViewModel(resolvedUserId, resolvedEmail, currentUser));
+            return View(
+                "~/Views/Billing/Membership.cshtml",
+                BuildUnavailableViewModel(resolvedUserId, resolvedEmail, currentUser, BuildChrome(currentUser)));
         }
     }
 
@@ -287,11 +295,13 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         MyFirstBookQuotaSnapshotDto? currentMyFirstBookQuota,
         string? userId,
         string? email,
-        HubUserDto? currentUser)
+        HubUserDto? currentUser,
+        SiteChromeViewModel chrome)
     {
         BillingPlanCardDto? free = page.Plans.SingleOrDefault(item => string.Equals(item.PlanKey, BrilliantDirectoriesBillingConstants.FreePlanKey, StringComparison.OrdinalIgnoreCase));
         BillingPlanCardDto? supporter = page.Plans.SingleOrDefault(item => string.Equals(item.PlanKey, BrilliantDirectoriesBillingConstants.SupporterPlanKey, StringComparison.OrdinalIgnoreCase));
         return new BillingMembershipPageViewModel(
+            Chrome: chrome,
             Page: page,
             FreePlan: free,
             SupporterPlan: supporter,
@@ -306,8 +316,13 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             ManageMembershipHref: page.ManageMembershipHref);
     }
 
-    private static BillingMembershipPageViewModel BuildUnavailableViewModel(string? userId, string? email, HubUserDto? currentUser)
+    private static BillingMembershipPageViewModel BuildUnavailableViewModel(
+        string? userId,
+        string? email,
+        HubUserDto? currentUser,
+        SiteChromeViewModel chrome)
         => new(
+            Chrome: chrome,
             Page: null,
             FreePlan: null,
             SupporterPlan: null,
@@ -320,6 +335,75 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             Heading: "Support Chummer",
             Summary: "Supporter checkout is unavailable right now. Free access stays the same.",
             ManageMembershipHref: "/downloads");
+
+    private SiteChromeViewModel BuildChrome(HubUserDto? currentUser)
+    {
+        const string title = "Billing";
+        const string description = "Same app. Supporter only changes the monthly Origin Book allowance.";
+        const string currentPath = "/account/billing";
+
+        if (currentUser is not null)
+        {
+            return _chrome?.BuildAuthenticatedChrome(
+                       title,
+                       description,
+                       currentPath,
+                       TrimToNull(currentUser.DisplayName) ?? "Signed in",
+                       TrimToNull(currentUser.Email))
+                   ?? BuildFallbackChrome(authenticated: true, TrimToNull(currentUser.DisplayName) ?? "Signed in");
+        }
+
+        return _chrome?.BuildPublicChrome(title, description, currentPath)
+               ?? BuildFallbackChrome(authenticated: false, signedInLabel: null);
+    }
+
+    private static SiteChromeViewModel BuildFallbackChrome(bool authenticated, string? signedInLabel)
+    {
+        var primaryNavigation = new[]
+        {
+            new PublicNavigationLink("Chummer", "/"),
+            new PublicNavigationLink("Downloads", "/downloads"),
+            new PublicNavigationLink("Participate", "/participate")
+        };
+        var secondaryNavigation = new[]
+        {
+            new PublicNavigationLink("Help", "/help"),
+            new PublicNavigationLink("FAQ", "/faq"),
+            new PublicNavigationLink("Privacy", "/privacy"),
+            new PublicNavigationLink("Terms", "/terms"),
+            new PublicNavigationLink("Contact", "/contact")
+        };
+        var headerActions = authenticated
+            ? new[]
+            {
+                new SiteChromeActionViewModel("Open Chummer", "/app?command=character_roster", "link"),
+                new SiteChromeActionViewModel("Account", "/account", "secondary", Current: true),
+                new SiteChromeActionViewModel("Sign out", "/logout", "primary")
+            }
+            : new[]
+            {
+                new SiteChromeActionViewModel("Open Chummer", "/login?next=%2Faccount%2Fbilling", "link"),
+                new SiteChromeActionViewModel("Claim your copy", "/signup?next=%2Faccount%2Fbilling", "primary")
+            };
+        var publicPrimaryCta = authenticated
+            ? null
+            : new SiteChromeActionViewModel("Claim your copy", "/signup?next=%2Faccount%2Fbilling", "primary");
+
+        return new SiteChromeViewModel(
+            Title: "Billing",
+            Description: "Same app. Supporter only changes the monthly Origin Book allowance.",
+            CurrentPath: "/account/billing",
+            PrimaryNavigation: primaryNavigation,
+            SecondaryNavigation: secondaryNavigation,
+            UtilityNavigation: Array.Empty<PublicNavigationLink>(),
+            HeaderActions: headerActions,
+            PublicPrimaryCta: publicPrimaryCta,
+            Authenticated: authenticated,
+            SignedInLabel: signedInLabel,
+            FooterCanonicalSource: "Chummer",
+            FooterGeneratedNote: "Chummer",
+            PublicSignalNavigation: Array.Empty<PublicNavigationLink>());
+    }
 
     private async Task<HubUserDto?> TryGetCurrentUserAsync(CancellationToken cancellationToken)
     {

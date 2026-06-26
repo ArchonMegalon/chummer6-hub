@@ -9504,6 +9504,19 @@ body {
   padding: 0.72rem 0.82rem;
 }
 
+.surface-billing .billing-plan-form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.surface-billing .billing-plan-card .route-choice-card__details {
+  margin-top: 0.05rem;
+}
+
+.surface-billing .billing-plan-card .minimal-actions {
+  margin-top: 0.1rem;
+}
+
 .surface-help .minimal-help-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.7rem;
