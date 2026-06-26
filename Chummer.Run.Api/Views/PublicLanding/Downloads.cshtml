@@ -13,8 +13,6 @@
         && nightly is not null
         && string.Equals(stable.Artifact.Id, nightly.Artifact.Id, StringComparison.OrdinalIgnoreCase);
     var sourceScriptHref = "/downloads/build-chummer6-linux.sh";
-    var updatedLabel = Model.ReleaseTruth.VerifiedDateLabel;
-
     static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     static string PlatformId(ReleaseOptionViewModel? option)
@@ -54,10 +52,6 @@
     <div>
         <h1>Downloads</h1>
         <p>Pick one. Stable for most tables, Nightly for newer builds, source script for Linux.</p>
-    </div>
-    <div class="minimal-status-pill" aria-label="Release freshness">
-        <span>Updated</span>
-        <strong>@updatedLabel</strong>
     </div>
 </section>
 

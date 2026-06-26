@@ -966,7 +966,10 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     ):
         assert forbidden not in downloads
 
-    assert "Updated" in downloads
+    assert "@ButtonText(stable)" in downloads
+    assert "@ButtonText(nightly)" in downloads
+    assert "Download script" in downloads
+    assert "Release freshness" not in downloads
 
 
 def test_minimal_palette_stays_neutral_and_readable() -> None:

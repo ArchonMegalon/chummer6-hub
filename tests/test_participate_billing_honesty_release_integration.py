@@ -51,7 +51,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("text.includes('Detail gallery')", text)
         self.assertIn("text.includes('Use this page for dossiers, recaps, and release details.')", text)
         self.assertIn("text.includes('Chummer is available.')", text)
-        self.assertIn("text.includes('Updated')", text)
+        self.assertIn("text.includes('Download script')", text)
         self.assertIn("url: `${baseUrl}/participate`", text)
         self.assertIn("!text.includes('Requests, votes, and shipped work.')", text)
         self.assertIn("text.includes('data-chummer-board-skin')", text)
