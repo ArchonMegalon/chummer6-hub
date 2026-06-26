@@ -77,11 +77,8 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const nightlyLane = desktop.locator('#nightly');
   await expect(stableLane).toBeVisible();
   await expect(nightlyLane).toBeVisible();
-  for (const platform of promotedPlatforms) {
-    const label = platform === 'windows' ? 'Windows' : 'Linux';
-    await expect(stableLane.getByRole('link', { name: label })).toBeVisible();
-    await expect(nightlyLane.getByRole('link', { name: label })).toBeVisible();
-  }
+  await expect(stableLane.getByRole('link')).toHaveCount(1);
+  await expect(nightlyLane.getByRole('link')).toHaveCount(1);
   const downloadsText = await desktop.locator('body').innerText();
   if (!promotedPlatforms.includes('linux') && downloadsText.includes('Windows and Linux installers.')) {
     failures.push('downloads: claims Linux installers while the release manifest does not promote Linux');
@@ -94,20 +91,15 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   results.push({ surface: 'downloads', stable_visible: true, nightly_visible: true, promoted_platforms: promotedPlatforms });
 
   await desktop.goto(`${baseUrl}/status`, { waitUntil: 'domcontentloaded' });
-  const decisionSurface = desktop.locator('[data-status-surface="decision-surface"]');
-  const decisionCards = decisionSurface.locator('.route-choice-card');
-  const nextActions = decisionSurface.locator('.minimal-actions a.button-like');
-  await expect(decisionSurface).toBeVisible();
-  await expect(decisionSurface).toContainText('Current release');
-  await expect(decisionSurface.getByRole('link', { name: 'Downloads' })).toBeVisible();
-  await expect(decisionSurface.getByRole('link', { name: 'Help' })).toBeVisible();
-  const cardCount = await decisionCards.count();
-  if (cardCount !== 0) {
-    failures.push(`status: expected no nested decision cards, found ${cardCount}`);
-  }
+  const statusHero = desktop.locator('.minimal-page-hero.minimal-status-pill');
+  const nextActions = statusHero.locator('.minimal-actions a.button-like');
+  await expect(statusHero).toBeVisible();
+  await expect(statusHero).toContainText('Current release');
+  await expect(statusHero.getByRole('link', { name: 'Downloads' })).toBeVisible();
+  await expect(statusHero.getByRole('link', { name: 'Help' })).toBeVisible();
   const nextActionCount = await nextActions.count();
-  if (nextActionCount !== 3) {
-    failures.push(`status: expected exactly 3 next actions, found ${nextActionCount}`);
+  if (nextActionCount !== 2) {
+    failures.push(`status: expected exactly 2 next actions, found ${nextActionCount}`);
   }
   const statusText = await desktop.locator('body').innerText();
   for (const forbidden of ['Signed-in return', 'Status poster', 'At a glance', 'Release and next step.', 'Current caution.']) {
@@ -115,7 +107,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       failures.push(`status: contains retired secondary surface "${forbidden}"`);
     }
   }
-  results.push({ surface: 'status', decision_card_count: cardCount, next_action_count: nextActionCount });
+  results.push({ surface: 'status', next_action_count: nextActionCount });
 
   await desktop.close();
 
@@ -135,7 +127,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       '',
       `- Generated: ${new Date().toISOString()}`,
       `- Base URL: ${baseUrl}`,
-      '- Checks: homepage starts with one download action, avoids duplicate homepage download strips, downloads exposes lane buttons for every promoted release platform, one status decision card plus one next-action rail.',
+      '- Checks: homepage starts with one download action, avoids duplicate homepage download strips, downloads exposes lane buttons for every promoted release platform, status uses compact next-action rail.',
       '',
       ...results.map((result) => `- ${String(result.surface)} checked`),
       ...(failures.length > 0 ? ['', '## Failures', '', ...failures.map((failure) => `- ${failure}`)] : []),

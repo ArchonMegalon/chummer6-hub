@@ -22,9 +22,9 @@ test('jackpoint public route stays available and points at the signed-in publica
 
   await page.goto(`${baseUrl}/jackpoint`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'JACKPOINT', exact: true })).toBeVisible();
-  await expect(page.locator('body')).toContainText('JACKPOINT now ships a real first-party briefing network');
-  await expect(page.locator('body')).toContainText('Signed-in publication desk');
-  await expect(page.locator('body')).toContainText('Player-safe dossier and mission-brief output only.');
+  await expect(page.locator('body')).toContainText('JACKPOINT keeps dossiers and mission briefs readable in public');
+  await expect(page.locator('body')).toContainText('Sign in for JACKPOINT');
+  await expect(page.locator('body')).toContainText('Dossier and mission-brief output only.');
 
   writeJsonArtifact('JACKPOINT_ROUTE_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),
