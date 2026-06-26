@@ -8,8 +8,8 @@
 <section class="minimal-page-hero route-anchor-target roadmap-signal">
     <div>
         <p class="eyebrow">Roadmap</p>
-        <h1>Maintenance first.</h1>
-        <p>Install reliability, cleaner screens, fewer dead ends.</p>
+        <h1>Now and next.</h1>
+        <p>Install reliability, cleaner screens, less noise.</p>
     </div>
 </section>
 
@@ -17,25 +17,25 @@
     <div class="minimal-section__lead">
         <p class="eyebrow">Now</p>
         <h2 id="roadmap-active-work">Current focus</h2>
-        <p>Short list.</p>
+        <p>Only the active work.</p>
     </div>
     <div class="minimal-lane-grid">
-        <article class="minimal-lane-card">
-            <span class="tag">Install</span>
-            <h3>Make setup boring</h3>
-            <p>Smaller installers, visible update progress, and better recovery when something fails.</p>
-        </article>
-        <article class="minimal-lane-card">
-            <span class="tag">Desktop</span>
-            <h3>Clean the builder</h3>
-            <p>Readable controls, less duplicated UI, and fewer surprises while creating a runner.</p>
-        </article>
-        <article class="minimal-lane-card">
-            <span class="tag">Web</span>
-            <h3>Keep the site quiet</h3>
-            <p>Downloads, help, account, billing, and public feedback should stay short and clear.</p>
-        </article>
-    </div>
+            <article class="minimal-lane-card">
+                <span class="tag">Install</span>
+                <h3>Make setup boring</h3>
+                <p>Smaller installers, visible update progress, and cleaner recovery.</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Desktop</span>
+                <h3>Clean the builder</h3>
+                <p>Readable controls, less duplicated UI, fewer surprises.</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Web</span>
+                <h3>Keep the site quiet</h3>
+                <p>Downloads, help, billing, and feedback should stay short and clear.</p>
+            </article>
+        </div>
 </section>
 
 @if (Model.Milestones.Count > 0)
@@ -43,8 +43,8 @@
     <section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-milestones-title">
         <div class="minimal-section__lead">
             <p class="eyebrow">Milestones</p>
-            <h2 id="roadmap-milestones-title">What is moving</h2>
-            <p>Short milestone readouts, not the whole board.</p>
+            <h2 id="roadmap-milestones-title">In progress</h2>
+            <p>Short milestone readouts.</p>
         </div>
         <div class="minimal-lane-grid">
             @foreach (var milestone in Model.Milestones.Take(6))
@@ -65,8 +65,8 @@
     <div class="minimal-section minimal-section--tight roadmap-board" aria-labelledby="roadmap-board-title">
         <div class="minimal-section__lead">
             <p class="eyebrow">Board</p>
-            <h2 id="roadmap-board-title">Current work</h2>
-            <p>Shown here without leaving Chummer.</p>
+            <h2 id="roadmap-board-title">Roadmap board</h2>
+            <p>Live board, same site.</p>
         </div>
         <iframe id="roadmap-board"
                 title="Chummer roadmap board"
@@ -80,8 +80,8 @@
     <section class="minimal-section minimal-section--tight roadmap-public-requests" aria-labelledby="roadmap-public-requests">
         <div class="minimal-section__lead">
             <p class="eyebrow">Requests</p>
-            <h2 id="roadmap-public-requests">What people ask for</h2>
-            <p>@Model.PublicRequestCount public requests - @Model.PublicRequestSyncedLabel</p>
+            <h2 id="roadmap-public-requests">Top requests</h2>
+            <p>@Model.PublicRequestCount public requests · @Model.PublicRequestSyncedLabel</p>
         </div>
         <div class="minimal-lane-grid">
             @foreach (var item in Model.PublicRequests)
@@ -102,8 +102,8 @@
 <div class="minimal-section minimal-section--tight">
     <div class="minimal-section__lead">
         <p class="eyebrow">Elsewhere</p>
-        <h2>More</h2>
-        <p>Requests, shipped work, and support.</p>
+        <h2>Other pages</h2>
+        <p>Participate, changelog, and help.</p>
     </div>
     <div class="minimal-actions">
         <a class="button-like button-like--primary" href="/participate">Participate</a>

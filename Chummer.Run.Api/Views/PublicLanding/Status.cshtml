@@ -1,6 +1,6 @@
 @model StatusPageViewModel
 @{
-    ViewData["Title"] = "Updated";
+    ViewData["Title"] = "Status";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-status surface-minimal";
     var publicPlatformLabels = Model.ReleaseExperience.PlatformAvailability
@@ -11,20 +11,20 @@
     var publicPlatformSummary = publicPlatformLabels.Length switch
     {
         0 => "No public installer right now.",
-        1 => $"{publicPlatformLabels[0]} is live.",
-        2 => $"{publicPlatformLabels[0]} and {publicPlatformLabels[1]} are live.",
-        _ => $"{string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]} are live."
+        1 => $"{publicPlatformLabels[0]} download is live.",
+        2 => $"{publicPlatformLabels[0]} and {publicPlatformLabels[1]} downloads are live.",
+        _ => $"{string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]} downloads are live."
     };
     var statusLine = Model.ReleaseExperience.Recommended is null
         ? "Downloads are paused."
-        : $"Updated. {publicPlatformSummary}";
+        : publicPlatformSummary;
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
 <section class="minimal-page-hero minimal-status-pill">
     <div>
-        <p class="eyebrow">Chummer · Current release</p>
+        <p class="eyebrow">Current release</p>
         <h1>Updated</h1>
         <p>@PublicStatusText(statusLine)</p>
         <div class="minimal-actions" aria-label="Status next actions">

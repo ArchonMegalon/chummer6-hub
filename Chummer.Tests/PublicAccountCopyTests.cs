@@ -19,11 +19,11 @@ public sealed class PublicAccountCopyTests
         Assert.Contains("label: Claim your copy", manifest, StringComparison.Ordinal);
         Assert.Contains("title: Open Chummer", manifest, StringComparison.Ordinal);
         Assert.Contains("title: Claim your copy", manifest, StringComparison.Ordinal);
-        Assert.Contains("Claim your copy only when you want recovery or linked installs.", trustContent, StringComparison.Ordinal);
+        Assert.Contains("Claim your copy only if you want recovery or linked installs.", trustContent, StringComparison.Ordinal);
         Assert.Contains("Claiming your copy gives you a recovery path and linked installs when you want them.", trustContent, StringComparison.Ordinal);
         Assert.Contains("Use Discord for normal questions and Contact for private details.", trustContent, StringComparison.Ordinal);
-        Assert.Contains("What went wrong?", trustContent, StringComparison.Ordinal);
-        Assert.Contains("Ask in Discord first. Use the form for private details.", trustContent, StringComparison.Ordinal);
+        Assert.Contains("Discord for normal questions. Use the form only for private install trouble, crashes, logs, or account detail.", trustContent, StringComparison.Ordinal);
+        Assert.Contains("Use Discord for normal questions. Use the form for private details.", trustContent, StringComparison.Ordinal);
         Assert.Contains("Public boards are optional.", trustContent, StringComparison.Ordinal);
         Assert.Contains(">Open Chummer</a>", nowView, StringComparison.Ordinal);
         Assert.Contains("\"Claim your copy\"", faqView, StringComparison.Ordinal);

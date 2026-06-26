@@ -2,8 +2,11 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Contracts.Receipts;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Metadata;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Reflection;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -41,6 +44,18 @@ public sealed class PublicConciergeServiceTests
         {
             Assert.DoesNotContain(forbidden, controller, StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    [Fact]
+    public void PublicConciergeWebhookRouteCapsRequestBodySize()
+    {
+        var method = typeof(Chummer.Run.Api.Controllers.PublicConciergeController).GetMethod(nameof(Chummer.Run.Api.Controllers.PublicConciergeController.ReceiveWebhook));
+
+        Assert.NotNull(method);
+        RequestSizeLimitAttribute requestSize = method!.GetCustomAttribute<RequestSizeLimitAttribute>()
+            ?? throw new InvalidOperationException("ReceiveWebhook is missing RequestSizeLimitAttribute.");
+
+        Assert.Equal(PublicConciergeService.MaxWebhookBodyBytes, ((IRequestSizeLimitMetadata)requestSize).MaxRequestBodySize);
     }
 
     [Fact]
@@ -194,6 +209,66 @@ public sealed class PublicConciergeServiceTests
             headers,
             "127.0.0.1"));
         Assert.Contains("not configured", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RecordWebhook_RejectsOversizedSummary()
+    {
+        using TempRoot temp = new("public-concierge-webhook-long-summary");
+        IConfiguration configuration = BuildConfiguration(temp.Root, new Dictionary<string, string?>
+        {
+            ["CHUMMER_PUBLIC_CONCIERGE_PROVIDER_FACEPOP_WEBHOOK_SECRET"] = "top-secret"
+        });
+
+        PublicConciergeService service = CreateService(configuration);
+        HeaderDictionary headers = new()
+        {
+            ["X-Chummer-Concierge-Webhook-Secret"] = "top-secret"
+        };
+
+        string payload = $$"""
+            {
+              "flow_id": "testimonial_capture",
+              "summary": "{{new string('x', PublicConciergeService.MaxWebhookSummaryLength + 1)}}"
+            }
+            """;
+
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => service.RecordWebhook(
+            "facepop",
+            System.Text.Json.JsonDocument.Parse(payload).RootElement,
+            headers,
+            "127.0.0.1"));
+        Assert.Contains("summary", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RecordWebhook_RejectsOversizedProviderToken()
+    {
+        using TempRoot temp = new("public-concierge-webhook-long-provider");
+        IConfiguration configuration = BuildConfiguration(temp.Root, new Dictionary<string, string?>
+        {
+            ["CHUMMER_PUBLIC_CONCIERGE_PROVIDER_FACEPOP_WEBHOOK_SECRET"] = "top-secret"
+        });
+
+        PublicConciergeService service = CreateService(configuration);
+        HeaderDictionary headers = new()
+        {
+            ["X-Chummer-Concierge-Webhook-Secret"] = "top-secret"
+        };
+
+        string payload = """
+            {
+              "flow_id": "testimonial_capture",
+              "summary": "Captured"
+            }
+            """;
+
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => service.RecordWebhook(
+            new string('p', PublicConciergeService.MaxWebhookTokenLength + 1),
+            System.Text.Json.JsonDocument.Parse(payload).RootElement,
+            headers,
+            "127.0.0.1"));
+        Assert.Contains("provider", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static PublicConciergeService CreateService(IConfiguration configuration, PublicConciergeStore? store = null)

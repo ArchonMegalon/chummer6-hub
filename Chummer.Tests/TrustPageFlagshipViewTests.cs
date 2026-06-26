@@ -18,7 +18,7 @@ public sealed class TrustPageFlagshipViewTests
         Assert.Contains("ViewData[\"Title\"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(Model.SupportIntake.Heading)", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(choice.Label)", trustView, StringComparison.Ordinal);
-        Assert.Contains("Ask in Discord first. Use the form for private details.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Discord for normal questions. Use the form only for private details.", trustView, StringComparison.Ordinal);
         Assert.Contains("Public ideas belong on <a class=\"inline-link\" href=\"/participate\">Participate</a>.", trustView, StringComparison.Ordinal);
         Assert.Contains("<details class=\"details-drawer minimal-help-card\" id=\"private-support-form\">", trustView, StringComparison.Ordinal);
         Assert.Contains("<summary>Private message</summary>", trustView, StringComparison.Ordinal);
@@ -43,7 +43,7 @@ public sealed class TrustPageFlagshipViewTests
         string trustViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
         string trustView = File.ReadAllText(trustViewPath);
 
-        int routeChoiceIndex = trustView.IndexOf("Ask in Discord first. Use the form for private details.", StringComparison.Ordinal);
+        int routeChoiceIndex = trustView.IndexOf("Discord for normal questions. Use the form only for private details.", StringComparison.Ordinal);
         int formIndex = trustView.IndexOf("<form class=\"settings-form\"", StringComparison.Ordinal);
 
         Assert.True(routeChoiceIndex >= 0, "contact support view should show the routing choices before the form");

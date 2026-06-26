@@ -109,11 +109,19 @@
         contactRouteChoices.Add((
             Id: "private-help",
             Badge: "Private",
-            Title: "Install trouble, crashes, or logs",
+            Title: "Private message",
             Summary: "Use the form for crashes, logs, screenshots, install trouble, or account details.",
             Href: "#support-intake",
             Label: "Open private form",
             Details: new[] { "Guest allowed", "Private reply", "Tracked if you sign in" }));
+        contactRouteChoices.Add((
+            Id: "public-feedback",
+            Badge: "Participate",
+            Title: "Public bugs and requests",
+            Summary: "Use Participate for roadmap items, public bugs, and visible feedback.",
+            Href: "/participate",
+            Label: "Open Participate",
+            Details: new[] { "Public requests", "Roadmap", "Optional" }));
     }
 }
 
@@ -253,7 +261,7 @@ else if (!contactPage)
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Contact</h2>
-            <p>Ask in Discord first. Use the form for private details.</p>
+            <p>Discord for normal questions. Use the form only for private details.</p>
         </div>
         <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact" id="contact-paths">
             @foreach (var choice in contactRouteChoices)

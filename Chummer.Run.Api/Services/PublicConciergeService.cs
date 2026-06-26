@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Security.Cryptography;
+using System.Net;
 using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.ViewModels;
 using Microsoft.AspNetCore.Http;
@@ -10,8 +11,11 @@ namespace Chummer.Run.Api.Services;
 
 public sealed class PublicConciergeService
 {
+    public const long MaxWebhookBodyBytes = 64 * 1024;
     private const string WorkflowRelativePath = ".codex-design/product/PUBLIC_CONCIERGE_WORKFLOWS.yaml";
     private const string SharedWebhookHeader = "X-Chummer-Concierge-Webhook-Secret";
+    internal const int MaxWebhookTokenLength = 128;
+    internal const int MaxWebhookSummaryLength = 512;
     private static readonly string[] SupportedLocales = ["en-US", "en", "de-AT", "de"];
 
     private readonly PublicCanonFileLoader _canon;
@@ -94,7 +98,8 @@ public sealed class PublicConciergeService
     {
         ConciergeSurfaceDefinition surface = ResolveSurface(surfaceKey);
         ConciergeFlowDocument flow = ResolveFlow(surface.FlowId);
-        ConciergeBranchDocument branch = flow.Branches.FirstOrDefault(candidate => string.Equals(candidate.Id, NormalizeToken(branchId), StringComparison.OrdinalIgnoreCase))
+        string normalizedBranchId = NormalizeRequiredToken(branchId, "branch id", nameof(branchId));
+        ConciergeBranchDocument branch = flow.Branches.FirstOrDefault(candidate => string.Equals(candidate.Id, normalizedBranchId, StringComparison.OrdinalIgnoreCase))
             ?? throw new KeyNotFoundException($"Unknown concierge branch '{branchId}' for '{surfaceKey}'.");
         (string locale, _) = ResolveLocale(requestedLocale, acceptLanguage);
 
@@ -153,25 +158,30 @@ public sealed class PublicConciergeService
         IHeaderDictionary headers,
         string? remoteIp)
     {
-        string provider = NormalizeToken(providerKey)
-            ?? throw new ArgumentException("provider is required.", nameof(providerKey));
+        if (payload.ValueKind != JsonValueKind.Object)
+        {
+            throw new ArgumentException("webhook payload must be a JSON object.", nameof(payload));
+        }
+
+        string provider = NormalizeRequiredToken(providerKey, "provider", nameof(providerKey));
 
         string verificationState = VerifyWebhook(provider, headers);
-        string flowId = NormalizeToken(ExtractFirstString(payload, "concierge_flow_id", "flow_id", "flow")) ?? "unknown_flow";
-        string? branchId = NormalizeToken(ExtractFirstString(payload, "branch_id", "branch"));
-        string correlationId = NormalizeToken(ExtractFirstString(payload, "correlation_id", "session_id", "response_id"))
+        string flowId = NormalizeOptionalToken(ExtractFirstString(payload, "concierge_flow_id", "flow_id", "flow"), "flow id") ?? "unknown_flow";
+        string? branchId = NormalizeOptionalToken(ExtractFirstString(payload, "branch_id", "branch"), "branch id");
+        string correlationId = NormalizeOptionalToken(ExtractFirstString(payload, "correlation_id", "session_id", "response_id"), "correlation id")
             ?? $"concierge-{Guid.NewGuid():N}";
-        string locale = NormalizeToken(ExtractFirstString(payload, "locale")) ?? "en-US";
-        string eventType = NormalizeToken(ExtractFirstString(payload, "event_type", "type", "event")) ?? "submitted";
-        string status = NormalizeToken(ExtractFirstString(payload, "status", "state")) ?? "received";
-        string? providerReceiptId = NormalizeToken(ExtractFirstString(payload, "provider_receipt_id", "receipt_id", "submission_id", "booking_id", "id", "event_id"));
-        string summary = ExtractFirstString(payload, "summary", "message", "headline")
-            ?? $"{HumanizeToken(provider)} {HumanizeToken(eventType)} record captured.";
-        string? caseId = NormalizeToken(ExtractFirstString(payload, "case_id", "support_case_id"));
-        string? bookingId = NormalizeToken(ExtractFirstString(payload, "booking_id", "appointment_id"));
-        string? assetRef = NormalizeToken(ExtractFirstString(payload, "asset_ref", "registry_asset_ref"));
-        string? publicationRef = NormalizeToken(ExtractFirstString(payload, "publication_ref", "registry_publication_ref"));
-        string? mediaKind = NormalizeToken(ExtractFirstString(payload, "media_kind", "response_kind"));
+        string locale = NormalizeOptionalToken(ExtractFirstString(payload, "locale"), "locale") ?? "en-US";
+        string eventType = NormalizeOptionalToken(ExtractFirstString(payload, "event_type", "type", "event"), "event type") ?? "submitted";
+        string status = NormalizeOptionalToken(ExtractFirstString(payload, "status", "state"), "status") ?? "received";
+        string? providerReceiptId = NormalizeOptionalToken(ExtractFirstString(payload, "provider_receipt_id", "receipt_id", "submission_id", "booking_id", "id", "event_id"), "provider receipt id");
+        string summary = NormalizeSummary(
+            ExtractFirstString(payload, "summary", "message", "headline")
+            ?? $"{HumanizeToken(provider)} {HumanizeToken(eventType)} record captured.");
+        string? caseId = NormalizeOptionalToken(ExtractFirstString(payload, "case_id", "support_case_id"), "case id");
+        string? bookingId = NormalizeOptionalToken(ExtractFirstString(payload, "booking_id", "appointment_id"), "booking id");
+        string? assetRef = NormalizeOptionalToken(ExtractFirstString(payload, "asset_ref", "registry_asset_ref"), "asset reference");
+        string? publicationRef = NormalizeOptionalToken(ExtractFirstString(payload, "publication_ref", "registry_publication_ref"), "publication reference");
+        string? mediaKind = NormalizeOptionalToken(ExtractFirstString(payload, "media_kind", "response_kind"), "media kind");
 
         string dedupKey = string.Join(':',
             provider,
@@ -255,8 +265,7 @@ public sealed class PublicConciergeService
 
     private ConciergeSurfaceDefinition ResolveSurface(string surfaceKey)
     {
-        string normalized = NormalizeToken(surfaceKey)
-            ?? throw new ArgumentException("surfaceKey is required.", nameof(surfaceKey));
+        string normalized = NormalizeRequiredToken(surfaceKey, "surfaceKey", nameof(surfaceKey));
 
         return normalized switch
         {
@@ -694,12 +703,30 @@ public sealed class PublicConciergeService
             metadata["branch_id"] = branchId!;
         }
 
-        if (!string.IsNullOrWhiteSpace(remoteIp))
+        if (TryNormalizeIpAddress(remoteIp, out string? normalizedIp))
         {
-            metadata["remote_ip"] = remoteIp!;
+            metadata["remote_ip"] = normalizedIp!;
         }
 
         return metadata;
+    }
+
+    private static bool TryNormalizeIpAddress(string? remoteIp, out string? normalizedIp)
+    {
+        normalizedIp = NormalizeOptionalToken(remoteIp, "remote ip");
+        if (normalizedIp is null)
+        {
+            return false;
+        }
+
+        if (!IPAddress.TryParse(normalizedIp, out IPAddress? parsed))
+        {
+            normalizedIp = null;
+            return false;
+        }
+
+        normalizedIp = parsed.ToString();
+        return true;
     }
 
     private static bool IsExternalHref(string href)
@@ -850,10 +877,41 @@ public sealed class PublicConciergeService
         return false;
     }
 
-    private static string? NormalizeToken(string? value)
-        => string.IsNullOrWhiteSpace(value)
-            ? null
-            : value.Trim();
+    private static string NormalizeRequiredToken(string? value, string label, string? paramName = null)
+        => NormalizeOptionalToken(value, label)
+            ?? throw new ArgumentException($"{label} is required.", paramName ?? label);
+
+    private static string? NormalizeOptionalToken(string? value, string label)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string normalized = value.Trim();
+        if (normalized.Length > MaxWebhookTokenLength)
+        {
+            throw new ArgumentException($"{label} must be {MaxWebhookTokenLength} characters or fewer.", label);
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeSummary(string value)
+    {
+        string normalized = value.Trim();
+        if (normalized.Length == 0)
+        {
+            throw new ArgumentException("summary is required.", nameof(value));
+        }
+
+        if (normalized.Length > MaxWebhookSummaryLength)
+        {
+            throw new ArgumentException($"summary must be {MaxWebhookSummaryLength} characters or fewer.", nameof(value));
+        }
+
+        return normalized;
+    }
 
     private static string NormalizeEnvToken(string value)
         => value.Replace("-", "_", StringComparison.Ordinal)

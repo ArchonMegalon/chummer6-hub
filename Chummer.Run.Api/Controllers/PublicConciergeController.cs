@@ -277,6 +277,7 @@ public sealed class PublicConciergeController : Controller
     [HttpPost("/api/v1/public/concierge/providers/{provider}/webhook")]
     [IgnoreAntiforgeryToken]
     [Consumes("application/json")]
+    [RequestSizeLimit(PublicConciergeService.MaxWebhookBodyBytes)]
     public ActionResult ReceiveWebhook([FromRoute] string provider, [FromBody] JsonElement payload)
     {
         try

@@ -238,7 +238,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Current release", view, StringComparison.Ordinal);
         Assert.Contains("<h1>Updated</h1>", view, StringComparison.Ordinal);
         Assert.Contains("var statusLine = Model.ReleaseExperience.Recommended is null", view, StringComparison.Ordinal);
-        Assert.Contains("Updated. {publicPlatformSummary}", view, StringComparison.Ordinal);
+        Assert.Contains(": publicPlatformSummary", view, StringComparison.Ordinal);
         Assert.Contains("@PublicStatusText(statusLine)", view, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Status next actions\"", view, StringComparison.Ordinal);
         Assert.Contains(">Help</a>", view, StringComparison.Ordinal);
@@ -321,7 +321,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);", view, StringComparison.Ordinal);
         Assert.Contains("var statusLine = Model.ReleaseExperience.Recommended is null", view, StringComparison.Ordinal);
-        Assert.Contains("Updated. {publicPlatformSummary}", view, StringComparison.Ordinal);
+        Assert.Contains(": publicPlatformSummary", view, StringComparison.Ordinal);
         Assert.Contains("@PublicStatusText(statusLine)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Updated {verifiedLabel}", view, StringComparison.Ordinal);
         Assert.DoesNotContain("PublicStatusText(Model.ReleaseSummary)", view, StringComparison.Ordinal);
@@ -1244,7 +1244,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Label: \"Open Discord\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Use the form for crashes, logs, screenshots, install trouble, or account details.", trustView, StringComparison.Ordinal);
-        Assert.Contains("Ask in Discord first. Use the form for private details.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Discord for normal questions. Use the form only for private details.", trustView, StringComparison.Ordinal);
         Assert.Contains("Public ideas belong on <a class=\"inline-link\" href=\"/participate\">Participate</a>.", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"Installer opens, then stops\"", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"I expected the app to start. It did not.\"", trustView, StringComparison.Ordinal);
@@ -1252,7 +1252,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("placeholder=\"Version or build, if visible\"", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"Desktop app, if visible\"", trustView, StringComparison.Ordinal);
         Assert.Contains("authenticated ? \"Open account support\" : \"Open private form\"", controller, StringComparison.Ordinal);
-        Assert.Contains("Use Discord for everything that does not need private details.", controller, StringComparison.Ordinal);
+        Assert.Contains("Keep normal questions in Discord.", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Save support history", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("saved support history", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Choose one", trustView, StringComparison.Ordinal);
