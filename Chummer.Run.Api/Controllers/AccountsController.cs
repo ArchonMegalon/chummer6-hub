@@ -133,6 +133,11 @@ public sealed class AccountsController : Controller
                        && string.IsNullOrWhiteSpace(caseId)
                        && !HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId);
 
+        if (!showHub && IsBillingSectionAlias(section))
+        {
+            return Redirect("/account/billing");
+        }
+
         var selectedSection = showHub
             ? "profile"
             : !string.IsNullOrWhiteSpace(caseId)
@@ -140,9 +145,7 @@ public sealed class AccountsController : Controller
             : HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId)
                 ? "work"
                 : NormalizeAccountSection(section);
-        if (string.Equals(selectedSection, "profile", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(selectedSection, "settings", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(selectedSection, "advanced", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(selectedSection, "profile", StringComparison.OrdinalIgnoreCase))
         {
             if (!showHub)
             {
@@ -448,12 +451,15 @@ public sealed class AccountsController : Controller
             HorizonArtifactRequestReceipt? receipt = null;
             if (_artifactRequests is not null)
             {
+                MediaArtifactSurfaceDefinition surface = _mediaHorizons?.GetSurface("origin-dossier")
+                    ?? new("origin-dossier", "origin-dossier-media");
                 string normalizedArtifactKind = artifactKind.Trim().ToLowerInvariant();
-                string sourceRef = $"origin-dossier:{originDossierProjectId}:{normalizedArtifactKind}";
+                string sourceRef = _mediaHorizons?.BuildSourceRef(surface, $"{originDossierProjectId}:{normalizedArtifactKind}")
+                    ?? $"{surface.HorizonId}:{originDossierProjectId}:{normalizedArtifactKind}";
                 receipt = _artifactRequests.BuildRequest(
                     new HorizonArtifactRequestCreateRequest(
-                        HorizonId: "origin-dossier",
-                        ArtifactKindOrCapabilityId: "dossier_media",
+                        HorizonId: surface.HorizonId,
+                        ArtifactKindOrCapabilityId: surface.CapabilityId,
                         UserId: subject.SubjectId,
                         SourceRef: sourceRef,
                         Visibility: "private",
@@ -1715,10 +1721,12 @@ public sealed class AccountsController : Controller
                 "access" => "access",
                 "work" => "work",
                 "participation" => "participation",
-                "settings" => "settings",
-                "advanced" => "settings",
                 _ => "profile"
             };
+
+    private static bool IsBillingSectionAlias(string? section)
+        => !string.IsNullOrWhiteSpace(section)
+           && section.Trim().ToLowerInvariant() is "billing" or "settings" or "advanced";
 
     private static IReadOnlyList<SectionLinkViewModel> BuildAccountCoreSections(string currentSection)
         => new[]
@@ -1742,7 +1750,6 @@ public sealed class AccountsController : Controller
             "support" => ("Account · Support", "Tracked cases and the next step."),
             "access" => ("Account · Installs", "Linked installs, downloads, and recovery."),
             "work" => ("Account · Campaigns", "Characters, groups, and campaigns."),
-            "settings" => ("Account · Billing", "Supporter and billing."),
             _ => ("Account", "Installs, campaigns, support, and billing.")
         };
 

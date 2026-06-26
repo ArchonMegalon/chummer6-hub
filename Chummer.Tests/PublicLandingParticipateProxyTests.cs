@@ -46,7 +46,7 @@ public sealed class PublicLandingParticipateProxyTests
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
         Assert.Contains("The board is unavailable", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("Use Support for account, install, or private details.", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("Use support only for private details.", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.DoesNotContain("Could not load posts", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("support@productlift.dev", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
@@ -65,8 +65,8 @@ public sealed class PublicLandingParticipateProxyTests
         string html = content.Content ?? string.Empty;
         Assert.Contains("Participate - Chummer.run", html, StringComparison.Ordinal);
         Assert.Contains("rel=\"canonical\" href=\"/participate/board\"", html, StringComparison.Ordinal);
-        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
-        Assert.Contains("Short requests, clear bugs, useful ideas.", html, StringComparison.Ordinal);
+        Assert.Contains("Public bugs and requests", html, StringComparison.Ordinal);
+        Assert.Contains("Say what broke, or what should exist.", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer Participate", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<title>What do you want to see next?", html, StringComparison.Ordinal);
         Assert.DoesNotContain("content=\"Tell us how we could make Chummer6 more useful to you\"", html, StringComparison.Ordinal);
@@ -96,7 +96,7 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Equal("text/html; charset=utf-8", contentResult.ContentType);
         Assert.Contains("rel=\"canonical\" href=\"/participate\"", html, StringComparison.Ordinal);
         Assert.Contains("<base href=\"/participate/\" />", html, StringComparison.Ordinal);
-        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
+        Assert.Contains("Public bugs and requests", html, StringComparison.Ordinal);
         Assert.DoesNotContain("chummer6.productlift.dev", html, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -116,10 +116,10 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Contains("rel=\"canonical\" href=\"/roadmap\"", html, StringComparison.Ordinal);
         Assert.Contains("<base href=\"/roadmap/board/\" />", html, StringComparison.Ordinal);
         Assert.Contains("Roadmap - Chummer.run", html, StringComparison.Ordinal);
-        Assert.Contains("What is next?", html, StringComparison.Ordinal);
-        Assert.Contains("Planned work and what moved recently.", html, StringComparison.Ordinal);
+        Assert.Contains("Now and next", html, StringComparison.Ordinal);
+        Assert.Contains("What is shipping, and what still needs work.", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Participate - Chummer.run", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("What should Chummer do next?", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Public bugs and requests", html, StringComparison.Ordinal);
         Assert.DoesNotContain("chummer6.productlift.dev", html, StringComparison.OrdinalIgnoreCase);
     }
 

@@ -7,7 +7,6 @@
         "support" => "Account · Support",
         "access" => "Account · Installs",
         "work" => "Account · Campaigns",
-        "settings" => "Account · Billing",
         _ => "Account"
     };
     var sectionTitle = Model.CurrentSection switch
@@ -16,7 +15,6 @@
         "support" => "Support",
         "access" => "Installs",
         "work" => "Campaigns",
-        "settings" => "Billing",
         _ => "Account"
     };
     var sectionCopy = Model.CurrentSection switch
@@ -25,7 +23,6 @@
         "support" => "Tracked cases and the next step.",
         "access" => "Linked installs, downloads, and recovery.",
         "work" => "Characters, groups, and campaigns.",
-        "settings" => "Supporter and billing.",
         _ => "Installs, campaigns, support, and billing."
     };
     ViewData["Title"] = pageTitle;

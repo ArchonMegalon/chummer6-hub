@@ -47,6 +47,9 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("hiddenStatusTerms", controller, StringComparison.Ordinal);
         Assert.Contains("text === 'search' || text === 'ctrl k'", controller, StringComparison.Ordinal);
         Assert.Contains("data-chummer-board-skin", controller, StringComparison.Ordinal);
+        Assert.Contains("--chummer-board-accent: #d4b36b;", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("#2e7bff", controller, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("#39c6ff", controller, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("RemoveHostedBoardAuthLinks", controller, StringComparison.Ordinal);
 
         string siblingNavigationPath = Path.GetFullPath(Path.Combine(RepoPaths.Root, "..", "chummer-design", "products", "chummer", "PUBLIC_NAVIGATION.yaml"));
@@ -72,6 +75,7 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("canonicalHref: \"/roadmap\"", controller, StringComparison.Ordinal);
         Assert.Contains("assetProxyBasePath: \"/roadmap/provider-assets\"", controller, StringComparison.Ordinal);
         Assert.Contains("pageTitle: \"Roadmap - Chummer.run\"", controller, StringComparison.Ordinal);
+        Assert.Contains("hostedHeadingReplacement: \"Now and next\"", controller, StringComparison.Ordinal);
         Assert.Contains("HostedBoardHtmlLooksUnavailable(html)", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Roadmap.cshtml\", model);", controller, StringComparison.Ordinal);

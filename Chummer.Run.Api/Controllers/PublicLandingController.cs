@@ -2196,8 +2196,8 @@ public sealed class PublicLandingController : Controller
                     string.IsNullOrWhiteSpace(subject.DisplayName) ? "Signed in" : subject.DisplayName,
                     subject.Email),
             Heading: "Participate",
-            Summary: "Short requests, clear bugs, useful ideas.",
-            StatusLabel: loadedFromBoard ? "Live requests" : "Requests unavailable",
+            Summary: "Public bugs and requests.",
+            StatusLabel: loadedFromBoard ? "Live board" : "Board unavailable",
             Posts: snapshot.Posts,
             FallbackItems: fallbackItems,
             TotalRequestCount: loadedFromBoard ? snapshot.TotalCount : fallbackItems.Length,
@@ -2566,17 +2566,17 @@ public sealed class PublicLandingController : Controller
                     canonicalHref: localOrigin,
                     assetProxyBasePath: "/participate/provider-assets",
                     pageTitle: "Participate - Chummer.run",
-                    hostedHeadingReplacement: "What should Chummer do next?",
-                    hostedSummaryReplacement: "Short requests, clear bugs, useful ideas.",
-                    hostedPrimaryActionReplacement: "Add a note",
-                    hostedLeadReplacement: "Tell us what would help.",
+                    hostedHeadingReplacement: "Public bugs and requests",
+                    hostedSummaryReplacement: "Say what broke, or what should exist.",
+                    hostedPrimaryActionReplacement: "Post",
+                    hostedLeadReplacement: "Keep it short.",
                     applyFeedbackPolish: true,
                     failureTitle: "The board is unavailable",
-                    failureSummary: "Try again shortly. Use Support only for private or blocked issues.",
+                    failureSummary: "Try again shortly. Use support only for private details.",
                     failurePrimaryHref: "/roadmap",
                     failurePrimaryLabel: "Roadmap",
                     failureSecondaryHref: "/contact#support-intake",
-                    failureSecondaryLabel: "Support",
+                    failureSecondaryLabel: "Private support",
                     failureReturnHref: fallbackPath,
                     failureReturnLabel: "Retry");
                 return Content(rewritten, "text/html; charset=utf-8");
@@ -2719,11 +2719,11 @@ public sealed class PublicLandingController : Controller
         => HostedBoardUnavailable(
             "The board is unavailable",
             "Try again shortly.",
-            "Use Support for account, install, or private details.",
+            "Use support only for private details.",
             "/roadmap",
             "Roadmap",
             "/contact#support-intake",
-            "Support",
+            "Private support",
             returnHref,
             "Retry");
 
@@ -2968,7 +2968,7 @@ public sealed class PublicLandingController : Controller
             string feedbackOnlyReplacementsJs = applyFeedbackPolish
                 ? """
       [/\bShort title of your feedback\.\.\./g, 'Short title'],
-      [/\bDescribe your idea or bug\.\.\./g, 'What happened, or what should exist?'],
+      [/\bDescribe your idea or bug\.\.\./g, 'What happened? What should exist?'],
       [/-- Choose a category --/g, 'Choose a category'],
       [/\bGathering votes\b/g, ''],
       [/\bFeature\b/g, 'Idea'],
@@ -2982,13 +2982,15 @@ public sealed class PublicLandingController : Controller
 <style data-chummer-board-skin>
 :root {
   color-scheme: dark;
-  --chummer-board-bg: #0b0c0d;
-  --chummer-board-panel: #15171a;
+  --chummer-board-bg: #0d0e10;
+  --chummer-board-panel: #17191c;
   --chummer-board-panel-soft: #111315;
   --chummer-board-line: rgba(241, 233, 219, 0.1);
-  --chummer-board-text: #f4eee4;
-  --chummer-board-muted: #b8afa1;
-  --chummer-board-accent: #d6b763;
+  --chummer-board-text: #f4efe6;
+  --chummer-board-muted: #b7af9f;
+  --chummer-board-accent: #d4b36b;
+  --chummer-board-accent-soft: rgba(212, 179, 107, 0.16);
+  --chummer-board-accent-ink: #181612;
 }
 
 body {
@@ -2996,25 +2998,75 @@ body {
   color: var(--chummer-board-text) !important;
 }
 
+body,
+body * {
+  letter-spacing: 0 !important;
+}
+
 main,
 [role="main"] {
   max-width: 1180px !important;
   margin-inline: auto !important;
+  padding: 1rem 1rem 1.4rem !important;
 }
 
 main > section:first-of-type,
 [role="main"] > section:first-of-type {
-  margin: 0.8rem 0 1rem !important;
+  margin: 0.45rem 0 0.85rem !important;
   padding: 0 !important;
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 
+main h1,
+main h2,
+main h3,
+main h4,
+main h5,
+main h6,
+[role="main"] h1,
+[role="main"] h2,
+[role="main"] h3,
+[role="main"] h4,
+[role="main"] h5,
+[role="main"] h6,
+main strong,
+[role="main"] strong,
+main label,
+[role="main"] label {
+  color: var(--chummer-board-text) !important;
+}
+
+main p,
+main li,
+main span,
+main small,
+main td,
+main th,
+[role="main"] p,
+[role="main"] li,
+[role="main"] span,
+[role="main"] small,
+[role="main"] td,
+[role="main"] th {
+  color: inherit !important;
+}
+
+main small,
+[role="main"] small,
+[class*="muted"],
+[class*="subtle"],
+[class*="secondary"] {
+  color: var(--chummer-board-muted) !important;
+}
+
 article,
 form,
 [class*="card"],
-[class*="panel"] {
+[class*="panel"],
+[class*="box"],
+[class*="tile"] {
   border-color: var(--chummer-board-line) !important;
   border-radius: 8px !important;
   background-color: var(--chummer-board-panel) !important;
@@ -3031,13 +3083,47 @@ select {
 }
 
 button,
-[role="button"] {
+[role="button"],
+input[type="submit"],
+input[type="button"] {
   background-image: none !important;
+  border: 1px solid rgba(241, 233, 219, 0.14) !important;
+  background: var(--chummer-board-panel-soft) !important;
+  color: var(--chummer-board-text) !important;
+}
+
+button:hover,
+[role="button"]:hover,
+input[type="submit"]:hover,
+input[type="button"]:hover,
+a:hover {
+  border-color: rgba(241, 233, 219, 0.24) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+}
+
+a,
+a:visited {
+  color: var(--chummer-board-text) !important;
+  text-decoration-color: rgba(241, 233, 219, 0.32) !important;
+}
+
+[aria-selected="true"],
+[data-state="active"],
+[class*="active"] > button,
+[class*="active"] > a,
+[class*="selected"] > button,
+[class*="selected"] > a,
+[class*="primary"],
+button[type="submit"] {
+  background: var(--chummer-board-accent-soft) !important;
+  border-color: rgba(212, 179, 107, 0.45) !important;
+  color: var(--chummer-board-text) !important;
 }
 
 input,
 textarea,
-select {
+select,
+option {
   background-color: #111315 !important;
   border-color: rgba(241, 233, 219, 0.14) !important;
   color: var(--chummer-board-text) !important;
@@ -3046,6 +3132,27 @@ select {
 input::placeholder,
 textarea::placeholder {
   color: rgba(244, 238, 228, 0.52) !important;
+}
+
+[role="tablist"],
+[class*="tabs"],
+[class*="toolbar"] {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+[class*="badge"],
+[class*="chip"],
+[class*="pill"],
+[class*="tag"] {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--chummer-board-line) !important;
+  color: var(--chummer-board-muted) !important;
+}
+
+svg,
+img {
+  filter: none !important;
 }
 
 [data-chummer-hidden-status] {
@@ -3496,17 +3603,17 @@ document.addEventListener('DOMContentLoaded', function () {
             canonicalHref: "/participate/board",
             assetProxyBasePath: "/participate/provider-assets",
             pageTitle: "Participate - Chummer.run",
-            hostedHeadingReplacement: "What should Chummer do next?",
-            hostedSummaryReplacement: "Short requests, clear bugs, useful ideas.",
-            hostedPrimaryActionReplacement: "Add a note",
-            hostedLeadReplacement: "Tell us what would help.",
+            hostedHeadingReplacement: "Public bugs and requests",
+            hostedSummaryReplacement: "Say what broke, or what should exist.",
+            hostedPrimaryActionReplacement: "Post",
+            hostedLeadReplacement: "Keep it short.",
             applyFeedbackPolish: true,
             failureTitle: "The board is unavailable",
-            failureSummary: "Try again shortly. Use Support only for private or blocked issues.",
+            failureSummary: "Try again shortly. Use support only for private details.",
             failurePrimaryHref: "/roadmap",
             failurePrimaryLabel: "Roadmap",
             failureSecondaryHref: "/contact#support-intake",
-            failureSecondaryLabel: "Support",
+            failureSecondaryLabel: "Private support",
             failureReturnHref: "/participate",
             failureReturnLabel: "Retry");
 
@@ -3909,6 +4016,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("text/html")]
     public async Task<IActionResult> OriginDossierPage(CancellationToken cancellationToken)
     {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("origin-dossier");
         TrustPageViewModel model = await BuildHorizonPreviewPageModel(
             pageId: "origin-dossier",
             title: "Origin Dossier",
@@ -3964,13 +4072,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 "Approved canon stays bounded",
                 "The sheet remains authoritative"
             ],
-            sharedArtifacts: BuildSharedArtifactSurfaceRoutes(
-                "origin-dossier",
-                "dossier_media"),
+            sharedArtifacts: BuildSharedArtifactSurfaceRoutes(surface),
             horizonCapability: BuildPublicHorizonCapability(
-                "origin-dossier",
-                "dossier_media",
-                "origin-dossier:public-story-packet"));
+                surface,
+                _mediaHorizons.BuildSourceRef(surface, "public-story-packet")));
         return View("~/Views/PublicLanding/TrustPage.cshtml", model);
     }
 
@@ -3978,7 +4083,9 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/origin-dossier/receipts/story-network.json")]
     [Produces("application/json")]
     public IActionResult OriginDossierReceiptJson()
-        => Ok(new
+    {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("origin-dossier");
+        return Ok(new
         {
             Horizon = "origin-dossier",
             Status = "shipped_mvp",
@@ -3990,11 +4097,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 BookStudioHref = "/docs/origin-book-studio",
                 Summary = "Origin Dossier keeps the approved story packet first, then widens into bounded media on first-party routes."
             },
-            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("origin-dossier", "dossier_media"),
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
             ArtifactCapability = BuildPublicHorizonCapability(
-                "origin-dossier",
-                "dossier_media",
-                "origin-dossier:public-story-packet"),
+                surface,
+                _mediaHorizons.BuildSourceRef(surface, "public-story-packet")),
             Boundary = new
             {
                 StoryTruth = "approved_chummer_owned_packet",
@@ -4002,6 +4108,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 ProviderTruth = "not_claimed"
             }
         });
+    }
 
     [HttpGet("/roadmap/origin-dossier")]
     public IActionResult OriginDossierRoadmapAlias()
@@ -4330,18 +4437,44 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpGet("/origin-dossier/media")]
     public async Task<IActionResult> OriginDossierMediaDispatch(CancellationToken cancellationToken)
-        => await DispatchResolvedHorizonArtifactAsync(
+    {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("origin-dossier");
+        return await DispatchResolvedHorizonArtifactAsync(
             operationLabel: "origin dossier media",
             dispatchRoute: "/origin-dossier/media",
             sourceId: "public-story-packet",
-            sourceRef: "origin-dossier:public-story-packet",
-            horizonId: "origin-dossier",
-            artifactKindOrCapabilityId: "dossier_media",
+            surface: surface,
             dispatchTarget: "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
             emitRunsiteHeaders: false,
             quotaAllowanceExhaustedMessage: "Dossier media allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm dossier media allowance receipt right now.",
             cancellationToken: cancellationToken);
+    }
+
+    private async Task<IActionResult> DispatchResolvedHorizonArtifactAsync(
+        string operationLabel,
+        string dispatchRoute,
+        string sourceId,
+        MediaArtifactSurfaceDefinition surface,
+        string dispatchTarget,
+        bool emitRunsiteHeaders,
+        string quotaAllowanceExhaustedMessage,
+        string fallbackQuotaUnavailableMessage,
+        CancellationToken cancellationToken,
+        AuthenticatedHubSubject? authenticatedSubject = null)
+        => await DispatchResolvedHorizonArtifactAsync(
+            operationLabel,
+            dispatchRoute,
+            sourceId,
+            _mediaHorizons.BuildSourceRef(surface, sourceId),
+            surface.HorizonId,
+            surface.CapabilityId,
+            dispatchTarget,
+            emitRunsiteHeaders,
+            quotaAllowanceExhaustedMessage,
+            fallbackQuotaUnavailableMessage,
+            cancellationToken,
+            authenticatedSubject);
 
     [HttpGet("/participate/karma-forge/discovery")]
     public async Task<IActionResult> KarmaForgeDiscoveryPacketDispatch(CancellationToken cancellationToken)
@@ -6526,10 +6659,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     canonicalHref: canonicalHref ?? localOrigin,
                     assetProxyBasePath: "/roadmap/provider-assets",
                     pageTitle: "Roadmap - Chummer.run",
-                    hostedHeadingReplacement: "What is next?",
-                    hostedSummaryReplacement: "Planned work and what moved recently.",
-                    hostedPrimaryActionReplacement: "Open item",
-                    hostedLeadReplacement: "Roadmap follows shipped work.",
+                    hostedHeadingReplacement: "Now and next",
+                    hostedSummaryReplacement: "What is shipping, and what still needs work.",
+                    hostedPrimaryActionReplacement: "Open",
+                    hostedLeadReplacement: "Roadmap follows real work.",
                     applyFeedbackPolish: false,
                     failureTitle: "Roadmap temporarily unavailable",
                     failureSummary: "Try again shortly. Use the changelog for shipped work or Participate for new requests.",

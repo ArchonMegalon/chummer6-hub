@@ -14,11 +14,14 @@ public sealed class AccountBuildLabHandoffViewTests
         string view = File.ReadAllText(viewPath);
         string hubView = File.ReadAllText(hubViewPath);
 
-        Assert.Contains("|| string.Equals(selectedSection, \"advanced\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
+        Assert.Contains("if (!showHub && IsBillingSectionAlias(section))", controller, StringComparison.Ordinal);
+        Assert.Contains("private static bool IsBillingSectionAlias(string? section)", controller, StringComparison.Ordinal);
+        Assert.Contains("section.Trim().ToLowerInvariant() is \"billing\" or \"settings\" or \"advanced\"", controller, StringComparison.Ordinal);
         Assert.Contains("string.Equals(selectedSection, \"profile\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
         Assert.Contains("return View(", controller, StringComparison.Ordinal);
         Assert.Contains("\"~/Views/Accounts/Hub.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect(\"/account\")", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/account/billing\")", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/account/access?localCoProcessor={Uri.EscapeDataString(normalizedProfile)}\")", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("/account/advanced?localCoProcessor=", controller, StringComparison.Ordinal);
         Assert.Contains("new SectionLinkViewModel(\"access\", \"Installs\"", controller, StringComparison.Ordinal);
@@ -27,12 +30,13 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.DoesNotContain("new SectionLinkViewModel(\"advanced\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"settings\"", controller, StringComparison.Ordinal);
 
-        Assert.Contains("\"settings\" => \"Billing\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"settings\" => \"Billing\"", view, StringComparison.Ordinal);
         Assert.Contains("Installs, campaigns, support, billing, and participation.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between profile, installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between profile, access, support, and work", view, StringComparison.Ordinal);
         Assert.DoesNotContain("\"work\" => \"Work\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"settings\" => \"Supporter and billing.\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("\"advanced\" => \"Billing\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("\"advanced\" => \"Advanced account details\"", view, StringComparison.Ordinal);
         Assert.Contains("Open campaigns on the web", view, StringComparison.Ordinal);
