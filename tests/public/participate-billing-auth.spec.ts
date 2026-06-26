@@ -10,10 +10,12 @@ test('billing and participate stay first-party for guests and signed-in users', 
   test.setTimeout(90_000);
 
   const guestBilling = await request.get(`${baseUrl}/account/billing`, { maxRedirects: 0 });
-  expect([302, 303, 307, 308]).toContain(guestBilling.status());
-  const guestLocation = guestBilling.headers()['location'] || '';
-  expect(guestLocation).toContain('/auth/google/start?next=');
-  expect(guestLocation).toContain('%2Faccount%2Fbilling');
+  expect(guestBilling.status()).toBe(200);
+  const guestBillingText = await guestBilling.text();
+  expect(guestBillingText).toContain('Same app for everyone.');
+  expect(guestBillingText).toContain('Origin books: Free 1/month. Supporter 2/month.');
+  expect(guestBillingText).toContain('Continue with email');
+  expect(guestBillingText).not.toContain('/auth/google/start?next=');
 
   const guestParticipate = await request.get(`${baseUrl}/participate`);
   expect(guestParticipate.status()).toBe(200);
@@ -29,8 +31,7 @@ test('billing and participate stay first-party for guests and signed-in users', 
   const guestSupporterStart = await request.get(`${baseUrl}/account/billing/supporter/start`, { maxRedirects: 0 });
   expect([302, 303, 307, 308]).toContain(guestSupporterStart.status());
   const guestSupporterStartLocation = guestSupporterStart.headers()['location'] || '';
-  expect(guestSupporterStartLocation).toContain('/auth/google/start?next=');
-  expect(guestSupporterStartLocation).toContain('%2Faccount%2Fbilling%2Fsupporter%2Fstart');
+  expect(guestSupporterStartLocation).toBe('/account/billing');
 
   test.skip(!identityToken, 'signed-in billing verification needs CHUMMER_E2E_IDENTITY_TOKEN');
 
@@ -128,7 +129,7 @@ test('billing and participate stay first-party for guests and signed-in users', 
     status: 'pass',
     base_url: baseUrl,
     guest_billing_status: guestBilling.status(),
-    guest_billing_location: guestLocation,
+    guest_billing_email_first: guestBillingText.includes('Continue with email'),
     guest_participate_status: guestParticipate.status(),
     guest_participate_public_wrapper: true,
     guest_supporter_start_status: guestSupporterStart.status(),
@@ -139,6 +140,6 @@ test('billing and participate stay first-party for guests and signed-in users', 
     signed_in_supporter_direct_location: signedInSupporterDirectLocation,
     signed_in_participate_proxy_verified: Boolean(boardBaseUrl),
     signed_in_identity_token_present: true,
-    first_party_sign_in_redirect: guestLocation.includes('/auth/google/start?next='),
+    first_party_sign_in_redirect: guestSupporterStartLocation === '/account/billing',
   });
 });

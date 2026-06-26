@@ -60,9 +60,12 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Contains("Same app for everyone.", view, StringComparison.Ordinal);
         Assert.Contains("Origin books: Free 1/month. Supporter 2/month.", view, StringComparison.Ordinal);
         Assert.Contains("Continue with email", view, StringComparison.Ordinal);
+        Assert.Contains("Supporter billing is not open yet.", view, StringComparison.Ordinal);
         Assert.Contains("Chummer will attach supporter status after the account is open.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Account ID", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Required to continue", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("temporarily unavailable", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Billing is unavailable", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Required for checkout", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Brilliant", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Directories", view, StringComparison.OrdinalIgnoreCase);
@@ -70,6 +73,16 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.DoesNotContain("hosted billing", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Premium", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Upgrade", view, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BillingControllerKeepsGuestCheckoutEmailFirst()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "BrilliantDirectoriesBillingController.cs"));
+
+        Assert.Contains("Redirect($\"/login?next={Uri.EscapeDataString(\"/account/billing\")}\")", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("/auth/google/start?next={Uri.EscapeDataString(\"/account/billing\")}", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Response.StatusCode = StatusCodes.Status503ServiceUnavailable", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -495,7 +508,7 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public async Task SignedInBillingPageReturnsServiceUnavailableInsteadOfThrowingWhenConfigurationIsMissing()
+    public async Task SignedInBillingPageShowsPendingSupporterPageWhenConfigurationIsMissing()
     {
         string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
         IConfiguration configuration = new ConfigurationBuilder()
@@ -510,10 +523,11 @@ public sealed class BrilliantDirectoriesBillingTests
         IActionResult result = await controller.BillingPage("ignored-user", "ignored@example.com");
 
         ViewResult view = Assert.IsType<ViewResult>(result);
-        Assert.Equal(StatusCodes.Status503ServiceUnavailable, controller.Response.StatusCode);
+        Assert.Equal(StatusCodes.Status200OK, controller.Response.StatusCode);
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
         Assert.True(model.Unavailable);
-        Assert.Contains("temporarily unavailable", model.Heading, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Support Chummer", model.Heading);
+        Assert.Contains("supporter checkout is being connected", model.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Unexpected server error", model.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -570,7 +584,7 @@ public sealed class BrilliantDirectoriesBillingTests
         IActionResult result = await controller.StartSupporterCheckout(new BrilliantDirectoriesCheckoutRequest("", "runner@example.com"));
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/auth/google/start?next=%2Faccount%2Fbilling", redirect.Url);
+        Assert.Equal("/login?next=%2Faccount%2Fbilling", redirect.Url);
     }
 
     [Fact]

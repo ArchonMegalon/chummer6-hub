@@ -49,7 +49,6 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         }
         catch (BrilliantDirectoriesBillingUnavailableException)
         {
-            Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
             return View("~/Views/Billing/Membership.cshtml", BuildUnavailableViewModel(resolvedUserId, resolvedEmail, currentUser));
         }
     }
@@ -174,7 +173,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             HubUserDto? currentUser = await TryGetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
             if (currentUser is null)
             {
-                return Redirect($"/auth/google/start?next={Uri.EscapeDataString("/account/billing")}");
+                return Redirect($"/login?next={Uri.EscapeDataString("/account/billing")}");
             }
 
             resolvedRequest = new BrilliantDirectoriesCheckoutRequest(
@@ -318,8 +317,8 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             SignedInLabel: currentUser?.DisplayName,
             UsingSignedInAccount: currentUser is not null,
             Unavailable: true,
-            Heading: "Membership temporarily unavailable",
-            Summary: "Your Chummer access is unchanged while billing is unavailable.",
+            Heading: "Support Chummer",
+            Summary: "The supporter checkout is being connected. Your Chummer access is unchanged.",
             ManageMembershipHref: "/account");
 
     private async Task<HubUserDto?> TryGetCurrentUserAsync(CancellationToken cancellationToken)
