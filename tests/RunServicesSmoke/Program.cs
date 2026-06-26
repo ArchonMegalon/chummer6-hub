@@ -576,6 +576,7 @@ void VerifyIdentityEmailDeliveryProviders()
         var unsafeWebhookConfig = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["ASPNETCORE_ENVIRONMENT"] = "Development",
                 ["IDENTITY_UNSAFE_ALLOW_UNSIGNED_EMAILIT_WEBHOOKS"] = "true"
             })
             .Build();
@@ -2884,6 +2885,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicLandingControllerSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Audience)", StringComparison.Ordinal), "detail-page facts should humanize audience labels before projecting them.");
     Assert(publicLandingControllerSource.Contains("\"Who should use this now\"", StringComparison.Ordinal), "live proof details should use customer-facing audience copy.");
     Assert(!publicLandingControllerSource.Contains("signed-in shell", StringComparison.Ordinal), "controller-built landing and support copy should avoid signed-in shell wording on customer-facing routes.");
+    Assert(!publicLandingControllerSource.Contains("/account/advanced?localCoProcessor=hosted_only", StringComparison.Ordinal), "public landing should not send optional local-acceleration users to the removed advanced account surface.");
     Assert(shelfSource.Contains("ArtifactViewHref", StringComparison.Ordinal) && shelfSource.Contains("new[] { \"all\", \"personal\", \"campaign\", \"creator\", \"public\" }", StringComparison.Ordinal), "artifacts shelf should expose first-class personal, campaign, creator, and public view filters instead of one blended signed-in overlay.");
     Assert(!publicLandingControllerSource.Contains("Redirect(\"/now\")", StringComparison.Ordinal), "status should be a first-class public surface instead of redirecting to the current-release page.");
     Assert(statusSource.Contains("data-status-surface=\"decision-surface\"", StringComparison.Ordinal), "status should keep the top release decision in one calm surface.");

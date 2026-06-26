@@ -7845,7 +7845,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 StatusLabel: "Signed-in"),
             new(
                 Label: "Capability data",
-                Summary: "Use capability and policy notes when you want the current local-acceleration status before opening the broader account settings page.",
+                Summary: "Use capability and policy notes when you want the current local-acceleration status before opening account billing and membership.",
                 Href: "/api/v1/campaign-spine/me/local-co-processor/capabilities",
                 StatusLabel: "API"),
             new(
@@ -7853,7 +7853,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 Summary: leadProfile is null
                     ? "LOCAL CO-PROCESSOR stays valid even when no optional profile is selected yet."
                     : $"{leadProfile.Label} keeps optional local help enabled only where it improves the product without becoming required.",
-                Href: leadProfile?.AccountHref ?? "/account/advanced?localCoProcessor=hosted_only",
+                Href: leadProfile?.AccountHref ?? "/account/billing",
                 StatusLabel: leadProfile is null ? "Ready" : "Profile")
         ];
 
