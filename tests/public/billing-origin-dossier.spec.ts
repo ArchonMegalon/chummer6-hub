@@ -37,11 +37,8 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(payfunnelsProjection.status()).toBe(200);
   expect(payfunnelsCheckout.status()).toBe(302);
   expect(payfunnelsCheckout.headers()['location'] || '').toContain('payfunnels');
-  expect(brilliantDirectoriesPage.status()).toBe(302);
-  expect(brilliantDirectoriesPage.headers()['location'] || '').toContain('/auth/google/start?next=');
-  expect([302, 303, 307, 308]).toContain(brilliantDirectoriesPreviewPage.status());
-  expect(brilliantDirectoriesPreviewPage.headers()['location'] || '').toContain('/auth/google/start?next=');
-  expect(brilliantDirectoriesPreviewPage.headers()['location'] || '').toContain('%2Faccount%2Fbilling');
+  expect(brilliantDirectoriesPage.status()).toBe(200);
+  expect(brilliantDirectoriesPreviewPage.status()).toBe(200);
   expect(brilliantDirectoriesPreviewPage.status()).not.toBe(500);
 
   expect(originPage.status()).toBe(200);
@@ -62,8 +59,11 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(payfunnelsText).not.toContain('Upgrade');
 
   const brilliantDirectoriesText = await brilliantDirectoriesPreviewPage.text();
+  expect(brilliantDirectoriesText).toContain('Supporter');
+  expect(brilliantDirectoriesText).toContain('Free');
   expect(brilliantDirectoriesText).not.toContain('Books this month:');
   expect(brilliantDirectoriesText).not.toContain('Account attached: user-a');
+  expect(brilliantDirectoriesText).not.toContain('runner@example.com');
   expect(brilliantDirectoriesText).not.toContain('external billing checkout');
   expect(brilliantDirectoriesText).not.toContain('external billing page');
   expect(brilliantDirectoriesText).not.toContain('hosted billing route');
@@ -99,7 +99,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
 
   const bookStudioPage = await openPublicPage(browser, '/docs/origin-book-studio');
   await expect(bookStudioPage.getByRole('heading', { name: 'Origin Book Studio' })).toBeVisible();
-  await expect(bookStudioPage.locator('body')).toContainText('first-party route');
+  await expect(bookStudioPage.locator('body')).toContainText('Chummer route published');
   await expect(bookStudioPage.locator('body')).toContainText('Fallback PDF is current');
   await expect(bookStudioPage.getByRole('link', { name: 'Download PDF' })).toBeVisible();
   await bookStudioPage.close();
