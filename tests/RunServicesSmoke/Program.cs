@@ -864,6 +864,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         privacyBoundaries,
         signedInTrustStatus,
         new OriginDossierPublicationService(configuration, loggerFactory.CreateLogger<OriginDossierPublicationService>()),
+        billing: null,
         loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -3122,6 +3123,7 @@ async Task VerifyPublicLandingProjectionAsync()
         privacyBoundaries,
         signedInTrustStatus,
         new OriginDossierPublicationService(configuration, loggerFactory.CreateLogger<OriginDossierPublicationService>()),
+        billing,
         loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -5831,7 +5833,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableLeaderboardsModel = unavailableLeaderboardsView?.Model as LeaderboardsPageViewModel;
     Assert(unavailableLeaderboardsModel?.Chrome.Authenticated == true, "leaderboards chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
 
-    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, new AccountDesktopLaunchTicketService(DataProtectionProvider.Create(Path.Combine(tempRoot, "account-desktop-launch-tickets")), configuration), supportCases, supportPresentation, campaignSpine, workspaceServerPlane, creatorPublicationRegistry, accountParticipationSessions, leaderboards, packageCatalog, karmaForge, buildGhostConcierge, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, new OriginDossierPublicationService(configuration, loggerFactory.CreateLogger<OriginDossierPublicationService>()), loggerFactory.CreateLogger<AccountsController>())
+    var unavailableAccountController = new AccountsController(accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, new AccountDesktopLaunchTicketService(DataProtectionProvider.Create(Path.Combine(tempRoot, "account-desktop-launch-tickets")), configuration), supportCases, supportPresentation, campaignSpine, workspaceServerPlane, creatorPublicationRegistry, accountParticipationSessions, leaderboards, packageCatalog, karmaForge, buildGhostConcierge, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, new OriginDossierPublicationService(configuration, loggerFactory.CreateLogger<OriginDossierPublicationService>()), billing: null, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

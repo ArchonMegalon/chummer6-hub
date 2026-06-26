@@ -274,7 +274,7 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public async Task BillingPagePreviewCarriesCurrentMyFirstBookQuota()
+    public async Task BillingPagePreviewCarriesCurrentOriginAuthoringAllowance()
     {
         BrilliantDirectoriesBillingService service = CreateService();
         (BrilliantDirectoriesBillingController controller, HubUserDto user) = CreateAuthenticatedController(service, email: "runner@example.com");
@@ -298,12 +298,12 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.True(model.Chrome.Authenticated);
         Assert.Equal("/account/billing", model.Chrome.CurrentPath);
         Assert.Equal(user.UserId, model.UserId);
-        Assert.NotNull(model.CurrentMyFirstBookQuota);
-        Assert.Equal("supporter", model.CurrentMyFirstBookQuota!.PlanKey);
-        Assert.True(model.CurrentMyFirstBookQuota.SupporterActive);
-        Assert.Equal(2, model.CurrentMyFirstBookQuota!.MonthlyLimit);
-        Assert.Equal(1, model.CurrentMyFirstBookQuota.MonthlyUsed);
-        Assert.Equal(1, model.CurrentMyFirstBookQuota.MonthlyRemaining);
+        Assert.NotNull(model.CurrentOriginAuthoringAllowance);
+        Assert.Equal("supporter", model.CurrentOriginAuthoringAllowance!.AllowanceTier);
+        Assert.True(model.CurrentOriginAuthoringAllowance.SupporterActive);
+        Assert.Equal(2, model.CurrentOriginAuthoringAllowance.WindowLimit);
+        Assert.Equal(1, model.CurrentOriginAuthoringAllowance.WindowUsed);
+        Assert.Equal(1, model.CurrentOriginAuthoringAllowance.WindowRemaining);
         Assert.NotNull(model.FreePlan);
         Assert.NotNull(model.SupporterPlan);
         Assert.Single(model.FreePlan!.ExampleStoryBooks);
@@ -553,7 +553,7 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.False(model.Chrome.Authenticated);
         Assert.Equal("/account/billing", model.Chrome.CurrentPath);
         Assert.False(model.UsingSignedInAccount);
-        Assert.Null(model.CurrentMyFirstBookQuota);
+        Assert.Null(model.CurrentOriginAuthoringAllowance);
         Assert.Equal("Supporter", model.SupporterPlan?.Name);
     }
 

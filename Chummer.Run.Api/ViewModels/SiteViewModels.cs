@@ -107,7 +107,7 @@ public sealed record BillingMembershipPageViewModel(
     Chummer.Run.Contracts.Billing.BrilliantDirectoriesBillingPageDto? Page,
     Chummer.Run.Contracts.Billing.BillingPlanCardDto? FreePlan,
     Chummer.Run.Contracts.Billing.BillingPlanCardDto? SupporterPlan,
-    Chummer.Run.Contracts.Billing.MyFirstBookQuotaSnapshotDto? CurrentMyFirstBookQuota,
+    HorizonArtifactAllowanceViewModel? CurrentOriginAuthoringAllowance,
     string? UserId,
     string? Email,
     string? SignedInLabel,
@@ -116,6 +116,21 @@ public sealed record BillingMembershipPageViewModel(
     string Heading,
     string Summary,
     string ManageMembershipHref);
+
+public sealed record HorizonArtifactAllowanceViewModel(
+    string HorizonId,
+    string CapabilityId,
+    string ArtifactKind,
+    string PublicLabel,
+    bool SupporterActive,
+    string AllowanceTier,
+    string AllowanceTierLabel,
+    string WindowKind,
+    int WindowLimit,
+    int WindowUsed,
+    int WindowRemaining,
+    DateTimeOffset WindowStartUtc,
+    DateTimeOffset WindowEndUtc);
 
 public sealed record ReleasePlatformAvailabilityViewModel(
     string PlatformId,

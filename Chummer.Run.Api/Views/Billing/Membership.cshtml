@@ -8,7 +8,7 @@
     var supporter = Model.SupporterPlan;
     var hasUserId = !string.IsNullOrWhiteSpace(Model.UserId);
     var usingSignedInAccount = Model.UsingSignedInAccount && hasUserId;
-    var quota = Model.CurrentMyFirstBookQuota;
+    var quota = Model.CurrentOriginAuthoringAllowance;
     var hasManageMembershipHref = !string.IsNullOrWhiteSpace(Model.ManageMembershipHref);
     var antiForgery = Antiforgery.GetAndStoreTokens(Context);
     var signedInLabel = string.IsNullOrWhiteSpace(Model.SignedInLabel) ? Model.Email ?? Model.UserId : Model.SignedInLabel;
@@ -27,7 +27,7 @@
             }
             @if (quota is not null)
             {
-                <li>This month: @quota.MonthlyUsed / @quota.MonthlyLimit books</li>
+                <li>This month: @quota.WindowUsed / @quota.WindowLimit books</li>
             }
         </ul>
     </div>

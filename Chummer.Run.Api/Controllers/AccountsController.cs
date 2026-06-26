@@ -283,19 +283,6 @@ public sealed class AccountsController : Controller
         int linkedInstallCount = installLinking.ClaimedInstallations?.Count ?? 0;
         int pendingClaimCount = installLinking.PendingClaimTickets.Count;
         bool hasLinkedInstall = linkedInstallCount > 0;
-        MyFirstBookQuotaSnapshotDto? quota = null;
-        if (_billing is not null)
-        {
-            try
-            {
-                quota = _billing.GetMyFirstBookQuota(user.UserId, email: user.Email);
-            }
-            catch (BrilliantDirectoriesBillingUnavailableException)
-            {
-                quota = null;
-            }
-        }
-
         HorizonArtifactQuotaSnapshot? originBookQuota = null;
         if (_horizonArtifactQuota is not null)
         {
@@ -314,20 +301,41 @@ public sealed class AccountsController : Controller
             }
         }
 
-        string membershipLabel = quota?.PlanName
-            ?? originBookQuota?.AllowanceTier switch
+        MyFirstBookQuotaSnapshotDto? quota = null;
+        if (originBookQuota is null && _billing is not null)
+        {
+            try
+            {
+                quota = _billing.GetMyFirstBookQuota(user.UserId, email: user.Email);
+            }
+            catch (BrilliantDirectoriesBillingUnavailableException)
+            {
+                quota = null;
+            }
+        }
+
+        string membershipLabel = originBookQuota?.AllowanceTier switch
             {
                 "supporter" => "Supporter",
-                _ => "Free"
-            };
-        string membershipSummary = originBookQuota is null
-            ? "Supporter checkout is unavailable right now."
-            : originBookQuota.SupporterActive
+                "free" => "Free",
+                _ => quota?.PlanName
+            }
+            ?? quota?.PlanName
+            ?? "Free";
+        string membershipSummary = originBookQuota is not null
+            ? originBookQuota.SupporterActive
                 ? "Supporter adds one extra Origin Book each month."
-                : "Same app. Supporter only changes the monthly Origin Book limit.";
-        string bookQuotaSummary = originBookQuota is null
-            ? "Book limit is unavailable right now."
-            : $"{originBookQuota.WindowRemaining} of {originBookQuota.WindowLimit} Origin Book{(originBookQuota.WindowLimit == 1 ? string.Empty : "s")} left this {DescribeAllowanceWindowPeriod(originBookQuota.WindowKind)}.";
+                : "Same app. Supporter only changes the monthly Origin Book limit."
+            : quota is not null
+                ? quota.SupporterActive
+                    ? "Supporter adds one extra Origin Book each month."
+                    : "Same app. Supporter only changes the monthly Origin Book limit."
+                : "Supporter checkout is unavailable right now.";
+        string bookQuotaSummary = originBookQuota is not null
+            ? $"{originBookQuota.WindowRemaining} of {originBookQuota.WindowLimit} Origin Book{(originBookQuota.WindowLimit == 1 ? string.Empty : "s")} left this {DescribeAllowanceWindowPeriod(originBookQuota.WindowKind)}."
+            : quota is not null
+                ? $"{quota.MonthlyRemaining} of {quota.MonthlyLimit} Origin Book{(quota.MonthlyLimit == 1 ? string.Empty : "s")} left this month."
+                : "Book limit is unavailable right now.";
 
         string installSummary = hasLinkedInstall
             ? $"{linkedInstallCount} linked install{(linkedInstallCount == 1 ? string.Empty : "s")}."
