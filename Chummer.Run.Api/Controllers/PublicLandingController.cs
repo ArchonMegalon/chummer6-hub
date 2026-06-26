@@ -10940,11 +10940,11 @@ Boundary:
         }
 
         string json = buildJson(normalizedReceiptId);
-        string payload = AppendPublicArtifactCapabilityJson(json, horizonId, artifactKindOrCapabilityId, sourceRef);
+        string payload = AppendPublicArtifactMetadataJson(json, horizonId, artifactKindOrCapabilityId, sourceRef);
         return Content(payload, "application/json");
     }
 
-    private string AppendPublicArtifactCapabilityJson(
+    private string AppendPublicArtifactMetadataJson(
         string json,
         string horizonId,
         string artifactKindOrCapabilityId,
@@ -10957,6 +10957,7 @@ Boundary:
         }
 
         payload["artifact_capability"] = BuildPublicArtifactCapabilityNode(horizonId, artifactKindOrCapabilityId, sourceRef);
+        payload["shared_artifacts"] = BuildSharedArtifactSurfaceRoutesNode(horizonId, artifactKindOrCapabilityId);
         return payload.ToJsonString(PublicJsonContentOptions);
     }
 
@@ -11933,34 +11934,50 @@ Boundary:
             Visibility: visibility);
     }
 
+    private JsonObject BuildSharedArtifactSurfaceRoutesNode(string horizonId, string artifactKindOrCapabilityId)
+    {
+        SharedArtifactSurfaceRoutes routes = ResolveSharedArtifactSurfaceRoutes(horizonId, artifactKindOrCapabilityId);
+        return new JsonObject
+        {
+            ["public_capability_catalog_href"] = routes.PublicCapabilityCatalogHref,
+            ["public_capability_health_href"] = routes.PublicCapabilityHealthHref,
+            ["public_request_receipt_detail_href_template"] = routes.PublicRequestReceiptDetailHrefTemplate,
+            ["signed_in_capability_catalog_href"] = routes.SignedInCapabilityCatalogHref,
+            ["signed_in_quota_catalog_href"] = routes.SignedInQuotaCatalogHref,
+            ["signed_in_request_receipt_href"] = routes.SignedInRequestReceiptHref,
+            ["signed_in_request_receipt_detail_href_template"] = routes.SignedInRequestReceiptDetailHrefTemplate
+        };
+    }
+
     private object BuildSharedArtifactSurfaceRoutes(string horizonId, string artifactKindOrCapabilityId)
+        => ResolveSharedArtifactSurfaceRoutes(horizonId, artifactKindOrCapabilityId);
+
+    private SharedArtifactSurfaceRoutes ResolveSharedArtifactSurfaceRoutes(string horizonId, string artifactKindOrCapabilityId)
     {
         HorizonCapabilityDefinition capability = _horizonCapabilities.GetCapability(horizonId, artifactKindOrCapabilityId);
         string encodedHorizonId = Uri.EscapeDataString(capability.HorizonId);
         string encodedCapabilityId = Uri.EscapeDataString(capability.CapabilityId);
         bool publicReceiptEligible = capability.PublicVisible && !capability.RequiresAuthentication;
-        return new
-        {
-            PublicCapabilityCatalogHref = "/api/v1/public/horizons/capabilities",
-            PublicCapabilityHealthHref = capability.PublicVisible
+        return new SharedArtifactSurfaceRoutes(
+            PublicCapabilityCatalogHref: "/api/v1/public/horizons/capabilities",
+            PublicCapabilityHealthHref: capability.PublicVisible
                 ? $"/api/v1/public/horizons/capabilities?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
-            PublicRequestReceiptDetailHrefTemplate = publicReceiptEligible
+            PublicRequestReceiptDetailHrefTemplate: publicReceiptEligible
                 ? "/api/v1/public/horizons/artifact-requests/{requestId}"
                 : null,
-            SignedInCapabilityCatalogHref = capability.RequiresAuthentication
+            SignedInCapabilityCatalogHref: capability.RequiresAuthentication
                 ? $"/api/v1/horizons/capabilities/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
-            SignedInQuotaCatalogHref = capability.RequiresAuthentication && capability.QuotaTracked
+            SignedInQuotaCatalogHref: capability.RequiresAuthentication && capability.QuotaTracked
                 ? $"/api/v1/horizons/quotas/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
-            SignedInRequestReceiptHref = capability.RequiresAuthentication || publicReceiptEligible
+            SignedInRequestReceiptHref: capability.RequiresAuthentication || publicReceiptEligible
                 ? $"/api/v1/horizons/artifact-requests/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
-            SignedInRequestReceiptDetailHrefTemplate = capability.RequiresAuthentication || publicReceiptEligible
+            SignedInRequestReceiptDetailHrefTemplate: capability.RequiresAuthentication || publicReceiptEligible
                 ? "/api/v1/horizons/artifact-requests/me/{requestId}"
-                : null
-        };
+                : null);
     }
 
     private PublicSignalLoopSnapshotViewModel BuildPublicSignalLoopSnapshot(
@@ -17200,6 +17217,15 @@ echo "Help: ${HELP_URL}"
         string ExecutableName,
         string LauncherName,
         string DesktopEntryName);
+
+    private sealed record SharedArtifactSurfaceRoutes(
+        string PublicCapabilityCatalogHref,
+        string? PublicCapabilityHealthHref,
+        string? PublicRequestReceiptDetailHrefTemplate,
+        string? SignedInCapabilityCatalogHref,
+        string? SignedInQuotaCatalogHref,
+        string? SignedInRequestReceiptHref,
+        string? SignedInRequestReceiptDetailHrefTemplate);
 
     private sealed record GuidedBootstrapScriptContext(
         PublicReleaseManifestDto Manifest,

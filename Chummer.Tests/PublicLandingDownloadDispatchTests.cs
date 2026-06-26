@@ -782,6 +782,75 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task CommunityOpenRunPacketJsonIncludesSharedArtifactRoutes()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.CommunityOpenRunPacketJson("open_run_board", CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=community_hub&artifactKindOrCapabilityId=community_hub-open-run-network", sharedArtifacts.GetProperty("public_capability_health_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("public_request_receipt_detail_href_template").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("signed_in_capability_catalog_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("signed_in_quota_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=community_hub&artifactKindOrCapabilityId=community_hub-open-run-network", sharedArtifacts.GetProperty("signed_in_request_receipt_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("signed_in_request_receipt_detail_href_template").GetString());
+    }
+
+    [Fact]
+    public async Task CreatorPacketJsonIncludesSharedArtifactRoutes()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.CreatorPacketJson("publication_board", CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=creator_os&artifactKindOrCapabilityId=creator_os-publication-network", sharedArtifacts.GetProperty("public_capability_health_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("public_request_receipt_detail_href_template").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("signed_in_capability_catalog_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("signed_in_quota_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=creator_os&artifactKindOrCapabilityId=creator_os-publication-network", sharedArtifacts.GetProperty("signed_in_request_receipt_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("signed_in_request_receipt_detail_href_template").GetString());
+    }
+
+    [Fact]
+    public async Task PassportReceiptDocumentJsonIncludesSharedArtifactRoutes()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.PassportReceiptJson("runner_return_posture", CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=runner_passport&artifactKindOrCapabilityId=runner_passport-identity-network", sharedArtifacts.GetProperty("public_capability_health_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("public_request_receipt_detail_href_template").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("signed_in_capability_catalog_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("signed_in_quota_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=runner_passport&artifactKindOrCapabilityId=runner_passport-identity-network", sharedArtifacts.GetProperty("signed_in_request_receipt_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("signed_in_request_receipt_detail_href_template").GetString());
+    }
+
+    [Fact]
     public void JackpointReceiptJsonReturnsSignedInPublicationContract()
     {
         using Fixture fixture = new();
@@ -1034,6 +1103,14 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var content = Assert.IsType<ContentResult>(result);
         using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=signal_deck&artifactKindOrCapabilityId=signal_deck-command-network", sharedArtifacts.GetProperty("public_capability_health_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("public_request_receipt_detail_href_template").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("signed_in_capability_catalog_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("signed_in_quota_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=signal_deck&artifactKindOrCapabilityId=signal_deck-command-network", sharedArtifacts.GetProperty("signed_in_request_receipt_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("signed_in_request_receipt_detail_href_template").GetString());
         JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
         Assert.Equal("signal_deck", capability.GetProperty("horizon_id").GetString());
         Assert.Equal("signal_deck-command-network", capability.GetProperty("capability_id").GetString());
@@ -1064,6 +1141,14 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var content = Assert.IsType<ContentResult>(result);
         using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=living_world&artifactKindOrCapabilityId=living_world-watch-network", sharedArtifacts.GetProperty("public_capability_health_href").GetString());
+        Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("public_request_receipt_detail_href_template").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("signed_in_capability_catalog_href").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("signed_in_quota_catalog_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=living_world&artifactKindOrCapabilityId=living_world-watch-network", sharedArtifacts.GetProperty("signed_in_request_receipt_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("signed_in_request_receipt_detail_href_template").GetString());
         JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
         Assert.Equal("living_world", capability.GetProperty("horizon_id").GetString());
         Assert.Equal("living_world-watch-network", capability.GetProperty("capability_id").GetString());
