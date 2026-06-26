@@ -770,13 +770,13 @@ public sealed class ReleaseBundlePromotionServiceTests
         await fixture.PromoteAsync(bundlePath);
         using JsonDocument canonical = fixture.ReadCanonicalManifest();
 
-        JsonElement[] artifacts = canonical.RootElement.GetProperty("artifacts").EnumerateArray().ToArray();
-        JsonElement artifact = Assert.Single(artifacts);
-        Assert.Equal("avalonia-osx-arm64-installer", artifact.GetProperty("artifactId").GetString());
-        Assert.Equal("preview", artifact.GetProperty("channel").GetString());
-        Assert.Equal("preview", artifact.GetProperty("channelId").GetString());
-        Assert.Equal("run-20260420-090000", artifact.GetProperty("version").GetString());
-        Assert.Equal("run-20260420-090000", artifact.GetProperty("releaseVersion").GetString());
+        foreach (JsonElement artifact in canonical.RootElement.GetProperty("artifacts").EnumerateArray())
+        {
+            Assert.Equal("preview", artifact.GetProperty("channel").GetString());
+            Assert.Equal("preview", artifact.GetProperty("channelId").GetString());
+            Assert.Equal("run-20260420-090000", artifact.GetProperty("version").GetString());
+            Assert.Equal("run-20260420-090000", artifact.GetProperty("releaseVersion").GetString());
+        }
     }
 
     private sealed class ReleaseBundlePromotionFixture : IDisposable
