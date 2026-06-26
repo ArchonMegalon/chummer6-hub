@@ -21,6 +21,7 @@ DEFAULT_OUTPUT = PUBLISHED_ROOT / "TEABLE_IMPORTANT_WORK.generated.json"
 DEFAULT_CSV_OUTPUT = PUBLISHED_ROOT / "TEABLE_IMPORTANT_WORK.csv"
 DEFAULT_TEABLE_ORIGIN = "https://app.teable.ai"
 DEFAULT_API_BASE_URL = "https://app.teable.ai/api"
+DEFAULT_HUB_BASE_URL = "https://chummer.run"
 DEFAULT_TABLE_NAME = "Chummer Important Work"
 DEFAULT_DB_TABLE_NAME = "chummer_important_work"
 
@@ -787,6 +788,83 @@ def sync_to_teable(
     }
 
 
+def send_hub_json(method: str, url: str, token: str, payload: dict[str, Any] | None = None, timeout: int = 60) -> Any:
+    data: bytes | None = None
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 Chummer-Important-Work-Sync",
+    }
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(url, data=data, headers=headers, method=method.upper())
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"hub_http_{exc.code}:{body[:240]}") from exc
+    if not body.strip():
+        return {}
+    return json.loads(body)
+
+
+def important_work_item_to_hub_request(item: ImportantWorkItem) -> dict[str, Any]:
+    return {
+        "itemId": item.item_id,
+        "kind": "workflow",
+        "scope": "chummer.run",
+        "summary": item.title,
+        "detail": "\n".join(
+            [
+                f"Area: {item.area}",
+                f"Cadence: {item.cadence}",
+                f"Why it matters: {item.why_it_matters}",
+                f"Next action: {item.next_action}",
+                f"Acceptance gate: {item.acceptance_gate}",
+            ]
+        ),
+        "status": item.status,
+        "priority": item.priority,
+        "source": item.source,
+        "tags": [item.area, item.priority, item.status],
+    }
+
+
+def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any]:
+    started_at = now_iso()
+    rows = important_work_items()
+    if not hub_token:
+        return {
+            "state": "blocked",
+            "attempted": True,
+            "started_at_utc": started_at,
+            "recorded_count": 0,
+            "failed_count": len(rows),
+            "errors": ["hub_internal_token_missing"],
+        }
+    recorded = 0
+    errors: list[str] = []
+    endpoint = f"{hub_base_url.rstrip('/')}/api/internal/community/important-work"
+    for item in rows:
+        try:
+            send_hub_json("POST", endpoint, hub_token, important_work_item_to_hub_request(item))
+            recorded += 1
+        except Exception as exc:  # pragma: no cover - live edge behavior is integration-level.
+            errors.append(f"{item.item_id}:{str(exc)[:180]}")
+    return {
+        "state": "passed" if not errors else "failed",
+        "attempted": True,
+        "started_at_utc": started_at,
+        "finished_at_utc": now_iso(),
+        "hub_base_url": hub_base_url.rstrip("/"),
+        "recorded_count": recorded,
+        "failed_count": len(errors),
+        "errors": errors,
+    }
+
+
 def resolve_api_base_url() -> str:
     explicit_api = normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_BASE_URL")) or normalize(os.environ.get("TEABLE_API_BASE_URL"))
     if explicit_api:
@@ -802,6 +880,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Project the important Chummer workstreams into Teable.")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--csv-output", type=Path, default=None, help="Write a Teable import CSV beside the JSON receipt.")
+    parser.add_argument("--seed-hub", action="store_true", help="Record the same work rows into the Chummer Hub internal store before Teable sync.")
+    parser.add_argument("--hub-base-url", default=normalize(os.environ.get("CHUMMER_PUBLIC_BASE_URL")) or normalize(os.environ.get("CHUMMER_HUB_BASE_URL")) or DEFAULT_HUB_BASE_URL)
+    parser.add_argument("--hub-token", default=normalize(os.environ.get("FLEET_INTERNAL_API_TOKEN")) or normalize(os.environ.get("CHUMMER_HUB_INTERNAL_API_TOKEN")))
     parser.add_argument("--sync", action="store_true", help="Upsert rows into Teable. Dry-run artifact only by default.")
     parser.add_argument("--api-base-url", default=resolve_api_base_url())
     parser.add_argument("--api-key", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY")) or normalize(os.environ.get("TEABLE_API_KEY")))
@@ -814,6 +895,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     projection = build_projection()
+    if args.seed_hub:
+        projection["hub_seed"] = seed_hub_store(
+            hub_base_url=str(args.hub_base_url),
+            hub_token=args.hub_token,
+        )
+        if projection["hub_seed"]["state"] != "passed":
+            projection["status"] = "blocked" if projection["hub_seed"]["state"] == "blocked" else "failed"
     if args.sync:
         projection["sync"] = sync_to_teable(
             api_key=args.api_key,
@@ -828,7 +916,8 @@ def main(argv: list[str] | None = None) -> int:
     args.output.write_text(json.dumps(projection, indent=2) + "\n", encoding="utf-8")
     csv_output = args.csv_output or (DEFAULT_CSV_OUTPUT if args.output == DEFAULT_OUTPUT else args.output.with_suffix(".csv"))
     write_csv_projection(csv_output, str(projection["generated_at_utc"]))
-    print(f"teable_important_work:{projection['status']} rows={projection['row_count']} sync={projection['sync']['state']} csv={csv_output}")
+    hub_seed_state = projection.get("hub_seed", {}).get("state", "not_requested")
+    print(f"teable_important_work:{projection['status']} rows={projection['row_count']} hub_seed={hub_seed_state} sync={projection['sync']['state']} csv={csv_output}")
     return 0 if projection["status"] == "ready" or projection["sync"]["state"] == "passed" else 2
 
 

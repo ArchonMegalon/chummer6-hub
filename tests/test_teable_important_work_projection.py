@@ -112,6 +112,41 @@ def test_sync_without_credentials_fails_closed_without_token_text():
     assert "Bearer" not in json.dumps(result)
 
 
+def test_seed_hub_without_internal_token_fails_closed_without_token_text():
+    module = load_module()
+
+    result = module.seed_hub_store(hub_base_url="https://chummer.run", hub_token=None)
+
+    assert result["state"] == "blocked"
+    assert result["errors"] == ["hub_internal_token_missing"]
+    assert "Bearer" not in json.dumps(result)
+
+
+def test_seed_hub_posts_every_important_work_item(monkeypatch):
+    module = load_module()
+    requests: list[tuple[str, str, str, dict | None]] = []
+
+    def fake_send_hub_json(method: str, url: str, token: str, payload: dict | None = None, timeout: int = 60):
+        requests.append((method, url, token, payload))
+        return {"itemId": payload["itemId"]}
+
+    monkeypatch.setattr(module, "send_hub_json", fake_send_hub_json)
+
+    result = module.seed_hub_store(hub_base_url="https://chummer.run/", hub_token="internal-token")
+
+    assert result["state"] == "passed"
+    assert result["recorded_count"] == len(module.important_work_items())
+    assert result["failed_count"] == 0
+    assert len(requests) == len(module.important_work_items())
+    method, url, token, payload = requests[0]
+    assert method == "POST"
+    assert url == "https://chummer.run/api/internal/community/important-work"
+    assert token == "internal-token"
+    assert payload["scope"] == "chummer.run"
+    assert payload["summary"]
+    assert "Acceptance gate:" in payload["detail"]
+
+
 def test_send_json_uses_teable_compatible_headers(monkeypatch):
     module = load_module()
     captured = {}
