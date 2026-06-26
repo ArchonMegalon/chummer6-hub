@@ -4018,6 +4018,75 @@ document.addEventListener('DOMContentLoaded', function () {
             fallbackQuotaUnavailableMessage: "Unable to confirm 3D-tour allowance receipt right now.",
             cancellationToken: cancellationToken);
 
+    [HttpGet("/propertyquarry")]
+    [Produces("text/html")]
+    public async Task<IActionResult> PropertyquarryPreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildPropertyquarryPageModel(cancellationToken));
+
+    [HttpGet("/propertyquarry/property-network")]
+    [HttpGet("/propertyquarry/receipts/property-network.json")]
+    [Produces("application/json")]
+    public IActionResult PropertyquarryReceiptJson()
+    {
+        IReadOnlyList<MediaArtifactDocument> properties = _mediaHorizons?.ListPropertyquarryProperties() ?? Array.Empty<MediaArtifactDocument>();
+        MediaArtifactDocument? firstProperty = properties.FirstOrDefault();
+        string firstPropertyMarkdownHref = firstProperty?.MarkdownRoute ?? "/propertyquarry/properties/northbound-research-lab.md";
+        string firstPropertyJsonHref = firstProperty?.JsonRoute ?? "/propertyquarry/properties/northbound-research-lab.json";
+        return Ok(new
+        {
+            Horizon = "propertyquarry",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                FirstPropertyMarkdownHref = firstPropertyMarkdownHref,
+                FirstPropertyJsonHref = firstPropertyJsonHref,
+                PropertyCount = properties.Count == 0 ? 3 : properties.Count,
+                Summary = "Public PROPERTYQUARRY keeps inspectable property packets, style markers, and 3D tour actions for GM prep."
+            },
+            SignedInDesk = new
+            {
+                AccountEntryHref = "/account/propertyquarry",
+                AccountRedirectHref = "/account/propertyquarry/open",
+                AccountWorkspaceHrefTemplate = "/account/propertyquarry/{propertyId}",
+                PrepWorkspaceApiHrefTemplate = "/api/v1/campaign-spine/me/property-workspaces/{propertyId}",
+                ContinuityApiHref = "/api/v1/campaign-spine/me/property-continuity/{propertyId}",
+                Summary = "Signed-in PROPERTYQUARRY keeps selected property prep, continuity hooks, and workspace continuity behind account links."
+            },
+            Boundary = new
+            {
+                TacticalAuthority = "not_claimed",
+                TourTruth = "chummer_owned",
+                PropertyTruth = "chummer_workspace_and_property_paths"
+            }
+        });
+    }
+
+    [HttpGet("/propertyquarry/properties/{propertyId}.md")]
+    [Produces("text/markdown")]
+    public IActionResult PropertyquarryPropertyMarkdown([FromRoute] string propertyId)
+        => Content(_mediaHorizons.BuildDocumentMarkdown(_mediaHorizons.GetPropertyquarryProperty(propertyId), "PROPERTYQUARRY", "Player-safe property overview and scene-flow output only. GM-private investigation notes stay off the public page."), "text/markdown");
+
+    [HttpGet("/propertyquarry/properties/{propertyId}.json")]
+    [Produces("application/json")]
+    public IActionResult PropertyquarryPropertyJson([FromRoute] string propertyId)
+        => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetPropertyquarryProperty(propertyId), "propertyquarry", "Player-safe property overview and scene-flow output only. GM-private investigation notes stay off the public page."), "application/json");
+
+    [HttpGet("/propertyquarry/properties/{propertyId}/tour")]
+    public async Task<IActionResult> PropertyquarryPropertyTourDispatch([FromRoute] string propertyId, CancellationToken cancellationToken)
+        => await DispatchHorizonArtifactAsync(
+            operationLabel: "propertyquarry property tour",
+            dispatchRoute: $"/propertyquarry/properties/{Uri.EscapeDataString(propertyId)}/tour",
+            sourceId: propertyId,
+            horizonId: "propertyquarry",
+            artifactKindOrCapabilityId: "tour",
+            emitRunsiteHeaders: false,
+            allowLegacyRunsiteQuotaFallback: false,
+            resolveSource: _mediaHorizons.GetPropertyquarryProperty,
+            resolveDispatchTarget: static document => document.TourHref,
+            quotaAllowanceExhaustedMessage: "3D-tour allowance is exhausted for this week.",
+            fallbackQuotaUnavailableMessage: "Unable to confirm 3D-tour allowance receipt right now.",
+            cancellationToken: cancellationToken);
+
     [HttpGet("/jackpoint/briefings/{briefingId}/video")]
     public async Task<IActionResult> JackpointBriefingVideoDispatch([FromRoute] string briefingId, CancellationToken cancellationToken)
         => await DispatchHorizonArtifactAsync(
@@ -7076,6 +7145,28 @@ document.addEventListener('DOMContentLoaded', function () {
             tertiaryAction: new TrustPageActionViewModel("Open first briefing", briefings[0].MarkdownRoute, "ghost"),
             cancellationToken: cancellationToken,
             connectedLanePacket: BuildJackpointConnectedLanePacket(subject));
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildPropertyquarryPageModel(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/propertyquarry", cancellationToken);
+        IReadOnlyList<MediaArtifactDocument> properties = _mediaHorizons.ListPropertyquarryProperties();
+        string firstPropertyMarkdownHref = properties.FirstOrDefault()?.MarkdownRoute ?? "/propertyquarry/properties/northbound-research-lab.md";
+        return await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/propertyquarry",
+            title: "PROPERTYQUARRY",
+            description: "Spatially anchored property packets with 3D-tour actions for GM-hosted runs.",
+            eyebrow: "Locations",
+            heading: "PROPERTYQUARRY",
+            intro: "PROPERTYQUARRY keeps inspectable property packets readable in public, and each property keeps its own scene style for quick orientation with optional 3D tours.",
+            boundaryLine: "Property packet and scene-style previews are public. GM-private investigation details, continuity, and run secrets stay signed in.",
+            summaryPoints: ["Property packets", "Scene styles", "3D tours", "Signed-in continuity"],
+            documents: properties,
+            primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for PROPERTYQUARRY" : "Open PROPERTYQUARRY", subject is null ? "/login?next=%2Faccount%2Fpropertyquarry" : "/account/propertyquarry", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open property network", "/propertyquarry/property-network", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open first property", firstPropertyMarkdownHref, "ghost"),
+            cancellationToken: cancellationToken,
+            connectedLanePacket: null);
     }
 
     private async Task<MediaArtifactHorizonPageViewModel> BuildRunsitePageModel(CancellationToken cancellationToken)

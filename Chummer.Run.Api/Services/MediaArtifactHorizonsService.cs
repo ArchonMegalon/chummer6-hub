@@ -10,6 +10,10 @@ public sealed class MediaArtifactHorizonsService
     private const string DefaultRunsiteTourLabel = "3D Tour";
     private const string DefaultRunsiteTourActionLabel = "Open 3D Tour";
     private const bool DefaultRunsiteTourOpenInNewTab = true;
+    private const string DefaultPropertyquarryTourHref = "https://my.matterport.com/show/?m=ax2JhiPGk5P";
+    private const string DefaultPropertyquarryTourLabel = "3D Tour";
+    private const string DefaultPropertyquarryTourActionLabel = "Open 3D Tour";
+    private const bool DefaultPropertyquarryTourOpenInNewTab = true;
 
     private static readonly IReadOnlyList<MediaArtifactDocument> JackpointBriefings =
     [
@@ -61,6 +65,34 @@ public sealed class MediaArtifactHorizonsService
             "Office Building")
     ];
 
+    private static readonly IReadOnlyList<MediaArtifactDocument> BasePropertyquarryProperties =
+    [
+        new(
+            "northbound-research-lab",
+            "Northbound research lab",
+            "Player-safe property packet for a high-security lab run.",
+            "/propertyquarry/properties/northbound-research-lab.md",
+            "/propertyquarry/properties/northbound-research-lab.json",
+            ["High-security lab", "Containment lanes", "GM-safe environmental notes"],
+            "Research Lab"),
+        new(
+            "shoreline-automation-factory",
+            "Shoreline automation factory",
+            "Player-safe property packet for automation plant prep and social dynamics.",
+            "/propertyquarry/properties/shoreline-automation-factory.md",
+            "/propertyquarry/properties/shoreline-automation-factory.json",
+            ["Factory layout", "Security zones", "Player-safe continuity notes"],
+            "Factory"),
+        new(
+            "eastriver-office-hub",
+            "Eastriver office hub",
+            "Player-safe property packet for executive office scenarios and controlled entrances.",
+            "/propertyquarry/properties/eastriver-office-hub.md",
+            "/propertyquarry/properties/eastriver-office-hub.json",
+            ["Reception flow", "Office movement", "Authority handoff"],
+            "Office Building")
+    ];
+
     private static readonly IReadOnlyList<MediaArtifactDocument> RunbookPrimers =
     [
         new(
@@ -92,6 +124,7 @@ public sealed class MediaArtifactHorizonsService
     ];
 
     private readonly IReadOnlyList<MediaArtifactDocument> _runsitePacks;
+    private readonly IReadOnlyList<MediaArtifactDocument> _propertyquarryProperties;
     private readonly HorizonCapabilityService? _capabilities;
 
     public MediaArtifactHorizonsService(IConfiguration? configuration = null, HorizonCapabilityService? capabilities = null)
@@ -102,6 +135,10 @@ public sealed class MediaArtifactHorizonsService
         string resolvedRunsiteTourLabel = ResolveRunsiteTourLabel(configuration);
         string resolvedRunsiteTourActionLabel = ResolveRunsiteTourActionLabel(configuration, resolvedRunsiteTourLabel);
         bool resolvedRunsiteTourOpenInNewTab = ResolveRunsiteTourOpenInNewTab(configuration);
+        string resolvedPropertyquarryTourHref = ResolvePropertyquarryTourHref(configuration);
+        string resolvedPropertyquarryTourLabel = ResolvePropertyquarryTourLabel(configuration);
+        string resolvedPropertyquarryTourActionLabel = ResolvePropertyquarryTourActionLabel(configuration, resolvedPropertyquarryTourLabel);
+        bool resolvedPropertyquarryTourOpenInNewTab = ResolvePropertyquarryTourOpenInNewTab(configuration);
 
         _runsitePacks = BaseRunsitePacks
             .Select(item => item with
@@ -114,15 +151,29 @@ public sealed class MediaArtifactHorizonsService
                 TourOpenInNewTab = resolvedRunsiteTourOpenInNewTab
             })
             .ToArray();
+
+        _propertyquarryProperties = BasePropertyquarryProperties
+            .Select(item => item with
+            {
+                TourHref = resolvedPropertyquarryTourHref,
+                TourLabel = resolvedPropertyquarryTourLabel,
+                TourActionHref = $"/propertyquarry/properties/{item.Id}/tour",
+                TourActionLabel = resolvedPropertyquarryTourActionLabel,
+                TourActionOpenInNewTab = false,
+                TourOpenInNewTab = resolvedPropertyquarryTourOpenInNewTab
+            })
+            .ToArray();
     }
 
     public IReadOnlyList<MediaArtifactDocument> ListJackpointBriefings() => JackpointBriefings;
     public IReadOnlyList<MediaArtifactDocument> ListRunsitePacks() => _runsitePacks;
     public IReadOnlyList<MediaArtifactDocument> ListRunbookPrimers() => RunbookPrimers;
+    public IReadOnlyList<MediaArtifactDocument> ListPropertyquarryProperties() => _propertyquarryProperties;
 
     public MediaArtifactDocument GetJackpointBriefing(string id) => GetById(JackpointBriefings, id, "JACKPOINT briefing");
     public MediaArtifactDocument GetRunsitePack(string id) => GetById(_runsitePacks, id, "RUNSITE pack");
     public MediaArtifactDocument GetRunbookPrimer(string id) => GetById(RunbookPrimers, id, "RUNBOOK primer");
+    public MediaArtifactDocument GetPropertyquarryProperty(string id) => GetById(_propertyquarryProperties, id, "PROPERTYQUARRY property");
 
     public string BuildDocumentMarkdown(MediaArtifactDocument document, string horizonLabel, string boundary)
     {
@@ -217,6 +268,7 @@ public sealed class MediaArtifactHorizonsService
         normalizedHorizonId = NormalizeHorizonId(horizonId);
         artifactKind = normalizedHorizonId switch
         {
+            "propertyquarry" => "tour",
             "jackpoint" => "briefing_video",
             "runbook-press" => "document_export",
             "runsite" => "tour",
@@ -254,6 +306,35 @@ public sealed class MediaArtifactHorizonsService
             configuration?["RunsiteTour:ButtonLabel"]);
         return configuredActionLabel ?? $"Open {fallbackLabel}";
     }
+
+    private static string ResolvePropertyquarryTourHref(IConfiguration? configuration)
+        => FirstConfiguredValue(
+            configuration?["PropertyquarryTour:Href"],
+            configuration?["PropertyquarryTour:SourceHref"])
+            ?? DefaultPropertyquarryTourHref;
+
+    private static string ResolvePropertyquarryTourLabel(IConfiguration? configuration)
+        => FirstConfiguredValue(
+            configuration?["PropertyquarryTour:Label"],
+            configuration?["PropertyquarryTour:SourceLabel"])
+            ?? DefaultPropertyquarryTourLabel;
+
+    private static string ResolvePropertyquarryTourActionLabel(IConfiguration? configuration, string fallbackLabel)
+    {
+        string? configuredActionLabel = FirstConfiguredValue(
+            configuration?["PropertyquarryTour:ActionLabel"],
+            configuration?["PropertyquarryTour:OpenLabel"],
+            configuration?["PropertyquarryTour:ButtonLabel"]);
+        return configuredActionLabel ?? $"Open {fallbackLabel}";
+    }
+
+    private static bool ResolvePropertyquarryTourOpenInNewTab(IConfiguration? configuration)
+        => bool.TryParse(FirstConfiguredValue(
+                configuration?["PropertyquarryTour:OpenInNewTab"],
+                configuration?["PropertyquarryTour:SourceOpenInNewTab"]),
+            out bool openInNewTab)
+            ? openInNewTab
+            : DefaultPropertyquarryTourOpenInNewTab;
 
     private static bool ResolveRunsiteTourOpenInNewTab(IConfiguration? configuration)
         => bool.TryParse(FirstConfiguredValue(

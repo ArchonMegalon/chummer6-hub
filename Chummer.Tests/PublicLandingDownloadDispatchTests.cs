@@ -675,6 +675,24 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public void PropertyquarryPropertyJsonIncludesStyleAndActionFields()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.PropertyquarryPropertyJson("northbound-research-lab");
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        Assert.Equal("Research Lab", payload.RootElement.GetProperty("style").GetString());
+        Assert.Equal("/propertyquarry/properties/northbound-research-lab/tour", payload.RootElement.GetProperty("tour_action_href").GetString());
+        Assert.Equal("Open 3D Tour", payload.RootElement.GetProperty("tour_action_label").GetString());
+        Assert.False(payload.RootElement.GetProperty("tour_action_open_in_new_tab").GetBoolean());
+        Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", payload.RootElement.GetProperty("tour_href").GetString());
+        Assert.True(payload.RootElement.GetProperty("tour_open_in_new_tab").GetBoolean());
+        Assert.Equal("3D Tour", payload.RootElement.GetProperty("tour_label").GetString());
+    }
+
+    [Fact]
     public void JackpointBriefingJsonIncludesPublicSafeSharedCapabilityMetadata()
     {
         using Fixture fixture = new();
@@ -694,6 +712,31 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("jackpoint:emerald-sprawl-briefing", capability.GetProperty("source_ref").GetString());
         Assert.False(capability.TryGetProperty("internal_provider_lane", out _));
         Assert.DoesNotContain("vidBoard", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void PropertyquarryPropertyJsonIncludesPublicSafeSharedCapabilityMetadata()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_PROPERTYQUARRY_CAPABILITY_PROPERTYQUARRY_TOUR_ENABLED"] = "true";
+        });
+
+        IActionResult result = fixture.Controller.PropertyquarryPropertyJson("northbound-research-lab");
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
+        Assert.Equal("propertyquarry", capability.GetProperty("horizon_id").GetString());
+        Assert.Equal("propertyquarry-tour", capability.GetProperty("capability_id").GetString());
+        Assert.Equal("tour", capability.GetProperty("artifact_kind").GetString());
+        Assert.Equal("3D Tour", capability.GetProperty("public_label").GetString());
+        Assert.Equal("explorable_location", capability.GetProperty("capability_slot").GetString());
+        Assert.Equal("available", capability.GetProperty("status").GetString());
+        Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.Equal("propertyquarry:northbound-research-lab", capability.GetProperty("source_ref").GetString());
+        Assert.False(capability.TryGetProperty("internal_provider_lane", out _));
+        Assert.DoesNotContain("Matterport", JsonSerializer.Serialize(capability), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -742,6 +785,30 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/runsites/packs/redmond-dockyard-pack/tour", firstPack.TourActionHref);
         Assert.Equal("Launch 3DVista", firstPack.TourActionLabel);
         Assert.False(firstPack.TourActionOpenInNewTab);
+    }
+
+    [Fact]
+    public void PropertyquarryPropertiesCanUseWhiteLabeledTourConfig()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["PropertyquarryTour:Href"] = "https://3dvista.example.test/tour/pq",
+                ["PropertyquarryTour:Label"] = "3DVista Property Tour",
+                ["PropertyquarryTour:ActionLabel"] = "Open Property 3DVista",
+                ["PropertyquarryTour:OpenInNewTab"] = "false"
+            })
+            .Build();
+
+        MediaArtifactHorizonsService mediaHorizons = new(configuration);
+        MediaArtifactDocument firstProperty = mediaHorizons.GetPropertyquarryProperty("northbound-research-lab");
+
+        Assert.Equal("https://3dvista.example.test/tour/pq", firstProperty.TourHref);
+        Assert.Equal("3DVista Property Tour", firstProperty.TourLabel);
+        Assert.False(firstProperty.TourOpenInNewTab);
+        Assert.Equal("/propertyquarry/properties/northbound-research-lab/tour", firstProperty.TourActionHref);
+        Assert.Equal("Open Property 3DVista", firstProperty.TourActionLabel);
+        Assert.False(firstProperty.TourActionOpenInNewTab);
     }
 
     [Fact]
@@ -1410,6 +1477,151 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task PropertyquarryPropertyTourDispatchUnauthenticatedRedirectsToLogin()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.PropertyquarryPropertyTourDispatch("northbound-research-lab", CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login?next=%2Fpropertyquarry%2Fproperties%2Fnorthbound-research-lab%2Ftour", redirect.Url);
+    }
+
+    [Fact]
+    public async Task PropertyquarryPropertyTourDispatchUnknownPropertyReturnsNotFound()
+    {
+        using Fixture fixture = new(
+            authenticated: true,
+            configureSettings: settings =>
+            {
+                settings["CHUMMER_HORIZON_PROPERTYQUARRY_CAPABILITY_PROPERTYQUARRY_TOUR_ENABLED"] = "true";
+            });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.PropertyquarryPropertyTourDispatch("not-a-property", CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task PropertyquarryPropertyTourDispatchEnforcesFreeWeeklyQuota()
+    {
+        using Fixture fixture = new(
+            authenticated: true,
+            configureSettings: settings =>
+            {
+                settings["CHUMMER_HORIZON_PROPERTYQUARRY_CAPABILITY_PROPERTYQUARRY_TOUR_ENABLED"] = "true";
+                settings["CHUMMER_HORIZON_PROPERTYQUARRY_CAPABILITY_PROPERTYQUARRY_TOUR_FREE_WEEKLY_LIMIT"] = "1";
+            });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult first = await fixture.Controller.PropertyquarryPropertyTourDispatch("northbound-research-lab", CancellationToken.None);
+        var firstRedirect = Assert.IsType<RedirectResult>(first);
+        Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", firstRedirect.Url);
+        Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
+
+        IActionResult second = await fixture.Controller.PropertyquarryPropertyTourDispatch("shoreline-automation-factory", CancellationToken.None);
+        ObjectResult problem = Assert.IsType<ObjectResult>(second);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Equal("3D-tour allowance is exhausted for this week.", details.Detail);
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("propertyquarry", "subject.dispatch", limit: 10);
+        Assert.Equal(2, receipts.Count);
+        Assert.Contains(receipts, receipt =>
+            receipt.Status == "accepted"
+            && receipt.SourceRef == "propertyquarry:northbound-research-lab"
+            && receipt.Quota?.WeeklyUsed == 1);
+        Assert.Contains(receipts, receipt =>
+            receipt.Status == "blocked"
+            && receipt.SourceRef == "propertyquarry:shoreline-automation-factory"
+            && receipt.BlockedReasons.Contains("artifact allowance"));
+    }
+
+    [Fact]
+    public async Task PropertyquarryPropertyTourDispatchPersistsSharedArtifactReceiptWithoutDoubleConsumingQuota()
+    {
+        using Fixture fixture = new(
+            authenticated: true,
+            configureSettings: settings =>
+            {
+                settings["CHUMMER_HORIZON_PROPERTYQUARRY_CAPABILITY_PROPERTYQUARRY_TOUR_ENABLED"] = "true";
+                settings["CHUMMER_HORIZON_PROPERTYQUARRY_CAPABILITY_PROPERTYQUARRY_TOUR_FREE_WEEKLY_LIMIT"] = "1";
+            });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.PropertyquarryPropertyTourDispatch("northbound-research-lab", CancellationToken.None);
+
+        Assert.IsType<RedirectResult>(result);
+        HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("propertyquarry", "subject.dispatch", limit: 10));
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("propertyquarry-tour", receipt.CapabilityId);
+        Assert.Equal("tour", receipt.ArtifactKind);
+        Assert.Equal("propertyquarry:northbound-research-lab", receipt.SourceRef);
+        Assert.Equal("private", receipt.Visibility);
+        Assert.NotNull(receipt.Quota);
+        Assert.Equal(1, receipt.Quota!.WeeklyUsed);
+        Assert.Equal(0, receipt.Quota.WeeklyRemaining);
+    }
+
+    [Fact]
+    public async Task PropertyquarryPropertyTourDispatchEnforcesSupporterWeeklyQuota()
+    {
+        using Fixture fixture = new(
+            authenticated: true,
+            configureSettings: settings =>
+            {
+                settings["CHUMMER_HORIZON_PROPERTYQUARRY_CAPABILITY_PROPERTYQUARRY_TOUR_ENABLED"] = "true";
+                settings["CHUMMER_HORIZON_PROPERTYQUARRY_CAPABILITY_PROPERTYQUARRY_TOUR_FREE_WEEKLY_LIMIT"] = "0";
+                settings["CHUMMER_HORIZON_PROPERTYQUARRY_CAPABILITY_PROPERTYQUARRY_TOUR_SUPPORTER_WEEKLY_LIMIT"] = "2";
+            });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        fixture.Billing.SyncMember(
+            new Chummer.Run.Contracts.Billing.BrilliantDirectoriesMemberSyncRequest(
+                UserId: "subject.dispatch",
+                MemberId: "supporter-membership",
+                Email: "dispatch@example.com",
+                PlanKey: "supporter",
+                PlanName: "Supporter",
+                MembershipStatus: "active",
+                SupporterActive: true,
+                ObservedAtUtc: new DateTimeOffset(2026, 6, 24, 10, 0, 0, TimeSpan.Zero)),
+            "sync-secret");
+
+        for (int i = 0; i < 2; i++)
+        {
+            IActionResult result = await fixture.Controller.PropertyquarryPropertyTourDispatch("northbound-research-lab", CancellationToken.None);
+            Assert.IsType<RedirectResult>(result);
+        }
+
+        IActionResult third = await fixture.Controller.PropertyquarryPropertyTourDispatch("shoreline-automation-factory", CancellationToken.None);
+        ObjectResult problem = Assert.IsType<ObjectResult>(third);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Equal("3D-tour allowance is exhausted for this week.", details.Detail);
+    }
+
+    [Fact]
     public async Task JackpointBriefingVideoDispatchUnauthenticatedRedirectsToLogin()
     {
         using Fixture fixture = new(authenticated: false);
@@ -1684,6 +1896,26 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/account/runsites/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/workspace-digests", payload.RootElement.GetProperty("SignedInBench").GetProperty("WorkspaceIndexApiHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/runs", payload.RootElement.GetProperty("SignedInBench").GetProperty("RunIndexApiHref").GetString());
+    }
+
+    [Fact]
+    public void PropertyquarryReceiptJsonReturnsSignedInPropertyNetworkContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.PropertyquarryReceiptJson();
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("propertyquarry", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("/propertyquarry/properties/northbound-research-lab.md", payload.RootElement.GetProperty("PublicBoard").GetProperty("FirstPropertyMarkdownHref").GetString());
+        Assert.Equal("/propertyquarry/properties/northbound-research-lab.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("FirstPropertyJsonHref").GetString());
+        Assert.Equal("/account/propertyquarry", payload.RootElement.GetProperty("SignedInDesk").GetProperty("AccountEntryHref").GetString());
+        Assert.Equal("/account/propertyquarry/open", payload.RootElement.GetProperty("SignedInDesk").GetProperty("AccountRedirectHref").GetString());
+        Assert.Equal("/account/propertyquarry/{propertyId}", payload.RootElement.GetProperty("SignedInDesk").GetProperty("AccountWorkspaceHrefTemplate").GetString());
+        Assert.Equal("/api/v1/campaign-spine/me/property-workspaces/{propertyId}", payload.RootElement.GetProperty("SignedInDesk").GetProperty("PrepWorkspaceApiHrefTemplate").GetString());
+        Assert.Equal("/api/v1/campaign-spine/me/property-continuity/{propertyId}", payload.RootElement.GetProperty("SignedInDesk").GetProperty("ContinuityApiHref").GetString());
     }
 
     [Fact]
