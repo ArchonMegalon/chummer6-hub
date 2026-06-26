@@ -351,14 +351,14 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             SignedInLabel: currentUser?.DisplayName,
             UsingSignedInAccount: currentUser is not null,
             Unavailable: true,
-            Heading: "Support Chummer",
+            Heading: "Membership",
             Summary: "Supporter checkout is unavailable right now. Free access stays the same.",
             ManageMembershipHref: "/downloads");
 
     private SiteChromeViewModel BuildChrome(HubUserDto? currentUser)
     {
         const string title = "Billing";
-        const string description = "Same app. Supporter only changes the monthly Origin Book allowance.";
+        const string description = "Same app. Supporter only changes the monthly Origin Book limit.";
         const string currentPath = "/account/billing";
 
         if (currentUser is not null)
@@ -410,7 +410,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
         return new SiteChromeViewModel(
             Title: "Billing",
-            Description: "Same app. Supporter only changes the monthly Origin Book allowance.",
+            Description: "Same app. Supporter only changes the monthly Origin Book limit.",
             CurrentPath: "/account/billing",
             PrimaryNavigation: primaryNavigation,
             SecondaryNavigation: secondaryNavigation,

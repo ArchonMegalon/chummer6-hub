@@ -321,13 +321,13 @@ public sealed class AccountsController : Controller
                 _ => "Free"
             };
         string membershipSummary = originBookQuota is null
-            ? "Supporter handoff is not configured yet."
+            ? "Supporter checkout is unavailable right now."
             : originBookQuota.SupporterActive
-                ? "Supporter only changes the monthly Origin Book allowance."
-                : "Free and Supporter use the same app.";
+                ? "Supporter adds one extra Origin Book each month."
+                : "Same app. Supporter only changes the monthly Origin Book limit.";
         string bookQuotaSummary = originBookQuota is null
-            ? "Origin book quota shows up here after billing is configured."
-            : $"{originBookQuota.WindowRemaining} of {originBookQuota.WindowLimit} origin books left this {DescribeAllowanceWindowPeriod(originBookQuota.WindowKind)}.";
+            ? "Book limit is unavailable right now."
+            : $"{originBookQuota.WindowRemaining} of {originBookQuota.WindowLimit} Origin Book{(originBookQuota.WindowLimit == 1 ? string.Empty : "s")} left this {DescribeAllowanceWindowPeriod(originBookQuota.WindowKind)}.";
 
         string installSummary = hasLinkedInstall
             ? $"{linkedInstallCount} linked install{(linkedInstallCount == 1 ? string.Empty : "s")}."
@@ -350,8 +350,8 @@ public sealed class AccountsController : Controller
                 user.DisplayName,
                 user.Email),
             User: user,
-            Heading: "Keep installs, support, and membership in one place.",
-            Summary: "Use this page for return paths. Character work belongs in Chummer itself.",
+            Heading: "Installs, billing, and support live here.",
+            Summary: "Use the desktop app for actual character work. Use this page for recovery, billing, and help.",
             MembershipLabel: membershipLabel,
             MembershipSummary: membershipSummary,
             BookQuotaSummary: bookQuotaSummary,
@@ -359,27 +359,27 @@ public sealed class AccountsController : Controller
             [
                 new AccountHubCardViewModel(
                     "Installs",
-                    "Devices and access",
+                    "Downloads and linked copies",
                     installSummary,
                     hasLinkedInstall ? "Open installs" : "Open downloads",
                     hasLinkedInstall ? "/account/access" : "/downloads",
-                    hasLinkedInstall ? "Downloads" : "Devices and access",
+                    hasLinkedInstall ? "Downloads" : "Installs",
                     hasLinkedInstall ? "/downloads" : "/account/access"),
                 new AccountHubCardViewModel(
                     "Membership",
-                    "Billing",
+                    "Membership",
                     membershipSummary,
                     "Open billing",
                     "/account/billing"),
                 new AccountHubCardViewModel(
                     "Support",
-                    "Tracked help",
+                    "Private help",
                     supportSummary,
                     "Open support",
                     "/account/support"),
                 new AccountHubCardViewModel(
                     "Campaigns",
-                    "Characters and groups",
+                    "Runners and groups",
                     campaignSummary,
                     "Open campaigns",
                     "/account/work")

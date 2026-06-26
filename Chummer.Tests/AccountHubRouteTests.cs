@@ -31,10 +31,16 @@ public sealed class AccountHubRouteTests
         Assert.Equal("~/Views/Accounts/Hub.cshtml", view.ViewName);
         AccountHubPageViewModel model = Assert.IsType<AccountHubPageViewModel>(view.Model);
         Assert.Equal("Account", model.Chrome.Title);
+        Assert.Equal("Installs, billing, and support live here.", model.Heading);
+        Assert.Equal("Use the desktop app for actual character work. Use this page for recovery, billing, and help.", model.Summary);
         Assert.Equal("Free", model.MembershipLabel);
-        Assert.Equal("Free and Supporter use the same app.", model.MembershipSummary);
-        Assert.Equal("1 of 1 origin books left this month.", model.BookQuotaSummary);
+        Assert.Equal("Same app. Supporter only changes the monthly Origin Book limit.", model.MembershipSummary);
+        Assert.Equal("1 of 1 Origin Book left this month.", model.BookQuotaSummary);
         Assert.Equal(4, model.Cards.Count);
+        Assert.Equal("Downloads and linked copies", model.Cards[0].Title);
+        Assert.Equal("Membership", model.Cards[1].Title);
+        Assert.Equal("Private help", model.Cards[2].Title);
+        Assert.Equal("Runners and groups", model.Cards[3].Title);
     }
 
     [Fact]
@@ -59,8 +65,8 @@ public sealed class AccountHubRouteTests
         ViewResult view = Assert.IsType<ViewResult>(result);
         AccountHubPageViewModel model = Assert.IsType<AccountHubPageViewModel>(view.Model);
         Assert.Equal("Supporter", model.MembershipLabel);
-        Assert.Equal("Supporter only changes the monthly Origin Book allowance.", model.MembershipSummary);
-        Assert.Equal("2 of 2 origin books left this month.", model.BookQuotaSummary);
+        Assert.Equal("Supporter adds one extra Origin Book each month.", model.MembershipSummary);
+        Assert.Equal("2 of 2 Origin Books left this month.", model.BookQuotaSummary);
     }
 
     [Fact]

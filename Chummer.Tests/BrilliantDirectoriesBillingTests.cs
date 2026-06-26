@@ -60,13 +60,16 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Contains("ViewData[\"Chrome\"] = Model.Chrome;", view, StringComparison.Ordinal);
         Assert.Contains("ViewData[\"SurfaceClass\"] = \"surface-billing surface-minimal\";", view, StringComparison.Ordinal);
         Assert.Contains("Same app.", view, StringComparison.Ordinal);
-        Assert.Contains("Origin books: 1/month free. 2/month supporter.", view, StringComparison.Ordinal);
+        Assert.Contains("Origin Books: 1/month on Free. 2/month on Supporter.", view, StringComparison.Ordinal);
         Assert.Contains("Continue with email", view, StringComparison.Ordinal);
-        Assert.Contains("<h2>Only the monthly book allowance changes</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("<h2>Only the book allowance changes</h2>", view, StringComparison.Ordinal);
         Assert.Contains("Supporter checkout is unavailable right now.", view, StringComparison.Ordinal);
         Assert.Contains("Chummer attaches supporter status after sign-in.", view, StringComparison.Ordinal);
         Assert.Contains("Checkout stays attached to this account.", view, StringComparison.Ordinal);
         Assert.Contains("Support Chummer", view, StringComparison.Ordinal);
+        Assert.Contains("Default plan. Same app. 1 Origin Book each month.", view, StringComparison.Ordinal);
+        Assert.Contains("Same app. 2 Origin Books each month. Supporter helps pay for Chummer.", view, StringComparison.Ordinal);
+        Assert.Contains("Supporter only changes the monthly Origin Book limit.", view, StringComparison.Ordinal);
         Assert.Contains("minimal-page-hero", view, StringComparison.Ordinal);
         Assert.Contains("minimal-lane-grid minimal-platform-list", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Layout = null;", view, StringComparison.Ordinal);
@@ -596,7 +599,7 @@ public sealed class BrilliantDirectoriesBillingTests
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
         Assert.True(model.Chrome.Authenticated);
         Assert.True(model.Unavailable);
-        Assert.Equal("Support Chummer", model.Heading);
+        Assert.Equal("Membership", model.Heading);
         Assert.Contains("supporter checkout is unavailable right now", model.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Unexpected server error", model.Summary, StringComparison.OrdinalIgnoreCase);
     }

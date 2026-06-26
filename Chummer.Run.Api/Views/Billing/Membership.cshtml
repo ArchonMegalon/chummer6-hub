@@ -20,7 +20,7 @@
         <p>@Model.Summary</p>
         <ul class="minimal-hero__points">
             <li>Same app.</li>
-            <li>Origin books: 1/month free. 2/month supporter.</li>
+            <li>Origin Books: 1/month on Free. 2/month on Supporter.</li>
             @if (usingSignedInAccount)
             {
                 <li>Signed in as @signedInLabel</li>
@@ -57,7 +57,7 @@ else
     <section class="minimal-section">
         <div class="minimal-section__lead">
             <p class="eyebrow">Plans</p>
-            <h2>Only the monthly book allowance changes</h2>
+            <h2>Only the book allowance changes</h2>
             <p>No extra app features right now.</p>
         </div>
         <div class="minimal-lane-grid minimal-platform-list">
@@ -66,7 +66,7 @@ else
                 <article class="minimal-lane-card billing-plan-card">
                     <span class="tag">Free</span>
                     <h2>@free.Name</h2>
-                    <p>Default. Full current app access. 1 Origin Book each month.</p>
+                    <p>Default plan. Same app. 1 Origin Book each month.</p>
                     <div class="route-choice-card__details">
                         <span>Default</span>
                         <span>1 book/month</span>
@@ -79,7 +79,7 @@ else
                 <article class="minimal-lane-card billing-plan-card">
                     <span class="tag">Supporter</span>
                     <h2>@supporter.Name</h2>
-                    <p>Same app. No extra app features right now. 2 Origin Books each month and direct support for Chummer.</p>
+                    <p>Same app. 2 Origin Books each month. Supporter helps pay for Chummer.</p>
                     <div class="route-choice-card__details">
                         <span>2 books/month</span>
                         <span>Same app</span>
@@ -99,7 +99,7 @@ else
                         {
                             <p class="muted-copy">Continue with email first. Chummer attaches supporter status after sign-in.</p>
                         }
-                        <p class="muted-copy">Supporter changes the monthly Origin Book limit only. The app stays the same.</p>
+                        <p class="muted-copy">Supporter only changes the monthly Origin Book limit.</p>
                         <div class="minimal-actions">
                             @if (hasUserId)
                             {
