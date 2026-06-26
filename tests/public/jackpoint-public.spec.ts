@@ -25,6 +25,7 @@ test('jackpoint public route stays available and points at the signed-in publica
   await expect(page.locator('body')).toContainText('JACKPOINT keeps dossiers and mission briefs readable in public');
   await expect(page.locator('body')).toContainText('Sign in for JACKPOINT');
   await expect(page.locator('body')).toContainText('Dossier and mission-brief output only.');
+  await expect(page.getByRole('link', { name: 'Open Briefing Video' }).first()).toHaveAttribute('href', '/jackpoint/briefings/emerald-sprawl-briefing/video');
 
   writeJsonArtifact('JACKPOINT_ROUTE_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),

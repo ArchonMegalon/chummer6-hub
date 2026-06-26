@@ -642,6 +642,39 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public void JackpointBriefingJsonIncludesStyleAndActionFields()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.JackpointBriefingJson("emerald-sprawl-briefing");
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        Assert.Equal("Dossier", payload.RootElement.GetProperty("style").GetString());
+        Assert.Equal("/jackpoint/briefings/emerald-sprawl-briefing/video", payload.RootElement.GetProperty("tour_action_href").GetString());
+        Assert.Equal("Open Briefing Video", payload.RootElement.GetProperty("tour_action_label").GetString());
+        Assert.False(payload.RootElement.GetProperty("tour_action_open_in_new_tab").GetBoolean());
+        Assert.Equal("/media/horizons/jackpoint-90s-deepdive.mp4", payload.RootElement.GetProperty("tour_href").GetString());
+        Assert.Equal("Briefing Video", payload.RootElement.GetProperty("artifact_capability").GetProperty("public_label").GetString());
+    }
+
+    [Fact]
+    public void RunbookPrimerJsonIncludesStyleAndActionFields()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.RunbookPrimerJson("new-runner-primer");
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        Assert.Equal("Primer", payload.RootElement.GetProperty("style").GetString());
+        Assert.Equal("/runbook/primers/new-runner-primer/export", payload.RootElement.GetProperty("tour_action_href").GetString());
+        Assert.Equal("Export Primer", payload.RootElement.GetProperty("tour_action_label").GetString());
+        Assert.False(payload.RootElement.GetProperty("tour_action_open_in_new_tab").GetBoolean());
+        Assert.Equal("/media/horizons/runbook-press-90s-deepdive.mp4", payload.RootElement.GetProperty("tour_href").GetString());
+    }
+
+    [Fact]
     public void JackpointBriefingJsonIncludesPublicSafeSharedCapabilityMetadata()
     {
         using Fixture fixture = new();
@@ -661,6 +694,30 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("jackpoint:emerald-sprawl-briefing", capability.GetProperty("source_ref").GetString());
         Assert.False(capability.TryGetProperty("internal_provider_lane", out _));
         Assert.DoesNotContain("vidBoard", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RunbookPrimerJsonIncludesPublicSafeSharedCapabilityMetadata()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true";
+        });
+
+        IActionResult result = fixture.Controller.RunbookPrimerJson("new-runner-primer");
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
+        Assert.Equal("runbook-press", capability.GetProperty("horizon_id").GetString());
+        Assert.Equal("runbook-export", capability.GetProperty("capability_id").GetString());
+        Assert.Equal("document_export", capability.GetProperty("artifact_kind").GetString());
+        Assert.Equal("Formatted Export", capability.GetProperty("public_label").GetString());
+        Assert.Equal("document_render", capability.GetProperty("capability_slot").GetString());
+        Assert.Equal("available", capability.GetProperty("status").GetString());
+        Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.Equal("runbook-press:new-runner-primer", capability.GetProperty("source_ref").GetString());
+        Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(capability), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -1350,6 +1407,202 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
         var details = Assert.IsType<ProblemDetails>(problem.Value);
         Assert.Equal("3D-tour allowance is exhausted for this week.", details.Detail);
+    }
+
+    [Fact]
+    public async Task JackpointBriefingVideoDispatchUnauthenticatedRedirectsToLogin()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.JackpointBriefingVideoDispatch("emerald-sprawl-briefing", CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login?next=%2Fjackpoint%2Fbriefings%2Femerald-sprawl-briefing%2Fvideo", redirect.Url);
+    }
+
+    [Fact]
+    public async Task JackpointBriefingVideoDispatchUnknownBriefingReturnsNotFound()
+    {
+        using Fixture fixture = new(authenticated: true, configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_JACKPOINT_CAPABILITY_JACKPOINT_BRIEFING_VIDEO_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_JACKPOINT_CAPABILITY_JACKPOINT_BRIEFING_VIDEO_FREE_WEEKLY_LIMIT"] = "1";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.JackpointBriefingVideoDispatch("not-a-briefing", CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task JackpointBriefingVideoDispatchEnforcesFreeWeeklyQuota()
+    {
+        using Fixture fixture = new(authenticated: true, configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_JACKPOINT_CAPABILITY_JACKPOINT_BRIEFING_VIDEO_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_JACKPOINT_CAPABILITY_JACKPOINT_BRIEFING_VIDEO_FREE_WEEKLY_LIMIT"] = "1";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult first = await fixture.Controller.JackpointBriefingVideoDispatch("emerald-sprawl-briefing", CancellationToken.None);
+        var firstRedirect = Assert.IsType<RedirectResult>(first);
+        Assert.Equal("/media/horizons/jackpoint-90s-deepdive.mp4", firstRedirect.Url);
+        Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
+
+        IActionResult second = await fixture.Controller.JackpointBriefingVideoDispatch("dockyard-contact-dossier", CancellationToken.None);
+        ObjectResult problem = Assert.IsType<ObjectResult>(second);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Equal("Briefing video allowance is exhausted for this week.", details.Detail);
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("jackpoint", "subject.dispatch", limit: 10);
+        Assert.Equal(2, receipts.Count);
+        Assert.Contains(receipts, receipt =>
+            receipt.Status == "accepted"
+            && receipt.SourceRef == "jackpoint:emerald-sprawl-briefing"
+            && receipt.Quota?.WeeklyUsed == 1);
+        Assert.Contains(receipts, receipt =>
+            receipt.Status == "blocked"
+            && receipt.SourceRef == "jackpoint:dockyard-contact-dossier"
+            && receipt.BlockedReasons.Contains("artifact allowance"));
+    }
+
+    [Fact]
+    public async Task JackpointBriefingVideoDispatchPersistsSharedArtifactReceiptWithoutDoubleConsumingQuota()
+    {
+        using Fixture fixture = new(authenticated: true, configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_JACKPOINT_CAPABILITY_JACKPOINT_BRIEFING_VIDEO_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_JACKPOINT_CAPABILITY_JACKPOINT_BRIEFING_VIDEO_FREE_WEEKLY_LIMIT"] = "1";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.JackpointBriefingVideoDispatch("emerald-sprawl-briefing", CancellationToken.None);
+
+        Assert.IsType<RedirectResult>(result);
+        HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("jackpoint", "subject.dispatch", limit: 10));
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("jackpoint-briefing-video", receipt.CapabilityId);
+        Assert.Equal("briefing_video", receipt.ArtifactKind);
+        Assert.Equal("jackpoint:emerald-sprawl-briefing", receipt.SourceRef);
+        Assert.Equal("private", receipt.Visibility);
+        Assert.NotNull(receipt.Quota);
+        Assert.Equal(1, receipt.Quota!.WeeklyUsed);
+        Assert.Equal(0, receipt.Quota.WeeklyRemaining);
+    }
+
+    [Fact]
+    public async Task RunbookPrimerExportDispatchUnauthenticatedRedirectsToLogin()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.RunbookPrimerExportDispatch("new-runner-primer", CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login?next=%2Frunbook%2Fprimers%2Fnew-runner-primer%2Fexport", redirect.Url);
+    }
+
+    [Fact]
+    public async Task RunbookPrimerExportDispatchUnknownPrimerReturnsNotFound()
+    {
+        using Fixture fixture = new(authenticated: true, configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_FREE_WEEKLY_LIMIT"] = "1";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.RunbookPrimerExportDispatch("not-a-primer", CancellationToken.None);
+
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public async Task RunbookPrimerExportDispatchEnforcesFreeWeeklyQuota()
+    {
+        using Fixture fixture = new(authenticated: true, configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_FREE_WEEKLY_LIMIT"] = "1";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult first = await fixture.Controller.RunbookPrimerExportDispatch("new-runner-primer", CancellationToken.None);
+        var firstRedirect = Assert.IsType<RedirectResult>(first);
+        Assert.Equal("/media/horizons/runbook-press-90s-deepdive.mp4", firstRedirect.Url);
+        Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
+
+        IActionResult second = await fixture.Controller.RunbookPrimerExportDispatch("gm-first-night-primer", CancellationToken.None);
+        ObjectResult problem = Assert.IsType<ObjectResult>(second);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, problem.StatusCode);
+        var details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Equal("Runbook export allowance is exhausted for this week.", details.Detail);
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("runbook-press", "subject.dispatch", limit: 10);
+        Assert.Equal(2, receipts.Count);
+        Assert.Contains(receipts, receipt =>
+            receipt.Status == "accepted"
+            && receipt.SourceRef == "runbook-press:new-runner-primer"
+            && receipt.Quota?.WeeklyUsed == 1);
+        Assert.Contains(receipts, receipt =>
+            receipt.Status == "blocked"
+            && receipt.SourceRef == "runbook-press:gm-first-night-primer"
+            && receipt.BlockedReasons.Contains("artifact allowance"));
+    }
+
+    [Fact]
+    public async Task RunbookPrimerExportDispatchPersistsSharedArtifactReceiptWithoutDoubleConsumingQuota()
+    {
+        using Fixture fixture = new(authenticated: true, configureSettings: settings =>
+        {
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_ENABLED"] = "true";
+            settings["CHUMMER_HORIZON_RUNBOOK_PRESS_CAPABILITY_RUNBOOK_EXPORT_FREE_WEEKLY_LIMIT"] = "1";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.RunbookPrimerExportDispatch("new-runner-primer", CancellationToken.None);
+
+        Assert.IsType<RedirectResult>(result);
+        HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("runbook-press", "subject.dispatch", limit: 10));
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("runbook-export", receipt.CapabilityId);
+        Assert.Equal("document_export", receipt.ArtifactKind);
+        Assert.Equal("runbook-press:new-runner-primer", receipt.SourceRef);
+        Assert.Equal("private", receipt.Visibility);
+        Assert.NotNull(receipt.Quota);
+        Assert.Equal(1, receipt.Quota!.WeeklyUsed);
+        Assert.Equal(0, receipt.Quota.WeeklyRemaining);
     }
 
     [Fact]

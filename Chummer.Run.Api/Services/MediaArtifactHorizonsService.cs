@@ -19,14 +19,26 @@ public sealed class MediaArtifactHorizonsService
             "Player-safe mission brief with objective posture, pressure line, and provenance-safe dossier framing.",
             "/jackpoint/briefings/emerald-sprawl-briefing.md",
             "/jackpoint/briefings/emerald-sprawl-briefing.json",
-            ["Objective pressure", "Contact posture", "No GM-private spoilers"]),
+            ["Objective pressure", "Contact posture", "No GM-private spoilers"],
+            "Dossier",
+            TourHref: "/media/horizons/jackpoint-90s-deepdive.mp4",
+            TourLabel: "Briefing Video",
+            TourActionHref: "/jackpoint/briefings/emerald-sprawl-briefing/video",
+            TourActionLabel: "Open Briefing Video",
+            TourActionOpenInNewTab: false),
         new(
             "dockyard-contact-dossier",
             "Dockyard contact dossier",
             "Short dossier card for a contact lane with bounded trust notes and follow-up hooks.",
             "/jackpoint/briefings/dockyard-contact-dossier.md",
             "/jackpoint/briefings/dockyard-contact-dossier.json",
-            ["Dossier card", "Player-safe contact notes", "Follow-up hook"])
+            ["Dossier card", "Player-safe contact notes", "Follow-up hook"],
+            "Dossier",
+            TourHref: "/media/horizons/jackpoint-90s-deepdive.mp4",
+            TourLabel: "Briefing Video",
+            TourActionHref: "/jackpoint/briefings/dockyard-contact-dossier/video",
+            TourActionLabel: "Open Briefing Video",
+            TourActionOpenInNewTab: false)
     ];
 
     private static readonly IReadOnlyList<MediaArtifactDocument> BaseRunsitePacks =
@@ -57,14 +69,26 @@ public sealed class MediaArtifactHorizonsService
             "Human-readable first-session primer that points at ready rails, continuity, and support without dumping rules text.",
             "/runbook/primers/new-runner-primer.md",
             "/runbook/primers/new-runner-primer.json",
-            ["First-session primer", "Ready rail", "Support rail"]),
+            ["First-session primer", "Ready rail", "Support rail"],
+            "Primer",
+            TourHref: "/media/horizons/runbook-press-90s-deepdive.mp4",
+            TourLabel: "Primer Export",
+            TourActionHref: "/runbook/primers/new-runner-primer/export",
+            TourActionLabel: "Export Primer",
+            TourActionOpenInNewTab: false),
         new(
             "gm-first-night-primer",
             "GM first-night primer",
             "GM-first packet for table-open sequencing, consequences, and next-screen posture.",
             "/runbook/primers/gm-first-night-primer.md",
             "/runbook/primers/gm-first-night-primer.json",
-            ["Table-open sequence", "Consequence sweep", "Next-screen posture"])
+            ["Table-open sequence", "Consequence sweep", "Next-screen posture"],
+            "Primer",
+            TourHref: "/media/horizons/runbook-press-90s-deepdive.mp4",
+            TourLabel: "Primer Export",
+            TourActionHref: "/runbook/primers/gm-first-night-primer/export",
+            TourActionLabel: "Export Primer",
+            TourActionOpenInNewTab: false)
     ];
 
     private readonly IReadOnlyList<MediaArtifactDocument> _runsitePacks;

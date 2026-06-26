@@ -4004,110 +4004,191 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpGet("/runsites/packs/{packId}/tour")]
     public async Task<IActionResult> RunsiteTourDispatch([FromRoute] string packId, CancellationToken cancellationToken)
+        => await DispatchHorizonArtifactAsync(
+            operationLabel: "runsite tour",
+            dispatchRoute: $"/runsites/packs/{Uri.EscapeDataString(packId)}/tour",
+            sourceId: packId,
+            horizonId: "runsite",
+            artifactKindOrCapabilityId: "tour",
+            emitRunsiteHeaders: true,
+            allowLegacyRunsiteQuotaFallback: true,
+            resolveSource: _mediaHorizons.GetRunsitePack,
+            resolveDispatchTarget: static document => document.TourHref,
+            quotaAllowanceExhaustedMessage: "3D-tour allowance is exhausted for this week.",
+            fallbackQuotaUnavailableMessage: "Unable to confirm 3D-tour allowance receipt right now.",
+            cancellationToken: cancellationToken);
+
+    [HttpGet("/jackpoint/briefings/{briefingId}/video")]
+    public async Task<IActionResult> JackpointBriefingVideoDispatch([FromRoute] string briefingId, CancellationToken cancellationToken)
+        => await DispatchHorizonArtifactAsync(
+            operationLabel: "jackpoint briefing video",
+            dispatchRoute: $"/jackpoint/briefings/{Uri.EscapeDataString(briefingId)}/video",
+            sourceId: briefingId,
+            horizonId: "jackpoint",
+            artifactKindOrCapabilityId: "briefing_video",
+            emitRunsiteHeaders: false,
+            allowLegacyRunsiteQuotaFallback: false,
+            resolveSource: _mediaHorizons.GetJackpointBriefing,
+            resolveDispatchTarget: static _ => "/media/horizons/jackpoint-90s-deepdive.mp4",
+            quotaAllowanceExhaustedMessage: "Briefing video allowance is exhausted for this week.",
+            fallbackQuotaUnavailableMessage: "Unable to confirm briefing video allowance receipt right now.",
+            cancellationToken: cancellationToken);
+
+    [HttpGet("/runbook/primers/{primerId}/export")]
+    public async Task<IActionResult> RunbookPrimerExportDispatch([FromRoute] string primerId, CancellationToken cancellationToken)
+        => await DispatchHorizonArtifactAsync(
+            operationLabel: "runbook primer export",
+            dispatchRoute: $"/runbook/primers/{Uri.EscapeDataString(primerId)}/export",
+            sourceId: primerId,
+            horizonId: "runbook-press",
+            artifactKindOrCapabilityId: "document_export",
+            emitRunsiteHeaders: false,
+            allowLegacyRunsiteQuotaFallback: false,
+            resolveSource: _mediaHorizons.GetRunbookPrimer,
+            resolveDispatchTarget: static _ => "/media/horizons/runbook-press-90s-deepdive.mp4",
+            quotaAllowanceExhaustedMessage: "Runbook export allowance is exhausted for this week.",
+            fallbackQuotaUnavailableMessage: "Unable to confirm runbook export allowance receipt right now.",
+            cancellationToken: cancellationToken);
+
+    private async Task<IActionResult> DispatchHorizonArtifactAsync(
+        string operationLabel,
+        string dispatchRoute,
+        string sourceId,
+        string horizonId,
+        string artifactKindOrCapabilityId,
+        bool emitRunsiteHeaders,
+        bool allowLegacyRunsiteQuotaFallback,
+        Func<string, MediaArtifactDocument> resolveSource,
+        Func<MediaArtifactDocument, string?> resolveDispatchTarget,
+        string quotaAllowanceExhaustedMessage,
+        string fallbackQuotaUnavailableMessage,
+        CancellationToken cancellationToken)
     {
         AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
         if (subject is null)
         {
-            _logger.LogInformation("Runsite tour dispatch rejected because no authenticated user was present for {PackId}.", packId);
-            return Redirect($"/login?next={Uri.EscapeDataString($"/runsites/packs/{packId}/tour")}");
+            _logger.LogInformation("{Operation} dispatch rejected because no authenticated user was present for {SourceId}.", operationLabel, sourceId);
+            return Redirect($"/login?next={Uri.EscapeDataString(dispatchRoute)}");
         }
 
-        MediaArtifactDocument pack;
+        MediaArtifactDocument source;
         try
         {
-            pack = _mediaHorizons.GetRunsitePack(packId);
+            source = resolveSource(sourceId);
         }
         catch (KeyNotFoundException)
         {
-            _logger.LogWarning("Runsite tour dispatch requested unknown pack {PackId}.", packId);
+            _logger.LogWarning("{Operation} dispatch requested unknown source {SourceId} for {HorizonId}.", operationLabel, sourceId, horizonId);
             return NotFound();
         }
 
-        if (string.IsNullOrWhiteSpace(pack.TourHref))
+        string? dispatchTarget = resolveDispatchTarget(source);
+        if (string.IsNullOrWhiteSpace(dispatchTarget))
         {
-            _logger.LogInformation("Runsite tour dispatch skipped because {PackId} has no configured tour href.", packId);
+            _logger.LogInformation("{Operation} dispatch skipped because {SourceId} has no configured target.", operationLabel, sourceId);
             return NotFound();
         }
 
-        RunsiteTourQuotaSnapshot quota;
-        try
+        RunsiteTourQuotaSnapshot? runsiteQuota = null;
+        if (_artifactRequests is not null)
         {
-            if (_artifactRequests is not null)
+            try
             {
                 HorizonArtifactRequestReceipt receipt = _artifactRequests.BuildRequest(
                     new HorizonArtifactRequestCreateRequest(
-                        HorizonId: "runsite",
-                        ArtifactKindOrCapabilityId: "tour",
+                        HorizonId: horizonId,
+                        ArtifactKindOrCapabilityId: artifactKindOrCapabilityId,
                         UserId: subject.SubjectId,
-                        SourceRef: $"runsite:{packId}",
+                        SourceRef: $"{horizonId}:{sourceId}",
                         Visibility: "private",
                         ExternalProcessingConsent: true,
                         Email: subject.Email),
                     consumeQuota: true);
+
                 if (!string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase))
                 {
                     _logger.LogWarning(
-                        "Runsite tour dispatch denied for {UserId} on {PackId}; blocked reasons: {BlockedReasons}.",
+                        "{Operation} dispatch denied for {UserId} on {SourceId}; blocked reasons: {BlockedReasons}.",
+                        operationLabel,
                         subject.SubjectId,
-                        packId,
+                        sourceId,
                         string.Join(", ", receipt.BlockedReasons));
                     if (receipt.BlockedReasons.Contains("artifact allowance", StringComparer.OrdinalIgnoreCase))
                     {
-                        return Problem(statusCode: StatusCodes.Status429TooManyRequests, detail: "3D-tour allowance is exhausted for this week.");
+                        return Problem(statusCode: StatusCodes.Status429TooManyRequests, detail: quotaAllowanceExhaustedMessage);
                     }
 
-                    return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "Unable to create a Chummer-owned 3D-tour request receipt.");
+                    return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"Unable to create a Chummer-owned {operationLabel} request receipt.");
                 }
 
                 if (receipt.Quota is null)
                 {
-                    _logger.LogWarning("Runsite tour dispatch accepted without quota receipt for {UserId} on {PackId}.", subject.SubjectId, packId);
-                    return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: "Unable to confirm 3D-tour allowance receipt right now.");
+                    _logger.LogWarning("{Operation} dispatch accepted without quota receipt for {UserId} on {SourceId}.", operationLabel, subject.SubjectId, sourceId);
+                    return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: fallbackQuotaUnavailableMessage);
                 }
 
-                quota = new RunsiteTourQuotaSnapshot(
-                    receipt.Quota.UserId,
-                    receipt.Quota.SupporterActive,
-                    receipt.Quota.WeeklyLimit,
-                    receipt.Quota.WeeklyUsed,
-                    receipt.Quota.WeeklyRemaining,
-                    receipt.Quota.WindowStartUtc,
-                    receipt.Quota.WindowEndUtc);
+                if (emitRunsiteHeaders)
+                {
+                    runsiteQuota = new RunsiteTourQuotaSnapshot(
+                        receipt.Quota.UserId,
+                        receipt.Quota.SupporterActive,
+                        receipt.Quota.WeeklyLimit,
+                        receipt.Quota.WeeklyUsed,
+                        receipt.Quota.WeeklyRemaining,
+                        receipt.Quota.WindowStartUtc,
+                        receipt.Quota.WindowEndUtc);
+                }
+
                 Response.Headers["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
             }
-            else
+            catch (BrilliantDirectoriesBillingUnavailableException ex)
             {
-                quota = _runsiteTourQuota.ConsumeTour(subject.SubjectId, email: subject.Email);
+                _logger.LogWarning(ex, "{Operation} dispatch failed because billing is unavailable for {UserId}/{SourceId}.", operationLabel, subject.SubjectId, sourceId);
+                return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
             }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "{Operation} dispatch denied for {UserId} on {SourceId} due unexpected request handling error.", operationLabel, subject.SubjectId, sourceId);
+                return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: $"Unable to process {operationLabel} request right now.");
+            }
+        }
+        else if (allowLegacyRunsiteQuotaFallback)
+        {
+            try
+            {
+                runsiteQuota = _runsiteTourQuota.ConsumeTour(subject.SubjectId, email: subject.Email);
+            }
+            catch (BrilliantDirectoriesBillingUnavailableException ex)
+            {
+                _logger.LogWarning(ex, "{Operation} dispatch failed because billing is unavailable for {UserId}/{SourceId}.", operationLabel, subject.SubjectId, sourceId);
+                return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "{Operation} dispatch denied for {UserId} on {SourceId} due quota enforcement.", operationLabel, subject.SubjectId, sourceId);
+                return Problem(statusCode: StatusCodes.Status429TooManyRequests, detail: ex.Message);
+            }
+        }
+        else
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "Shared horizon artifact dispatch service is not available right now.");
+        }
 
-            Response.Headers["X-Runsite-Tour-Limit"] = quota.WeeklyLimit.ToString(CultureInfo.InvariantCulture);
-            Response.Headers["X-Runsite-Tour-Remaining"] = quota.WeeklyRemaining.ToString(CultureInfo.InvariantCulture);
-        }
-        catch (BrilliantDirectoriesBillingUnavailableException ex)
+        if (emitRunsiteHeaders)
         {
-            _logger.LogWarning(ex, "Runsite tour dispatch failed because billing is unavailable for {UserId}/{PackId}.", subject.SubjectId, packId);
-            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Runsite tour dispatch denied for {UserId} on {PackId} due quota enforcement.", subject.SubjectId, packId);
-            return Problem(statusCode: StatusCodes.Status429TooManyRequests, detail: ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Runsite tour dispatch failed unexpectedly for {UserId} on {PackId}.", subject.SubjectId, packId);
-            return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: "Unable to process 3D-tour dispatch right now.");
+            Response.Headers["X-Runsite-Tour-Limit"] = runsiteQuota?.WeeklyLimit.ToString(CultureInfo.InvariantCulture);
+            Response.Headers["X-Runsite-Tour-Remaining"] = runsiteQuota?.WeeklyRemaining.ToString(CultureInfo.InvariantCulture);
         }
 
         _logger.LogInformation(
-            "Runsite tour dispatch allowed for {UserId} on {PackId}; supporter={SupporterActive}, remaining={WeeklyRemaining}/{WeeklyLimit}.",
+            "{Operation} dispatch allowed for {UserId} on {SourceId}; remaining={Remaining}/{Limit}.",
+            operationLabel,
             subject.SubjectId,
-            packId,
-            quota.SupporterActive,
-            quota.WeeklyRemaining,
-            quota.WeeklyLimit);
+            sourceId,
+            runsiteQuota?.WeeklyRemaining,
+            runsiteQuota?.WeeklyLimit);
 
-        return Redirect(pack.TourHref);
+        return Redirect(dispatchTarget);
     }
 
     [HttpGet("/runsites/tour-quota/me")]
