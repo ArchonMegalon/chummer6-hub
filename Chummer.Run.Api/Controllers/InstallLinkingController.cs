@@ -144,6 +144,25 @@ public sealed class InstallLinkingController : ControllerBase
         }
     }
 
+    [HttpPost("grants/revoke")]
+    [ProducesResponseType<RevokeInstallationGrantResponseDto>(StatusCodes.Status200OK)]
+    public ActionResult<RevokeInstallationGrantResponseDto> RevokeGrant([FromBody] RevokeInstallationGrantRequestDto? request)
+    {
+        if (request is null)
+        {
+            return BadRequest("grant revoke payload is required.");
+        }
+
+        try
+        {
+            return Ok(_installLinking.RevokeGrant(request));
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpPost("callbacks/exchange")]
     [ProducesResponseType<ExchangeInstallBrowserCallbackResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<ExchangeInstallBrowserCallbackResponseDto> ExchangeBrowserCallback([FromBody] ExchangeInstallBrowserCallbackRequestDto? request)

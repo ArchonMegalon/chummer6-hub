@@ -267,6 +267,65 @@ public sealed class InstallLinkingService
         }
     }
 
+    public RevokeInstallationGrantResponseDto RevokeGrant(RevokeInstallationGrantRequestDto request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var installationId = NormalizeOptional(request.InstallationId)
+            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "installation id is required.");
+        var accessToken = NormalizeOptional(request.AccessToken)
+            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "access token is required.");
+        var now = DateTimeOffset.UtcNow;
+
+        lock (_store.Gate)
+        {
+            ExpireGrantsLocked(now);
+
+            if (!_store.InstallationsById.TryGetValue(installationId, out ClaimedInstallationDto? installation))
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status404NotFound, "installation was not found.");
+            }
+
+            InstallationGrantDto? presentedGrant = _store.GrantsById.Values
+                .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
+                .Where(item => string.Equals(item.AccessToken, accessToken, StringComparison.Ordinal))
+                .OrderByDescending(static item => item.IssuedAtUtc)
+                .FirstOrDefault();
+            if (presentedGrant is null)
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status401Unauthorized, "installation grant is unknown.");
+            }
+
+            if (!string.Equals(presentedGrant.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase)
+                || presentedGrant.ExpiresAtUtc <= now)
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status401Unauthorized, "installation grant is no longer active.");
+            }
+
+            ClaimedInstallationDto revokedInstallation = installation with
+            {
+                Status = ClaimedInstallationStates.Revoked,
+                GrantId = null,
+                UpdatedAtUtc = now
+            };
+            _store.InstallationsById[revokedInstallation.InstallationId] = revokedInstallation;
+
+            InstallationGrantDto[] revokedGrants = _store.GrantsById.Values
+                .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
+                .Where(item => string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
+                .Select(item => item with { Status = InstallationGrantStates.Revoked })
+                .ToArray();
+
+            foreach (InstallationGrantDto revokedGrant in revokedGrants)
+            {
+                _store.GrantsById[revokedGrant.GrantId] = revokedGrant;
+            }
+
+            _store.PersistLocked();
+            return new RevokeInstallationGrantResponseDto(revokedInstallation, revokedGrants);
+        }
+    }
+
     public IssueInstallBrowserCallbackResponseDto IssueBrowserCallback(
         IssueInstallBrowserCallbackRequestDto request,
         string? userId,

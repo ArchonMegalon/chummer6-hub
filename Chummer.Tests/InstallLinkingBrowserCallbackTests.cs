@@ -77,6 +77,57 @@ public sealed class InstallLinkingBrowserCallbackTests
         Assert.Empty(summaryAfterExchange.PendingBrowserCallbacks ?? Array.Empty<InstallBrowserCallbackDto>());
     }
 
+    [Fact]
+    public void Revoke_grant_unlinks_install_and_revokes_active_grants()
+    {
+        using Fixture fixture = new();
+
+        IssueInstallBrowserCallbackResponseDto issued = fixture.Service.IssueBrowserCallback(
+            new IssueInstallBrowserCallbackRequestDto(
+                InstallationId: "ins-unlink-1",
+                ArtifactId: "avalonia-linux-x64-installer",
+                ApplicationVersion: "6.0.1-preview",
+                ChannelId: "preview",
+                HeadId: "avalonia",
+                Platform: "linux",
+                Arch: "x64",
+                CallbackUri: "chummer://install-link",
+                PublicKey: "public-key",
+                HostLabel: "Linux Workstation",
+                InstallAccessClass: InstallAccessClasses.AccountRecommended),
+            userId: "user-archon",
+            subjectId: "subject-archon");
+        ExchangeInstallBrowserCallbackResponseDto exchanged = fixture.Service.ExchangeBrowserCallback(
+            new ExchangeInstallBrowserCallbackRequestDto(
+                CallbackCode: issued.Callback.CallbackCode,
+                InstallationId: "ins-unlink-1",
+                HeadId: "avalonia",
+                ApplicationVersion: "6.0.1-preview",
+                ChannelId: "preview",
+                Platform: "linux",
+                Arch: "x64",
+                PublicKey: "public-key",
+                HostLabel: "Linux Workstation"));
+
+        RevokeInstallationGrantResponseDto revoked = fixture.Service.RevokeGrant(
+            new RevokeInstallationGrantRequestDto(
+                InstallationId: exchanged.Installation.InstallationId,
+                AccessToken: exchanged.Grant.AccessToken));
+
+        Assert.Equal(ClaimedInstallationStates.Revoked, revoked.Installation.Status);
+        InstallationGrantDto revokedGrant = Assert.Single(revoked.RevokedGrants);
+        Assert.Equal(exchanged.Grant.GrantId, revokedGrant.GrantId);
+        Assert.Equal(InstallationGrantStates.Revoked, revokedGrant.Status);
+        Assert.Null(fixture.Service.ResolveInstallationForGrant(
+            exchanged.Installation.InstallationId,
+            exchanged.Grant.AccessToken));
+        InstallLinkingSummaryDto summary = fixture.Service.GetSummary("user-archon", "subject-archon");
+        Assert.Contains(summary.ClaimedInstallations ?? Array.Empty<ClaimedInstallationDto>(),
+            item => string.Equals(item.InstallationId, "ins-unlink-1", StringComparison.Ordinal)
+                    && string.Equals(item.Status, ClaimedInstallationStates.Revoked, StringComparison.Ordinal));
+        Assert.Empty(summary.ActiveGrants ?? Array.Empty<InstallationGrantDto>());
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _tempRoot;
