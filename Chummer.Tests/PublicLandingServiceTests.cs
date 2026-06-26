@@ -56,7 +56,7 @@ public sealed class PublicLandingServiceTests
 
         Assert.Equal("/community", communityHub.DetailRoute);
         Assert.Equal("/community", communityHub.DetailPrimaryHref);
-        Assert.Equal("/community/receipts/open-run-network.json", communityHub.FallbackRoute);
+        Assert.Equal("/community/open-run-network", communityHub.FallbackRoute);
         Assert.Equal("/ledger", blackLedger.DetailRoute);
         Assert.Equal("/ledger/factions", blackLedger.DetailPrimaryHref);
     }

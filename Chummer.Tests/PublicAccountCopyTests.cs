@@ -18,8 +18,8 @@ public sealed class PublicAccountCopyTests
         Assert.Contains("label: Claim your copy", manifest, StringComparison.Ordinal);
         Assert.Contains("title: Open Chummer", manifest, StringComparison.Ordinal);
         Assert.Contains("title: Claim your copy", manifest, StringComparison.Ordinal);
-        Assert.Contains("Open Chummer with an account", trustContent, StringComparison.Ordinal);
-        Assert.Contains("Claim your copy only when", trustContent, StringComparison.Ordinal);
+        Assert.Contains("Use an account for recovery and saved help history.", trustContent, StringComparison.Ordinal);
+        Assert.Contains("Create an account when you want recovery, saved help history, and a cleaner return path", trustContent, StringComparison.Ordinal);
         Assert.Contains(">Open Chummer</a>", nowView, StringComparison.Ordinal);
         Assert.Contains("\"Claim your copy\"", faqView, StringComparison.Ordinal);
         Assert.Contains("authenticated ? \"Open account\" : \"Claim your copy\"", trustPageView, StringComparison.Ordinal);

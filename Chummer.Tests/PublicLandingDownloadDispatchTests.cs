@@ -456,8 +456,8 @@ public sealed class PublicLandingDownloadDispatchTests
         using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
         Assert.Equal("runner_passport", payload.RootElement.GetProperty("Horizon").GetString());
         Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
-        Assert.Equal("/passport/receipts/runner_return_posture.md", payload.RootElement.GetProperty("PublicBoard").GetProperty("RunnerReturnMarkdownHref").GetString());
-        Assert.Equal("/passport/receipts/runner_return_posture.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("RunnerReturnJsonHref").GetString());
+        Assert.Equal("/passport/runner_return_posture.md", payload.RootElement.GetProperty("PublicBoard").GetProperty("RunnerReturnMarkdownHref").GetString());
+        Assert.Equal("/passport/runner_return_posture.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("RunnerReturnJsonHref").GetString());
         Assert.Equal("/account/passport", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountEntryHref").GetString());
         Assert.Equal("/account/passport/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
         Assert.Equal("/account/ledger/notifications", payload.RootElement.GetProperty("SignedInBench").GetProperty("LiveNotificationsHref").GetString());
@@ -517,7 +517,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/play/anarchy", payload.RootElement.GetProperty("PlayShell").GetProperty("PlayHref").GetString());
         Assert.Equal("/ledger/anarchy", payload.RootElement.GetProperty("PlayShell").GetProperty("LedgerHref").GetString());
         Assert.Equal("/anarchy/export/runner.json", payload.RootElement.GetProperty("ExportLane").GetProperty("ExportJsonHref").GetString());
-        Assert.Equal("/anarchy/receipts/explain.json", payload.RootElement.GetProperty("ExportLane").GetProperty("ExplainReceiptHref").GetString());
+        Assert.Equal("/anarchy/explain", payload.RootElement.GetProperty("ExportLane").GetProperty("ExplainReceiptHref").GetString());
         Assert.Equal("Shipped rules-light path", payload.RootElement.GetProperty("PublicProfile").GetProperty("VerdictLabel").GetString());
         Assert.True(payload.RootElement.GetProperty("DispatchLane").GetProperty("ReceiptAnchored").GetBoolean());
     }

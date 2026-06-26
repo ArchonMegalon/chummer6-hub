@@ -22,9 +22,9 @@ test('community hub public route stays available and points at the signed-in boa
 
   await page.goto(`${baseUrl}/community`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Community Hub', exact: true })).toBeVisible();
-  await expect(page.locator('body')).toContainText('Community Hub now ships a real first-party open-run network');
+  await expect(page.locator('body')).toContainText('Community Hub keeps the public board readable first.');
   await expect(page.locator('body')).toContainText('Sign in for Community Hub');
-  await expect(page.locator('body')).toContainText('Meeting tools and public venues are handoff lanes only.');
+  await expect(page.locator('body')).toContainText('Meeting tools and public venues are next step paths only.');
 
   writeJsonArtifact('COMMUNITY_HUB_ROUTE_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),
