@@ -5,7 +5,7 @@ namespace Chummer.Tests;
 public sealed class PublicLandingReleaseTrustViewTests
 {
     [Fact]
-    public void DownloadsViewKeepsOnlyStableNightlyAndLinuxSourceBuildVisible()
+    public void DownloadsViewKeepsOnlyStableNightlyVisibleAndMovesLinuxSourceBehindOtherDownloads()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml");
         string view = File.ReadAllText(viewPath);
@@ -16,6 +16,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("<summary>Other downloads</summary>", view, StringComparison.Ordinal);
         Assert.Contains("Build from source", view, StringComparison.Ordinal);
         Assert.Contains("build-chummer6-linux.sh", view, StringComparison.Ordinal);
+        Assert.True(
+            view.IndexOf("id=\"linux-source\"", StringComparison.Ordinal) >
+            view.IndexOf("<summary>Other downloads</summary>", StringComparison.Ordinal));
         Assert.Contains("Recommended from your browser. Other platforms stay out of the way.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Pick one.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer picks the right installer for this browser.", view, StringComparison.Ordinal);
@@ -99,7 +102,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Recommended for this browser.", view, StringComparison.Ordinal);
         Assert.Contains("Newer than Stable.", view, StringComparison.Ordinal);
         Assert.Contains("No sudo. Updates default to notify.", view, StringComparison.Ordinal);
-        Assert.Contains("showLinuxSourcePrimary", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("showLinuxSourcePrimary", view, StringComparison.Ordinal);
         Assert.Contains("RequestedPlatformHasPublicDownload", view, StringComparison.Ordinal);
         Assert.Contains("No public installer for this browser yet.", view, StringComparison.Ordinal);
         Assert.Contains("var stable = requestedPlatformUnavailable ? null : recommended;", view, StringComparison.Ordinal);
@@ -1051,8 +1054,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         string css = File.ReadAllText(cssPath);
 
         Assert.Contains("auth-entry--lean", view, StringComparison.Ordinal);
-        Assert.Contains("Use the same copy. Add recovery and support history.", controller, StringComparison.Ordinal);
-        Assert.Contains("Open your account. Keep installs and support together.", controller, StringComparison.Ordinal);
+        Assert.Contains("Use email first. Google is optional.", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Use the same copy. Add recovery and support history.", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open your account. Keep installs and support together.", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"Claim your copy\"", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"Open Chummer\"", controller, StringComparison.Ordinal);
         Assert.Contains("<h1 id=\"auth-title\">@Model.Heading</h1>", view, StringComparison.Ordinal);
@@ -1089,7 +1093,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("auth-entry--lean", view, StringComparison.Ordinal);
-        Assert.Contains("Open your account. Keep installs and support together.", controller, StringComparison.Ordinal);
+        Assert.Contains("Use email first. Google is optional.", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open your account. Keep installs and support together.", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("installLinkReturnsToLocalApp", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Keep Chummer open while the browser connects this copy.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("If the browser cannot return to Chummer, open this page again from the app.", view, StringComparison.Ordinal);
