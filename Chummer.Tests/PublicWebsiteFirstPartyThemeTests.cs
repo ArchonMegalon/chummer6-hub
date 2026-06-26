@@ -25,7 +25,6 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
         string appNavigation = File.ReadAllText(RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_NAVIGATION.yaml"));
-        string partizipateView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml"));
 
         Assert.Contains("public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
@@ -46,8 +45,9 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("[id*=\"global-search\"]", controller, StringComparison.Ordinal);
         Assert.Contains("new RegExp('\\\\bWhat do you want' + ' to see next\\\\?'", controller, StringComparison.Ordinal);
         Assert.Contains("text === 'search' || text === 'ctrl k'", controller, StringComparison.Ordinal);
-        Assert.Contains("partizipate-board", partizipateView, StringComparison.Ordinal);
-        Assert.DoesNotContain("ProductLift", partizipateView, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("boardPath: string.Empty", controller, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-board-skin", controller, StringComparison.Ordinal);
+        Assert.Contains("RemoveHostedBoardAuthLinks", controller, StringComparison.Ordinal);
 
         string siblingNavigationPath = Path.GetFullPath(Path.Combine(RepoPaths.Root, "..", "chummer-design", "products", "chummer", "PUBLIC_NAVIGATION.yaml"));
         if (!File.Exists(siblingNavigationPath))

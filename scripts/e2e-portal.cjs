@@ -62,12 +62,8 @@ const checks = [
   {
     url: `${baseUrl}/participate`,
     assert: text =>
-      text.includes('Participate')
-      && text.includes('partizipate-board')
+      text.includes('data-chummer-board-skin')
       && text.includes('Short requests, clear bugs, useful ideas.')
-      && text.includes('Public requests')
-      && !text.includes('participate-board')
-      && !text.includes('src="/participate/board')
       && !text.includes('Requests, votes, and shipped work.')
       && !text.includes('ProductLift')
       && !text.includes('Something went wrong')
@@ -77,10 +73,7 @@ const checks = [
     url: `${baseUrl}/partizipate`,
     assert: (text, response) =>
       /\/partizipate\/?$/.test(response.url)
-      && text.includes('partizipate-board')
       && text.includes('Short requests, clear bugs, useful ideas.')
-      && text.includes('Public requests')
-      && !text.includes('participate-board')
       && text.includes('data-chummer-board-skin')
       && !text.includes('cdn.productlift.dev')
       && !text.includes('media.productlift.dev')

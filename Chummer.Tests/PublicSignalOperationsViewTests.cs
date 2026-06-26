@@ -11,11 +11,14 @@ public sealed class PublicSignalOperationsViewTests
     {
         string feedbackViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
         string participateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml");
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
 
         Assert.False(File.Exists(feedbackViewPath));
         string participateView = File.ReadAllText(participateViewPath);
+        string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("partizipate-board", participateView, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-board-skin", controller, StringComparison.Ordinal);
+        Assert.Contains("localOrigin: \"/partizipate\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("participate-hosted__frame", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("var signalOperations = Model.SignalOperations;", participateView, StringComparison.Ordinal);

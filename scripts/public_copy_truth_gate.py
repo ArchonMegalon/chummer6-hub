@@ -9,12 +9,12 @@ from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completio
 
 
 PARTICIPATE_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Partizipate.cshtml"
+PUBLIC_CONTROLLER = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs"
 OPERATIONS_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_PublicSignalOperationsPacket.cshtml"
 PROJECTION_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_PublicSignalProjectionPacket.cshtml"
 
 REQUIRED_HTML_PHRASES = (
-    "Participate",
-    "partizipate-board",
+    "data-chummer-board-skin",
     "Short requests, clear bugs, useful ideas.",
 )
 FORBIDDEN_HTML_PHRASES = (
@@ -31,7 +31,9 @@ FORBIDDEN_HTML_PHRASES = (
     "proof-bound",
 )
 REQUIRED_SOURCE_PHRASES = (
-    "partizipate-board",
+    "localOrigin: \"/partizipate\"",
+    "localBaseHref: \"/partizipate/\"",
+    "data-chummer-board-skin",
     "Short requests, clear bugs, useful ideas.",
     "Chummer follow-up is not visible here yet.",
     "account follow-up waits until the shipped path is available on this host",
@@ -78,9 +80,10 @@ def run(base_url: str, route: str) -> int:
     scan_forbidden(body, FORBIDDEN_HTML_PHRASES, normalized_route, failures)
 
     participate_source = PARTICIPATE_VIEW.read_text(encoding="utf-8")
+    controller_source = PUBLIC_CONTROLLER.read_text(encoding="utf-8")
     operations_source = OPERATIONS_VIEW.read_text(encoding="utf-8")
     projection_source = PROJECTION_VIEW.read_text(encoding="utf-8")
-    source_text = "\n".join((participate_source, operations_source, projection_source))
+    source_text = "\n".join((participate_source, controller_source, operations_source, projection_source))
 
     scan_required(source_text, REQUIRED_SOURCE_PHRASES, "feedback source", failures)
     scan_forbidden(source_text, FORBIDDEN_SOURCE_PHRASES, "feedback source", failures)
@@ -96,6 +99,7 @@ def run(base_url: str, route: str) -> int:
         "failures": failures,
         "source_files": [
             str(PARTICIPATE_VIEW),
+            str(PUBLIC_CONTROLLER),
             str(OPERATIONS_VIEW),
             str(PROJECTION_VIEW),
         ],

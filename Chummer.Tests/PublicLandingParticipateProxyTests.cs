@@ -95,7 +95,7 @@ public sealed class PublicLandingParticipateProxyTests
     }
 
     [Fact]
-    public async Task PartizipateAliasRendersCompactFirstPartyBoardAtTypoUrl()
+    public async Task PartizipateAliasProxiesHostedBoardAtTypoUrl()
     {
         var controller = CreateController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -104,19 +104,19 @@ public sealed class PublicLandingParticipateProxyTests
 
         IActionResult result = await controller.ParticipateAliasPage(CancellationToken.None);
 
-        ViewResult view = Assert.IsType<ViewResult>(result);
-        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
-        Assert.Equal("Participate", model.Heading);
-        Assert.Equal("Short requests, clear bugs, useful ideas.", model.Summary);
-        Assert.Equal("/partizipate", model.RetryHref);
-        Assert.Equal("/roadmap", model.RoadmapHref);
-        Assert.NotEqual(0, model.TotalRequestCount);
-        Assert.DoesNotContain(model.Posts, post => post.Title.Contains("ProductLift", StringComparison.OrdinalIgnoreCase));
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        string html = content.Content ?? string.Empty;
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("rel=\"canonical\" href=\"/partizipate\"", html, StringComparison.Ordinal);
+        Assert.Contains("<base href=\"/partizipate/\" />", html, StringComparison.Ordinal);
+        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Sign up<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">Log in<", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("global-search-trigger", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task PartizipateCatchAllEmptyPathRendersCompactFirstPartyBoard()
+    public async Task PartizipateCatchAllEmptyPathUsesHostedBoardProxy()
     {
         var controller = CreateController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -125,12 +125,14 @@ public sealed class PublicLandingParticipateProxyTests
 
         IActionResult result = await controller.ParticipateBoardProxyLegacyAlias(string.Empty, CancellationToken.None);
 
-        ViewResult view = Assert.IsType<ViewResult>(result);
-        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
-        Assert.Equal("Participate", model.Heading);
-        Assert.Equal("/partizipate", model.RetryHref);
-        Assert.NotEqual(0, model.TotalRequestCount);
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        string html = content.Content ?? string.Empty;
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("rel=\"canonical\" href=\"/partizipate\"", html, StringComparison.Ordinal);
+        Assert.Contains("<base href=\"/partizipate/\" />", html, StringComparison.Ordinal);
+        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("menubar_signup", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("menubar_login", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

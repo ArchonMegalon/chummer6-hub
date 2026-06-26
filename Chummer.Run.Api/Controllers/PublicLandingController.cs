@@ -2128,10 +2128,12 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
-    {
-        FirstPartyParticipateBoardViewModel model = await BuildFirstPartyParticipateBoardAsync(cancellationToken, "/partizipate").ConfigureAwait(false);
-        return View("~/Views/PublicLanding/Partizipate.cshtml", model);
-    }
+        => await ParticipateBoardProxyCore(
+            boardPath: string.Empty,
+            cancellationToken,
+            localOrigin: "/partizipate",
+            localBaseHref: "/partizipate/",
+            fallbackPath: "/partizipate").ConfigureAwait(false);
 
     [HttpGet("/participate")]
     [Produces("text/html")]
@@ -2422,7 +2424,12 @@ public sealed class PublicLandingController : Controller
         string raw = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
         if (string.IsNullOrWhiteSpace(raw))
         {
-            return await ParticipateAliasPage(cancellationToken).ConfigureAwait(false);
+            return await ParticipateBoardProxyCore(
+                boardPath: string.Empty,
+                cancellationToken,
+                localOrigin: "/partizipate",
+                localBaseHref: "/partizipate/",
+                fallbackPath: "/partizipate").ConfigureAwait(false);
         }
 
         string targetPath = raw switch

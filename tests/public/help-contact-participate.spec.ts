@@ -46,10 +46,8 @@ test('help, contact, and participate keep public and private paths clear', async
 
   expect(helpRobots).toContain('index');
   expect(contactRobots).toContain('index');
-  expect(participateText).toContain('partizipate-board');
+  expect(participateText).toContain('data-chummer-board-skin');
   expect(participateText).toContain('Short requests, clear bugs, useful ideas.');
-  expect(participateText).not.toContain('participate-board');
-  expect(participateText).not.toContain('src="/participate/board');
   expect(participateText).not.toContain('Requests, votes, and shipped work.');
   expect(participateText).not.toContain('ProductLift');
   expect(participateBoardText).not.toContain('/auth/google/start?next=');
@@ -70,8 +68,7 @@ test('help, contact, and participate keep public and private paths clear', async
   await contactPage.close();
 
   const participatePage = await openPublicPage(browser, '/participate');
-  await expect(participatePage.getByRole('heading', { name: 'Participate' })).toHaveCount(1);
-  await expect(participatePage.locator('.partizipate-board')).toBeVisible();
+  await expect(participatePage.locator('style[data-chummer-board-skin]')).toHaveCount(1);
   await expect(participatePage.locator('#participate-board')).toHaveCount(0);
   await expect(participatePage.locator('body')).not.toContainText('Requests, votes, and shipped work.');
   await expect(participatePage.locator('body')).not.toContainText('ProductLift');
@@ -87,6 +84,6 @@ test('help, contact, and participate keep public and private paths clear', async
     help_robots: helpRobots,
     contact_robots: contactRobots,
     participate_robots: participateRobots,
-    participate_mode: 'first_party_board',
+    participate_mode: 'whitelabel_productlift_proxy',
   });
 });

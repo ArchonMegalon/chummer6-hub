@@ -434,7 +434,7 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert 'BuildParticipateSignInHref(string targetPath = "/participate")' in controller
     assert '? _chrome.BuildPublicChrome(' in controller
     assert ': _chrome.BuildAuthenticatedChrome(' in controller
-    assert 'return View("~/Views/PublicLanding/Partizipate.cshtml", model);' in controller
+    assert 'boardPath: string.Empty' in controller
     assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/participate/board";' in controller
     assert "ResolveParticipateSupporterHref()" in controller
     assert 'BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();' in controller
@@ -455,8 +455,10 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert r"\bAI-powered\b" in controller
     assert "authCandidates" in controller
     assert "node.remove()" in controller
-    assert "partizipate-board" in participate
+    assert "localOrigin: \"/partizipate\"" in controller
+    assert "localBaseHref: \"/partizipate/\"" in controller
     assert "data-chummer-board-skin" in participate
+    assert "data-chummer-board-skin" in controller
     assert "participate-hosted__frame" not in participate
     assert "Model.SupporterHref" in participate
     assert "Fallback form" not in participate
