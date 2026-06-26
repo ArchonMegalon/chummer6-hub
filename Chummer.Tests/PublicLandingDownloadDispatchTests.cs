@@ -512,6 +512,10 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/account/ledger/notifications", payload.RootElement.GetProperty("LiveRail").GetProperty("NotificationsHref").GetString());
         Assert.Equal("/account/work#aftermath-packages", payload.RootElement.GetProperty("AftermathRail").GetProperty("WorkspaceHref").GetString());
         Assert.Equal(2, payload.RootElement.GetProperty("AftermathRail").GetProperty("ApiRoutes").GetArrayLength());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=table-pulse&artifactKindOrCapabilityId=table-pulse-debrief", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=table-pulse", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("table-pulse", capability.GetProperty("HorizonId").GetString());
         Assert.Equal("table-pulse-debrief", capability.GetProperty("CapabilityId").GetString());
@@ -522,6 +526,31 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("table-pulse:live-and-aftermath", capability.GetProperty("SourceRef").GetString());
         Assert.DoesNotContain("hedy", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Nonverbia", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void OriginDossierReceiptJsonReturnsStoryAndSharedArtifactContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.OriginDossierReceiptJson();
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("origin-dossier", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("/docs/origin-dossier-the-name-she-chose", payload.RootElement.GetProperty("PublicBoard").GetProperty("StoryBookletHref").GetString());
+        Assert.Equal("/origin-dossier/media", payload.RootElement.GetProperty("PublicBoard").GetProperty("MediaDispatchHref").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=origin-dossier", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("origin-dossier-media", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("origin-dossier:public-story-packet", capability.GetProperty("SourceRef").GetString());
+        Assert.DoesNotContain("First Book", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vidBoard", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -654,6 +683,39 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/account/jackpoint/open", payload.RootElement.GetProperty("SignedInDesk").GetProperty("AccountRedirectHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/publications", payload.RootElement.GetProperty("SignedInDesk").GetProperty("PublicationIndexApiHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/publications/{publicationId}", payload.RootElement.GetProperty("SignedInDesk").GetProperty("PublicationDetailApiHrefTemplate").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=jackpoint&artifactKindOrCapabilityId=jackpoint-briefing-video", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=jackpoint", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("jackpoint", capability.GetProperty("HorizonId").GetString());
+        Assert.Equal("jackpoint-briefing-video", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("jackpoint:briefing-network", capability.GetProperty("SourceRef").GetString());
+        Assert.DoesNotContain("vidBoard", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RunbookReceiptJsonReturnsPrimerAndSharedArtifactContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.RunbookReceiptJson();
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("runbook-press", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("/runbook/primers/new-runner-primer.md", payload.RootElement.GetProperty("PublicBoard").GetProperty("FirstPrimerMarkdownHref").GetString());
+        Assert.Equal("/runbook/primers/{primerId}/export", payload.RootElement.GetProperty("PublicBoard").GetProperty("ExportDispatchHrefTemplate").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=runbook-press&artifactKindOrCapabilityId=runbook-export", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=runbook-press", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("runbook-export", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("runbook-press:primer-network", capability.GetProperty("SourceRef").GetString());
+        Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Documentation.AI", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -2404,6 +2466,15 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/account/runsites/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/workspace-digests", payload.RootElement.GetProperty("SignedInBench").GetProperty("WorkspaceIndexApiHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/runs", payload.RootElement.GetProperty("SignedInBench").GetProperty("RunIndexApiHref").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=runsite", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("runsite-tour", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("runsite:prep-network", capability.GetProperty("SourceRef").GetString());
+        Assert.DoesNotContain("Matterport", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("3DVista", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -2424,6 +2495,40 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/account/propertyquarry/{propertyId}", payload.RootElement.GetProperty("SignedInDesk").GetProperty("AccountWorkspaceHrefTemplate").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/property-workspaces/{propertyId}", payload.RootElement.GetProperty("SignedInDesk").GetProperty("PrepWorkspaceApiHrefTemplate").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/property-continuity/{propertyId}", payload.RootElement.GetProperty("SignedInDesk").GetProperty("ContinuityApiHref").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-tour", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=propertyquarry", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("propertyquarry-tour", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("propertyquarry:property-network", capability.GetProperty("SourceRef").GetString());
+        Assert.DoesNotContain("Matterport", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("3DVista", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void KarmaForgeReceiptJsonReturnsDiscoveryAndSharedArtifactContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.KarmaForgeReceiptJson();
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("karma-forge", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("/participate/karma-forge", payload.RootElement.GetProperty("PublicBoard").GetProperty("IntakeHref").GetString());
+        Assert.Equal("/participate/karma-forge/discovery", payload.RootElement.GetProperty("PublicBoard").GetProperty("DiscoveryDispatchHref").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/quotas/me?horizonId=karma-forge&artifactKindOrCapabilityId=karma-forge-discovery", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=karma-forge", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("karma-forge-discovery", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("karma-forge:public-intake", capability.GetProperty("SourceRef").GetString());
+        Assert.DoesNotContain("Icanpreneur", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Deftform", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MetaSurvey", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

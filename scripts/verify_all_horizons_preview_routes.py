@@ -21,6 +21,7 @@ ROUTES = [
     ("/runsites", "runsite", "shipped_mvp"),
     ("/propertyquarry", "propertyquarry", "shipped_mvp"),
     ("/runbook", "runbook_press", "shipped_mvp"),
+    ("/origin-dossier", "origin_dossier", "shipped_mvp"),
     ("/table-pulse", "table_pulse", "shipped_mvp"),
     ("/community", "community_hub", "shipped_mvp"),
     ("/creator", "creator_os", "shipped_mvp"),
@@ -96,6 +97,7 @@ def main() -> int:
         "- RUNSITE shipped MVP\n"
         "- PROPERTYQUARRY shipped MVP\n"
         "- RUNBOOK PRESS shipped MVP\n"
+        "- ORIGIN DOSSIER shipped MVP\n"
         "- TABLE PULSE shipped MVP\n"
         "- Community Hub shipped MVP\n"
         "- Creator OS shipped MVP\n"
@@ -128,6 +130,7 @@ def main() -> int:
         "RUNSITE_PACKET_E2E.generated.json": "runsite",
         "PROPERTYQUARRY_ROUTE_PROOF.generated.json": "propertyquarry",
         "RUNBOOK_PRESS_PRIMER_E2E.generated.json": "runbook_press",
+        "ORIGIN_DOSSIER_STORY_E2E.generated.json": "origin_dossier",
         "TABLE_PULSE_AFTERMATH_E2E.generated.json": "table_pulse",
         "COMMUNITY_OPEN_RUN_E2E.generated.json": "community_hub",
         "GHOSTWIRE_AFTER_ACTION_E2E.generated.json": "ghostwire",

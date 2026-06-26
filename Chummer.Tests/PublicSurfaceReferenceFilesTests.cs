@@ -93,6 +93,9 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/account/propertyquarry", manifest, StringComparison.Ordinal);
         Assert.Contains("/account/propertyquarry/open", manifest, StringComparison.Ordinal);
         Assert.Contains("/account/propertyquarry/{propertyId}", manifest, StringComparison.Ordinal);
+        Assert.Contains("/runbook/primer-network", manifest, StringComparison.Ordinal);
+        Assert.Contains("/origin-dossier", manifest, StringComparison.Ordinal);
+        Assert.Contains("/origin-dossier/story-network", manifest, StringComparison.Ordinal);
         Assert.Contains("/onramp", manifest, StringComparison.Ordinal);
         Assert.Contains("/onramp/receipts/guided-starter.json", manifest, StringComparison.Ordinal);
         Assert.Contains("/edition-studio", manifest, StringComparison.Ordinal);
@@ -108,6 +111,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/ledger/factions/{factionId}/promo.vtt", manifest, StringComparison.Ordinal);
         Assert.Contains("verification_path: /ledger/factions/ashline-circle/promo.json", manifest, StringComparison.Ordinal);
         Assert.Contains("/contact/submitted/{caseId}", manifest, StringComparison.Ordinal);
+        Assert.Contains("/participate/karma-forge/discovery-network", manifest, StringComparison.Ordinal);
         Assert.Contains("/participate/karma-forge/submitted/{submissionId}", manifest, StringComparison.Ordinal);
         Assert.Contains("verification_mode: controller_contract", manifest, StringComparison.Ordinal);
         Assert.Contains("verify_public_routes_from_manifest.py", runbook, StringComparison.Ordinal);
@@ -225,6 +229,7 @@ public sealed class PublicSurfaceReferenceFilesTests
             ("alice", "shipped_mvp"),
             ("karma-forge", "shipped_mvp"),
             ("knowledge-fabric", "shipped_mvp"),
+            ("origin-dossier", "shipped_mvp"),
             ("jackpoint", "signed_in_command_lane_live"),
             ("black-ledger", "signed_in_command_lane_live"),
             ("runsite", "signed_in_command_lane_live"),

@@ -12,23 +12,32 @@ COMPLETION = ROOT.parent / "_completion" / "all_horizons_missed_potential"
 TARGETS = {
     "JACKPOINT_BRIEFING_E2E.generated.json": [
         "/jackpoint",
+        "/jackpoint/briefing-network",
         "/jackpoint/briefings/emerald-sprawl-briefing.md",
         "/jackpoint/briefings/emerald-sprawl-briefing.json",
     ],
     "RUNSITE_PACKET_E2E.generated.json": [
         "/runsites",
+        "/runsites/prep-network",
         "/runsites/packs/redmond-dockyard-pack.md",
         "/runsites/packs/redmond-dockyard-pack.json",
     ],
     "PROPERTYQUARRY_ROUTE_PROOF.generated.json": [
         "/propertyquarry",
+        "/propertyquarry/property-network",
         "/propertyquarry/properties/northbound-research-lab.md",
         "/propertyquarry/properties/northbound-research-lab.json",
     ],
     "RUNBOOK_PRESS_PRIMER_E2E.generated.json": [
         "/runbook",
+        "/runbook/primer-network",
         "/runbook/primers/new-runner-primer.md",
         "/runbook/primers/new-runner-primer.json",
+    ],
+    "ORIGIN_DOSSIER_STORY_E2E.generated.json": [
+        "/origin-dossier",
+        "/origin-dossier/story-network",
+        "/docs/origin-dossier-the-name-she-chose",
     ],
 }
 

@@ -689,6 +689,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("KarmaForgeDiscoveryService", services, StringComparison.Ordinal);
         Assert.Contains("KarmaForgeStore", services, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/participate/karma-forge\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/participate/karma-forge/discovery-network\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpPost(\"/participate/karma-forge\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")]", controller, StringComparison.Ordinal);
         Assert.Contains("KarmaForgeSubmitted.cshtml", controller, StringComparison.Ordinal);
@@ -872,6 +873,20 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/account/jackpoint/{publicationId}\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"me/publications\")]", campaignSpineController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"me/publications/{publicationId}\")]", campaignSpineController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RunbookAndOriginDossierUseNamedPublicReceiptRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.Contains("[HttpGet(\"/runbook\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/runbook/receipts/primer-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("RUNBOOK PRESS keeps printable primers first-party", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/origin-dossier\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/origin-dossier/receipts/story-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("Origin Dossier keeps the approved story packet first", controller, StringComparison.Ordinal);
     }
 
     [Fact]

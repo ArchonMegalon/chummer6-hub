@@ -376,6 +376,33 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: first-party primer and campaign-book surface only
+- path: /runbook/primer-network
+  title: RUNBOOK PRESS primer details
+  audience: public
+  purpose: product_surface_detail
+  requires_auth: false
+  guest_fallback: /runbook
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: first-party named primer network receipt
+- path: /origin-dossier
+  title: ORIGIN DOSSIER
+  audience: public
+  purpose: product_surface
+  requires_auth: false
+  guest_fallback: /origin-dossier
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: first-party origin story and bounded media surface only
+- path: /origin-dossier/story-network
+  title: ORIGIN DOSSIER story details
+  audience: public
+  purpose: product_surface_detail
+  requires_auth: false
+  guest_fallback: /origin-dossier
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: first-party named origin story network receipt
 - path: /community
   title: Community Hub
   audience: public
@@ -664,6 +691,15 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: governed discovery entry only
+- path: /participate/karma-forge/discovery-network
+  title: KARMA FORGE discovery details
+  audience: public
+  purpose: product_surface_receipt
+  requires_auth: false
+  guest_fallback: /participate/karma-forge
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: first-party governed discovery network receipt only
 - path: /alice
   title: ALICE compare bench
   audience: public

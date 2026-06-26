@@ -3893,6 +3893,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 "no_player_scoring",
                 "no_public_surveillance"
             },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("table-pulse", "debrief_packet"),
             ArtifactCapability = BuildPublicHorizonCapability(
                 "table-pulse",
                 "debrief_packet",
@@ -3965,6 +3966,35 @@ document.addEventListener('DOMContentLoaded', function () {
         return View("~/Views/PublicLanding/TrustPage.cshtml", model);
     }
 
+    [HttpGet("/origin-dossier/story-network")]
+    [HttpGet("/origin-dossier/receipts/story-network.json")]
+    [Produces("application/json")]
+    public IActionResult OriginDossierReceiptJson()
+        => Ok(new
+        {
+            Horizon = "origin-dossier",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                StoryBookletHref = "/docs/origin-dossier-the-name-she-chose",
+                StoryBookletPdfHref = "/docs/origin-dossier-the-name-she-chose/download.pdf",
+                MediaDispatchHref = "/origin-dossier/media",
+                BookStudioHref = "/docs/origin-book-studio",
+                Summary = "Origin Dossier keeps the approved story packet first, then widens into bounded media on first-party routes."
+            },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("origin-dossier", "dossier_media"),
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "origin-dossier",
+                "dossier_media",
+                "origin-dossier:public-story-packet"),
+            Boundary = new
+            {
+                StoryTruth = "approved_chummer_owned_packet",
+                SilentMechanicsMutation = "not_claimed",
+                ProviderTruth = "not_claimed"
+            }
+        });
+
     [HttpGet("/roadmap/origin-dossier")]
     public IActionResult OriginDossierRoadmapAlias()
         => Redirect("/origin-dossier");
@@ -4008,6 +4038,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 ArtifactDetailHrefTemplate = "/artifacts/publications/{publicationId}",
                 Summary = "Signed-in JACKPOINT keeps publication review, public publication status, and campaign-return publication history inside Chummer."
             },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("jackpoint", "briefing_video"),
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "jackpoint",
+                "briefing_video",
+                "jackpoint:briefing-network"),
             Boundary = new
             {
                 PublicAudience = "player_safe_only",
@@ -4073,6 +4108,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 RunDetailApiHrefTemplate = "/api/v1/campaign-spine/me/runs/{runId}",
                 Summary = "Signed-in RUNSITE keeps workspace prep, runboard continuity, and prep-library launch inside Chummer."
             },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("runsite", "tour"),
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "runsite",
+                "tour",
+                "runsite:prep-network"),
             Boundary = new
             {
                 TacticalAuthority = "not_claimed",
@@ -4143,6 +4183,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 ContinuityApiHref = "/api/v1/campaign-spine/me/property-continuity/{propertyId}",
                 Summary = "Signed-in PROPERTYQUARRY keeps selected property prep, continuity hooks, and workspace continuity behind account links."
             },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("propertyquarry", "tour"),
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "propertyquarry",
+                "tour",
+                "propertyquarry:property-network"),
             Boundary = new
             {
                 TacticalAuthority = "not_claimed",
@@ -4632,6 +4677,41 @@ document.addEventListener('DOMContentLoaded', function () {
     public async Task<IActionResult> RunbookPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunbookPageModel(cancellationToken));
 
+    [HttpGet("/runbook/primer-network")]
+    [HttpGet("/runbook/receipts/primer-network.json")]
+    [Produces("application/json")]
+    public IActionResult RunbookReceiptJson()
+    {
+        IReadOnlyList<MediaArtifactDocument> primers = _mediaHorizons?.ListRunbookPrimers() ?? Array.Empty<MediaArtifactDocument>();
+        MediaArtifactDocument? firstPrimer = primers.FirstOrDefault();
+        string firstPrimerMarkdownHref = firstPrimer?.MarkdownRoute ?? "/runbook/primers/new-runner-primer.md";
+        string firstPrimerJsonHref = firstPrimer?.JsonRoute ?? "/runbook/primers/new-runner-primer.json";
+        return Ok(new
+        {
+            Horizon = "runbook-press",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                FirstPrimerMarkdownHref = firstPrimerMarkdownHref,
+                FirstPrimerJsonHref = firstPrimerJsonHref,
+                PrimerCount = primers.Count == 0 ? 2 : primers.Count,
+                ExportDispatchHrefTemplate = "/runbook/primers/{primerId}/export",
+                Summary = "RUNBOOK PRESS keeps printable primers first-party and routes formatted exports through shared Chummer-owned artifact requests."
+            },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("runbook-press", "document_export"),
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "runbook-press",
+                "document_export",
+                "runbook-press:primer-network"),
+            Boundary = new
+            {
+                PublicationStudio = "not_claimed",
+                SourceTruth = "chummer_owned_primer_packets",
+                ProviderTruth = "not_claimed"
+            }
+        });
+    }
+
     [HttpGet("/roadmap/runbook-press")]
     public IActionResult RunbookPressRoadmapAlias()
         => Redirect("/runbook");
@@ -5099,6 +5179,34 @@ document.addEventListener('DOMContentLoaded', function () {
             cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/KarmaForge.cshtml", model);
     }
+
+    [HttpGet("/participate/karma-forge/discovery-network")]
+    [HttpGet("/participate/karma-forge/receipts/discovery-network.json")]
+    [Produces("application/json")]
+    public IActionResult KarmaForgeReceiptJson()
+        => Ok(new
+        {
+            Horizon = "karma-forge",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                IntakeHref = "/participate/karma-forge",
+                DiscoveryDispatchHref = "/participate/karma-forge/discovery",
+                SubmittedReceiptHrefTemplate = "/participate/karma-forge/submitted/{submissionId}",
+                Summary = "KARMA FORGE keeps house-rule demand intake first-party and routes discovery packets through shared Chummer-owned artifact receipts."
+            },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("karma-forge", "discovery_packet"),
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "karma-forge",
+                "discovery_packet",
+                "karma-forge:public-intake"),
+            Boundary = new
+            {
+                RulesTruth = "not_claimed",
+                ApprovalTruth = "chummer_owned",
+                RoadmapTruth = "separate"
+            }
+        });
 
     [HttpPost("/participate/karma-forge")]
     [ValidateAntiForgeryToken]
@@ -11669,6 +11777,23 @@ Boundary:
             PublicVisible: health.PublicVisible,
             SourceRef: sourceRef,
             Visibility: visibility);
+    }
+
+    private object BuildSharedArtifactSurfaceRoutes(string horizonId, string artifactKindOrCapabilityId)
+    {
+        HorizonCapabilityDefinition capability = _horizonCapabilities.GetCapability(horizonId, artifactKindOrCapabilityId);
+        string encodedHorizonId = Uri.EscapeDataString(capability.HorizonId);
+        string encodedCapabilityId = Uri.EscapeDataString(capability.CapabilityId);
+        return new
+        {
+            PublicCapabilityCatalogHref = "/api/v1/public/horizons/capabilities",
+            SignedInQuotaCatalogHref = capability.RequiresAuthentication && capability.QuotaTracked
+                ? $"/api/v1/horizons/quotas/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
+                : null,
+            SignedInRequestReceiptHref = capability.RequiresAuthentication
+                ? $"/api/v1/horizons/artifact-requests/me?horizonId={encodedHorizonId}"
+                : null
+        };
     }
 
     private PublicSignalLoopSnapshotViewModel BuildPublicSignalLoopSnapshot(
