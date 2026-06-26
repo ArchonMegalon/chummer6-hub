@@ -11954,10 +11954,10 @@ Boundary:
             SignedInQuotaCatalogHref = capability.RequiresAuthentication && capability.QuotaTracked
                 ? $"/api/v1/horizons/quotas/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
-            SignedInRequestReceiptHref = capability.RequiresAuthentication
+            SignedInRequestReceiptHref = capability.RequiresAuthentication || publicReceiptEligible
                 ? $"/api/v1/horizons/artifact-requests/me?horizonId={encodedHorizonId}"
                 : null,
-            SignedInRequestReceiptDetailHrefTemplate = capability.RequiresAuthentication
+            SignedInRequestReceiptDetailHrefTemplate = capability.RequiresAuthentication || publicReceiptEligible
                 ? "/api/v1/horizons/artifact-requests/me/{requestId}"
                 : null
         };

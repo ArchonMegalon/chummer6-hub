@@ -696,8 +696,8 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
-        Assert.Null(sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
-        Assert.Null(sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=runner_passport", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("runner_passport", capability.GetProperty("HorizonId").GetString());
         Assert.Equal("runner_passport-identity-network", capability.GetProperty("CapabilityId").GetString());
@@ -735,6 +735,8 @@ public sealed class PublicLandingDownloadDispatchTests
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=community_hub&artifactKindOrCapabilityId=community_hub-open-run-network", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=community_hub", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("community_hub-open-run-network", capability.GetProperty("CapabilityId").GetString());
         Assert.Equal("open_run_network", capability.GetProperty("ArtifactKind").GetString());
@@ -767,6 +769,8 @@ public sealed class PublicLandingDownloadDispatchTests
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=creator_os&artifactKindOrCapabilityId=creator_os-publication-network", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=creator_os", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("creator_os-publication-network", capability.GetProperty("CapabilityId").GetString());
         Assert.Equal("publication_network", capability.GetProperty("ArtifactKind").GetString());
