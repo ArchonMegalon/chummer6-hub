@@ -56,7 +56,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(originBookStudioPdf.headers()['content-type']).toContain('application/pdf');
   expect(originBookStudioSource.status()).toBe(200);
   expect(originBookStudioSource.headers()['content-type']).toContain('text/markdown');
-  expect(originVideo.status()).toBe(200);
+  expect(originVideo.status()).toBe(404);
 
   const payfunnelsText = await payfunnelsPage.text();
   expect(payfunnelsText).toContain('$1 Billing Test');

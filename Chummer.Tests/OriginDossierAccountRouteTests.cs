@@ -103,6 +103,7 @@ public sealed class OriginDossierAccountRouteTests
         IActionResult listenResult = await controller.OriginDossierArtifact("origin-route", "listen", CancellationToken.None);
         RedirectResult listen = Assert.IsType<RedirectResult>(listenResult);
         Assert.Equal("https://audio.chummer.run/share/origin-route-audiobook", listen.Url);
+        Assert.StartsWith("horizon-artifact-", controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
 
         IActionResult readResult = await controller.OriginDossierArtifact("origin-route", "read", CancellationToken.None);
         RedirectResult read = Assert.IsType<RedirectResult>(readResult);
@@ -112,6 +113,13 @@ public sealed class OriginDossierAccountRouteTests
         PhysicalFileResult watch = Assert.IsType<PhysicalFileResult>(watchResult);
         Assert.Equal(artifacts.DossierVideoPath, watch.FileName);
         Assert.Equal("video/mp4", watch.ContentType);
+
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("origin-dossier", fixture.SubjectId, limit: 10);
+        Assert.Equal(4, receipts.Count);
+        Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:cover" && receipt.Quota is null && receipt.Visibility == "private");
+        Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:listen" && receipt.Quota is null && receipt.Visibility == "private");
+        Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:read" && receipt.Quota is null && receipt.Visibility == "private");
+        Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:watch" && receipt.Quota is null && receipt.Visibility == "private");
 
         AccountsController anonymous = fixture.CreateController(authenticated: false);
         IActionResult anonymousResult = await anonymous.OriginDossierArtifact("origin-route", "listen", CancellationToken.None);
@@ -150,6 +158,9 @@ public sealed class OriginDossierAccountRouteTests
 
         public string SubjectId { get; }
 
+        public HorizonArtifactRequestReceiptStore ArtifactRequestReceipts
+            => _provider.GetRequiredService<HorizonArtifactRequestReceiptStore>();
+
         public static OriginDossierRouteFixture Create()
         {
             string root = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-route-tests", Guid.NewGuid().ToString("N"));
@@ -167,6 +178,7 @@ public sealed class OriginDossierAccountRouteTests
                     ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = Path.Combine(root, "myfirstbook-usage.json"),
                     ["CHUMMER_PAYFUNNELS_BILLING_STORE_PATH"] = Path.Combine(root, "payfunnels-billing.json"),
                     ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = Path.Combine(root, "origin-dossier-publications.json"),
+                    ["CHUMMER_HORIZON_ARTIFACT_REQUEST_RECEIPT_STORE_PATH"] = Path.Combine(root, "horizon-artifact-request-receipts.json"),
                     ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
                     ["CHUMMER_LOCAL_E2E_ACCESS_TOKEN"] = AccessToken,
                     ["CHUMMER_LOCAL_E2E_SUBJECT_ID"] = subjectId,
