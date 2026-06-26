@@ -43,6 +43,22 @@ Nested configuration keys under `BrilliantDirectories:*` are also supported for 
 
 The sync secret is a Hub webhook secret, not a Brilliant Directories tenant credential. Do not commit real values.
 
+## Release gate
+
+The public page may stay online without provider configuration, but that state is only a placeholder handoff:
+
+```text
+Supporter checkout is not open yet.
+```
+
+A publish that claims live Brilliant Directories billing must run the public billing E2E with:
+
+```bash
+CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT=1
+```
+
+That gate fails if `/account/billing` still shows the placeholder copy. Do not describe billing as live until `BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL`, `BRILLIANT_DIRECTORIES_MEMBER_PORTAL_URL` when available, and `BRILLIANT_DIRECTORIES_SYNC_SECRET` are configured in the public deployment environment.
+
 ## Production boundary
 
 Production callers must bind `UserId` from the signed-in Hub account/session or a verified account-linking job. Do not let arbitrary browser form input decide which Hub account receives a membership snapshot.

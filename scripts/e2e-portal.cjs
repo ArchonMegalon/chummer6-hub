@@ -54,6 +54,17 @@ const checks = [
     }
   },
   {
+    url: `${baseUrl}/account`,
+    assert: (text, response) =>
+      response.url.endsWith('/account/billing')
+      && text.includes('Support Chummer')
+      && text.includes('Same app for everyone.')
+      && text.includes('Origin books: Free 1/month. Supporter 2/month.')
+      && !text.includes('Open work')
+      && !text.includes('Open installs')
+      && !text.includes('Account ID')
+  },
+  {
     url: `${baseUrl}/contact`,
     assert: text =>
       text.includes('Discord first. Private form only for logs or account details.')
@@ -102,16 +113,18 @@ const checks = [
   {
     url: `${baseUrl}/hub`,
     assert: (text, response) =>
-      response.url.endsWith('/login?next=%2Faccount')
-      && text.includes('Open Chummer')
-      && text.includes('Open your account. Keep installs and support together.')
+      response.url.endsWith('/account/billing')
+      && text.includes('Support Chummer')
+      && text.includes('Same app for everyone.')
+      && !text.includes('Open your account. Keep installs and support together.')
   },
   {
     url: `${baseUrl}/hub/`,
     assert: (text, response) =>
-      response.url.endsWith('/login?next=%2Faccount')
-      && text.includes('Open Chummer')
-      && text.includes('Open your account. Keep installs and support together.')
+      response.url.endsWith('/account/billing')
+      && text.includes('Support Chummer')
+      && text.includes('Same app for everyone.')
+      && !text.includes('Open your account. Keep installs and support together.')
   },
   {
     url: `${baseUrl}/blazor/`,

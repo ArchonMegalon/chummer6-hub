@@ -2,6 +2,9 @@ import { expect, test, type Browser } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
+const requireBrilliantDirectoriesCheckout = /^(1|true|yes|on)$/i.test(
+  process.env.CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT?.trim() || '',
+);
 
 async function openPublicPage(browser: Browser, route: string) {
   const page = await browser.newPage({ baseURL: baseUrl });
@@ -72,6 +75,11 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(brilliantDirectoriesText).not.toContain('hosted billing route');
   expect(brilliantDirectoriesText).not.toContain('Premium');
   expect(brilliantDirectoriesText).not.toContain('Upgrade');
+  if (requireBrilliantDirectoriesCheckout) {
+    expect(brilliantDirectoriesText).not.toContain('Supporter billing is not open yet.');
+    expect(brilliantDirectoriesText).not.toContain('Not open yet');
+    expect(brilliantDirectoriesText).toContain('Support Chummer');
+  }
 
   const originPayload = await originReceipt.json();
   expect(originPayload.document.slug).toBe('origin-dossier-the-name-she-chose');
