@@ -471,6 +471,58 @@ platforms:
     }
 
     [Fact]
+    public void BuildExperienceUsesBrowserArchitectureHintsWhenMultipleLinuxBuildsExist()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260422-111500",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-22T11:15:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-x64-installer",
+                    Platform: "Avalonia Desktop Linux X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    Sha256: "6b0a63c39850a257e66d142c0bad196a7cc4fcbaf027635965f138f534bb13ea",
+                    SizeBytes: 34297862,
+                    Head: "avalonia",
+                    PlatformId: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "account_required"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-arm64-installer",
+                    Platform: "Avalonia Desktop Linux ARM64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-arm64-installer.deb",
+                    Sha256: "8a0a63c39850a257e66d142c0bad196a7cc4fcbaf027635965f138f534bb13eb",
+                    SizeBytes: 34297862,
+                    Head: "avalonia",
+                    PlatformId: "linux",
+                    Arch: "arm64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-arm64-installer.deb",
+                    InstallAccessClass: "account_required")
+            ]);
+
+        var experience = service.BuildExperience(
+            manifest,
+            userAgent: "Mozilla/5.0 (X11; Linux x86_64) Sec-CH-UA-Platform=\"Linux\" Sec-CH-UA-Arch=\"arm\" Sec-CH-UA-Bitness=\"64\"",
+            authenticated: false);
+
+        Assert.Equal("Linux", experience.RequestedPlatformLabel);
+        Assert.Equal("avalonia-linux-arm64-installer", experience.Recommended?.Artifact.Id);
+    }
+
+    [Fact]
     public void BuildOptionTreatsWindowsLauncherAndZipAsSupportOnlyPackages()
     {
         var configuration = new ConfigurationBuilder()
