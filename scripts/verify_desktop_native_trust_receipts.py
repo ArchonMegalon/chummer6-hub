@@ -246,7 +246,7 @@ REQUIRED_SOURCE_MARKERS = {
         "NormalizeSupportPrefill(applicationVersion) ?? manifest.Version",
         "desktop app update lane",
         "previous installed copy",
-        "Support stays on the same install rail",
+        "Support stays with this install path",
         "BuildAccountSupportHref(",
         "\"/account/support\"",
         "Keep the fix, update, rollback, and verification on this same linked install.",
@@ -269,7 +269,7 @@ REQUIRED_SOURCE_MARKERS = {
     ],
     Path("Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml"): [
         "Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.",
-        "Support stays on the same install rail",
+        "Support stays with this install path",
     ],
     Path("Chummer.Run.Api/Views/Accounts/Account.cshtml"): [
         "The next safe action is still inside Chummer on the already-downloaded device.",
@@ -552,7 +552,7 @@ REQUIRED_PROOF_RECEIPTS = {
         "milestone_id": 102,
         "frontier_id": FRONTIER_ID,
         "summary": (
-            "Support stays on the same install rail with installed build, current release, channel, head, platform, "
+            "Support stays with this install path, with installed build, current release, channel, head, platform, "
             "fallback, update, and rollback truth attached for the desktop client."
         ),
         "surfaces": [

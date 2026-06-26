@@ -168,7 +168,7 @@ SCENES = (
         "id": "runbook_press",
         "horizon": "RUNBOOK PRESS",
         "title": "Living Campaign Truth Becomes Books",
-        "body": "Confirmed material flows into primers, district guides, GM appendices, and web or PDF exports without losing provenance.",
+        "body": "Confirmed material flows into primers, district guides, GM appendices, and web or PDF exports with context intact.",
         "proof": "Books come from confirmed material",
         "voiceover": "RUNBOOK PRESS builds primers, handbooks, and campaign books from confirmed material instead of copy-paste from ten tools.",
         "onscreen": "RUNBOOK PRESS / Campaign truth becomes books",

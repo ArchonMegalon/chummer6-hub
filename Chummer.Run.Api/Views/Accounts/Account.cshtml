@@ -3396,8 +3396,8 @@
                                     @Html.AntiForgeryToken()
                                     <label for="creatorPublicationSubmitNotes">@(correctionResubmission ? "Correction notes" : "Publish notes")</label>
                                     <textarea id="creatorPublicationSubmitNotes" name="notes" rows="3" placeholder="@(correctionResubmission
-                                        // .Replace( M115 source marker: State what changed so this corrected packet can re-enter governed decision flow without losing provenance or lineage. )
-                                        ? "State what changed so this corrected packet can re-enter governed moderation without losing provenance or lineage."
+                                        // .Replace( M115 source marker: State what changed so this corrected packet can re-enter moderation with its context and lineage intact. )
+                                        ? "State what changed so this corrected packet can re-enter moderation with its context and lineage intact."
                                         : "Explain why this publication is ready to move forward.")"></textarea>
                                     <div class="stacked-actions">
                                         <button class="button-like button-like--primary" type="submit">@(correctionResubmission ? "Resubmit corrected packet" : "Send forward")</button>

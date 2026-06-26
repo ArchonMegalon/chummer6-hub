@@ -4,7 +4,7 @@
     var pageTitle = Model.CurrentSection switch
     {
         "access" => "Home · Access",
-        "work" => "Home · Work",
+        "work" => "Home · Campaigns",
         "setup" => "Home · Setup",
         _ => "Home"
     };
@@ -14,8 +14,8 @@
     ViewData["SurfaceClass"] = isAccessSection
         ? "surface-home surface-minimal surface-home-access"
         : "surface-home surface-minimal";
-    ViewData["ContextSidebarHeading"] = "Home sections";
-    ViewData["ContextSidebarSummary"] = "Use the section links to move between access, work, and setup.";
+    ViewData["ContextSidebarHeading"] = "Home";
+    ViewData["ContextSidebarSummary"] = "Jump between installs, campaigns, and setup.";
     ViewData["ContextSidebarLinks"] = Model.Sections
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
         .ToArray();
@@ -27,12 +27,12 @@
     var activeAccessRights = Model.InstallLinking.ActiveGrants?.Count ?? 0;
     var pendingClaims = Model.InstallLinking.PendingClaimTickets.Count;
     var primaryActionTargetsSetup = string.Equals(Model.PrimaryAction.Href, "/home/setup", StringComparison.OrdinalIgnoreCase);
-    var dossiers = Model.CampaignSpine.Dossiers.Take(3).ToArray();
-    var campaigns = Model.CampaignSpine.Campaigns.Take(3).ToArray();
-    var runs = Model.CampaignSpine.Runs.Take(3).ToArray();
-    var workspaces = Model.CampaignSpine.Workspaces.Take(2).ToArray();
-    var buildHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(2).ToArray();
-    var rulesAnswers = Model.CampaignSpine.RulesNavigator.Take(2).ToArray();
+    var dossiers = Model.CampaignSpine.Dossiers.Take(2).ToArray();
+    var campaigns = Model.CampaignSpine.Campaigns.Take(2).ToArray();
+    var runs = Model.CampaignSpine.Runs.Take(1).ToArray();
+    var workspaces = Model.CampaignSpine.Workspaces.Take(1).ToArray();
+    var buildHandoffs = Model.CampaignSpine.BuildLabHandoffs.Take(1).ToArray();
+    var rulesAnswers = Model.CampaignSpine.RulesNavigator.Take(1).ToArray();
     var migrationReceipts = Model.CampaignSpine.MigrationReceipts.Take(1).ToArray();
     var creatorPublications = Model.CampaignSpine.CreatorPublications.Take(1).ToArray();
     var restoreDevices = Model.CampaignSpine.Restore.ClaimedDevices.Take(1).ToArray();
@@ -182,15 +182,15 @@
     var heading = Model.CurrentSection switch
     {
         "access" => "Installs",
-        "work" => "Work",
+        "work" => "Campaigns",
         "setup" => "Finish setup",
         _ => $"Welcome back, {Model.User.DisplayName}"
     };
     var summary = Model.CurrentSection switch
     {
         "access" => "See linked copies, setup codes, downloads, and install help.",
-        "work" => "Pick up dossiers, active runs, and the next useful path without turning Home into a deeper work page.",
-        "setup" => "Finish the short setup flow first, then come back to access and work with a steadier account.",
+        "work" => "Return to runners, campaigns, and the next useful page.",
+        "setup" => "Finish the short setup flow first, then come back to installs and campaigns with a steadier account.",
         _ => "Pick up where you left off: finish the basics, install the current release, and keep track of what is planned next."
     };
 
@@ -363,8 +363,8 @@
             <div class="flagship-coverage flagship-coverage--home" aria-label="Account flagship coverage">
                 <div class="flagship-coverage__lead">
                     <p class="eyebrow">@PublicText(Model.FlagshipCoverage.Eyebrow)</p>
-                    <h2 class="editorial-title">Everything you need in one place.</h2>
-                    <p class="editorial-copy">Downloads, session access, and support stay together so you do not have to hunt across pages.</p>
+                    <h2 class="editorial-title">What matters right now.</h2>
+                    <p class="editorial-copy">Downloads, access, and support stay together.</p>
                 </div>
                 <div class="flagship-coverage__grid">
                     @foreach (var card in Model.FlagshipCoverage.Cards)
@@ -496,11 +496,11 @@
                 <div class="home-stream">
                                 <div class="home-stream__column">
                                     <div class="home-stream__lead">
-                                        <p class="eyebrow">Work</p>
-                                        <h2 class="home-stream__title">Pick up where you actually left off</h2>
+                                        <p class="eyebrow">Campaigns</p>
+                                        <h2 class="home-stream__title">Return to the last real session</h2>
                                         @* Campaign return. GM readiness cues. *@
-                                        <p class="home-stream__summary">Dossiers, runs, and current work stay visible here so Home can point to the next useful page without turning into the full workbench.</p>
-                                        <p class="muted-copy">Recent work, rules answers, and active sessions stay visible here before you open the deeper work page.</p>
+                                        <p class="home-stream__summary">Runners, campaigns, and active sessions stay visible here so Home can point to the next useful page without turning into the full workbench.</p>
+                                        <p class="muted-copy">The short list stays here before you open the deeper campaign pages.</p>
                                     </div>
                                     <div class="app-rail">
                                         @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0 && workspaces.Length == 0)
@@ -1302,9 +1302,9 @@
         else if (showWorkSection)
         {
             <section class="release-footnote">
-                <p class="eyebrow">Work</p>
-                <h2 class="editorial-title">Finish setup before the work surfaces try to carry too much</h2>
-                <p class="editorial-copy">The work view gets useful once Chummer has a stable identity, install path, and return path attached to the account.</p>
+                <p class="eyebrow">Campaigns</p>
+                <h2 class="editorial-title">Finish setup before campaigns start carrying real state</h2>
+                <p class="editorial-copy">This view gets useful once Chummer has a stable identity, install path, and return path attached to the account.</p>
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="/home/setup">Open setup</a>
                 </div>
@@ -1315,7 +1315,7 @@
         {
             <section class="release-footnote">
                 <p class="eyebrow">Setup</p>
-                <h2 class="editorial-title">Finish the small setup flow, then come back to access and work</h2>
+                <h2 class="editorial-title">Finish the small setup flow, then come back to installs and campaigns</h2>
                 <p class="editorial-copy">Profile, recovery, and update preferences live here so the rest of the account can stay calmer by default.</p>
                 <div class="stacked-actions">
                     <button class="button-like button-like--primary" type="button" data-open-onboarding id="openSetupButton">@(showOnboarding ? "Complete setup" : "Open setup")</button>

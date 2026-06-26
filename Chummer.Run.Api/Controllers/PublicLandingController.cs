@@ -10349,9 +10349,9 @@ Boundary:
         {
             return new HomePrimaryActionViewModel(
                 "First session",
-                "Open work and start your first playable session",
-                "Your install is linked. Open your workspace to move from setup into the next safe session before returning to optional tasks.",
-                "Open work",
+                "Open campaigns and start your first playable session",
+                "Your install is linked. Open campaigns to move into the first playable session before you spend time anywhere else.",
+                "Open campaigns",
                 "/home/work",
                 "primary");
         }
@@ -10939,7 +10939,7 @@ Boundary:
         {
             new SectionLinkViewModel("overview", "Overview", "/home", string.Equals(currentSection, "overview", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("access", "Installs", "/home/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("work", "Work", "/home/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("work", "Campaigns", "/home/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("setup", "Setup", "/home/setup", string.Equals(currentSection, "setup", StringComparison.OrdinalIgnoreCase))
         };
 
@@ -10947,8 +10947,8 @@ Boundary:
         => currentSection switch
         {
             "access" => ("Home · Installs", "Linked copies, setup codes, downloads, and install help."),
-            "work" => ("Home · Work", "Current work, return context, and the next useful route without the rest of Home."),
-            "setup" => ("Home · Setup", "Finish the short account setup flow, then come back to access and work."),
+            "work" => ("Home · Campaigns", "Current runners, campaigns, and the next useful route."),
+            "setup" => ("Home · Setup", "Finish the short account setup flow, then come back to installs and campaigns."),
             _ => ("Home", "Pick the next action and keep track of what is opening next.")
         };
 

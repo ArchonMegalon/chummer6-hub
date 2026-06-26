@@ -15,7 +15,7 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("Home summary", view, StringComparison.Ordinal);
         Assert.Contains("Recent change", view, StringComparison.Ordinal);
         Assert.Contains("Use as guest or link this copy later.", view, StringComparison.Ordinal);
-        Assert.Contains("Everything you need in one place.", view, StringComparison.Ordinal);
+        Assert.Contains("What matters right now.", view, StringComparison.Ordinal);
         Assert.Contains("<span class=\"tag\">Campaign</span>", view, StringComparison.Ordinal);
         Assert.Contains(">Open campaign</a>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<span class=\"tag\">Workspace</span>", view, StringComparison.Ordinal);

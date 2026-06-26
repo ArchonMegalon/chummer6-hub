@@ -934,7 +934,7 @@
         2594403904
       ],
       "active_flagship_frontier_id": 2594403904,
-      "summary": "Support stays on the same install rail with installed build, current release, channel, head, platform, fallback, update, and rollback truth attached for the desktop client.",
+      "summary": "Support stays with this install path, with installed build, current release, channel, head, platform, fallback, update, and rollback truth attached for the desktop client.",
       "routes": [
         "/api/v1/install-linking/continuation",
         "/api/v1/install-linking/continuation/support",

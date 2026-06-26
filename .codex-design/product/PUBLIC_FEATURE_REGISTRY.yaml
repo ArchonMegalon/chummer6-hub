@@ -24,7 +24,7 @@ cards:
     audience: public
     image_family: simulation_bench
     asset_slot: capability_check_rules
-    action_label: See a rules explanation
+    action_label: See the explanation trail
     status_note: "Modifiers, sources, and repeated results stay visible together."
     pain: Follow the sources and modifiers instead of arguing from vibes.
     payoff: The answer stays inspectable when somebody asks where the number came from.
@@ -136,7 +136,7 @@ cards:
     badge: Live now
     audience: public
     image_family: simulation_bench
-    action_label: See the explanation
+    action_label: See the explanation trail
   - id: real_public_guide
     bucket: supporting_reads
     title: Product guide and roadmap

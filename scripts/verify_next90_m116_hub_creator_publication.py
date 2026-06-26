@@ -152,7 +152,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
     "Chummer.Run.Api/Views/Accounts/Account.cshtml": [
         "Correction notes",
         "Resubmit corrected packet",
-        "State what changed so this corrected packet can re-enter governed moderation without losing provenance or lineage.",
+        "State what changed so this corrected packet can re-enter moderation with its context and lineage intact.",
         "Request changes",
         "Publish publicly",
     ],
