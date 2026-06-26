@@ -705,6 +705,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("public_identity_return", capability.GetProperty("CapabilitySlot").GetString());
         Assert.Equal("available", capability.GetProperty("Status").GetString());
         Assert.True(capability.GetProperty("RequestSupported").GetBoolean());
+        Assert.False(capability.GetProperty("QuotaTracked").GetBoolean());
         Assert.Equal("runner_passport:identity-network", capability.GetProperty("SourceRef").GetString());
         string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
         Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
@@ -736,6 +737,7 @@ public sealed class PublicLandingDownloadDispatchTests
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("community_hub-open-run-network", capability.GetProperty("CapabilityId").GetString());
         Assert.Equal("open_run_network", capability.GetProperty("ArtifactKind").GetString());
+        Assert.False(capability.GetProperty("QuotaTracked").GetBoolean());
         Assert.Equal("community_hub:open-run-network", capability.GetProperty("SourceRef").GetString());
         string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
         Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
@@ -767,6 +769,7 @@ public sealed class PublicLandingDownloadDispatchTests
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("creator_os-publication-network", capability.GetProperty("CapabilityId").GetString());
         Assert.Equal("publication_network", capability.GetProperty("ArtifactKind").GetString());
+        Assert.False(capability.GetProperty("QuotaTracked").GetBoolean());
         Assert.Equal("creator_os:publication-network", capability.GetProperty("SourceRef").GetString());
         string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
         Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
@@ -1008,6 +1011,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("document_render", capability.GetProperty("capability_slot").GetString());
         Assert.Equal("available", capability.GetProperty("status").GetString());
         Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.True(capability.GetProperty("quota_tracked").GetBoolean());
         Assert.Equal("runbook-press:new-runner-primer", capability.GetProperty("source_ref").GetString());
         Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(capability), StringComparison.OrdinalIgnoreCase);
     }
@@ -1035,6 +1039,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.True(capability.GetProperty("request_supported").GetBoolean());
         Assert.False(capability.GetProperty("requires_authentication").GetBoolean());
         Assert.True(capability.GetProperty("public_visible").GetBoolean());
+        Assert.False(capability.GetProperty("quota_tracked").GetBoolean());
         Assert.Equal("signal_deck:pressure_posture", capability.GetProperty("source_ref").GetString());
         string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
         Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
@@ -1064,6 +1069,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.True(capability.GetProperty("request_supported").GetBoolean());
         Assert.False(capability.GetProperty("requires_authentication").GetBoolean());
         Assert.True(capability.GetProperty("public_visible").GetBoolean());
+        Assert.False(capability.GetProperty("quota_tracked").GetBoolean());
         Assert.Equal("living_world:watch_package_posture", capability.GetProperty("source_ref").GetString());
         string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
         Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
@@ -1225,6 +1231,21 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("3D Tour", publicSafeHealth.PublicLabel);
         Assert.Equal(1, publicSafeHealth.FreeWeeklyLimit);
         Assert.Equal(10, publicSafeHealth.SupporterWeeklyLimit);
+        Assert.True(publicSafeHealth.QuotaTracked);
+    }
+
+    [Fact]
+    public void HorizonCapabilityHealthMarksReceiptOnlyCapabilitiesAsNonQuotaTracked()
+    {
+        using Fixture fixture = new();
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+
+        HorizonCapabilityHealthSnapshot health = capabilities.GetHealth("runner_passport", "identity_network", publicSafe: true);
+
+        Assert.Equal("available", health.Status);
+        Assert.False(health.RequiresAuthentication);
+        Assert.True(health.PublicVisible);
+        Assert.False(health.QuotaTracked);
     }
 
     [Fact]
@@ -1512,6 +1533,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("available", runsiteTour.Status);
         Assert.Equal(1, runsiteTour.FreeWeeklyLimit);
         Assert.Equal(10, runsiteTour.SupporterWeeklyLimit);
+        Assert.True(runsiteTour.QuotaTracked);
     }
 
     [Fact]
@@ -1626,6 +1648,10 @@ public sealed class PublicLandingDownloadDispatchTests
             && capability.CapabilityId == "origin-dossier-media"
             && capability.Status == "disabled");
         Assert.Contains(catalog.Capabilities, capability =>
+            capability.HorizonId == "runner_passport"
+            && capability.CapabilityId == "runner_passport-identity-network"
+            && !capability.QuotaTracked);
+        Assert.Contains(catalog.Capabilities, capability =>
             capability.HorizonId == "table-pulse"
             && capability.CapabilityId == "table-pulse-debrief");
         Assert.All(catalog.Capabilities, capability => Assert.Null(capability.InternalProviderLane));
@@ -1657,6 +1683,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Null(health.InternalProviderLane);
         Assert.Equal(3, health.FreeWeeklyLimit);
         Assert.Equal(12, health.SupporterWeeklyLimit);
+        Assert.True(health.QuotaTracked);
         Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(health), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Documentation.AI", JsonSerializer.Serialize(health), StringComparison.OrdinalIgnoreCase);
     }
@@ -1727,9 +1754,51 @@ public sealed class PublicLandingDownloadDispatchTests
         HorizonArtifactRequestReceipt acceptedReceipt = Assert.IsType<HorizonArtifactRequestReceipt>(Assert.IsType<OkObjectResult>(accepted.Result).Value);
         HorizonArtifactRequestReceipt exhaustedReceipt = Assert.IsType<HorizonArtifactRequestReceipt>(Assert.IsType<OkObjectResult>(exhausted.Result).Value);
         Assert.Equal("accepted", acceptedReceipt.Status);
+        Assert.True(acceptedReceipt.QuotaTracked);
         Assert.Equal(0, acceptedReceipt.Quota?.WeeklyRemaining);
         Assert.Equal("blocked", exhaustedReceipt.Status);
         Assert.Contains("artifact allowance", exhaustedReceipt.BlockedReasons);
+    }
+
+    [Fact]
+    public void InternalHorizonArtifactRequestEndpointAcceptsNonQuotaTrackedCapability()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["FLEET_INTERNAL_API_TOKEN"] = "test-internal-token";
+        });
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+        HorizonArtifactQuotaService quota = new(
+            new HorizonArtifactUsageStore(fixture.Configuration),
+            capabilities,
+            fixture.Billing);
+        var controller = new InternalHorizonCapabilitiesController(
+            capabilities,
+            quota,
+            new HorizonArtifactRequestService(capabilities, quota),
+            fixture.Configuration)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer test-internal-token";
+
+        ActionResult<HorizonArtifactRequestReceipt> result = controller.BuildArtifactRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: "runner_passport",
+                ArtifactKindOrCapabilityId: "identity_network",
+                UserId: "subject.internal-passport",
+                SourceRef: "runner_passport:identity-network",
+                Visibility: "public_safe",
+                ExternalProcessingConsent: true));
+
+        HorizonArtifactRequestReceipt receipt = Assert.IsType<HorizonArtifactRequestReceipt>(Assert.IsType<OkObjectResult>(result.Result).Value);
+        Assert.Equal("accepted", receipt.Status);
+        Assert.False(receipt.QuotaTracked);
+        Assert.Null(receipt.Quota);
+        Assert.Empty(receipt.BlockedReasons);
     }
 
     [Fact]
@@ -2012,6 +2081,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("black-ledger-newsroom", payload.CapabilityId);
         Assert.Equal("public_safe", payload.Visibility);
         Assert.True(payload.PublicSafe);
+        Assert.False(payload.QuotaTracked);
         Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-newsroom", payload.CapabilityHealthHref);
         Assert.Equal($"/api/v1/public/horizons/artifact-requests/{receipt.RequestId}", payload.PublicReceiptHref);
 
@@ -2749,6 +2819,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("newsroom_bulletin", receipt.ArtifactKind);
         Assert.Equal("black-ledger:turn-1:newsroom", receipt.SourceRef);
         Assert.Equal("public_safe", receipt.Visibility);
+        Assert.False(receipt.QuotaTracked);
         Assert.True(string.IsNullOrWhiteSpace(receipt.RequestedByUserId));
         Assert.Null(receipt.Quota);
     }

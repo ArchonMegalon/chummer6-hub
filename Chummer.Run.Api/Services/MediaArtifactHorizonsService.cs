@@ -308,6 +308,7 @@ public sealed class MediaArtifactHorizonsService
             request_supported = string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
             requires_authentication = health.RequiresAuthentication,
             public_visible = health.PublicVisible,
+            quota_tracked = health.QuotaTracked,
             source_ref = $"{health.HorizonId}:{document.Id}",
             visibility = "public_safe"
         };

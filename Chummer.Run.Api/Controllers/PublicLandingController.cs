@@ -4432,25 +4432,26 @@ document.addEventListener('DOMContentLoaded', function () {
                     return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"Unable to create a Chummer-owned {operationLabel} request receipt.");
                 }
 
-                if (receipt.QuotaTracked && receipt.Quota is null)
+                HorizonArtifactQuotaSnapshot? receiptQuota = receipt.Quota;
+                if (receipt.QuotaTracked && receiptQuota is null)
                 {
                     _logger.LogWarning("{Operation} dispatch accepted without quota receipt for {UserId} on {SourceId}.", operationLabel, subject.SubjectId, sourceId);
                     return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: fallbackQuotaUnavailableMessage);
                 }
 
-                if (emitRunsiteHeaders)
+                if (emitRunsiteHeaders && receiptQuota is not null)
                 {
                     runsiteQuota = new RunsiteTourQuotaSnapshot(
-                        receipt.Quota.UserId,
-                        receipt.Quota.SupporterActive,
-                        receipt.Quota.AllowanceTier,
-                        receipt.Quota.EntitlementBasis,
-                        receipt.Quota.EntitlementScope,
-                        receipt.Quota.WeeklyLimit,
-                        receipt.Quota.WeeklyUsed,
-                        receipt.Quota.WeeklyRemaining,
-                        receipt.Quota.WindowStartUtc,
-                        receipt.Quota.WindowEndUtc);
+                        receiptQuota.UserId,
+                        receiptQuota.SupporterActive,
+                        receiptQuota.AllowanceTier,
+                        receiptQuota.EntitlementBasis,
+                        receiptQuota.EntitlementScope,
+                        receiptQuota.WeeklyLimit,
+                        receiptQuota.WeeklyUsed,
+                        receiptQuota.WeeklyRemaining,
+                        receiptQuota.WindowStartUtc,
+                        receiptQuota.WindowEndUtc);
                 }
 
                 Response.Headers["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
