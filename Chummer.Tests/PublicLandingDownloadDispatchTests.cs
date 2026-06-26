@@ -3632,6 +3632,72 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task PropertyquarryTourQuotaMeRequiresAuthentication()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.PropertyquarryTourQuota(CancellationToken.None);
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, problem.StatusCode);
+    }
+
+    [Fact]
+    public async Task PropertyquarryTourQuotaMeReturnsCurrentUserAllowance()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.PropertyquarryTourQuota(CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        var quota = Assert.IsType<RunsiteTourQuotaSnapshot>(ok.Value);
+        Assert.False(quota.SupporterActive);
+        Assert.Equal("free", quota.AllowanceTier);
+        Assert.Equal("free_weekly_allowance", quota.EntitlementBasis);
+        Assert.Equal("account", quota.EntitlementScope);
+        Assert.Equal("weekly", quota.WindowKind);
+        Assert.Equal(1, quota.WeeklyLimit);
+        Assert.Equal(0, quota.WeeklyUsed);
+        Assert.Equal(1, quota.WeeklyRemaining);
+    }
+
+    [Fact]
+    public async Task PropertyquarryTourQuotaMeUsesEnsuredUserIdForAllowanceProjection()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.HorizonArtifactQuota.Consume(
+            new HorizonArtifactQuotaRequest(
+                fixture.DispatchUserId,
+                "propertyquarry",
+                "propertyquarry-tour",
+                "dispatch@example.com"),
+            DateTimeOffset.UtcNow);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.PropertyquarryTourQuota(CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        var quota = Assert.IsType<RunsiteTourQuotaSnapshot>(ok.Value);
+        Assert.Equal(1, quota.WeeklyUsed);
+        Assert.Equal(0, quota.WeeklyRemaining);
+        Assert.Equal(1, quota.WindowUsed);
+        Assert.Equal(0, quota.WindowRemaining);
+    }
+
+    [Fact]
     public void RunsiteTourQuotaPersistsUsageAndResetsByWeek()
     {
         using Fixture fixture = new();

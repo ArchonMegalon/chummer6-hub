@@ -17,17 +17,31 @@ public sealed class RunsiteTourQuotaService
         string userId,
         DateTimeOffset? now = null,
         string? email = null)
-        => ToRunsiteSnapshot(_quota.GetQuota(new HorizonArtifactQuotaRequest(userId, "runsite", "tour", email), now));
+        => GetQuotaForHorizon("runsite", userId, now, email);
+
+    public RunsiteTourQuotaSnapshot GetQuotaForHorizon(
+        string horizonId,
+        string userId,
+        DateTimeOffset? now = null,
+        string? email = null)
+        => ToRunsiteSnapshot(_quota.GetQuota(new HorizonArtifactQuotaRequest(userId, horizonId, "tour", email), now));
 
     public RunsiteTourQuotaSnapshot ConsumeTour(string userId, DateTimeOffset? now = null, string? email = null)
+        => ConsumeTourForHorizon("runsite", userId, now, email);
+
+    public RunsiteTourQuotaSnapshot ConsumeTourForHorizon(
+        string horizonId,
+        string userId,
+        DateTimeOffset? now = null,
+        string? email = null)
     {
         try
         {
-            return ToRunsiteSnapshot(_quota.Consume(new HorizonArtifactQuotaRequest(userId, "runsite", "tour", email), now));
+            return ToRunsiteSnapshot(_quota.Consume(new HorizonArtifactQuotaRequest(userId, horizonId, "tour", email), now));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("allowance is exhausted", StringComparison.OrdinalIgnoreCase))
         {
-            RunsiteTourQuotaSnapshot quota = GetQuota(userId, now, email);
+            RunsiteTourQuotaSnapshot quota = GetQuotaForHorizon(horizonId, userId, now, email);
             throw new InvalidOperationException($"3D-tour allowance is exhausted for this {DescribeAllowanceWindowPeriod(quota.WindowKind)}.", ex);
         }
     }

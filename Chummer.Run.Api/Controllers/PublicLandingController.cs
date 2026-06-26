@@ -4718,6 +4718,16 @@ document.addEventListener('DOMContentLoaded', function () {
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> RunsiteTourQuota(CancellationToken cancellationToken = default)
+        => await TourQuota("runsite", cancellationToken);
+
+    [HttpGet("/propertyquarry/tour-quota/me")]
+    [ProducesResponseType<RunsiteTourQuotaSnapshot>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<IActionResult> PropertyquarryTourQuota(CancellationToken cancellationToken = default)
+        => await TourQuota("propertyquarry", cancellationToken);
+
+    private async Task<IActionResult> TourQuota(string horizonId, CancellationToken cancellationToken)
     {
         AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
         if (subject is null)
@@ -4728,7 +4738,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try
         {
             HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            return Ok(_runsiteTourQuota.GetQuota(user.UserId, email: subject.Email));
+            return Ok(_runsiteTourQuota.GetQuotaForHorizon(horizonId, user.UserId, email: subject.Email));
         }
         catch (BrilliantDirectoriesBillingUnavailableException ex)
         {
