@@ -299,6 +299,8 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Equal("/account/billing", model.Chrome.CurrentPath);
         Assert.Equal(user.UserId, model.UserId);
         Assert.NotNull(model.CurrentMyFirstBookQuota);
+        Assert.Equal("supporter", model.CurrentMyFirstBookQuota!.PlanKey);
+        Assert.True(model.CurrentMyFirstBookQuota.SupporterActive);
         Assert.Equal(2, model.CurrentMyFirstBookQuota!.MonthlyLimit);
         Assert.Equal(1, model.CurrentMyFirstBookQuota.MonthlyUsed);
         Assert.Equal(1, model.CurrentMyFirstBookQuota.MonthlyRemaining);
@@ -351,6 +353,7 @@ public sealed class BrilliantDirectoriesBillingTests
         MyFirstBookQuotaSnapshotDto quota = Assert.IsType<MyFirstBookQuotaSnapshotDto>(Assert.IsType<OkObjectResult>(result.Result).Value);
         Assert.Equal(user.UserId, quota.UserId);
         Assert.Equal("free", quota.PlanKey);
+        Assert.Equal("Free", quota.PlanName);
         Assert.Equal(1, quota.MonthlyLimit);
         Assert.Equal(1, quota.MonthlyRemaining);
     }
@@ -380,6 +383,8 @@ public sealed class BrilliantDirectoriesBillingTests
         MyFirstBookQuotaConsumeResultDto secondPayload = Assert.IsType<MyFirstBookQuotaConsumeResultDto>(Assert.IsType<OkObjectResult>(second.Result).Value);
         ObjectResult thirdProblem = Assert.IsType<ObjectResult>(third.Result);
 
+        Assert.Equal("consumed", firstPayload.Status);
+        Assert.Equal("Supporter", firstPayload.Quota.PlanName);
         Assert.Equal(1, firstPayload.Quota.MonthlyRemaining);
         Assert.Equal(0, secondPayload.Quota.MonthlyRemaining);
         Assert.Equal(StatusCodes.Status429TooManyRequests, thirdProblem.StatusCode);
@@ -831,6 +836,7 @@ public sealed class BrilliantDirectoriesBillingTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json"),
+                ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORE_PATH"] = Path.Combine(root, "horizon-artifact-usage.json"),
                 ["IDENTITY_SERVICE_BASE_URL"] = "https://identity.example.test"
             })
             .Build();
@@ -856,7 +862,9 @@ public sealed class BrilliantDirectoriesBillingTests
         accounts.EnsureUser("sub-auth", "Runner", email);
         HubUserDto? ensured = accounts.GetBySubject("sub-auth");
         Assert.NotNull(ensured);
-        BrilliantDirectoriesBillingController controller = new(service, identity, accounts)
+        HorizonCapabilityService capabilities = new(configuration);
+        HorizonArtifactQuotaService horizonQuota = new(new HorizonArtifactUsageStore(configuration), capabilities, service);
+        BrilliantDirectoriesBillingController controller = new(service, identity, accounts, horizonArtifactQuota: horizonQuota)
         {
             ControllerContext = new ControllerContext
             {

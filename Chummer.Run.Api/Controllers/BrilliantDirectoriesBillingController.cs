@@ -18,19 +18,22 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     private readonly AccountService? _accounts;
     private readonly ILogger<BrilliantDirectoriesBillingController> _logger;
     private readonly HubPageChromeService? _chrome;
+    private readonly HorizonArtifactQuotaService? _horizonArtifactQuota;
 
     public BrilliantDirectoriesBillingController(
         BrilliantDirectoriesBillingService billing,
         HubIdentityClient? identity = null,
         AccountService? accounts = null,
         ILogger<BrilliantDirectoriesBillingController>? logger = null,
-        HubPageChromeService? chrome = null)
+        HubPageChromeService? chrome = null,
+        HorizonArtifactQuotaService? horizonArtifactQuota = null)
     {
         _billing = billing;
         _identity = identity;
         _accounts = accounts;
         _logger = logger ?? NullLogger<BrilliantDirectoriesBillingController>.Instance;
         _chrome = chrome;
+        _horizonArtifactQuota = horizonArtifactQuota;
     }
 
     [HttpGet("/account/billing")]
@@ -48,7 +51,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             var page = _billing.GetPage();
             var quota = string.IsNullOrWhiteSpace(resolvedUserId)
                 ? null
-                : _billing.GetMyFirstBookQuota(resolvedUserId, email: resolvedEmail);
+                : ResolveCurrentMyFirstBookQuotaProjection(resolvedUserId, resolvedEmail);
             return View(
                 "~/Views/Billing/Membership.cshtml",
                 BuildViewModel(page, quota, resolvedUserId, resolvedEmail, currentUser, BuildChrome(currentUser)));
@@ -118,7 +121,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
         try
         {
-            return Ok(_billing.GetMyFirstBookQuota(currentUser.UserId, email: currentUser.Email));
+            return Ok(ResolveCurrentMyFirstBookQuotaProjection(currentUser.UserId, currentUser.Email));
         }
         catch (InvalidOperationException ex)
         {
@@ -163,6 +166,19 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
         try
         {
+            if (_horizonArtifactQuota is not null)
+            {
+                HorizonArtifactQuotaSnapshot quota = _horizonArtifactQuota.Consume(
+                    new HorizonArtifactQuotaRequest(
+                        UserId: currentUser.UserId,
+                        HorizonId: "origin-dossier",
+                        ArtifactKindOrCapabilityId: "premium_authoring_credit",
+                        Email: currentUser.Email));
+                return Ok(new MyFirstBookQuotaConsumeResultDto(
+                    "consumed",
+                    MapOriginAuthoringQuota(quota)));
+            }
+
             return Ok(_billing.ConsumeMyFirstBookQuota(currentUser.UserId, email: currentUser.Email));
         }
         catch (InvalidOperationException ex)
@@ -452,4 +468,36 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
     private string? BillingSecretHeader()
         => HttpContext?.Request.Headers["X-Chummer-Billing-Secret"].ToString();
+
+    private MyFirstBookQuotaSnapshotDto ResolveCurrentMyFirstBookQuotaProjection(string userId, string? email)
+    {
+        if (_horizonArtifactQuota is not null)
+        {
+            HorizonArtifactQuotaSnapshot quota = _horizonArtifactQuota.GetQuota(
+                new HorizonArtifactQuotaRequest(
+                    UserId: userId,
+                    HorizonId: "origin-dossier",
+                    ArtifactKindOrCapabilityId: "premium_authoring_credit",
+                    Email: email));
+            return MapOriginAuthoringQuota(quota);
+        }
+
+        return _billing.GetMyFirstBookQuota(userId, email: email);
+    }
+
+    private static MyFirstBookQuotaSnapshotDto MapOriginAuthoringQuota(HorizonArtifactQuotaSnapshot quota)
+        => new(
+            UserId: quota.UserId,
+            PlanKey: quota.SupporterActive
+                ? BrilliantDirectoriesBillingConstants.SupporterPlanKey
+                : BrilliantDirectoriesBillingConstants.FreePlanKey,
+            PlanName: quota.SupporterActive
+                ? BrilliantDirectoriesBillingConstants.SupporterPlanName
+                : BrilliantDirectoriesBillingConstants.FreePlanName,
+            SupporterActive: quota.SupporterActive,
+            MonthlyLimit: quota.WindowLimit,
+            MonthlyUsed: quota.WindowUsed,
+            MonthlyRemaining: quota.WindowRemaining,
+            WindowStartUtc: quota.WindowStartUtc,
+            WindowEndUtc: quota.WindowEndUtc);
 }
