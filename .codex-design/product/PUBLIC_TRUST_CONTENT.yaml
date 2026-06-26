@@ -33,7 +33,7 @@ trust_pages:
       - id: sign-in-recovery
         eyebrow: "Account recovery"
         heading: "Account"
-        body: "Use an account for recovery and saved help history."
+        body: "Claim your copy only when you want recovery or linked installs."
         bullets:
           - "Guest use is fine."
           - "Claim only when you want recovery."
@@ -176,11 +176,11 @@ faq_pages:
           - question: "Why would I trust what Chummer shows me?"
             answer: "Because Chummer keeps results and explanations close together in the product."
           - question: "What does account creation give me right away?"
-            answer: "Account creation gives you recovery, help history in Account, and a cleaner return path when linked installs are available."
+            answer: "Claiming your copy gives you a recovery path and linked installs when you want them."
       - title: "Downloads and installs"
         entries:
           - question: "Do I need an account to download the current release?"
-            answer: "No. The current Linux package is open public. Create an account when you want recovery, saved help history, and a cleaner return path when linked downloads are available."
+            answer: "No. The current public package stays open. Claim your copy only when you want recovery or linked installs."
           - question: "Does the account change the download file?"
             answer: "No. The published package stays the same for everyone. Account linking is separate from the file itself."
           - question: "Where do I go if install or update goes sideways?"
@@ -190,4 +190,4 @@ faq_pages:
           - question: "Do I need to participate to help or report a bug?"
             answer: "No. Support and feedback stand on their own. Participation is optional and separate from the normal customer help path."
           - question: "Can I get help without another account?"
-            answer: "Yes. Support is the default help path. Create a Chummer account if you want saved help history inside your account."
+            answer: "Yes. Use Discord for normal questions and Contact for private details. Claim your copy only when recovery matters."

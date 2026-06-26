@@ -668,8 +668,8 @@ public sealed class AuthController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, Request.Headers.UserAgent.ToString(), authenticated: false);
         var supportLine = createAccount
-            ? "Use the same copy. Add recovery and support history."
-            : "Open your account. Keep installs and support together.";
+            ? "Use email first. Google is optional."
+            : "Use email first. Google is optional.";
         return new AuthPageViewModel(
             Chrome: _chrome.BuildPublicChrome(heading, supportLine, createAccount ? "/signup" : "/login"),
             Heading: heading,
