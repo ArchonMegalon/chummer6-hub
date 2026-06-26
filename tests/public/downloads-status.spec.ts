@@ -33,11 +33,11 @@ test('downloads and status stay concise and point to the right next steps', asyn
   await downloadsPage.close();
 
   const statusPage = await openPublicPage(browser, '/status');
-  await expect(statusPage.getByRole('heading', { name: 'Current release' })).toBeVisible();
-  await expect(statusPage.locator('body')).toContainText('The build, platforms, and current state in one place.');
-  await expect(statusPage.getByRole('link', { name: 'Open downloads' })).toBeVisible();
-  await expect(statusPage.getByRole('link', { name: 'Open help' })).toBeVisible();
-  await expect(statusPage.getByRole('heading', { name: 'Platforms' })).toBeVisible();
+  await expect(statusPage.getByRole('heading', { name: 'Status' })).toBeVisible();
+  await expect(statusPage.locator('[data-status-surface="decision-surface"]')).toContainText('Current release');
+  await expect(statusPage.getByRole('link', { name: 'Downloads' })).toBeVisible();
+  await expect(statusPage.getByRole('link', { name: 'Help' })).toBeVisible();
+  await expect(statusPage.getByRole('heading', { name: 'Platforms' })).toHaveCount(0);
   await statusPage.close();
 
   writeJsonArtifact('DOWNLOADS_STATUS_E2E.generated.json', {

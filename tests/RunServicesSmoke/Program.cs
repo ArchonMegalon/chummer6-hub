@@ -2893,8 +2893,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!publicLandingControllerSource.Contains("Redirect(\"/now\")", StringComparison.Ordinal), "status should be a first-class public surface instead of redirecting to the current-release page.");
     Assert(statusSource.Contains("data-status-surface=\"decision-surface\"", StringComparison.Ordinal), "status should keep the top release decision in one calm surface.");
     Assert(statusSource.Contains("Current release", StringComparison.Ordinal), "status should keep the current release posture inside the one public decision surface.");
-    Assert(statusSource.Contains("Open downloads", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");
-    Assert(statusSource.Contains("Open help", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");
+    Assert(statusSource.Contains(">Downloads</a>", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");
+    Assert(statusSource.Contains(">Help</a>", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");
     Assert(!statusSource.Contains("<h2>Platforms</h2>", StringComparison.Ordinal), "status should not carry a platform shelf after the minimal release decision.");
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
     Assert(!featureDetailSource.Contains("Get help with this surface", StringComparison.Ordinal), "detail-family pages should keep next-step help inside the family-specific route blocks.");

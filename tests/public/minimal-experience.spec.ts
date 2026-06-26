@@ -98,11 +98,12 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const decisionCards = decisionSurface.locator('.route-choice-card');
   const nextActions = decisionSurface.locator('.minimal-actions a.button-like');
   await expect(decisionSurface).toBeVisible();
-  await expect(decisionSurface).toContainText('Release');
-  await expect(decisionSurface).toContainText('Open downloads');
+  await expect(decisionSurface).toContainText('Current release');
+  await expect(decisionSurface.getByRole('link', { name: 'Downloads' })).toBeVisible();
+  await expect(decisionSurface.getByRole('link', { name: 'Help' })).toBeVisible();
   const cardCount = await decisionCards.count();
-  if (cardCount !== 1) {
-    failures.push(`status: expected exactly 1 decision card, found ${cardCount}`);
+  if (cardCount !== 0) {
+    failures.push(`status: expected no nested decision cards, found ${cardCount}`);
   }
   const nextActionCount = await nextActions.count();
   if (nextActionCount !== 3) {
