@@ -57,3 +57,16 @@ def test_auxiliary_teable_services_default_disabled_in_source() -> None:
         text = path.read_text(encoding="utf-8")
         for snippet in snippets:
             assert snippet in text, f"missing opt-in default guard in {path}"
+
+
+def test_chummer_teable_tables_do_not_fall_back_to_user_or_ea_base() -> None:
+    chummer_owned_services = [
+        ROOT / "Chummer.Run.Api/Services/Community/TeableImportantWorkService.cs",
+        ROOT / "Chummer.Run.Api/Services/Community/TeableHeyyScamChatService.cs",
+        ROOT / "Chummer.Run.Api/Services/Community/TeableBlackLedgerWorldTickService.cs",
+        ROOT / "Chummer.Run.Api/Services/KarmaForge/TeableKarmaForgeReviewBoardService.cs",
+    ]
+
+    for path in chummer_owned_services:
+        text = path.read_text(encoding="utf-8")
+        assert '?? Normalize(_configuration["CHUMMER_TEABLE_USERS_BASE_ID"])' not in text

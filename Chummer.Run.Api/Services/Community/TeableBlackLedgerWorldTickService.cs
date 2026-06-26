@@ -545,8 +545,7 @@ public sealed class TeableBlackLedgerWorldTickService
             ?? DefaultApiBaseUrl).TrimEnd('/');
         string tableName = Normalize(_configuration["CHUMMER_TEABLE_BLACK_LEDGER_TABLE_NAME"]) ?? DefaultTableName;
         string? baseId = Normalize(_configuration["CHUMMER_TEABLE_BLACK_LEDGER_BASE_ID"])
-            ?? Normalize(_configuration["CHUMMER_TEABLE_KARMA_FORGE_BASE_ID"])
-            ?? Normalize(_configuration["CHUMMER_TEABLE_USERS_BASE_ID"]);
+            ?? Normalize(_configuration["CHUMMER_TEABLE_KARMA_FORGE_BASE_ID"]);
         string? tableId = Normalize(_configuration["CHUMMER_TEABLE_BLACK_LEDGER_TABLE_ID"]);
         return new(enabled, apiKey, apiBaseUrl, baseId, tableId, tableName);
     }
