@@ -81,6 +81,29 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
+    public void BillingPageDoesNotInventAccountPortalWhenProviderPortalIsMissing()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL"] = "https://billing.example.test/supporter",
+                ["BRILLIANT_DIRECTORIES_SYNC_SECRET"] = "sync-secret",
+                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
+            })
+            .Build();
+        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
+
+        BrilliantDirectoriesBillingPageDto page = service.GetPage();
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Billing", "Membership.cshtml"));
+
+        Assert.Equal(string.Empty, page.ManageMembershipHref);
+        Assert.Contains("hasManageMembershipHref", view, StringComparison.Ordinal);
+        Assert.Contains("@if (hasManageMembershipHref)", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("ManageMembershipHref: options.MemberPortalUrl ?? \"/account\"", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Community", "BrilliantDirectoriesBillingService.cs")), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BillingControllerKeepsGuestCheckoutEmailFirst()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "BrilliantDirectoriesBillingController.cs"));

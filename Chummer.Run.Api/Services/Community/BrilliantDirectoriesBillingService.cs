@@ -105,7 +105,7 @@ public sealed class BrilliantDirectoriesBillingService
             Plans: PlanDefinitions
                 .Select(plan => ToCard(plan, options))
                 .ToArray(),
-            ManageMembershipHref: options.MemberPortalUrl ?? "/account");
+            ManageMembershipHref: options.MemberPortalUrl ?? string.Empty);
     }
 
     public MyFirstBookQuotaSnapshotDto GetMyFirstBookQuota(string userId, DateTimeOffset? now = null, string? email = null)

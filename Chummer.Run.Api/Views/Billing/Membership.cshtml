@@ -8,6 +8,7 @@
     var hasUserId = !string.IsNullOrWhiteSpace(Model.UserId);
     var usingSignedInAccount = Model.UsingSignedInAccount && hasUserId;
     var quota = Model.CurrentMyFirstBookQuota;
+    var hasManageMembershipHref = !string.IsNullOrWhiteSpace(Model.ManageMembershipHref);
     var antiForgery = Antiforgery.GetAndStoreTokens(Context);
 }
 <!doctype html>
@@ -190,7 +191,10 @@
                             {
                                 <a class="button button--primary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
                             }
-                            <a class="button" href="@Model.ManageMembershipHref">Manage billing</a>
+                            @if (hasManageMembershipHref)
+                            {
+                                <a class="button" href="@Model.ManageMembershipHref">Manage billing</a>
+                            }
                         </div>
                     </form>
                 </div>
