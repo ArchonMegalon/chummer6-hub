@@ -942,11 +942,14 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Nightly" in downloads
     assert "Linux" in downloads
     assert "Build from source" in downloads
-    assert "Recommended from your browser. Stable, Nightly, or Linux source." in downloads
-    assert "Recommended for this browser" in downloads
+    assert "Recommended from your browser. Other platforms stay out of the way." in downloads
+    assert "Recommended for this browser." in downloads
+    assert "<summary>Other downloads</summary>" in downloads
+    assert "showLinuxSourcePrimary" in downloads
     assert "No sudo. Updates default to notify." in downloads
     assert "/downloads/build-chummer6-linux.sh" in downloads
     assert "stableAndNightlyMatch" in downloads
+    assert "release.Alternatives.Concat(release.OtherPlatforms)" not in downloads
     assert "FirstOrDefault(IsNightly)" in downloads
     assert "static bool IsNightly(ReleaseOptionViewModel option)" in downloads
     assert 'value.Contains("nightly", StringComparison.OrdinalIgnoreCase)' in downloads

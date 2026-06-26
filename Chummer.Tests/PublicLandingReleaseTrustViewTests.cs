@@ -11,12 +11,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("<h1>Downloads</h1>", view, StringComparison.Ordinal);
-        Assert.Contains("<span>Recommended for this browser</span>", view, StringComparison.Ordinal);
+        Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
-        Assert.Contains("<span>Linux</span>", view, StringComparison.Ordinal);
+        Assert.Contains("<summary>Other downloads</summary>", view, StringComparison.Ordinal);
         Assert.Contains("Build from source", view, StringComparison.Ordinal);
         Assert.Contains("build-chummer6-linux.sh", view, StringComparison.Ordinal);
-        Assert.Contains("Recommended from your browser. Stable, Nightly, or Linux source.", view, StringComparison.Ordinal);
+        Assert.Contains("Recommended from your browser. Other platforms stay out of the way.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Pick one.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer picks the right installer for this browser.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
@@ -76,6 +76,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("aria-label=\"Downloads\"", view, StringComparison.Ordinal);
         Assert.Contains("downloads-choice-list", view, StringComparison.Ordinal);
+        Assert.Contains("downloads-other-platforms", view, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"platforms\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<h2>Help</h2>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Arch Linux", view, StringComparison.Ordinal);
@@ -94,10 +95,17 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("id=\"stable\"", view, StringComparison.Ordinal);
         Assert.Contains("id=\"linux-source\"", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
-        Assert.Contains("<span>Recommended for this browser</span>", view, StringComparison.Ordinal);
-        Assert.Contains("The regular build.", view, StringComparison.Ordinal);
+        Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
+        Assert.Contains("Recommended for this browser.", view, StringComparison.Ordinal);
         Assert.Contains("Newer than Stable.", view, StringComparison.Ordinal);
         Assert.Contains("No sudo. Updates default to notify.", view, StringComparison.Ordinal);
+        Assert.Contains("showLinuxSourcePrimary", view, StringComparison.Ordinal);
+        Assert.Contains("release.Alternatives", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("release.Alternatives.Concat(release.OtherPlatforms)", view, StringComparison.Ordinal);
+        Assert.Contains("data-release-lane=\"other\"", view, StringComparison.Ordinal);
+        Assert.Contains("Use this only when you need this platform.", view, StringComparison.Ordinal);
+        Assert.Contains("<summary>Other downloads</summary>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Stable, Nightly, or Linux source.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("The regular build for this device.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("The newest promoted build available from this page.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Local build script. No sudo. Updates default to notify.", view, StringComparison.Ordinal);
@@ -372,7 +380,9 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("<h1>Downloads</h1>", downloadsView, StringComparison.Ordinal);
         Assert.Contains(">Nightly<", downloadsView, StringComparison.Ordinal);
-        Assert.Contains(">Recommended for this browser<", downloadsView, StringComparison.Ordinal);
+        Assert.Contains(">Stable<", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Recommended for this browser.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("<summary>Other downloads</summary>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Download script", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Home or Roadmap", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);

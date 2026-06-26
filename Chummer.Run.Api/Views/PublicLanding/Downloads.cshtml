@@ -6,12 +6,20 @@
 
     var release = Model.ReleaseExperience;
     var stable = release.Recommended;
-    var nightly = release.Alternatives.Concat(release.OtherPlatforms)
+    var nightly = release.Alternatives
         .Where(option => stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase))
         .FirstOrDefault(IsNightly);
     var stableAndNightlyMatch = stable is not null
         && nightly is not null
         && string.Equals(stable.Artifact.Id, nightly.Artifact.Id, StringComparison.OrdinalIgnoreCase);
+    var stablePlatformId = PlatformId(stable);
+    var showLinuxSourcePrimary = string.Equals(stablePlatformId, "linux", StringComparison.OrdinalIgnoreCase);
+    var otherPlatformOptions = release.OtherPlatforms
+        .Concat(release.ManualPackages)
+        .Where(option => stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase))
+        .Where(option => nightly is null || !string.Equals(option.Artifact.Id, nightly.Artifact.Id, StringComparison.OrdinalIgnoreCase))
+        .ToArray();
+    var hasOtherDownloads = otherPlatformOptions.Length > 0 || !showLinuxSourcePrimary;
     var sourceScriptHref = "/downloads/build-chummer6-linux.sh";
     static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
@@ -73,7 +81,7 @@
 <section class="minimal-page-hero downloads-simple-hero">
     <div>
         <h1>Downloads</h1>
-        <p>Recommended from your browser. Stable, Nightly, or Linux source.</p>
+        <p>Recommended from your browser. Other platforms stay out of the way.</p>
     </div>
 </section>
 
@@ -90,9 +98,9 @@ else
     <section class="downloads-choice-list" aria-label="Downloads">
         <article class="downloads-choice-card" id="stable">
             <div>
-                <span>Recommended for this browser</span>
+                <span>Stable</span>
                 <h2>@stable.PlatformLabel</h2>
-                <p>The regular build.</p>
+                <p>Recommended for this browser.</p>
             </div>
             <a class="button-like button-like--primary"
                href="@stable.DispatchHref"
@@ -137,18 +145,70 @@ else
             }
         </article>
 
-        <article class="downloads-choice-card" id="linux-source">
-            <div>
-                <span>Linux</span>
-                <h2>Build from source</h2>
-                <p>No sudo. Updates default to notify.</p>
-            </div>
-            <a class="button-like button-like--ghost"
-               href="@sourceScriptHref"
-               download
-               data-analytics-event="downloads_linux_source_script"
-               data-analytics-surface="minimal_downloads"
-               data-analytics-label="build-chummer6-linux.sh">Download script</a>
-        </article>
+        @if (showLinuxSourcePrimary)
+        {
+            <article class="downloads-choice-card" id="linux-source">
+                <div>
+                    <span>Linux</span>
+                    <h2>Build from source</h2>
+                    <p>No sudo. Updates default to notify.</p>
+                </div>
+                <a class="button-like button-like--ghost"
+                   href="@sourceScriptHref"
+                   download
+                   data-analytics-event="downloads_linux_source_script"
+                   data-analytics-surface="minimal_downloads"
+                   data-analytics-label="build-chummer6-linux.sh">Download script</a>
+            </article>
+        }
     </section>
+
+    @if (hasOtherDownloads)
+    {
+        <details class="details-drawer downloads-other-platforms" id="other-downloads">
+            <summary>Other downloads</summary>
+            <div class="downloads-choice-list downloads-choice-list--collapsed" aria-label="Other downloads">
+                @if (!showLinuxSourcePrimary)
+                {
+                    <article class="downloads-choice-card" id="linux-source">
+                        <div>
+                            <span>Linux</span>
+                            <h2>Build from source</h2>
+                            <p>No sudo. Updates default to notify.</p>
+                        </div>
+                        <a class="button-like button-like--ghost"
+                           href="@sourceScriptHref"
+                           download
+                           data-analytics-event="downloads_linux_source_script"
+                           data-analytics-surface="minimal_downloads"
+                           data-analytics-label="build-chummer6-linux.sh">Download script</a>
+                    </article>
+                }
+
+                @foreach (var option in otherPlatformOptions)
+                {
+                    <article class="downloads-choice-card">
+                        <div>
+                            <span>@option.PlatformLabel</span>
+                            <h2>@option.HeadLabel</h2>
+                            <p>Use this only when you need this platform.</p>
+                        </div>
+                        <a class="button-like button-like--ghost"
+                           href="@option.DispatchHref"
+                           data-download-action="download-artifact"
+                           data-download-artifact="@option.Artifact.Id"
+                           data-download-platform="@PlatformId(option)"
+                           data-download-raw-url="@option.DirectFileHref"
+                           data-download-install-route="/downloads/install/@Uri.EscapeDataString(option.Artifact.Id)"
+                           data-download-link-mode="raw-url"
+                           data-release-lane="other"
+                           data-platform="@PlatformId(option)"
+                           data-analytics-event="downloads_other_install"
+                           data-analytics-surface="minimal_downloads"
+                           data-analytics-label="@option.PlatformLabel">@ButtonText(option)</a>
+                    </article>
+                }
+            </div>
+        </details>
+    }
 }
