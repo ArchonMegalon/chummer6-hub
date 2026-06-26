@@ -4024,6 +4024,7 @@ document.addEventListener('DOMContentLoaded', function () {
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildPropertyquarryPageModel(cancellationToken));
 
     [HttpGet("/propertyquarry/property-network")]
+    [HttpGet("/propertyquarry/receipts/property-network")]
     [HttpGet("/propertyquarry/receipts/property-network.json")]
     [Produces("application/json")]
     public IActionResult PropertyquarryReceiptJson()
