@@ -178,8 +178,8 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
         "No newer Nightly right now.",
         "static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "var releaseSummaryText = PublicStatusText(Model.ReleaseSummary);",
-        "@compactReleaseSummary",
-        "@PublicStatusText(platform.Summary)",
+        "var availabilityText = $\"{releaseAvailabilityLabel}. {compactReleaseSummary}\";",
+        "@PublicStatusText(availabilityText)",
     ):
         assert expected in combined
 

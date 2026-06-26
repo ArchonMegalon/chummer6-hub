@@ -23,6 +23,7 @@
     var compactReleaseSummary = releaseSummaryText.StartsWith("Updated ", StringComparison.OrdinalIgnoreCase)
         ? publicPlatformSummary
         : releaseSummaryText;
+    var availabilityText = $"{releaseAvailabilityLabel}. {compactReleaseSummary}";
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
@@ -44,48 +45,18 @@
 
 <section class="minimal-page-hero">
     <div>
-        <h1>Current release</h1>
-        <p>The build, platforms, and current state in one place.</p>
+        <h1>Chummer is available.</h1>
+        <p>@PublicStatusText(availabilityText)</p>
     </div>
-    <div class="minimal-status-pill" aria-label="Current release">
+    <div class="minimal-status-pill" aria-label="Updated">
         <span>Updated</span>
         <strong>@verifiedLabel</strong>
     </div>
 </section>
 
-<section class="minimal-section minimal-section--tight" data-status-surface="decision-surface">
-    <div class="minimal-facts">
-        <article class="route-choice-card">
-            <span class="tag">Release</span>
-            <h3>@Model.ReleaseExperience.Display.ChannelLabel</h3>
-            <p>@compactReleaseSummary</p>
-        </article>
-        <article>
-            <span>Available now</span>
-            <strong>@releaseAvailabilityLabel</strong>
-        </article>
-    </div>
+<section class="minimal-section minimal-section--tight minimal-section--single-action" data-status-surface="decision-surface">
     <div class="minimal-actions" aria-label="Status next actions">
-        <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Open downloads</a>
-        <a class="button-like button-like--secondary" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Help">Open help</a>
-        <a class="button-like button-like--ghost" href="/changelog" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Changes">Changes</a>
+        <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Downloads</a>
+        <a class="button-like button-like--ghost" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Help">Help</a>
     </div>
 </section>
-
-@if (Model.ReleaseExperience.PlatformAvailability.Count > 0)
-{
-    <section class="minimal-section minimal-section--tight">
-        <div class="minimal-section__lead">
-            <h2>Platforms</h2>
-        </div>
-        <div class="minimal-platform-list">
-            @foreach (var platform in Model.ReleaseExperience.PlatformAvailability)
-            {
-                <article id="status-platform-@platform.PlatformId">
-                    <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this device)" : string.Empty)</h3>
-                    <p>@PublicStatusText(platform.Summary)</p>
-                </article>
-            }
-        </div>
-    </section>
-}
