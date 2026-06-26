@@ -2793,6 +2793,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Retry after", StringComparison.Ordinal), "account support interactions should project retry timing when pacing applies.");
     Assert(accountSource.Contains("Support intake is pacing requests to keep queue and closure timelines trustworthy.", StringComparison.Ordinal), "account support form should surface a trustworthy pacing explanation instead of a generic failure.");
     Assert(!accountSource.Contains("More settings", StringComparison.Ordinal), "account should not advertise fake local account settings when billing owns membership settings.");
+    Assert(!accountSource.Contains("Save participation settings", StringComparison.Ordinal), "account should describe local opt-ins as preferences instead of fake account settings.");
+    Assert(!accountSource.Contains("Participation settings saved.", StringComparison.Ordinal), "account save feedback should describe local opt-ins as preferences instead of fake account settings.");
+    Assert(!accountsControllerSource.Contains("recognition settings", StringComparison.Ordinal), "account participation chrome should describe optional recognition as preferences.");
     Assert(accountsControllerSource.Contains("Redirect(\"/account/billing\")", StringComparison.Ordinal), "account settings should hand off to the real Brilliant Directories billing surface.");
     Assert(accountSource.Contains("Model.PrivacyBoundary", StringComparison.Ordinal), "account privacy should render the shared privacy-boundary panel on the signed-in surface.");
     Assert(accountSource.Contains("<summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should keep primary sign-in inside a calmer drawer instead of a full stacked section.");

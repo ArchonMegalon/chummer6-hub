@@ -4633,7 +4633,7 @@
                         <label class="check-row"><input id="impactCloseoutNotifications" type="checkbox" @(Model.Experience.ImpactCloseoutNotifications ? "checked" : null) /> <span>Send me closeout updates when something I followed actually changes</span></label>
                         <label class="check-row"><input id="publicContributionProfileOptIn" type="checkbox" @(Model.Experience.PublicContributionProfileOptIn ? "checked" : null) /> <span>Allow public participation recognition if my account visibility is already public</span></label>
                     </div>
-                    <button class="button-like button-like--primary" type="submit">Save participation settings</button>
+                    <button class="button-like button-like--primary" type="submit">Save participation preferences</button>
                     <p id="experienceStatusNotice" class="muted-copy" hidden></p>
                 </form>
             </section>
@@ -5113,9 +5113,9 @@
         notificationsEnabled: true
         }
       });
-      ui.setNotice(notice, "Telegram companion settings saved.");
+      ui.setNotice(notice, "Telegram companion preferences saved.");
     } catch (error) {
-      ui.setNotice(notice, ui.describeError(error, "Telegram companion settings could not be saved."), true);
+      ui.setNotice(notice, ui.describeError(error, "Telegram companion preferences could not be saved."), true);
     } finally {
       ui.setButtonBusy(button, false, "Saving...");
     }
@@ -5296,9 +5296,9 @@
       if (participationOverview) {
         participationOverview.textContent = "Configured";
       }
-      ui.setNotice(notice, "Participation settings saved.");
+      ui.setNotice(notice, "Participation preferences saved.");
     } catch (error) {
-      ui.setNotice(notice, ui.describeError(error, "Participation settings could not be saved."), true);
+      ui.setNotice(notice, ui.describeError(error, "Participation preferences could not be saved."), true);
     } finally {
       ui.setButtonBusy(button, false, "Saving...");
     }

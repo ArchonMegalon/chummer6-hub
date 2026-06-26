@@ -1507,7 +1507,7 @@ public sealed class AccountsController : Controller
     private static (string Title, string Description) DescribeAccountSection(string currentSection)
         => currentSection switch
         {
-            "participation" => ("Account · Participation", "Followed package work, guided contribution receipts, and privacy-safe recognition settings."),
+            "participation" => ("Account · Participation", "Followed package work, guided contribution receipts, and privacy-safe recognition preferences."),
             "support" => ("Account · Support", "Open, track, and close support without leaving the account surface."),
             "access" => ("Account · Installs", "Linked copies, setup codes, downloads, and install help."),
             "work" => ("Account · Campaigns", "Campaign return and table context when you explicitly need them."),
