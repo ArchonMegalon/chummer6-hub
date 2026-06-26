@@ -56,18 +56,17 @@ const checks = [
   {
     url: `${baseUrl}/account`,
     assert: (text, response) =>
-      response.url.endsWith('/account/billing')
-      && text.includes('Support Chummer')
-      && text.includes('Same app for everyone.')
-      && text.includes('Origin books: Free 1/month. Supporter 2/month.')
-      && !text.includes('Open work')
-      && !text.includes('Open installs')
+      response.url.endsWith('/login?next=%2Faccount')
+      && text.includes('Open Chummer')
+      && text.includes('Keep this copy attached to your account. Use email first. Google is optional.')
+      && text.includes('Continue with email')
+      && text.includes('Continue with Google')
       && !text.includes('Account ID')
   },
   {
     url: `${baseUrl}/contact`,
     assert: text =>
-      text.includes('Discord first. Private form only for logs or account details.')
+      text.includes('Ask in Discord first. Use the form for private details.')
       && text.includes('Bug report')
   },
   {
@@ -83,7 +82,7 @@ const checks = [
   {
     url: `${baseUrl}/partizipate`,
     assert: (text, response) =>
-      /\/partizipate\/?$/.test(response.url)
+      /\/participate\/?$/.test(response.url)
       && text.includes('Short requests, clear bugs, useful ideas.')
       && text.includes('data-chummer-board-skin')
       && !text.includes('cdn.productlift.dev')
@@ -113,18 +112,20 @@ const checks = [
   {
     url: `${baseUrl}/hub`,
     assert: (text, response) =>
-      response.url.endsWith('/account/billing')
-      && text.includes('Support Chummer')
-      && text.includes('Same app for everyone.')
-      && !text.includes('Open your account. Keep installs and support together.')
+      response.url.endsWith('/login?next=%2Faccount')
+      && text.includes('Open Chummer')
+      && text.includes('Continue with email')
+      && text.includes('Continue with Google')
+      && !text.includes('Support Chummer')
   },
   {
     url: `${baseUrl}/hub/`,
     assert: (text, response) =>
-      response.url.endsWith('/account/billing')
-      && text.includes('Support Chummer')
-      && text.includes('Same app for everyone.')
-      && !text.includes('Open your account. Keep installs and support together.')
+      response.url.endsWith('/login?next=%2Faccount')
+      && text.includes('Open Chummer')
+      && text.includes('Continue with email')
+      && text.includes('Continue with Google')
+      && !text.includes('Support Chummer')
   },
   {
     url: `${baseUrl}/blazor/`,
@@ -164,7 +165,8 @@ const checks = [
     url: `${baseUrl}/coach/`,
     assert: (text, response) =>
       /\/status\/?$/.test(response.url)
-      && text.includes('Current public installer: Linux.')
+      && text.includes('Current release')
+      && text.includes('Updated. Linux is live.')
       && text.includes('Downloads')
   }
 ];

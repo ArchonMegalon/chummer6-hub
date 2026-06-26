@@ -469,7 +469,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
     await expectVisible(page, 'text=Contact Chummer');
-    await expectVisible(page, 'text=Discord first. Keep the form for private details.');
+    await expectVisible(page, 'text=Ask in Discord first. Use the form for private details.');
     await expectVisible(page, 'text=Open private form');
     await page.locator('summary:has-text("Private message")').click();
     await expectVisible(page, 'text=Send support request');
