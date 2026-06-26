@@ -332,7 +332,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
     await expectVisible(page, 'text=A Shadowrun character manager for clean sheets and faster tables.');
     await expectVisible(page, 'text=Download Chummer');
-    await expectVisible(page, 'text=Current public installers: Windows and Linux.');
+    await expectVisible(page, 'text=Current public installer: Linux.');
     await expectVisible(page, 'text=Kestrel');
     await expectVisible(page, 'text=Brick');
     await expectVisible(page, 'text=Whisper');
@@ -454,19 +454,20 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoPageErrors(page, pageErrors, 'Signed-out /participate/codex redirect');
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
-    await expectVisible(page, 'text=Install Chummer');
+    await expectVisible(page, 'text=Downloads');
     await expectVisible(page, 'text=Nightly');
     await expectVisible(page, 'text=Stable');
-    await expectVisible(page, 'text=Current public installer');
-    await expectVisible(page, 'text=Updated');
-    await expectVisible(page, 'text=Platforms');
+    await expectVisible(page, 'text=Recommended from your browser.');
+    await expectVisible(page, 'text=Other downloads');
+    await expectVisible(page, 'text=Build from source');
     await assertNoBannedCopy(page, 'Downloads');
   });
 
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
     await expectVisible(page, 'text=Contact Chummer');
-    await expectVisible(page, 'text=Choose one');
+    await expectVisible(page, 'text=Contact paths');
     await expectVisible(page, 'text=Send support request');
+    await expectVisible(page, 'text=Open private form');
   });
   await gotoAndAssert(
     page,
@@ -759,9 +760,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
-    await expectVisible(page, 'text=Install Chummer');
+    await expectVisible(page, 'text=Downloads');
     await expectVisible(page, 'text=Stable');
     await expectVisible(page, 'text=Nightly');
+    await expectVisible(page, 'text=Recommended from your browser.');
     await assertNoBannedCopy(page, 'Signed-in /downloads');
   });
 
