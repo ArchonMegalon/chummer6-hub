@@ -805,7 +805,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--sync", action="store_true", help="Upsert rows into Teable. Dry-run artifact only by default.")
     parser.add_argument("--api-base-url", default=resolve_api_base_url())
     parser.add_argument("--api-key", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY")) or normalize(os.environ.get("TEABLE_API_KEY")))
-    parser.add_argument("--base-id", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID")) or normalize(os.environ.get("EA_ENV_TEABLE_BASE_ID")))
+    parser.add_argument("--base-id", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID")))
     parser.add_argument("--table-id", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_ID")))
     parser.add_argument("--table-name", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_NAME")) or DEFAULT_TABLE_NAME)
     return parser.parse_args(argv)

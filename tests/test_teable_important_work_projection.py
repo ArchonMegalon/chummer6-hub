@@ -152,14 +152,14 @@ def test_resolve_api_base_url_accepts_teable_base_url(monkeypatch):
     assert module.resolve_api_base_url() == "https://app.teable.ai/api"
 
 
-def test_parse_args_uses_ea_teable_base_fallback(monkeypatch):
+def test_parse_args_ignores_ea_teable_base_fallback(monkeypatch):
     module = load_module()
     monkeypatch.delenv("CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID", raising=False)
     monkeypatch.setenv("EA_ENV_TEABLE_BASE_ID", "base-ea")
 
     args = module.parse_args([])
 
-    assert args.base_id == "base-ea"
+    assert args.base_id is None
 
 
 def test_sync_setup_failure_writes_failed_state_without_token(monkeypatch):

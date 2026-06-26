@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.teable_important_work.v1",
-  "generated_at_utc": "2026-06-20T17:58:30Z",
+  "generated_at_utc": "2026-06-26T03:03:56Z",
   "status": "ready",
   "table_name": "Chummer Important Work",
   "row_count": 38,
@@ -265,7 +265,7 @@
       "source": "Release requirement",
       "why_it_matters": "The website is the user's source of truth for stable and nightly installers.",
       "next_action": "Keep stable/nightly buttons minimal and ensure each Windows/Linux build updates the download shelf automatically.",
-      "acceptance_gate": "After a build, chummer.run/downloads exposes the newest Windows and Linux installers with no account-first noise."
+      "acceptance_gate": "After a build, chummer.run/downloads exposes lane buttons only for promoted installer platforms with no account-first noise."
     },
     {
       "item_id": "public-website-minimal-redesign",
@@ -509,9 +509,17 @@
     }
   ],
   "sync": {
-    "state": "not_requested",
-    "attempted": false,
-    "synced_count": 0,
+    "state": "passed",
+    "attempted": true,
+    "started_at_utc": "2026-06-26T03:03:56Z",
+    "finished_at_utc": "2026-06-26T03:04:54Z",
+    "api_base_url": "https://app.teable.ai/api",
+    "base_id": "bseQCIXVnYLcq2KiWzN",
+    "table_id": "tbl5UEwrkhI27HOlwkT",
+    "table_name": "Chummer Important Work",
+    "synced_count": 38,
+    "created_count": 0,
+    "updated_count": 38,
     "failed_count": 0,
     "errors": []
   }

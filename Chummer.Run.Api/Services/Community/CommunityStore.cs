@@ -60,6 +60,7 @@ public sealed class CommunityStore
     public List<HeyyScamChatOperatorSummaryReceipt> HeyyScamChatOperatorSummaryReceipts { get; } = new();
     public List<ExecutiveAssistantChannelConversationState> ExecutiveAssistantChannelConversations { get; } = new();
     public List<ExecutiveAssistantChannelMessageState> ExecutiveAssistantChannelMessages { get; } = new();
+    public List<ImportantWorkItemProjection> ImportantWorkItems { get; } = new();
     public Dictionary<string, RunnerDossierProjection> DossiersById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CrewProjection> CrewsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CampaignProjection> CampaignSpinesById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -153,6 +154,9 @@ public sealed class CommunityStore
             ExecutiveAssistantChannelMessages: ExecutiveAssistantChannelMessages
                 .OrderByDescending(static item => item.CreatedAtUtc)
                 .ToArray(),
+            ImportantWorkItems: ImportantWorkItems
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray(),
             Dossiers: DossiersById.Values.OrderBy(static item => item.DossierId, StringComparer.OrdinalIgnoreCase).ToArray(),
             Crews: CrewsById.Values.OrderBy(static item => item.CrewId, StringComparer.OrdinalIgnoreCase).ToArray(),
             CampaignSpines: CampaignSpinesById.Values.OrderBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -238,6 +242,7 @@ public sealed class CommunityStore
         HeyyScamChatOperatorSummaryReceipts.Clear();
         ExecutiveAssistantChannelConversations.Clear();
         ExecutiveAssistantChannelMessages.Clear();
+        ImportantWorkItems.Clear();
         DossiersById.Clear();
         CrewsById.Clear();
         CampaignSpinesById.Clear();
@@ -327,6 +332,7 @@ public sealed class CommunityStore
         HeyyScamChatOperatorSummaryReceipts.AddRange(snapshot.HeyyScamChatOperatorSummaryReceipts ?? Array.Empty<HeyyScamChatOperatorSummaryReceipt>());
         ExecutiveAssistantChannelConversations.AddRange(snapshot.ExecutiveAssistantChannelConversations ?? Array.Empty<ExecutiveAssistantChannelConversationState>());
         ExecutiveAssistantChannelMessages.AddRange(snapshot.ExecutiveAssistantChannelMessages ?? Array.Empty<ExecutiveAssistantChannelMessageState>());
+        ImportantWorkItems.AddRange(snapshot.ImportantWorkItems ?? Array.Empty<ImportantWorkItemProjection>());
 
         foreach (var dossier in snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>())
         {
@@ -473,6 +479,7 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<HeyyScamChatOperatorSummaryReceipt>? HeyyScamChatOperatorSummaryReceipts = null,
     IReadOnlyList<ExecutiveAssistantChannelConversationState>? ExecutiveAssistantChannelConversations = null,
     IReadOnlyList<ExecutiveAssistantChannelMessageState>? ExecutiveAssistantChannelMessages = null,
+    IReadOnlyList<ImportantWorkItemProjection>? ImportantWorkItems = null,
     IReadOnlyList<RunnerDossierProjection>? Dossiers = null,
     IReadOnlyList<CrewProjection>? Crews = null,
     IReadOnlyList<CampaignProjection>? CampaignSpines = null,
@@ -495,6 +502,22 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<OpenRunCloseoutProjection>? OpenRunCloseouts = null,
     IReadOnlyList<WorkspaceRestoreProjection>? RestoreSummaries = null,
     BlackLedgerFactionOnboardingState? BlackLedgerFactionOnboarding = null);
+
+public sealed record ImportantWorkItemProjection(
+    string ItemId,
+    string Kind,
+    string Scope,
+    string Summary,
+    string Detail,
+    string Status,
+    string Priority,
+    string? UserId,
+    string? SubjectId,
+    string? Source,
+    string? Link,
+    IReadOnlyList<string> Tags,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
 
 internal sealed record SponsorSessionStateSnapshot(
     string SponsorSessionId,

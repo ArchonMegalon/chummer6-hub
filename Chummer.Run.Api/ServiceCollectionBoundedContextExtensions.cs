@@ -64,10 +64,12 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<TeableBlackLedgerWorldTickService>();
         services.AddSingleton<TeableHeyyScamChatService>();
         services.AddSingleton<TeableExecutiveAssistantChannelService>();
+        services.AddSingleton<TeableImportantWorkService>();
         services.AddHostedService<TeableUserProjectionSyncWorker>();
         services.AddHostedService<TeableBlackLedgerWorldTickSyncWorker>();
         services.AddHostedService<TeableHeyyScamChatSyncWorker>();
         services.AddHostedService<TeableExecutiveAssistantChannelSyncWorker>();
+        services.AddHostedService<TeableImportantWorkSyncWorker>();
         services.AddHttpClient();
         services.AddSingleton<AccountService>();
         services.AddSingleton<IdentityLinkService>();
@@ -80,6 +82,8 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<MyFirstBookUsageStore>();
         services.AddSingleton<BrilliantDirectoriesBillingService>();
         services.AddSingleton<OriginDossierPublicationService>();
+        services.AddSingleton<OriginDossierProviderCreditReservationStore>();
+        services.AddSingleton<OriginDossierProviderCreditReservationService>();
         services.AddSingleton<PayFunnelsBillingStore>();
         services.AddSingleton<PayFunnelsBillingService>();
         services.AddSingleton<LeaderboardService>();
