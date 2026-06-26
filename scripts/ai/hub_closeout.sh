@@ -13,6 +13,7 @@ HUB_PUBLIC_HOST="${HUB_PUBLIC_HOST:-chummer.run}"
 HUB_CLOSEOUT_BUILD="${HUB_CLOSEOUT_BUILD:-1}"
 HUB_CLOSEOUT_BROWSER="${HUB_CLOSEOUT_BROWSER:-1}"
 HUB_CLOSEOUT_LIVE_AUDIT="${HUB_CLOSEOUT_LIVE_AUDIT:-1}"
+HUB_CLOSEOUT_INCLUDE_BLAZOR="${HUB_CLOSEOUT_INCLUDE_BLAZOR:-0}"
 HUB_ENV_FILE="${CHUMMER_HUB_ENV_FILE:-}"
 PUBLIC_EDGE_DEPLOY_SOURCE_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE:-1}"
 PUBLIC_EDGE_EXPECTED_HEAD="${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}"
@@ -51,6 +52,11 @@ if [[ -n "$HUB_ENV_FILE" ]]; then
 else
   echo "compose env file: <none>"
 fi
+if [[ "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "1" || "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "true" || "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "TRUE" ]]; then
+  echo "include blazor lane: yes"
+else
+  echo "include blazor lane: no"
+fi
 
 if [[ "$HUB_CLOSEOUT_BUILD" == "1" || "$HUB_CLOSEOUT_BUILD" == "true" || "$HUB_CLOSEOUT_BUILD" == "TRUE" ]]; then
   echo
@@ -62,7 +68,11 @@ if [[ "$HUB_CLOSEOUT_BUILD" == "1" || "$HUB_CLOSEOUT_BUILD" == "true" || "$HUB_C
     fi
     python3 scripts/verify_public_edge_deploy_source.py "${gate_args[@]}"
   fi
-  docker compose "${compose_args[@]}" up -d --build --remove-orphans chummer-run-identity chummer-portal
+  public_edge_services=(chummer-run-identity chummer-portal)
+  if [[ "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "1" || "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "true" || "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "TRUE" ]]; then
+    public_edge_services+=(chummer-public-blazor)
+  fi
+  docker compose "${compose_args[@]}" up -d --build --remove-orphans "${public_edge_services[@]}"
 fi
 
 echo

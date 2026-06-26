@@ -115,7 +115,6 @@ services:
     depends_on:
       - chummer-run-identity
       - support-progress-mock
-      - chummer-public-blazor
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
