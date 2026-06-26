@@ -220,46 +220,47 @@ app.MapPost("/api/desktop-analytics/track", async (
     DesktopAnalyticsBridgeService analyticsBridge,
     HttpContext context,
     CancellationToken ct) =>
-{
-    if (string.IsNullOrWhiteSpace(request.HeadId)
-        || string.IsNullOrWhiteSpace(request.EventName)
-        || string.IsNullOrWhiteSpace(request.Surface)
-        || string.IsNullOrWhiteSpace(request.ReleaseVersion)
-        || string.IsNullOrWhiteSpace(request.ReleaseChannel))
     {
-        return Results.BadRequest(new ProblemDetails
+        if (string.IsNullOrWhiteSpace(request.HeadId)
+            || string.IsNullOrWhiteSpace(request.EventName)
+            || string.IsNullOrWhiteSpace(request.Surface)
+            || string.IsNullOrWhiteSpace(request.ReleaseVersion)
+            || string.IsNullOrWhiteSpace(request.ReleaseChannel))
         {
-            Title = "Desktop analytics validation failed.",
-            Type = "https://chummer.run/problems/desktop-analytics-validation",
-            Status = StatusCodes.Status400BadRequest,
-            Detail = "Desktop analytics requests require head, event, surface, and release metadata."
-        });
-    }
-
-    DesktopAnalyticsTrackResult result = await analyticsBridge.TrackAsync(
-        request,
-        context.Connection.RemoteIpAddress?.ToString(),
-        context.Request.Headers.UserAgent.ToString(),
-        ct);
-
-    if (!result.Accepted)
-    {
-        if (result.Status.StartsWith("provider_http_", StringComparison.Ordinal)
-            || result.Status == "provider_error")
-        {
-            return Results.Json(result, statusCode: StatusCodes.Status502BadGateway);
+            return Results.BadRequest(new ProblemDetails
+            {
+                Title = "Desktop analytics validation failed.",
+                Type = "https://chummer.run/problems/desktop-analytics-validation",
+                Status = StatusCodes.Status400BadRequest,
+                Detail = "Desktop analytics requests require head, event, surface, and release metadata."
+            });
         }
 
-        if (result.Status == "provider_not_configured")
+        DesktopAnalyticsTrackResult result = await analyticsBridge.TrackAsync(
+            request,
+            context.Connection.RemoteIpAddress?.ToString(),
+            context.Request.Headers.UserAgent.ToString(),
+            ct);
+
+        if (!result.Accepted)
         {
-            return Results.Json(result, statusCode: StatusCodes.Status503ServiceUnavailable);
+            if (result.Status.StartsWith("provider_http_", StringComparison.Ordinal)
+                || result.Status == "provider_error")
+            {
+                return Results.Json(result, statusCode: StatusCodes.Status502BadGateway);
+            }
+
+            if (result.Status == "provider_not_configured")
+            {
+                return Results.Json(result, statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
+            return Results.BadRequest(result);
         }
 
-        return Results.BadRequest(result);
-    }
-
-    return Results.Accepted(value: result);
-});
+        return Results.Accepted(value: result);
+    })
+    .WithMetadata(new RequestSizeLimitAttribute(DesktopAnalyticsBridgeService.MaxRequestBodyBytes));
 app.MapGet("/openapi/", GetSelfHostedDocs);
 
 app.MapControllers();

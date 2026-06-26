@@ -61,6 +61,7 @@ def test_env_example_documents_origin_edition_gold_without_committing_session_se
     assert "CHUMMER_ORIGIN_PROVIDER_ACCOUNT_ALIASES=\n" in env_example
     assert "CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES=\n" in env_example
     assert "CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES=\n" in env_example
+    assert "CHUMMER_ORIGIN_VISUAL_ACCOUNT_ALIASES=\n" in env_example
     assert "CHUMMER_ORIGIN_TELEGRAM_ACCOUNT_ALIASES=\n" in env_example
     assert "CHUMMER_ORIGIN_PROVIDER_RESERVATION_STORE_PATH=.state/origin-provider-credit-reservations.json" in env_example
     assert "CHUMMER_ORIGIN_MAX_ACTIVE_PROVIDER_RESERVATIONS=5" in env_example

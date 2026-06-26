@@ -413,6 +413,10 @@ public sealed class OriginDossierPublicationService
             missing,
             HasStorySceneCoverReceipt(entry),
             "story scene cover receipt path");
+        AddIfMissing(
+            missing,
+            HasProviderAccountAliasReceipt(entry.StorySceneCoverAccountAlias, entry.StorySceneCoverReceiptPath, "CHUMMER_ORIGIN_VISUAL_ACCOUNT_ALIASES", "OriginDossier:VisualAccountAliases"),
+            "story scene cover account alias");
         AddIfMissing(missing, HasCoverConsistencyReceipt(entry), "cover consistency receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.AudiobookPath), "audiobook artifact path");
         AddIfMissing(missing, HasAudiobookshelfImportReceipt(entry), "Audiobookshelf import receipt path");
@@ -420,6 +424,10 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, HasArchivedArtifact(entry.DossierVideoPath), "dossier video artifact path");
         AddIfMissing(missing, HasArchivedArtifact(entry.MoviePosterPath), "movie poster artifact path");
         AddIfMissing(missing, HasDossierVideoReceipt(entry), "dossier video receipt path");
+        AddIfMissing(
+            missing,
+            HasProviderAccountAliasReceipt(entry.DossierVideoAccountAlias, entry.DossierVideoReceiptPath, "CHUMMER_ORIGIN_VISUAL_ACCOUNT_ALIASES", "OriginDossier:VisualAccountAliases"),
+            "dossier video account alias");
         AddIfMissing(missing, entry.TelegramShareDelivered, "Telegram share delivery");
         AddIfMissing(
             missing,
@@ -665,7 +673,11 @@ public sealed class OriginDossierPublicationService
     }
 
     private static string ProviderAccountRegistryRole(string envKey)
-        => envKey.Contains("AUDIO", StringComparison.OrdinalIgnoreCase) ? "audio" : "manuscript";
+        => envKey.Contains("AUDIO", StringComparison.OrdinalIgnoreCase)
+            ? "audio"
+            : envKey.Contains("VISUAL", StringComparison.OrdinalIgnoreCase)
+                ? "visual"
+                : "manuscript";
 
     private static bool HasSourcePacketReceipt(string? sourcePacketPath, string? receiptPath)
         => HasArtifactReceipt(
@@ -1479,6 +1491,7 @@ public sealed class OriginDossierPublicationService
             BookArtifactReceiptPath = CleanNullable(request.BookArtifactReceiptPath),
             StorySceneCoverPath = CleanNullable(request.StorySceneCoverPath),
             StorySceneCoverReceiptPath = CleanNullable(request.StorySceneCoverReceiptPath),
+            StorySceneCoverAccountAlias = CleanNullable(request.StorySceneCoverAccountAlias),
             EbookArtifactPath = CleanNullable(request.EbookArtifactPath),
             EbookAudiobookshelfImportReceiptPath = CleanNullable(request.EbookAudiobookshelfImportReceiptPath),
             CoverConsistencyReceiptPath = CleanNullable(request.CoverConsistencyReceiptPath),
@@ -1487,6 +1500,7 @@ public sealed class OriginDossierPublicationService
             AudiobookProviderAccountAlias = CleanNullable(request.AudiobookProviderAccountAlias),
             DossierVideoPath = CleanNullable(request.DossierVideoPath),
             DossierVideoReceiptPath = CleanNullable(request.DossierVideoReceiptPath),
+            DossierVideoAccountAlias = CleanNullable(request.DossierVideoAccountAlias),
             MoviePosterPath = CleanNullable(request.MoviePosterPath),
             MovieSubtitlesPath = CleanNullable(request.MovieSubtitlesPath),
             MovieStoryboardPath = CleanNullable(request.MovieStoryboardPath),
@@ -1645,6 +1659,7 @@ internal sealed class OriginDossierPublicationIndexEntry
     public string? BookArtifactReceiptPath { get; init; }
     public string? StorySceneCoverPath { get; init; }
     public string? StorySceneCoverReceiptPath { get; init; }
+    public string? StorySceneCoverAccountAlias { get; init; }
     public string? EbookArtifactPath { get; init; }
     public string? EbookAudiobookshelfImportReceiptPath { get; init; }
     public string? CoverConsistencyReceiptPath { get; init; }
@@ -1653,6 +1668,7 @@ internal sealed class OriginDossierPublicationIndexEntry
     public string? AudiobookProviderAccountAlias { get; init; }
     public string? DossierVideoPath { get; init; }
     public string? DossierVideoReceiptPath { get; init; }
+    public string? DossierVideoAccountAlias { get; init; }
     public string? MoviePosterPath { get; init; }
     public string? MovieSubtitlesPath { get; init; }
     public string? MovieStoryboardPath { get; init; }

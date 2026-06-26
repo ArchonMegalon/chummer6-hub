@@ -9,7 +9,7 @@ from typing import Any
 
 
 CONTRACT_NAME = "chummer.origin_provider_account_registry.verification.v1"
-REQUIRED_ROLES = ("manuscript", "audio", "audiobookshelf", "telegram")
+REQUIRED_ROLES = ("manuscript", "audio", "visual", "audiobookshelf", "telegram")
 DISABLED_STATUSES = {"disabled", "revoked", "unavailable", "blocked", "retired"}
 FORBIDDEN_VALUE_MARKERS = (
     "Bearer ",
@@ -77,11 +77,13 @@ def account_roles(account: dict[str, Any]) -> set[str]:
 
 def role_matches(account_role_tokens: set[str], required_role: str) -> bool:
     if required_role == "manuscript":
-        return bool(account_role_tokens & {"manuscript", "authoring", "premium_authoring", "premium_guided_authoring", "scale_drafting", "drafting", "finishing", "narrative_editions", "origin", "chummer_origin", "runner_memoir"})
+        return bool(account_role_tokens & {"manuscript", "authoring", "premium_authoring", "premium_guided_authoring", "scale_drafting", "drafting", "finishing", "narrative_editions", "runner_memoir"})
     if required_role == "audio":
-        return bool(account_role_tokens & {"audio", "audiobook", "narration", "premium_narration", "finishing", "origin", "chummer_origin"})
+        return bool(account_role_tokens & {"audio", "audiobook", "narration", "premium_narration", "finishing"})
     if required_role == "audiobookshelf":
         return bool(account_role_tokens & {"audiobookshelf", "ebook_shelf", "audiobook_shelf", "book_share", "share_host"})
+    if required_role == "visual":
+        return bool(account_role_tokens & {"visual", "scene_render", "scene-render", "video_render", "video-render", "visuals", "magicfit", "origin_visual", "origin_visuals"})
     if required_role == "telegram":
         return bool(account_role_tokens & {"telegram", "telegram_delivery", "telegram_official_bot", "origin_delivery"})
     return required_role in account_role_tokens

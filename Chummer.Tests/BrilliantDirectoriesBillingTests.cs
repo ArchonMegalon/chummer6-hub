@@ -139,6 +139,17 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
+    public void SupporterCheckoutFormRequiresAntiforgeryValidation()
+    {
+        var action = typeof(BrilliantDirectoriesBillingController).GetMethod(nameof(BrilliantDirectoriesBillingController.StartSupporterCheckout));
+
+        Assert.NotNull(action);
+        Assert.Contains(
+            action!.GetCustomAttributes(inherit: true),
+            static attribute => attribute is ValidateAntiForgeryTokenAttribute);
+    }
+
+    [Fact]
     public void ContributionEntitlementsDoNotUseSupporterBillingLanguage()
     {
         string root = Path.Combine(Path.GetTempPath(), "chummer-entitlement-billing-boundary-tests", Guid.NewGuid().ToString("N"));
@@ -610,7 +621,7 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public async Task SupporterCheckoutFormReturnsServiceUnavailableWhenConfigurationIsMissing()
+    public async Task SupporterCheckoutFormReturnsServiceUnavailableWhenConfigurationIsMissingForSignedInUser()
     {
         string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
         IConfiguration configuration = new ConfigurationBuilder()
@@ -620,7 +631,7 @@ public sealed class BrilliantDirectoriesBillingTests
             })
             .Build();
         BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
-        BrilliantDirectoriesBillingController controller = new(service);
+        (BrilliantDirectoriesBillingController controller, _) = CreateAuthenticatedController(service, email: "runner@example.com");
 
         IActionResult result = await controller.StartSupporterCheckout(new BrilliantDirectoriesCheckoutRequest("user-a", "runner@example.com"));
 
@@ -629,7 +640,7 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public async Task SupporterCheckoutWithoutAttachedUserRedirectsToFirstPartySignIn()
+    public async Task SupporterCheckoutWithoutAttachedUserRedirectsToFirstPartySignInEvenWhenUserIdIsSupplied()
     {
         BrilliantDirectoriesBillingService service = CreateService();
         BrilliantDirectoriesBillingController controller = new(service)
@@ -640,7 +651,7 @@ public sealed class BrilliantDirectoriesBillingTests
             }
         };
 
-        IActionResult result = await controller.StartSupporterCheckout(new BrilliantDirectoriesCheckoutRequest("", "runner@example.com"));
+        IActionResult result = await controller.StartSupporterCheckout(new BrilliantDirectoriesCheckoutRequest("spoofed-user", "runner@example.com"));
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
         Assert.Equal("/login?next=%2Faccount%2Fbilling", redirect.Url);
@@ -712,6 +723,22 @@ public sealed class BrilliantDirectoriesBillingTests
             new BrilliantDirectoriesCheckoutRequest("user-a", "runner@example.com"));
         BrilliantDirectoriesCheckoutResponseDto checkout = Assert.IsType<BrilliantDirectoriesCheckoutResponseDto>(Assert.IsType<OkObjectResult>(authorized.Result).Value);
         Assert.Contains("billing.example.test/supporter", checkout.CheckoutUrl, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SupporterCheckoutFormUsesSignedInAccountInsteadOfPostedOverrides()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        (BrilliantDirectoriesBillingController controller, HubUserDto user) = CreateAuthenticatedController(service, email: "runner@example.com");
+
+        IActionResult result = await controller.StartSupporterCheckout(
+            new BrilliantDirectoriesCheckoutRequest("spoofed-user", "spoofed@example.com"));
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Contains($"external_user={Uri.EscapeDataString(user.UserId)}", redirect.Url!, StringComparison.Ordinal);
+        Assert.Contains("contact=runner%40example.com", redirect.Url!, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("spoofed-user", redirect.Url!, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("spoofed%40example.com", redirect.Url!, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

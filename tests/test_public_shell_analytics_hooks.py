@@ -263,6 +263,13 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
         self.assertIn('Accepted: false, Forwarded: false, Status: $"provider_http_{(int)response.StatusCode}"', source)
         self.assertIn('Accepted: false, Forwarded: false, Status: "provider_error"', source)
         self.assertIn('Status: string.IsNullOrWhiteSpace(apiKey) ? "forwarded_public" : "forwarded"', source)
+        self.assertIn('ReservedPropertyKeys', source)
+        self.assertIn('property_key_reserved', source)
+        self.assertIn('properties_limit_exceeded', source)
+        self.assertIn('MaxRequestBodyBytes = 16 * 1024', source)
+
+        program_source = (REPO_ROOT / "Chummer.Run.Api" / "Program.cs").read_text(encoding="utf-8")
+        self.assertIn('RequestSizeLimitAttribute(DesktopAnalyticsBridgeService.MaxRequestBodyBytes)', program_source)
 
     def test_desktop_analytics_bridge_accepts_every_avalonia_shell_event(self) -> None:
         bridge_source = (REPO_ROOT / "Chummer.Run.Api" / "Services" / "DesktopAnalyticsBridgeService.cs").read_text(encoding="utf-8")

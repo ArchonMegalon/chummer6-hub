@@ -32,9 +32,12 @@ def test_provider_registry_keeps_configured_multi_word_provider_tokens() -> None
     registry = module.OriginProviderCapabilityRegistry(
         manuscript_provider_tokens=("guided memoir lane",),
         audio_provider_tokens=("premiumvoice",),
+        visual_provider_tokens=("magic fit",),
     )
 
     assert registry.manuscript_provider_allowed("Guided Memoir Lane 02") is True
     assert registry.manuscript_provider_allowed("Unguided Memoir Lane 02") is False
     assert registry.audio_provider_allowed("PremiumVoice Account 04") is True
     assert registry.audio_provider_allowed("NotPremiumVoice Account 04") is False
+    assert registry.visual_provider_allowed("Magic Fit Render 02") is True
+    assert registry.visual_provider_allowed("NotAMagicVisualLane Account 04") is False

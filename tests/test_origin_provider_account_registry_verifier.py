@@ -38,6 +38,12 @@ def valid_registry() -> dict:
                 "roles": ["audio", "audiobook", "origin"],
             },
             {
+                "accountAlias": "MAGICFIT_ORIGIN_VISUAL_01",
+                "provider": "Magicfit",
+                "status": "available",
+                "roles": ["visual", "scene_render", "origin"],
+            },
+            {
                 "accountAlias": "ABS_ORIGIN_01",
                 "provider": "Audiobookshelf",
                 "status": "available",
@@ -65,6 +71,7 @@ def test_verifier_accepts_redacted_complete_registry(tmp_path: Path) -> None:
     assert receipt["rawSecretValuesStored"] is False
     assert receipt["enabledRoleCounts"]["manuscript"] >= 1
     assert receipt["enabledRoleCounts"]["audio"] >= 1
+    assert receipt["enabledRoleCounts"]["visual"] >= 1
     assert receipt["enabledRoleCounts"]["audiobookshelf"] >= 1
     assert receipt["enabledRoleCounts"]["telegram"] == 1
     assert "rangersofB5" not in json.dumps(receipt)
@@ -107,12 +114,13 @@ def test_verifier_rejects_missing_required_roles(tmp_path: Path) -> None:
     assert ok is False
     assert "required_role_missing:audiobookshelf" in receipt["issues"]
     assert "required_role_missing:telegram" in receipt["issues"]
+    assert "required_role_missing:visual" in receipt["issues"]
 
 
 def test_verifier_rejects_audiobookshelf_account_without_share_host(tmp_path: Path) -> None:
     module = load_module()
     payload = valid_registry()
-    payload["accounts"][2].pop("shareHost")
+    payload["accounts"][3].pop("shareHost")
     registry = write_json(tmp_path / "origin-provider-accounts.json", payload)
 
     ok, receipt = module.verify(registry, require_all_roles=True)
@@ -124,14 +132,14 @@ def test_verifier_rejects_audiobookshelf_account_without_share_host(tmp_path: Pa
 def test_verifier_rejects_origin_share_only_as_required_delivery_roles(tmp_path: Path) -> None:
     module = load_module()
     payload = valid_registry()
-    payload["accounts"][2] = {
+    payload["accounts"][3] = {
         "accountAlias": "ABS_ORIGIN_01",
         "provider": "Audiobookshelf",
         "status": "available",
         "roles": ["origin_share"],
         "shareHost": "audio.chummer.run",
     }
-    payload["accounts"][3] = {
+    payload["accounts"][4] = {
         "accountAlias": "EA_TELEGRAM_ORIGIN",
         "provider": "Telegram",
         "status": "available",

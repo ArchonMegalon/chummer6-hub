@@ -280,6 +280,11 @@ internal static class OriginDossierProviderAccountRegistry
             "audio" => normalizedProvider.Contains("inkfluence", StringComparison.Ordinal)
                 || normalizedProvider.Contains("unmixr", StringComparison.Ordinal)
                 || normalizedProvider.Contains("unmixer", StringComparison.Ordinal),
+            "visual" => normalizedProvider.Contains("magicfit", StringComparison.Ordinal)
+                || normalizedProvider.Contains("magic fit", StringComparison.Ordinal)
+                || normalizedProvider.Contains("scene", StringComparison.Ordinal)
+                || normalizedProvider.Contains("render", StringComparison.Ordinal)
+                || normalizedProvider.Contains("video", StringComparison.Ordinal),
             "audiobookshelf" => normalizedProvider.Contains("audiobookshelf", StringComparison.Ordinal),
             "telegram" => normalizedProvider.Contains("telegram", StringComparison.Ordinal),
             _ => false,
@@ -380,6 +385,7 @@ internal static class OriginDossierProviderAccountRegistry
         {
             "manuscript" => tokens.Overlaps(["manuscript", "authoring", "premium_authoring", "premium_guided_authoring", "scale_drafting", "drafting", "finishing", "narrative_editions", "origin", "chummer_origin", "runner_memoir"]),
             "audio" => tokens.Overlaps(["audio", "audiobook", "narration", "premium_narration", "finishing", "origin", "chummer_origin"]),
+            "visual" => tokens.Overlaps(["visual", "scene_render", "scene-render", "video_render", "video-render", "visuals", "runsite", "origin_visual", "origin_visuals", "origin_dossier"]),
             "audiobookshelf" => tokens.Overlaps(["audiobookshelf", "ebook_shelf", "audiobook_shelf", "book_share", "share_host"]),
             "telegram" => tokens.Overlaps(["telegram", "telegram_delivery", "telegram_official_bot", "origin_delivery"]),
             "provider" => true,

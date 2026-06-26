@@ -74,6 +74,36 @@ public sealed class StoreCorruptionRecoveryTests
         Assert.False(File.Exists(temp.Path));
     }
 
+    [Fact]
+    public void BrilliantDirectoriesBillingStoreQuarantinesCorruptSnapshotAndStartsEmpty()
+    {
+        using TempStoreFile temp = new("brilliant-directories-billing-store.json");
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = temp.Path })
+            .Build();
+
+        BrilliantDirectoriesBillingStore store = new(configuration);
+
+        Assert.Empty(store.Members);
+        Assert.Single(Directory.GetFiles(temp.Root, "brilliant-directories-billing-store.json.corrupt-*"));
+        Assert.False(File.Exists(temp.Path));
+    }
+
+    [Fact]
+    public void MyFirstBookUsageStoreQuarantinesCorruptSnapshotAndStartsEmpty()
+    {
+        using TempStoreFile temp = new("myfirstbook-usage-store.json");
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = temp.Path })
+            .Build();
+
+        MyFirstBookUsageStore store = new(configuration);
+
+        Assert.Empty(store.Entries);
+        Assert.Single(Directory.GetFiles(temp.Root, "myfirstbook-usage-store.json.corrupt-*"));
+        Assert.False(File.Exists(temp.Path));
+    }
+
     private sealed class TempStoreFile : IDisposable
     {
         public TempStoreFile(string fileName)

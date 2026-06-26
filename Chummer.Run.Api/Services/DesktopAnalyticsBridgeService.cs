@@ -1,11 +1,23 @@
 using System.Text;
 using System.Text.Json;
+using System.Net;
 using Chummer.Contracts.Presentation;
 
 namespace Chummer.Run.Api.Services;
 
 public sealed class DesktopAnalyticsBridgeService : IDisposable
 {
+    public const long MaxRequestBodyBytes = 16 * 1024;
+    internal const int MaxHeadIdLength = 128;
+    internal const int MaxSurfaceLength = 128;
+    internal const int MaxReleaseVersionLength = 64;
+    internal const int MaxReleaseChannelLength = 32;
+    internal const int MaxUiModeLength = 32;
+    internal const int MaxLanguageLength = 32;
+    internal const int MaxPropertyCount = 16;
+    internal const int MaxPropertyKeyLength = 64;
+    internal const int MaxPropertyValueLength = 256;
+    private const int MaxUserAgentLength = 256;
     private static readonly HashSet<string> AllowedEvents = new(StringComparer.Ordinal)
     {
         "desktop_shell_opened",
@@ -29,6 +41,16 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
         "localhost",
         "127.0.0.1",
         "host.docker.internal"
+    };
+    private static readonly HashSet<string> ReservedPropertyKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "surface",
+        "head_id",
+        "ui_mode",
+        "language",
+        "release_version",
+        "release_channel",
+        "occurred_at_utc"
     };
 
     public DesktopAnalyticsBridgeService(IConfiguration configuration, ILogger<DesktopAnalyticsBridgeService> logger)
@@ -57,6 +79,41 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
             return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: "event_not_allowed");
         }
 
+        if (!IsBounded(request.HeadId, MaxHeadIdLength))
+        {
+            return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: "head_id_invalid");
+        }
+
+        if (!IsBounded(request.Surface, MaxSurfaceLength))
+        {
+            return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: "surface_invalid");
+        }
+
+        if (!IsBounded(request.ReleaseVersion, MaxReleaseVersionLength))
+        {
+            return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: "release_version_invalid");
+        }
+
+        if (!IsBounded(request.ReleaseChannel, MaxReleaseChannelLength))
+        {
+            return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: "release_channel_invalid");
+        }
+
+        if (!IsOptionalBounded(request.UiMode, MaxUiModeLength))
+        {
+            return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: "ui_mode_invalid");
+        }
+
+        if (!IsOptionalBounded(request.Language, MaxLanguageLength))
+        {
+            return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: "language_invalid");
+        }
+
+        if (!TryNormalizeProperties(request.Properties, out Dictionary<string, string> normalizedProperties, out string? rejectedStatus))
+        {
+            return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: rejectedStatus ?? "properties_invalid");
+        }
+
         string siteId = (_configuration["RYBBIT_CHUMMER_DESKTOP_SITE_ID"] ?? string.Empty).Trim();
         string apiKey = (_configuration["RYBBIT_CHUMMER_DESKTOP_API_KEY"] ?? string.Empty).Trim();
         string origin = (_configuration["RYBBIT_CHUMMER_DESKTOP_API_ORIGIN"] ?? "https://app.rybbit.io").Trim().TrimEnd('/');
@@ -70,20 +127,6 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
             || !IsAllowedTrackUri(trackUri))
         {
             return new DesktopAnalyticsTrackResult(Accepted: false, Forwarded: false, Status: "provider_origin_invalid");
-        }
-
-        Dictionary<string, string> normalizedProperties = new(StringComparer.Ordinal);
-        if (request.Properties is not null)
-        {
-            foreach ((string key, string value) in request.Properties)
-            {
-                if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
-                {
-                    continue;
-                }
-
-                normalizedProperties[key.Trim()] = value.Trim();
-            }
         }
 
         string normalizedSurface = NormalizeSegment(request.Surface, "desktop");
@@ -115,8 +158,8 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
                     pathname = $"/desktop/{normalizedHeadId}/{normalizedSurface}",
                     hostname = "desktop.chummer.run",
                     event_name = request.EventName,
-                    user_agent = string.IsNullOrWhiteSpace(userAgent) ? $"ChummerDesktop/{request.ReleaseVersion}" : userAgent,
-                    ip_address = string.IsNullOrWhiteSpace(remoteIpAddress) ? null : remoteIpAddress,
+                    user_agent = NormalizeUserAgent(userAgent, request.ReleaseVersion),
+                    ip_address = NormalizeIpAddress(remoteIpAddress),
                     properties = propertiesJson
                 }),
                 Encoding.UTF8,
@@ -173,6 +216,89 @@ public sealed class DesktopAnalyticsBridgeService : IDisposable
 
         string normalized = builder.ToString().Trim('-');
         return string.IsNullOrWhiteSpace(normalized) ? fallback : normalized;
+    }
+
+    private static bool TryNormalizeProperties(
+        IReadOnlyDictionary<string, string>? properties,
+        out Dictionary<string, string> normalizedProperties,
+        out string? rejectedStatus)
+    {
+        normalizedProperties = new Dictionary<string, string>(StringComparer.Ordinal);
+        rejectedStatus = null;
+
+        if (properties is null || properties.Count == 0)
+        {
+            return true;
+        }
+
+        if (properties.Count > MaxPropertyCount)
+        {
+            rejectedStatus = "properties_limit_exceeded";
+            return false;
+        }
+
+        foreach ((string key, string value) in properties)
+        {
+            string? normalizedKey = TrimToNull(key);
+            string? normalizedValue = TrimToNull(value);
+            if (normalizedKey is null || normalizedValue is null)
+            {
+                continue;
+            }
+
+            if (normalizedKey.Length > MaxPropertyKeyLength)
+            {
+                rejectedStatus = "property_key_invalid";
+                return false;
+            }
+
+            if (normalizedValue.Length > MaxPropertyValueLength)
+            {
+                rejectedStatus = "property_value_invalid";
+                return false;
+            }
+
+            if (ReservedPropertyKeys.Contains(normalizedKey))
+            {
+                rejectedStatus = "property_key_reserved";
+                return false;
+            }
+
+            normalizedProperties[normalizedKey] = normalizedValue;
+        }
+
+        return true;
+    }
+
+    private static string NormalizeUserAgent(string? userAgent, string releaseVersion)
+    {
+        string fallback = $"ChummerDesktop/{releaseVersion.Trim()}";
+        string candidate = TrimToNull(userAgent) ?? fallback;
+        return candidate.Length <= MaxUserAgentLength ? candidate : candidate[..MaxUserAgentLength];
+    }
+
+    private static string? NormalizeIpAddress(string? remoteIpAddress)
+    {
+        string? candidate = TrimToNull(remoteIpAddress);
+        return candidate is not null && IPAddress.TryParse(candidate, out _) ? candidate : null;
+    }
+
+    private static bool IsBounded(string? value, int maxLength)
+    {
+        string? normalized = TrimToNull(value);
+        return normalized is not null && normalized.Length <= maxLength;
+    }
+
+    private static bool IsOptionalBounded(string? value, int maxLength)
+    {
+        string? normalized = TrimToNull(value);
+        return normalized is null || normalized.Length <= maxLength;
+    }
+
+    private static string? TrimToNull(string? value)
+    {
+        string? trimmed = value?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
     }
 
     private static bool IsAllowedTrackUri(Uri trackUri)
