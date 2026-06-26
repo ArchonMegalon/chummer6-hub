@@ -158,7 +158,7 @@ const checks = [
     url: `${baseUrl}/coach/`,
     assert: (text, response) =>
       /\/status\/?$/.test(response.url)
-      && text.includes('Current release')
+      && text.includes('Chummer is available.')
       && text.includes('Updated')
   }
 ];

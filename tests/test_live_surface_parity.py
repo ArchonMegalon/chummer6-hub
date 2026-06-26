@@ -50,8 +50,8 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Current release The build, platforms, and current state in one place. "
-                b"Updated Open downloads Open help Platforms"
+                b"Chummer is available. Available. Current public installers: Windows and Linux. "
+                b"Updated Downloads Help"
                 b"</body></html>"
             )
             return
