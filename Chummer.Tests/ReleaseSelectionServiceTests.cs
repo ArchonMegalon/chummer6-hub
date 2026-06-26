@@ -316,7 +316,8 @@ platforms:
         var loader = new PublicCanonFileLoader(configuration);
         var document = loader.LoadRequiredYaml<PublicReleaseExperienceDocument>(".codex-design/product/PUBLIC_RELEASE_EXPERIENCE.yaml");
 
-        Assert.Contains("posted", document.ProofScopeSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("inspect", document.ProofScopeSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not a blanket", document.ProofScopeSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Flagship", document.FlagshipClaimSummary, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("concierge", document.PublicConciergeSummary, StringComparison.OrdinalIgnoreCase);
     }
