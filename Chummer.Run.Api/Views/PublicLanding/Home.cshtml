@@ -453,8 +453,13 @@
                             {
                                 @if (accessSupportCases.Length > 0)
                                 {
+                                    var supportCase = accessSupportCases[0];
                                     <h3>@PublicText(accessSupportCases[0].Case.Title)</h3>
                                     <p>@PublicText(accessSupportCases[0].ClosureSummary)</p>
+                                    @if (!string.IsNullOrWhiteSpace(supportCase.PrimaryActionHref))
+                                    {
+                                        <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@PublicText(supportCase.PrimaryActionLabel)</a>
+                                    }
                                 }
                                 else if (restoreConflicts > 0)
                                 {

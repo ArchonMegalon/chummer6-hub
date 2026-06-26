@@ -42,7 +42,7 @@ is_public_artifact() {
       return 0
       ;;
   esac
-  if ! to_bool "$CHUMMER_MACOS_PUBLIC_SHELF_ENABLED" && [[ "$artifact_name" == chummer-*-osx-*installer.dmg || "$artifact_name" == chummer-*-osx-*installer.pkg ]]; then
+  if ! to_bool "$CHUMMER_MACOS_PUBLIC_SHELF_ENABLED" && [[ "$artifact_name" == chummer-blazor-desktop-*-installer.dmg || "$artifact_name" == chummer-blazor-desktop-*-installer.pkg || "$artifact_name" == chummer-*-osx-*installer.dmg || "$artifact_name" == chummer-*-osx-*installer.pkg ]]; then
     return 1
   fi
   case "$artifact_name" in
@@ -438,7 +438,12 @@ for file_name in "${promoted_file_names[@]}"; do
 done
 
 if [[ "${#promoted_file_names[@]}" -gt 0 ]]; then
-  mapfile -t promoted_file_names < <(printf '%s\n' "${promoted_file_names[@]}" | awk 'NF && !seen[$0]++')
+  deduped_promoted_file_names=()
+  while IFS= read -r deduped_file_name; do
+    [[ -n "$deduped_file_name" ]] || continue
+    deduped_promoted_file_names+=("$deduped_file_name")
+  done < <(printf '%s\n' "${promoted_file_names[@]}" | awk 'NF && !seen[$0]++')
+  promoted_file_names=("${deduped_promoted_file_names[@]}")
 fi
 
 mkdir -p "$DEPLOY_DIR/files"

@@ -105,7 +105,7 @@ internal static class DesktopInstallRail
             ReturnHref: $"/downloads/install/{Uri.EscapeDataString(normalizedArtifactId)}",
             ReturnLabel: recoveryMode ? "Return to recovery" : "Return to setup",
             Summary: recoveryMode
-                ? "This case stays with the same linked copy. Go back to recovery when you are ready to retry, and only use a recovery code if Chummer asks for one on that device."
+                ? "This case stays with the same linked copy. Go back to recovery mode when you are ready to retry, and only use a recovery code if Chummer asks for one on that device."
                 : "This case stays with the same linked copy. Go back to setup when you are ready to retry install, first launch, or update on that device.",
             RecoveryModeOnly: recoveryMode);
     }
@@ -132,7 +132,7 @@ internal static class DesktopInstallRail
             NextSafeAction: recoveryMode
                 ? "Finish setup in Chummer. Only use the recovery code if setup explicitly enters recovery mode."
                 : "Continue in the installer or desktop app so the linked copy can claim this account without another browser step.",
-            UpdateAction: "Use the desktop update screen or signed-in installer for this same channel and build before filing a new support case. This is the desktop app update lane.",
+            UpdateAction: "Use the desktop update screen or signed-in installer for this same channel and build before filing a new support case. Keep this on the same linked desktop update path.",
             RollbackAction: "If update or setup fails, keep the previous installed copy and return to Devices and access or tracked support for this same linked copy. Keep the fix, update, rollback, and verification on this same linked install.",
             SupportContinuation: "Support stays with this same linked copy, including its current claim, build, channel, fallback, and recovery context.");
     }

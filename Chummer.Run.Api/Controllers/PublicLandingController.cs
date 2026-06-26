@@ -16557,7 +16557,7 @@ echo "Help: ${HELP_URL}"
         {
             "manage" => "Signed-in faction management for campaign pressure, district coverage, and private coordination.",
             "stewards" => "Steward roles stay explicit here so public summary roles never get confused with private campaign authority.",
-            "private-lore" => "Private lore overlays can exist here for campaign context, but public Ledger pages must never render them.",
+            "private-lore" => "Private lore overlays can exist here for campaign context, but public Ledger routes must never render them.",
             _ => "Faction command workspace for the same Black Ledger world, with private labels and management details kept off public pages.",
         };
 

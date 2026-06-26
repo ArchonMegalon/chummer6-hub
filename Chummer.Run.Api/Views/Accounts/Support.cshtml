@@ -1,0 +1,541 @@
+@using Chummer.Run.Api.Services
+@model AccountPageViewModel
+@{
+    ViewData["Title"] = "Account · Support";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+
+    var supportQuery = Context.Request.Query;
+    var supportCaseDefaultKind = supportQuery.TryGetValue("kind", out var supportKindValues) ? supportKindValues.ToString() : string.Empty;
+    var supportCaseDefaultTitle = supportQuery.TryGetValue("title", out var supportTitleValues) ? supportTitleValues.ToString() : string.Empty;
+    var supportCaseDefaultSummary = supportQuery.TryGetValue("summary", out var supportSummaryValues) ? supportSummaryValues.ToString() : string.Empty;
+    var supportCaseDefaultDetail = supportQuery.TryGetValue("detail", out var supportDetailValues) ? supportDetailValues.ToString() : string.Empty;
+    var selectedSupportInstallationId = supportQuery.TryGetValue("installationId", out var supportInstallationValues) ? supportInstallationValues.ToString() : null;
+    var linkedInstallations = Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>();
+    var supportCaseSummaries = (Model.SupportCaseSummaries ?? Array.Empty<SupportCasePresentationViewModel>())
+        .OrderByDescending(item => item.Case.UpdatedAtUtc)
+        .ToArray();
+    var openSupportCases = Model.SupportCases.Count(item => !string.Equals(item.Status, "user_notified", StringComparison.OrdinalIgnoreCase));
+    var leadSupportCase = supportCaseSummaries.FirstOrDefault();
+    var composeRequested = !string.IsNullOrWhiteSpace(supportCaseDefaultKind)
+        || !string.IsNullOrWhiteSpace(supportCaseDefaultTitle)
+        || !string.IsNullOrWhiteSpace(supportCaseDefaultSummary)
+        || !string.IsNullOrWhiteSpace(supportCaseDefaultDetail)
+        || !string.IsNullOrWhiteSpace(selectedSupportInstallationId);
+}
+<section class="minimal-page-hero">
+    <div>
+        <p class="eyebrow">Account · Support</p>
+        <h1>Private support stays simple.</h1>
+        <p>Use Discord for normal questions. Use this page when you need private follow-up, files, or tracked case closure.</p>
+        <ul class="minimal-hero__points">
+            <li>Signed in as @Model.User.DisplayName</li>
+            <li>@openSupportCases open case@(openSupportCases == 1 ? string.Empty : "s")</li>
+            <li>@linkedInstallations.Count linked install@(linkedInstallations.Count == 1 ? string.Empty : "s")</li>
+        </ul>
+    </div>
+</section>
+
+<section class="minimal-section">
+    <div class="minimal-lane-grid minimal-platform-list">
+        <article class="minimal-lane-card">
+            <span class="tag">Discord</span>
+            <h2>Normal questions</h2>
+            <p>Quick questions, discussion, and ordinary feedback belong in the Chummer5 server.</p>
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" href="https://discord.gg/chummer" rel="noopener" target="_blank">Open Discord</a>
+            </div>
+        </article>
+        <article class="minimal-lane-card">
+            <span class="tag">Private</span>
+            <h2>Private case</h2>
+            <p>Use the private form for crashes, logs, install trouble, screenshots, or anything tied to your account.</p>
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" href="#support-intake">Open private form</a>
+                <a class="button-like button-like--ghost" href="/account/access">Installs</a>
+            </div>
+        </article>
+        <article class="minimal-lane-card">
+            <span class="tag">Tracked</span>
+            <h2>@(leadSupportCase is null ? "No case is waiting" : leadSupportCase.Case.Title)</h2>
+            <p>@(leadSupportCase is null ? "When a private case exists, the next step stays attached to it here." : leadSupportCase.NextSafeAction)</p>
+            <div class="minimal-actions">
+                @if (leadSupportCase is null)
+                {
+                    <a class="button-like button-like--ghost" href="#support-cases">Recent cases</a>
+                }
+                else
+                {
+                    <a class="button-like button-like--primary" href="@leadSupportCase.DetailHref">Open case</a>
+                    <a class="button-like button-like--ghost" href="@leadSupportCase.PrimaryActionHref">@leadSupportCase.PrimaryActionLabel</a>
+                }
+            </div>
+        </article>
+    </div>
+</section>
+
+<section class="minimal-section minimal-section--tight" id="support-cases">
+    <div class="minimal-section__lead">
+        <h2>Recent cases</h2>
+        <p>@(supportCaseSummaries.Length == 0 ? "Nothing is tracked on this account yet." : "Open a tracked case to see the exact next step, fix state, and follow-up lane.")</p>
+    </div>
+    @if (supportCaseSummaries.Length == 0)
+    {
+        <article class="minimal-lane-card">
+            <span class="tag">Queue</span>
+            <h3>No recent case</h3>
+            <p>Start with the private form only when Discord is not enough or the issue needs files, logs, or account-linked follow-up.</p>
+        </article>
+    }
+    else
+    {
+        <div class="minimal-lane-grid minimal-platform-list">
+            @foreach (var supportCase in supportCaseSummaries.Take(4))
+            {
+                <article class="minimal-lane-card">
+                    <span class="tag">@supportCase.StatusLabel</span>
+                    <h3>@supportCase.Case.Title</h3>
+                    <p>@supportCase.ClosureSummary</p>
+                    <div class="settings-summary-list">
+                        <div class="settings-summary-row">
+                            <span>Updated</span>
+                            <strong>@supportCase.UpdatedLabel</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Stage</span>
+                            <strong>@supportCase.StageLabel</strong>
+                        </div>
+                    </div>
+                    <div class="minimal-actions">
+                        <a class="button-like button-like--primary" href="@supportCase.DetailHref">Open case</a>
+                        <a class="button-like button-like--ghost" href="@supportCase.PrimaryActionHref">@supportCase.PrimaryActionLabel</a>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+<section class="minimal-section minimal-section--tight" id="support-intake">
+    <div class="minimal-section__lead">
+        <h2>Private form</h2>
+        <p>Keep it short. Add files only when they make the fix faster.</p>
+    </div>
+    @if (composeRequested)
+    {
+        <details class="details-drawer" open>
+            <summary>Open private form</summary>
+            <form id="supportCaseForm" class="settings-form">
+                <div class="field">
+                    <label for="supportCaseKind">Case type</label>
+                    <select id="supportCaseKind">
+                        <option value="bug_report" selected="@(string.Equals(supportCaseDefaultKind, "bug_report", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Bug report</option>
+                        <option value="feedback" selected="@(string.Equals(supportCaseDefaultKind, "feedback", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Feedback</option>
+                        <option value="install_help" selected="@(string.Equals(supportCaseDefaultKind, "install_help", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Install or update help</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="supportCaseInstallation">Related install</label>
+                    <select id="supportCaseInstallation">
+                        <option value="">No specific install</option>
+                        @foreach (var installation in linkedInstallations)
+                        {
+                            <option
+                                value="@installation.InstallationId"
+                                data-version="@installation.Version"
+                                data-channel="@installation.Channel"
+                                data-head="@installation.HeadId"
+                                data-platform="@installation.Platform"
+                                data-arch="@installation.Arch"
+                                selected="@(string.Equals(selectedSupportInstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="supportCaseTitle">Short title</label>
+                    <input id="supportCaseTitle" maxlength="160" placeholder="Update prompt was unclear on Linux" value="@supportCaseDefaultTitle" />
+                </div>
+                <div class="field">
+                    <label for="supportCaseSummary">One-line summary</label>
+                    <input id="supportCaseSummary" maxlength="280" placeholder="The updater offered a restart but did not explain what was staged." value="@supportCaseDefaultSummary" />
+                </div>
+                <div class="field">
+                    <label for="supportCaseDetail">What happened</label>
+                    <textarea id="supportCaseDetail" rows="6" placeholder="What did you expect, what actually happened, and what would help close it faster?">@supportCaseDefaultDetail</textarea>
+                </div>
+                <div class="field">
+                    <label for="supportCaseAttachments">Attachments</label>
+                    <input id="supportCaseAttachments" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.txt,.log,.json,.zip,.md" />
+                    <p class="muted-copy">Screenshots, logs, or a small archive are enough.</p>
+                </div>
+                <div id="supportCaseContextPreview" class="settings-summary-list" hidden></div>
+                <button class="button-like button-like--primary" type="submit">Submit private case</button>
+                <p id="supportCaseStatusNotice" class="muted-copy" hidden></p>
+            </form>
+        </details>
+    }
+    else
+    {
+        <details class="details-drawer">
+            <summary>Open private form</summary>
+            <form id="supportCaseForm" class="settings-form">
+                <div class="field">
+                    <label for="supportCaseKind">Case type</label>
+                    <select id="supportCaseKind">
+                        <option value="bug_report" selected="@(string.Equals(supportCaseDefaultKind, "bug_report", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Bug report</option>
+                        <option value="feedback" selected="@(string.Equals(supportCaseDefaultKind, "feedback", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Feedback</option>
+                        <option value="install_help" selected="@(string.Equals(supportCaseDefaultKind, "install_help", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Install or update help</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="supportCaseInstallation">Related install</label>
+                    <select id="supportCaseInstallation">
+                        <option value="">No specific install</option>
+                        @foreach (var installation in linkedInstallations)
+                        {
+                            <option
+                                value="@installation.InstallationId"
+                                data-version="@installation.Version"
+                                data-channel="@installation.Channel"
+                                data-head="@installation.HeadId"
+                                data-platform="@installation.Platform"
+                                data-arch="@installation.Arch"
+                                selected="@(string.Equals(selectedSupportInstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="supportCaseTitle">Short title</label>
+                    <input id="supportCaseTitle" maxlength="160" placeholder="Update prompt was unclear on Linux" value="@supportCaseDefaultTitle" />
+                </div>
+                <div class="field">
+                    <label for="supportCaseSummary">One-line summary</label>
+                    <input id="supportCaseSummary" maxlength="280" placeholder="The updater offered a restart but did not explain what was staged." value="@supportCaseDefaultSummary" />
+                </div>
+                <div class="field">
+                    <label for="supportCaseDetail">What happened</label>
+                    <textarea id="supportCaseDetail" rows="6" placeholder="What did you expect, what actually happened, and what would help close it faster?">@supportCaseDefaultDetail</textarea>
+                </div>
+                <div class="field">
+                    <label for="supportCaseAttachments">Attachments</label>
+                    <input id="supportCaseAttachments" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.txt,.log,.json,.zip,.md" />
+                    <p class="muted-copy">Screenshots, logs, or a small archive are enough.</p>
+                </div>
+                <div id="supportCaseContextPreview" class="settings-summary-list" hidden></div>
+                <button class="button-like button-like--primary" type="submit">Submit private case</button>
+                <p id="supportCaseStatusNotice" class="muted-copy" hidden></p>
+            </form>
+        </details>
+    }
+</section>
+
+<section class="minimal-section minimal-section--tight">
+    <details class="details-drawer">
+        <summary>Need routing help first?</summary>
+        <form id="supportAssistantForm" class="settings-form">
+            <div class="field">
+                <label for="supportAssistantQuery">Describe the problem</label>
+                <textarea id="supportAssistantQuery" rows="4" placeholder="What changed, what hurts, or what are you trying to do?"></textarea>
+            </div>
+            <div class="field">
+                <label for="supportAssistantInstallation">Related install</label>
+                <select id="supportAssistantInstallation">
+                    <option value="" selected="@(string.IsNullOrWhiteSpace(selectedSupportInstallationId) ? "selected" : null)">Any install or no install yet</option>
+                    @foreach (var installation in linkedInstallations)
+                    {
+                        <option value="@installation.InstallationId" selected="@(string.Equals(selectedSupportInstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
+                    }
+                </select>
+            </div>
+            <button class="button-like button-like--secondary" type="submit">Get suggestion</button>
+            <p id="supportAssistantStatusNotice" class="muted-copy" hidden></p>
+            <div id="supportAssistantAnswer" class="stacked-copy" hidden></div>
+            <div id="supportAssistantActions" class="stacked-actions" hidden></div>
+            <div id="supportAssistantCitations" class="settings-summary-list" hidden></div>
+        </form>
+    </details>
+
+    <details class="details-drawer">
+        <summary>Rules help</summary>
+        <form id="ruleGhostForm" class="settings-form">
+            <div class="field">
+                <label for="ruleGhostQuery">Ask a Shadowrun rules question</label>
+                <textarea id="ruleGhostQuery" rows="4" placeholder="Example: In SR6, how should I think about Edge during a firefight?"></textarea>
+            </div>
+            <div class="field">
+                <label for="ruleGhostRuleset">Edition</label>
+                <select id="ruleGhostRuleset">
+                    <option value="" selected>Auto detect</option>
+                    <option value="sr5">SR5</option>
+                    <option value="sr6">SR6</option>
+                </select>
+            </div>
+            <button class="button-like button-like--secondary" type="submit">Explain rule</button>
+            <p class="muted-copy">Chummer summarizes owned material in plain language and avoids book wording.</p>
+            <p id="ruleGhostStatusNotice" class="muted-copy" hidden></p>
+            <div id="ruleGhostAnswer" class="stacked-copy" hidden></div>
+            <div id="ruleGhostFollowUps" class="stacked-actions" hidden></div>
+            <div id="ruleGhostCitations" class="settings-summary-list" hidden></div>
+        </form>
+    </details>
+</section>
+
+<script>
+(() => {
+  const ui = window.ChummerUi;
+  if (!ui) {
+    return;
+  }
+
+  const bindSubmit = (id, handler) => {
+    const form = document.getElementById(id);
+    if (!form) {
+      return;
+    }
+
+    form.addEventListener("submit", handler);
+  };
+
+  const setRateLimitNotice = (noticeNode, error, prefix, nextSafeAction) => {
+    const payload = error?.payload && typeof error.payload === "object" ? error.payload : null;
+    const status = payload?.status;
+    if (status !== 429) {
+      return false;
+    }
+
+    const retryAfter = Number.isFinite(payload?.retryAfterSeconds) && payload.retryAfterSeconds > 0
+      ? payload.retryAfterSeconds
+      : null;
+    const waitLabel = retryAfter
+      ? `${retryAfter} second${retryAfter === 1 ? "" : "s"}`
+      : "a short cooldown";
+    ui.setNotice(noticeNode, `${prefix} Retry after ${waitLabel}. ${nextSafeAction}`, true);
+    return true;
+  };
+
+  bindSubmit("supportAssistantForm", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("supportAssistantStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const answer = document.getElementById("supportAssistantAnswer");
+    const actions = document.getElementById("supportAssistantActions");
+    const citations = document.getElementById("supportAssistantCitations");
+    ui.clearNotice(notice);
+    answer.hidden = true;
+    actions.hidden = true;
+    citations.hidden = true;
+    answer.textContent = "";
+    actions.innerHTML = "";
+    citations.innerHTML = "";
+    ui.setButtonBusy(button, true, "Loading...");
+    try {
+      const payload = await ui.requestJson("/api/v1/support/cases/assistant", {
+        method: "POST",
+        json: {
+          query: document.getElementById("supportAssistantQuery").value,
+          installationId: document.getElementById("supportAssistantInstallation").value || null
+        }
+      });
+
+      answer.textContent = payload.answer || "";
+      answer.hidden = !answer.textContent;
+
+      const actionItems = Array.isArray(payload.actions) ? payload.actions : [];
+      if (actionItems.length > 0) {
+        actions.hidden = false;
+        for (const item of actionItems) {
+          const label = (item.label || item.actionId || "").trim();
+          if (!label) {
+            continue;
+          }
+
+          const link = document.createElement("a");
+          link.className = "button-like button-like--ghost";
+          link.href = item.href || "#";
+          link.textContent = label.replaceAll("_", " ");
+          actions.appendChild(link);
+        }
+      }
+
+      const citationItems = Array.isArray(payload.citations) ? payload.citations : [];
+      if (citationItems.length > 0) {
+        citations.hidden = false;
+        for (const item of citationItems) {
+          const row = document.createElement("div");
+          row.className = "settings-summary-row";
+          const label = document.createElement("span");
+          label.textContent = item.label || item.sourceKind || "Source";
+          const summary = document.createElement("strong");
+          summary.textContent = item.summary || "";
+          row.appendChild(label);
+          row.appendChild(summary);
+          citations.appendChild(row);
+        }
+      }
+
+      ui.setNotice(notice, "Suggestion loaded.");
+    } catch (error) {
+      const rateLimited = setRateLimitNotice(
+        notice,
+        error,
+        "Suggestions are pacing requests to keep replies readable.",
+        "Wait a moment, then retry with one focused question.");
+      if (!rateLimited) {
+        ui.setNotice(notice, ui.describeError(error, "Suggestion could not be loaded right now."), true);
+      }
+    } finally {
+      ui.setButtonBusy(button, false, "Loading...");
+    }
+  });
+
+  bindSubmit("supportCaseForm", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("supportCaseStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const installationSelect = document.getElementById("supportCaseInstallation");
+    const attachmentsField = document.getElementById("supportCaseAttachments");
+    const installationOption = installationSelect.options[installationSelect.selectedIndex];
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Submitting...");
+    try {
+      const formData = new FormData();
+      formData.set("kind", document.getElementById("supportCaseKind").value);
+      formData.set("title", document.getElementById("supportCaseTitle").value);
+      formData.set("summary", document.getElementById("supportCaseSummary").value);
+      formData.set("detail", document.getElementById("supportCaseDetail").value);
+      if (installationSelect.value) formData.set("installationId", installationSelect.value);
+      if (installationOption?.dataset?.version) formData.set("applicationVersion", installationOption.dataset.version);
+      if (installationOption?.dataset?.channel) formData.set("releaseChannel", installationOption.dataset.channel);
+      if (installationOption?.dataset?.head) formData.set("headId", installationOption.dataset.head);
+      if (installationOption?.dataset?.platform) formData.set("platform", installationOption.dataset.platform);
+      if (installationOption?.dataset?.arch) formData.set("arch", installationOption.dataset.arch);
+      Array.from(attachmentsField.files || []).forEach((file) => formData.append("attachments", file, file.name));
+
+      const response = await fetch("/api/v1/support/cases/form", {
+        method: "POST",
+        headers: {
+          "RequestVerificationToken": ui.getRequestVerificationToken()
+        },
+        body: formData,
+        credentials: "same-origin"
+      });
+
+      const payload = await ui.readJsonResponse(response, "Support case could not be submitted right now.");
+      window.location.href = `/account/support/${encodeURIComponent(payload.caseId)}`;
+    } catch (error) {
+      const rateLimited = setRateLimitNotice(
+        notice,
+        error,
+        "Support intake is pacing requests to keep tracked queues clean.",
+        "Wait a moment, then submit one updated case instead of retrying rapidly.");
+      if (!rateLimited) {
+        ui.setNotice(notice, ui.describeError(error, "Support case could not be submitted right now."), true);
+      }
+    } finally {
+      ui.setButtonBusy(button, false, "Submitting...");
+    }
+  });
+
+  bindSubmit("ruleGhostForm", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("ruleGhostStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const answer = document.getElementById("ruleGhostAnswer");
+    const followUps = document.getElementById("ruleGhostFollowUps");
+    const citations = document.getElementById("ruleGhostCitations");
+    ui.clearNotice(notice);
+    answer.hidden = true;
+    followUps.hidden = true;
+    citations.hidden = true;
+    answer.textContent = "";
+    followUps.innerHTML = "";
+    citations.innerHTML = "";
+    ui.setButtonBusy(button, true, "Loading...");
+    try {
+      const payload = await ui.requestJson("/api/v1/rule-ghost/ask", {
+        method: "POST",
+        json: {
+          query: document.getElementById("ruleGhostQuery").value,
+          preferredRuleset: document.getElementById("ruleGhostRuleset").value || null
+        }
+      });
+
+      answer.textContent = payload.answer || "";
+      answer.hidden = !answer.textContent;
+
+      const followUpItems = Array.isArray(payload.safeFollowUps) ? payload.safeFollowUps : [];
+      if (followUpItems.length > 0) {
+        followUps.hidden = false;
+        for (const item of followUpItems) {
+          const chip = document.createElement("span");
+          chip.className = "button-like button-like--ghost";
+          chip.textContent = item;
+          followUps.appendChild(chip);
+        }
+      }
+
+      const citationItems = Array.isArray(payload.citations) ? payload.citations : [];
+      if (citationItems.length > 0) {
+        citations.hidden = false;
+        for (const item of citationItems) {
+          const row = document.createElement("div");
+          row.className = "settings-summary-row";
+          const label = document.createElement("span");
+          label.textContent = item.sourceLabel || "Owned rulebook";
+          const summary = document.createElement("strong");
+          summary.textContent = [item.sectionHint, item.summary].filter(Boolean).join(" · ");
+          row.appendChild(label);
+          row.appendChild(summary);
+          citations.appendChild(row);
+        }
+      }
+
+      ui.setNotice(notice, payload.refused ? "Rules answer refused." : "Rules summary loaded.");
+    } catch (error) {
+      const rateLimited = setRateLimitNotice(
+        notice,
+        error,
+        "Rules help is pacing requests to keep answers clear.",
+        "Wait a moment, then retry with one mechanic and one edition.");
+      if (!rateLimited) {
+        ui.setNotice(notice, ui.describeError(error, "Rules help could not load right now."), true);
+      }
+    } finally {
+      ui.setButtonBusy(button, false, "Loading...");
+    }
+  });
+
+  const supportInstallation = document.getElementById("supportCaseInstallation");
+  const supportContextPreview = document.getElementById("supportCaseContextPreview");
+  const syncSupportContextPreview = () => {
+    if (!supportInstallation || !supportContextPreview) {
+      return;
+    }
+
+    const option = supportInstallation.options[supportInstallation.selectedIndex];
+    if (!option || !option.value) {
+      supportContextPreview.hidden = true;
+      supportContextPreview.innerHTML = "";
+      return;
+    }
+
+    const rows = [
+      ["Linked install", option.textContent?.trim() || option.value],
+      ["Version", option.dataset.version || "Unknown"],
+      ["Channel", option.dataset.channel || "Unknown"],
+      ["Platform", [option.dataset.platform, option.dataset.arch].filter(Boolean).join(" / ") || "Unknown"]
+    ];
+
+    supportContextPreview.hidden = false;
+    supportContextPreview.innerHTML = rows.map(([label, value]) => `
+      <div class="settings-summary-row">
+        <span>${label}</span>
+        <strong>${value}</strong>
+      </div>
+    `).join("");
+  };
+
+  supportInstallation?.addEventListener("change", syncSupportContextPreview);
+  syncSupportContextPreview();
+})();
+</script>

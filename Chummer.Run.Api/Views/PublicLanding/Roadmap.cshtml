@@ -38,6 +38,28 @@
     </div>
 </section>
 
+@if (Model.Milestones.Count > 0)
+{
+    <section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-milestones-title">
+        <div class="minimal-section__lead">
+            <p class="eyebrow">Milestones</p>
+            <h2 id="roadmap-milestones-title">What is moving</h2>
+            <p>Short milestone readouts, not the whole board.</p>
+        </div>
+        <div class="minimal-lane-grid">
+            @foreach (var milestone in Model.Milestones.Take(6))
+            {
+                <article class="minimal-lane-card">
+                    <span class="tag">@milestone.WaveLabel</span>
+                    <h3>@milestone.Title</h3>
+                    <p>@milestone.CasualSummary</p>
+                    <p class="muted-copy">@milestone.StatusLabel</p>
+                </article>
+            }
+        </div>
+    </section>
+}
+
 @if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))
 {
     <div class="minimal-section minimal-section--tight roadmap-board" aria-labelledby="roadmap-board-title">
@@ -85,7 +107,7 @@
     </div>
     <div class="minimal-actions">
         <a class="button-like button-like--primary" href="/participate">Participate</a>
-        <a class="button-like button-like--ghost" href="/changelog">Changelog</a>
+        <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
         <a class="button-like button-like--ghost" href="/help">Support</a>
     </div>
 </div>

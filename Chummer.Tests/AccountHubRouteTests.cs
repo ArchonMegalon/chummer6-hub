@@ -143,7 +143,7 @@ public sealed class AccountHubRouteTests
         IActionResult result = await controller.AccountPage("support", null, CancellationToken.None);
 
         ViewResult view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("~/Views/Accounts/Account.cshtml", view.ViewName);
+        Assert.Equal("~/Views/Accounts/Support.cshtml", view.ViewName);
         Assert.IsType<AccountPageViewModel>(view.Model);
     }
 
@@ -154,6 +154,19 @@ public sealed class AccountHubRouteTests
         AccountsController controller = fixture.CreateController();
 
         IActionResult result = await controller.AccountPage("work", null, CancellationToken.None, workspaceId: "workspace-demo", runId: null, handoffId: null, entryId: null, publicationId: null, prepQuery: null);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Accounts/Account.cshtml", view.ViewName);
+        Assert.IsType<AccountPageViewModel>(view.Model);
+    }
+
+    [Fact]
+    public async Task AccountSupportDetailRouteKeepsLegacyDetailedSurface()
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.AccountPage("support", "case-demo", CancellationToken.None);
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.Equal("~/Views/Accounts/Account.cshtml", view.ViewName);

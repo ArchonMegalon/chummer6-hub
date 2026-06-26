@@ -626,7 +626,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("minimal-lane-grid", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Stable", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Nightly", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Arch Linux", downloadsView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Arch Linux", downloadsView, StringComparison.Ordinal);
         Assert.Contains("BuildMacBootstrapTerminalCommand", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveClaimTicketForDownload", controller, StringComparison.Ordinal);
         Assert.Contains("CopyCommandLabel", controller, StringComparison.Ordinal);

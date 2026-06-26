@@ -156,7 +156,8 @@
                 data-auto-replay="@(Context.Request.Query.ContainsKey("replay") ? "true" : "false")"
                 data-primary-label="@UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)"
                 data-primary-href="@Model.PrimaryAction.Href"
-                data-secondary-label="@UndetectableHumanizerCopyAdapter.Humanize(Model.SecondaryAction.Label)"
+                data-secondary-accessible-label="@UndetectableHumanizerCopyAdapter.Humanize(Model.SecondaryAction.Label)"
+                data-secondary-label="@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.SecondaryAction.Label)"
                 data-secondary-href="@Model.SecondaryAction.Href"></div>
         </div>
     }
@@ -189,7 +190,7 @@
         </section>
         <div class="ledger-flagship__actions" aria-label="Black Ledger actions">
             <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href" data-analytics-event="ledger_primary_action" data-analytics-surface="ledger_hero" data-analytics-label="@UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)">@UndetectableHumanizerCopyAdapter.Humanize(Model.PrimaryAction.Label)</a>
-            <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href" data-analytics-event="ledger_secondary_action" data-analytics-surface="ledger_hero" data-analytics-label="@UndetectableHumanizerCopyAdapter.Humanize(Model.SecondaryAction.Label)">@UndetectableHumanizerCopyAdapter.Humanize(Model.SecondaryAction.Label)</a>
+            <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href" data-analytics-event="ledger_secondary_action" data-analytics-surface="ledger_hero" data-analytics-label="@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.SecondaryAction.Label)">@UndetectableHumanizerCopyAdapter.HumanizeLedger(Model.SecondaryAction.Label)</a>
             <a class="inline-link" href="/ledger/map#ledger-map" data-analytics-event="ledger_open_command_map" data-analytics-surface="ledger_hero" data-analytics-label="Open command map">Open command map</a>
         </div>
         <div class="trust-claim__details ledger-flagship__boundary">

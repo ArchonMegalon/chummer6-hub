@@ -11,16 +11,20 @@ public sealed class AccountBuildLabHandoffViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string hubViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Hub.cshtml");
         string sectionViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Section.cshtml");
+        string supportViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Support.cshtml");
         string controller = File.ReadAllText(controllerPath);
         string view = File.ReadAllText(viewPath);
         string hubView = File.ReadAllText(hubViewPath);
         string sectionView = File.ReadAllText(sectionViewPath);
+        string supportView = File.ReadAllText(supportViewPath);
 
         Assert.Contains("string.Equals(selectedSection, \"profile\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
         Assert.Contains("return View(", controller, StringComparison.Ordinal);
         Assert.Contains("\"~/Views/Accounts/Hub.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("\"~/Views/Accounts/Section.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.Contains("\"~/Views/Accounts/Support.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("ShouldShowMinimalAccountSection", controller, StringComparison.Ordinal);
+        Assert.Contains("ShouldShowMinimalSupportSection", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect(\"/account\")", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("IsBillingSectionAlias", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("section.Trim().ToLowerInvariant() is \"billing\" or \"settings\" or \"advanced\"", controller, StringComparison.Ordinal);
@@ -56,6 +60,10 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("@Model.Eyebrow", sectionView, StringComparison.Ordinal);
         Assert.Contains("@Model.Heading", sectionView, StringComparison.Ordinal);
         Assert.Contains("@foreach (var card in Model.Cards)", sectionView, StringComparison.Ordinal);
+        Assert.Contains("Private support stays simple.", supportView, StringComparison.Ordinal);
+        Assert.Contains("supportCaseForm", supportView, StringComparison.Ordinal);
+        Assert.Contains("supportAssistantForm", supportView, StringComparison.Ordinal);
+        Assert.Contains("ruleGhostForm", supportView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -161,7 +169,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("Open build details for", view, StringComparison.Ordinal);
         Assert.Contains("Create recap or replay", view, StringComparison.Ordinal);
         Assert.Contains("Recaps and replays become available once this campaign has a tracked run.", view, StringComparison.Ordinal);
-        Assert.Contains("Recent recaps and replays", view, StringComparison.Ordinal);
+        Assert.Contains("Recent aftermath recap packages and replay outputs", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Runboard continuity", view, StringComparison.Ordinal);
         Assert.DoesNotContain("GM prep and travel", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<summary>Aftermath and recap</summary>", view, StringComparison.Ordinal);

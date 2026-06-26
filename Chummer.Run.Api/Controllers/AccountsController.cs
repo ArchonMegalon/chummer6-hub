@@ -265,6 +265,11 @@ public sealed class AccountsController : Controller
                 ParticipationKarmaSubmissions: _karmaForge.ListRecentForSubject(subject.SubjectId, 5),
                 ParticipationActivityReceipts: _participationNotifications.ListReceiptsForUser(user.UserId, 6),
                 OriginDossierPublications: originDossierPublications);
+            if (ShouldShowMinimalSupportSection(selectedSection, caseId))
+            {
+                return View("~/Views/Accounts/Support.cshtml", model);
+            }
+
             return View("~/Views/Accounts/Account.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -669,6 +674,10 @@ public sealed class AccountsController : Controller
                || string.Equals(selectedSection, "work", StringComparison.OrdinalIgnoreCase)
                || string.Equals(selectedSection, "participation", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool ShouldShowMinimalSupportSection(string selectedSection, string? caseId)
+        => string.Equals(selectedSection, "support", StringComparison.OrdinalIgnoreCase)
+           && string.IsNullOrWhiteSpace(caseId);
 
     private static string DescribeInstallation(ClaimedInstallationDto installation)
     {
