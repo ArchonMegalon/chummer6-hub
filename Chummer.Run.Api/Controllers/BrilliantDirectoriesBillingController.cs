@@ -36,13 +36,8 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         _ = userId;
         _ = email;
         HubUserDto? currentUser = await TryGetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
-        if (currentUser is null)
-        {
-            return Redirect($"/auth/google/start?next={Uri.EscapeDataString("/account/billing")}");
-        }
-
-        string resolvedUserId = currentUser.UserId;
-        string? resolvedEmail = TrimToNull(currentUser.Email);
+        string? resolvedUserId = TrimToNull(currentUser?.UserId);
+        string? resolvedEmail = TrimToNull(currentUser?.Email);
 
         try
         {
@@ -208,7 +203,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         HubUserDto? currentUser = await TryGetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
         if (currentUser is null)
         {
-            return Redirect($"/auth/google/start?next={Uri.EscapeDataString("/account/billing/supporter/start")}");
+            return Redirect("/account/billing");
         }
 
         try

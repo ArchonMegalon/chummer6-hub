@@ -170,21 +170,25 @@
                         {
                             <input type="hidden" name="userId" value="@Model.UserId">
                             <div class="pill">Account attached</div>
+                            <label>
+                                Email
+                                <input type="email" name="email" value="@Model.Email" autocomplete="email" placeholder="Optional">
+                            </label>
                         }
                         else
                         {
-                            <label>
-                                Account ID
-                                <input type="text" name="userId" value="@Model.UserId" autocomplete="username" placeholder="Required to continue">
-                            </label>
+                            <p class="field-help">Continue with email first. Chummer will attach supporter status after the account is open.</p>
                         }
-                        <label>
-                            Email
-                            <input type="email" name="email" value="@Model.Email" autocomplete="email" placeholder="Optional">
-                        </label>
                         <p class="field-help">Supporter does not unlock extra app features right now. It only raises the monthly Origin Book allowance to 2 and helps pay for Chummer.</p>
                         <div class="action-row">
-                            <button class="button button--primary" type="submit">@supporter.PrimaryAction.Label</button>
+                            @if (hasUserId)
+                            {
+                                <button class="button button--primary" type="submit">@supporter.PrimaryAction.Label</button>
+                            }
+                            else
+                            {
+                                <a class="button button--primary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
+                            }
                             <a class="button" href="@Model.ManageMembershipHref">Manage billing</a>
                         </div>
                     </form>

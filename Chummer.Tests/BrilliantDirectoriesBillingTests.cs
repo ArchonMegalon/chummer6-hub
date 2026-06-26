@@ -59,7 +59,10 @@ public sealed class BrilliantDirectoriesBillingTests
 
         Assert.Contains("Same app for everyone.", view, StringComparison.Ordinal);
         Assert.Contains("Origin books: Free 1/month. Supporter 2/month.", view, StringComparison.Ordinal);
-        Assert.Contains("Required to continue", view, StringComparison.Ordinal);
+        Assert.Contains("Continue with email", view, StringComparison.Ordinal);
+        Assert.Contains("Chummer will attach supporter status after the account is open.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Account ID", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Required to continue", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Required for checkout", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Brilliant", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Directories", view, StringComparison.OrdinalIgnoreCase);
@@ -445,7 +448,7 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public async Task BillingPageWithoutAttachedUserRedirectsToFirstPartySignIn()
+    public async Task BillingPageWithoutAttachedUserRendersPublicMembershipChoice()
     {
         BrilliantDirectoriesBillingService service = CreateService();
         BrilliantDirectoriesBillingController controller = new(service)
@@ -458,12 +461,15 @@ public sealed class BrilliantDirectoriesBillingTests
 
         IActionResult result = await controller.BillingPage();
 
-        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/auth/google/start?next=%2Faccount%2Fbilling", redirect.Url);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
+        Assert.False(model.UsingSignedInAccount);
+        Assert.Null(model.CurrentMyFirstBookQuota);
+        Assert.Equal("Supporter", model.SupporterPlan?.Name);
     }
 
     [Fact]
-    public async Task BillingPageRequiresSignInBeforeRenderingUnavailableProviderState()
+    public async Task BillingPageWithoutAttachedUserCanShowUnavailableProviderState()
     {
         string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
         IConfiguration configuration = new ConfigurationBuilder()
@@ -483,8 +489,9 @@ public sealed class BrilliantDirectoriesBillingTests
 
         IActionResult result = await controller.BillingPage("user-a", "runner@example.com");
 
-        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/auth/google/start?next=%2Faccount%2Fbilling", redirect.Url);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
+        Assert.True(model.Unavailable);
     }
 
     [Fact]
@@ -567,7 +574,7 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public async Task DirectSupporterCheckoutWithoutAttachedUserRedirectsToFirstPartySignIn()
+    public async Task DirectSupporterCheckoutWithoutAttachedUserReturnsToBillingChoice()
     {
         BrilliantDirectoriesBillingService service = CreateService();
         BrilliantDirectoriesBillingController controller = new(service)
@@ -581,7 +588,7 @@ public sealed class BrilliantDirectoriesBillingTests
         IActionResult result = await controller.StartSupporterCheckoutDirect();
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/auth/google/start?next=%2Faccount%2Fbilling%2Fsupporter%2Fstart", redirect.Url);
+        Assert.Equal("/account/billing", redirect.Url);
     }
 
     [Fact]

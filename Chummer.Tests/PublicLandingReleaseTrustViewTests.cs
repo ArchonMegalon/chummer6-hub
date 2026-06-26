@@ -214,21 +214,22 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StatusPageUsesTheSharedRouteChoiceShellInsteadOfOnlyAFlatSummaryTable()
+    public void StatusPageUsesCompactAvailabilitySurface()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("The build, platforms, and current state in one place.", view, StringComparison.Ordinal);
-        Assert.Contains("Release", view, StringComparison.Ordinal);
-        Assert.Contains("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
+        Assert.Contains("Chummer is available.", view, StringComparison.Ordinal);
         Assert.Contains("PublicStatusText(Model.ReleaseSummary)", view, StringComparison.Ordinal);
-        Assert.Contains("@compactReleaseSummary", view, StringComparison.Ordinal);
+        Assert.Contains("var availabilityText = $\"{releaseAvailabilityLabel}. {compactReleaseSummary}\";", view, StringComparison.Ordinal);
+        Assert.Contains("@PublicStatusText(availabilityText)", view, StringComparison.Ordinal);
         Assert.Contains("IsReleaseAvailable(Model.Manifest.ProofStatus)", view, StringComparison.Ordinal);
         Assert.Contains("normalized.Contains(\"ready\"", view, StringComparison.Ordinal);
         Assert.Contains("data-status-surface=\"decision-surface\"", view, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Status next actions\"", view, StringComparison.Ordinal);
-        Assert.Contains("Open help", view, StringComparison.Ordinal);
+        Assert.Contains(">Help</a>", view, StringComparison.Ordinal);
+        Assert.Contains(">Downloads</a>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("minimal-platform-list", view, StringComparison.Ordinal);
         Assert.DoesNotContain(">Contact</a>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("status-decision-strip", view, StringComparison.Ordinal);
         Assert.DoesNotContain("What still blocks gold support", view, StringComparison.Ordinal);
@@ -302,8 +303,8 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);", view, StringComparison.Ordinal);
         Assert.Contains("PublicStatusText(Model.ReleaseSummary)", view, StringComparison.Ordinal);
-        Assert.Contains("@compactReleaseSummary", view, StringComparison.Ordinal);
-        Assert.Contains("@PublicStatusText(platform.Summary)", view, StringComparison.Ordinal);
+        Assert.Contains("@PublicStatusText(availabilityText)", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@PublicStatusText(platform.Summary)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.ReleaseSummary", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@platform.Summary", view, StringComparison.Ordinal);
         Assert.DoesNotContain("CustomerStatusText(", view, StringComparison.Ordinal);
@@ -334,8 +335,9 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("BuildPublicStatusReleaseSummary", controller, StringComparison.Ordinal);
         Assert.Contains("BuildPublicStatusCautionSummary", controller, StringComparison.Ordinal);
-        Assert.Contains("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
-        Assert.Contains("The build, platforms, and current state in one place.", view, StringComparison.Ordinal);
+        Assert.Contains("Chummer is available.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("The build, platforms, and current state in one place.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@HumanizeStatusToken(Model.Manifest.RolloutState, \"Current release\")", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Not mirrored", view, StringComparison.Ordinal);
         Assert.DoesNotContain("HumanizeStatusToken", view, StringComparison.Ordinal);
@@ -548,7 +550,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string packageCatalogService = File.ReadAllText(packageCatalogServicePath);
 
         Assert.Contains("href=\"/help\"", status, StringComparison.Ordinal);
-        Assert.Contains("Open help", status, StringComparison.Ordinal);
+        Assert.Contains(">Help</a>", status, StringComparison.Ordinal);
         Assert.DoesNotContain("href=\"/contact\"", status, StringComparison.Ordinal);
         Assert.DoesNotContain("Signed-in return", status, StringComparison.Ordinal);
         Assert.DoesNotContain("support follow-through", status, StringComparison.Ordinal);
