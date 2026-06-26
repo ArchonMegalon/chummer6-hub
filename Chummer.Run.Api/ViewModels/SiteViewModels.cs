@@ -698,7 +698,8 @@ public sealed record BlackLedgerHubPageViewModel(
     TrustPageActionViewModel SecondaryAction,
     PublicHorizonCapabilityViewModel? DigestCapability = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null,
+    SharedArtifactSurfaceRoutesViewModel? SharedArtifacts = null);
 
 public sealed record BlackLedgerFactionWorkspaceTabViewModel(
     string Label,
@@ -1036,7 +1037,8 @@ public sealed record KarmaForgeIntakePageViewModel(
     IReadOnlyList<string> CanonicalOutputs,
     IReadOnlyList<KarmaForgeRecentSubmissionViewModel> RecentSubmissions,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null,
+    SharedArtifactSurfaceRoutesViewModel? SharedArtifacts = null);
 
 public sealed record KarmaForgeIntakeFormViewModel(
     string ActionHref,
@@ -1104,7 +1106,8 @@ public sealed record KarmaForgeSubmittedPageViewModel(
     string CandidateJson,
     string ImpactHypothesisJson,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null,
+    SharedArtifactSurfaceRoutesViewModel? SharedArtifacts = null);
 
 public sealed record PublicHorizonCapabilityViewModel(
     string HorizonId,
@@ -1383,7 +1386,8 @@ public sealed record TrustPageViewModel(
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null,
     PrivacyBoundaryPanelViewModel? PrivacyBoundary = null,
-    PublicHorizonCapabilityViewModel? HorizonCapability = null);
+    PublicHorizonCapabilityViewModel? HorizonCapability = null,
+    SharedArtifactSurfaceRoutesViewModel? SharedArtifacts = null);
 
 public sealed record FaqEntryViewModel(
     string Question,

@@ -3856,6 +3856,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 "Private aftermath recaps are real now",
                 "Live play and aftermath stay separate on purpose"
             ],
+            sharedArtifacts: BuildSharedArtifactSurfaceRoutes(
+                "table-pulse",
+                "debrief_packet"),
             horizonCapability: BuildPublicHorizonCapability(
                 "table-pulse",
                 "debrief_packet",
@@ -3961,6 +3964,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 "Approved canon stays bounded",
                 "The sheet remains authoritative"
             ],
+            sharedArtifacts: BuildSharedArtifactSurfaceRoutes(
+                "origin-dossier",
+                "dossier_media"),
             horizonCapability: BuildPublicHorizonCapability(
                 "origin-dossier",
                 "dossier_media",
@@ -11444,7 +11450,8 @@ Boundary:
         IReadOnlyList<TrustPageActionViewModel> actions,
         CancellationToken cancellationToken,
         IReadOnlyList<string>? summaryPoints = null,
-        PublicHorizonCapabilityViewModel? horizonCapability = null)
+        PublicHorizonCapabilityViewModel? horizonCapability = null,
+        SharedArtifactSurfaceRoutesViewModel? sharedArtifacts = null)
     {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(title, description, currentPath, cancellationToken);
@@ -11473,7 +11480,8 @@ Boundary:
             SummaryPoints: PublicFacingCopyHumanizer.CleanLines(summaryPoints),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
-            HorizonCapability: horizonCapability);
+            HorizonCapability: horizonCapability,
+            SharedArtifacts: sharedArtifacts);
     }
 
     private async Task<TrustPageViewModel> BuildDocumentPortalHomePageModel(CancellationToken cancellationToken)
@@ -11619,6 +11627,11 @@ Boundary:
                 "External viewer optional",
                 "Fallback PDF is current"
             ],
+            sharedArtifacts: string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
+                ? BuildSharedArtifactSurfaceRoutes(
+                    "origin-dossier",
+                    "dossier_media")
+                : null,
             horizonCapability: string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
                 ? BuildPublicHorizonCapability(
                     "origin-dossier",
@@ -11741,7 +11754,10 @@ Boundary:
                     HumanizeToken(item.QueueStatus, "Queued")))
                 .ToArray(),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
+            SharedArtifacts: BuildSharedArtifactSurfaceRoutes(
+                "karma-forge",
+                "discovery_packet"));
     }
 
     private async Task<NowPageViewModel> BuildNowPageModel(
@@ -11896,7 +11912,10 @@ Boundary:
             CandidateJson: JsonSerializer.Serialize(submission.Candidate, jsonOptions),
             ImpactHypothesisJson: JsonSerializer.Serialize(submission.ImpactHypothesis, jsonOptions),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
+            SharedArtifacts: BuildSharedArtifactSurfaceRoutes(
+                "karma-forge",
+                "discovery_packet"));
     }
 
     private PublicHorizonCapabilityViewModel BuildPublicHorizonCapability(
@@ -16106,7 +16125,10 @@ echo "Help: ${HELP_URL}"
                 "world_tick_digest",
                 $"black-ledger:turn-{newsTurn}:digest"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
+            SharedArtifacts: BuildSharedArtifactSurfaceRoutes(
+                "black-ledger",
+                "world_tick_digest"));
     }
 
     private async Task<IActionResult> BuildLedgerFactionWorkspacePage(
