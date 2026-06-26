@@ -428,6 +428,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me", sharedArtifacts.GetProperty("SignedInRequestCreateHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-newsroom", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement broadcast = payload.RootElement.GetProperty("Broadcast");
@@ -3499,6 +3500,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
         Assert.Null(sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me", sharedArtifacts.GetProperty("SignedInRequestCreateHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-faction-promo", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
@@ -3662,6 +3664,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Null(sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
         Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
         Assert.Equal("/api/v1/horizons/quotas/me?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me", sharedArtifacts.GetProperty("SignedInRequestCreateHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
@@ -3694,6 +3697,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-tour", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
         Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-tour", sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
         Assert.Equal("/api/v1/horizons/quotas/me?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-tour", sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me", sharedArtifacts.GetProperty("SignedInRequestCreateHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-tour", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
         Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");

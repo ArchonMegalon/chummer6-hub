@@ -52,6 +52,7 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Null(model.Publication.SharedArtifacts.PublicRequestReceiptDetailHrefTemplate);
         Assert.Equal("/api/v1/horizons/capabilities/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.Publication.SharedArtifacts.SignedInCapabilityCatalogHref);
         Assert.Equal("/api/v1/horizons/quotas/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.Publication.SharedArtifacts.SignedInQuotaCatalogHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me", model.Publication.SharedArtifacts.SignedInRequestCreateHref);
         Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.Publication.SharedArtifacts.SignedInRequestReceiptHref);
         Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", model.Publication.SharedArtifacts.SignedInRequestReceiptDetailHrefTemplate);
         string serialized = JsonSerializer.Serialize(model.Publication.ArtifactCapability);
