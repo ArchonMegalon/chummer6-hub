@@ -511,8 +511,8 @@ test('login stays compact and does not reintroduce the old visual hero', async (
 
     const panel = page.locator('.auth-panel--entry').first();
     await expect(panel).toBeVisible();
-    await expect(page.locator('body')).toContainText('Sign in');
-    await expect(page.locator('body')).toContainText('Use your email to continue.');
+    await expect(page.locator('body')).toContainText('Open Chummer');
+    await expect(page.locator('body')).toContainText('Open your account. Keep installs and support together.');
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible();
 

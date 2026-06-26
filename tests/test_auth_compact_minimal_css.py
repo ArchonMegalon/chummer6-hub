@@ -27,9 +27,10 @@ def test_login_entry_stays_compact_and_single_purpose() -> None:
     view = AUTH_ENTRY.read_text(encoding="utf-8")
     controller = AUTH_CONTROLLER.read_text(encoding="utf-8")
 
-    assert "width: min(18.75rem, 100%);" in css
-    assert "font-size: 1.24rem;" in css
-    assert "min-height: 2.25rem;" in css
+    assert "width: min(17.5rem, 100%);" in css
+    assert "font-size: 1.12rem;" in css
+    assert "min-height: 2.05rem;" in css
+    assert "padding: 0.68rem;" in css
     assert "box-shadow: none;" in css
 
     assert "auth-entry__story" not in view

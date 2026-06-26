@@ -3172,9 +3172,10 @@ def test_login_view_is_minimal_auth_surface() -> None:
 
     for expected in (
         ".route-login.surface-auth.surface-minimal",
-        "width: min(18.75rem, 100%);",
-        "font-size: 1.24rem;",
-        "min-height: 2.25rem;",
+        "width: min(17.5rem, 100%);",
+        "font-size: 1.12rem;",
+        "min-height: 2.05rem;",
+        "padding: 0.68rem;",
         ".surface-auth.surface-minimal.surface-auth-message",
     ):
         assert expected in auth_compact
