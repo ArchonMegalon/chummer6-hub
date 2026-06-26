@@ -376,6 +376,9 @@ public sealed class HorizonCapabilityService
             SignedInQuotaCatalogHref: capability.RequiresAuthentication && capability.QuotaTracked
                 ? $"/api/v1/horizons/quotas/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
+            SignedInRequestCreateHref: capability.RequiresAuthentication || publicReceiptEligible
+                ? "/api/v1/horizons/artifact-requests/me"
+                : null,
             SignedInRequestReceiptHref: capability.RequiresAuthentication || publicReceiptEligible
                 ? $"/api/v1/horizons/artifact-requests/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
@@ -394,6 +397,7 @@ public sealed class HorizonCapabilityService
             ["public_request_receipt_detail_href_template"] = routes.PublicRequestReceiptDetailHrefTemplate,
             ["signed_in_capability_catalog_href"] = routes.SignedInCapabilityCatalogHref,
             ["signed_in_quota_catalog_href"] = routes.SignedInQuotaCatalogHref,
+            ["signed_in_request_create_href"] = routes.SignedInRequestCreateHref,
             ["signed_in_request_receipt_href"] = routes.SignedInRequestReceiptHref,
             ["signed_in_request_receipt_detail_href_template"] = routes.SignedInRequestReceiptDetailHrefTemplate
         };

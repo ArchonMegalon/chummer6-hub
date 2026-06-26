@@ -1145,6 +1145,7 @@ public sealed record SharedArtifactSurfaceRoutesViewModel(
     string? PublicRequestReceiptDetailHrefTemplate,
     string? SignedInCapabilityCatalogHref,
     string? SignedInQuotaCatalogHref,
+    string? SignedInRequestCreateHref,
     string? SignedInRequestReceiptHref,
     string? SignedInRequestReceiptDetailHrefTemplate);
 

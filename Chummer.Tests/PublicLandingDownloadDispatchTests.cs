@@ -2355,6 +2355,127 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task HorizonArtifactRequestCreateMeEndpointRequiresAuthentication()
+    {
+        using Fixture fixture = new(authenticated: false);
+        var controller = new HorizonArtifactRequestsController(
+            requests: new HorizonArtifactRequestService(new HorizonCapabilityService(fixture.Configuration), fixture.HorizonArtifactQuota, fixture.ArtifactRequestReceipts),
+            accounts: fixture.Accounts,
+            identity: fixture.Identity,
+            logger: NullLogger<HorizonArtifactRequestsController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        ActionResult<HorizonArtifactRequestReceipt> result = await controller.CreateMyArtifactRequest(
+            new SignedInHorizonArtifactRequestCreateRequest(
+                HorizonId: "runsite",
+                ArtifactKindOrCapabilityId: "tour",
+                SourceRef: "runsite:redmond-dockyard-pack",
+                Visibility: "private",
+                ExternalProcessingConsent: true),
+            cancellationToken: CancellationToken.None);
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, problem.StatusCode);
+    }
+
+    [Fact]
+    public async Task HorizonArtifactRequestCreateMeEndpointConsumesQuotaAndReturnsReceiptHeaders()
+    {
+        using Fixture fixture = new(authenticated: true);
+        HorizonArtifactRequestService requests = new(new HorizonCapabilityService(fixture.Configuration), fixture.HorizonArtifactQuota, fixture.ArtifactRequestReceipts);
+        var controller = new HorizonArtifactRequestsController(
+            requests: requests,
+            accounts: fixture.Accounts,
+            identity: fixture.Identity,
+            logger: NullLogger<HorizonArtifactRequestsController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        ActionResult<HorizonArtifactRequestReceipt> result = await controller.CreateMyArtifactRequest(
+            new SignedInHorizonArtifactRequestCreateRequest(
+                HorizonId: "runsite",
+                ArtifactKindOrCapabilityId: "tour",
+                SourceRef: "runsite:redmond-dockyard-pack",
+                Visibility: "private",
+                ExternalProcessingConsent: true),
+            cancellationToken: CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        HorizonArtifactRequestReceipt receipt = Assert.IsType<HorizonArtifactRequestReceipt>(ok.Value);
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal(fixture.DispatchUserId, receipt.RequestedByUserId);
+        Assert.NotNull(receipt.Quota);
+        Assert.Equal("weekly", receipt.Quota!.WindowKind);
+        Assert.Equal(1, receipt.Quota.WindowLimit);
+        Assert.Equal(1, receipt.Quota.WindowUsed);
+        Assert.Equal(0, receipt.Quota.WindowRemaining);
+        Assert.Equal("true", controller.Response.Headers["X-Horizon-Artifact-Quota-Tracked"].ToString());
+        Assert.Equal(receipt.RequestId, controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString());
+        Assert.Equal($"/api/v1/horizons/artifact-requests/me/{receipt.RequestId}", controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+        Assert.Equal("0", controller.Response.Headers["X-Horizon-Artifact-Quota-Remaining"].ToString());
+
+        HorizonArtifactRequestReceipt stored = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("runsite", fixture.DispatchUserId, limit: 10));
+        Assert.Equal(receipt.RequestId, stored.RequestId);
+    }
+
+    [Fact]
+    public async Task HorizonArtifactRequestCreateMeEndpointReturnsBlockedReceiptWhenAllowanceIsExhausted()
+    {
+        using Fixture fixture = new(authenticated: true);
+        HorizonArtifactRequestService requests = new(new HorizonCapabilityService(fixture.Configuration), fixture.HorizonArtifactQuota, fixture.ArtifactRequestReceipts);
+        var controller = new HorizonArtifactRequestsController(
+            requests: requests,
+            accounts: fixture.Accounts,
+            identity: fixture.Identity,
+            logger: NullLogger<HorizonArtifactRequestsController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        ActionResult<HorizonArtifactRequestReceipt> first = await controller.CreateMyArtifactRequest(
+            new SignedInHorizonArtifactRequestCreateRequest(
+                HorizonId: "runsite",
+                ArtifactKindOrCapabilityId: "tour",
+                SourceRef: "runsite:redmond-dockyard-pack",
+                Visibility: "private",
+                ExternalProcessingConsent: true),
+            cancellationToken: CancellationToken.None);
+        _ = Assert.IsType<OkObjectResult>(first.Result);
+
+        ActionResult<HorizonArtifactRequestReceipt> second = await controller.CreateMyArtifactRequest(
+            new SignedInHorizonArtifactRequestCreateRequest(
+                HorizonId: "runsite",
+                ArtifactKindOrCapabilityId: "tour",
+                SourceRef: "runsite:everett-switchyard-pack",
+                Visibility: "private",
+                ExternalProcessingConsent: true),
+            cancellationToken: CancellationToken.None);
+
+        ObjectResult blocked = Assert.IsType<ObjectResult>(second.Result);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, blocked.StatusCode);
+        HorizonArtifactRequestReceipt receipt = Assert.IsType<HorizonArtifactRequestReceipt>(blocked.Value);
+        Assert.Equal("blocked", receipt.Status);
+        Assert.Contains("artifact allowance", receipt.BlockedReasons, StringComparer.OrdinalIgnoreCase);
+        Assert.NotNull(receipt.Quota);
+        Assert.Equal(0, receipt.Quota!.WindowRemaining);
+        Assert.Equal(receipt.RequestId, controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString());
+    }
+
+    [Fact]
     public async Task HorizonArtifactRequestMeReceiptEndpointReturnsOwnedReceipt()
     {
         using Fixture fixture = new(authenticated: true);
@@ -2655,6 +2776,27 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.DoesNotContain("BrilliantDirectories", serialized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("vidBoard", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SharedArtifactSurfaceRoutesAdvertiseSignedInRequestCreationHref()
+    {
+        using Fixture fixture = new();
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+
+        SharedArtifactSurfaceRoutesViewModel authenticatedRoutes = capabilities.BuildSharedArtifactSurfaceRoutesViewModel("runsite", "tour");
+        SharedArtifactSurfaceRoutesViewModel publicSafeRoutes = capabilities.BuildSharedArtifactSurfaceRoutesViewModel("signal_deck", "command_network");
+
+        Assert.Equal("/api/v1/horizons/artifact-requests/me", authenticatedRoutes.SignedInRequestCreateHref);
+        Assert.Equal("/api/v1/horizons/artifact-requests/me", publicSafeRoutes.SignedInRequestCreateHref);
+
+        using JsonDocument authenticatedJson = JsonSerializer.SerializeToDocument(
+            capabilities.BuildSharedArtifactSurfaceRoutesJsonNode("runsite", "tour"));
+        using JsonDocument publicSafeJson = JsonSerializer.SerializeToDocument(
+            capabilities.BuildSharedArtifactSurfaceRoutesJsonNode("signal_deck", "command_network"));
+
+        Assert.Equal("/api/v1/horizons/artifact-requests/me", authenticatedJson.RootElement.GetProperty("signed_in_request_create_href").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me", publicSafeJson.RootElement.GetProperty("signed_in_request_create_href").GetString());
     }
 
     [Fact]
