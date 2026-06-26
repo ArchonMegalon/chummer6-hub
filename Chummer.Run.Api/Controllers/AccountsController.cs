@@ -8,9 +8,9 @@ using Chummer.Campaign.Contracts;
 using Chummer.Control.Contracts.Support;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Contracts;
+using Chummer.Run.Contracts.Billing;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Ledger;
-using Chummer.Run.Contracts.Billing;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
@@ -283,59 +283,22 @@ public sealed class AccountsController : Controller
         int linkedInstallCount = installLinking.ClaimedInstallations?.Count ?? 0;
         int pendingClaimCount = installLinking.PendingClaimTickets.Count;
         bool hasLinkedInstall = linkedInstallCount > 0;
-        HorizonArtifactQuotaSnapshot? originBookQuota = null;
-        if (_horizonArtifactQuota is not null)
-        {
-            try
-            {
-                originBookQuota = _horizonArtifactQuota.GetQuota(
-                    new HorizonArtifactQuotaRequest(
-                        UserId: user.UserId,
-                        HorizonId: "origin-dossier",
-                        ArtifactKindOrCapabilityId: "premium_authoring_credit",
-                        Email: user.Email));
-            }
-            catch (InvalidOperationException)
-            {
-                originBookQuota = null;
-            }
-        }
+        HorizonArtifactAllowanceViewModel? allowance = TryResolveOriginAuthoringAllowanceProjection(user);
 
-        MyFirstBookQuotaSnapshotDto? quota = null;
-        if (originBookQuota is null && _billing is not null)
-        {
-            try
-            {
-                quota = _billing.GetMyFirstBookQuota(user.UserId, email: user.Email);
-            }
-            catch (BrilliantDirectoriesBillingUnavailableException)
-            {
-                quota = null;
-            }
-        }
-
-        string membershipLabel = originBookQuota?.AllowanceTier switch
+        string membershipLabel = allowance?.AllowanceTier switch
             {
                 "supporter" => "Supporter",
-                "free" => "Free",
-                _ => quota?.PlanName
+                _ => "Free"
             }
-            ?? quota?.PlanName
             ?? "Free";
-        string membershipSummary = originBookQuota is not null
-            ? originBookQuota.SupporterActive
+        string membershipSummary = allowance is not null
+            ? allowance.SupporterActive
                 ? "Supporter adds one extra Origin Book each month."
                 : "Same app. Supporter only changes the monthly Origin Book limit."
-            : quota is not null
-                ? quota.SupporterActive
-                    ? "Supporter adds one extra Origin Book each month."
-                    : "Same app. Supporter only changes the monthly Origin Book limit."
-                : "Supporter checkout is unavailable right now.";
-        string bookQuotaSummary = originBookQuota is not null
-            ? $"{originBookQuota.WindowRemaining} of {originBookQuota.WindowLimit} Origin Book{(originBookQuota.WindowLimit == 1 ? string.Empty : "s")} left this {DescribeAllowanceWindowPeriod(originBookQuota.WindowKind)}."
-            : quota is not null
-                ? $"{quota.MonthlyRemaining} of {quota.MonthlyLimit} Origin Book{(quota.MonthlyLimit == 1 ? string.Empty : "s")} left this month."
-                : "Book limit is unavailable right now.";
+            : "Supporter checkout is unavailable right now.";
+        string bookQuotaSummary = allowance is not null
+            ? $"{allowance.WindowRemaining} of {allowance.WindowLimit} Origin Book{(allowance.WindowLimit == 1 ? string.Empty : "s")} left this {DescribeAllowanceWindowPeriod(allowance.WindowKind)}."
+            : "Book limit is unavailable right now.";
 
         string installSummary = hasLinkedInstall
             ? $"{linkedInstallCount} linked install{(linkedInstallCount == 1 ? string.Empty : "s")}."
@@ -394,12 +357,79 @@ public sealed class AccountsController : Controller
             ]);
     }
 
+    private HorizonArtifactAllowanceViewModel? TryResolveOriginAuthoringAllowanceProjection(HubUserDto user)
+    {
+        if (_horizonArtifactQuota is not null)
+        {
+            try
+            {
+                HorizonArtifactQuotaSnapshot quota = _horizonArtifactQuota.GetQuota(
+                    new HorizonArtifactQuotaRequest(
+                        UserId: user.UserId,
+                        HorizonId: "origin-dossier",
+                        ArtifactKindOrCapabilityId: "premium_authoring_credit",
+                        Email: user.Email));
+                return MapOriginAuthoringAllowance(quota);
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+        }
+
+        if (_billing is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return MapOriginAuthoringAllowance(_billing.GetMyFirstBookQuota(user.UserId, email: user.Email));
+        }
+        catch (BrilliantDirectoriesBillingUnavailableException)
+        {
+            return null;
+        }
+    }
+
     private static string DescribeAllowanceWindowPeriod(string? windowKind)
         => string.Equals(windowKind, "monthly", StringComparison.OrdinalIgnoreCase)
             ? "month"
             : string.Equals(windowKind, "weekly", StringComparison.OrdinalIgnoreCase)
                 ? "week"
                 : "window";
+
+    private static HorizonArtifactAllowanceViewModel MapOriginAuthoringAllowance(HorizonArtifactQuotaSnapshot quota)
+        => new(
+            HorizonId: quota.HorizonId,
+            CapabilityId: quota.CapabilityId,
+            ArtifactKind: quota.ArtifactKind,
+            PublicLabel: quota.PublicLabel,
+            SupporterActive: quota.SupporterActive,
+            AllowanceTier: quota.AllowanceTier,
+            AllowanceTierLabel: quota.SupporterActive ? "Supporter" : "Free",
+            WindowKind: quota.WindowKind,
+            WindowLimit: quota.WindowLimit,
+            WindowUsed: quota.WindowUsed,
+            WindowRemaining: quota.WindowRemaining,
+            WindowStartUtc: quota.WindowStartUtc,
+            WindowEndUtc: quota.WindowEndUtc);
+
+    private static HorizonArtifactAllowanceViewModel MapOriginAuthoringAllowance(MyFirstBookQuotaSnapshotDto quota)
+        => new(
+            HorizonId: "origin-dossier",
+            CapabilityId: "origin-dossier-premium-authoring",
+            ArtifactKind: "premium_authoring_credit",
+            PublicLabel: "Premium Authoring Credit",
+            SupporterActive: quota.SupporterActive,
+            AllowanceTier: quota.SupporterActive ? "supporter" : "free",
+            AllowanceTierLabel: quota.PlanName,
+            WindowKind: "monthly",
+            WindowLimit: quota.MonthlyLimit,
+            WindowUsed: quota.MonthlyUsed,
+            WindowRemaining: quota.MonthlyRemaining,
+            WindowStartUtc: quota.WindowStartUtc,
+            WindowEndUtc: quota.WindowEndUtc);
 
     [HttpGet("/account/work/origin-dossiers/{originDossierProjectId}")]
     [Produces("text/html")]
