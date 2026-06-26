@@ -27,7 +27,7 @@ public sealed class HubPageChromeServiceTests
     }
 
     [Fact]
-    public void BuildPublicChromeUsesGoogleStartForDownloadsHeaderSignIn()
+    public void BuildPublicChromeUsesEmailFirstLoginForDownloadsHeaderSignIn()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -41,13 +41,13 @@ public sealed class HubPageChromeServiceTests
         var chrome = service.BuildPublicChrome("Downloads", "Install the current release build.", "/downloads");
 
         var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Open Chummer");
-        Assert.Equal("/auth/google/start?next=%2Fdownloads", signIn.Href);
+        Assert.Equal("/login?next=%2Fdownloads", signIn.Href);
         Assert.DoesNotContain(chrome.HeaderActions, action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
         Assert.Null(chrome.PublicPrimaryCta);
     }
 
     [Fact]
-    public void BuildPublicChromeUsesGoogleStartForParticipateHeaderSignIn()
+    public void BuildPublicChromeUsesEmailFirstLoginForParticipateHeaderSignIn()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -61,7 +61,7 @@ public sealed class HubPageChromeServiceTests
         var chrome = service.BuildPublicChrome("Participate", "Authorize Codex access.", "/participate");
 
         var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Open Chummer");
-        Assert.Equal("/auth/google/start?next=%2Fparticipate", signIn.Href);
+        Assert.Equal("/login?next=%2Fparticipate", signIn.Href);
     }
 
     [Fact]

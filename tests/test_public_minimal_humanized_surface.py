@@ -565,6 +565,20 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
         assert forbidden not in participate
 
 
+def test_public_header_open_chummer_stays_email_first() -> None:
+    chrome = read("Chummer.Run.Api/Services/HubPageChromeService.cs")
+    sign_in_helper = chrome.split("private static string BuildContextualSignInHref", 1)[1].split("public SiteChromeViewModel BuildAuthenticatedChrome", 1)[0]
+
+    assert 'return $"/login?next={Uri.EscapeDataString(normalizedCurrentPath)}";' in sign_in_helper
+    forbidden_direct_google_routes = (
+        'normalizedCurrentPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)',
+        'normalizedCurrentPath.StartsWith("/participate", StringComparison.OrdinalIgnoreCase)',
+        'normalizedCurrentPath.StartsWith("/partizipate", StringComparison.OrdinalIgnoreCase)',
+    )
+    for forbidden in forbidden_direct_google_routes:
+        assert forbidden not in sign_in_helper
+
+
 def test_billing_surface_uses_real_view_and_honest_supporter_copy() -> None:
     controller = read("Chummer.Run.Api/Controllers/BrilliantDirectoriesBillingController.cs")
     billing_view = read("Chummer.Run.Api/Views/Billing/Membership.cshtml")
