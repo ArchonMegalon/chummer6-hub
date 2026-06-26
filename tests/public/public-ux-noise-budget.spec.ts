@@ -64,7 +64,8 @@ test('contact page keeps routing and private intake clear without extra ceremony
 
   await expect(page.locator('h1')).toContainText('Contact Chummer');
   expect(bodyText).toContain('Choose one');
-  expect(bodyText).toContain('Discord for normal contact. Private form for logs or account details.');
+  expect(bodyText).toContain('Discord first. Private form only for logs or account details.');
+  expect(bodyText).not.toContain('Discord for normal contact. Private form for logs or account details.');
   expect(bodyText).not.toContain('Public ideas go to Participate. Private problems stay here.');
   expect(bodyText).toContain('One problem per message keeps the reply clear.');
   expect(bodyText).not.toContain('Open the right support case');
