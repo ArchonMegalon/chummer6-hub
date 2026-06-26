@@ -144,7 +144,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         try
         {
             _billing.EnsureAuthorized(BillingSecretHeader());
-            return Ok(_originAuthoringAllowance.ConsumeLegacyQuota(userId, ResolveKnownAccountEmail(userId, email)));
+            return Ok(ConsumeCurrentOriginAuthoringAllowance(userId, ResolveKnownAccountEmail(userId, email)));
         }
         catch (UnauthorizedAccessException)
         {
