@@ -3,7 +3,7 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('anarchy public route stays available and shipped as a rules-light lane', async ({ request, page }) => {
+test('anarchy public route stays available and shipped as a rules-light path', async ({ request, page }) => {
   const routeResponse = await request.get(`${baseUrl}/anarchy`);
   const receiptResponse = await request.get(`${baseUrl}/anarchy/receipts/runtime.json`);
 
