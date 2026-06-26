@@ -335,7 +335,11 @@ public sealed class OriginDossierAccountRouteTests
                     "audiobookshelf-dossier-import.receipt.json",
                     "audiobookshelf_dossier_import",
                     "Audiobookshelf",
-                    ["dossierShare: https://audio.chummer.run/share/origin-route-dossier"],
+                    [
+                        "dossierShare: https://audio.chummer.run/share/origin-route-dossier",
+                        "origin.chummer.run/Varga/Mira/Route-Runner",
+                        "origin.chummer.run/Varga/Mira/Route-Runner/dossier"
+                    ],
                     [ebookArtifactPath]),
                 CoverConsistencyReceiptPath: WriteCoverConsistencyReceipt(
                     projectRoot,
@@ -348,7 +352,11 @@ public sealed class OriginDossierAccountRouteTests
                     "audiobookshelf-import.receipt.json",
                     "audiobookshelf_import",
                     "Audiobookshelf",
-                    ["narrationProvider: Unmixr"],
+                    [
+                        "narrationProvider: Unmixr",
+                        "origin.chummer.run/Varga/Mira/Route-Runner",
+                        "origin.chummer.run/Varga/Mira/Route-Runner/audiobook"
+                    ],
                     [audiobookPath]),
                 DossierVideoPath: dossierVideoPath,
                 DossierVideoReceiptPath: WriteReceipt(
@@ -357,23 +365,11 @@ public sealed class OriginDossierAccountRouteTests
                     "dossier_video_import",
                     "video_lane",
                     artifactPaths: [dossierVideoPath]),
-                TelegramShareDeliveryReceiptPath: WriteReceipt(
+                TelegramShareDeliveryReceiptPath: WriteTelegramShareReceipt(
                     projectRoot,
                     "telegram-share.receipt.json",
-                    "telegram_share_delivery",
-                    "EA Telegram",
-                    [
-                        $"/account/work/origin-dossiers/{projectId}",
-                        $"/account/work/origin-dossiers/{projectId}/read",
-                        $"/account/work/origin-dossiers/{projectId}/listen",
-                        $"/account/work/origin-dossiers/{projectId}/watch",
-                        Sha256Text($"/account/work/origin-dossiers/{projectId}"),
-                        Sha256Text($"/account/work/origin-dossiers/{projectId}/read"),
-                        Sha256Text($"/account/work/origin-dossiers/{projectId}/listen"),
-                        Sha256Text($"/account/work/origin-dossiers/{projectId}/watch"),
-                        "origin.chummer.run/Varga/Mira/Route-Runner",
-                        Sha256Text("origin.chummer.run/Varga/Mira/Route-Runner")
-                    ]),
+                    projectId,
+                    "origin.chummer.run/Varga/Mira/Route-Runner"),
                 FinalNoFallbackNoSentinelAuditReceiptPath: WriteFinalNoFallbackNoSentinelAuditReceipt(
                     projectRoot,
                     "final-no-fallback-no-sentinel.receipt.json",
@@ -434,6 +430,64 @@ public sealed class OriginDossierAccountRouteTests
                         artifactSha256 = (artifactPaths ?? [])
                             .Select(ComputeSha256)
                             .ToArray()
+                    },
+                    new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true }));
+            return path;
+        }
+
+        private static string WriteTelegramShareReceipt(
+            string projectRoot,
+            string fileName,
+            string projectId,
+            string originEditionNamespace)
+        {
+            string path = Path.Combine(projectRoot, fileName);
+            string ownerPath = $"/account/work/origin-dossiers/{projectId}";
+            string readPath = $"{ownerPath}/read";
+            string listenPath = $"{ownerPath}/listen";
+            string watchPath = $"{ownerPath}/watch";
+
+            File.WriteAllText(
+                path,
+                System.Text.Json.JsonSerializer.Serialize(
+                    new
+                    {
+                        contractName = "ea.telegram_audiobook_live_delivery_receipt.v1",
+                        operation = "telegram_share_delivery",
+                        provider = "Telegram",
+                        adapter = "ExecutiveAssistantChannelMessagingService",
+                        status = "delivered",
+                        completedAtUtc = DateTimeOffset.UtcNow,
+                        telegramMessageIdHashedByEa = true,
+                        rawTelegramChatIdIncluded = false,
+                        deliveredLinks = new[]
+                        {
+                            ownerPath,
+                            readPath,
+                            listenPath,
+                            watchPath,
+                            Sha256Text(ownerPath),
+                            Sha256Text(readPath),
+                            Sha256Text(listenPath),
+                            Sha256Text(watchPath),
+                            originEditionNamespace,
+                            Sha256Text(originEditionNamespace),
+                            "operator_verified_live_run",
+                            "provider_receipt_reference:Telegram:telegram_share_delivery"
+                        },
+                        linkBundle = new
+                        {
+                            project_id = projectId,
+                            origin_namespace_sha256 = Sha256Text(originEditionNamespace),
+                            open_in_chummer_url_sha256 = Sha256Text(ownerPath),
+                            read_url_sha256 = Sha256Text(readPath),
+                            listen_url_sha256 = Sha256Text(listenPath),
+                            watch_url_sha256 = Sha256Text(watchPath),
+                            all_required_links_present = true,
+                            raw_urls_exposed = false,
+                            telegram_delivery_status = "sent",
+                            telegram_message_id_present = true
+                        }
                     },
                     new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true }));
             return path;
