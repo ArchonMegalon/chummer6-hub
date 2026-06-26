@@ -135,18 +135,10 @@
     @if (Model.Unavailable)
     {
         <section class="card card--accent">
-            <h2>Not open yet</h2>
-            <p class="note">Supporter billing is not open yet. Free Chummer access stays unchanged.</p>
+            <h2>Membership</h2>
+            <p class="note">Supporter checkout is not connected yet. Free Chummer access stays unchanged.</p>
             <div class="action-row">
-                @if (usingSignedInAccount)
-                {
-                    <a class="button" href="@Model.ManageMembershipHref">Back to account</a>
-                }
-                else
-                {
-                    <a class="button button--primary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
-                }
-                <a class="button" href="/downloads">Downloads</a>
+                <a class="button button--primary" href="/downloads">Get Chummer</a>
             </div>
         </section>
     }

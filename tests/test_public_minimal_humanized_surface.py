@@ -599,7 +599,7 @@ def test_billing_surface_uses_real_view_and_honest_supporter_copy() -> None:
     assert "Same app for everyone." in billing_view
     assert "Origin books: Free 1/month. Supporter 2/month." in billing_view
     assert "Supporter does not unlock extra app features right now." in billing_view
-    assert "Supporter billing is not open yet." in billing_view
+    assert "Supporter checkout is not connected yet." in billing_view
     assert "Continue with email" in billing_view
     assert "Books this month:" in billing_view
     assert '__RequestVerificationToken' in billing_view
