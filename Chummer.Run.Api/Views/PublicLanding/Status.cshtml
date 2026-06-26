@@ -15,14 +15,19 @@
         2 => $"Current public installers: {publicPlatformLabels[0]} and {publicPlatformLabels[1]}.",
         _ => $"Current public installers: {string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]}."
     };
-    var statusLine = Model.ReleaseExperience.Recommended is null
-        ? "Downloads are paused."
-        : publicPlatformSummary;
+    var updateSummary = string.IsNullOrWhiteSpace(Model.ReleaseExperience.UpdatePostureSummary)
+        ? "Updates are available from Downloads."
+        : Model.ReleaseExperience.UpdatePostureSummary.Trim();
+    var statusLine = $"{publicPlatformSummary} {updateSummary}";
+    if (Model.ReleaseExperience.Recommended is null)
+    {
+        statusLine = "Downloads are paused.";
+    }
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
-<section class="minimal-page-hero minimal-status-pill" data-status-surface="decision-surface">
+<section class="minimal-page-hero minimal-status-pill">
     <div>
         <h1>Status</h1>
         <p class="eyebrow">Current release</p>
@@ -30,7 +35,6 @@
         <div class="minimal-actions" aria-label="Status next actions">
             <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Downloads</a>
             <a class="button-like button-like--ghost" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Help">Help</a>
-            <a class="button-like button-like--ghost" href="/contact" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Contact">Contact</a>
         </div>
     </div>
 </section>
