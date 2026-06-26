@@ -3,7 +3,6 @@
     ViewData["Title"] = "Status";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-status surface-minimal";
-    var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
     var publicPlatformLabels = Model.ReleaseExperience.PlatformAvailability
         .Where(static platform => platform.PubliclyAvailable)
         .Select(static platform => platform.PlatformLabel)
@@ -16,7 +15,10 @@
         2 => $"Current public installers: {publicPlatformLabels[0]} and {publicPlatformLabels[1]}.",
         _ => $"Current public installers: {string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]}."
     };
-    var statusLine = $"Updated {verifiedLabel}. {publicPlatformSummary}";
+    var updateSummary = Model.ReleaseExperience.Recommended is null
+        ? "Downloads are paused."
+        : "Updates are available from Downloads.";
+    var statusLine = $"{publicPlatformSummary} {updateSummary}";
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
