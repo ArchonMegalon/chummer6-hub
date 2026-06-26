@@ -110,7 +110,7 @@
             Id: "private-help",
             Badge: "Private",
             Title: "Install trouble, crashes, or logs",
-            Summary: "Use the form only when the issue needs a private reply, screenshots, logs, install recovery, or account detail.",
+            Summary: "Use the form for crashes, logs, screenshots, install trouble, or account details.",
             Href: "#support-intake",
             Label: "Open private form",
             Details: new[] { "Guest allowed", "Private reply", "Tracked if you sign in" }));
@@ -208,7 +208,7 @@
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Start here</h2>
-            <p>Pick the closest path.</p>
+            <p>Pick what went wrong.</p>
         </div>
         <div class="minimal-help-grid">
             @foreach (var choice in helpRouteChoices)
@@ -253,7 +253,7 @@ else if (!contactPage)
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Contact</h2>
-            <p>Discord first. Keep the form for private details.</p>
+            <p>Ask in Discord first. Use the form for private details.</p>
         </div>
         <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact" id="contact-paths">
             @foreach (var choice in contactRouteChoices)
@@ -356,7 +356,7 @@ else if (!contactPage)
                 </div>
             </form>
             <p class="muted-copy">
-                Public requests belong on <a class="inline-link" href="/participate">Participate</a>.
+                Public ideas belong on <a class="inline-link" href="/participate">Participate</a>.
                 @if (Model.SupportIntake.Authenticated
                     && !string.IsNullOrWhiteSpace(Model.SupportIntake.AccountSupportHref)
                     && !string.IsNullOrWhiteSpace(Model.SupportIntake.AccountSupportLabel))

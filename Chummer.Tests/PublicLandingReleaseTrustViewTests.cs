@@ -1242,9 +1242,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Href: \"https://discord.gg/chummer\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Label: \"Open Discord\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Use the form only when the issue needs a private reply, screenshots, logs, install recovery, or account detail.", trustView, StringComparison.Ordinal);
-        Assert.Contains("Discord first. Keep the form for private details.", trustView, StringComparison.Ordinal);
-        Assert.Contains("Public requests belong on <a class=\"inline-link\" href=\"/participate\">Participate</a>.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Use the form for crashes, logs, screenshots, install trouble, or account details.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Ask in Discord first. Use the form for private details.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Public ideas belong on <a class=\"inline-link\" href=\"/participate\">Participate</a>.", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"Installer opens, then stops\"", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"I expected the app to start. It did not.\"", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"What did you try, what happened, and what should I check first?\"", trustView, StringComparison.Ordinal);
@@ -1255,6 +1255,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Save support history", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("saved support history", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Choose one", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Discord first. Keep the form for private details.", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("Discord first. Private form only for logs or account details.", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("Installer linked, but first launch did not explain the next step", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("The Linux release installed successfully", trustView, StringComparison.Ordinal);
