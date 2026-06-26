@@ -11955,7 +11955,7 @@ Boundary:
                 ? $"/api/v1/horizons/quotas/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
             SignedInRequestReceiptHref = capability.RequiresAuthentication || publicReceiptEligible
-                ? $"/api/v1/horizons/artifact-requests/me?horizonId={encodedHorizonId}"
+                ? $"/api/v1/horizons/artifact-requests/me?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}"
                 : null,
             SignedInRequestReceiptDetailHrefTemplate = capability.RequiresAuthentication || publicReceiptEligible
                 ? "/api/v1/horizons/artifact-requests/me/{requestId}"

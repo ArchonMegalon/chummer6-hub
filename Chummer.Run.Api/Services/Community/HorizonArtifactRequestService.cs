@@ -84,8 +84,9 @@ public sealed class HorizonArtifactRequestService
     public IReadOnlyList<HorizonArtifactRequestReceipt> ListRecentReceipts(
         string? horizonId = null,
         string? userId = null,
+        string? artifactKindOrCapabilityId = null,
         int limit = 50)
-        => _receipts?.ListRecent(horizonId, userId, limit) ?? Array.Empty<HorizonArtifactRequestReceipt>();
+        => _receipts?.ListRecent(horizonId, userId, artifactKindOrCapabilityId, limit) ?? Array.Empty<HorizonArtifactRequestReceipt>();
 
     public HorizonArtifactRequestReceipt? FindReceipt(string requestId)
         => _receipts?.FindByRequestId(requestId);

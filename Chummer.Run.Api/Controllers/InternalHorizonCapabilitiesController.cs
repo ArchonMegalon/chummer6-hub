@@ -72,6 +72,7 @@ public sealed class InternalHorizonCapabilitiesController : ControllerBase
     public ActionResult<HorizonArtifactRequestReceiptCatalog> ListArtifactRequests(
         [FromQuery] string? horizonId = null,
         [FromQuery] string? userId = null,
+        [FromQuery] string? artifactKindOrCapabilityId = null,
         [FromQuery] int limit = 50)
     {
         ActionResult? denied = RequireInternalAutomationAuth();
@@ -80,11 +81,12 @@ public sealed class InternalHorizonCapabilitiesController : ControllerBase
             return denied;
         }
 
-        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = _artifactRequests.ListRecentReceipts(horizonId, userId, limit);
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = _artifactRequests.ListRecentReceipts(horizonId, userId, artifactKindOrCapabilityId, limit);
         return Ok(new HorizonArtifactRequestReceiptCatalog(
             HorizonId: string.IsNullOrWhiteSpace(horizonId) ? null : horizonId.Trim(),
             UserId: string.IsNullOrWhiteSpace(userId) ? null : userId.Trim(),
-            Receipts: receipts));
+            Receipts: receipts,
+            ArtifactKindOrCapabilityId: string.IsNullOrWhiteSpace(artifactKindOrCapabilityId) ? null : artifactKindOrCapabilityId.Trim()));
     }
 
     [HttpGet("/api/internal/horizons/quotas")]
@@ -165,4 +167,5 @@ public sealed record HorizonCapabilityHealthCatalog(
 public sealed record HorizonArtifactRequestReceiptCatalog(
     string? HorizonId,
     string? UserId,
-    IReadOnlyList<HorizonArtifactRequestReceipt> Receipts);
+    IReadOnlyList<HorizonArtifactRequestReceipt> Receipts,
+    string? ArtifactKindOrCapabilityId = null);

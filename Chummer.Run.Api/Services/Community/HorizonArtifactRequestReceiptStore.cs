@@ -23,10 +23,12 @@ public sealed class HorizonArtifactRequestReceiptStore
     public IReadOnlyList<HorizonArtifactRequestReceipt> ListRecent(
         string? horizonId = null,
         string? userId = null,
+        string? artifactKindOrCapabilityId = null,
         int limit = 50)
     {
         string normalizedHorizon = Clean(horizonId);
         string normalizedUser = Clean(userId);
+        string normalizedSelector = Clean(artifactKindOrCapabilityId);
         int boundedLimit = Math.Clamp(limit, 1, 200);
         lock (Gate)
         {
@@ -35,6 +37,9 @@ public sealed class HorizonArtifactRequestReceiptStore
                     || string.Equals(receipt.HorizonId, normalizedHorizon, StringComparison.OrdinalIgnoreCase))
                 .Where(receipt => string.IsNullOrWhiteSpace(normalizedUser)
                     || string.Equals(receipt.RequestedByUserId, normalizedUser, StringComparison.OrdinalIgnoreCase))
+                .Where(receipt => string.IsNullOrWhiteSpace(normalizedSelector)
+                    || string.Equals(receipt.ArtifactKind, normalizedSelector, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(receipt.CapabilityId, normalizedSelector, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(receipt => receipt.CreatedAtUtc)
                 .ThenBy(receipt => receipt.RequestId, StringComparer.OrdinalIgnoreCase)
                 .Take(boundedLimit)

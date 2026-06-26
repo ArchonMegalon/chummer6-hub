@@ -27,6 +27,7 @@ public sealed class HorizonArtifactRequestsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<HorizonArtifactRequestReceiptCatalog>> MyArtifactRequests(
         [FromQuery] string? horizonId = null,
+        [FromQuery] string? artifactKindOrCapabilityId = null,
         [FromQuery] int limit = 50,
         CancellationToken cancellationToken = default)
     {
@@ -39,11 +40,13 @@ public sealed class HorizonArtifactRequestsController : ControllerBase
         IReadOnlyList<HorizonArtifactRequestReceipt> receipts = _requests.ListRecentReceipts(
             horizonId,
             subject.SubjectId,
+            artifactKindOrCapabilityId,
             limit);
         return Ok(new HorizonArtifactRequestReceiptCatalog(
             HorizonId: TrimToNull(horizonId),
             UserId: subject.SubjectId,
-            Receipts: receipts));
+            Receipts: receipts,
+            ArtifactKindOrCapabilityId: TrimToNull(artifactKindOrCapabilityId)));
     }
 
     [HttpGet("/api/v1/horizons/artifact-requests/me/{requestId}")]
