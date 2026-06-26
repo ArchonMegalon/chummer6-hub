@@ -4727,7 +4727,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         try
         {
-            return Ok(_runsiteTourQuota.GetQuota(subject.SubjectId, email: subject.Email));
+            HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_runsiteTourQuota.GetQuota(user.UserId, email: subject.Email));
         }
         catch (BrilliantDirectoriesBillingUnavailableException ex)
         {

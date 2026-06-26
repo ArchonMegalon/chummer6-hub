@@ -3605,6 +3605,33 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task RunsiteTourQuotaMeUsesEnsuredUserIdForAllowanceProjection()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.HorizonArtifactQuota.Consume(
+            new HorizonArtifactQuotaRequest(
+                fixture.DispatchUserId,
+                "runsite",
+                "runsite-tour",
+                "dispatch@example.com"),
+            DateTimeOffset.UtcNow);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.RunsiteTourQuota(CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        var quota = Assert.IsType<RunsiteTourQuotaSnapshot>(ok.Value);
+        Assert.Equal(1, quota.WeeklyUsed);
+        Assert.Equal(0, quota.WeeklyRemaining);
+        Assert.Equal(1, quota.WindowUsed);
+        Assert.Equal(0, quota.WindowRemaining);
+    }
+
+    [Fact]
     public void RunsiteTourQuotaPersistsUsageAndResetsByWeek()
     {
         using Fixture fixture = new();
