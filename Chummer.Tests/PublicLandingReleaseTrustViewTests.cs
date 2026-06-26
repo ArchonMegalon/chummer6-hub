@@ -132,6 +132,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Manage linked devices", view, StringComparison.Ordinal);
         Assert.Contains("See the latest update", view, StringComparison.Ordinal);
         Assert.Contains("Get help when setup stalls", view, StringComparison.Ordinal);
+        Assert.Contains("\"Install history\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Account settings\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Use this page to finish one install handoff, then move to the page that owns the next job.", view, StringComparison.Ordinal);
         Assert.Contains("Current release", view, StringComparison.Ordinal);
         Assert.Contains("Back to downloads", view, StringComparison.Ordinal);
