@@ -27,7 +27,8 @@ public sealed class RunsiteTourQuotaService
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("allowance is exhausted", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("3D-tour allowance is exhausted for this week.", ex);
+            RunsiteTourQuotaSnapshot quota = GetQuota(userId, now, email);
+            throw new InvalidOperationException($"3D-tour allowance is exhausted for this {DescribeAllowanceWindowPeriod(quota.WindowKind)}.", ex);
         }
     }
 
@@ -45,7 +46,17 @@ public sealed class RunsiteTourQuotaService
             snapshot.WeeklyUsed,
             snapshot.WeeklyRemaining,
             snapshot.WindowStartUtc,
-            snapshot.WindowEndUtc);
+            snapshot.WindowEndUtc)
+        {
+            WindowKind = snapshot.WindowKind
+        };
+
+    private static string DescribeAllowanceWindowPeriod(string? windowKind)
+        => string.Equals(windowKind, "monthly", StringComparison.OrdinalIgnoreCase)
+            ? "month"
+            : string.Equals(windowKind, "weekly", StringComparison.OrdinalIgnoreCase)
+                ? "week"
+                : "window";
 }
 
 public sealed record RunsiteTourQuotaSnapshot(
@@ -58,4 +69,13 @@ public sealed record RunsiteTourQuotaSnapshot(
     int WeeklyUsed,
     int WeeklyRemaining,
     DateTimeOffset WindowStartUtc,
-    DateTimeOffset WindowEndUtc);
+    DateTimeOffset WindowEndUtc)
+{
+    public string WindowKind { get; init; } = "weekly";
+
+    public int WindowLimit => WeeklyLimit;
+
+    public int WindowUsed => WeeklyUsed;
+
+    public int WindowRemaining => WeeklyRemaining;
+}

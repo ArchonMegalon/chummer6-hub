@@ -3440,9 +3440,13 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("free", quota.AllowanceTier);
         Assert.Equal("free_weekly_allowance", quota.EntitlementBasis);
         Assert.Equal("account", quota.EntitlementScope);
+        Assert.Equal("weekly", quota.WindowKind);
         Assert.Equal(1, quota.WeeklyLimit);
         Assert.Equal(0, quota.WeeklyUsed);
         Assert.Equal(1, quota.WeeklyRemaining);
+        Assert.Equal(1, quota.WindowLimit);
+        Assert.Equal(0, quota.WindowUsed);
+        Assert.Equal(1, quota.WindowRemaining);
     }
 
     [Fact]
@@ -3457,20 +3461,29 @@ public sealed class PublicLandingDownloadDispatchTests
 
         RunsiteTourQuotaSnapshot consumed = firstService.ConsumeTour("subject.persist", firstWeek, "persist@example.com");
 
+        Assert.Equal("weekly", consumed.WindowKind);
         Assert.Equal(1, consumed.WeeklyUsed);
         Assert.Equal(0, consumed.WeeklyRemaining);
+        Assert.Equal(1, consumed.WindowUsed);
+        Assert.Equal(0, consumed.WindowRemaining);
 
         var reloadedCapabilities = new HorizonCapabilityService(fixture.Configuration);
         var reloadedService = new RunsiteTourQuotaService(
             new HorizonArtifactQuotaService(new HorizonArtifactUsageStore(fixture.Configuration), reloadedCapabilities, fixture.Billing),
             reloadedCapabilities);
         RunsiteTourQuotaSnapshot sameWeek = reloadedService.GetQuota("subject.persist", firstWeek.AddDays(1), "persist@example.com");
+        Assert.Equal("weekly", sameWeek.WindowKind);
         Assert.Equal(1, sameWeek.WeeklyUsed);
         Assert.Equal(0, sameWeek.WeeklyRemaining);
+        Assert.Equal(1, sameWeek.WindowUsed);
+        Assert.Equal(0, sameWeek.WindowRemaining);
 
         RunsiteTourQuotaSnapshot nextWeek = reloadedService.GetQuota("subject.persist", firstWeek.AddDays(7), "persist@example.com");
+        Assert.Equal("weekly", nextWeek.WindowKind);
         Assert.Equal(0, nextWeek.WeeklyUsed);
         Assert.Equal(1, nextWeek.WeeklyRemaining);
+        Assert.Equal(0, nextWeek.WindowUsed);
+        Assert.Equal(1, nextWeek.WindowRemaining);
     }
 
     [Fact]
