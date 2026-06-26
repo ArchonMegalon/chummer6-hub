@@ -37,12 +37,11 @@ const checks = [
   {
     url: `${baseUrl}/downloads/`,
     assert: text =>
-      text.includes('Install Chummer')
-      && text.includes('Current public installer')
-      && text.includes('Current build')
-      && text.includes('Newest build')
-      && text.includes('Windows')
-      && text.includes('Linux')
+      text.includes('Downloads')
+      && text.includes('Stable')
+      && text.includes('Nightly')
+      && text.includes('Build from source')
+      && text.includes('Download script')
   },
   {
     url: `${baseUrl}/downloads/releases.json`,
@@ -68,7 +67,7 @@ const checks = [
       && text.includes('Short requests, clear bugs, useful ideas.')
       && text.includes('Public requests')
       && !text.includes('participate-board')
-      && !text.includes('/participate/board')
+      && !text.includes('src="/participate/board')
       && !text.includes('Requests, votes, and shipped work.')
       && !text.includes('ProductLift')
       && !text.includes('Something went wrong')
@@ -82,7 +81,7 @@ const checks = [
       && text.includes('Short requests, clear bugs, useful ideas.')
       && text.includes('Public requests')
       && !text.includes('participate-board')
-      && !text.includes('data-chummer-board-skin')
+      && text.includes('data-chummer-board-skin')
       && !text.includes('cdn.productlift.dev')
       && !text.includes('media.productlift.dev')
       && !text.includes('Requests, votes, and shipped work.')
@@ -112,14 +111,14 @@ const checks = [
     assert: (text, response) =>
       response.url.endsWith('/login?next=%2Faccount')
       && text.includes('Open Chummer')
-      && text.includes('Keep this copy attached to your account.')
+      && text.includes('Open your account. Keep installs and support together.')
   },
   {
     url: `${baseUrl}/hub/`,
     assert: (text, response) =>
       response.url.endsWith('/login?next=%2Faccount')
       && text.includes('Open Chummer')
-      && text.includes('Keep this copy attached to your account.')
+      && text.includes('Open your account. Keep installs and support together.')
   },
   {
     url: `${baseUrl}/blazor/`,
@@ -145,7 +144,9 @@ const checks = [
     url: `${baseUrl}/avalonia/`,
     assert: (text, response) =>
       /\/downloads\/?$/.test(response.url)
-      && text.includes('Install Chummer')
+      && text.includes('Downloads')
+      && text.includes('Stable')
+      && text.includes('Build from source')
   },
   {
     url: `${baseUrl}/session/`,

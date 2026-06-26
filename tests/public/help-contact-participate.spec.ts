@@ -49,7 +49,7 @@ test('help, contact, and participate keep public and private paths clear', async
   expect(participateText).toContain('partizipate-board');
   expect(participateText).toContain('Short requests, clear bugs, useful ideas.');
   expect(participateText).not.toContain('participate-board');
-  expect(participateText).not.toContain('/participate/board');
+  expect(participateText).not.toContain('src="/participate/board');
   expect(participateText).not.toContain('Requests, votes, and shipped work.');
   expect(participateText).not.toContain('ProductLift');
   expect(participateBoardText).not.toContain('/auth/google/start?next=');

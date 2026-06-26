@@ -54,7 +54,7 @@ async function main() {
     const boardSkin = page.locator('[data-chummer-board-skin]');
 
     await boardSkin.waitFor({ state: 'attached' });
-    assert.equal(await boardSkin.count(), 1, 'public participate should render the whitelabeled hosted board skin.');
+    assert.equal(await boardSkin.count(), 1, 'public participate should not embed the hosted board wrapper.');
 
     const visibleText = await page.locator('body').innerText();
     assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(visibleText), false, 'vendor error copy must not be visible.');

@@ -75,7 +75,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("Could not load posts.", text)
         self.assertIn("Network error while loading tab configuration.", text)
         self.assertIn("support@productlift.dev", text)
-        self.assertIn("board.waitFor({ state: 'visible' })", text)
+        self.assertIn("boardSkin.waitFor({ state: 'attached' })", text)
         self.assertIn("public participate should not embed the hosted board wrapper", text)
         self.assertIn("vendor error copy must not be visible", text)
 

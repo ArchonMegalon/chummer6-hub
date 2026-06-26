@@ -556,7 +556,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("partizipate-board", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("participate-hosted__frame", feedback, StringComparison.Ordinal);
-        Assert.DoesNotContain("/participate/board", feedback, StringComparison.Ordinal);
+        Assert.DoesNotContain("src=\"/participate/board", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("Need private help?", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("Use <a class=\"inline-link\" href=\"/contact#support-intake\">Support</a>", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("shipped follow-through", feedback, StringComparison.OrdinalIgnoreCase);

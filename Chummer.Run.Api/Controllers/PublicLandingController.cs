@@ -2243,7 +2243,10 @@ public sealed class PublicLandingController : Controller
                     CommentCount: ReadJsonInt(item, "comments_count"),
                     Status: CleanParticipateStatus(ReadNestedJsonString(item, "status", "name")),
                     Category: CleanParticipateCategory(ReadNestedJsonString(item, "category", "name")),
-                    UpdatedLabel: FormatParticipateUpdatedLabel(ReadJsonString(item, "updated_at"))));
+                    UpdatedLabel: FormatParticipateUpdatedLabel(ReadJsonString(item, "updated_at")),
+                    Href: RewriteParticipatePostHref(FirstNonEmptyParticipateValue(
+                        ReadJsonString(item, "proxy_url"),
+                        ReadJsonString(item, "url")))));
             }
 
             int totalCount = ReadJsonInt(document.RootElement, "total");
@@ -2323,6 +2326,34 @@ public sealed class PublicLandingController : Controller
 
     private static string FirstNonEmptyParticipateValue(params string[] values)
         => values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value))?.Trim() ?? string.Empty;
+
+    private static string? RewriteParticipatePostHref(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string trimmed = value.Trim();
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? absolute))
+        {
+            string pathAndQuery = string.IsNullOrWhiteSpace(absolute.PathAndQuery) ? "/" : absolute.PathAndQuery;
+            return $"/participate/board{pathAndQuery}";
+        }
+
+        if (!Uri.TryCreate(trimmed, UriKind.Relative, out _))
+        {
+            return null;
+        }
+
+        string relative = trimmed.StartsWith("/", StringComparison.Ordinal) ? trimmed : $"/{trimmed}";
+        if (relative.StartsWith("/participate/board", StringComparison.OrdinalIgnoreCase))
+        {
+            return relative;
+        }
+
+        return $"/participate/board{relative}";
+    }
 
     private static string StripHtml(string value)
     {

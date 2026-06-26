@@ -2837,6 +2837,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!participateSource.Contains("story-guide-tail", StringComparison.Ordinal), "participate should open with a quieter route intro instead of a generic CTA band.");
     Assert(!participateSource.Contains("Requests, votes, and shipped work.", StringComparison.Ordinal), "participate should not add wrapper copy above the public board.");
     Assert(participateSource.Contains("partizipate-board", StringComparison.Ordinal), "participate should render the first-party board as the primary surface.");
+    Assert(participateSource.Contains("href=\"@item.Href\"", StringComparison.Ordinal), "live participate cards should open first-party board detail routes instead of becoming dead copied cards.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");

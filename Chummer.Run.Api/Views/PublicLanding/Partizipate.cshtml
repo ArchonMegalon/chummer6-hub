@@ -4,7 +4,7 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-minimal surface-participate surface-partizipate";
     var posts = Model.LoadedFromBoard
-        ? Model.Posts.Select(post => new ParticipateItemViewModel(post.Score, post.Title, post.Summary, post.Status)).ToArray()
+        ? Model.Posts.Select(post => new ParticipateItemViewModel(post.Score, post.Title, post.Summary, post.Status, post.Href)).ToArray()
         : Model.FallbackItems;
 }
 
@@ -33,7 +33,16 @@
                     <div class="partizipate-request__topline">
                         <span>@item.Status</span>
                     </div>
-                    <h2>@item.Title</h2>
+                    <h2>
+                        @if (!string.IsNullOrWhiteSpace(item.Href))
+                        {
+                            <a href="@item.Href">@item.Title</a>
+                        }
+                        else
+                        {
+                            @item.Title
+                        }
+                    </h2>
                     @if (!string.IsNullOrWhiteSpace(item.Summary))
                     {
                         <p>@item.Summary</p>

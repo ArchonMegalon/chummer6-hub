@@ -9953,6 +9953,17 @@ body {
   line-height: 1.25;
 }
 
+.partizipate-request h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.partizipate-request h2 a:hover,
+.partizipate-request h2 a:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
 .partizipate-request p {
   max-width: 54rem;
   margin: 0;

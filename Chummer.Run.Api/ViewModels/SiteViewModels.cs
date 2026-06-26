@@ -983,7 +983,8 @@ public sealed record ParticipateItemViewModel(
     int Score,
     string Title,
     string Summary,
-    string Status);
+    string Status,
+    string? Href = null);
 
 public sealed record FirstPartyParticipateBoardViewModel(
     SiteChromeViewModel Chrome,
@@ -1008,7 +1009,8 @@ public sealed record FirstPartyParticipatePostViewModel(
     int CommentCount,
     string Status,
     string Category,
-    string UpdatedLabel);
+    string UpdatedLabel,
+    string? Href);
 
 public sealed record KarmaForgeIntakePageViewModel(
     SiteChromeViewModel Chrome,

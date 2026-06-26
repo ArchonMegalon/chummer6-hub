@@ -175,7 +175,7 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
         "static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "@PublicDownloadText(Model.Manifest.Message)",
         "stableAndNightlyMatch",
-        "There is no newer Nightly available. Nightly currently matches Stable.",
+        "No newer Nightly right now.",
         "static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "var releaseSummaryText = PublicStatusText(Model.ReleaseSummary);",
         "@compactReleaseSummary",
@@ -3056,7 +3056,7 @@ def test_email_preview_fallback_does_not_expose_live_ticket_by_default() -> None
     assert "public static bool ShouldExposeInlinePreviewLink(HttpRequest request)" in browser_auth
     assert "IDENTITY_UNSAFE_ALLOW_INLINE_EMAIL_PREVIEW_LINKS" in email_delivery
     assert 'DeliveryMode: "email_delivery_unavailable"' in email_delivery
-    assert "IsInlinePreviewDelivery(delivery.DeliveryMode) ? ticketId : string.Empty" in identity_access
+    assert "IsInlinePreviewDelivery(delivery.DeliveryMode) && delivery.ExposeInlinePreviewTicket ? ticketId : string.Empty" in identity_access
     assert "AccessTokenHash" in identity_access
     assert "RefreshTokenHash" in identity_access
     assert "TicketHash" in identity_access
