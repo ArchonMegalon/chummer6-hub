@@ -30,6 +30,20 @@ WINDOWS_INSTALLER_STUB = _minimal_windows_exe()
 WINDOWS_PLACEHOLDER_INSTALLER_STUB = b"MZ" + (b"installer-stub" * 200)
 
 
+def _windows_installer_stub_with_payload_metadata(
+    *,
+    payload_download_url: str,
+    payload_sha256: str,
+    payload_size_bytes: int,
+) -> bytes:
+    return WINDOWS_INSTALLER_STUB + (
+        "\n"
+        f"ChummerInstallerPayloadUrl={payload_download_url}\n"
+        f"ChummerInstallerPayloadSha256={payload_sha256}\n"
+        f"ChummerInstallerPayloadSizeBytes={payload_size_bytes}\n"
+    ).encode("utf-8")
+
+
 def _write_bootstrap_payload(payload_path: Path, *, launch_executable: str = "Chummer.Avalonia.exe") -> bytes:
     with zipfile.ZipFile(payload_path, "w") as archive:
         archive.writestr(launch_executable, b"placeholder")
@@ -444,6 +458,104 @@ def test_windows_installer_verifier_rejects_bootstrap_manifest_without_payload_d
     assert "manifest installerMode=bootstrap is missing payloadSizeBytes" in result.stderr
 
 
+def test_windows_installer_verifier_rejects_bootstrap_installer_without_embedded_payload_metadata(tmp_path: Path) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    payload_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    payload_url = f"https://example.invalid/downloads/files/{payload_path.name}"
+    _write_payload_sidecar(
+        files_dir / "chummer-avalonia-win-x64-payload.zip.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+        download_url=payload_url,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name=installer_path.name,
+        installer_sha256=hashlib.sha256(WINDOWS_INSTALLER_STUB).hexdigest(),
+        installer_size_bytes=len(WINDOWS_INSTALLER_STUB),
+        payload_name=payload_path.name,
+        payload_download_url=payload_url,
+        payload_sha256=payload_sha256,
+        payload_size_bytes=len(payload_bytes),
+    )
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(manifest_path),
+            "--require-embedded-bootstrap-metadata",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "bootstrap installer does not contain embedded payloadDownloadUrl metadata" in result.stderr
+
+
+def test_windows_installer_verifier_rejects_missing_manifest_row_when_required(tmp_path: Path) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    payload_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    payload_url = f"https://example.invalid/downloads/files/{payload_path.name}"
+    installer_path.write_bytes(
+        _windows_installer_stub_with_payload_metadata(
+            payload_download_url=payload_url,
+            payload_sha256=payload_sha256,
+            payload_size_bytes=len(payload_bytes),
+        )
+    )
+    _write_payload_sidecar(
+        files_dir / "chummer-avalonia-win-x64-payload.zip.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+        download_url=payload_url,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name="chummer-blazor-desktop-win-x64-installer.exe",
+        payload_name=payload_path.name,
+        payload_download_url=payload_url,
+        payload_sha256=payload_sha256,
+        payload_size_bytes=len(payload_bytes),
+    )
+
+    result = subprocess.run(
+        [
+            "python3",
+            str(VERIFY_SCRIPT),
+            "--files-dir",
+            str(files_dir),
+            "--manifest",
+            str(manifest_path),
+            "--require-manifest-row",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "Windows installer is missing from the supplied release manifest" in result.stderr
+
+
 def test_windows_installer_verifier_rejects_manifest_payload_url_with_wrong_file_name(tmp_path: Path) -> None:
     files_dir = tmp_path / "files"
     files_dir.mkdir()
@@ -637,22 +749,31 @@ def test_publish_download_bundle_promotes_windows_bootstrap_payload_sidecar(tmp_
     files_dir = bundle_dir / "files"
     files_dir.mkdir(parents=True)
     installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
-    installer_path.write_bytes(WINDOWS_INSTALLER_STUB)
     payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
     payload_bytes = _write_bootstrap_payload(payload_path)
+    payload_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    payload_url = f"https://example.invalid/downloads/files/{payload_path.name}"
+    installer_bytes = _windows_installer_stub_with_payload_metadata(
+        payload_download_url=payload_url,
+        payload_sha256=payload_sha256,
+        payload_size_bytes=len(payload_bytes),
+    )
+    installer_path.write_bytes(installer_bytes)
     _write_payload_sidecar(
         files_dir / "chummer-avalonia-win-x64-payload.zip.json",
         installer_name=installer_path.name,
         payload_name=payload_path.name,
         payload_bytes=payload_bytes,
+        download_url=payload_url,
     )
     _write_bundle_manifest(
         bundle_dir / "releases.json",
         installer_name=installer_path.name,
-        installer_sha256=hashlib.sha256(WINDOWS_INSTALLER_STUB).hexdigest(),
-        installer_size_bytes=len(WINDOWS_INSTALLER_STUB),
+        installer_sha256=hashlib.sha256(installer_bytes).hexdigest(),
+        installer_size_bytes=len(installer_bytes),
         payload_name=payload_path.name,
-        payload_sha256=hashlib.sha256(payload_bytes).hexdigest(),
+        payload_download_url=payload_url,
+        payload_sha256=payload_sha256,
         payload_size_bytes=len(payload_bytes),
         release_proof=_release_proof_for_windows_installer(),
     )

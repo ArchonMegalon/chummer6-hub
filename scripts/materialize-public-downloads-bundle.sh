@@ -67,8 +67,8 @@ resolve_ui_downloads_path() {
   local relative_path="$1"
   local candidate
   for candidate in \
-    "$PRESENTATION_ROOT/Docker/Downloads/$relative_path" \
-    "$PRESENTATION_ROOT/Chummer.Portal/downloads/$relative_path"
+    "$PRESENTATION_ROOT/Chummer.Portal/downloads/$relative_path" \
+    "$PRESENTATION_ROOT/Docker/Downloads/$relative_path"
   do
     if [[ -e "$candidate" ]]; then
       echo "$candidate"
@@ -87,9 +87,9 @@ resolve_public_release_channel_source() {
 
   local candidate
   for candidate in \
-    "$REGISTRY_ROOT/.codex-studio/published/RELEASE_CHANNEL.generated.json" \
     "$REPO_ROOT/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json" \
-    "$(resolve_ui_downloads_path "RELEASE_CHANNEL.generated.json")"
+    "$(resolve_ui_downloads_path "RELEASE_CHANNEL.generated.json")" \
+    "$REGISTRY_ROOT/.codex-studio/published/RELEASE_CHANNEL.generated.json"
   do
     if [[ -f "$candidate" ]]; then
       echo "$candidate"

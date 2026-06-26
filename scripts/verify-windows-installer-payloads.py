@@ -31,6 +31,7 @@ DEFAULT_LAUNCH_EXECUTABLES = {
 @dataclass(frozen=True)
 class ManifestRow:
     file_name: str
+    download_url: str
     sha256: str
     size_bytes: int | None
     payload_file_name: str
@@ -71,6 +72,18 @@ def url_file_name(value: str) -> str:
 def is_https_download_url(value: str) -> bool:
     parsed = urlparse(value)
     return parsed.scheme.lower() == "https" and bool(parsed.netloc)
+
+
+def same_origin(left: str, right: str) -> bool:
+    left_uri = urlparse(left)
+    right_uri = urlparse(right)
+    return (
+        left_uri.scheme.lower(),
+        left_uri.netloc.lower(),
+    ) == (
+        right_uri.scheme.lower(),
+        right_uri.netloc.lower(),
+    )
 
 
 def is_windows_installer_name(name: str) -> bool:
@@ -123,6 +136,7 @@ def read_manifest_rows(manifest_paths: list[Path]) -> dict[str, ManifestRow]:
                     continue
                 rows[file_name] = ManifestRow(
                     file_name=file_name,
+                    download_url=str(item.get("downloadUrl") or item.get("url") or "").strip(),
                     sha256=str(item.get("sha256") or "").strip().lower(),
                     size_bytes=try_int(item.get("sizeBytes")),
                     payload_file_name=str(item.get("payloadFileName") or "").strip(),
@@ -244,6 +258,14 @@ def validate_manifest_payload_metadata(candidate: PayloadCandidate, manifest_row
                 failures.append(
                     f"manifest payloadDownloadUrl file name {download_file_name or '<empty>'} does not match payloadFileName {manifest_row.payload_file_name}"
                 )
+        if (
+            manifest_row.download_url
+            and is_https_download_url(manifest_row.download_url)
+            and manifest_row.payload_download_url
+            and is_https_download_url(manifest_row.payload_download_url)
+            and not same_origin(manifest_row.download_url, manifest_row.payload_download_url)
+        ):
+            failures.append("manifest payloadDownloadUrl must use the same origin as the installer downloadUrl")
     if manifest_row.installer_mode == "bundled" and candidate.mode != "bundled":
         failures.append("manifest says installerMode=bundled but the payload was not appended")
     if candidate.mode == "bootstrap":
@@ -283,6 +305,46 @@ def validate_manifest_installer_metadata(installer_path: Path, manifest_row: Man
             f"manifest Windows installer row sizeBytes {manifest_row.size_bytes} does not match installer size {observed_size}"
         )
 
+    return failures
+
+
+def validate_bootstrap_installer_metadata(
+    installer_path: Path,
+    candidate: PayloadCandidate,
+    manifest_row: ManifestRow | None,
+) -> list[str]:
+    if candidate.mode != "bootstrap":
+        return []
+
+    payload_download_url = manifest_row.payload_download_url if manifest_row is not None else ""
+    payload_sha256 = manifest_row.payload_sha256 if manifest_row is not None else ""
+    payload_size_bytes = manifest_row.payload_size_bytes if manifest_row is not None else None
+
+    if not payload_download_url or not payload_sha256 or payload_size_bytes is None:
+        sidecar_path = Path(candidate.source + ".json")
+        if sidecar_path.is_file():
+            try:
+                sidecar = json.loads(sidecar_path.read_text(encoding="utf-8-sig"))
+            except json.JSONDecodeError:
+                sidecar = {}
+            if isinstance(sidecar, dict):
+                payload_download_url = payload_download_url or str(sidecar.get("downloadUrl") or "").strip()
+                payload_sha256 = payload_sha256 or str(sidecar.get("sha256") or "").strip().lower()
+                payload_size_bytes = payload_size_bytes if payload_size_bytes is not None else try_int(sidecar.get("sizeBytes"))
+
+    if not payload_download_url or not payload_sha256 or payload_size_bytes is None:
+        return []
+
+    installer_bytes = installer_path.read_bytes()
+    required_values = {
+        "payloadDownloadUrl": payload_download_url,
+        "payloadSha256": payload_sha256,
+        "payloadSizeBytes": str(payload_size_bytes),
+    }
+    failures: list[str] = []
+    for label, value in required_values.items():
+        if value.encode("utf-8") not in installer_bytes:
+            failures.append(f"bootstrap installer does not contain embedded {label} metadata")
     return failures
 
 
@@ -429,12 +491,16 @@ def verify_installer(
     expected_launches: list[str],
     expected_entries: list[str],
     require_sample: bool,
+    require_embedded_bootstrap_metadata: bool,
+    require_manifest_row: bool,
 ) -> list[str]:
     failures: list[str] = []
     if not installer_path.is_file():
         return [f"installer does not exist: {installer_path}"]
     if installer_path.stat().st_size <= FOOTER_LENGTH:
         return [f"installer is too small to contain a payload-aware executable: {installer_path}"]
+    if require_manifest_row and manifest_row is None:
+        return [f"{installer_path.name}: Windows installer is missing from the supplied release manifest"]
     failures.extend(validate_windows_executable_structure(installer_path))
 
     candidate = read_appended_payload(installer_path)
@@ -450,6 +516,8 @@ def verify_installer(
     failures.extend(validate_manifest_installer_metadata(installer_path, manifest_row))
     failures.extend(validate_manifest_payload_metadata(candidate, manifest_row))
     failures.extend(validate_bootstrap_sidecar_metadata(installer_path, candidate, manifest_row))
+    if require_embedded_bootstrap_metadata:
+        failures.extend(validate_bootstrap_installer_metadata(installer_path, candidate, manifest_row))
     failures.extend(
         validate_zip_payload(
             installer_path.name,
@@ -474,6 +542,16 @@ def main() -> int:
     parser.add_argument("--expected-entry", action="append", default=[], help="Exact zip entry expected in the payload zip.")
     parser.add_argument("--heads-json-base64", default="", help="Installer heads JSON metadata used to derive exact payload entries.")
     parser.add_argument("--require-sample", action="store_true", help="Require the legacy Soma sample character in the payload.")
+    parser.add_argument(
+        "--require-embedded-bootstrap-metadata",
+        action="store_true",
+        help="Require bootstrap installers to contain the manifest payload URL, SHA-256, and size metadata.",
+    )
+    parser.add_argument(
+        "--require-manifest-row",
+        action="store_true",
+        help="Require every checked Windows installer to have a matching row in one supplied release manifest.",
+    )
     parser.add_argument("--allow-empty", action="store_true", help="Pass when no Windows installers are present.")
     args = parser.parse_args()
 
@@ -490,6 +568,10 @@ def main() -> int:
     expected_entries = [normalize_zip_name(entry) for entry in args.expected_entry]
     expected_entries.extend(parse_heads_json_base64(args.heads_json_base64))
     require_sample = args.require_sample or is_truthy(os.environ.get("CHUMMER_WINDOWS_INSTALLER_REQUIRE_SAMPLE_PAYLOAD"))
+    require_embedded_bootstrap_metadata = (
+        args.require_embedded_bootstrap_metadata
+        or is_truthy(os.environ.get("CHUMMER_WINDOWS_INSTALLER_REQUIRE_EMBEDDED_BOOTSTRAP_METADATA"))
+    )
     failures: list[str] = []
     for installer_path in installers:
         manifest_row = manifest_rows.get(installer_path.name)
@@ -502,6 +584,8 @@ def main() -> int:
                 [str(item).strip() for item in args.expected_launch if str(item).strip()],
                 expected_entries,
                 require_sample,
+                require_embedded_bootstrap_metadata,
+                args.require_manifest_row,
             )
         )
 

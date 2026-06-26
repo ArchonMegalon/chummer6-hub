@@ -93,7 +93,7 @@ verify_windows_installer_payload_gate() {
     exit 1
   fi
 
-  local -a gate_args=(--files-dir "$FILES_SOURCE" --allow-empty)
+  local -a gate_args=(--files-dir "$FILES_SOURCE" --allow-empty --require-embedded-bootstrap-metadata --require-manifest-row)
   [[ -f "$MANIFEST_SOURCE" ]] && gate_args+=(--manifest "$MANIFEST_SOURCE")
   python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" "${gate_args[@]}"
 }
