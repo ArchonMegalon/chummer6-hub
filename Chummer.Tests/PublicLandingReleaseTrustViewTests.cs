@@ -1019,8 +1019,10 @@ public sealed class PublicLandingReleaseTrustViewTests
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AuthController.cs");
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Auth", "Entry.cshtml");
+        string cssPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "css", "site.css");
         string controller = File.ReadAllText(controllerPath);
         string view = File.ReadAllText(viewPath);
+        string css = File.ReadAllText(cssPath);
 
         Assert.Contains("auth-entry--lean", view, StringComparison.Ordinal);
         Assert.Contains("Use the same copy. Add recovery and support history.", controller, StringComparison.Ordinal);
@@ -1032,6 +1034,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("<label for=\"email\" class=\"field-label\">Email</label>", view, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"runner@example.com\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("auth-value-strip", view, StringComparison.Ordinal);
+        Assert.Contains("width: min(326px, calc(100vw - 32px));", css, StringComparison.Ordinal);
+        Assert.Contains("background-image: none;", css, StringComparison.Ordinal);
+        Assert.Contains("font-size: 1.45rem;", css, StringComparison.Ordinal);
     }
 
     [Fact]
