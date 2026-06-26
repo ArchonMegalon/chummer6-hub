@@ -11069,7 +11069,7 @@ Boundary:
             Options:
             [
                 new SupportIntakeOptionViewModel(SupportCaseKinds.InstallHelp, "Install or update", "Choose this when the installer, updater, or download link is the problem."),
-                new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, regressions, or cases that need private logs or saved support history."),
+                new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Bug report", "Use this for broken behavior, bad routing, regressions, or cases that need private logs or saved support history."),
                 new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Public feedback should start on the feedback page. Choose this form only when the issue needs private or account-linked follow-up.")
             ],
             DefaultKind: overrides.Kind,

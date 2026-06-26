@@ -895,7 +895,7 @@ public sealed class ReleaseSelectionService
         {
             return new PlatformShelfNoticeViewModel(
                 $"{label} is not on the downloads page yet",
-                $"The current release does not include a public {label} installer yet. Use Windows or Linux today, or contact support if you need help with this platform.");
+                $"The current release does not include a public {label} installer yet. Use the current public build when it fits your system, or contact support if you need help with this platform.");
         }
 
         return new PlatformShelfNoticeViewModel(

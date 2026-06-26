@@ -5,7 +5,7 @@ trust_pages:
   - id: help
     eyebrow: "Help"
     heading: "Get help without guessing"
-    intro: "Pick the closest path."
+    intro: "Pick the closest path. Keep public ideas, private bugs, and downloads separate."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
@@ -26,26 +26,26 @@ trust_pages:
       - id: install-update
         eyebrow: "Install or update"
         heading: "Downloads"
-        body: "Get the current Windows or Linux build."
+        body: "Get the current public build."
         bullets:
           - "Stable for normal use."
-          - "Nightly for the newest build."
+          - "Source build for Linux users who want to compile it themselves."
       - id: sign-in-recovery
-        eyebrow: "Sign-in or account recovery"
+        eyebrow: "Account recovery"
         heading: "Account"
         body: "Use an account for recovery and saved help history."
         bullets:
           - "Guest use is fine."
           - "Claim only when you want recovery."
       - id: product-bug
-        eyebrow: "Product bug"
+        eyebrow: "Bug report"
         heading: "Private support"
-        body: "Use Contact when logs, screenshots, or account details are involved."
+        body: "Use Contact when logs, screenshots, crash details, or account details are involved."
         bullets:
           - "One issue per message."
           - "Discord is better for normal questions."
       - id: product-question
-        eyebrow: "Product question or UX confusion"
+        eyebrow: "Product question"
         heading: "FAQ"
         body: "Read the short answers before opening a support case."
         bullets:

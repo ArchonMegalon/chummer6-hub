@@ -57,7 +57,7 @@ const checks = [
     url: `${baseUrl}/contact`,
     assert: text =>
       text.includes('Choose public feedback for ideas.')
-      && text.includes('Product bug')
+      && text.includes('Bug report')
   },
   {
     url: `${baseUrl}/participate`,

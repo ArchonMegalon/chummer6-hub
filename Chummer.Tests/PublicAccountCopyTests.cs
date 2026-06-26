@@ -23,7 +23,7 @@ public sealed class PublicAccountCopyTests
         Assert.Contains(">Open Chummer</a>", nowView, StringComparison.Ordinal);
         Assert.Contains("\"Claim your copy\"", faqView, StringComparison.Ordinal);
         Assert.Contains("authenticated ? \"Open account\" : \"Claim your copy\"", trustPageView, StringComparison.Ordinal);
-        Assert.Contains("AccountSupportLabel: authenticated ? \"Open account support\" : \"Claim your copy\"", controller, StringComparison.Ordinal);
+        Assert.Contains("AccountSupportLabel: authenticated ? \"Open account support\" : \"Save support history\"", controller, StringComparison.Ordinal);
 
         Assert.DoesNotContain("label: Sign in", manifest, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Create account", manifest, StringComparison.Ordinal);
