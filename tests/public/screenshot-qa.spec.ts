@@ -44,7 +44,7 @@ const supportingSurfaces = [
     id: 'contact',
     route: '/contact',
     screenshotPrefix: 'contact',
-      requiredText: ['Contact Chummer', 'Choose one', 'Send support request'],
+      requiredText: ['Contact Chummer', 'Contact paths', 'Send support request'],
   },
 ] as const;
 

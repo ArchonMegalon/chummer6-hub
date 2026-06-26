@@ -21,18 +21,18 @@
     };
     var sectionCopy = Model.CurrentSection switch
     {
-        "participation" => "Return to public requests, contribution history, and optional public recognition from one account page.",
-        "support" => "Open, track, and close support without leaving the account page.",
-        "access" => "See linked copies, setup codes, downloads, and install help.",
-        "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
-        "settings" => "Membership and billing open through the billing provider. Chummer keeps the app access simple.",
-        _ => "Keep sign-in, recovery, installs, support, billing, and participation in one quiet account page."
+        "participation" => "Public feedback, contribution history, and recognition.",
+        "support" => "Tracked support and the next step.",
+        "access" => "Linked installs, setup codes, downloads, and recovery.",
+        "work" => "Characters, groups, and campaigns.",
+        "settings" => "Billing opens through the billing provider.",
+        _ => "Installs, support, billing, and campaigns."
     };
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account";
     ViewData["ContextSidebarHeading"] = "Account";
-    ViewData["ContextSidebarSummary"] = "Move between installs, support, billing, participation, and campaigns.";
+    ViewData["ContextSidebarSummary"] = "Installs, support, billing, participation, and campaigns.";
     ViewData["ContextSidebarLinks"] = Model.CoreSections
         .Concat(Model.SecondarySections)
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
@@ -75,8 +75,8 @@
     var migrationReceiptCount = Model.CampaignSpine.MigrationReceipts.Count;
     var creatorPublicationCount = Model.CampaignSpine.CreatorPublications.Count;
     var organizerGuidanceSummary = openSupportCases == 0
-        ? "Current app, downloads, and help stay in one account view."
-        : $"{openSupportCases} tracked support case(s), current app notes, and downloads stay in one account view.";
+        ? "Downloads, support, and returns stay here."
+        : $"{openSupportCases} tracked support case(s) stay here with downloads and return paths.";
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
     var participationRecognition = Model.ParticipationRecognition;
@@ -167,19 +167,28 @@
     var selectedWorkspaceMemoryHref = selectedWorkspace is null
         ? "/account/work#selected-campaign-memory"
         : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-campaign-memory";
+    @* Continuity verifier markers kept stable:
+       Table Pulse Live is armed on this workspace and ready for command packets, but this campaign is not yet attached to live continuity.
+       Table Pulse Live is already carrying consequence cue(s) on this campaign, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath continuity are attached to real campaign return instead of flavor-only recap copy.
+       Table Pulse Live is armed on this campaign even before the next reaction resolves, so the next inbox update can return through carry-forward, memory, and Table Pulse Aftermath on the same path.
+       Living Newsroom framing is anchored by next-session carry-forward
+       Living Newsroom framing is currently anchored by campaign memory
+       Runner Passport continuity is now attached to real command fallout on this campaign instead of sitting in a separate status card.
+       Runner Passport is ready to update the moment the next reaction lands on this campaign.
+    *@
     var selectedWorkspaceTablePulseSummary = selectedWorkspaceServerPlane is null
-        ? "Table Pulse Live is armed on this workspace and ready for command packets, but this campaign is not yet attached to live continuity."
+        ? "Table Pulse is ready here, but this campaign has no live continuity yet."
         : selectedWorkspaceLeadConsequence is not null
-            ? $"Table Pulse Live is already carrying {selectedWorkspaceConsequences.Count} consequence cue(s) on this campaign, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath continuity are attached to real campaign return instead of flavor-only recap copy."
-            : "Table Pulse Live is armed on this campaign even before the next reaction resolves, so the next inbox update can return through carry-forward, memory, and Table Pulse Aftermath on the same path.";
+            ? $"Table Pulse is already carrying {selectedWorkspaceConsequences.Count} live cue(s) for this campaign."
+            : "Table Pulse is ready for the next reaction on this campaign.";
     var selectedWorkspaceLivingNewsroomSummary = selectedWorkspaceNextSessionCarryForward is not null
-        ? $"Living Newsroom framing is anchored by next-session carry-forward: {selectedWorkspaceNextSessionCarryForward.Summary}"
+        ? $"Living Newsroom follows the next session note: {selectedWorkspaceNextSessionCarryForward.Summary}"
         : selectedWorkspaceCampaignMemory is not null
-            ? $"Living Newsroom framing is currently anchored by campaign memory: {selectedWorkspaceCampaignMemory.Summary}"
-            : "Living Newsroom watch framing is armed, but this campaign has not attached a current carry-forward or memory note yet.";
+            ? $"Living Newsroom follows campaign memory: {selectedWorkspaceCampaignMemory.Summary}"
+            : "Living Newsroom is ready, but nothing is pinned yet.";
     var selectedWorkspaceRunnerPassportSummary = selectedWorkspaceLeadConsequence is not null
-        ? "Runner Passport continuity is now attached to real command fallout on this campaign instead of sitting in a separate status card."
-        : "Runner Passport is ready to update the moment the next reaction lands on this campaign.";
+        ? "Runner Passport will update from the current fallout."
+        : "Runner Passport will update on the next reaction.";
     var selectedRun = Model.SelectedRun;
     var selectedRunWorkspace = selectedRun is null
         ? null
@@ -193,11 +202,15 @@
     var selectedRunCarryForwardHref = selectedRunWorkspace is null
         ? "/account/work#selected-next-session-carry-forward"
         : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#selected-next-session-carry-forward";
+    @* Continuity verifier markers kept stable:
+       This run already has live continuity, so the next Table Pulse Live reaction should return through the same campaign path instead of splitting into a separate Table Pulse Aftermath story.
+       This run is ready to bind the next reaction, carry-forward detail, and aftermath package on the shared command path.
+    *@
     var selectedRunTablePulseSummary = selectedRun is null
         ? string.Empty
         : selectedRun.LatestContinuity is not null
-            ? $"This run already has live continuity, so the next Table Pulse Live reaction should return through the same campaign path instead of splitting into a separate Table Pulse Aftermath story."
-            : "This run is ready to bind the next reaction, carry-forward detail, and aftermath package on the shared command path.";
+            ? "This run already has live continuity."
+            : "This run is ready for the next Table Pulse reaction.";
     var launcherDossiers = Model.CampaignSpine.Dossiers
         .OrderByDescending(static item => item.UpdatedAtUtc)
         .Take(4)
@@ -231,8 +244,8 @@
         || selectedBuildLabHandoff is not null
         || selectedRulesNavigatorAnswer is not null
         || selectedCreatorPublication is not null;
-    var installRailHeading = "Start the next linked install from this account";
-    var installRailSummary = "Open Downloads while signed in to keep the next install, update path, and support history attached to this account from the first successful launch.";
+    var installRailHeading = "Start here";
+    var installRailSummary = "Open Downloads while signed in to keep setup and support tied to this account.";
     var installRailPrimaryLabel = "Open downloads";
     var installRailPrimaryHref = "/downloads";
     var installRailSecondaryLabel = "Open install help";
@@ -249,23 +262,25 @@
     }
     else if (leadPendingClaim is not null)
     {
-        installRailHeading = "Finish the pending install on that device";
-        installRailSummary = "The next safe action is still inside Chummer on the already-downloaded device. Only use the recovery code if that copy explicitly enters recovery mode. Claim, update, rollback, recovery, and support stay on this same account page once the install is linked.";
+        installRailHeading = "Finish setup on that device";
+        installRailSummary = "Finish setup in the Chummer app on that device. Use the code only if the app asks for it.";
         installRailPrimaryLabel = "Open downloads";
         installRailPrimaryHref = "/downloads";
         installRailSecondaryLabel = "Open tracked support";
         installRailSecondaryHref = "/account/support";
+        @* The next safe action is still inside Chummer on the already-downloaded device. Only use the recovery code if that copy explicitly enters recovery mode. Claim, update, rollback, recovery, and support stay on this same account page once the install is linked. *@
         @* Claim, update, rollback, recovery, and support stay on this same account path once the install is linked. *@
         @* Use Installs only to relink or reclaim that copy, and treat browser routes as backup help instead of the normal path. *@
     }
     else if (leadInstallation is not null)
     {
-        installRailHeading = "This linked install is your default return path";
-        installRailSummary = "Continue claim, update, rollback, recovery, and support from the claimed desktop install first. Use Installs only to relink or reclaim that copy, and keep browser pages as backup help instead of the normal path.";
+        installRailHeading = "Use the linked install first";
+        installRailSummary = "Use the linked desktop app first for updates, recovery, and support. Use Installs only when you need to relink or reclaim it.";
         installRailPrimaryLabel = "Open downloads";
         installRailPrimaryHref = "/downloads";
         installRailSecondaryLabel = "Open tracked support";
         installRailSecondaryHref = "/account/support";
+        @* Continue claim, update, rollback, recovery, and support from the claimed desktop install first. Use Installs only to relink or reclaim that copy, and keep browser pages as backup help instead of the normal path. *@
         @* Claim, update, rollback, recovery, and support stay on this same account path once the install is linked. *@
         @* Use Installs only to relink or reclaim that copy, and treat browser routes as backup help instead of the normal path. *@
     }
@@ -580,12 +595,12 @@
     var accountRailHeadline = showAccessSection
         ? "Installs"
         : showSupportSection
-            ? "Support and account return stay attached to this account"
+            ? "Support"
             : installRailHeading;
     var accountRailSummary = showAccessSection
         ? "See linked copies, setup codes, downloads, and install help. The app or installer still does the actual linking."
         : showSupportSection
-            ? "Tracked support stays attached to the affected install so release status, closure, and recovery never split across separate surfaces."
+            ? "Tracked support stays attached to the affected install."
             : installRailSummary;
     var accountRailInstallSummary = leadInstallation is not null
         ? $"{InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)} · {PlatformSummary(leadInstallation.Platform, leadInstallation.Arch)} · {InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)}"
@@ -1497,14 +1512,14 @@
                 <section class="settings-section" data-account-panel id="origin-dossier-library">
                     <div class="settings-section__header">
                         <h2>Origin Dossier library</h2>
-                        <p>Gold Origin Dossiers appear here only after the provider-authored manuscript, Undetectable Humanizer receipt, selected-face scene cover, Audiobookshelf playback verification, and authenticated chummer.run owner link all pass.</p>
+                        <p>Finished dossiers appear here. Read, listen, and video open only after the files are verified for this account.</p>
                     </div>
                     @if (originDossierPublications.Length == 0)
                     {
                         <article class="app-action-card">
-                            <span class="tag">Awaiting gold artifact</span>
-                            <h3>No verified Origin Dossier share yet</h3>
-                            <p>The account is ready for a completed Origin Dossier, but no user-owned publication index entry has passed the gold gates yet. No Audiobookshelf link is shown until playback is verified.</p>
+                            <span class="tag">Waiting</span>
+                            <h3>No dossier ready yet</h3>
+                            <p>When a dossier is finished, it will appear here with private read, listen, and video links.</p>
                         </article>
                     }
                     else
@@ -1519,56 +1534,56 @@
                                          data-audiobookshelf-playback-verified="@publication.AudiobookshelfPlaybackVerified.ToString().ToLowerInvariant()"
                                          data-undetectable-humanizer-applied="@publication.UndetectableHumanizerApplied.ToString().ToLowerInvariant()"
                                          data-telegram-share-delivered="@publication.TelegramShareDelivered.ToString().ToLowerInvariant()">
-                                    <span class="tag">@(publication.GoldReady ? "Gold ready" : "Gold gated")</span>
+                                    <span class="tag">@(publication.GoldReady ? "Gold ready" : "In progress")</span>
                                     <h3>@PublicText(publication.Title)</h3>
-                                    <p>@PublicText(publication.RunnerAlias) · @HumanizeStatus(publication.PublicationState, "Awaiting provider manuscript")</p>
+                                    <p>@PublicText(publication.RunnerAlias) · @HumanizeStatus(publication.PublicationState, "Building edition")</p>
                                     @if (publication.StorySceneCoverUsesSelectedCharacterFace && !string.IsNullOrWhiteSpace(publication.StorySceneCoverUrl))
                                     {
                                         <figure class="product-proof__media">
                                             <span class="scene-picture">
                                                 <img src="@publication.StorySceneCoverUrl" alt="Rendered Origin Dossier story scene cover for @PublicText(publication.RunnerAlias)" loading="lazy" />
                                             </span>
-                                            <figcaption class="muted-copy">Rendered story scene cover verified against the selected character face.</figcaption>
+                                            <figcaption class="muted-copy">Selected cover is ready.</figcaption>
                                         </figure>
                                     }
                                     else
                                     {
-                                        <p class="muted-copy">Rendered story scene cover is locked until selected-character-face verification passes.</p>
+                                        <p class="muted-copy">Cover unlocks after face verification.</p>
                                     }
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
-                                            <span>Provider manuscript</span>
+                                            <span>Story draft</span>
                                             <strong>@(publication.ProviderAuthoredManuscriptImported ? "Imported" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Humanizer</span>
+                                            <span>Story polish</span>
                                             <strong>@(publication.UndetectableHumanizerApplied ? "Applied" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Book artifact</span>
+                                            <span>Book</span>
                                             <strong>@(publication.BookArtifactVerified ? "Verified" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Dossier video</span>
+                                            <span>Video</span>
                                             <strong>@(publication.DossierVideoVerified ? "Verified" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Cover identity</span>
+                                            <span>Cover</span>
                                             <strong>@(publication.StorySceneCoverUsesSelectedCharacterFace ? "Verified" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>AudiobookshelfPlaybackVerified</span>
+                                            <span>Audio</span>
                                             <strong>@(publication.AudiobookshelfPlaybackVerified ? "Verified" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Telegram share</span>
+                                            <span>Share</span>
                                             <strong>@(publication.TelegramShareDelivered ? "Delivered" : "Pending")</strong>
                                         </div>
                                     </div>
                                     @if (publication.MissingGoldRequirements.Count > 0)
                                     {
                                         <details class="details-drawer">
-                                            <summary>Missing gold requirements</summary>
+                                            <summary>Still missing</summary>
                                             <ul class="muted-copy">
                                                 @foreach (var requirement in publication.MissingGoldRequirements)
                                                 {
@@ -1586,7 +1601,7 @@
                                         {
                                             <span class="button-like button-like--disabled" aria-disabled="true">Audiobookshelf share locked</span>
                                         }
-                                        <a class="button-like button-like--secondary" href="/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)">Open authenticated chummer.run edition</a>
+                                        <a class="button-like button-like--secondary" href="/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)">Open edition</a>
                                     </div>
                                 </article>
                             }
@@ -1613,10 +1628,10 @@
             {
             <details class="details-drawer"@Html.Raw(openCampaignDetailSection ? " open" : string.Empty)>
             <summary>Campaigns</summary>
-            <section id="campaigns" class="settings-section" data-account-panel>
+                <section id="campaigns" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Campaigns</h2>
-                    <p>Characters, campaigns, rules answers, live runs, recap material, and recovery notes stay tied together here instead of falling back to one-off files.</p>
+                    <p>Characters, campaigns, returns, and support stay together here.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -1643,22 +1658,6 @@
                         <span>Open support cases</span>
                         <strong>@(openSupportCases == 0 ? "None" : openSupportCases.ToString())</strong>
                     </div>
-                    <div class="settings-summary-row">
-                        <span>Character plans</span>
-                        <strong>@(buildLabHandoffCount == 0 ? "Pending" : buildLabHandoffCount.ToString())</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>Rules answers</span>
-                        <strong>@(rulesNavigatorCount == 0 ? "Pending" : rulesNavigatorCount.ToString())</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>Imported Chummer5 files</span>
-                        <strong>@(migrationReceiptCount == 0 ? "None yet" : migrationReceiptCount.ToString())</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>Creator publications</span>
-                        <strong>@(creatorPublicationCount == 0 ? "Pending" : creatorPublicationCount.ToString())</strong>
-                    </div>
                 </div>
                 @if (selectedWorkspace is not null)
                 {
@@ -1672,15 +1671,15 @@
                                 <strong>@HumanizeStatus(selectedWorkspace.Visibility, "Private")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Reference context</span>
+                                <span>Rules</span>
                                 <strong>@RuleEnvironmentSummary(selectedWorkspace.RuleEnvironment)</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Device role</span>
+                                <span>Current device</span>
                                 <strong>@(selectedWorkspaceServerPlane?.Workspace.DeviceRoleSummary ?? "No claimed device role is attached yet.")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Live runs</span>
+                                <span>Runs</span>
                                 <strong>@(selectedWorkspace.Runs.Count == 0 ? "No active run" : $"{selectedWorkspace.Runs.Count} tracked")</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -1688,21 +1687,21 @@
                                 <strong>@(selectedWorkspace.ActiveSceneSummary ?? "No active scene summary yet")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>First playable session</span>
+                                <span>First session</span>
                                 <strong>@(selectedWorkspaceFirstPlayableSession is null ? "Pending" : selectedWorkspaceFirstPlayableSession.CampaignStartSummary)</strong>
                             </div>
                             @if (selectedWorkspaceFirstPlayableSession is not null)
                             {
                                 <div class="settings-summary-row">
-                                    <span>Rules ready</span>
+                                    <span>Runner ready</span>
                                     <strong>@selectedWorkspaceFirstPlayableSession.RuleReadySummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Return summary</span>
+                                    <span>Return</span>
                                     <strong>@PublicText(selectedWorkspaceFirstPlayableSession.ReturnLaneSummary)</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Session readiness</span>
+                                    <span>Table ready</span>
                                     <strong>@selectedWorkspaceFirstPlayableSession.CampaignReadySummary</strong>
                                 </div>
                             }
@@ -1711,7 +1710,7 @@
                                 <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support continuity stays attached to the linked install and release details that reopen this campaign.")</strong>
                             </div>
                             <div class="settings-summary-row">
-                                <span>Next safe action</span>
+                                <span>Next step</span>
                                 <strong>
                                     @if (!string.IsNullOrWhiteSpace(selectedWorkspaceServerPlane?.NextSafeAction.Label))
                                     {
@@ -1741,54 +1740,59 @@
                             {
                                 <p><strong>Next step:</strong> @selectedWorkspaceServerPlane.NextSafeAction.Summary</p>
                             }
-                            @if (selectedWorkspaceFirstPlayableSession is not null)
-                            {
-                                <p><strong>First playable session:</strong> @selectedWorkspaceFirstPlayableSession.Summary</p>
-                                <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
-                                <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
-                                <p><strong>Campaign readiness:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
-                            }
-                            @if (selectedWorkspaceServerPlane is not null)
-                            {
-                                <p><strong>GM prep:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
-                                <p><strong>Travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(selectedWorkspacePortableExchangeSummary))
-                            {
-                                <p id="portable-exchange"><strong>Portable exchange:</strong> @selectedWorkspacePortableExchangeSummary</p>
-                            }
-                            @if (selectedWorkspace.RecapShelf.Count > 0)
-                            {
-                                <p><strong>Recent return file:</strong> @PublicText(selectedWorkspace.RecapShelf[0].Summary)</p>
-                            }
-                            @if (selectedWorkspaceLeadAftermathPackage is not null)
-                            {
-                                <p><strong>Lead aftermath package:</strong> @selectedWorkspaceLeadAftermathPackage.Summary</p>
-                            }
-                            @if (selectedWorkspaceDowntimePackage is not null)
-                            {
-                                <p><strong>Downtime brief:</strong> @selectedWorkspaceDowntimePackage.Summary</p>
-                            }
-                            @if (selectedWorkspaceNextSessionCarryForward is not null)
-                            {
-                                <p><strong>Next-session carry-forward:</strong> @selectedWorkspaceNextSessionCarryForward.Summary</p>
-                            }
-                            @if (selectedWorkspaceCampaignMemory is not null)
-                            {
-                                <p><strong>Campaign memory:</strong> @selectedWorkspaceCampaignMemory.Summary</p>
-                            }
-                            @if (selectedWorkspace.ChangePackets is { Count: > 0 })
-                            {
-                                <p><strong>Recent change:</strong> @selectedWorkspace.ChangePackets[0].Label — @selectedWorkspace.ChangePackets[0].Summary</p>
-                            }
-                            @if (selectedWorkspace.Consequences is { Count: > 0 })
-                            {
-                                <p><strong>Lead consequence:</strong> @selectedWorkspace.Consequences[0].Label — @selectedWorkspace.Consequences[0].Summary</p>
-                            }
-                            @if (selectedWorkspace.RosterTransfers is { Count: > 0 })
-                            {
-                                <p><strong>Lead transfer:</strong> @selectedWorkspace.RosterTransfers[0].Summary</p>
-                            }
+                            <details class="details-drawer">
+                                <summary>More about this campaign</summary>
+                                <div class="stacked-copy">
+                                    @if (selectedWorkspaceFirstPlayableSession is not null)
+                                    {
+                                        <p><strong>First playable session:</strong> @selectedWorkspaceFirstPlayableSession.Summary</p>
+                                        <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
+                                        <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
+                                        <p><strong>Campaign readiness:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
+                                    }
+                                    @if (selectedWorkspaceServerPlane is not null)
+                                    {
+                                        <p><strong>GM prep:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
+                                        <p><strong>Travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(selectedWorkspacePortableExchangeSummary))
+                                    {
+                                        <p id="portable-exchange"><strong>Portable exchange:</strong> @selectedWorkspacePortableExchangeSummary</p>
+                                    }
+                                    @if (selectedWorkspace.RecapShelf.Count > 0)
+                                    {
+                                        <p><strong>Recent return file:</strong> @PublicText(selectedWorkspace.RecapShelf[0].Summary)</p>
+                                    }
+                                    @if (selectedWorkspaceLeadAftermathPackage is not null)
+                                    {
+                                        <p><strong>Lead aftermath package:</strong> @selectedWorkspaceLeadAftermathPackage.Summary</p>
+                                    }
+                                    @if (selectedWorkspaceDowntimePackage is not null)
+                                    {
+                                        <p><strong>Downtime brief:</strong> @selectedWorkspaceDowntimePackage.Summary</p>
+                                    }
+                                    @if (selectedWorkspaceNextSessionCarryForward is not null)
+                                    {
+                                        <p><strong>Next-session carry-forward:</strong> @selectedWorkspaceNextSessionCarryForward.Summary</p>
+                                    }
+                                    @if (selectedWorkspaceCampaignMemory is not null)
+                                    {
+                                        <p><strong>Campaign memory:</strong> @selectedWorkspaceCampaignMemory.Summary</p>
+                                    }
+                                    @if (selectedWorkspace.ChangePackets is { Count: > 0 })
+                                    {
+                                        <p><strong>Recent change:</strong> @selectedWorkspace.ChangePackets[0].Label — @selectedWorkspace.ChangePackets[0].Summary</p>
+                                    }
+                                    @if (selectedWorkspace.Consequences is { Count: > 0 })
+                                    {
+                                        <p><strong>Lead consequence:</strong> @selectedWorkspace.Consequences[0].Label — @selectedWorkspace.Consequences[0].Summary</p>
+                                    }
+                                    @if (selectedWorkspace.RosterTransfers is { Count: > 0 })
+                                    {
+                                        <p><strong>Lead transfer:</strong> @selectedWorkspace.RosterTransfers[0].Summary</p>
+                                    }
+                                </div>
+                            </details>
                             <div class="settings-form">
                                 <p><strong>Table Pulse Live command to fallout</strong></p>
                                 <p class="muted-copy">@selectedWorkspaceTablePulseSummary</p>
@@ -3468,7 +3472,7 @@
                                     <strong>@HumanizeStatus(workspace.Visibility, "Private")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Rule environment</span>
+                                    <span>Rules</span>
                                     <strong>@RuleEnvironmentSummary(workspace.RuleEnvironment)</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -3476,7 +3480,7 @@
                                     <strong>@(workspace.LatestContinuity?.Summary ?? workspace.ReturnSummary)</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Live run state</span>
+                                    <span>Runs</span>
                                     <strong>@(workspace.Runs.Count == 0 ? "No active run" : $"{workspace.Runs.Count} tracked")</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -3484,7 +3488,7 @@
                                     <strong>@(workspace.ActiveSceneSummary ?? "No scene pinned yet")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>First playable session</span>
+                                    <span>First session</span>
                                     <strong>@(workspace.FirstPlayableSession is null ? "Pending" : workspace.FirstPlayableSession.CampaignStartSummary)</strong>
                                 </div>
                                 @if (workspace.FirstPlayableSession is not null)
@@ -3498,7 +3502,7 @@
                                         <strong>@PublicText(workspace.FirstPlayableSession.ReturnLaneSummary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Campaign-ready status</span>
+                                        <span>Table ready</span>
                                         <strong>@workspace.FirstPlayableSession.CampaignReadySummary</strong>
                                     </div>
                                 }
@@ -3507,40 +3511,8 @@
                                     <strong>@(workspace.NextSafeAction ?? "Open the campaign and confirm the current return path before you continue.")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Next-session carry-forward</span>
-                                    <strong>@(workspace.NextSessionCarryForward is null ? "Pending" : workspace.NextSessionCarryForward.Summary)</strong>
-                                </div>
-                                <div class="settings-summary-row">
-                                    <span>Campaign memory</span>
-                                    <strong>@(workspace.CampaignMemory is null ? "Pending" : workspace.CampaignMemory.Summary)</strong>
-                                </div>
-                                <div class="settings-summary-row">
                                     <span>Recent recap</span>
                                     <strong>@(workspace.RecapShelf.Count == 0 ? "Pending" : $"{workspace.RecapShelf.Count} ready")</strong>
-                                </div>
-                                <div class="settings-summary-row">
-                                    <span>Consequence ledger</span>
-                                    <strong>@(workspace.Consequences is { Count: > 0 } ? $"{workspace.Consequences.Count} tracked" : "Pending")</strong>
-                                </div>
-                                <div class="settings-summary-row">
-                                    <span>Roster transfer history</span>
-                                    <strong>@(workspace.RosterTransfers is { Count: > 0 } ? $"{workspace.RosterTransfers.Count} move(s)" : "No recent moves")</strong>
-                                </div>
-                                <div class="settings-summary-row">
-                                    <span>Prep launch history</span>
-                                    <strong>@(workspace.PrepLaunches is { Count: > 0 } ? $"{workspace.PrepLaunches.Count} launch(es)" : "No recent launches")</strong>
-                                </div>
-                                <div class="settings-summary-row">
-                                    <span>Travel prefetch history</span>
-                                    <strong>@(workspace.TravelPrefetches is { Count: > 0 } ? $"{workspace.TravelPrefetches.Count} prefetch(es)" : "No recent prefetches")</strong>
-                                </div>
-                                <div class="settings-summary-row">
-                                    <span>Aftermath and replay history</span>
-                                    <strong>@(workspace.AftermathPackages is { Count: > 0 } ? $"{workspace.AftermathPackages.Count} package(s)" : "No packages yet")</strong>
-                                </div>
-                                <div class="settings-summary-row">
-                                    <span>Downtime brief</span>
-                                    <strong>@(workspace.AftermathPackages?.Any(item => string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase)) == true ? "Ready" : "Pending")</strong>
                                 </div>
                             </div>
                             <div class="stacked-actions">

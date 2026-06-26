@@ -12,8 +12,8 @@ test('billing and participate stay first-party for guests and signed-in users', 
   const guestBilling = await request.get(`${baseUrl}/account/billing`, { maxRedirects: 0 });
   expect(guestBilling.status()).toBe(200);
   const guestBillingText = await guestBilling.text();
-  expect(guestBillingText).toContain('Same app for everyone.');
-  expect(guestBillingText).toContain('Origin books: Free 1/month. Supporter 2/month.');
+  expect(guestBillingText).toContain('Same app.');
+  expect(guestBillingText).toContain('Origin books: 1/month free. 2/month supporter.');
   expect(guestBillingText).toContain('Continue with email');
   expect(guestBillingText).not.toContain('/auth/google/start?next=');
 
@@ -52,10 +52,11 @@ test('billing and participate stay first-party for guests and signed-in users', 
 
   await page.goto(`${baseUrl}/account/billing`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('h1')).toContainText('Membership');
-  await expect(page.locator('body')).toContainText('Same app for everyone.');
-  await expect(page.locator('body')).toContainText('Origin books: Free 1/month. Supporter 2/month.');
+  await expect(page.locator('body')).toContainText('Same app.');
+  await expect(page.locator('body')).toContainText('Origin books: 1/month free. 2/month supporter.');
   await expect(page.locator('body')).toContainText('Signed in as');
-  await expect(page.locator('body')).toContainText('Supporter does not unlock extra app features right now.');
+  await expect(page.locator('body')).toContainText('No extra app features right now.');
+  await expect(page.locator('body')).toContainText('Checkout stays attached to this account.');
   await expect(page.locator('body')).not.toContainText('external billing checkout');
   await expect(page.locator('body')).not.toContainText('hosted billing route');
   await expect(page.locator('form[action="/account/billing/supporter"]')).toBeVisible();

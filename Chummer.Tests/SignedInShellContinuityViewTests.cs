@@ -93,17 +93,20 @@ public sealed class SignedInShellContinuityViewTests
 
         Assert.Contains("id=\"origin-dossier-library\"", view, StringComparison.Ordinal);
         Assert.Contains("Origin Dossier library", view, StringComparison.Ordinal);
-        Assert.Contains("Undetectable Humanizer receipt", view, StringComparison.Ordinal);
+        Assert.Contains("Finished dossiers appear here.", view, StringComparison.Ordinal);
         Assert.Contains("data-story-scene-cover-uses-selected-character-face", view, StringComparison.Ordinal);
         Assert.Contains("data-audiobookshelf-playback-verified", view, StringComparison.Ordinal);
         Assert.Contains("data-undetectable-humanizer-applied", view, StringComparison.Ordinal);
         Assert.Contains("data-telegram-share-delivered", view, StringComparison.Ordinal);
-        Assert.Contains("Book artifact", view, StringComparison.Ordinal);
-        Assert.Contains("Dossier video", view, StringComparison.Ordinal);
-        Assert.Contains("Telegram share", view, StringComparison.Ordinal);
+        Assert.Contains("Story draft", view, StringComparison.Ordinal);
+        Assert.Contains("Story polish", view, StringComparison.Ordinal);
+        Assert.Contains("Book", view, StringComparison.Ordinal);
+        Assert.Contains("Video", view, StringComparison.Ordinal);
+        Assert.Contains("Share", view, StringComparison.Ordinal);
         Assert.Contains("Listen in Audiobookshelf", view, StringComparison.Ordinal);
         Assert.Contains("Audiobookshelf share locked", view, StringComparison.Ordinal);
         Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)", view, StringComparison.Ordinal);
+        Assert.Contains("Open edition", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -130,10 +133,14 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("data-dossier-video-verified", detailView, StringComparison.Ordinal);
         Assert.Contains("data-telegram-share-delivered", detailView, StringComparison.Ordinal);
         Assert.Contains("data-origin-edition-tabs", detailView, StringComparison.Ordinal);
+        Assert.Contains("Readiness", detailView, StringComparison.Ordinal);
+        Assert.Contains("Story draft", detailView, StringComparison.Ordinal);
+        Assert.Contains("Story polish", detailView, StringComparison.Ordinal);
         Assert.Contains("Read in Audiobookshelf", detailView, StringComparison.Ordinal);
         Assert.Contains("Listen in Audiobookshelf", detailView, StringComparison.Ordinal);
         Assert.Contains("Watch scene movie", detailView, StringComparison.Ordinal);
         Assert.Contains("Canon Audit", detailView, StringComparison.Ordinal);
+        Assert.Contains("Access notes", detailView, StringComparison.Ordinal);
         Assert.Contains("Dossier ebook share locked", detailView, StringComparison.Ordinal);
         Assert.Contains("Archived book locked", detailView, StringComparison.Ordinal);
         Assert.Contains("Dossier film locked", detailView, StringComparison.Ordinal);

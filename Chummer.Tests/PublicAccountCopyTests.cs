@@ -13,6 +13,7 @@ public sealed class PublicAccountCopyTests
         string faqView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Faq.cshtml"));
         string trustPageView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml"));
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string authEntryView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Auth", "Entry.cshtml"));
 
         Assert.Contains("label: Open Chummer", manifest, StringComparison.Ordinal);
         Assert.Contains("label: Claim your copy", manifest, StringComparison.Ordinal);
@@ -25,7 +26,10 @@ public sealed class PublicAccountCopyTests
         Assert.Contains("\"Claim your copy\"", faqView, StringComparison.Ordinal);
         Assert.Contains("authenticated ? \"Open account\" : \"Claim your copy\"", trustPageView, StringComparison.Ordinal);
         Assert.Contains("AccountSupportLabel: authenticated ? \"Open account support\" : \"Open private form\"", controller, StringComparison.Ordinal);
-        Assert.Contains("Use email first. Google is optional.", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AuthController.cs")), StringComparison.Ordinal);
+        Assert.Contains("action=\"/auth/email/start\"", authEntryView, StringComparison.Ordinal);
+        Assert.Contains(">Continue with email</button>", authEntryView, StringComparison.Ordinal);
+        Assert.Contains("@if (Model.GoogleAvailable)", authEntryView, StringComparison.Ordinal);
+        Assert.Contains("Continue with Google", authEntryView, StringComparison.Ordinal);
 
         Assert.DoesNotContain("label: Sign in", manifest, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Create account", manifest, StringComparison.Ordinal);

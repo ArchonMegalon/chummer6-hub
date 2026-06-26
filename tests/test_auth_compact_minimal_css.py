@@ -12,7 +12,7 @@ def test_compact_auth_buttons_stay_quiet_and_readable() -> None:
 
     primary_block = ".route-login.surface-auth.surface-minimal .button-like--primary"
     assert primary_block in css
-    assert "background: #d6b763;" in css
+    assert "background: #f3eadb;" in css
     assert "box-shadow: none;" in css
     assert "transform: none;" in css
 
@@ -27,17 +27,19 @@ def test_login_entry_stays_compact_and_single_purpose() -> None:
     view = AUTH_ENTRY.read_text(encoding="utf-8")
     controller = AUTH_CONTROLLER.read_text(encoding="utf-8")
 
-    assert "width: min(17.5rem, 100%);" in css
-    assert "font-size: 1.12rem;" in css
-    assert "min-height: 2.05rem;" in css
-    assert "padding: 0.68rem;" in css
+    assert "width: min(326px, calc(100vw - 32px));" in css
+    assert "font-size: 1.45rem;" in css
+    assert "min-height: 40px;" in css
+    assert "padding: 15px;" in css
     assert "box-shadow: none;" in css
+    assert "background-image: none;" in css
 
     assert "auth-entry__story" not in view
     assert "hero-brand" not in view
     assert "<img" not in view
 
-    assert "Open your account. Keep installs and support together." in controller
-    assert "Use the same copy. Add recovery and support history." in controller
+    assert "Use email first. Google is optional." in controller
+    assert "Open your account. Keep installs and support together." not in controller
+    assert "Use the same copy. Add recovery and support history." not in controller
     assert "Keep this copy attached to your account." not in controller
     assert "Claiming only connects this copy to your account." not in controller

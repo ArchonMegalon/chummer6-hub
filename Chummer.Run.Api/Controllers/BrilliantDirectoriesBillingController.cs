@@ -318,7 +318,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             UsingSignedInAccount: currentUser is not null,
             Unavailable: true,
             Heading: "Support Chummer",
-            Summary: "Supporter checkout is not connected yet. Your Chummer access is unchanged.",
+            Summary: "Supporter checkout is unavailable right now. Free access stays the same.",
             ManageMembershipHref: "/downloads");
 
     private async Task<HubUserDto?> TryGetCurrentUserAsync(CancellationToken cancellationToken)

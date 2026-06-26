@@ -25,7 +25,7 @@ public sealed class BrilliantDirectoriesBillingTests
 
         Assert.Equal("Brilliant Directories", page.Provider);
         Assert.Equal("brilliant_directories", page.ProviderKey);
-        Assert.Contains("same Chummer app", page.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("same app", page.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, page.MyFirstBookQuotaPolicy.FreeMonthlyBooks);
         Assert.Equal(2, page.MyFirstBookQuotaPolicy.SupporterMonthlyBooks);
         Assert.False(page.Capabilities.StoresTenantCredentials);
@@ -57,12 +57,14 @@ public sealed class BrilliantDirectoriesBillingTests
     {
         string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Billing", "Membership.cshtml"));
 
-        Assert.Contains("Same app for everyone.", view, StringComparison.Ordinal);
-        Assert.Contains("Origin books: Free 1/month. Supporter 2/month.", view, StringComparison.Ordinal);
+        Assert.Contains("Same app.", view, StringComparison.Ordinal);
+        Assert.Contains("Origin books: 1/month free. 2/month supporter.", view, StringComparison.Ordinal);
         Assert.Contains("Continue with email", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Membership</h2>", view, StringComparison.Ordinal);
-        Assert.Contains("Supporter checkout is not connected yet.", view, StringComparison.Ordinal);
-        Assert.Contains("Chummer will attach supporter status after the account is open.", view, StringComparison.Ordinal);
+        Assert.Contains("Supporter checkout is unavailable right now.", view, StringComparison.Ordinal);
+        Assert.Contains("Chummer attaches supporter status after sign-in.", view, StringComparison.Ordinal);
+        Assert.Contains("Checkout stays attached to this account.", view, StringComparison.Ordinal);
+        Assert.Contains("Support Chummer", view, StringComparison.Ordinal);
         Assert.Contains("--bg: #171716;", view, StringComparison.Ordinal);
         Assert.Contains("--accent: #d6b763;", view, StringComparison.Ordinal);
         Assert.DoesNotContain("--bg: #0d1016;", view, StringComparison.Ordinal);
@@ -555,7 +557,7 @@ public sealed class BrilliantDirectoriesBillingTests
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
         Assert.True(model.Unavailable);
         Assert.Equal("Support Chummer", model.Heading);
-        Assert.Contains("supporter checkout is not connected yet", model.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("supporter checkout is unavailable right now", model.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Unexpected server error", model.Summary, StringComparison.OrdinalIgnoreCase);
     }
 

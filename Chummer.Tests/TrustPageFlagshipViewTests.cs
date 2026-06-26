@@ -13,15 +13,16 @@ public sealed class TrustPageFlagshipViewTests
         Assert.Contains("Choose the right help path", trustView, StringComparison.Ordinal);
         Assert.Contains("Pick the closest one.", trustView, StringComparison.Ordinal);
         Assert.Contains("minimal-help-grid", trustView, StringComparison.Ordinal);
-        Assert.Contains("Choose one", trustView, StringComparison.Ordinal);
+        Assert.Contains("Contact paths", trustView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid--compact", trustView, StringComparison.Ordinal);
         Assert.Contains("ViewData[\"Title\"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(Model.SupportIntake.Heading)", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(Model.SupportIntake.AccountSupportLabel)", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(choice.Label)", trustView, StringComparison.Ordinal);
-        Assert.Contains("Discord first. Private form only for logs or account details.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Public requests belong on <a class=\"inline-link\" href=\"/participate\">Participate</a>.", trustView, StringComparison.Ordinal);
         Assert.Contains("<details class=\"details-drawer minimal-help-card\" id=\"private-support-form\">", trustView, StringComparison.Ordinal);
-        Assert.Contains("<summary>Private issue form</summary>", trustView, StringComparison.Ordinal);
+        Assert.Contains("<summary>Private form</summary>", trustView, StringComparison.Ordinal);
         Assert.Contains("<label for=\"supportHeadId\">App copy</label>", trustView, StringComparison.Ordinal);
         Assert.Contains("<label for=\"supportInstallationId\">Installed copy</label>", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the short privacy summary first, then the full policy.", trustView, StringComparison.Ordinal);
@@ -42,7 +43,7 @@ public sealed class TrustPageFlagshipViewTests
         string trustViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
         string trustView = File.ReadAllText(trustViewPath);
 
-        int routeChoiceIndex = trustView.IndexOf("Discord first. Private form only for logs or account details.", StringComparison.Ordinal);
+        int routeChoiceIndex = trustView.IndexOf("Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.", StringComparison.Ordinal);
         int formIndex = trustView.IndexOf("<form class=\"settings-form\"", StringComparison.Ordinal);
 
         Assert.True(routeChoiceIndex >= 0, "contact support view should show the routing choices before the form");

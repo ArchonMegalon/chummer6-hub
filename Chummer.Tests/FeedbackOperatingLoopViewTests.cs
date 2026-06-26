@@ -31,21 +31,17 @@ public sealed class FeedbackOperatingLoopViewTests
     [Fact]
     public void RoadmapAndChangelogRoutesReuseTheSharedSignalLoopSnapshotForRelatedPages()
     {
-        string roadmapViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml");
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string changelogViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Changelog.cshtml");
 
-        string roadmapView = File.ReadAllText(roadmapViewPath);
+        string controller = File.ReadAllText(controllerPath);
         string changelogView = File.ReadAllText(changelogViewPath);
 
-        Assert.Contains("Roadmap", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Install reliability, cleaner screens, fewer dead ends.", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Maintenance first.", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("What people ask for", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Model.PublicRequests", roadmapView, StringComparison.Ordinal);
-        Assert.Contains(">Changelog</a>", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("/changelog", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Participate", roadmapView, StringComparison.Ordinal);
-        Assert.DoesNotContain("Use the right place", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
+        Assert.Contains("RoadmapBoardProxyCore(", controller, StringComparison.Ordinal);
+        Assert.Contains("canonicalHref: \"/roadmap\"", controller, StringComparison.Ordinal);
+        Assert.Contains("assetProxyBasePath: \"/roadmap/provider-assets\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Roadmap.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", changelogView, StringComparison.Ordinal);
         Assert.Contains("What changed, and what comes next.", changelogView, StringComparison.Ordinal);
         Assert.Contains("Browse roadmap", changelogView, StringComparison.Ordinal);

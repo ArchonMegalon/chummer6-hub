@@ -33,7 +33,7 @@ test('signed-in owner can see Origin Dossier cover, tabs, and gated media links 
     `${baseUrl}/account/work/origin-dossiers/${projectId}/listen`,
   );
 
-  await page.getByRole('link', { name: 'Open authenticated chummer.run edition' }).click();
+  await page.getByRole('link', { name: 'Open edition' }).click();
   await expect(page).toHaveURL(`${baseUrl}/account/work/origin-dossiers/${projectId}`);
   await expect(page.locator('[data-origin-dossier-detail]')).toBeVisible();
   await expect(page.locator('[data-origin-dossier-gold-ready="true"]')).toBeVisible();

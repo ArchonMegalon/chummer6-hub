@@ -29,7 +29,7 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
         "Open aftermath",
     ),
     "Chummer.Run.Api/Views/PublicLanding/Home.cshtml": (
-        "Table Pulse aftermath: account reaction fallout stays on the same reviewed workspace",
+        "Table Pulse aftermath: account reaction fallout stays on the same campaign page",
         "Open aftermath and return",
     ),
     "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml": (
@@ -38,7 +38,7 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
         "Table Pulse Aftermath return items that stay in this account view",
     ),
     "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml": (
-        "Connected workspace section",
+        "Connected section",
         "Model.ConnectedLanePacket.BoundaryLine",
     ),
     "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml": (

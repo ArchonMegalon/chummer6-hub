@@ -252,15 +252,9 @@ else if (!contactPage)
 {
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
-            <h2>Choose one</h2>
-            <p>Discord first. Private form only for logs or account details.</p>
-            <p>For normal questions, reach me on Discord in the Chummer5 server.</p>
-            <p>Use the form only when Discord is the wrong place.</p>
-            <p>Public feedback should start on the feedback page.</p>
-            <p>Create a Chummer account if you want saved help history inside your account.</p>
-            <p>Use the Chummer5 server for normal contact.</p>
-            <p>Open private form for install logs, crashes, and account details.</p>
-            <p>Support stays private.</p>
+            <h2>Contact paths</h2>
+            <p>Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.</p>
+            <p>Public requests belong on <a class="inline-link" href="/participate">Participate</a>.</p>
         </div>
         <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact" id="contact-paths">
             @foreach (var choice in contactRouteChoices)
@@ -277,7 +271,7 @@ else if (!contactPage)
 
     <section class="minimal-section minimal-section--tight" id="support-intake">
         <details class="details-drawer minimal-help-card" id="private-support-form">
-            <summary>Private issue form</summary>
+            <summary>Private form</summary>
             <article class="trust-page-section trust-page-section--form">
             <p class="eyebrow">Support</p>
             <h2>@PublicText(Model.SupportIntake.Heading)</h2>

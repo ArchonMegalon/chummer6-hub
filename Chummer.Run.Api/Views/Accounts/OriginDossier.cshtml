@@ -40,52 +40,52 @@
                  data-book-artifact-verified="@publication.BookArtifactVerified.ToString().ToLowerInvariant()"
                  data-dossier-video-verified="@publication.DossierVideoVerified.ToString().ToLowerInvariant()"
                  data-telegram-share-delivered="@publication.TelegramShareDelivered.ToString().ToLowerInvariant()">
-            <span class="tag">@(publication.GoldReady ? "Gold ready" : "Gold gated")</span>
-            <h2>Story scene</h2>
+            <span class="tag">@(publication.GoldReady ? "Gold ready" : "In progress")</span>
+            <h2>Cover</h2>
             @if (canShowCover)
             {
                 <figure class="product-proof__media">
                     <span class="scene-picture">
                         <img src="@publication.StorySceneCoverUrl" alt="Rendered Origin Dossier story scene cover for @Clean(publication.RunnerAlias)" loading="eager" />
                     </span>
-                    <figcaption class="muted-copy">Rendered scene cover verified against the selected character face.</figcaption>
+                    <figcaption class="muted-copy">Selected cover is ready.</figcaption>
                 </figure>
             }
             else
             {
-                <p class="muted-copy">The rendered scene cover stays locked until selected-character-face verification passes.</p>
+                <p class="muted-copy">Cover unlocks after face verification.</p>
             }
         </article>
         <article class="app-action-card">
-            <span class="tag">Publication gates</span>
+            <span class="tag">Readiness</span>
             <h2>Edition readiness</h2>
             <div class="settings-summary-list">
                 <div class="settings-summary-row">
-                    <span>Provider manuscript</span>
+                    <span>Story draft</span>
                     <strong>@(publication.ProviderAuthoredManuscriptImported ? "Imported" : "Pending")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Undetectable Humanizer</span>
+                    <span>Story polish</span>
                     <strong>@(publication.UndetectableHumanizerApplied ? "Applied" : "Pending")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Book artifact</span>
+                    <span>Book</span>
                     <strong>@(publication.BookArtifactVerified ? "Verified" : "Pending")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Scene cover identity</span>
+                    <span>Cover</span>
                     <strong>@(publication.StorySceneCoverUsesSelectedCharacterFace ? "Verified" : "Pending")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Audiobookshelf playback</span>
+                    <span>Audio</span>
                     <strong>@(publication.AudiobookshelfPlaybackVerified ? "Verified" : "Pending")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Dossier video</span>
+                    <span>Video</span>
                     <strong>@(publication.DossierVideoVerified ? "Verified" : "Pending")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Telegram share</span>
+                    <span>Share</span>
                     <strong>@(publication.TelegramShareDelivered ? "Delivered" : "Pending")</strong>
                 </div>
                 @if (publication.ArtifactCapability is not null)
@@ -95,7 +95,7 @@
                         <strong>@Clean(publication.ArtifactCapability.Status)</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Capability slot</span>
+                        <span>Format</span>
                         <strong>@Clean(publication.ArtifactCapability.CapabilitySlot.Replace("_", " ", StringComparison.OrdinalIgnoreCase))</strong>
                     </div>
                 }
@@ -103,7 +103,7 @@
             @if (publication.MissingGoldRequirements.Count > 0)
             {
                 <details class="details-drawer">
-                    <summary>Missing gold requirements</summary>
+                    <summary>Still missing</summary>
                     <ul class="muted-copy">
                         @foreach (var requirement in publication.MissingGoldRequirements)
                         {
@@ -119,8 +119,8 @@
 <section class="minimal-section minimal-section--tight" id="origin-edition-tabs" data-origin-edition-tabs>
     <article class="app-action-card">
         <span class="tag">Owner links</span>
-        <h2>Read, listen, watch, and audit</h2>
-        <p>These tabs unlock only after the verified ebook, Audiobookshelf playback, rendered cover, dossier video, and share-delivery gates pass for this signed-in account.</p>
+        <h2>Edition</h2>
+        <p>Read, listen, and video open here when this account is cleared for them.</p>
         <nav class="minimal-actions" aria-label="Origin Edition tabs">
             <a class="button-like button-like--ghost" href="#origin-edition-read">Read</a>
             <a class="button-like button-like--ghost" href="#origin-edition-listen">Listen</a>
@@ -134,7 +134,7 @@
     <article class="app-action-card">
         <span class="tag">Read</span>
         <h2>Dossier ebook</h2>
-        <p>The dossier ebook is shared through Audiobookshelf under the Origin Edition namespace while Chummer keeps canon and publication state.</p>
+        <p>Read the private book edition here.</p>
         <div class="minimal-actions" aria-label="Origin Edition read actions">
             @if (canRead)
             {
@@ -160,7 +160,7 @@
     <article class="app-action-card">
         <span class="tag">Listen</span>
         <h2>Audiobook</h2>
-        <p>The M4B audiobook must be real provider narration, imported into Audiobookshelf, and covered with the same rendered story scene.</p>
+        <p>Listen here when the audiobook is ready.</p>
         <div class="minimal-actions" aria-label="Origin Edition listen actions">
             @if (canListen)
             {
@@ -178,7 +178,7 @@
     <article class="app-action-card">
         <span class="tag">Watch</span>
         <h2>Story scene movie</h2>
-        <p>The scene movie is hosted by Chummer media so video playback stays tied to Chummer approval and canon audit state.</p>
+        <p>Watch the selected scene here when the video is ready.</p>
         <div class="minimal-actions" aria-label="Origin Edition watch actions">
             @if (canWatch)
             {
@@ -201,8 +201,8 @@
          data-no-fallback-media-verified="@publication.GoldReady.ToString().ToLowerInvariant()">
     <article class="app-action-card">
         <span class="tag">Canon Audit</span>
-        <h2>Publication proof</h2>
-        <p>Chummer will not publish provider-created facts directly. Gold requires approved canon, privacy proof, humanizer receipt, cover consistency, real media, and Telegram delivery receipts.</p>
+        <h2>Access notes</h2>
+        <p>Chummer keeps the canon. Book, audio, video, cover, and share links stay locked until the edition is ready.</p>
         <div class="settings-summary-list">
             <div class="settings-summary-row">
                 <span>Namespace</span>
@@ -210,7 +210,7 @@
             </div>
             <div class="settings-summary-row">
                 <span>Canon and privacy</span>
-                <strong>@(publication.ProviderAuthoredManuscriptImported && publication.UndetectableHumanizerApplied ? "Receipts present" : "Pending")</strong>
+                <strong>@(publication.ProviderAuthoredManuscriptImported && publication.UndetectableHumanizerApplied ? "Ready" : "Pending")</strong>
             </div>
             <div class="settings-summary-row">
                 <span>No fallback media</span>
@@ -229,6 +229,6 @@
 
     private static string Humanize(string? value)
         => Clean(string.IsNullOrWhiteSpace(value)
-            ? "Awaiting provider manuscript"
+            ? "Building edition"
             : value.Replace('_', ' '));
 }

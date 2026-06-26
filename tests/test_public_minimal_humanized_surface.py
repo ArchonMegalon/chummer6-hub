@@ -33,8 +33,9 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'if (helpPage || contactPage)' in trust_page
     assert 'return "/downloads";' in trust_page
     assert 'route-choice-grid--compact' in trust_page
-    assert 'Choose one' in trust_page
-    assert 'Discord first. Private form only for logs or account details.' in trust_page
+    assert 'Contact paths' in trust_page
+    assert 'Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.' in trust_page
+    assert 'Public requests belong on <a class="inline-link" href="/participate">Participate</a>.' in trust_page
     assert 'Public ideas go to Participate. Private problems stay here.' not in trust_page
     assert 'Send support request' in trust_page
     assert 'other routes below' not in trust_page
@@ -125,17 +126,14 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
 
     for expected in (
         "Installs is where you reconnect, replace, or recover this copy.",
-        "Public feedback should start on the feedback page.",
         "Return to setup",
         "Go back to setup when you are ready",
         "use this claim code only if Chummer asks for it on that device",
         "Contact Chummer",
-        "For normal questions, reach me on Discord in the Chummer5 server.",
-        "Create a Chummer account if you want saved help history inside your account.",
-        "Use the Chummer5 server for normal contact",
+        "Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.",
+        "Public requests belong on <a class=\"inline-link\" href=\"/participate\">Participate</a>.",
         "Open private form",
-        "Support stays private.",
-        "Use the form only when Discord is the wrong place",
+        "Private form",
     ):
         assert expected in combined
 
@@ -444,9 +442,10 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "data-chummer-board-failure-patch" in controller
     assert "polishVisibleCopy" in controller
     assert "quietHostedBoardChrome" in controller
-    assert "document.title = 'Participate - Chummer.run';" in controller
-    assert '"What do you want to see next? - Chummer.run", "Participate - Chummer.run"' in controller
-    assert '"Tell us how we could make Chummer6 more useful to you", "Short requests, clear bugs, useful ideas."' in controller
+    assert "const pageTitle = __CHUMMER_PAGE_TITLE__;" in controller
+    assert 'pageTitle: "Participate - Chummer.run"' in controller
+    assert "hostedHeadingReplacement: \"What should Chummer do next?\"" in controller
+    assert "hostedSummaryReplacement: \"Short requests, clear bugs, useful ideas.\"" in controller
     assert "What should Chummer do next?" in controller
     assert "Short requests, clear bugs, useful ideas." in controller
     assert "Add a note" in controller
@@ -597,14 +596,16 @@ def test_billing_surface_uses_real_view_and_honest_supporter_copy() -> None:
     assert 'return Redirect($"/login?next={Uri.EscapeDataString("/account/billing")}")' in controller
     assert "<!doctype html>" not in controller
     assert '/auth/google/start?next={Uri.EscapeDataString("/account/billing")}' not in controller
-    assert "Same app for everyone." in billing_view
-    assert "Origin books: Free 1/month. Supporter 2/month." in billing_view
-    assert "Supporter does not unlock extra app features right now." in billing_view
-    assert "Supporter checkout is not connected yet." in billing_view
+    assert "Same app." in billing_view
+    assert "Origin books: 1/month free. 2/month supporter." in billing_view
+    assert "No extra app features right now." in billing_view
+    assert "Supporter checkout is unavailable right now." in billing_view
     assert "Continue with email" in billing_view
-    assert "Books this month:" in billing_view
+    assert "This month:" in billing_view
     assert '__RequestVerificationToken' in billing_view
     assert "Manage billing" in billing_view
+    assert "Checkout stays attached to this account." in billing_view
+    assert "Chummer attaches supporter status after sign-in." in billing_view
     assert "story-example" not in billing_view
     assert "Account attached: @Model.UserId" not in billing_view
     assert "temporarily unavailable" not in billing_view
@@ -873,8 +874,8 @@ def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
 
     assert "@Model.Heading" in entry
     assert "@Model.SupportLine" in entry
-    assert "Open your account. Keep installs and support together." in combined
-    assert "Use the same copy. Add recovery and support history." in combined
+    assert "Use email first. Google is optional." in combined
+    assert "Continue with email" in entry
     assert "Continue with Google" in entry
 
     for forbidden in (
@@ -895,6 +896,8 @@ def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
         "Claim your copy",
         "Email me a link",
         "Use your email to sign in.",
+        "Open your account. Keep installs and support together.",
+        "Use the same copy. Add recovery and support history.",
     ):
         assert forbidden not in entry
 
@@ -1064,7 +1067,10 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
     assert "Use the right place" not in roadmap
 
     controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
-    assert "What Chummer is fixing next." in controller
+    assert 'public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)' in controller
+    assert 'canonicalHref: "/roadmap"' in controller
+    assert 'assetProxyBasePath: "/roadmap/provider-assets"' in controller
+    assert 'pageTitle: "Roadmap - Chummer.run"' in controller
     for forbidden in (
         "Milestone-backed public direction",
         "current readiness",
@@ -1437,12 +1443,22 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
 def test_signed_in_account_copy_uses_files_status_and_plain_download_language() -> None:
     account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
 
+    assert "Installs, support, billing, participation, and campaigns." in account
+    assert "Tracked support and the next step." in account
+    assert "Characters, groups, and campaigns." in account
+    assert "Billing opens through the billing provider." in account
+    assert "Start here" in account
+    assert "Finish setup on that device" in account
+    assert "Use the linked install first" in account
+    assert "Table Pulse is ready for the next reaction on this campaign." in account
+    assert "This run is ready for the next Table Pulse reaction." in account
     assert '? "Installs"' in account
     assert "See linked copies, setup codes, downloads, and install help. The app or installer still does the actual linking." in account
     assert "keep setup and support tied to this account" in account
     assert "Add an email recovery path if you want an easier way back later." in account
 
     for forbidden in (
+        "Move between installs, support, billing, participation, and campaigns.",
         "The artifact stays the same for everyone",
         "Artifact shelf posture",
         "Current release posture",
@@ -2432,12 +2448,12 @@ def test_faction_workspace_uses_page_language_instead_of_route_language() -> Non
     assert "The campaign city view starts with the globe" in workspace
     assert "Account page" in workspace
     assert "Public page stays separate" in workspace
-    assert "Current workspace." in workspace
+    assert "Current section." in workspace
     assert "public Ledger pages" in workspace
     assert "account campaign pages" in workspace
     assert "Public Ledger pages" in workspace
     assert "account faction pages" in workspace
-    assert "account workspace" in workspace
+    assert "this account page" in workspace
     assert "private lore overlay" in workspace
     assert "Private layer" in workspace
     assert "Private lore stays private" in workspace
@@ -3177,10 +3193,10 @@ def test_login_view_is_minimal_auth_surface() -> None:
 
     for expected in (
         ".route-login.surface-auth.surface-minimal",
-        "width: min(17.5rem, 100%);",
-        "font-size: 1.12rem;",
-        "min-height: 2.05rem;",
-        "padding: 0.68rem;",
+        "width: min(326px, calc(100vw - 32px));",
+        "font-size: 1.45rem;",
+        "min-height: 40px;",
+        "padding: 15px;",
         ".surface-auth.surface-minimal.surface-auth-message",
     ):
         assert expected in auth_compact

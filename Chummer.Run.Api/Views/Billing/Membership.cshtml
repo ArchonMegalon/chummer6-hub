@@ -120,8 +120,8 @@
         <h1>@Model.Heading</h1>
         <p class="summary">@Model.Summary</p>
         <div class="meter">
-            <div class="pill">Same app for everyone.</div>
-            <div class="pill">Origin books: Free 1/month. Supporter 2/month.</div>
+            <div class="pill">Same app.</div>
+            <div class="pill">Origin books: 1/month free. 2/month supporter.</div>
         </div>
         @if (usingSignedInAccount)
         {
@@ -129,7 +129,7 @@
         }
         @if (quota is not null)
         {
-            <div class="pill">Books this month: @quota.MonthlyUsed / @quota.MonthlyLimit</div>
+            <div class="pill">This month: @quota.MonthlyUsed / @quota.MonthlyLimit books</div>
         }
     </section>
 
@@ -137,9 +137,9 @@
     {
         <section class="card card--accent">
             <h2>Membership</h2>
-            <p class="note">Supporter checkout is not connected yet. Free Chummer access stays unchanged.</p>
+            <p class="note">Supporter checkout is unavailable right now. Free access stays the same.</p>
             <div class="action-row">
-                <a class="button button--primary" href="/downloads">Get Chummer</a>
+                <a class="button button--primary" href="/downloads">Downloads</a>
             </div>
         </section>
     }
@@ -154,7 +154,7 @@
                         <span class="label">Free</span>
                         <strong>@free.Name</strong>
                     </div>
-                    <p class="note">@free.Summary</p>
+                    <p class="note">Default. Full current app access. 1 Origin Book each month.</p>
                 </div>
             }
             @if (supporter is not null)
@@ -165,27 +165,27 @@
                         <span class="label">Supporter</span>
                         <strong>@supporter.Name</strong>
                     </div>
-                    <p class="note">@supporter.Summary</p>
+                    <p class="note">Same app. No extra app features right now. 2 Origin Books each month and direct support for Chummer.</p>
                     <form class="form-grid" method="post" action="/account/billing/supporter">
                         <input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken">
                         @if (hasUserId)
                         {
                             <input type="hidden" name="userId" value="@Model.UserId">
-                            <div class="pill">Account attached</div>
-                            <label>
-                                Email
-                                <input type="email" name="email" value="@Model.Email" autocomplete="email" placeholder="Optional">
-                            </label>
+                            @if (!string.IsNullOrWhiteSpace(Model.Email))
+                            {
+                                <input type="hidden" name="email" value="@Model.Email">
+                            }
+                            <div class="pill">Checkout stays attached to this account.</div>
                         }
                         else
                         {
-                            <p class="field-help">Continue with email first. Chummer will attach supporter status after the account is open.</p>
+                            <p class="field-help">Continue with email first. Chummer attaches supporter status after sign-in.</p>
                         }
-                        <p class="field-help">Supporter does not unlock extra app features right now. It only raises the monthly Origin Book allowance to 2 and helps pay for Chummer.</p>
+                        <p class="field-help">Supporter changes the monthly Origin Book limit only. The app stays the same.</p>
                         <div class="action-row">
                             @if (hasUserId)
                             {
-                                <button class="button button--primary" type="submit">@supporter.PrimaryAction.Label</button>
+                                <button class="button button--primary" type="submit">Support Chummer</button>
                             }
                             else
                             {

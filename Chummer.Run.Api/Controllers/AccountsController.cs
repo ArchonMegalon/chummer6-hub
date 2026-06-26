@@ -41,6 +41,7 @@ public sealed class AccountsController : Controller
     private readonly PublicPrivacyBoundaryService _privacyBoundaries;
     private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly OriginDossierPublicationService _originDossierPublications;
+    private readonly HorizonArtifactRequestService? _artifactRequests;
     private readonly ILogger<AccountsController> _logger;
 
     public AccountsController(
@@ -68,7 +69,8 @@ public sealed class AccountsController : Controller
         PublicPrivacyBoundaryService privacyBoundaries,
         SignedInTrustStatusService signedInTrustStatus,
         OriginDossierPublicationService originDossierPublications,
-        ILogger<AccountsController> logger)
+        ILogger<AccountsController> logger,
+        HorizonArtifactRequestService? artifactRequests = null)
     {
         _accounts = accounts;
         _identity = identity;
@@ -94,6 +96,7 @@ public sealed class AccountsController : Controller
         _privacyBoundaries = privacyBoundaries;
         _signedInTrustStatus = signedInTrustStatus;
         _originDossierPublications = originDossierPublications;
+        _artifactRequests = artifactRequests;
         _logger = logger;
     }
 
@@ -333,6 +336,36 @@ public sealed class AccountsController : Controller
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            HorizonArtifactRequestReceipt? receipt = null;
+            if (_artifactRequests is not null)
+            {
+                string normalizedArtifactKind = artifactKind.Trim().ToLowerInvariant();
+                string sourceRef = $"origin-dossier:{originDossierProjectId}:{normalizedArtifactKind}";
+                receipt = _artifactRequests.BuildRequest(
+                    new HorizonArtifactRequestCreateRequest(
+                        HorizonId: "origin-dossier",
+                        ArtifactKindOrCapabilityId: "dossier_media",
+                        UserId: subject.SubjectId,
+                        SourceRef: sourceRef,
+                        Visibility: "private",
+                        ExternalProcessingConsent: true,
+                        Email: subject.Email),
+                    consumeQuota: false,
+                    requireEnabledCapability: false);
+                if (!string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogWarning(
+                        "Origin Dossier artifact access denied for {UserId} on {ProjectId}/{ArtifactKind}; blocked reasons: {BlockedReasons}.",
+                        subject.SubjectId,
+                        originDossierProjectId,
+                        normalizedArtifactKind,
+                        string.Join(", ", receipt.BlockedReasons));
+                    return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "Unable to create a Chummer-owned Origin Dossier artifact access receipt.");
+                }
+
+                Response.Headers["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
+            }
+
             if (string.Equals(artifactKind, "read", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(artifactKind, "dossier", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(artifactKind, "listen", StringComparison.OrdinalIgnoreCase))
@@ -1514,12 +1547,12 @@ public sealed class AccountsController : Controller
     private static (string Title, string Description) DescribeAccountSection(string currentSection)
         => currentSection switch
         {
-            "participation" => ("Account · Participation", "Followed package work, guided contribution receipts, and privacy-safe recognition preferences."),
-            "support" => ("Account · Support", "Open, track, and close support without leaving the account surface."),
-            "access" => ("Account · Installs", "Linked copies, setup codes, downloads, and install help."),
-            "work" => ("Account · Campaigns", "Campaign return and table context when you explicitly need them."),
-            "settings" => ("Account · Billing", "Membership and billing are handled by the billing provider."),
-            _ => ("Account", "Profile, sign-in methods, recovery posture, and billing entry points.")
+            "participation" => ("Account · Participation", "Public feedback, participation history, and recognition."),
+            "support" => ("Account · Support", "Tracked support and the next step."),
+            "access" => ("Account · Installs", "Linked installs, setup codes, downloads, and recovery."),
+            "work" => ("Account · Campaigns", "Characters, groups, and campaigns."),
+            "settings" => ("Account · Billing", "Billing opens through the billing provider."),
+            _ => ("Account", "Installs, support, billing, and campaigns.")
         };
 
     [HttpGet("me")]

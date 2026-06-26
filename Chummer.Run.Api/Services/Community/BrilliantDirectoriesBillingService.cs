@@ -90,7 +90,7 @@ public sealed class BrilliantDirectoriesBillingService
             Provider: options.ProviderName,
             ProviderKey: options.ProviderKey,
             Heading: "Membership",
-            Summary: "Free and Supporter use the same Chummer app. Supporter is just a way to help pay for the work.",
+            Summary: "Free and Supporter use the same app. Supporter helps pay for Chummer.",
             MyFirstBookQuotaPolicy: new MyFirstBookQuotaPolicyDto(
                 FreeMonthlyBooks: FreeMyFirstBookMonthlyLimit,
                 SupporterMonthlyBooks: SupporterMyFirstBookMonthlyLimit),

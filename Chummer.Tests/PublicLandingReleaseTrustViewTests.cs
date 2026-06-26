@@ -102,7 +102,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Recommended for this browser.", view, StringComparison.Ordinal);
         Assert.Contains("Newer than Stable.", view, StringComparison.Ordinal);
         Assert.Contains("No sudo. Updates default to notify.", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("showLinuxSourcePrimary", view, StringComparison.Ordinal);
+        Assert.Contains("Download script", view, StringComparison.Ordinal);
         Assert.Contains("RequestedPlatformHasPublicDownload", view, StringComparison.Ordinal);
         Assert.Contains("No public installer for this browser yet.", view, StringComparison.Ordinal);
         Assert.Contains("var stable = requestedPlatformUnavailable ? null : recommended;", view, StringComparison.Ordinal);
@@ -187,11 +187,9 @@ public sealed class PublicLandingReleaseTrustViewTests
     public void PublicFeedbackRoutesStayFirstPartyAcrossFeedbackRoadmapAndShippedUpdates()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
-        string roadmapViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml");
         string changelogViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Changelog.cshtml");
 
         string controller = File.ReadAllText(controllerPath);
-        string roadmapView = File.ReadAllText(roadmapViewPath);
         string changelogView = File.ReadAllText(changelogViewPath);
 
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
@@ -205,17 +203,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Changelog.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("BuildNowPageModel(", controller, StringComparison.Ordinal);
-        Assert.Contains("return View(\"~/Views/PublicLanding/Roadmap.cshtml\", model);", controller, StringComparison.Ordinal);
-        Assert.Contains("BuildRoadmapMilestones()", controller, StringComparison.Ordinal);
+        Assert.Contains("public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
+        Assert.Contains("RoadmapBoardProxyCore(", controller, StringComparison.Ordinal);
+        Assert.Contains("canonicalHref: \"/roadmap\"", controller, StringComparison.Ordinal);
+        Assert.Contains("assetProxyBasePath: \"/roadmap/provider-assets\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Redirect(\"/horizons?source=roadmap#public-roadmap-projection\")", controller, StringComparison.Ordinal);
-        Assert.Contains("route-anchor-target", roadmapView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", changelogView, StringComparison.Ordinal);
-        Assert.Contains("Install reliability, cleaner screens, fewer dead ends.", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Maintenance first.", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("What people ask for", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Participate", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Current focus", roadmapView, StringComparison.Ordinal);
-        Assert.DoesNotContain("Use the right place", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Recent changes", changelogView, StringComparison.Ordinal);
         Assert.Contains("<span>Release notes</span>", changelogView, StringComparison.Ordinal);
         Assert.Contains("<strong>Current app</strong>", changelogView, StringComparison.Ordinal);
@@ -243,7 +236,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("<h1>Status</h1>", view, StringComparison.Ordinal);
-        Assert.Contains("var statusLine = $\"{publicPlatformSummary} {updateSummary}\";", view, StringComparison.Ordinal);
+        Assert.Contains("var statusLine = Model.ReleaseExperience.Recommended is null", view, StringComparison.Ordinal);
+        Assert.Contains("statusLine = $\"{statusLine} {updateSummary}\";", view, StringComparison.Ordinal);
         Assert.Contains("Updates are available from Downloads.", view, StringComparison.Ordinal);
         Assert.Contains("@PublicStatusText(statusLine)", view, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Status next actions\"", view, StringComparison.Ordinal);
@@ -326,7 +320,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);", view, StringComparison.Ordinal);
-        Assert.Contains("var statusLine = $\"{publicPlatformSummary} {updateSummary}\";", view, StringComparison.Ordinal);
+        Assert.Contains("var statusLine = Model.ReleaseExperience.Recommended is null", view, StringComparison.Ordinal);
+        Assert.Contains("statusLine = $\"{statusLine} {updateSummary}\";", view, StringComparison.Ordinal);
         Assert.Contains("@PublicStatusText(statusLine)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Updated {verifiedLabel}", view, StringComparison.Ordinal);
         Assert.DoesNotContain("PublicStatusText(Model.ReleaseSummary)", view, StringComparison.Ordinal);
@@ -1213,6 +1208,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Label: \"Open Discord\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Use the form only when the issue needs a private reply, screenshots, logs, install recovery, or account detail.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Public requests belong on <a class=\"inline-link\" href=\"/participate\">Participate</a>.", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"Installer opens, then stops\"", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"I expected the app to start. It did not.\"", trustView, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"What did you try, what happened, and what should I check first?\"", trustView, StringComparison.Ordinal);
@@ -1222,6 +1219,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Use Discord for everything that does not need private details.", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Save support history", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("saved support history", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Choose one", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Discord first. Private form only for logs or account details.", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("Installer linked, but first launch did not explain the next step", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("The Linux release installed successfully", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need a different path?", trustView, StringComparison.Ordinal);

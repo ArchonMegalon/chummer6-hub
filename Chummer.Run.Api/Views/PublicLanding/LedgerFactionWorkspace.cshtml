@@ -10,7 +10,7 @@
         <p class="eyebrow">@UndetectableHumanizerCopyAdapter.Humanize(Model.Eyebrow)</p>
         <h1 class="page-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</h1>
         <p class="page-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
-        <p class="ledger-flagship__support">The campaign city view starts with the globe, not a list. Hover factions, read pressure, then open the workspace section you need.</p>
+        <p class="ledger-flagship__support">The campaign city view starts with the globe, not a list. Hover factions, read pressure, then open the section you need.</p>
         <div class="trust-claim__details">
             <span>Account page</span>
             <span>Faction: @UndetectableHumanizerCopyAdapter.Humanize(Model.Faction.PublicName)</span>
@@ -37,13 +37,13 @@
                 data-secondary-label="Open manage"
                 data-secondary-href="/account/ledger/factions/@Model.Faction.Id.Replace('_', '-')?section=manage"></div>
         </div>
-        <div class="ledger-flagship__nav" aria-label="Faction workspace sections">
+        <div class="ledger-flagship__nav" aria-label="Faction sections">
             @foreach (var tab in Model.Tabs)
             {
                 <a class="ledger-flagship__nav-card @(tab.Current ? "ledger-flagship__nav-card--current" : string.Empty)" href="@tab.Href">
                     <span class="tag">Tab</span>
                     <strong>@UndetectableHumanizerCopyAdapter.Humanize(tab.Label)</strong>
-                <p>@(tab.Current ? "Current workspace." : "Open this faction workspace section.")</p>
+                <p>@(tab.Current ? "Current section." : "Open this section.")</p>
                 </a>
             }
         </div>
@@ -52,11 +52,11 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Workspace tabs</p>
+        <p class="eyebrow">Sections</p>
         <h2 class="editorial-title">Faction management stays signed in.</h2>
         <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.PrivacyNote)</p>
     </div>
-    <div class="trust-claim__details" aria-label="Faction workspace tabs">
+    <div class="trust-claim__details" aria-label="Faction sections">
         @foreach (var tab in Model.Tabs)
         {
             <a class="inline-link" href="@tab.Href">@(tab.Current ? $"{UndetectableHumanizerCopyAdapter.Humanize(tab.Label)} (current)" : UndetectableHumanizerCopyAdapter.Humanize(tab.Label))</a>
@@ -68,7 +68,7 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Connected workspace section</p>
+            <p class="eyebrow">Connected section</p>
             <h2 class="editorial-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.ConnectedLanePacket.Heading)</h2>
             <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.ConnectedLanePacket.Summary)</p>
         </div>
@@ -193,7 +193,7 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
             <article class="route-choice-card">
                 <span class="tag">Private layer</span>
                 <h3>Private lore stays private</h3>
-                <p>The private lore overlay stays available only inside the account workspace and stays off public pages.</p>
+                <p>The private lore overlay stays available only inside this account page and stays off public pages.</p>
             </article>
         </div>
         @if (Model.Allegiance is not null && Model.AvailableActions is not null)
@@ -240,7 +240,7 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
         <div class="editorial-block__lead">
             <p class="eyebrow">Latest dispatches</p>
             <h2 class="editorial-title">Faction-linked dispatch history</h2>
-            <p class="editorial-copy">Public dispatches remain visible, and this account path keeps the faction workspace adjacent to them.</p>
+            <p class="editorial-copy">Public dispatches remain visible, and this account path keeps the private faction page next to them.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var dispatch in Model.Dispatches.Take(3))

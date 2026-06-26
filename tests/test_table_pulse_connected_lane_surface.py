@@ -66,7 +66,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             home_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Home.cshtml"
             home_path.write_text(
                 home_path.read_text(encoding="utf-8").replace(
-                    "Table Pulse aftermath: account reaction fallout stays on the same reviewed workspace",
+                    "Table Pulse aftermath: account reaction fallout stays on the same campaign page",
                     "Table Pulse aftermath: account reaction fallout stays available",
                     1,
                 ),
@@ -77,7 +77,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/Home.cshtml missing marker: Table Pulse aftermath: account reaction fallout stays on the same reviewed workspace",
+            "Chummer.Run.Api/Views/PublicLanding/Home.cshtml missing marker: Table Pulse aftermath: account reaction fallout stays on the same campaign page",
             result.stderr,
         )
 
@@ -154,7 +154,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             workspace_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml"
             workspace_path.write_text(
                 workspace_path.read_text(encoding="utf-8").replace(
-                    "Connected workspace section",
+                    "Connected section",
                     "Workspace tabs",
                     1,
                 ),
@@ -165,7 +165,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml missing marker: Connected workspace section",
+            "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml missing marker: Connected section",
             result.stderr,
         )
     def test_verifier_accepts_live_public_routes(self) -> None:

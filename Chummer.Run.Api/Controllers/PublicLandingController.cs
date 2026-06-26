@@ -4942,7 +4942,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 LiveNotificationsHref = "/account/ledger/notifications",
                 LeaderBriefingHrefTemplate = "/account/ledger/factions/{factionId}/leader-briefing",
                 AftermathHref = "/account/work#aftermath-packages",
-                Summary = "Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return path."
+                Summary = "Runner Passport keeps account identity connected to the Table Pulse inbox, leader briefings, and the private aftermath return."
             },
             Boundary = new
             {

@@ -29,10 +29,11 @@
 .route-login.surface-auth.surface-minimal .auth-entry,
 .route-signup.surface-auth.surface-minimal .auth-entry,
 .surface-auth.surface-minimal.surface-auth-message .auth-entry {
-  width: min(17.5rem, 100%);
+  width: min(326px, calc(100vw - 32px));
   border: 1px solid rgba(243, 234, 219, 0.12);
-  border-radius: 7px;
+  border-radius: 8px;
   background: #1b1b19;
+  background-image: none;
   box-shadow: none;
 }
 
@@ -40,8 +41,8 @@
 .route-signup.surface-auth.surface-minimal .auth-panel--entry,
 .surface-auth.surface-minimal.surface-auth-message .auth-panel--entry {
   display: grid;
-  gap: 0.5rem;
-  padding: 0.68rem;
+  gap: 0.62rem;
+  padding: 15px;
 }
 
 .route-login.surface-auth.surface-minimal .auth-panel__intro,
@@ -53,7 +54,7 @@
 .route-login.surface-auth.surface-minimal .auth-panel__intro h1,
 .route-signup.surface-auth.surface-minimal .auth-panel__intro h1,
 .surface-auth.surface-minimal.surface-auth-message .auth-panel__intro h1 {
-  font-size: 1.12rem;
+  font-size: 1.45rem;
   line-height: 1.12;
 }
 
@@ -83,15 +84,15 @@
 
 .route-login.surface-auth.surface-minimal .field input,
 .route-signup.surface-auth.surface-minimal .field input {
-  min-height: 2.05rem;
-  padding: 0.38rem 0.5rem;
+  min-height: 40px;
+  padding: 0.48rem 0.62rem;
   border-radius: 6px;
 }
 
 .route-login.surface-auth.surface-minimal .button-like,
 .route-signup.surface-auth.surface-minimal .button-like,
 .surface-auth.surface-minimal.surface-auth-message .button-like {
-  min-height: 2.05rem;
+  min-height: 40px;
   border-radius: 6px;
   font-size: 0.82rem;
 }
@@ -100,7 +101,7 @@
 .route-signup.surface-auth.surface-minimal .button-like--primary,
 .surface-auth.surface-minimal.surface-auth-message .button-like--primary {
   border: 1px solid rgba(243, 234, 219, 0.18);
-  background: #d6b763;
+  background: #f3eadb;
   color: #15130f;
   box-shadow: none;
 }
@@ -111,7 +112,7 @@
 .route-signup.surface-auth.surface-minimal .button-like--primary:focus-visible,
 .surface-auth.surface-minimal.surface-auth-message .button-like--primary:hover,
 .surface-auth.surface-minimal.surface-auth-message .button-like--primary:focus-visible {
-  background: #e0c270;
+  background: #fff2dc;
   box-shadow: none;
   transform: none;
 }

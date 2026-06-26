@@ -101,6 +101,46 @@ public sealed class PublicLandingParticipateProxyTests
     }
 
     [Fact]
+    public async Task RoadmapPageRendersCanonicalRoadmapBoard()
+    {
+        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.RoadmapPage(CancellationToken.None);
+
+        ContentResult contentResult = Assert.IsType<ContentResult>(result);
+        string html = contentResult.Content ?? string.Empty;
+        Assert.Equal("text/html; charset=utf-8", contentResult.ContentType);
+        Assert.Contains("rel=\"canonical\" href=\"/roadmap\"", html, StringComparison.Ordinal);
+        Assert.Contains("<base href=\"/roadmap/board/\" />", html, StringComparison.Ordinal);
+        Assert.Contains("Roadmap - Chummer.run", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Participate - Chummer.run", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("What should Chummer do next?", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("chummer6.productlift.dev", html, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RoadmapPageReturnsFirstPartyFallbackWhenUpstreamIsUnavailable()
+    {
+        var controller = CreateController(new ThrowingHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.RoadmapPage(CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("Roadmap temporarily unavailable", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("href=\"/changelog\"", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("href=\"/participate\"", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("Unexpected server error", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ProductLift", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task PartizipateAliasRedirectsToCanonicalParticipateUrl()
     {
         var controller = CreateController(new HostedBoardChromeHttpClientFactory());
@@ -163,6 +203,7 @@ public sealed class PublicLandingParticipateProxyTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = "https://ideas.example.test/feedback",
+                ["CHUMMER_PRODUCTLIFT_ROADMAP_URL"] = "https://ideas.example.test/roadmap",
                 ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
                 ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
                 ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = "/tmp/public-landing-participate-billing-store.json",
