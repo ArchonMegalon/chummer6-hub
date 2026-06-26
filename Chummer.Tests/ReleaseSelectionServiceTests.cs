@@ -418,6 +418,58 @@ platforms:
     }
 
     [Fact]
+    public void BuildExperienceUsesBrowserClientHintsBeforeGenericUserAgent()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260422-111500",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-22T11:15:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-x64-installer",
+                    Platform: "Avalonia Desktop Linux X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    Sha256: "6b0a63c39850a257e66d142c0bad196a7cc4fcbaf027635965f138f534bb13ea",
+                    SizeBytes: 34297862,
+                    Head: "avalonia",
+                    PlatformId: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "account_required"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-installer",
+                    Platform: "Avalonia Desktop Windows X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    Sha256: "cb3493c1113c23b5e496dfe8a1e6de9afc43c802d7da865adc5255497341e5c4",
+                    SizeBytes: 96466473,
+                    Head: "avalonia",
+                    PlatformId: "win-x64",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    InstallAccessClass: "account_required")
+            ]);
+
+        var experience = service.BuildExperience(
+            manifest,
+            userAgent: "Mozilla/5.0 (X11; Linux x86_64) Sec-CH-UA-Platform=\"Windows\" Sec-CH-UA-Arch=\"x86\" Sec-CH-UA-Bitness=\"64\"",
+            authenticated: false);
+
+        Assert.Equal("Windows", experience.RequestedPlatformLabel);
+        Assert.Equal("avalonia-win-x64-installer", experience.Recommended?.Artifact.Id);
+    }
+
+    [Fact]
     public void BuildOptionTreatsWindowsLauncherAndZipAsSupportOnlyPackages()
     {
         var configuration = new ConfigurationBuilder()

@@ -710,6 +710,26 @@ public sealed class ReleaseSelectionService
 
     private static string? DetectPreferredPlatform(string userAgent)
     {
+        var platformHint = ExtractBrowserClientHint(userAgent, "Sec-CH-UA-Platform");
+        if (!string.IsNullOrWhiteSpace(platformHint))
+        {
+            if (platformHint.Contains("Windows", StringComparison.OrdinalIgnoreCase))
+            {
+                return "windows";
+            }
+
+            if (platformHint.Contains("Linux", StringComparison.OrdinalIgnoreCase))
+            {
+                return "linux";
+            }
+
+            if (platformHint.Contains("macOS", StringComparison.OrdinalIgnoreCase)
+                || platformHint.Contains("Mac", StringComparison.OrdinalIgnoreCase))
+            {
+                return "macos";
+            }
+        }
+
         if (userAgent.Contains("Windows", StringComparison.OrdinalIgnoreCase))
         {
             return "windows";
@@ -730,6 +750,26 @@ public sealed class ReleaseSelectionService
 
     private static string? DetectPreferredArchitecture(string userAgent)
     {
+        var archHint = ExtractBrowserClientHint(userAgent, "Sec-CH-UA-Arch");
+        var bitnessHint = ExtractBrowserClientHint(userAgent, "Sec-CH-UA-Bitness");
+        if (!string.IsNullOrWhiteSpace(archHint))
+        {
+            if (archHint.Equals("arm", StringComparison.OrdinalIgnoreCase)
+                || archHint.Equals("arm64", StringComparison.OrdinalIgnoreCase)
+                || archHint.Equals("aarch64", StringComparison.OrdinalIgnoreCase))
+            {
+                return "arm64";
+            }
+
+            if (archHint.Equals("x86", StringComparison.OrdinalIgnoreCase)
+                || archHint.Equals("x86_64", StringComparison.OrdinalIgnoreCase)
+                || archHint.Equals("amd64", StringComparison.OrdinalIgnoreCase)
+                || archHint.Equals("x64", StringComparison.OrdinalIgnoreCase))
+            {
+                return bitnessHint?.Contains("32", StringComparison.OrdinalIgnoreCase) == true ? "x86" : "x64";
+            }
+        }
+
         if (userAgent.Contains("arm64", StringComparison.OrdinalIgnoreCase)
             || userAgent.Contains("aarch64", StringComparison.OrdinalIgnoreCase)
             || userAgent.Contains("Apple Silicon", StringComparison.OrdinalIgnoreCase))
@@ -747,6 +787,60 @@ public sealed class ReleaseSelectionService
         }
 
         return null;
+    }
+
+    private static string? ExtractBrowserClientHint(string browserSignals, string hintName)
+    {
+        if (string.IsNullOrWhiteSpace(browserSignals) || string.IsNullOrWhiteSpace(hintName))
+        {
+            return null;
+        }
+
+        string marker = hintName + "=";
+        int index = browserSignals.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            marker = hintName + ":";
+            index = browserSignals.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (index < 0)
+        {
+            return null;
+        }
+
+        int valueStart = index + marker.Length;
+        while (valueStart < browserSignals.Length && char.IsWhiteSpace(browserSignals[valueStart]))
+        {
+            valueStart++;
+        }
+
+        if (valueStart >= browserSignals.Length)
+        {
+            return null;
+        }
+
+        char quote = browserSignals[valueStart] is '"' or '\'' ? browserSignals[valueStart++] : '\0';
+        int valueEnd = valueStart;
+        while (valueEnd < browserSignals.Length)
+        {
+            char current = browserSignals[valueEnd];
+            if (quote != '\0')
+            {
+                if (current == quote)
+                {
+                    break;
+                }
+            }
+            else if (char.IsWhiteSpace(current) || current == ';' || current == ',')
+            {
+                break;
+            }
+
+            valueEnd++;
+        }
+
+        return browserSignals[valueStart..valueEnd].Trim();
     }
 
     private static int ArchitecturePriority(PublicReleaseArtifactDto download, string? preferredArch)

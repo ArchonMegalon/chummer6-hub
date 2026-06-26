@@ -415,11 +415,12 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> DownloadsPage(CancellationToken cancellationToken)
     {
         ApplyNoStoreHeaders(Response.Headers);
+        ApplyDownloadClientHintHeaders(Response.Headers);
         var surface = _landing.LoadSurface();
         var rawManifest = _releases.LoadManifest();
         var manifest = _releaseSelection.ApplyAccessPolicy(rawManifest);
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
-        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, BuildDownloadSelectionUserAgent(), authenticated);
         var signedInWindowsBuilds = authenticated
             ? _releaseSelection.BuildSignedInOnlyWindowsOptions(rawManifest)
             : Array.Empty<ReleaseOptionViewModel>();
@@ -12705,6 +12706,55 @@ Boundary:
 
     private static SiteChromeViewModel RebindDownloadsHeaderActions(SiteChromeViewModel chrome, ReleaseExperienceViewModel releaseExperience)
         => RebindGuestGateChromeActions(chrome, releaseExperience, rebindSignIn: true);
+
+    private string BuildDownloadSelectionUserAgent()
+    {
+        var builder = new StringBuilder(Request.Headers.UserAgent.ToString());
+        AppendBrowserClientHint(builder, "Sec-CH-UA-Platform");
+        AppendBrowserClientHint(builder, "Sec-CH-UA-Arch");
+        AppendBrowserClientHint(builder, "Sec-CH-UA-Bitness");
+        AppendBrowserClientHint(builder, "Sec-CH-UA-Model");
+        return builder.ToString();
+    }
+
+    private void AppendBrowserClientHint(StringBuilder builder, string headerName)
+    {
+        if (!Request.Headers.TryGetValue(headerName, out var value) || string.IsNullOrWhiteSpace(value.ToString()))
+        {
+            return;
+        }
+
+        if (builder.Length > 0)
+        {
+            builder.Append(' ');
+        }
+
+        builder.Append(headerName).Append('=').Append(value.ToString().Trim());
+    }
+
+    private static void ApplyDownloadClientHintHeaders(IHeaderDictionary headers)
+    {
+        const string clientHints = "Sec-CH-UA-Platform, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Model";
+        headers["Accept-CH"] = clientHints;
+        headers["Vary"] = AppendVaryHeader(headers["Vary"].ToString(), "User-Agent", "Sec-CH-UA-Platform", "Sec-CH-UA-Arch", "Sec-CH-UA-Bitness", "Sec-CH-UA-Model");
+    }
+
+    private static string AppendVaryHeader(string current, params string[] values)
+    {
+        var existing = string.IsNullOrWhiteSpace(current)
+            ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            : current.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                existing.Add(value.Trim());
+            }
+        }
+
+        return string.Join(", ", existing);
+    }
 
     private static SiteChromeViewModel RebindGuestGateChromeActions(
         SiteChromeViewModel chrome,
