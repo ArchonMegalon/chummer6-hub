@@ -33,10 +33,24 @@ public sealed class FlipLinkDocumentPortalService
         Audience: "players_and_gms",
         CreatedAtUtc: new DateTimeOffset(2026, 6, 19, 0, 0, 0, TimeSpan.Zero));
 
+    private static readonly DocumentDefinition OriginBookStudio = new(
+        Id: "origin_book_studio",
+        Slug: "origin-book-studio",
+        Category: "origin-dossier",
+        RelativeGuidePath: "ORIGIN_BOOK_STUDIO.md",
+        SourceRepo: "chummer6-design",
+        SourcePath: "products/chummer/ORIGIN_BOOK_STUDIO.md",
+        Version: "2026.06-canon-first-book-studio",
+        PdfFileName: "origin-book-studio.pdf",
+        Title: "Origin Book Studio",
+        Audience: "players_gms_and_operators",
+        CreatedAtUtc: new DateTimeOffset(2026, 6, 24, 0, 0, 0, TimeSpan.Zero));
+
     private static readonly IReadOnlyList<DocumentDefinition> PublicDocuments =
     [
         Quickstart,
-        OriginDossier
+        OriginDossier,
+        OriginBookStudio
     ];
 
     private readonly string _productRoot;

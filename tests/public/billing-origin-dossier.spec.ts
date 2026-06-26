@@ -28,6 +28,9 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   const originStoryPage = await request.get(`${baseUrl}/docs/origin-dossier-the-name-she-chose`);
   const originReceipt = await request.get(`${baseUrl}/docs/origin-dossier-the-name-she-chose/receipts/publication.json`);
   const originPdf = await request.get(`${baseUrl}/docs/origin-dossier-the-name-she-chose/download.pdf`);
+  const originBookStudioPage = await request.get(`${baseUrl}/docs/origin-book-studio`);
+  const originBookStudioReceipt = await request.get(`${baseUrl}/docs/origin-book-studio/receipts/publication.json`);
+  const originBookStudioPdf = await request.get(`${baseUrl}/docs/origin-book-studio/download.pdf`);
   const originVideo = await request.get(`${baseUrl}/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4`);
 
   expect(payfunnelsPage.status()).toBe(200);
@@ -46,6 +49,10 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(originReceipt.status()).toBe(200);
   expect(originPdf.status()).toBe(200);
   expect(originPdf.headers()['content-type']).toContain('application/pdf');
+  expect(originBookStudioPage.status()).toBe(200);
+  expect(originBookStudioReceipt.status()).toBe(200);
+  expect(originBookStudioPdf.status()).toBe(200);
+  expect(originBookStudioPdf.headers()['content-type']).toContain('application/pdf');
   expect(originVideo.status()).toBe(200);
 
   const payfunnelsText = await payfunnelsPage.text();
@@ -69,11 +76,18 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(originPayload.receipt.embedRoute).toBe('/docs/embed/origin-dossier-the-name-she-chose');
   expect(originPayload.viewerPosture).toBe('operator_managed_viewer_optional');
 
+  const originBookStudioPayload = await originBookStudioReceipt.json();
+  expect(originBookStudioPayload.document.slug).toBe('origin-book-studio');
+  expect(originBookStudioPayload.document.sourcePath).toBe('products/chummer/ORIGIN_BOOK_STUDIO.md');
+  expect(originBookStudioPayload.receipt.embedRoute).toBe('/docs/embed/origin-book-studio');
+  expect(originBookStudioPayload.viewerPosture).toBe('operator_managed_viewer_optional');
+
   const dossierPage = await openPublicPage(browser, '/origin-dossier');
   await expect(dossierPage.getByRole('heading', { name: 'Origin Dossier' })).toBeVisible();
   await expect(dossierPage.locator('body')).toContainText('story packet');
   await expect(dossierPage.locator('body')).toContainText('The sheet stays authoritative');
   await expect(dossierPage.getByRole('link', { name: 'Open the story booklet' })).toBeVisible();
+  await expect(dossierPage.getByRole('link', { name: 'Read the book-studio design' })).toBeVisible();
   await dossierPage.close();
 
   const storyPage = await openPublicPage(browser, '/docs/origin-dossier-the-name-she-chose');
@@ -82,6 +96,13 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   await expect(storyPage.locator('body')).toContainText('Fallback PDF is current');
   await expect(storyPage.getByRole('link', { name: 'Download PDF' })).toBeVisible();
   await storyPage.close();
+
+  const bookStudioPage = await openPublicPage(browser, '/docs/origin-book-studio');
+  await expect(bookStudioPage.getByRole('heading', { name: 'Origin Book Studio' })).toBeVisible();
+  await expect(bookStudioPage.locator('body')).toContainText('first-party route');
+  await expect(bookStudioPage.locator('body')).toContainText('Fallback PDF is current');
+  await expect(bookStudioPage.getByRole('link', { name: 'Download PDF' })).toBeVisible();
+  await bookStudioPage.close();
 
   writeJsonArtifact('BILLING_ORIGIN_DOSSIER_E2E.generated.json', {
     generated_at_utc: new Date().toISOString(),
@@ -96,7 +117,11 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
     origin_story_page_status: originStoryPage.status(),
     origin_receipt_status: originReceipt.status(),
     origin_pdf_status: originPdf.status(),
+    origin_book_studio_page_status: originBookStudioPage.status(),
+    origin_book_studio_receipt_status: originBookStudioReceipt.status(),
+    origin_book_studio_pdf_status: originBookStudioPdf.status(),
     origin_video_status: originVideo.status(),
     origin_story_slug: originPayload.document.slug,
+    origin_book_studio_slug: originBookStudioPayload.document.slug,
   });
 });

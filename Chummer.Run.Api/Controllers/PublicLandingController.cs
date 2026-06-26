@@ -3819,6 +3819,7 @@ document.addEventListener('DOMContentLoaded', function () {
             actions:
             [
                 new TrustPageActionViewModel("Open the story booklet", "/docs/origin-dossier-the-name-she-chose", "primary"),
+                new TrustPageActionViewModel("Read the book-studio design", "/docs/origin-book-studio", "secondary"),
                 new TrustPageActionViewModel("Watch the narrated overview", "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4", "secondary"),
                 new TrustPageActionViewModel("Download the booklet PDF", "/docs/origin-dossier-the-name-she-chose/download.pdf", "ghost")
             ],

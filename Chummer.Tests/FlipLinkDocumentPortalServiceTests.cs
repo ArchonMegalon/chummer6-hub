@@ -163,4 +163,39 @@ public sealed class FlipLinkDocumentPortalServiceTests
         Assert.Equal("/docs/embed/origin-dossier-the-name-she-chose", receipt!.EmbedRoute);
         Assert.Equal(document.PdfSha256, receipt.PdfSha256);
     }
+
+    [Fact]
+    public void OriginBookStudioDocumentPublishesCurrentCanonFirstDesignSource()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new FlipLinkDocumentPortalService(configuration);
+
+        ChummerDocument? document = service.TryGetPublicDocument("origin-book-studio");
+        var receipt = service.TryBuildPublicationReceipt("origin-book-studio");
+        var pdf = service.TryBuildPdfArtifact("origin-book-studio");
+
+        Assert.NotNull(document);
+        Assert.Equal("origin_book_studio", document!.Id);
+        Assert.Equal("origin-dossier", document.Category);
+        Assert.Equal("Origin Book Studio", document.Title);
+        Assert.Equal("products/chummer/ORIGIN_BOOK_STUDIO.md", document.SourcePath);
+        Assert.Equal("2026.06-canon-first-book-studio", document.Version);
+        Assert.Equal("/docs/origin-book-studio/download.pdf", document.PdfArtifactPath);
+        Assert.False(string.IsNullOrWhiteSpace(document.SourceHash));
+        Assert.Equal(64, document.SourceHash.Length);
+        Assert.False(string.IsNullOrWhiteSpace(document.PdfSha256));
+        Assert.Equal(64, document.PdfSha256.Length);
+        Assert.Equal(ChummerDocumentStatuses.Published, document.Status);
+        Assert.NotNull(receipt);
+        Assert.Equal("/docs/embed/origin-book-studio", receipt!.EmbedRoute);
+        Assert.NotNull(pdf);
+        Assert.Equal("origin-book-studio.pdf", pdf!.FileName);
+        Assert.Equal("application/pdf", pdf.ContentType);
+    }
 }
