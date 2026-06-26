@@ -20,6 +20,8 @@ public sealed class TrustPageFlagshipViewTests
         Assert.Contains("@PublicText(Model.SupportIntake.AccountSupportLabel)", trustView, StringComparison.Ordinal);
         Assert.Contains("@PublicText(choice.Label)", trustView, StringComparison.Ordinal);
         Assert.Contains("Discord first. Private form only for logs or account details.", trustView, StringComparison.Ordinal);
+        Assert.Contains("<details class=\"details-drawer minimal-help-card\" id=\"private-support-form\">", trustView, StringComparison.Ordinal);
+        Assert.Contains("<summary>Private issue form</summary>", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the short privacy summary first, then the full policy.", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the short rules summary first, then the full terms.", trustView, StringComparison.Ordinal);
         Assert.Contains("else if (!contactPage)", trustView, StringComparison.Ordinal);

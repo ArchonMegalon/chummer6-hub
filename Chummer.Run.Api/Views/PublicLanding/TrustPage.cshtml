@@ -261,7 +261,9 @@ else if (!contactPage)
     </section>
 
     <section class="minimal-section minimal-section--tight" id="support-intake">
-        <article class="trust-page-section trust-page-section--form minimal-help-card">
+        <details class="details-drawer minimal-help-card" id="private-support-form">
+            <summary>Private issue form</summary>
+            <article class="trust-page-section trust-page-section--form">
             <p class="eyebrow">Support</p>
             <h2>@PublicText(Model.SupportIntake.Heading)</h2>
             <p>@PublicText(Model.SupportIntake.Intro)</p>
@@ -353,7 +355,8 @@ else if (!contactPage)
             {
                 <p class="muted-copy">Back to setup: <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@PublicText(Model.SupportIntake.InstallRailLabel)</a></p>
             }
-        </article>
+            </article>
+        </details>
     </section>
 }
 
