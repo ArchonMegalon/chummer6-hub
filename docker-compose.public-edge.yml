@@ -53,6 +53,9 @@ services:
       CHUMMER_RYBBIT_SITE_ID: ${RYBBIT_CHUMMER_RUN_SITE_ID:-}
       CHUMMER_RYBBIT_SCRIPT_URL: ${RYBBIT_CHUMMER_RUN_SCRIPT_URL:-}
       CHUMMER_RYBBIT_BASE_URL: ${RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN:-https://app.rybbit.io}
+      CHUMMER_BLAZOR_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
+    volumes:
+      - chummer-public-blazor-state:/app/state
     cpu_shares: 128
     cpus: ${CHUMMER_PUBLIC_BLAZOR_CPUS:-0.75}
     networks:
@@ -409,6 +412,7 @@ services:
       - "${CHUMMER_RUN_CF_TUNNEL_TOKEN:?set CHUMMER_RUN_CF_TUNNEL_TOKEN in an ignored .env file}"
 
 volumes:
+  chummer-public-blazor-state:
   chummer-run-api-state:
   chummer-run-identity-state:
 
