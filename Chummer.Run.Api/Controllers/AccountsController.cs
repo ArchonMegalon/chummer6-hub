@@ -117,6 +117,13 @@ public sealed class AccountsController : Controller
         [FromRoute] string? publicationId = null,
         [FromQuery] string? prepQuery = null)
     {
+        if (string.IsNullOrWhiteSpace(section)
+            && string.IsNullOrWhiteSpace(caseId)
+            && !HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId))
+        {
+            return Redirect("/account/billing");
+        }
+
         var selectedSection = !string.IsNullOrWhiteSpace(caseId)
             ? "support"
             : HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId)

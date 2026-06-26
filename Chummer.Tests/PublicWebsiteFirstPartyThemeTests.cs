@@ -30,8 +30,8 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect(\"/partizipate\");", controller, StringComparison.Ordinal);
         Assert.Contains("BuildFirstPartyParticipateBoardAsync", controller, StringComparison.Ordinal);
-        Assert.Contains("View(\"~/Views/PublicLanding/Partizipate.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("ParticipateBoardProxyCore(", controller, StringComparison.Ordinal);
+        Assert.Contains("localOrigin: \"/partizipate\"", controller, StringComparison.Ordinal);
         Assert.Contains("private string? ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);

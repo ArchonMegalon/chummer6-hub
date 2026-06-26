@@ -2128,7 +2128,12 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
-        => View("~/Views/PublicLanding/Partizipate.cshtml", await BuildFirstPartyParticipateBoardAsync(cancellationToken).ConfigureAwait(false));
+        => await ParticipateBoardProxyCore(
+            boardPath: string.Empty,
+            cancellationToken,
+            localOrigin: "/partizipate",
+            localBaseHref: "/partizipate/",
+            fallbackPath: "/partizipate").ConfigureAwait(false);
 
     [HttpGet("/participate")]
     [Produces("text/html")]
@@ -11056,13 +11061,13 @@ Boundary:
             ActionHref: QueryHelpers.AddQueryString("/contact", BuildSupportRailQuery(installRail)),
             Heading: "Private help",
             Intro: authenticated
-                ? "Send one clear problem here, or open Account > Support when you want the full saved history."
+                ? "Send one clear problem here, or open account support when you want the full saved history."
                 : "Send one clear problem here. You can create an account later if you want saved history inside Chummer.",
             Authenticated: authenticated,
             AccountSupportHref: authenticated ? "/account/support" : "/signup?next=%2Faccount%2Fsupport",
             AccountSupportLabel: authenticated ? "Open account support" : "Save support history",
-            InstallAccessHref: installRail.ReturnHref ?? "/account/access",
-            InstallAccessLabel: installRail.ReturnLabel ?? "Open installs",
+            InstallAccessHref: installRail.ReturnHref ?? "/downloads",
+            InstallAccessLabel: installRail.ReturnLabel ?? "Open downloads",
             ResponseExpectation: BuildSupportResponseExpectation(authenticated, manifest.SupportabilityState, manifest.SupportabilitySummary),
             SubmissionNotice: submissionNotice,
             AttachmentHelp: "Add screenshots, logs, or a small diagnostic bundle when they make the bug or install problem easier to route.",
