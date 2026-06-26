@@ -67,6 +67,8 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     }
 
     [HttpGet("/billing")]
+    [HttpGet("/account/settings")]
+    [HttpGet("/account/advanced")]
     [Produces("text/html")]
     public IActionResult BillingAlias()
         => Redirect("/account/billing");

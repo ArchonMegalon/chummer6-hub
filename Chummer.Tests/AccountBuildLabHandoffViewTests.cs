@@ -14,14 +14,13 @@ public sealed class AccountBuildLabHandoffViewTests
         string view = File.ReadAllText(viewPath);
         string hubView = File.ReadAllText(hubViewPath);
 
-        Assert.Contains("if (!showHub && IsBillingSectionAlias(section))", controller, StringComparison.Ordinal);
-        Assert.Contains("private static bool IsBillingSectionAlias(string? section)", controller, StringComparison.Ordinal);
-        Assert.Contains("section.Trim().ToLowerInvariant() is \"billing\" or \"settings\" or \"advanced\"", controller, StringComparison.Ordinal);
         Assert.Contains("string.Equals(selectedSection, \"profile\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
         Assert.Contains("return View(", controller, StringComparison.Ordinal);
         Assert.Contains("\"~/Views/Accounts/Hub.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect(\"/account\")", controller, StringComparison.Ordinal);
-        Assert.Contains("return Redirect(\"/account/billing\")", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsBillingSectionAlias", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("section.Trim().ToLowerInvariant() is \"billing\" or \"settings\" or \"advanced\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("return Redirect(\"/account/billing\")", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/account/access?localCoProcessor={Uri.EscapeDataString(normalizedProfile)}\")", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("/account/advanced?localCoProcessor=", controller, StringComparison.Ordinal);
         Assert.Contains("new SectionLinkViewModel(\"access\", \"Installs\"", controller, StringComparison.Ordinal);

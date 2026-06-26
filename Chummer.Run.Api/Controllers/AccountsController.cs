@@ -136,11 +136,6 @@ public sealed class AccountsController : Controller
                        && string.IsNullOrWhiteSpace(caseId)
                        && !HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId);
 
-        if (!showHub && IsBillingSectionAlias(section))
-        {
-            return Redirect("/account/billing");
-        }
-
         var selectedSection = showHub
             ? "profile"
             : !string.IsNullOrWhiteSpace(caseId)
@@ -1727,10 +1722,6 @@ public sealed class AccountsController : Controller
                 "participation" => "participation",
                 _ => "profile"
             };
-
-    private static bool IsBillingSectionAlias(string? section)
-        => !string.IsNullOrWhiteSpace(section)
-           && section.Trim().ToLowerInvariant() is "billing" or "settings" or "advanced";
 
     private static IReadOnlyList<SectionLinkViewModel> BuildAccountCoreSections(string currentSection)
         => new[]

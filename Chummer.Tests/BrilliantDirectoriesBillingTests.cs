@@ -136,6 +136,8 @@ public sealed class BrilliantDirectoriesBillingTests
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "BrilliantDirectoriesBillingController.cs"));
 
+        Assert.Contains("[HttpGet(\"/account/settings\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/advanced\")]", controller, StringComparison.Ordinal);
         Assert.Contains("Redirect($\"/login?next={Uri.EscapeDataString(\"/account/billing\")}\")", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("/auth/google/start?next={Uri.EscapeDataString(\"/account/billing\")}", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Response.StatusCode = StatusCodes.Status503ServiceUnavailable", controller, StringComparison.Ordinal);
@@ -755,6 +757,16 @@ public sealed class BrilliantDirectoriesBillingTests
         IActionResult result = await controller.StartSupporterCheckoutDirect();
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/account/billing", redirect.Url);
+    }
+
+    [Fact]
+    public void BillingLegacyAliasesRedirectToCanonicalBillingPage()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        BrilliantDirectoriesBillingController controller = new(service);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(controller.BillingAlias());
         Assert.Equal("/account/billing", redirect.Url);
     }
 
