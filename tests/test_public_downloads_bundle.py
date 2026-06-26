@@ -169,6 +169,7 @@ class PublicDownloadsBundleTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
 
             releases_payload = json.loads((output_root / "releases.json").read_text(encoding="utf-8"))
+            self.assertEqual(releases_payload.get("publicVersion"), "0.0.0.1")
             aur_catalog_path = output_root / "aur-packages.json"
             if (output_root / "files" / "chummer-avalonia-linux-x64-installer.deb").is_file():
                 self.assertTrue(aur_catalog_path.is_file(), "Linux bundles should publish an Arch/AUR sidecar catalog")

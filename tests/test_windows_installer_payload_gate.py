@@ -48,6 +48,7 @@ def _write_bootstrap_payload(payload_path: Path, *, launch_executable: str = "Ch
     with zipfile.ZipFile(payload_path, "w") as archive:
         archive.writestr(launch_executable, b"placeholder")
         archive.writestr("Samples/Legacy/Soma-Career.chum5", b"sample")
+        archive.writestr("runtime/chummer-runtime.pack", b"0" * 8192)
     return payload_path.read_bytes()
 
 
@@ -696,6 +697,48 @@ def test_windows_installer_verifier_rejects_manifest_payload_url_that_is_relativ
 
     assert result.returncode != 0
     assert "manifest installerMode=bootstrap payloadDownloadUrl must be an absolute HTTPS URL" in result.stderr
+
+
+def test_windows_installer_verifier_rejects_bulk_bootstrap_installer(tmp_path: Path) -> None:
+    files_dir = tmp_path / "files"
+    files_dir.mkdir()
+    installer_path = files_dir / "chummer-avalonia-win-x64-installer.exe"
+    payload_path = files_dir / "chummer-avalonia-win-x64-payload.zip"
+    payload_bytes = _write_bootstrap_payload(payload_path)
+    payload_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    installer_bytes = _windows_installer_stub_with_payload_metadata(
+        payload_download_url=f"https://example.invalid/downloads/files/{payload_path.name}",
+        payload_sha256=payload_sha256,
+        payload_size_bytes=len(payload_bytes),
+    ) + (b"\0" * len(payload_bytes))
+    installer_path.write_bytes(installer_bytes)
+    _write_payload_sidecar(
+        files_dir / "chummer-avalonia-win-x64-payload.zip.json",
+        installer_name=installer_path.name,
+        payload_name=payload_path.name,
+        payload_bytes=payload_bytes,
+    )
+    manifest_path = tmp_path / "releases.json"
+    _write_bundle_manifest(
+        manifest_path,
+        installer_name=installer_path.name,
+        installer_sha256=hashlib.sha256(installer_bytes).hexdigest(),
+        installer_size_bytes=len(installer_bytes),
+        payload_name=payload_path.name,
+        payload_sha256=payload_sha256,
+        payload_size_bytes=len(payload_bytes),
+    )
+
+    result = subprocess.run(
+        ["python3", str(VERIFY_SCRIPT), "--files-dir", str(files_dir), "--manifest", str(manifest_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "manifest installerMode=bootstrap but installer size" in result.stderr
+    assert "is not smaller than payloadSizeBytes" in result.stderr
 
 
 def test_windows_installer_verifier_accepts_appended_payload(tmp_path: Path) -> None:

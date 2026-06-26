@@ -704,7 +704,8 @@ public sealed class PublicReleaseManifestService
             GeneratedAt: parsed.GeneratedAt,
             ContractName: string.IsNullOrWhiteSpace(parsed.ContractName)
                 ? (string.IsNullOrWhiteSpace(parsed.ContractNameAlias) ? DefaultManifestContractName : parsed.ContractNameAlias)
-                : parsed.ContractName)
+                : parsed.ContractName,
+            PublicVersion: parsed.PublicVersion)
         {
             ProofUiLocalizationReleaseGate = parsed.ReleaseProof?.UiLocalizationReleaseGate is JsonElement uiLocalizationReleaseGate
                 ? uiLocalizationReleaseGate.Clone()
@@ -768,7 +769,8 @@ public sealed class PublicReleaseManifestService
             GeneratedAt: parsed.GeneratedAt ?? parsed.GeneratedAtAlias,
             ContractName: string.IsNullOrWhiteSpace(parsed.ContractName)
                 ? parsed.ContractNameAlias
-                : parsed.ContractName)
+                : parsed.ContractName,
+            PublicVersion: parsed.PublicVersion)
         {
             ProofUiLocalizationReleaseGate = parsed.ReleaseProof?.UiLocalizationReleaseGate is JsonElement uiLocalizationReleaseGate
                 ? uiLocalizationReleaseGate.Clone()
@@ -2334,6 +2336,7 @@ public sealed class PublicReleaseManifestService
         string? Product,
         string? ChannelId,
         string? Version,
+        string? PublicVersion,
         DateTimeOffset? GeneratedAt,
         DateTimeOffset? PublishedAt,
         string? Status,
@@ -2384,6 +2387,7 @@ public sealed class PublicReleaseManifestService
         [property: JsonPropertyName("generated_at")] DateTimeOffset? GeneratedAtAlias,
         string? ContractName,
         [property: JsonPropertyName("contract_name")] string? ContractNameAlias,
+        string? PublicVersion,
         JsonElement? DesktopTupleCoverage,
         JsonElement? RegistryBoundaryCoverage,
         JsonElement? PublicTrustMetrics,

@@ -21,6 +21,7 @@ FOOTER_LENGTH = len(APPENDED_PAYLOAD_MAGIC) + 8
 WINDOWS_EXE_MAGIC = b"MZ"
 WINDOWS_PE_MAGIC = b"PE\0\0"
 ZIP_LOCAL_FILE_MAGIC = b"PK\x03\x04"
+MAX_BOOTSTRAP_INSTALLER_BYTES = 15 * 1024 * 1024
 
 DEFAULT_LAUNCH_EXECUTABLES = {
     "avalonia": "Chummer.Avalonia.exe",
@@ -30,6 +31,7 @@ DEFAULT_LAUNCH_EXECUTABLES = {
 
 @dataclass(frozen=True)
 class ManifestRow:
+    artifact_id: str
     file_name: str
     download_url: str
     sha256: str
@@ -135,6 +137,7 @@ def read_manifest_rows(manifest_paths: list[Path]) -> dict[str, ManifestRow]:
                 if not file_name or not is_windows_installer_name(file_name):
                     continue
                 rows[file_name] = ManifestRow(
+                    artifact_id=str(item.get("artifactId") or item.get("id") or "").strip(),
                     file_name=file_name,
                     download_url=str(item.get("downloadUrl") or item.get("url") or "").strip(),
                     sha256=str(item.get("sha256") or "").strip().lower(),
@@ -179,6 +182,29 @@ def find_installers(files_dir: Path | None, explicit_installers: list[Path]) -> 
         seen.add(installer)
         unique.append(installer)
     return unique
+
+
+def split_tokens(value: str | None) -> set[str]:
+    tokens: set[str] = set()
+    for raw in str(value or "").replace(";", ",").replace("\n", ",").split(","):
+        for token in raw.split():
+            token = token.strip().lower()
+            if token:
+                tokens.add(token)
+    return tokens
+
+
+def is_disabled_installer(installer_path: Path, manifest_row: ManifestRow | None, disabled_tokens: set[str]) -> bool:
+    if not disabled_tokens:
+        return False
+
+    candidates = {installer_path.name.lower()}
+    if manifest_row is not None:
+        for value in (manifest_row.artifact_id, manifest_row.file_name, manifest_row.download_url):
+            value = str(value or "").strip().lower()
+            if value:
+                candidates.add(value)
+    return any(token in candidates for token in disabled_tokens)
 
 
 def read_appended_payload(installer_path: Path) -> PayloadCandidate | None:
@@ -305,6 +331,24 @@ def validate_manifest_installer_metadata(installer_path: Path, manifest_row: Man
             f"manifest Windows installer row sizeBytes {manifest_row.size_bytes} does not match installer size {observed_size}"
         )
 
+    return failures
+
+
+def validate_bootstrap_installer_size(installer_path: Path, manifest_row: ManifestRow | None) -> list[str]:
+    if manifest_row is None or manifest_row.installer_mode != "bootstrap":
+        return []
+
+    observed_size = installer_path.stat().st_size
+    failures: list[str] = []
+    if observed_size > MAX_BOOTSTRAP_INSTALLER_BYTES:
+        failures.append(
+            f"manifest installerMode=bootstrap but installer is {observed_size} bytes; "
+            f"bootstrap launchers must be <= {MAX_BOOTSTRAP_INSTALLER_BYTES} bytes"
+        )
+    if manifest_row.payload_size_bytes is not None and observed_size >= manifest_row.payload_size_bytes:
+        failures.append(
+            f"manifest installerMode=bootstrap but installer size {observed_size} is not smaller than payloadSizeBytes {manifest_row.payload_size_bytes}"
+        )
     return failures
 
 
@@ -515,6 +559,7 @@ def verify_installer(
 
     failures.extend(validate_manifest_installer_metadata(installer_path, manifest_row))
     failures.extend(validate_manifest_payload_metadata(candidate, manifest_row))
+    failures.extend(validate_bootstrap_installer_size(installer_path, manifest_row))
     failures.extend(validate_bootstrap_sidecar_metadata(installer_path, candidate, manifest_row))
     if require_embedded_bootstrap_metadata:
         failures.extend(validate_bootstrap_installer_metadata(installer_path, candidate, manifest_row))
@@ -552,12 +597,27 @@ def main() -> int:
         action="store_true",
         help="Require every checked Windows installer to have a matching row in one supplied release manifest.",
     )
+    parser.add_argument(
+        "--disabled-artifact-id",
+        action="append",
+        default=[],
+        help="Skip a quarantined Windows installer artifact id, file name, or URL.",
+    )
     parser.add_argument("--allow-empty", action="store_true", help="Pass when no Windows installers are present.")
     args = parser.parse_args()
 
     files_dir = args.files_dir.resolve() if args.files_dir else None
     manifest_rows = read_manifest_rows([path.resolve() for path in args.manifest])
-    installers = find_installers(files_dir, args.installer)
+    disabled_tokens: set[str] = set()
+    for value in args.disabled_artifact_id:
+        disabled_tokens.update(split_tokens(value))
+    disabled_tokens.update(split_tokens(os.environ.get("CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS")))
+    disabled_tokens.update(split_tokens(os.environ.get("CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS")))
+    installers = [
+        installer
+        for installer in find_installers(files_dir, args.installer)
+        if not is_disabled_installer(installer, manifest_rows.get(installer.name), disabled_tokens)
+    ]
     if not installers:
         if args.allow_empty:
             print("windows_installer_payload_gate:ok no_windows_installers")

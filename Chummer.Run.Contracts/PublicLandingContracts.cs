@@ -104,7 +104,8 @@ public sealed record PublicReleaseManifestDto(
     IReadOnlyList<string>? ProofJourneys = null,
     IReadOnlyList<string>? ProofRoutes = null,
     DateTimeOffset? GeneratedAt = null,
-    string? ContractName = "Chummer.Hub.Registry.Contracts")
+    string? ContractName = "Chummer.Hub.Registry.Contracts",
+    string? PublicVersion = null)
 {
     [JsonPropertyName("generated_at")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -118,7 +119,7 @@ public sealed record PublicReleaseManifestDto(
     public string VersionRole => "artifact_identity";
 
     [JsonPropertyName("displayVersion")]
-    public string DisplayVersion => ResolveDisplayVersion(Version, Channel, RolloutState);
+    public string DisplayVersion => ResolveDisplayVersion(PublicVersion, Version, Channel, RolloutState);
 
     [JsonPropertyName("displayBuildLabel")]
     public string DisplayBuildLabel => ResolveDisplayBuildLabel(Version, Channel, RolloutState);
@@ -178,6 +179,16 @@ public sealed record PublicReleaseManifestDto(
 
     [JsonIgnore]
     public JsonElement? ProofUiLocalizationReleaseGate { get; init; }
+
+    private static string ResolveDisplayVersion(string? publicVersion, string? version, string? channel, string? rolloutState)
+    {
+        if (!string.IsNullOrWhiteSpace(publicVersion))
+        {
+            return publicVersion.Trim();
+        }
+
+        return ResolveDisplayVersion(version, channel, rolloutState);
+    }
 
     private static string ResolveDisplayVersion(string? version, string? channel, string? rolloutState)
         => IsPublicStable(channel, rolloutState)

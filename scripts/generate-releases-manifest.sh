@@ -24,6 +24,7 @@ PREVIEW_INSTALL_ACCESS_CLASS="${CHUMMER_PREVIEW_INSTALL_ACCESS_CLASS:-}"
 FORCE_ACCOUNT_REQUIRED_DOWNLOADS="${CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS:-}"
 PUBLIC_WEB_BASE_URL="${CHUMMER_PUBLIC_WEB_BASE_URL:-https://chummer.run}"
 DOWNLOADS_PREFIX="${CHUMMER_PUBLIC_DOWNLOADS_PREFIX:-${PUBLIC_WEB_BASE_URL%/}/downloads/files}"
+PUBLIC_VERSION="${CHUMMER_PUBLIC_VERSION:-0.0.0.1}"
 
 resolve_ui_localization_release_gate_path() {
   local explicit_path="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-}"
@@ -683,6 +684,27 @@ materialize_aur_sidecar() {
     --optional >/dev/null
 }
 
+stamp_public_version() {
+  local manifest_path="${1:-}"
+  local public_version="${2:-}"
+  if [[ -z "$manifest_path" || -z "$public_version" || ! -f "$manifest_path" ]]; then
+    return 0
+  fi
+
+  python3 - "$manifest_path" "$public_version" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+public_version = str(sys.argv[2]).strip()
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+if public_version:
+    payload["publicVersion"] = public_version
+manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
 is_public_artifact() {
   local artifact_name
   artifact_name="$(basename "$1")"
@@ -825,6 +847,8 @@ fi
 python3 "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" "${materialize_args[@]}" >/dev/null
 normalize_preview_install_access_classes "$CANONICAL_MANIFEST_PATH" "$RELEASE_CHANNEL"
 normalize_preview_install_access_classes "$MANIFEST_PATH" "$RELEASE_CHANNEL"
+stamp_public_version "$CANONICAL_MANIFEST_PATH" "$PUBLIC_VERSION"
+stamp_public_version "$MANIFEST_PATH" "$PUBLIC_VERSION"
 canonicalize_release_channel_registries "$CANONICAL_MANIFEST_PATH"
 canonicalize_release_channel_registries "$MANIFEST_PATH"
 filter_files_to_manifest_truth "$DOWNLOADS_DIR" "$CANONICAL_MANIFEST_PATH"
@@ -871,6 +895,8 @@ if [[ "$resolved_manifest_path" == "$resolved_portal_manifest_path" ]]; then
 else
   cp "$MANIFEST_PATH" "$PORTAL_MANIFEST_PATH"
   cp "$CANONICAL_MANIFEST_PATH" "$PORTAL_CANONICAL_MANIFEST_PATH"
+  stamp_public_version "$PORTAL_MANIFEST_PATH" "$PUBLIC_VERSION"
+  stamp_public_version "$PORTAL_CANONICAL_MANIFEST_PATH" "$PUBLIC_VERSION"
   canonicalize_release_channel_registries "$PORTAL_MANIFEST_PATH"
   canonicalize_release_channel_registries "$PORTAL_CANONICAL_MANIFEST_PATH"
   echo "synced portal manifest -> $PORTAL_MANIFEST_PATH"

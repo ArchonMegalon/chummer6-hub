@@ -150,16 +150,28 @@ for row in rows:
     if not artifact_id:
         continue
     kind = str(row.get("kind") or row.get("flavor") or "").strip().lower()
-    if kind != "portable":
-        continue
     file_name = str(row.get("fileName") or "").strip()
     if not file_name:
         file_name = Path(str(row.get("downloadUrl") or row.get("url") or "").strip()).name
-    if not file_name.endswith(".exe") or file_name.endswith("-installer.exe"):
-        continue
-    sibling_zip = files_root / Path(file_name).with_suffix(".zip").name
-    if sibling_zip.is_file():
-        disabled_ids.append(artifact_id)
+    if kind == "portable" and file_name.endswith(".exe") and not file_name.endswith("-installer.exe"):
+        sibling_zip = files_root / Path(file_name).with_suffix(".zip").name
+        if sibling_zip.is_file():
+            disabled_ids.append(artifact_id)
+    if str(row.get("installerMode") or "").strip().lower() == "bootstrap":
+        installer_path = files_root / file_name
+        payload_file_name = str(row.get("payloadFileName") or "").strip()
+        payload_path = files_root / payload_file_name if payload_file_name else None
+        if installer_path.is_file():
+            installer_size = installer_path.stat().st_size
+            payload_size = None
+            try:
+                payload_size = int(row.get("payloadSizeBytes"))
+            except (TypeError, ValueError):
+                payload_size = None
+            if payload_size is None and payload_path is not None and payload_path.is_file():
+                payload_size = payload_path.stat().st_size
+            if installer_size > 15 * 1024 * 1024 or (payload_size is not None and installer_size >= payload_size):
+                disabled_ids.append(artifact_id)
 
 seen: set[str] = set()
 for artifact_id in disabled_ids:
@@ -531,16 +543,6 @@ copy_public_artifacts "$RUNSERVICES_SOURCE_FILES_ROOT" "$combined_files_root"
 copy_public_artifacts "$PRESENTATION_FILES_ROOT" "$combined_files_root"
 filter_files_to_manifest_truth "$combined_files_root" "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH"
 
-if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-payloads.py" ]]; then
-  echo "Missing Windows installer payload gate: $SCRIPT_DIR/verify-windows-installer-payloads.py" >&2
-  exit 1
-fi
-
-python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" \
-  --files-dir "$combined_files_root" \
-  --manifest "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" \
-  --allow-empty
-
 AUTO_DISABLED_ARTIFACT_IDS="$(detect_auto_disabled_artifact_ids "$combined_files_root" "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" | paste -sd, -)"
 if [[ -n "$AUTO_DISABLED_ARTIFACT_IDS" ]]; then
   if [[ -n "$DISABLED_ARTIFACT_IDS" ]]; then
@@ -550,6 +552,21 @@ if [[ -n "$AUTO_DISABLED_ARTIFACT_IDS" ]]; then
   fi
   echo "auto-disabled public artifact ids: $AUTO_DISABLED_ARTIFACT_IDS"
 fi
+
+if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-payloads.py" ]]; then
+  echo "Missing Windows installer payload gate: $SCRIPT_DIR/verify-windows-installer-payloads.py" >&2
+  exit 1
+fi
+
+windows_payload_gate_args=(
+  --files-dir "$combined_files_root"
+  --manifest "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH"
+  --allow-empty
+)
+if [[ -n "$DISABLED_ARTIFACT_IDS" ]]; then
+  windows_payload_gate_args+=(--disabled-artifact-id "$DISABLED_ARTIFACT_IDS")
+fi
+python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" "${windows_payload_gate_args[@]}"
 
 if [[ -d "$PRESENTATION_STARTUP_SMOKE_ROOT" ]]; then
   find "$PRESENTATION_STARTUP_SMOKE_ROOT" -maxdepth 1 -type f -name 'startup-smoke-*.receipt.json' -print0 \

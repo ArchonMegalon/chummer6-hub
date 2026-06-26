@@ -39,6 +39,11 @@ const requiredHtml = [
   'data-chummer-board-skin',
 ];
 
+const forbiddenHtml = [
+  'partizipate-board__grid',
+  'Requests, votes, and shipped work.',
+];
+
 function extractVisibleText(html) {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
@@ -70,8 +75,17 @@ function extractVisibleText(html) {
     }
   });
 
+  forbiddenHtml.forEach((needle) => {
+    if (html.includes(needle)) {
+      failures.push(`forbidden-html:${needle}`);
+    }
+  });
+
   if (!response.ok) {
     failures.push(`status:${response.status}`);
+  }
+  if (response.headers.has('set-cookie')) {
+    failures.push('forwarded-set-cookie');
   }
   if (/What do you want to see next/i.test(title) || /ProductLift/i.test(title)) {
     failures.push(`title:${title}`);
@@ -94,6 +108,7 @@ function extractVisibleText(html) {
     url,
     checked_forbidden_patterns: forbidden.length,
     checked_required_html: requiredHtml.length,
+    checked_forbidden_html: forbiddenHtml.length,
     title,
   }));
 })().catch((error) => {

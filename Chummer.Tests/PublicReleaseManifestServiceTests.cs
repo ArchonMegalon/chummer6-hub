@@ -65,6 +65,47 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void LoadManifestUsesPublicVersionAsTheHumanFacingDisplayVersion()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "public_stable",
+            ["version"] = "run-20260623-102621",
+            ["publicVersion"] = "0.0.0.1",
+            ["publishedAt"] = "2026-06-23T10:26:21Z",
+            ["status"] = "published",
+            ["rolloutState"] = "public_stable",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Linux X64 Installer",
+                    ["fileName"] = "chummer-avalonia-linux-x64-installer.deb",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    ["sha256"] = new string('a', 64),
+                    ["sizeBytes"] = 1234L,
+                    ["installAccessClass"] = "open_public"
+                }
+            }
+        });
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.Equal("run-20260623-102621", manifest.Version);
+        Assert.Equal("0.0.0.1", manifest.PublicVersion);
+        Assert.Equal("0.0.0.1", manifest.DisplayVersion);
+        Assert.Equal("Current public build", manifest.DisplayBuildLabel);
+    }
+
+    [Fact]
     public void LoadManifestUsesRepoLocalPortalDownloadsWhenNoDownloadsRootIsConfigured()
     {
         string root = Path.Combine(Path.GetTempPath(), "public-release-default-root-tests", Guid.NewGuid().ToString("N"));
