@@ -71,6 +71,32 @@ public sealed class TeableImportantWorkServiceTests
     }
 
     [Fact]
+    public async Task SyncRequiresExplicitChummerRunBaseInsteadOfFallingBackToUsersBase()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID"] = "",
+            ["CHUMMER_TEABLE_USERS_BASE_ID"] = "old-executive-assistant-base",
+            ["CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_ID"] = "",
+        });
+        fixture.Service.Record(new ImportantWorkItemRequest(
+            Kind: "workflow",
+            Scope: "chummer.run",
+            Summary: "Should not fall back",
+            Detail: "Important Chummer work belongs in the chummer.run base only.",
+            Status: "open",
+            Priority: "high",
+            ItemId: "work_no_ea_fallback"));
+        fixture.Handler.Requests.Clear();
+
+        TeableImportantWorkSyncResult result = await fixture.Service.SyncAllAsync();
+
+        Assert.Equal("failed", result.State);
+        Assert.Contains("teable_chummer_run_base_id_required", result.Errors);
+        Assert.Empty(fixture.Handler.Requests);
+    }
+
+    [Fact]
     public async Task ControllerRequiresInternalAuthForImportantWorkRecord()
     {
         using Fixture fixture = new();

@@ -127,36 +127,36 @@ trust_pages:
   - id: contact
     eyebrow: "Contact"
     heading: "Contact Chummer"
-    intro: "Choose public feedback for ideas. Use support for install trouble, bugs, or anything with logs or account detail."
+    intro: "For normal questions, reach me on Discord in the Chummer5 server. Use the form only for private install trouble, crashes, logs, or account detail."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
-      - "Support form"
-      - "Guest submissions allowed"
-      - "Tracked follow-up with an account"
+      - "Discord first"
+      - "Private form for logs"
+      - "Account history when needed"
     actions:
-      - label: "Open support"
-        href: "/contact#support-intake"
+      - label: "Open Discord"
+        href: "https://discord.gg/chummer"
         tone: primary
-      - label: "Open account support"
-        href: "/signup?next=%2Faccount%2Fsupport"
+      - label: "Private support"
+        href: "/contact#support-intake"
         tone: secondary
       - label: "Read help first"
         href: "/help"
         tone: ghost
     sections:
-      - id: right-lane
-        eyebrow: "Route it cleanly"
-        heading: "Choose the closest problem"
-        body: "Use install or update for setup trouble, product bug for broken behavior, and feedback for roadmap or UX friction that slows the table down."
+      - id: discord
+        eyebrow: "Discord"
+        heading: "Use the Chummer5 server for normal contact"
+        body: "Questions, quick feedback, and normal discussion belong in Discord where the Chummer community already is."
       - id: tracked-support
-        eyebrow: "Tracked follow-up"
-        heading: "Create an account when you want help history inside Chummer"
-        body: "You can submit help here without another account. Create a Chummer account if you want to see your help history later in one place."
+        eyebrow: "Private"
+        heading: "Use the form only when Discord is the wrong place"
+        body: "Install failures, crashes, screenshots, logs, or account details should stay private. The form is for those cases."
       - id: public-issues
         eyebrow: "Public feedback"
-        heading: "Use public feedback only when the report should be public"
-        body: "Most people should start with Help or Contact. Public feedback is only for technical reports you want discussed in public."
+        heading: "Use Participate for roadmap items"
+        body: "Ideas and public UX feedback should go to Participate, not the private support form."
 faq_pages:
   - id: faq
     eyebrow: "FAQ"

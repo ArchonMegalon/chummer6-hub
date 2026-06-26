@@ -127,12 +127,12 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "Go back to setup when you are ready",
         "use this claim code only if Chummer asks for it on that device",
         "Contact Chummer",
-        "Choose public feedback for ideas. Use support for install trouble, bugs, or anything with logs or account detail.",
+        "For normal questions, reach me on Discord in the Chummer5 server.",
         "Create a Chummer account if you want saved help history inside your account.",
-        "Choose the closest problem",
-        "Open support",
+        "Use the Chummer5 server for normal contact",
+        "Open private form",
         "Support stays separate from public feedback.",
-        "Create an account when you want help history inside Chummer",
+        "Use the form only when Discord is the wrong place",
     ):
         assert expected in combined
 

@@ -109,21 +109,21 @@
             ? Model.SupportIntake.InstallAccessLabel
             : Model.SupportIntake.InstallRailLabel!;
         contactRouteChoices.Add((
-            Id: "public-ideas",
-            Badge: "Public",
-            Title: "Ideas and safe public bugs",
-            Summary: "Use Participate when the discussion can be public and does not need logs, account detail, or campaign secrets.",
-            Href: "/participate",
-            Label: "Open participate",
-            Details: new[] { "Public board", "Votes and comments", "No private logs" }));
+            Id: "discord-contact",
+            Badge: "Discord",
+            Title: "Chummer5 server",
+            Summary: "Use Discord for normal questions, quick feedback, and community discussion.",
+            Href: "https://discord.gg/chummer",
+            Label: "Open Discord",
+            Details: new[] { "Normal contact", "Community context", "Fastest path" }));
         contactRouteChoices.Add((
             Id: "private-help",
             Badge: "Private",
-            Title: "Install trouble, crashes, or account detail",
-            Summary: "Use support when the issue needs a reply, screenshots, logs, install recovery, or anything you do not want public.",
+            Title: "Install trouble, crashes, or logs",
+            Summary: "Use the form only when the issue needs a private reply, screenshots, logs, install recovery, or account detail.",
             Href: "#support-intake",
-            Label: "Open support",
-            Details: new[] { "Guest allowed", "Private reply", "Tracked later if you sign in" }));
+            Label: "Open private form",
+            Details: new[] { "Guest allowed", "Private reply", "Tracked if you sign in" }));
     }
 }
 

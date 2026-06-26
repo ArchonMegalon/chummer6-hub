@@ -240,7 +240,17 @@ public sealed class TeableImportantWorkService
         await _syncGate.WaitAsync(cancellationToken);
         try
         {
-            TeableDestination destination = await EnsureDestinationAsync(options, cancellationToken);
+            TeableDestination destination;
+            try
+            {
+                destination = await EnsureDestinationAsync(options, cancellationToken);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TaskCanceledException)
+            {
+                string error = Truncate(ex.Message, 240);
+                SetSyncFailure(error, now);
+                return BuildResult(StateFailed, items.Count, 0, items.Count, options.TableName, options.BaseId, options.TableId, now, [error]);
+            }
             Dictionary<string, string> existingRecords = await FetchExistingRecordIdsAsync(destination.TableId, options, cancellationToken);
             int synced = 0;
             int failed = 0;
@@ -456,8 +466,7 @@ public sealed class TeableImportantWorkService
             ?? string.Empty;
         string apiBaseUrl = (Normalize(_configuration["CHUMMER_TEABLE_IMPORTANT_WORK_API_BASE_URL"]) ?? DefaultApiBaseUrl).TrimEnd('/');
         string tableName = Normalize(_configuration["CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_NAME"]) ?? DefaultTableName;
-        string? baseId = Normalize(_configuration["CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID"])
-            ?? Normalize(_configuration["CHUMMER_TEABLE_USERS_BASE_ID"]);
+        string? baseId = Normalize(_configuration["CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID"]);
         string? tableId = Normalize(_configuration["CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_ID"]);
         string basePurpose = Normalize(_configuration["CHUMMER_TEABLE_IMPORTANT_WORK_BASE_PURPOSE"]) ?? "chummer.run";
         return new TeableOptions(enabled, apiKey, apiBaseUrl, baseId, tableId, tableName, basePurpose);

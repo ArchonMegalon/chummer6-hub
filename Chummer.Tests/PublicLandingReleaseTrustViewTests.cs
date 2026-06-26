@@ -1158,7 +1158,7 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void ContactSupportPageSteersSafePublicFeedbackToFixerBoardBeforePrivateIntake()
+    public void ContactSupportPageUsesDiscordBeforePrivateIntake()
     {
         string trustViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
@@ -1166,12 +1166,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         string trustView = File.ReadAllText(trustViewPath);
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("Title: \"Ideas and safe public bugs\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Use Participate when the discussion can be public", trustView, StringComparison.Ordinal);
-        Assert.Contains("Href: \"/participate\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Label: \"Open participate\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("Title: \"Chummer5 server\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("Use Discord for normal questions", trustView, StringComparison.Ordinal);
+        Assert.Contains("Href: \"https://discord.gg/chummer\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("Label: \"Open Discord\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Use support when the issue needs a reply, screenshots, logs, install recovery, or anything you do not want public.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Use the form only when the issue needs a private reply, screenshots, logs, install recovery, or account detail.", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need a different path?", trustView, StringComparison.Ordinal);
     }
 

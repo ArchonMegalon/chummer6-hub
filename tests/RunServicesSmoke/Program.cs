@@ -5729,7 +5729,7 @@ async Task VerifyPublicLandingProjectionAsync()
     };
     var loginResult = await authController.LoginPage("/home", CancellationToken.None);
     var loginModel = (loginResult as ViewResult)?.Model as AuthPageViewModel;
-    Assert(loginModel is not null && loginModel.GoogleStartHref.Contains("/auth/google/start", StringComparison.Ordinal), "login page should render the Google-first auth shell.");
+    Assert(loginModel is not null && loginModel.GoogleStartHref.Contains("/auth/google/start", StringComparison.Ordinal), "login page should keep Google available as a secondary sign-in path.");
     Assert(string.Equals(loginModel!.NextPath, "/home", StringComparison.Ordinal), "login page should preserve the guest next path.");
     Assert(loginModel.AccessPosture is not null, "login page should reuse the shared public access posture copy.");
 
