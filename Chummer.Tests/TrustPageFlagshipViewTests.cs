@@ -11,10 +11,9 @@ public sealed class TrustPageFlagshipViewTests
         string trustView = File.ReadAllText(trustViewPath);
 
         Assert.Contains("Choose the right help path", trustView, StringComparison.Ordinal);
-        Assert.Contains("Start with the closest match. The second link is only there when the first step does not fit.", trustView, StringComparison.Ordinal);
+        Assert.Contains("Pick one.", trustView, StringComparison.Ordinal);
         Assert.Contains("minimal-help-card__list", trustView, StringComparison.Ordinal);
         Assert.Contains("aria-label=\"Quick notes\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Or:", trustView, StringComparison.Ordinal);
         Assert.Contains("Choose one", trustView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid--compact", trustView, StringComparison.Ordinal);
         Assert.Contains("ViewData[\"Title\"] = UndetectableHumanizerCopyAdapter.Humanize(Model.Heading);", trustView, StringComparison.Ordinal);
@@ -29,6 +28,7 @@ public sealed class TrustPageFlagshipViewTests
         Assert.DoesNotContain("Need a different path?", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("one fallback", trustView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Fallback:", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Or:", trustView, StringComparison.Ordinal);
     }
 
     [Fact]

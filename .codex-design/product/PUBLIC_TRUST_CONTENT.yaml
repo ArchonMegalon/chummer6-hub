@@ -5,7 +5,7 @@ trust_pages:
   - id: help
     eyebrow: "Help"
     heading: "Get help without guessing"
-    intro: "Start here for downloads, sign-in recovery, and support."
+    intro: "Pick the closest path."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
@@ -25,36 +25,32 @@ trust_pages:
     sections:
       - id: install-update
         eyebrow: "Install or update"
-        heading: "Start with Downloads"
-        body: "Downloads has Stable and Nightly installers for Windows and Linux. Use Help when install or update does not behave as expected."
+        heading: "Downloads"
+        body: "Get the current Windows or Linux build."
         bullets:
-          - "Stable is the calm default."
-          - "Nightly is the newest published build."
-          - "Claim your copy only when you want saved help history or recovery."
+          - "Stable for normal use."
+          - "Nightly for the newest build."
       - id: sign-in-recovery
         eyebrow: "Sign-in or account recovery"
-        heading: "Use Account for recovery"
-        body: "Open Chummer with an account when you want help history, recovery, and install return kept together."
+        heading: "Account"
+        body: "Use an account for recovery and saved help history."
         bullets:
-          - "Guest use is allowed."
-          - "Account help keeps follow-up in one place."
-          - "Recovery should stay boring."
+          - "Guest use is fine."
+          - "Claim only when you want recovery."
       - id: product-bug
         eyebrow: "Product bug"
-        heading: "Send bugs through Contact"
-        body: "Use Contact for install trouble, product bugs, and practical feedback. Public feedback is optional."
+        heading: "Private support"
+        body: "Use Contact when logs, screenshots, or account details are involved."
         bullets:
-          - "Use Contact for install trouble, product bugs, or UX friction."
-          - "Use Account > Support if you want your help history saved in one place."
-          - "Use public feedback only when the bug should stay public."
+          - "One issue per message."
+          - "Discord is better for normal questions."
       - id: product-question
         eyebrow: "Product question or UX confusion"
-        heading: "Ask Chummer first"
-        body: "FAQ and Help should answer the normal questions without making you dig through project details."
+        heading: "FAQ"
+        body: "Read the short answers before opening a support case."
         bullets:
-          - "FAQ answers normal product questions in plain language."
-          - "Support stays separate from public feedback."
-          - "You do not need another account to ask for help."
+          - "No account needed."
+          - "Support stays private."
   - id: privacy
     eyebrow: "Privacy"
     heading: "What Chummer stores, and what it does not"

@@ -54,15 +54,6 @@
         _ => null
     };
 
-    static TrustPageActionViewModel? HelpFallbackActionFor(string sectionId, bool authenticated) => sectionId switch
-    {
-        "install-update" => new TrustPageActionViewModel("Open support", "/contact#support-intake", "ghost"),
-        "sign-in-recovery" => new TrustPageActionViewModel("Open support", "/contact#support-intake", "ghost"),
-        "product-bug" => new TrustPageActionViewModel("Open status", "/status", "ghost"),
-        "product-question" => new TrustPageActionViewModel("Open support", "/contact#support-intake", "ghost"),
-        _ => null
-    };
-
     if (policyPage && Model.SummaryPoints is { Count: > 0 })
     {
         for (var index = 0; index < Model.SummaryPoints.Count; index++)
@@ -81,8 +72,7 @@
         foreach (var pageSection in Model.Sections)
         {
             var quickAction = HelpActionFor(pageSection.Id, Model.Chrome.Authenticated);
-            var fallbackAction = HelpFallbackActionFor(pageSection.Id, Model.Chrome.Authenticated);
-            var routeAction = quickAction ?? fallbackAction ?? new TrustPageActionViewModel("Open details", $"#{pageSection.Id}", "ghost");
+            var routeAction = quickAction ?? new TrustPageActionViewModel("Open details", $"#{pageSection.Id}", "ghost");
             helpRouteChoices.Add((
                 Id: pageSection.Id,
                 Badge: pageSection.Eyebrow,
@@ -210,12 +200,11 @@
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Choose the right help path</h2>
-            <p>Start with the closest match. The second link is only there when the first step does not fit.</p>
+            <p>Pick one.</p>
         </div>
         <div class="minimal-help-grid">
             @foreach (var choice in helpRouteChoices)
             {
-                var fallbackAction = HelpFallbackActionFor(choice.Id, Model.Chrome.Authenticated);
                 <article class="minimal-help-card" id="@choice.Id">
                     <span>@PublicText(choice.Badge)</span>
                     <h3>@PublicText(choice.Title)</h3>
@@ -230,10 +219,6 @@
                         </ul>
                     }
                     <a class="inline-link" href="@choice.Href">@PublicText(choice.Label)</a>
-                    @if (fallbackAction is not null)
-                    {
-                        <p class="muted-copy">Or: <a class="inline-link" href="@ContextualPreviewHref(fallbackAction.Href)">@PublicText(fallbackAction.Label)</a></p>
-                    }
                 </article>
             }
         </div>

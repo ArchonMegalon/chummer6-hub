@@ -28,7 +28,8 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'minimal-help-grid' in trust_page
     assert 'minimal-help-card' in trust_page
     assert 'Choose the right help path' in trust_page
-    assert 'Start with the closest match.' in trust_page
+    assert 'Pick one.' in trust_page
+    assert 'Start with the closest match.' not in trust_page
     assert 'minimal-help-card__list' in trust_page
     assert 'if (helpPage || contactPage)' in trust_page
     assert 'return "/downloads";' in trust_page
@@ -132,7 +133,7 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "Create a Chummer account if you want saved help history inside your account.",
         "Use the Chummer5 server for normal contact",
         "Open private form",
-        "Support stays separate from public feedback.",
+        "Support stays private.",
         "Use the form only when Discord is the wrong place",
     ):
         assert expected in combined
