@@ -421,7 +421,8 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/help', async () => {
     await expectVisible(page, 'text=Get help without guessing');
-    await expectBodyText(page, 'Choose the right help path', '/help');
+    await expectBodyText(page, 'Start here', '/help');
+    await expectBodyText(page, 'Pick the closest path.', '/help');
     await expectBodyText(page, 'Install or update', '/help');
     const helpDownloadsNext = resolveInstallNextFromHref(
       await readFirstHref(page, 'a:has-text("Open downloads")', '/help downloads link'),
@@ -468,9 +469,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
     await expectVisible(page, 'text=Contact Chummer');
-    await expectVisible(page, 'text=Contact paths');
+    await expectVisible(page, 'text=Discord first. Keep the form for private details.');
     await expectVisible(page, 'text=Open private form');
-    await page.locator('summary:has-text("Private form")').click();
+    await page.locator('summary:has-text("Private message")').click();
     await expectVisible(page, 'text=Send support request');
   });
   await gotoAndAssert(
@@ -479,7 +480,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     '/contact?kind=install_help&title=Mobile%20follow-through%20needs%20grounded%20runtime&summary=Scene%20resume%20needs%20support%20review&detail=Session%3A%20session-redmond&sessionId=session-redmond&sceneId=scene-redmond&runtime=sr6.preview.v1&bundle=bundle-redmond',
     async () => {
       await expectVisible(page, 'text=Contact Chummer');
-      await page.locator('summary:has-text("Private form")').click();
+      await page.locator('summary:has-text("Private message")').click();
       assert.equal(await page.locator('#supportKind').inputValue(), 'install_help', 'Prefilled contact route should preserve the support kind.');
       assert.equal(await page.locator('#supportTitle').inputValue(), 'Mobile follow-through needs grounded runtime', 'Prefilled contact route should preserve the support title.');
       assert.equal(await page.locator('#supportSummary').inputValue(), 'Scene resume needs support review', 'Prefilled contact route should preserve the support summary.');
@@ -490,7 +491,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
     await expectVisible(page, 'text=Contact Chummer');
   });
-  await page.locator('summary:has-text("Private form")').click();
+  await page.locator('summary:has-text("Private message")').click();
   await page.selectOption('#supportKind', 'bug_report');
   await page.fill('#supportTitle', 'Guest support intake smoke');
   await page.fill('#supportSummary', 'Guest support submission should land on the first-party confirmation page.');
