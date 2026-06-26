@@ -10,7 +10,10 @@
     };
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-home";
+    var isAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
+    ViewData["SurfaceClass"] = isAccessSection
+        ? "surface-home surface-minimal surface-home-access"
+        : "surface-home surface-minimal";
     ViewData["ContextSidebarHeading"] = "Home sections";
     ViewData["ContextSidebarSummary"] = "Use the section links to move between access, work, and setup.";
     ViewData["ContextSidebarLinks"] = Model.Sections
@@ -161,7 +164,7 @@
             || restoreDevices.Length > 0);
     var effectiveWorkSurfaceReady = workSurfaceReady || hasSeedableStarterWork;
     var showOverviewSection = string.Equals(Model.CurrentSection, "overview", StringComparison.OrdinalIgnoreCase);
-    var showAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
+    var showAccessSection = isAccessSection;
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
     var showSetupSection = string.Equals(Model.CurrentSection, "setup", StringComparison.OrdinalIgnoreCase);
     var showInlineStatus = showAccessSection;
@@ -169,6 +172,12 @@
     var contextualDownloadsHref = string.IsNullOrWhiteSpace(Model.ReleaseExperience.Recommended?.DispatchHref)
         ? "/downloads"
         : Model.ReleaseExperience.Recommended.DispatchHref;
+    var accessReleaseLabel = string.IsNullOrWhiteSpace(Model.ReleaseExperience.Display.BuildLabel)
+        ? "Current public release"
+        : Model.ReleaseExperience.Display.BuildLabel;
+    var accessSupportCases = releasedOrNotifiedCases.Take(2).ToArray();
+    var accessRecentReceipts = recentReceipts.Take(1).ToArray();
+    var hasAccessActivity = accessSupportCases.Length > 0 || accessRecentReceipts.Length > 0 || restoreConflicts > 0;
     var openSetupDialog = showOnboarding || showSetupSection;
     var heading = Model.CurrentSection switch
     {
@@ -414,18 +423,18 @@
 
         @if (showAccessSection && (!showOnboarding || accessSurfaceReady))
         {
-            <section class="release-shelf release-shelf--manual">
+            <section class="release-shelf release-shelf--manual release-shelf--compact">
                 <div class="home-stream__lead">
                     <p class="eyebrow">Access</p>
                     <h2 class="home-stream__title">Your install path</h2>
-                    <p class="home-stream__summary">Current release, linked devices, and support follow-up stay here.</p>
+                    <p class="home-stream__summary">Release, devices, and support status in one place.</p>
                 </div>
-                <div class="app-rail">
+                <div class="app-rail app-rail--compact">
                     <article class="app-rail__item">
                         <span class="tag">Release</span>
                         <div class="app-rail__copy">
-                            <h3>Updated</h3>
-                            <p>Use this when you want the latest public build or need to check whether updating is worth it.</p>
+                            <h3>@HomeText(accessReleaseLabel)</h3>
+                            <p>Use /now when your desktop client should stay aligned.</p>
                         </div>
                         <a class="inline-link" href="/now">Open release</a>
                     </article>
@@ -433,61 +442,39 @@
                         <span class="tag">Device</span>
                         <div class="app-rail__copy">
                             <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} linked copy access" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install")</h3>
-                            <p>Reconnect, replace, or recover a local copy from one place.</p>
+                            <p>Open one place to reconnect, replace, or recover.</p>
                         </div>
                         <a class="inline-link" href="/account/access">Open devices</a>
                     </article>
-                    @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
-                    {
-                        <article class="app-rail__item">
-                            <span class="tag">Support</span>
-                            <div class="app-rail__copy">
-                                <h3>No urgent follow-up</h3>
-                                <p>No support update, setup step, or restore conflict needs attention.</p>
-                            </div>
-                            <a class="inline-link" href="/account/support">Open support</a>
-                        </article>
-                    }
-                    else
-                    {
-                        @foreach (var supportCase in releasedOrNotifiedCases)
-                        {
-                            <article class="app-rail__item">
-                                <span class="tag">@PublicText(supportCase.StageLabel)</span>
-                                <div class="app-rail__copy">
-                                    <h3>@PublicText(supportCase.Case.Title)</h3>
-                                    <p>@PublicText(supportCase.ClosureSummary) <span>Next: @PublicText(supportCase.NextSafeAction)</span></p>
-                                    @if (!string.IsNullOrWhiteSpace(supportCase.AffectedInstallSummary))
-                                    {
-                                        <p class="muted-copy">@PublicText(supportCase.AffectedInstallSummary)</p>
-                                    }
-                                </div>
-                                <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@PublicText(supportCase.PrimaryActionLabel)</a>
-                            </article>
-                        }
-                        @foreach (var receipt in recentReceipts)
-                        {
-                            <article class="app-rail__item">
-                                <span class="tag">Install</span>
-                                <div class="app-rail__copy">
-                                    <h3>@HomeText(receipt.ArtifactLabel)</h3>
-                                    <p>@HomeText(receipt.Version) on @HomeText(receipt.Channel) is attached to this account.</p>
-                                </div>
-                                <a class="inline-link" href="/account/access">Open devices</a>
-                            </article>
-                        }
-                        @if (restoreConflicts > 0)
-                        {
-                            <article class="app-rail__item">
-                                <span class="tag">Campaign</span>
-                                <div class="app-rail__copy">
-                                    <h3>Return needs confirmation</h3>
+                    <article class="app-rail__item">
+                        <span class="tag">Support</span>
+                        <div class="app-rail__copy">
+                            @if (hasAccessActivity)
+                            {
+                                @if (accessSupportCases.Length > 0)
+                                {
+                                    <h3>@PublicText(accessSupportCases[0].Case.Title)</h3>
+                                    <p>@PublicText(accessSupportCases[0].ClosureSummary)</p>
+                                }
+                                else if (restoreConflicts > 0)
+                                {
+                                    <h3>Return confirmation pending</h3>
                                     <p>@PublicText(Model.CampaignSpine.Restore.ConflictSummaries[0])</p>
-                                </div>
-                                <a class="inline-link" href="/account/work">Open campaign</a>
-                            </article>
-                        }
-                    }
+                                }
+                                else if (accessRecentReceipts.Length > 0)
+                                {
+                                    <h3>@HomeText(accessRecentReceipts[0].ArtifactLabel)</h3>
+                                    <p>@HomeText(accessRecentReceipts[0].Version) on @HomeText(accessRecentReceipts[0].Channel)</p>
+                                }
+                            }
+                            else
+                            {
+                                <h3>No urgent follow-up</h3>
+                                <p>Nothing blocking: finish builds and installs at your pace.</p>
+                            }
+                        </div>
+                        <a class="inline-link" href="/account/support">Open support</a>
+                    </article>
                 </div>
             </section>
         }

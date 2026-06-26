@@ -1639,6 +1639,10 @@ td {
   box-shadow: var(--shadow-soft);
 }
 
+.release-shelf--compact {
+  padding: 0.8rem;
+}
+
 .proof-statement {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.12);
@@ -3595,6 +3599,10 @@ td {
   gap: 0.7rem;
 }
 
+.app-rail--compact {
+  gap: 0.5rem;
+}
+
 .works-item,
 .app-rail__item {
   display: grid;
@@ -3692,6 +3700,30 @@ td {
   display: grid;
   gap: 1rem;
   grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.6fr);
+}
+
+.surface-home-access .home-command,
+.surface-home-access .home-dashboard,
+.surface-home-access .release-shelf {
+  gap: 0.7rem;
+  margin-top: 0.7rem;
+}
+
+.surface-home-access .home-command {
+  grid-template-columns: 1fr;
+}
+
+.surface-home-access .home-command__intro,
+.surface-home-access .home-cockpit-strip__lead {
+  padding: 0.9rem 1rem;
+}
+
+.surface-home-access .home-dashboard__main {
+  gap: 0.7rem;
+}
+
+.surface-home-access .release-shelf {
+  margin-top: 0;
 }
 
 .home-dashboard--focus {
@@ -9860,8 +9892,23 @@ body {
 .partizipate-board {
   display: grid;
   gap: 1rem;
-  min-height: calc(100svh - 7rem);
+  min-height: auto;
   align-content: start;
+}
+
+.surface-partizipate .partizipate-board__grid {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.surface-partizipate .partizipate-request {
+  gap: 0.7rem;
+  padding: 0.68rem 0;
+}
+
+.surface-partizipate .partizipate-board__meta {
+  margin: 0;
+  padding: 0.3rem 0;
 }
 
 .partizipate-board__header {

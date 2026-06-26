@@ -3,7 +3,12 @@
     ViewData["Title"] = "Participate";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-minimal surface-participate surface-partizipate";
-    var posts = Model.Posts.Select(post => new ParticipateItemViewModel(post.Score, post.Title, post.Summary, post.Status, post.Href)).ToArray();
+    var maxVisiblePosts = 8;
+    var displayPosts = Model.Posts
+        .Take(maxVisiblePosts)
+        .Select(post => new ParticipateItemViewModel(post.Score, post.Title, post.Summary, post.Status, post.Href))
+        .ToArray();
+    var hasMorePosts = Model.Posts.Count > maxVisiblePosts;
 }
 
 <style data-chummer-board-skin>
@@ -24,8 +29,8 @@
 
     @if (Model.LoadedFromBoard)
     {
-        <div class="partizipate-board__grid" aria-label="Public requests">
-            @foreach (var item in posts)
+            <div class="partizipate-board__grid" aria-label="Public requests">
+            @foreach (var item in displayPosts)
             {
                 <article class="partizipate-request">
                     <div class="partizipate-request__score" aria-label="@item.Score votes">
@@ -52,6 +57,10 @@
                         }
                     </div>
                 </article>
+            }
+            @if (hasMorePosts)
+            {
+                <p class="partizipate-board__meta">Showing the top 8 requests.</p>
             }
         </div>
     }
