@@ -1,6 +1,6 @@
 @model StatusPageViewModel
 @{
-    ViewData["Title"] = "Status";
+    ViewData["Title"] = "Updated";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-status surface-minimal";
     var publicPlatformLabels = Model.ReleaseExperience.PlatformAvailability
@@ -24,8 +24,8 @@
 
 <section class="minimal-page-hero minimal-status-pill">
     <div>
-        <h1>Status</h1>
-        <p class="eyebrow">Current release</p>
+        <p class="eyebrow">Chummer</p>
+        <h1>Updated</h1>
         <p>@PublicStatusText(statusLine)</p>
         <div class="minimal-actions" aria-label="Status next actions">
             <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Downloads</a>

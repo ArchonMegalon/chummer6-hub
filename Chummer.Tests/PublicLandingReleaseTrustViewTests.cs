@@ -235,7 +235,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("<h1>Status</h1>", view, StringComparison.Ordinal);
+        Assert.Contains("<h1>Updated</h1>", view, StringComparison.Ordinal);
         Assert.Contains("var statusLine = Model.ReleaseExperience.Recommended is null", view, StringComparison.Ordinal);
         Assert.Contains("Updated. {publicPlatformSummary}", view, StringComparison.Ordinal);
         Assert.Contains("@PublicStatusText(statusLine)", view, StringComparison.Ordinal);
@@ -356,7 +356,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("BuildPublicStatusReleaseSummary", controller, StringComparison.Ordinal);
         Assert.Contains("BuildPublicStatusCautionSummary", controller, StringComparison.Ordinal);
-        Assert.Contains("<h1>Status</h1>", view, StringComparison.Ordinal);
+        Assert.Contains("<h1>Updated</h1>", view, StringComparison.Ordinal);
         Assert.Contains("publicPlatformSummary", view, StringComparison.Ordinal);
         Assert.DoesNotContain("updateSummary", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Updated {verifiedLabel}", view, StringComparison.Ordinal);
