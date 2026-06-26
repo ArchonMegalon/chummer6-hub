@@ -54,7 +54,7 @@ SOURCE_MARKERS = {
     "tests/RunServicesSmoke/Program.cs": [
         'var hostedProofContracts = new HostedProofContractService(releases).Build(new HostedProofContractContext(',
         'campaign spine hosted proof contracts should emit open-run proof on the governed open-run route.',
-        'campaign spine hosted proof contracts should emit account-aware horizon conversion proof on the Devices & access route.',
+        'campaign spine hosted proof contracts should emit account-aware horizon conversion proof on the Installs route.',
     ],
     "scripts/materialize_next90_m126_hub_hosted_proof_contracts_proof.py": [
         '"package_id": "next90-m126-hub-define-hosted-proof-contracts-for-open-runs-shadowcaster"',

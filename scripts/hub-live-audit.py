@@ -634,7 +634,7 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"/account/access returned {status}, expected 200")
-    require_snippet(body, "Devices &amp; access", "/account/access")
+    require_snippet(body, "Installs", "/account/access")
     require_snippet(body, "Cross-device recovery", "/account/access")
     require_snippet(body, "Advanced device recovery", "/account/access")
     require_snippet(body, "Offline-ready return", "/account/access")
@@ -721,7 +721,7 @@ def verify_signed_in_work_audit(
         raise AssertionError(f"/home/access returned {status}, expected 200")
     require_snippet(body, "What changed for you", "/home/access")
     require_snippet(body, "Release and device state", "/home/access")
-    require_snippet(body, "Open Devices &amp; access", "/home/access")
+    require_snippet(body, "Open installs", "/home/access")
     require_snippet(body, "Open current release", "/home/access")
 
     workspace_id = workspaces[0]["workspaceId"]
@@ -12051,7 +12051,7 @@ def main() -> int:
         AuditRoute(
             "/contact",
             "Contact Chummer",
-            required_texts=("Send support request", "Claim your copy", "Open Devices and access"),
+            required_texts=("Send support request", "Claim your copy", "Open installs"),
             expects_header_count=1),
         AuditRoute(
             "/privacy",

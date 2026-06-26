@@ -27,7 +27,7 @@ REQUIRED_MARKERS = [
     'campaign spine hosted proof contracts should emit Shadowcasters horizon proof on the public roadmap route.',
     'campaign spine hosted proof contracts should emit public-signal proof on the governed Participate route.',
     'campaign spine hosted proof contracts should emit community-hub proof on the signed-in work rail.',
-    'campaign spine hosted proof contracts should emit account-aware horizon conversion proof on the Devices & access route.',
+    'campaign spine hosted proof contracts should emit account-aware horizon conversion proof on the Installs route.',
 ]
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]

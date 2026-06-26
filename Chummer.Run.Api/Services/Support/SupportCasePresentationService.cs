@@ -78,7 +78,7 @@ public sealed class SupportCasePresentationService
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "The closure notice already went out, and the reporter confirmed that the fix worked on the affected install."
                     : $"The closure notice already went out for {fixedReleaseLabel}, and the reporter confirmed that the fix worked on the affected install.",
-                installRailCase ? "Open Devices and access" : "Open downloads",
+                installRailCase ? "Open installs" : "Open downloads",
                 installRailCase ? "/account/access" : "/downloads",
                 false),
             SupportCaseVerificationStates.StillBroken => (
@@ -121,34 +121,34 @@ public sealed class SupportCasePresentationService
             SupportCaseStatuses.Fixed => (
                 "Fixed",
                 installRailCase
-                    ? "Open Devices and access, then continue with the same linked copy when the fixed build reaches your install."
+                    ? "Open Installs, then continue with the same linked copy when the fixed build reaches your install."
                     : "Watch downloads so this fix can reach your installed channel.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "The underlying issue is fixed, but the release step may still be moving."
                     : $"The underlying issue is fixed and is moving through {fixedReleaseLabel}.",
-                installRailCase ? "Open Devices and access" : "Open downloads",
+                installRailCase ? "Open installs" : "Open downloads",
                 installRailCase ? "/account/access" : "/downloads",
                 false),
             SupportCaseStatuses.ReleasedToReporterChannel => (
                 "Released",
                 installRailCase
-                    ? "Open Devices and access, then update or relink the same linked install to pick up the reporter-ready fix."
+                    ? "Open Installs, then update or relink the same linked install to pick up the reporter-ready fix."
                     : "Open downloads or update this linked install to pick up the reporter-ready fix.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "The fix reached a reporter-ready release channel."
                     : $"The fix reached {fixedReleaseLabel}.",
-                installRailCase ? "Open Devices and access" : "Open downloads",
+                installRailCase ? "Open installs" : "Open downloads",
                 installRailCase ? "/account/access" : "/downloads",
                 false),
             SupportCaseStatuses.UserNotified => (
                 "Closed with notice",
                 installRailCase
-                    ? "Open Devices and access, then update, relink, or reinstall with the same account if needed."
+                    ? "Open Installs, then update, relink, or reinstall with the same account if needed."
                     : "Update or reinstall if needed, then reopen support only if the same issue still reproduces.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "Chummer already sent the closure notice for this case."
                     : $"Chummer already sent the closure notice for {fixedReleaseLabel}.",
-                installRailCase ? "Open Devices and access" : "Open downloads",
+                installRailCase ? "Open installs" : "Open downloads",
                 installRailCase ? "/account/access" : "/downloads",
                 false),
             SupportCaseStatuses.Deferred => (
@@ -312,7 +312,7 @@ public sealed class SupportCasePresentationService
         {
             if (HasInstallRailContext(supportCase))
             {
-                return "Follow-up stays attached to the affected claimed install. Use Account > Support for tracked history and Devices & access only when you need to relink or reclaim that copy.";
+                return "Follow-up stays attached to the affected claimed install. Use Account > Support for tracked history and Installs only when you need to relink or reclaim that copy.";
             }
 
             return "Follow-up stays inside Account > Support for this signed-in report.";
@@ -403,11 +403,11 @@ public sealed class SupportCasePresentationService
         {
             return normalizedStatus switch
             {
-                SupportCaseStatuses.Fixed => "Relink or reclaim the affected copy in Devices and access, then return to that claimed install before you wait for this fix to land there.",
+                SupportCaseStatuses.Fixed => "Relink or reclaim the affected copy in Installs, then return to that claimed install before you wait for this fix to land there.",
                 SupportCaseStatuses.ReleasedToReporterChannel => string.IsNullOrWhiteSpace(fixedReleaseLabel)
-                    ? "Relink or reclaim the affected copy in Devices and access, then return to that claimed install before you pick up the reporter-ready fix there."
-                    : $"Relink or reclaim the affected copy in Devices and access, then return to that claimed install before you pick up {fixedReleaseLabel} there.",
-                SupportCaseStatuses.UserNotified => "Relink or reclaim the affected copy in Devices and access, then return to that claimed install before you verify whether the reported fix held there.",
+                    ? "Relink or reclaim the affected copy in Installs, then return to that claimed install before you pick up the reporter-ready fix there."
+                    : $"Relink or reclaim the affected copy in Installs, then return to that claimed install before you pick up {fixedReleaseLabel} there.",
+                SupportCaseStatuses.UserNotified => "Relink or reclaim the affected copy in Installs, then return to that claimed install before you verify whether the reported fix held there.",
                 _ => fallbackAction
             };
         }
@@ -463,7 +463,7 @@ public sealed class SupportCasePresentationService
         {
             return verificationAvailable
                 ? new InstallVerificationReadiness(
-                    Summary: "No linked install is attached yet. Link or reclaim the affected copy in Devices and access before you verify the fix here.",
+                    Summary: "No linked install is attached yet. Link or reclaim the affected copy in Installs before you verify the fix here.",
                     FixReadyOnLinkedInstall: false,
                     NeedsInstallUpdate: false,
                     NeedsLinkedInstall: true)
@@ -479,7 +479,7 @@ public sealed class SupportCasePresentationService
         {
             return verificationAvailable
                 ? new InstallVerificationReadiness(
-                    Summary: "The affected install is not linked to this account right now. Reclaim that copy in Devices and access before you verify the fix.",
+                    Summary: "The affected install is not linked to this account right now. Reclaim that copy in Installs before you verify the fix.",
                     FixReadyOnLinkedInstall: false,
                     NeedsInstallUpdate: false,
                     NeedsLinkedInstall: true)

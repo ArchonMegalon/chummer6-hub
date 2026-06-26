@@ -172,14 +172,14 @@
     var openSetupDialog = showOnboarding || showSetupSection;
     var heading = Model.CurrentSection switch
     {
-        "access" => "Access and return",
+        "access" => "Installs",
         "work" => "Work",
         "setup" => "Finish setup",
         _ => $"Welcome back, {Model.User.DisplayName}"
     };
     var summary = Model.CurrentSection switch
     {
-        "access" => "Keep install return, release status, and support history in one calmer place instead of searching the whole account surface.",
+        "access" => "See linked copies, setup codes, downloads, and install help.",
         "work" => "Pick up dossiers, active runs, and the next useful path without turning Home into a deeper work page.",
         "setup" => "Finish the short setup flow first, then come back to access and work with a steadier account.",
         _ => "Pick up where you left off: finish the basics, install the current release, and keep track of what is planned next."
@@ -313,7 +313,7 @@
                 {
                     <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)">@PublicText(Model.PrimaryAction.Label)</a>
                 }
-                <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
+                <a class="button-like button-like--secondary" href="/account/access">Open installs</a>
                 <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
             </div>
         </div>
@@ -404,10 +404,10 @@
                     <a class="button-like button-like--secondary" href="/now">Open current release</a>
                 </article>
                 <article class="app-action-card">
-                    <span class="tag">Devices &amp; access</span>
+                    <span class="tag">Installs</span>
                     <h2>Keep this copy connected</h2>
-                    <p>Link this install, keep access rights clear, and keep the claim path visible without digging through support copy.</p>
-                    <a class="button-like button-like--ghost" href="/account/access">Open Devices &amp; access</a>
+                    <p>Link this copy, check setup codes, and recover a local install without digging through support copy.</p>
+                    <a class="button-like button-like--ghost" href="/account/access">Open installs</a>
                 </article>
             </div>
         }
@@ -432,7 +432,7 @@
                     <article class="app-rail__item">
                         <span class="tag">Device</span>
                         <div class="app-rail__copy">
-                            <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s)" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install")</h3>
+                            <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} linked copy access" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install")</h3>
                             <p>Reconnect, replace, or recover a local copy from one place.</p>
                         </div>
                         <a class="inline-link" href="/account/access">Open devices</a>

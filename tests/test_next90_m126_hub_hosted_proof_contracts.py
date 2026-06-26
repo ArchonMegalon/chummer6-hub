@@ -61,11 +61,11 @@ class Next90M126HubHostedProofContractsTests(unittest.TestCase):
             self.copy_sources(temp_root)
             smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
             smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(smoke_text.replace("account-aware horizon conversion proof on the Devices & access route", "account-aware drift"), encoding="utf-8")
+            smoke_path.write_text(smoke_text.replace("account-aware horizon conversion proof on the Installs route", "account-aware drift"), encoding="utf-8")
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("account-aware horizon conversion proof on the Devices & access route", result.stderr)
+        self.assertIn("account-aware horizon conversion proof on the Installs route", result.stderr)
 
     @staticmethod
     def copy_sources(temp_root: Path) -> None:

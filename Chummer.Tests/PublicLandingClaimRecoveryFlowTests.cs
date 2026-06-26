@@ -18,7 +18,7 @@ public sealed class PublicLandingClaimRecoveryFlowTests
         string accountView = File.ReadAllText(accountViewPath);
         string presenter = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Support", "SupportCasePresentationService.cs"));
 
-        Assert.Contains("AccountLabel: \"Open Devices and access\"", controller, StringComparison.Ordinal);
+        Assert.Contains("AccountLabel: \"Open installs\"", controller, StringComparison.Ordinal);
         Assert.Contains("SupportLabel: \"Open tracked support\"", controller, StringComparison.Ordinal);
         Assert.Contains("DesktopInstallRail.BuildSupportHref(", controller, StringComparison.Ordinal);
         Assert.Contains("/continue.json", controller, StringComparison.Ordinal);
@@ -37,16 +37,16 @@ public sealed class PublicLandingClaimRecoveryFlowTests
             dispatchView,
             StringComparison.Ordinal);
         Assert.Contains("@Model.SupportIntake.InstallAccessHref", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
-        Assert.Contains("Devices and access is where you reconnect, replace, or recover this copy.", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
+        Assert.Contains("Installs is where you reconnect, replace, or recover this copy.", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
         Assert.Contains(
             "Recovery codes are only for the already-downloaded app when it asks for one.",
             accountView,
             StringComparison.Ordinal);
         Assert.Contains("Linked install path", accountView, StringComparison.Ordinal);
         Assert.Contains("Recovery codes stay below as a fallback, not the first instruction.", accountView, StringComparison.Ordinal);
-        Assert.Contains("Open Devices and access", presenter, StringComparison.Ordinal);
+        Assert.Contains("Open installs", presenter, StringComparison.Ordinal);
         Assert.Contains(
-            "Follow-up stays attached to the affected claimed install. Use Account > Support for tracked history and Devices & access only when you need to relink or reclaim that copy.",
+            "Follow-up stays attached to the affected claimed install. Use Account > Support for tracked history and Installs only when you need to relink or reclaim that copy.",
             presenter,
             StringComparison.Ordinal);
     }

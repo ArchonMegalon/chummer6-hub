@@ -23,7 +23,7 @@
     {
         "participation" => "Return to public requests, contribution history, and optional public recognition from one account page.",
         "support" => "Open, track, and close support without leaving the account surface.",
-        "access" => "See installed copies, pending setup, and install help without the internal machinery.",
+        "access" => "See linked copies, setup codes, downloads, and install help.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
         "settings" => "Membership and billing open through the billing provider. Chummer keeps the app access simple.",
         _ => "Keep sign-in, recovery, installs, support, billing, and participation in one quiet account surface."
@@ -216,7 +216,7 @@
     var launcherPrimaryHref = hasLinkedDesktop ? string.Empty : "/downloads";
     var launcherPrimaryLabel = hasLinkedDesktop ? "Open in Chummer" : "Install Chummer";
     var launcherSecondaryHref = hasLinkedDesktop ? "/account/access" : "/account/access";
-    var launcherSecondaryLabel = hasLinkedDesktop ? "Devices & access" : "Finish setup";
+    var launcherSecondaryLabel = hasLinkedDesktop ? "Installs" : "Finish setup";
     var exampleLaunchers = new[]
     {
         new { Id = "street-samurai", Label = "Street Samurai", Summary = "Cybered frontline build with straightforward combat pressure.", Archetype = "Combat" },
@@ -259,18 +259,18 @@
         installRailSecondaryLabel = "Open tracked support";
         installRailSecondaryHref = "/account/support";
         @* Claim, update, rollback, recovery, and support stay on this same account path once the install is linked. *@
-        @* Use Devices & access only to relink or reclaim that copy, and treat browser routes as backup help instead of the normal path. *@
+        @* Use Installs only to relink or reclaim that copy, and treat browser routes as backup help instead of the normal path. *@
     }
     else if (leadInstallation is not null)
     {
         installRailHeading = "This linked install is your default return path";
-        installRailSummary = "Continue claim, update, rollback, recovery, and support from the claimed desktop install first. Use Devices & access only to relink or reclaim that copy, and keep browser pages as backup help instead of the normal path.";
+        installRailSummary = "Continue claim, update, rollback, recovery, and support from the claimed desktop install first. Use Installs only to relink or reclaim that copy, and keep browser pages as backup help instead of the normal path.";
         installRailPrimaryLabel = "Open downloads";
         installRailPrimaryHref = "/downloads";
         installRailSecondaryLabel = "Open tracked support";
         installRailSecondaryHref = "/account/support";
         @* Claim, update, rollback, recovery, and support stay on this same account path once the install is linked. *@
-        @* Use Devices & access only to relink or reclaim that copy, and treat browser routes as backup help instead of the normal path. *@
+        @* Use Installs only to relink or reclaim that copy, and treat browser routes as backup help instead of the normal path. *@
     }
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
@@ -581,12 +581,12 @@
     }
 
     var accountRailHeadline = showAccessSection
-        ? "Installs stay here"
+        ? "Installs"
         : showSupportSection
             ? "Support and account return stay attached to this account"
             : installRailHeading;
     var accountRailSummary = showAccessSection
-        ? "Use this page to see linked copies, pending setup, and help for an affected install. The app or installer still does the actual linking."
+        ? "See linked copies, setup codes, downloads, and install help. The app or installer still does the actual linking."
         : showSupportSection
             ? "Tracked support stays attached to the affected install so release status, closure, and recovery never split across separate surfaces."
             : installRailSummary;
@@ -594,7 +594,7 @@
         ? $"{InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)} · {PlatformSummary(leadInstallation.Platform, leadInstallation.Arch)} · {InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)}"
         : pendingClaims > 0
             ? $"{pendingClaims} pending setup code(s) are still waiting on their original device."
-            : "No linked install is attached yet. Open Downloads while signed in to start with the same download and a direct return path.";
+            : "No linked install is attached yet. Open Downloads while signed in to keep setup and support tied to this account.";
     var accountRailRecoverySummary = leadPendingClaim is not null
         ? $"{PublicText(leadPendingClaim.ArtifactLabel)} is already staged. Use the pending code only if that copy explicitly opens in recovery mode."
         : "Recovery codes stay in reserve. The default path remains installer or in-app linking on the affected device.";
@@ -625,7 +625,7 @@
                 <strong>@(emailLink is null ? "Add one" : HumanizeStatus(emailLink.Status, "Add one"))</strong>
             </article>
             <article class="account-overview__card">
-                <span class="tag">Devices &amp; access</span>
+                <span class="tag">Installs</span>
                 <strong>@(activeAccessRights > 0 ? $"{activeAccessRights} active" : claimedInstallations > 0 ? $"{claimedInstallations} linked" : "Ready to link")</strong>
             </article>
             <article class="account-overview__card">
@@ -647,7 +647,7 @@
                         <p>@accountRailSummary</p>
                         <div class="stacked-actions">
                             <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
-                            <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
+                            <a class="button-like button-like--secondary" href="/account/access">Open installs</a>
                             <a class="button-like button-like--ghost" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
                         </div>
                     </div>
@@ -670,7 +670,7 @@
                         <article class="account-rail-snapshot__fact">
                             <span>Recovery reserve</span>
                             <strong>@accountRailRecoverySummary</strong>
-                            <p>Devices &amp; access exists for reconnecting, replacement, and recovery after the installer or app does the real work.</p>
+                            <p>Use Installs for reconnecting, replacement, and recovery after the installer or app does the real work.</p>
                         </article>
                     </div>
                 </section>
@@ -686,7 +686,7 @@
                 <p>@accountRailSummary</p>
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
-                    <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
+                    <a class="button-like button-like--secondary" href="/account/access">Open installs</a>
                     <a class="button-like button-like--ghost" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
                 </div>
             </div>
@@ -709,7 +709,7 @@
                 <article class="account-rail-snapshot__fact">
                     <span>Recovery reserve</span>
                     <strong>@accountRailRecoverySummary</strong>
-                    <p>Devices &amp; access exists for reconnecting, replacement, and recovery after the installer or app does the real work.</p>
+                    <p>Use Installs for reconnecting, replacement, and recovery after the installer or app does the real work.</p>
                 </article>
             </div>
         </section>
@@ -1114,7 +1114,7 @@
             <section id="devices-access" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Installs</h2>
-                    <p>See linked copies, pending setup, and install help without the internal machinery.</p>
+                    <p>See linked copies, setup codes, downloads, and install help.</p>
                 </div>
                 <article class="app-action-card app-action-card--primary">
                     <span class="tag">Current install</span>
@@ -1488,7 +1488,7 @@
                                 {
                                     <a class="button-like button-like--primary" href="@(hasLinkedDesktop ? AccountOpenExampleHref(example.Id) : "/downloads")">@(hasLinkedDesktop ? $"Open {example.Label}" : "Install Chummer first")</a>
                                 }
-                                <a class="button-like button-like--ghost" href="/account/access">Devices &amp; access</a>
+                                <a class="button-like button-like--ghost" href="/account/access">Installs</a>
                             </div>
                         </article>
                     }
@@ -2559,10 +2559,10 @@
                             {
                                 <div class="settings-form">
                                     <p><strong>Prepare offline travel files</strong></p>
-                                    <p class="muted-copy">Claim a device from Downloads or Devices &amp; access first. Chummer can prepare dossiers, campaigns, rules settings, recent files, and prep notes while secrets and local caches stay on this device.</p>
+                                    <p class="muted-copy">Link a copy from Downloads or Installs first. Chummer can prepare dossiers, campaigns, rules settings, recent files, and prep notes while secrets and local caches stay on this device.</p>
                                     <div class="stacked-actions">
-                                        <a class="button-like button-like--secondary" href="/downloads">Claim a device from Downloads</a>
-                                        <a class="button-like button-like--ghost" href="/account/access">Open Devices &amp; access</a>
+                                        <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
+                                        <a class="button-like button-like--ghost" href="/account/access">Open installs</a>
                                     </div>
                                 </div>
                             }

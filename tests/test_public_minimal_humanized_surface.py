@@ -123,7 +123,7 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         assert forbidden not in combined
 
     for expected in (
-        "Devices and access is where you reconnect, replace, or recover this copy.",
+        "Installs is where you reconnect, replace, or recover this copy.",
         "Public feedback should start on the feedback page.",
         "Return to setup",
         "Go back to setup when you are ready",
@@ -897,7 +897,7 @@ def test_account_access_surface_prioritizes_installs_over_internal_sync_noise() 
     account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
 
     assert '"access" => "Installs"' in account
-    assert "See linked copies, pending setup, and install help without the internal machinery." in account
+    assert "See linked copies, setup codes, downloads, and install help." in account
     assert "<summary>Connection details</summary>" in account
     assert "Recovery codes are only for the already-downloaded app when it asks for one." in account
     assert "<summary>Download history</summary>" in account
@@ -907,6 +907,8 @@ def test_account_access_surface_prioritizes_installs_over_internal_sync_noise() 
 
     for forbidden in (
         "<h2>Devices &amp; access</h2>",
+        "Devices &amp; access",
+        "Devices and access",
         "<summary>Account sync history</summary>",
         "<span>Account access status</span>",
         "<span>Account recovery path</span>",
@@ -921,6 +923,8 @@ def test_account_access_surface_prioritizes_installs_over_internal_sync_noise() 
         "hub_entitlement_ledger",
         "No connection history is attached right now.",
         "No connection problems are active right now.",
+        "without the internal machinery",
+        "access right",
     ):
         assert forbidden not in account
 
@@ -1416,9 +1420,9 @@ def test_campaign_city_pages_do_not_render_maintenance_console_words() -> None:
 def test_signed_in_account_copy_uses_files_status_and_plain_download_language() -> None:
     account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
 
-    assert "Installs stay here" in account
-    assert "Use this page to see linked copies, pending setup, and help for an affected install." in account
-    assert "same download and a direct return path" in account
+    assert '? "Installs"' in account
+    assert "See linked copies, setup codes, downloads, and install help. The app or installer still does the actual linking." in account
+    assert "keep setup and support tied to this account" in account
     assert "Add an email recovery path if you want an easier way back later." in account
 
     for forbidden in (

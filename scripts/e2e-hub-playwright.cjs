@@ -602,12 +602,12 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/home/access', async () => {
-    await expectVisible(page, 'text=Access and return');
+    await expectVisible(page, 'text=Installs');
     await expectVisible(page, 'text=Finish setup before you worry about devices and follow-up');
     await expectBodyText(page, 'Release and device state', '/home/access');
     await expandDetailsBySummary(page, 'Release and device state', '/home/access');
     await expectBodyText(page, 'Open current release', '/home/access');
-    await expectBodyText(page, 'Open Devices & access', '/home/access');
+    await expectBodyText(page, 'Open installs', '/home/access');
     const bodyText = await page.locator('body').innerText();
     assert.equal(bodyText.includes('Need product proof before you act?'), false, '/home/access should use the calmer proof follow-through note.');
   });
@@ -815,7 +815,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/account/access', async () => {
-    await expectVisible(page, 'text=Devices & access');
+    await expectVisible(page, 'text=Installs');
     await expectBodyText(page, 'Recent install handoffs', '/account/access');
     await expectBodyText(page, 'Cross-device recovery', '/account/access');
     await expectBodyText(page, 'Advanced device recovery', '/account/access');

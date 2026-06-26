@@ -60,12 +60,12 @@ public sealed class SupportCasePresentationServiceTests
 
         var presentation = service.Build(supportCase, installLinking);
 
-        Assert.Equal("Open Devices and access", presentation.PrimaryActionLabel);
+        Assert.Equal("Open installs", presentation.PrimaryActionLabel);
         Assert.Equal("/account/access", presentation.PrimaryActionHref);
         Assert.Contains("Update the affected claimed install to preview 0.7.1-preview", presentation.NextSafeAction, StringComparison.Ordinal);
-        Assert.DoesNotContain("Open Devices and access", presentation.NextSafeAction, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open installs", presentation.NextSafeAction, StringComparison.Ordinal);
         Assert.Contains("affected claimed install", presentation.FollowUpLaneSummary, StringComparison.Ordinal);
-        Assert.Contains("Devices & access only when you need to relink or reclaim", presentation.FollowUpLaneSummary, StringComparison.Ordinal);
+        Assert.Contains("Installs only when you need to relink or reclaim", presentation.FollowUpLaneSummary, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -148,10 +148,10 @@ public sealed class SupportCasePresentationServiceTests
 
         var presentation = service.Build(supportCase, installLinking);
 
-        Assert.Equal("Open Devices and access", presentation.PrimaryActionLabel);
+        Assert.Equal("Open installs", presentation.PrimaryActionLabel);
         Assert.Equal("/account/access", presentation.PrimaryActionHref);
         Assert.True(presentation.NeedsLinkedInstall);
-        Assert.Contains("Relink or reclaim the affected copy in Devices and access", presentation.NextSafeAction, StringComparison.Ordinal);
+        Assert.Contains("Relink or reclaim the affected copy in Installs", presentation.NextSafeAction, StringComparison.Ordinal);
         Assert.Contains("return to that claimed install", presentation.NextSafeAction, StringComparison.Ordinal);
         Assert.DoesNotContain("same linked install", presentation.NextSafeAction, StringComparison.OrdinalIgnoreCase);
     }
@@ -215,7 +215,7 @@ public sealed class SupportCasePresentationServiceTests
         Assert.False(presentation.NeedsLinkedInstall);
         Assert.Contains("Update the affected claimed install normally", presentation.NextSafeAction, StringComparison.Ordinal);
         Assert.Contains("Reopen this same tracked case", presentation.NextSafeAction, StringComparison.Ordinal);
-        Assert.DoesNotContain("Open Devices and access", presentation.NextSafeAction, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open installs", presentation.NextSafeAction, StringComparison.Ordinal);
         Assert.Contains("stays linked on preview 0.7.1-preview", presentation.InstallReadinessSummary, StringComparison.Ordinal);
     }
 }

@@ -1753,7 +1753,7 @@ public sealed class PublicLandingController : Controller
                 SecondaryDownloadHref: bootstrapScriptDownload ? rawDownloadHref : null,
                 SecondaryDownloadLabel: bootstrapScriptDownload ? BuildBootstrapSecondaryDownloadLabel(bootstrapPlatform) : null,
                 AccountHref: "/account/access",
-                AccountLabel: "Open Devices and access",
+                AccountLabel: "Open installs",
                 HelpHref: release.InstallHelpHref,
                 HelpLabel: release.InstallHelpLabel,
                 SupportHref: supportHref,
@@ -9301,10 +9301,10 @@ Boundary:
         if ((installLinking.ClaimedInstallations?.Count ?? 0) == 0 && installLinking.PendingClaimTickets.Count > 0)
         {
             return new HomePrimaryActionViewModel(
-                "Devices & access",
+                "Installs",
                 "Link this copy",
-                "You already have a pending linked install. Open Devices and access to claim this copy instead of starting over.",
-                "Open Devices and access",
+                "You already have a pending linked install. Open Installs to claim this copy instead of starting over.",
+                "Open installs",
                 "/account/access",
                 "primary");
         }
@@ -9867,7 +9867,7 @@ Boundary:
         => new[]
         {
             new SectionLinkViewModel("overview", "Overview", "/home", string.Equals(currentSection, "overview", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("access", "Access", "/home/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("access", "Installs", "/home/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("work", "Work", "/home/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("setup", "Setup", "/home/setup", string.Equals(currentSection, "setup", StringComparison.OrdinalIgnoreCase))
         };
@@ -9875,7 +9875,7 @@ Boundary:
     private static (string Title, string Description) DescribeHomeSection(string currentSection)
         => currentSection switch
         {
-            "access" => ("Home · Access", "Install return, support closure, and access state without the rest of the dashboard."),
+            "access" => ("Home · Installs", "Linked copies, setup codes, downloads, and install help."),
             "work" => ("Home · Work", "Current work, return context, and the next useful route without the rest of Home."),
             "setup" => ("Home · Setup", "Finish the short account setup flow, then come back to access and work."),
             _ => ("Home", "Pick the next action and keep track of what is opening next.")
@@ -11045,7 +11045,7 @@ Boundary:
             AccountSupportHref: authenticated ? "/account/support" : "/signup?next=%2Faccount%2Fsupport",
             AccountSupportLabel: authenticated ? "Open account support" : "Claim your copy",
             InstallAccessHref: installRail.ReturnHref ?? "/account/access",
-            InstallAccessLabel: installRail.ReturnLabel ?? "Open Devices and access",
+            InstallAccessLabel: installRail.ReturnLabel ?? "Open installs",
             ResponseExpectation: BuildSupportResponseExpectation(authenticated, manifest.SupportabilityState, manifest.SupportabilitySummary),
             SubmissionNotice: submissionNotice,
             AttachmentHelp: "Add screenshots, logs, or a small diagnostic bundle when they make the bug or install problem easier to route.",

@@ -90,7 +90,7 @@
     {
         string installHref = ContextualPreviewHref(Model.SupportIntake.InstallAccessHref);
         string installSummary = string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary)
-            ? "Devices and access is where you reconnect, replace, or recover this copy."
+            ? "Installs is where you reconnect, replace, or recover this copy."
             : Model.SupportIntake.InstallRailSummary!;
         string installTitle = Model.SupportIntake.RecoveryModeOnly
             ? "Install recovery stays on the same device page"
@@ -341,7 +341,7 @@ else if (!contactPage)
                     </div>
                     <div class="field">
                         <label for="supportInstallationId">Install id</label>
-                        <input id="supportInstallationId" name="installationId" maxlength="64" placeholder="Optional install id from Devices and access" value="@Model.SupportIntake.DefaultInstallationId" />
+                        <input id="supportInstallationId" name="installationId" maxlength="64" placeholder="Optional install id from Installs" value="@Model.SupportIntake.DefaultInstallationId" />
                     </div>
                     <div class="field">
                         <label for="supportArch">Architecture</label>
