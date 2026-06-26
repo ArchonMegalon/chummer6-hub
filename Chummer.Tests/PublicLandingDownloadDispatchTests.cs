@@ -2398,6 +2398,13 @@ public sealed class PublicLandingDownloadDispatchTests
         IActionResult first = await fixture.Controller.RunsiteTourDispatch("redmond-dockyard-pack", CancellationToken.None);
         var firstRedirect = Assert.IsType<RedirectResult>(first);
         Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", firstRedirect.Url);
+        Assert.Equal("true", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Tracked"].ToString());
+        Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Limit"].ToString());
+        Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Used"].ToString());
+        Assert.Equal("0", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Remaining"].ToString());
+        Assert.Equal("free", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Tier"].ToString());
+        Assert.Equal("free_weekly_allowance", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Basis"].ToString());
+        Assert.Equal("account", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Scope"].ToString());
         Assert.Equal("1", fixture.Controller.Response.Headers["X-Runsite-Tour-Limit"].ToString());
         Assert.Equal("0", fixture.Controller.Response.Headers["X-Runsite-Tour-Remaining"].ToString());
         string firstRequestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
@@ -2537,6 +2544,15 @@ public sealed class PublicLandingDownloadDispatchTests
         IActionResult first = await fixture.Controller.PropertyquarryPropertyTourDispatch("northbound-research-lab", CancellationToken.None);
         var firstRedirect = Assert.IsType<RedirectResult>(first);
         Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P", firstRedirect.Url);
+        Assert.Equal("true", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Tracked"].ToString());
+        Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Limit"].ToString());
+        Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Used"].ToString());
+        Assert.Equal("0", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Remaining"].ToString());
+        Assert.Equal("free", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Tier"].ToString());
+        Assert.Equal("free_weekly_allowance", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Basis"].ToString());
+        Assert.Equal("account", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Scope"].ToString());
+        Assert.False(fixture.Controller.Response.Headers.ContainsKey("X-Runsite-Tour-Limit"));
+        Assert.False(fixture.Controller.Response.Headers.ContainsKey("X-Runsite-Tour-Remaining"));
         Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
 
         IActionResult second = await fixture.Controller.PropertyquarryPropertyTourDispatch("shoreline-automation-factory", CancellationToken.None);
@@ -2785,6 +2801,13 @@ public sealed class PublicLandingDownloadDispatchTests
         IActionResult first = await fixture.Controller.RunbookPrimerExportDispatch("new-runner-primer", CancellationToken.None);
         var firstRedirect = Assert.IsType<RedirectResult>(first);
         AssertProtectedMediaRedirect(firstRedirect.Url, "/media/horizons/runbook-press-90s-deepdive.mp4");
+        Assert.Equal("true", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Tracked"].ToString());
+        Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Limit"].ToString());
+        Assert.Equal("1", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Used"].ToString());
+        Assert.Equal("0", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Remaining"].ToString());
+        Assert.Equal("free", fixture.Controller.Response.Headers["X-Horizon-Artifact-Allowance-Tier"].ToString());
+        Assert.Equal("free_weekly_allowance", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Basis"].ToString());
+        Assert.Equal("account", fixture.Controller.Response.Headers["X-Horizon-Artifact-Entitlement-Scope"].ToString());
         Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
 
         IActionResult second = await fixture.Controller.RunbookPrimerExportDispatch("gm-first-night-primer", CancellationToken.None);

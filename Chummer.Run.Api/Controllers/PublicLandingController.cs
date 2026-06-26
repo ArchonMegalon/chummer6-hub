@@ -4400,7 +4400,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return Redirect($"/login?next={Uri.EscapeDataString(dispatchRoute)}");
         }
 
-        RunsiteTourQuotaSnapshot? runsiteQuota = null;
+        HorizonArtifactQuotaSnapshot? dispatchQuota = null;
         if (_artifactRequests is not null)
         {
             try
@@ -4439,19 +4439,16 @@ document.addEventListener('DOMContentLoaded', function () {
                     return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: fallbackQuotaUnavailableMessage);
                 }
 
-                if (emitRunsiteHeaders && receiptQuota is not null)
+                Response.Headers["X-Horizon-Artifact-Quota-Tracked"] = receipt.QuotaTracked ? "true" : "false";
+                if (receiptQuota is not null)
                 {
-                    runsiteQuota = new RunsiteTourQuotaSnapshot(
-                        receiptQuota.UserId,
-                        receiptQuota.SupporterActive,
-                        receiptQuota.AllowanceTier,
-                        receiptQuota.EntitlementBasis,
-                        receiptQuota.EntitlementScope,
-                        receiptQuota.WeeklyLimit,
-                        receiptQuota.WeeklyUsed,
-                        receiptQuota.WeeklyRemaining,
-                        receiptQuota.WindowStartUtc,
-                        receiptQuota.WindowEndUtc);
+                    dispatchQuota = receiptQuota;
+                    Response.Headers["X-Horizon-Artifact-Quota-Limit"] = receiptQuota.WeeklyLimit.ToString(CultureInfo.InvariantCulture);
+                    Response.Headers["X-Horizon-Artifact-Quota-Used"] = receiptQuota.WeeklyUsed.ToString(CultureInfo.InvariantCulture);
+                    Response.Headers["X-Horizon-Artifact-Quota-Remaining"] = receiptQuota.WeeklyRemaining.ToString(CultureInfo.InvariantCulture);
+                    Response.Headers["X-Horizon-Artifact-Allowance-Tier"] = receiptQuota.AllowanceTier;
+                    Response.Headers["X-Horizon-Artifact-Entitlement-Basis"] = receiptQuota.EntitlementBasis;
+                    Response.Headers["X-Horizon-Artifact-Entitlement-Scope"] = receiptQuota.EntitlementScope;
                 }
 
                 Response.Headers["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
@@ -4473,10 +4470,10 @@ document.addEventListener('DOMContentLoaded', function () {
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "Shared horizon artifact dispatch service is not available right now.");
         }
 
-        if (emitRunsiteHeaders)
+        if (emitRunsiteHeaders && dispatchQuota is not null)
         {
-            Response.Headers["X-Runsite-Tour-Limit"] = runsiteQuota?.WeeklyLimit.ToString(CultureInfo.InvariantCulture);
-            Response.Headers["X-Runsite-Tour-Remaining"] = runsiteQuota?.WeeklyRemaining.ToString(CultureInfo.InvariantCulture);
+            Response.Headers["X-Runsite-Tour-Limit"] = dispatchQuota.WeeklyLimit.ToString(CultureInfo.InvariantCulture);
+            Response.Headers["X-Runsite-Tour-Remaining"] = dispatchQuota.WeeklyRemaining.ToString(CultureInfo.InvariantCulture);
         }
 
         _logger.LogInformation(
@@ -4484,8 +4481,8 @@ document.addEventListener('DOMContentLoaded', function () {
             operationLabel,
             subject.SubjectId,
             sourceId,
-            runsiteQuota?.WeeklyRemaining,
-            runsiteQuota?.WeeklyLimit);
+            dispatchQuota?.WeeklyRemaining,
+            dispatchQuota?.WeeklyLimit);
 
         return Redirect(ProtectHorizonArtifactDispatchTarget(dispatchTarget));
     }
