@@ -2,18 +2,24 @@ using System.Text;
 using System.Text.Json;
 using Chummer.Run.Contracts.Billing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chummer.Run.Api.Services.Community;
 
 public sealed class MyFirstBookUsageStore
 {
+    private readonly ILogger<MyFirstBookUsageStore> _logger;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
     };
 
-    public MyFirstBookUsageStore(IConfiguration configuration)
+    public MyFirstBookUsageStore(
+        IConfiguration configuration,
+        ILogger<MyFirstBookUsageStore>? logger = null)
     {
+        _logger = logger ?? NullLogger<MyFirstBookUsageStore>.Instance;
         StoragePath = ResolveStoragePath(configuration);
         Load();
     }
@@ -41,18 +47,46 @@ public sealed class MyFirstBookUsageStore
         {
             if (!File.Exists(StoragePath))
             {
+                _logger.LogInformation("MyFirstBookUsageStore starting with an empty durable state at {StoragePath}.", StoragePath);
                 return;
             }
 
-            string storeJson = File.ReadAllText(StoragePath, Encoding.UTF8);
-            if (string.IsNullOrWhiteSpace(storeJson))
+            try
             {
-                return;
-            }
+                string storeJson = File.ReadAllText(StoragePath, Encoding.UTF8);
+                if (string.IsNullOrWhiteSpace(storeJson))
+                {
+                    _logger.LogInformation("MyFirstBookUsageStore loaded an empty durable state from {StoragePath}.", StoragePath);
+                    return;
+                }
 
-            var snapshot = JsonSerializer.Deserialize<MyFirstBookUsageStoreSnapshot>(storeJson, _jsonOptions);
-            Entries.Clear();
-            Entries.AddRange(snapshot?.Entries ?? []);
+                var snapshot = JsonSerializer.Deserialize<MyFirstBookUsageStoreSnapshot>(storeJson, _jsonOptions);
+                Entries.Clear();
+                Entries.AddRange(snapshot?.Entries ?? []);
+                _logger.LogInformation(
+                    "MyFirstBookUsageStore loaded {EntryCount} quota ledger entries from {StoragePath}.",
+                    Entries.Count,
+                    StoragePath);
+            }
+            catch (JsonException ex)
+            {
+                Entries.Clear();
+                QuarantineCorruptStoreFile();
+                _logger.LogWarning(ex, "MyFirstBookUsageStore quarantined corrupt durable state at {StoragePath} and restarted empty.", StoragePath);
+            }
+        }
+    }
+
+    private void QuarantineCorruptStoreFile()
+    {
+        string quarantinePath = $"{StoragePath}.corrupt-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+        try
+        {
+            File.Move(StoragePath, quarantinePath);
+        }
+        catch
+        {
+            // Starting empty is safer than crashing when a local usage ledger file is unreadable.
         }
     }
 

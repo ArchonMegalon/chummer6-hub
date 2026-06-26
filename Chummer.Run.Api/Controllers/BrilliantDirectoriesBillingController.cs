@@ -173,21 +173,36 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
     [HttpPost("/account/billing/supporter")]
     [Consumes("application/x-www-form-urlencoded")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> StartSupporterCheckout([FromForm] BrilliantDirectoriesCheckoutRequest request, CancellationToken cancellationToken = default)
     {
-        BrilliantDirectoriesCheckoutRequest resolvedRequest = request;
-        if (string.IsNullOrWhiteSpace(resolvedRequest.UserId))
+        HubUserDto? currentUser = await TryGetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
+        if (currentUser is null)
         {
-            HubUserDto? currentUser = await TryGetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
-            if (currentUser is null)
-            {
-                return Redirect($"/login?next={Uri.EscapeDataString("/account/billing")}");
-            }
-
-            resolvedRequest = new BrilliantDirectoriesCheckoutRequest(
-                currentUser.UserId,
-                TrimToNull(resolvedRequest.Email) ?? TrimToNull(currentUser.Email));
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/billing")}");
         }
+
+        string currentUserId = currentUser.UserId;
+        string? currentEmail = TrimToNull(currentUser.Email);
+        string? requestedUserId = TrimToNull(request.UserId);
+        string? requestedEmail = TrimToNull(request.Email);
+        if (!string.IsNullOrWhiteSpace(requestedUserId)
+            && !string.Equals(requestedUserId, currentUserId, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "Ignoring supporter checkout user override for signed-in account {UserId}.",
+                currentUserId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestedEmail)
+            && !string.Equals(requestedEmail, currentEmail, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation(
+                "Ignoring supporter checkout email override for signed-in account {UserId}.",
+                currentUserId);
+        }
+
+        BrilliantDirectoriesCheckoutRequest resolvedRequest = new(currentUserId, currentEmail);
 
         try
         {
