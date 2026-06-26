@@ -136,7 +136,7 @@ else
             </div>
             @if (nightly is null || stableAndNightlyMatch)
             {
-                <a class="button-like button-like--secondary" href="#stable">Use Stable</a>
+                <a class="button-like button-like--secondary" href="@(stable is null ? "#other-downloads" : "#stable")">@(stable is null ? "Other downloads" : "Use Stable")</a>
             }
             else
             {
