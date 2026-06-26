@@ -2128,12 +2128,7 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
-        => await ParticipateBoardProxyCore(
-            boardPath: string.Empty,
-            cancellationToken,
-            localOrigin: "/partizipate",
-            localBaseHref: "/partizipate/",
-            fallbackPath: "/partizipate").ConfigureAwait(false);
+        => View("~/Views/PublicLanding/Partizipate.cshtml", await BuildFirstPartyParticipateBoardAsync(cancellationToken).ConfigureAwait(false));
 
     [HttpGet("/participate")]
     [Produces("text/html")]

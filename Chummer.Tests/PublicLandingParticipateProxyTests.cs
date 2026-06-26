@@ -95,7 +95,7 @@ public sealed class PublicLandingParticipateProxyTests
     }
 
     [Fact]
-    public async Task PartizipateAliasProxiesHostedBoardAtTypoUrl()
+    public async Task PartizipateAliasRendersReadableFirstPartyBoardAtTypoUrl()
     {
         var controller = CreateController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -104,15 +104,13 @@ public sealed class PublicLandingParticipateProxyTests
 
         IActionResult result = await controller.ParticipateAliasPage(CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        string html = content.Content ?? string.Empty;
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("rel=\"canonical\" href=\"/partizipate\"", html, StringComparison.Ordinal);
-        Assert.Contains("<base href=\"/partizipate/\" />", html, StringComparison.Ordinal);
-        Assert.Contains("What should Chummer do next?", html, StringComparison.Ordinal);
-        Assert.DoesNotContain(">Sign up<", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(">Log in<", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("global-search-trigger", html, StringComparison.OrdinalIgnoreCase);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.Equal("Participate", model.Heading);
+        Assert.Equal("/partizipate", model.RetryHref);
+        Assert.NotEmpty(model.Posts.Count > 0 ? model.Posts.Select(static item => item.Title) : model.FallbackItems.Select(static item => item.Title));
+        Assert.DoesNotContain("ProductLift", model.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
