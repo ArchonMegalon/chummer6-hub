@@ -105,6 +105,47 @@ public sealed class PublicLandingDownloadsChromeTests
             authenticated: false);
     }
 
+    private static ReleaseExperienceViewModel BuildGuestWindowsExperienceFromLinuxOnlyShelf()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var releaseSelection = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "0.0.0.1",
+            Channel: "public_stable",
+            PublishedAt: DateTimeOffset.Parse("2026-06-26T08:00:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-x64-installer",
+                    Platform: "Avalonia Desktop Linux x64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    Sha256: "linux-direct",
+                    SizeBytes: 303,
+                    Head: "avalonia",
+                    PlatformId: "linux-x64",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "open_public")
+            ],
+            ProofStatus: "passed",
+            ProofRoutes:
+            [
+                "/downloads/get/avalonia-linux-x64-installer"
+            ]);
+
+        return releaseSelection.BuildExperience(
+            manifest,
+            userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            authenticated: false);
+    }
+
     [Fact]
     public void RebindDownloadsHeaderActionsUsesDownloadsShelfWhenAnyGuestInstallerIsAvailable()
     {
@@ -221,5 +262,17 @@ public sealed class PublicLandingDownloadsChromeTests
         Assert.NotNull(rebound.PublicPrimaryCta);
         Assert.Equal(releaseExperience.Recommended.ActionLabel, rebound.PublicPrimaryCta!.Label);
         Assert.Equal(releaseExperience.Recommended.DispatchHref, rebound.PublicPrimaryCta!.Href);
+    }
+
+    [Fact]
+    public void WindowsBrowserAgainstLinuxOnlyShelfKeepsRequestedPlatformUnavailable()
+    {
+        var releaseExperience = BuildGuestWindowsExperienceFromLinuxOnlyShelf();
+
+        Assert.False(releaseExperience.RequestedPlatformHasPublicDownload);
+        Assert.Equal("Windows", releaseExperience.RequestedPlatformLabel);
+        Assert.NotNull(releaseExperience.Recommended);
+        Assert.Equal("avalonia-linux-x64-installer", releaseExperience.Recommended!.Artifact.Id);
+        Assert.Equal("Linux", releaseExperience.Recommended.PlatformLabel);
     }
 }

@@ -5,7 +5,10 @@
     ViewData["SurfaceClass"] = "surface-downloads surface-minimal";
 
     var release = Model.ReleaseExperience;
-    var stable = release.Recommended;
+    var recommended = release.Recommended;
+    var requestedPlatformUnavailable = !release.RequestedPlatformHasPublicDownload
+        && !string.IsNullOrWhiteSpace(release.RequestedPlatformLabel);
+    var stable = requestedPlatformUnavailable ? null : recommended;
     var nightly = release.Alternatives
         .Where(option => stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase))
         .FirstOrDefault(IsNightly);
@@ -15,6 +18,7 @@
     var stablePlatformId = PlatformId(stable);
     var showLinuxSourcePrimary = string.Equals(stablePlatformId, "linux", StringComparison.OrdinalIgnoreCase);
     var otherPlatformOptions = release.OtherPlatforms
+        .Concat(requestedPlatformUnavailable && recommended is not null ? new[] { recommended } : Array.Empty<ReleaseOptionViewModel>())
         .Concat(release.ManualPackages)
         .Where(option => stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase))
         .Where(option => nightly is null || !string.Equals(option.Artifact.Id, nightly.Artifact.Id, StringComparison.OrdinalIgnoreCase))
@@ -85,7 +89,7 @@
     </div>
 </section>
 
-@if (Model.Manifest.Downloads.Count == 0 || stable is null)
+@if (Model.Manifest.Downloads.Count == 0)
 {
     <section class="minimal-empty">
         <h2>No build is available right now</h2>
@@ -99,22 +103,29 @@ else
         <article class="downloads-choice-card" id="stable">
             <div>
                 <span>Stable</span>
-                <h2>@stable.PlatformLabel</h2>
-                <p>Recommended for this browser.</p>
+                <h2>@(stable is null ? $"{release.RequestedPlatformLabel} unavailable" : stable.PlatformLabel)</h2>
+                <p>@(stable is null ? "No public installer for this browser yet." : "Recommended for this browser.")</p>
             </div>
-            <a class="button-like button-like--primary"
-               href="@stable.DispatchHref"
-               data-download-action="download-artifact"
-               data-download-artifact="@stable.Artifact.Id"
-               data-download-platform="@PlatformId(stable)"
-               data-download-raw-url="@stable.DirectFileHref"
-               data-download-install-route="/downloads/install/@Uri.EscapeDataString(stable.Artifact.Id)"
-               data-download-link-mode="raw-url"
-               data-release-lane="stable"
-               data-platform="@PlatformId(stable)"
-               data-analytics-event="downloads_stable_install"
-               data-analytics-surface="minimal_downloads"
-               data-analytics-label="@stable.PlatformLabel">@ButtonText(stable)</a>
+            @if (stable is null)
+            {
+                <a class="button-like button-like--primary" href="#other-downloads">Other downloads</a>
+            }
+            else
+            {
+                <a class="button-like button-like--primary"
+                   href="@stable.DispatchHref"
+                   data-download-action="download-artifact"
+                   data-download-artifact="@stable.Artifact.Id"
+                   data-download-platform="@PlatformId(stable)"
+                   data-download-raw-url="@stable.DirectFileHref"
+                   data-download-install-route="/downloads/install/@Uri.EscapeDataString(stable.Artifact.Id)"
+                   data-download-link-mode="raw-url"
+                   data-release-lane="stable"
+                   data-platform="@PlatformId(stable)"
+                   data-analytics-event="downloads_stable_install"
+                   data-analytics-surface="minimal_downloads"
+                   data-analytics-label="@stable.PlatformLabel">@ButtonText(stable)</a>
+            }
         </article>
 
         <article class="downloads-choice-card" id="nightly">

@@ -100,6 +100,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Newer than Stable.", view, StringComparison.Ordinal);
         Assert.Contains("No sudo. Updates default to notify.", view, StringComparison.Ordinal);
         Assert.Contains("showLinuxSourcePrimary", view, StringComparison.Ordinal);
+        Assert.Contains("RequestedPlatformHasPublicDownload", view, StringComparison.Ordinal);
+        Assert.Contains("No public installer for this browser yet.", view, StringComparison.Ordinal);
+        Assert.Contains("var stable = requestedPlatformUnavailable ? null : recommended;", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"#other-downloads\"", view, StringComparison.Ordinal);
         Assert.Contains("release.Alternatives", view, StringComparison.Ordinal);
         Assert.DoesNotContain("release.Alternatives.Concat(release.OtherPlatforms)", view, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"other\"", view, StringComparison.Ordinal);
