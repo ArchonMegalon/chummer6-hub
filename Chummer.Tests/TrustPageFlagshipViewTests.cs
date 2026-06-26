@@ -22,6 +22,8 @@ public sealed class TrustPageFlagshipViewTests
         Assert.Contains("Discord first. Private form only for logs or account details.", trustView, StringComparison.Ordinal);
         Assert.Contains("<details class=\"details-drawer minimal-help-card\" id=\"private-support-form\">", trustView, StringComparison.Ordinal);
         Assert.Contains("<summary>Private issue form</summary>", trustView, StringComparison.Ordinal);
+        Assert.Contains("<label for=\"supportHeadId\">App copy</label>", trustView, StringComparison.Ordinal);
+        Assert.Contains("<label for=\"supportInstallationId\">Installed copy</label>", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the short privacy summary first, then the full policy.", trustView, StringComparison.Ordinal);
         Assert.Contains("Read the short rules summary first, then the full terms.", trustView, StringComparison.Ordinal);
         Assert.Contains("else if (!contactPage)", trustView, StringComparison.Ordinal);
@@ -30,6 +32,8 @@ public sealed class TrustPageFlagshipViewTests
         Assert.DoesNotContain("one fallback", trustView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Fallback:", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("Or:", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Desktop head</label>", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Install id</label>", trustView, StringComparison.Ordinal);
     }
 
     [Fact]
