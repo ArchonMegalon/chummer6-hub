@@ -4022,6 +4022,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("application/json")]
     public IActionResult JackpointReceiptJson()
     {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("jackpoint");
         IReadOnlyList<MediaArtifactDocument> briefings = _mediaHorizons?.ListJackpointBriefings() ?? Array.Empty<MediaArtifactDocument>();
         string firstBriefingMarkdownHref = briefings.FirstOrDefault()?.MarkdownRoute ?? "/jackpoint/briefings/emerald-sprawl-briefing.md";
         string firstBriefingJsonHref = briefings.FirstOrDefault()?.JsonRoute ?? "/jackpoint/briefings/emerald-sprawl-briefing.json";
@@ -4046,11 +4047,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 ArtifactDetailHrefTemplate = "/artifacts/publications/{publicationId}",
                 Summary = "Signed-in JACKPOINT keeps publication review, public publication status, and campaign-return publication history inside Chummer."
             },
-            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("jackpoint", "briefing_video"),
-            ArtifactCapability = BuildPublicHorizonCapability(
-                "jackpoint",
-                "briefing_video",
-                "jackpoint:briefing-network"),
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
+            ArtifactCapability = BuildPublicHorizonCapability(surface, "jackpoint:briefing-network"),
             Boundary = new
             {
                 PublicAudience = "player_safe_only",
@@ -4069,7 +4067,15 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/jackpoint/briefings/{briefingId}.json")]
     [Produces("application/json")]
     public IActionResult JackpointBriefingJson([FromRoute] string briefingId)
-        => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetJackpointBriefing(briefingId), "jackpoint", "Player-safe dossier and mission-brief output only. GM-private spoiler packets stay off the public page."), "application/json");
+    {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("jackpoint");
+        return Content(
+            _mediaHorizons.BuildDocumentJson(
+                _mediaHorizons.GetJackpointBriefing(briefingId),
+                surface,
+                "Player-safe dossier and mission-brief output only. GM-private spoiler packets stay off the public page."),
+            "application/json");
+    }
 
     [HttpGet("/briefings")]
     public IActionResult BriefingsAliasPage()
@@ -4089,6 +4095,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("application/json")]
     public IActionResult RunsiteReceiptJson()
     {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("runsite");
         IReadOnlyList<MediaArtifactDocument> packs = _mediaHorizons?.ListRunsitePacks() ?? Array.Empty<MediaArtifactDocument>();
         MediaArtifactDocument? firstPack = packs.FirstOrDefault();
         string firstPackMarkdownHref = firstPack?.MarkdownRoute ?? "/runsites/packs/redmond-dockyard-pack.md";
@@ -4116,11 +4123,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 RunDetailApiHrefTemplate = "/api/v1/campaign-spine/me/runs/{runId}",
                 Summary = "Signed-in RUNSITE keeps workspace prep, runboard continuity, and prep-library launch inside Chummer."
             },
-            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("runsite", "tour"),
-            ArtifactCapability = BuildPublicHorizonCapability(
-                "runsite",
-                "tour",
-                "runsite:prep-network"),
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
+            ArtifactCapability = BuildPublicHorizonCapability(surface, "runsite:prep-network"),
             Boundary = new
             {
                 TacticalAuthority = "not_claimed",
@@ -4139,22 +4143,32 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/runsites/packs/{packId}.json")]
     [Produces("application/json")]
     public IActionResult RunsitePackJson([FromRoute] string packId)
-        => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetRunsitePack(packId), "runsite", "Spatial-prep guide only. This route does not claim a full overlay, VTT, or tactical control stack."), "application/json");
+    {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("runsite");
+        return Content(
+            _mediaHorizons.BuildDocumentJson(
+                _mediaHorizons.GetRunsitePack(packId),
+                surface,
+                "Spatial-prep guide only. This route does not claim a full overlay, VTT, or tactical control stack."),
+            "application/json");
+    }
 
     [HttpGet("/runsites/packs/{packId}/tour")]
     public async Task<IActionResult> RunsiteTourDispatch([FromRoute] string packId, CancellationToken cancellationToken)
-        => await DispatchHorizonArtifactAsync(
+    {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("runsite");
+        return await DispatchHorizonArtifactAsync(
             operationLabel: "runsite tour",
             dispatchRoute: $"/runsites/packs/{Uri.EscapeDataString(packId)}/tour",
             sourceId: packId,
-            horizonId: "runsite",
-            artifactKindOrCapabilityId: "tour",
+            surface: surface,
             emitRunsiteHeaders: true,
             resolveSource: _mediaHorizons.GetRunsitePack,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "3D-tour allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm 3D-tour allowance receipt right now.",
             cancellationToken: cancellationToken);
+    }
 
     [HttpGet("/propertyquarry")]
     [Produces("text/html")]
@@ -4167,6 +4181,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("application/json")]
     public IActionResult PropertyquarryReceiptJson()
     {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("propertyquarry");
         IReadOnlyList<MediaArtifactDocument> properties = _mediaHorizons?.ListPropertyquarryProperties() ?? Array.Empty<MediaArtifactDocument>();
         MediaArtifactDocument? firstProperty = properties.FirstOrDefault();
         string firstPropertyMarkdownHref = firstProperty?.MarkdownRoute ?? "/propertyquarry/properties/northbound-research-lab.md";
@@ -4191,11 +4206,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 ContinuityApiHref = "/api/v1/campaign-spine/me/property-continuity/{propertyId}",
                 Summary = "Signed-in PROPERTYQUARRY keeps selected property prep, continuity hooks, and workspace continuity behind account links."
             },
-            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("propertyquarry", "tour"),
-            ArtifactCapability = BuildPublicHorizonCapability(
-                "propertyquarry",
-                "tour",
-                "propertyquarry:property-network"),
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
+            ArtifactCapability = BuildPublicHorizonCapability(surface, "propertyquarry:property-network"),
             Boundary = new
             {
                 TacticalAuthority = "not_claimed",
@@ -4213,52 +4225,66 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/propertyquarry/properties/{propertyId}.json")]
     [Produces("application/json")]
     public IActionResult PropertyquarryPropertyJson([FromRoute] string propertyId)
-        => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetPropertyquarryProperty(propertyId), "propertyquarry", "Player-safe property overview and scene-flow output only. GM-private investigation notes stay off the public page."), "application/json");
+    {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("propertyquarry");
+        return Content(
+            _mediaHorizons.BuildDocumentJson(
+                _mediaHorizons.GetPropertyquarryProperty(propertyId),
+                surface,
+                "Player-safe property overview and scene-flow output only. GM-private investigation notes stay off the public page."),
+            "application/json");
+    }
 
     [HttpGet("/propertyquarry/properties/{propertyId}/tour")]
     public async Task<IActionResult> PropertyquarryPropertyTourDispatch([FromRoute] string propertyId, CancellationToken cancellationToken)
-        => await DispatchHorizonArtifactAsync(
+    {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("propertyquarry");
+        return await DispatchHorizonArtifactAsync(
             operationLabel: "propertyquarry property tour",
             dispatchRoute: $"/propertyquarry/properties/{Uri.EscapeDataString(propertyId)}/tour",
             sourceId: propertyId,
-            horizonId: "propertyquarry",
-            artifactKindOrCapabilityId: "tour",
+            surface: surface,
             emitRunsiteHeaders: false,
             resolveSource: _mediaHorizons.GetPropertyquarryProperty,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "3D-tour allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm 3D-tour allowance receipt right now.",
             cancellationToken: cancellationToken);
+    }
 
     [HttpGet("/jackpoint/briefings/{briefingId}/video")]
     public async Task<IActionResult> JackpointBriefingVideoDispatch([FromRoute] string briefingId, CancellationToken cancellationToken)
-        => await DispatchHorizonArtifactAsync(
+    {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("jackpoint");
+        return await DispatchHorizonArtifactAsync(
             operationLabel: "jackpoint briefing video",
             dispatchRoute: $"/jackpoint/briefings/{Uri.EscapeDataString(briefingId)}/video",
             sourceId: briefingId,
-            horizonId: "jackpoint",
-            artifactKindOrCapabilityId: "briefing_video",
+            surface: surface,
             emitRunsiteHeaders: false,
             resolveSource: _mediaHorizons.GetJackpointBriefing,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "Briefing video allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm briefing video allowance receipt right now.",
             cancellationToken: cancellationToken);
+    }
 
     [HttpGet("/runbook/primers/{primerId}/export")]
     public async Task<IActionResult> RunbookPrimerExportDispatch([FromRoute] string primerId, CancellationToken cancellationToken)
-        => await DispatchHorizonArtifactAsync(
+    {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("runbook-press");
+        return await DispatchHorizonArtifactAsync(
             operationLabel: "runbook primer export",
             dispatchRoute: $"/runbook/primers/{Uri.EscapeDataString(primerId)}/export",
             sourceId: primerId,
-            horizonId: "runbook-press",
-            artifactKindOrCapabilityId: "document_export",
+            surface: surface,
             emitRunsiteHeaders: false,
             resolveSource: _mediaHorizons.GetRunbookPrimer,
             resolveDispatchTarget: static document => document.DispatchTargetHref ?? document.TourHref,
             quotaAllowanceExhaustedMessage: "Runbook export allowance is exhausted for this week.",
             fallbackQuotaUnavailableMessage: "Unable to confirm runbook export allowance receipt right now.",
             cancellationToken: cancellationToken);
+    }
 
     [HttpGet("/table-pulse/debrief")]
     public async Task<IActionResult> TablePulseDebriefDispatch(CancellationToken cancellationToken)
@@ -4336,8 +4362,7 @@ document.addEventListener('DOMContentLoaded', function () {
         string operationLabel,
         string dispatchRoute,
         string sourceId,
-        string horizonId,
-        string artifactKindOrCapabilityId,
+        MediaArtifactSurfaceDefinition surface,
         bool emitRunsiteHeaders,
         Func<string, MediaArtifactDocument> resolveSource,
         Func<MediaArtifactDocument, string?> resolveDispatchTarget,
@@ -4359,7 +4384,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         catch (KeyNotFoundException)
         {
-            _logger.LogWarning("{Operation} dispatch requested unknown source {SourceId} for {HorizonId}.", operationLabel, sourceId, horizonId);
+            _logger.LogWarning("{Operation} dispatch requested unknown source {SourceId} for {HorizonId}.", operationLabel, sourceId, surface.HorizonId);
             return NotFound();
         }
 
@@ -4374,9 +4399,9 @@ document.addEventListener('DOMContentLoaded', function () {
             operationLabel,
             dispatchRoute,
             sourceId,
-            $"{horizonId}:{sourceId}",
-            horizonId,
-            artifactKindOrCapabilityId,
+            $"{surface.HorizonId}:{sourceId}",
+            surface.HorizonId,
+            surface.CapabilityId,
             dispatchTarget,
             emitRunsiteHeaders,
             quotaAllowanceExhaustedMessage,
@@ -4689,6 +4714,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("application/json")]
     public IActionResult RunbookReceiptJson()
     {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("runbook-press");
         IReadOnlyList<MediaArtifactDocument> primers = _mediaHorizons?.ListRunbookPrimers() ?? Array.Empty<MediaArtifactDocument>();
         MediaArtifactDocument? firstPrimer = primers.FirstOrDefault();
         string firstPrimerMarkdownHref = firstPrimer?.MarkdownRoute ?? "/runbook/primers/new-runner-primer.md";
@@ -4705,11 +4731,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 ExportDispatchHrefTemplate = "/runbook/primers/{primerId}/export",
                 Summary = "RUNBOOK PRESS keeps printable primers first-party and routes formatted exports through shared Chummer-owned artifact requests."
             },
-            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("runbook-press", "document_export"),
-            ArtifactCapability = BuildPublicHorizonCapability(
-                "runbook-press",
-                "document_export",
-                "runbook-press:primer-network"),
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
+            ArtifactCapability = BuildPublicHorizonCapability(surface, "runbook-press:primer-network"),
             Boundary = new
             {
                 PublicationStudio = "not_claimed",
@@ -4731,7 +4754,15 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/runbook/primers/{primerId}.json")]
     [Produces("application/json")]
     public IActionResult RunbookPrimerJson([FromRoute] string primerId)
-        => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetRunbookPrimer(primerId), "runbook_press", "Printable onboarding and prep packets only. This route does not claim a full long-form publishing studio."), "application/json");
+    {
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons.GetSurface("runbook-press");
+        return Content(
+            _mediaHorizons.BuildDocumentJson(
+                _mediaHorizons.GetRunbookPrimer(primerId),
+                surface,
+                "Printable onboarding and prep packets only. This route does not claim a full long-form publishing studio."),
+            "application/json");
+    }
 
     [HttpGet("/primers")]
     public IActionResult PrimersAliasPage()
@@ -11925,11 +11956,20 @@ Boundary:
         string visibility = "public_safe")
         => _horizonCapabilities.BuildPublicCapabilityViewModel(horizonId, artifactKindOrCapabilityId, sourceRef, visibility);
 
+    private PublicHorizonCapabilityViewModel BuildPublicHorizonCapability(
+        MediaArtifactSurfaceDefinition surface,
+        string sourceRef,
+        string visibility = "public_safe")
+        => BuildPublicHorizonCapability(surface.HorizonId, surface.CapabilityId, sourceRef, visibility);
+
     private JsonObject BuildSharedArtifactSurfaceRoutesNode(string horizonId, string artifactKindOrCapabilityId)
         => _horizonCapabilities.BuildSharedArtifactSurfaceRoutesJsonNode(horizonId, artifactKindOrCapabilityId);
 
     private SharedArtifactSurfaceRoutesViewModel BuildSharedArtifactSurfaceRoutes(string horizonId, string artifactKindOrCapabilityId)
         => _horizonCapabilities.BuildSharedArtifactSurfaceRoutesViewModel(horizonId, artifactKindOrCapabilityId);
+
+    private SharedArtifactSurfaceRoutesViewModel BuildSharedArtifactSurfaceRoutes(MediaArtifactSurfaceDefinition surface)
+        => BuildSharedArtifactSurfaceRoutes(surface.HorizonId, surface.CapabilityId);
 
     private PublicSignalLoopSnapshotViewModel BuildPublicSignalLoopSnapshot(
         PublicLandingSurfaceDto surface,

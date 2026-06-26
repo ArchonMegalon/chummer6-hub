@@ -35,6 +35,14 @@ public sealed class MediaArtifactHorizonsService
                 MatterportHref: DefaultMatterportTourHref,
                 ThreeDvVistaHref: DefaultThreeDvVistaTourHref)
         };
+    private static readonly IReadOnlyDictionary<string, MediaArtifactSurfaceDefinition> SurfaceDefinitions =
+        new Dictionary<string, MediaArtifactSurfaceDefinition>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["jackpoint"] = new("jackpoint", "jackpoint-briefing-video"),
+            ["propertyquarry"] = new("propertyquarry", "propertyquarry-tour"),
+            ["runbook-press"] = new("runbook-press", "runbook-export"),
+            ["runsite"] = new("runsite", "runsite-tour")
+        };
 
     private static readonly IReadOnlyList<MediaArtifactDocument> JackpointBriefings =
     [
@@ -225,6 +233,13 @@ public sealed class MediaArtifactHorizonsService
     public MediaArtifactDocument GetRunsitePack(string id) => GetById(_runsitePacks, id, "RUNSITE pack");
     public MediaArtifactDocument GetRunbookPrimer(string id) => GetById(RunbookPrimers, id, "RUNBOOK primer");
     public MediaArtifactDocument GetPropertyquarryProperty(string id) => GetById(_propertyquarryProperties, id, "PROPERTYQUARRY property");
+    public MediaArtifactSurfaceDefinition GetSurface(string horizonId)
+    {
+        string normalizedHorizonId = NormalizeHorizonId(horizonId);
+        return SurfaceDefinitions.TryGetValue(normalizedHorizonId, out MediaArtifactSurfaceDefinition? surface)
+            ? surface
+            : throw new KeyNotFoundException($"Unknown media artifact horizon '{horizonId}'.");
+    }
 
     public string BuildDocumentMarkdown(MediaArtifactDocument document, string horizonLabel, string boundary)
     {
@@ -266,10 +281,13 @@ public sealed class MediaArtifactHorizonsService
     }
 
     public string BuildDocumentJson(MediaArtifactDocument document, string horizonId, string boundary)
+        => BuildDocumentJson(document, GetSurface(horizonId), boundary);
+
+    public string BuildDocumentJson(MediaArtifactDocument document, MediaArtifactSurfaceDefinition surface, string boundary)
         => JsonSerializer.Serialize(
             new
             {
-                horizon_id = horizonId,
+                horizon_id = surface.HorizonId,
                 document.Id,
                 document.Label,
                 document.Summary,
@@ -283,49 +301,35 @@ public sealed class MediaArtifactHorizonsService
                 tour_action_href = document.TourActionHref,
                 tour_action_label = document.TourActionLabel,
                 tour_action_open_in_new_tab = document.TourActionOpenInNewTab,
-                shared_artifacts = BuildSharedArtifactRoutes(horizonId),
-                artifact_capability = BuildPublicArtifactCapability(horizonId, document),
+                shared_artifacts = BuildSharedArtifactRoutes(surface),
+                artifact_capability = BuildPublicArtifactCapability(surface, document),
                 boundary,
                 status = "live",
                 generated_at_utc = DateTimeOffset.UtcNow
             },
             new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
 
-    private JsonObject? BuildSharedArtifactRoutes(string horizonId)
+    private JsonObject? BuildSharedArtifactRoutes(MediaArtifactSurfaceDefinition surface)
     {
-        if (_capabilities is null || !TryResolveArtifactKind(horizonId, out string normalizedHorizonId, out string artifactKind))
+        if (_capabilities is null)
         {
             return null;
         }
 
-        return _capabilities.BuildSharedArtifactSurfaceRoutesJsonNode(normalizedHorizonId, artifactKind);
+        return _capabilities.BuildSharedArtifactSurfaceRoutesJsonNode(surface.HorizonId, surface.CapabilityId);
     }
 
-    private JsonObject? BuildPublicArtifactCapability(string horizonId, MediaArtifactDocument document)
+    private JsonObject? BuildPublicArtifactCapability(MediaArtifactSurfaceDefinition surface, MediaArtifactDocument document)
     {
-        if (_capabilities is null || !TryResolveArtifactKind(horizonId, out string normalizedHorizonId, out string artifactKind))
+        if (_capabilities is null)
         {
             return null;
         }
 
         return _capabilities.BuildPublicCapabilityJsonNode(
-            normalizedHorizonId,
-            artifactKind,
-            $"{normalizedHorizonId}:{document.Id}");
-    }
-
-    private static bool TryResolveArtifactKind(string horizonId, out string normalizedHorizonId, out string artifactKind)
-    {
-        normalizedHorizonId = NormalizeHorizonId(horizonId);
-        artifactKind = normalizedHorizonId switch
-        {
-            "propertyquarry" => "tour",
-            "jackpoint" => "briefing_video",
-            "runbook-press" => "document_export",
-            "runsite" => "tour",
-            _ => string.Empty
-        };
-        return !string.IsNullOrWhiteSpace(artifactKind);
+            surface.HorizonId,
+            surface.CapabilityId,
+            $"{surface.HorizonId}:{document.Id}");
     }
 
     private static string NormalizeHorizonId(string horizonId)
@@ -497,3 +501,7 @@ public sealed record MediaArtifactDocument(
     string? TourActionLabel = null,
     bool TourActionOpenInNewTab = false,
     string? DispatchTargetHref = null);
+
+public sealed record MediaArtifactSurfaceDefinition(
+    string HorizonId,
+    string CapabilityId);

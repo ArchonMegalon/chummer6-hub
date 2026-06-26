@@ -1070,6 +1070,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var content = Assert.IsType<ContentResult>(result);
         using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        Assert.Equal("runsite", payload.RootElement.GetProperty("horizon_id").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
         Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=runsite&artifactKindOrCapabilityId=runsite-tour", sharedArtifacts.GetProperty("public_capability_health_href").GetString());
@@ -1103,6 +1104,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var content = Assert.IsType<ContentResult>(result);
         using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        Assert.Equal("jackpoint", payload.RootElement.GetProperty("horizon_id").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
         Assert.Null(sharedArtifacts.GetProperty("public_capability_health_href").GetString());
@@ -1136,6 +1138,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var content = Assert.IsType<ContentResult>(result);
         using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        Assert.Equal("propertyquarry", payload.RootElement.GetProperty("horizon_id").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
         Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-tour", sharedArtifacts.GetProperty("public_capability_health_href").GetString());
@@ -1169,6 +1172,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var content = Assert.IsType<ContentResult>(result);
         using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        Assert.Equal("runbook-press", payload.RootElement.GetProperty("horizon_id").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("shared_artifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("public_capability_catalog_href").GetString());
         Assert.Null(sharedArtifacts.GetProperty("public_capability_health_href").GetString());
