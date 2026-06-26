@@ -2884,7 +2884,7 @@ public sealed class PublicLandingController : Controller
             TimeSpan.FromMilliseconds(250));
         rewritten = Regex.Replace(
             rewritten,
-            @"(<meta\b[^>]*\b(?:property|name)\s*=\s*[""'](?:og:url|twitter:url)[""'][^>]*\bcontent\s*=\s*[""'])[^""']+([""'][^>]*>)",
+            @"(<meta\b[^>]*\b(?:property|name)\s*=\s*[""'](?:og:url|twitter:url)[""'][^>]*\bcontent\s*=\s*[""'])[^""']*([""'][^>]*>)",
             $"$1{localOrigin}$2",
             RegexOptions.IgnoreCase | RegexOptions.Singleline,
             TimeSpan.FromMilliseconds(250));

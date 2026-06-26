@@ -219,7 +219,11 @@ public sealed class PublicSignalOperationsViewTests
         const string html = """
 <!doctype html>
 <html>
-<head><title>Board</title></head>
+<head>
+  <title>Board</title>
+  <meta property="og:url" content="">
+  <meta name="twitter:url" content="https://chummer6.productlift.dev/feedback">
+</head>
 <link rel="preload" href="https://media.productlift.dev/branding-stylesheets/theme.css" as="style">
 <script src="https://cdn.productlift.dev/js/all.js"></script>
 <body>
@@ -241,6 +245,8 @@ public sealed class PublicSignalOperationsViewTests
             [html, new Uri("https://chummer6.productlift.dev/feedback"), "https://chummer.run/", "/account/billing/supporter/start"])!;
 
         Assert.Contains("<base href=\"/participate/board/\" />", rewritten, StringComparison.Ordinal);
+        Assert.Contains("<meta property=\"og:url\" content=\"/participate/board\">", rewritten, StringComparison.Ordinal);
+        Assert.Contains("<meta name=\"twitter:url\" content=\"/participate/board\">", rewritten, StringComparison.Ordinal);
         Assert.Contains("href=\"/participate/board/roadmap\"", rewritten, StringComparison.Ordinal);
         Assert.Contains("src=\"/participate/board/assets/poster.png\"", rewritten, StringComparison.Ordinal);
         Assert.Contains("/participate/provider-assets/media/branding-stylesheets/theme.css", rewritten, StringComparison.OrdinalIgnoreCase);
