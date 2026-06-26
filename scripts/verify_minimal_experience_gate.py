@@ -59,6 +59,11 @@ def count_occurrences(text: str, needle: str) -> int:
     return len(re.findall(re.escape(needle), text, flags=re.IGNORECASE))
 
 
+def count_class_token(text: str, token: str) -> int:
+    pattern = rf'class=["\'][^"\']*(?<![\w-]){re.escape(token)}(?![\w-])[^"\']*["\']'
+    return len(re.findall(pattern, text, flags=re.IGNORECASE))
+
+
 def find_release_noise(text: str) -> list[str]:
     patterns = [
         r"\brun-\d{8}-\d{6}\b",
@@ -108,7 +113,7 @@ def build_payload(
     promo_video_link_load = all(asset_checker(urljoin(f"{normalized_base_url}/", link)) for link in product_video_links)
     stable_visible = 'id="stable"' in downloads_html and "Current build" in downloads_html
     nightly_visible = 'id="nightly"' in downloads_html and "Newest build" in downloads_html
-    decision_card_count = count_occurrences(status_html, 'class="minimal-status-pill"')
+    decision_card_count = count_class_token(status_html, "minimal-status-pill")
     next_action_count = count_occurrences(status_html, 'data-analytics-event="status_next_action"')
     status_updated_count = count_occurrences(status_html, "Updated")
     downloads_updated_count = count_occurrences(downloads_html, "Updated")

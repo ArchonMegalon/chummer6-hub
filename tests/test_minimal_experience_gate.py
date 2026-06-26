@@ -33,9 +33,8 @@ class MinimalExperienceGateTests(unittest.TestCase):
                 <article id="stable"><h2>Current build</h2></article>
                 <article id="nightly"><span>Nightly</span><h2>Newest build</h2></article>
             """,
-                "https://example.invalid/status": """
-                <div class="minimal-status-pill"></div>
-                <span>Updated</span>
+            "https://example.invalid/status": """
+                <div class="minimal-page-hero minimal-status-pill"></div>
                 <a data-analytics-event="status_next_action">Downloads</a>
                 <a data-analytics-event="status_next_action">Support</a>
                 <a data-analytics-event="status_next_action">Release notes</a>
@@ -54,7 +53,7 @@ class MinimalExperienceGateTests(unittest.TestCase):
         self.assertTrue(payload["results"][0]["hero_image_loaded"])
         self.assertEqual(payload["results"][0]["product_video_links"], ["/media/promo/every-wonder-horizon-promo.mp4"])
         self.assertEqual(payload["results"][1]["updated_label_count"], 1)
-        self.assertEqual(payload["results"][2]["updated_label_count"], 1)
+        self.assertEqual(payload["results"][2]["updated_label_count"], 0)
 
     def test_payload_rejects_repeated_dates_and_internal_release_noise(self) -> None:
         module = load_module()
@@ -73,7 +72,7 @@ class MinimalExperienceGateTests(unittest.TestCase):
                 <p>Released 2026-06-23</p>
             """,
             "https://example.invalid/status": """
-                <div class="minimal-status-pill"></div>
+                <div class="minimal-page-hero minimal-status-pill"></div>
                 <span>Updated</span><span>Updated</span>
                 <p>Build run-20260623-102621</p>
                 <p>Checks passed</p>

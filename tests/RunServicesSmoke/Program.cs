@@ -2895,7 +2895,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(statusSource.Contains("Current release", StringComparison.Ordinal), "status should keep the current release posture inside the one public decision surface.");
     Assert(statusSource.Contains("Open downloads", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");
     Assert(statusSource.Contains("Open help", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");
-    Assert(statusSource.Contains("<h2>Platforms</h2>", StringComparison.Ordinal), "status should keep platform specifics visible without adding another release drawer.");
+    Assert(!statusSource.Contains("<h2>Platforms</h2>", StringComparison.Ordinal), "status should not carry a platform shelf after the minimal release decision.");
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
     Assert(!featureDetailSource.Contains("Get help with this surface", StringComparison.Ordinal), "detail-family pages should keep next-step help inside the family-specific route blocks.");
     Assert(liveProofDetailSource.Contains("Model.Chrome.Authenticated", StringComparison.Ordinal), "live proof detail should conditionally surface signed-in artifact continuity instead of treating all visitors the same.");
