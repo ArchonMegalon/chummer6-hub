@@ -73,7 +73,7 @@
     var creatorPublicationCount = Model.CampaignSpine.CreatorPublications.Count;
     var organizerGuidanceSummary = openSupportCases == 0
         ? "Downloads, support, and returns stay here."
-        : $"{openSupportCases} tracked support case(s) stay here with downloads and return paths.";
+        : $"{openSupportCases} support case(s) stay here with downloads and next steps.";
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
     var participationRecognition = Model.ParticipationRecognition;
@@ -206,8 +206,8 @@
     var selectedRunTablePulseSummary = selectedRun is null
         ? string.Empty
         : selectedRun.LatestContinuity is not null
-            ? "This run already has live continuity."
-            : "This run is ready for the next Table Pulse reaction.";
+            ? "This run already has a live follow-up."
+            : "This run is ready for the next Table Pulse update.";
     var launcherDossiers = Model.CampaignSpine.Dossiers
         .OrderByDescending(static item => item.UpdatedAtUtc)
         .Take(4)
@@ -609,7 +609,7 @@
         : "Recovery codes stay in reserve. The default path remains installer or in-app linking on the affected device.";
     var accountRailSupportSummary = openSupportCases > 0
         ? $"{openSupportCases} active support case(s) stay attached to this account."
-        : "No active support case is blocking the next install or return path right now.";
+        : "No active support case is blocking the next install or next step right now.";
 }
 
 <section class="account-stage">
@@ -1420,7 +1420,7 @@
                             </article>
                             <article>
                                 <h3>Groups and campaigns</h3>
-                                <p>Jump back into the campaign return path without digging through the whole account page.</p>
+                                <p>Jump back into the campaign without digging through the whole account page.</p>
                                 @if (launcherGroups.Length == 0 && launcherCampaigns.Length == 0)
                                 {
                                     <p class="muted-copy">No saved group or campaign path yet.</p>
@@ -1719,7 +1719,7 @@
                                     }
                                     else
                                     {
-                                        <text>Open the campaign and confirm the current return path before you continue.</text>
+                                        <text>Open the campaign and confirm the next step before you continue.</text>
                                     }
                                 </strong>
                             </div>
@@ -1770,7 +1770,7 @@
                                     }
                                     @if (selectedWorkspaceNextSessionCarryForward is not null)
                                     {
-                                        <p><strong>Next-session carry-forward:</strong> @selectedWorkspaceNextSessionCarryForward.Summary</p>
+                                        <p><strong>Next session note:</strong> @selectedWorkspaceNextSessionCarryForward.Summary</p>
                                     }
                                     @if (selectedWorkspaceCampaignMemory is not null)
                                     {
@@ -1791,7 +1791,7 @@
                                 </div>
                             </details>
                             <div class="settings-form">
-                                <p><strong>Table Pulse Live command to fallout</strong></p>
+                                <p><strong>Table Pulse live follow-up</strong></p>
                                 <p class="muted-copy">@selectedWorkspaceTablePulseSummary</p>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
@@ -1819,7 +1819,7 @@
                                     <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse Live inbox</a>
                                     <a class="button-like button-like--ghost" href="/signal-deck">Open Signal Deck</a>
                                     <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
-                                    <a class="button-like button-like--ghost" href="@selectedWorkspaceCarryForwardHref">Open carry-forward</a>
+                                    <a class="button-like button-like--ghost" href="@selectedWorkspaceCarryForwardHref">Open next session note</a>
                                     <a class="button-like button-like--ghost" href="@selectedWorkspaceMemoryHref">Open campaign memory</a>
                                     <a class="button-like button-like--ghost" href="@selectedWorkspaceAftermathHref">Open aftermath</a>
                                     <a class="button-like button-like--ghost" href="/passport">Open Runner Passport</a>
@@ -1891,7 +1891,7 @@
                                         </div>
                                     }
                                     <div class="settings-summary-row">
-                                        <span>Next-session carry-forward</span>
+                                        <span>Next session note</span>
                                         <strong>@(selectedWorkspaceNextSessionCarryForward is null ? "Pending" : $"{selectedWorkspaceNextSessionCarryForward.Label} · {selectedWorkspaceNextSessionCarryForward.Summary}")</strong>
                                     </div>
                                     <div class="settings-summary-row">
@@ -2049,7 +2049,7 @@
                             @if (selectedWorkspaceNextSessionCarryForward is not null)
                             {
                                 <details id="selected-next-session-carry-forward" class="details-drawer">
-                                    <summary>Next-session carry-forward</summary>
+                                    <summary>Next session note</summary>
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
                                             <span>Carry-forward summary</span>
@@ -2419,7 +2419,7 @@
                             @if (selectedWorkspaceServerPlane.Runboard is not null)
                             {
                                 <details class="details-drawer">
-                                    <summary>Runboard continuity</summary>
+                                    <summary>Runboard</summary>
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
                                             <span>Status</span>
@@ -2447,7 +2447,7 @@
                             }
 
                             <details class="details-drawer">
-                                <summary>GM prep and travel</summary>
+                                <summary>GM tools and travel</summary>
                                 <div class="settings-summary-list">
                                 <div class="settings-summary-row">
                                     <span>Prep kits</span>
@@ -2515,7 +2515,7 @@
                                     }
                                 </div>
                             }
-                            <p><strong>Safehouse / travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
+                            <p><strong>Travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                             <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
                             <p><strong>Cache freshness:</strong> @selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary</p>
                             <p><strong>Offline actionability:</strong> @selectedWorkspaceServerPlane.TravelMode.OfflineActionabilitySummary</p>
@@ -2709,7 +2709,7 @@
                             </details>
 
                             <details class="details-drawer">
-                                <summary>Aftermath and recap</summary>
+                                <summary>Aftermath and recaps</summary>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
                                         <span>Publication-safe outputs</span>
@@ -2724,7 +2724,7 @@
                                         <strong>@PublicText(selectedWorkspaceServerPlane.CampaignSummary.PublicationSummary)</strong>
                                     </div>
                                 </div>
-                                <p><strong>Return path:</strong> @selectedWorkspace.ReturnSummary</p>
+                                <p><strong>Next return:</strong> @selectedWorkspace.ReturnSummary</p>
                                 @if (selectedWorkspaceServerPlane.RecapShelf.Count > 0)
                                 {
                                     <details class="details-drawer" id="selected-recap-shelf">
@@ -2789,7 +2789,7 @@
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(linkedPublication?.BuildHandoffId))
                                                     {
-                                                        <a class="inline-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build path for @linkedPublication.Title</a>
+                                                        <a class="inline-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build details for @linkedPublication.Title</a>
                                                     }
                                                     @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
                                                     {
@@ -2817,7 +2817,7 @@
                                             </select>
                                         </div>
                                         <div class="field">
-                                            <label for="aftermathPackageKind">Package kind</label>
+                                            <label for="aftermathPackageKind">Recap type</label>
                                             <select id="aftermathPackageKind" required>
                                                 <option value="session_recap">Session recap</option>
                                                 <option value="replay_timeline">Replay timeline</option>
@@ -2828,26 +2828,26 @@
                                             </select>
                                         </div>
                                         <div class="field">
-                                            <label for="aftermathPackageTitle">Package title</label>
-                                            <input id="aftermathPackageTitle" maxlength="128" placeholder="Generated from run and package kind by default" />
+                                            <label for="aftermathPackageTitle">Title</label>
+                                            <input id="aftermathPackageTitle" maxlength="128" placeholder="Filled from the run and recap type by default" />
                                         </div>
                                         <div class="field">
-                                            <label for="aftermathPackageNote">Package reason</label>
-                                            <textarea id="aftermathPackageNote" rows="3" placeholder="What aftermath, replay, or next-session continuity should stay grounded in this package?"></textarea>
+                                            <label for="aftermathPackageNote">Why this matters</label>
+                                            <textarea id="aftermathPackageNote" rows="3" placeholder="What should this recap or replay keep visible for the next session?"></textarea>
                                         </div>
                                         <div id="aftermathPackagePreview" class="settings-summary-list" hidden></div>
-                                        <button class="button-like button-like--secondary" type="submit">Generate aftermath or replay package</button>
+                                        <button class="button-like button-like--secondary" type="submit">Create recap or replay</button>
                                         <p id="aftermathPackageStatusNotice" class="muted-copy" hidden></p>
                                     </form>
                                 }
                                 else
                                 {
-                                    <p class="muted-copy">Generate aftermath or replay packages becomes available once the campaign has a tracked run to pin into the return path.</p>
+                                    <p class="muted-copy">Recaps and replays become available once this campaign has a tracked run.</p>
                                 }
                                 @if (selectedWorkspaceAftermathPackages.Count > 0)
                                 {
                                     <details class="details-drawer" id="aftermath-packages">
-                                        <summary>Recent aftermath recap packages and replay outputs</summary>
+                                        <summary>Recent recaps and replays</summary>
                                         <ul class="muted-copy">
                                             @foreach (var package in selectedWorkspaceAftermathPackages)
                                             {
@@ -2889,7 +2889,7 @@
                             <p><strong>Continuity:</strong> @selectedRun.LatestContinuity.Summary</p>
                         }
                         <div class="settings-form">
-                            <p><strong>Table Pulse aftermath return</strong></p>
+                            <p><strong>Table Pulse follow-up</strong></p>
                             <p class="muted-copy">@selectedRunTablePulseSummary</p>
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
@@ -2897,8 +2897,8 @@
                                     <strong>Use the Table Pulse Live inbox to trigger or open the next response.</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Campaign return</span>
-                                    <strong>@(selectedRunWorkspace is null ? "Open campaign work" : $"{selectedRunWorkspace.CampaignName} · return path")</strong>
+                                    <span>Campaign</span>
+                                    <strong>@(selectedRunWorkspace is null ? "Open campaign" : $"{selectedRunWorkspace.CampaignName} · next return")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Aftermath</span>
@@ -2910,7 +2910,7 @@
                                 <a class="button-like button-like--ghost" href="/signal-deck">Open Signal Deck</a>
                                 <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
                                 <a class="button-like button-like--ghost" href="@selectedRunWorkspaceHref">Open campaign</a>
-                                <a class="button-like button-like--ghost" href="@selectedRunCarryForwardHref">Open carry-forward</a>
+                                <a class="button-like button-like--ghost" href="@selectedRunCarryForwardHref">Open next session note</a>
                                 <a class="button-like button-like--ghost" href="@selectedRunAftermathHref">Open aftermath</a>
                             </div>
                         </div>
@@ -3440,7 +3440,7 @@
                         }
                         @if (!string.IsNullOrWhiteSpace(selectedCreatorPublication.BuildHandoffId))
                         {
-                            <a class="inline-link" href="@BuildHandoffDetailHref(selectedCreatorPublication.BuildHandoffId)">Open build path for @selectedCreatorPublication.Title</a>
+                            <a class="inline-link" href="@BuildHandoffDetailHref(selectedCreatorPublication.BuildHandoffId)">Open build details for @selectedCreatorPublication.Title</a>
                         }
                         @if (IsDiscoverablePublicCreatorPublication(selectedCreatorPublication))
                         {
@@ -3450,7 +3450,7 @@
                 }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
-                    <p class="muted-copy">No campaign yet. Use the starter path to seed the first playable session before you come back for deeper campaign continuity.</p>
+                    <p class="muted-copy">No campaign yet. Start the first playable session, then come back here when there is real campaign history to follow.</p>
                     <div class="stacked-actions">
                         <button id="seedStarterWorkspaceFromAccount" class="button-like button-like--primary" type="button">Start first playable session</button>
                         <a class="inline-link" href="/home/work">Open Home</a>
@@ -3505,7 +3505,7 @@
                                 }
                                 <div class="settings-summary-row">
                                     <span>Next safe action</span>
-                                    <strong>@(workspace.NextSafeAction ?? "Open the campaign and confirm the current return path before you continue.")</strong>
+                                    <strong>@(workspace.NextSafeAction ?? "Open the campaign and confirm the next step before you continue.")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Recent recap</span>
@@ -3608,7 +3608,7 @@
                             @if (workspace.NextSessionCarryForward is not null)
                             {
                                 <details class="details-drawer">
-                                    <summary>Next-session carry-forward</summary>
+                                    <summary>Next session note</summary>
                                     <ul class="muted-copy">
                                         <li><strong>Summary:</strong> @workspace.NextSessionCarryForward.Summary</li>
                                         <li><strong>Return:</strong> @workspace.NextSessionCarryForward.ReturnSummary</li>
@@ -3762,7 +3762,7 @@
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(linkedPublication?.BuildHandoffId))
                                                 {
-                                                    <a class="inline-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build path for @linkedPublication.Title</a>
+                                                    <a class="inline-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build details for @linkedPublication.Title</a>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
                                                 {
@@ -3989,7 +3989,7 @@
                                     }
                                     @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
                                     {
-                                        <a class="inline-link" href="@BuildHandoffDetailHref(publication.BuildHandoffId)">Open build path for @publication.Title</a>
+                                        <a class="inline-link" href="@BuildHandoffDetailHref(publication.BuildHandoffId)">Open build details for @publication.Title</a>
                                     }
                                     @if (IsDiscoverablePublicCreatorPublication(publication))
                                     {
@@ -4070,7 +4070,7 @@
                                     <strong>@op.LeagueOperationsSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Campaign return pulse</span>
+                                    <span>Campaign follow-up</span>
                                     <strong>@op.CampaignReturnSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -4378,15 +4378,15 @@
                                         <span class="tag">Help &amp; trust</span>
                                         <div class="app-rail__copy">
                                             <h3>Help</h3>
-                                            <p>Help, contact, and privacy guidance stay on the same Chummer surface so organizers can point members to the real recovery path.</p>
+                                            <p>Help, contact, and privacy stay together so organizers can send members to the right recovery page.</p>
                                         </div>
                                         <a class="inline-link" href="/help">Open help and trust</a>
                                     </article>
                                     <article class="app-rail__item">
                                         <span class="tag">Support closure</span>
                                         <div class="app-rail__copy">
-                                            <h3>@(openSupportCases == 0 ? "Quiet support" : "Tracked support continuity")</h3>
-                                            <p>@(openSupportCases == 0 ? "No tracked support case is blocking organizer guidance right now, so members can stay on the public release and help pages." : $"{openSupportCases} tracked support case(s) are still visible on this account if member guidance needs a real closure reference.")</p>
+                                            <h3>@(openSupportCases == 0 ? "Quiet support" : "Tracked support")</h3>
+                                            <p>@(openSupportCases == 0 ? "No support case is blocking organizer guidance right now, so members can stay on the public release and help pages." : $"{openSupportCases} support case(s) are still visible on this account if members need a clear closure reference.")</p>
                                             <p class="muted-copy">@op.SupportEscalationSummary</p>
                                         </div>
                                         <a class="inline-link" href="/account/support">Open support closure</a>
@@ -4829,20 +4829,20 @@
   };
 
   const defaultAftermathPackagePosture = (run, packageKind) => {
-    const scopeLabel = run?.Title || "Campaign return";
+    const scopeLabel = run?.Title || "Campaign";
     switch (packageKind) {
       case "replay_timeline":
-        return `${scopeLabel} keeps contested turns in the same replay timeline.`;
+        return `${scopeLabel} keeps the contested turns together in one replay timeline.`;
       case "after_action_report":
-        return `${scopeLabel} keeps after-action detail and consequence continuity on the shared return path.`;
+        return `${scopeLabel} keeps the important aftermath details in one place.`;
       case "downtime_brief":
-        return `${scopeLabel} keeps downtime obligations and next-session readiness on the shared return path.`;
+        return `${scopeLabel} keeps downtime notes and next-session prep together.`;
       case "runboard_state":
-        return `${scopeLabel} keeps the GM runboard and turn detail in the same place.`;
+        return `${scopeLabel} keeps the GM runboard and turn details together.`;
       case "resolution_report_draft":
-        return `${scopeLabel} keeps the ResolutionReport draft continuous without turning hub into the engine-math owner.`;
+        return `${scopeLabel} keeps the ResolutionReport draft together without moving the real rules work into the website.`;
       default:
-        return `${scopeLabel} keeps recap and next-session return together.`;
+        return `${scopeLabel} keeps the recap and the next session note together.`;
     }
   };
 
@@ -4863,10 +4863,10 @@
     }
 
     const rows = [
-      ["Run scope", run ? `${run.Title} · ${ui.humanizeStatus(run.Status, "Active")}` : "Campaign-wide aftermath"],
-      ["Package kind", ui.humanizeStatus(kindSelect.value.replaceAll("_", " "), "Aftermath package")],
-      ["Package title", titleInput.value.trim() || defaultAftermathTitle()],
-      ["Package", defaultAftermathPackagePosture(run, kindSelect.value)]
+      ["Run scope", run ? `${run.Title} · ${ui.humanizeStatus(run.Status, "Active")}` : "Campaign-wide recap"],
+      ["Recap type", ui.humanizeStatus(kindSelect.value.replaceAll("_", " "), "Recap")],
+      ["Title", titleInput.value.trim() || defaultAftermathTitle()],
+      ["Preview", defaultAftermathPackagePosture(run, kindSelect.value)]
     ];
 
     preview.hidden = false;
@@ -5371,7 +5371,7 @@
       });
       window.location.href = `${workspaceDetailHref(selectedWorkspaceId)}#aftermath-packages`;
     } catch (error) {
-      ui.setNotice(notice, ui.describeError(error, "Aftermath or replay package could not be generated right now."), true);
+      ui.setNotice(notice, ui.describeError(error, "Recap or replay could not be created right now."), true);
     } finally {
       ui.setButtonBusy(button, false, "Packaging...");
     }

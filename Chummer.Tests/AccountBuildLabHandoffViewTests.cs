@@ -138,6 +138,28 @@ public sealed class AccountBuildLabHandoffViewTests
     }
 
     [Fact]
+    public void AccountWorkSurfaceUsesSimplerFollowUpAndRecapCopy()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("<summary>Runboard</summary>", view, StringComparison.Ordinal);
+        Assert.Contains("<summary>GM tools and travel</summary>", view, StringComparison.Ordinal);
+        Assert.Contains("<summary>Aftermath and recaps</summary>", view, StringComparison.Ordinal);
+        Assert.Contains("Open next session note", view, StringComparison.Ordinal);
+        Assert.Contains("Open build details for", view, StringComparison.Ordinal);
+        Assert.Contains("Create recap or replay", view, StringComparison.Ordinal);
+        Assert.Contains("Recaps and replays become available once this campaign has a tracked run.", view, StringComparison.Ordinal);
+        Assert.Contains("Recent recaps and replays", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Runboard continuity", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("GM prep and travel", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<summary>Aftermath and recap</summary>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open carry-forward", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open build path for", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Generate aftermath or replay package", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AccountRecapShelfRendersCompatibilityAndLineageCues()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
