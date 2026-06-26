@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
@@ -36,6 +37,7 @@ public sealed class PublicLandingController : Controller
 {
     private const string ReleaseUploadTicketEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TICKET";
     private const string ReleaseUploadTokenEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TOKEN";
+    private static readonly JsonSerializerOptions PublicJsonContentOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     private readonly PublicLandingService _landing;
     private readonly FlipLinkDocumentPortalService _flipLinkDocumentPortal;
@@ -4967,8 +4969,20 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/passport/identity-network")]
     [HttpGet("/passport/receipts/identity-network.json")]
     [Produces("application/json")]
-    public IActionResult RunnerPassportIdentityNetworkReceiptJson()
+    public async Task<IActionResult> RunnerPassportIdentityNetworkReceiptJson(CancellationToken cancellationToken)
     {
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "runner passport identity network",
+            currentPath: "/passport/identity-network",
+            sourceRef: "runner_passport:identity-network",
+            horizonId: "runner_passport",
+            artifactKindOrCapabilityId: "identity_network",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
+        }
+
         RunnerPassportPublicSummary summary = _communityCreatorHorizons.BuildPassportSummary();
         return Ok(new
         {
@@ -5003,7 +5017,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 Surveillance = "Not claimed",
                 ModerationTruth = "Signed-in only",
                 IdentityRecovery = "Signed-in only"
-            }
+            },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("runner_passport", "identity_network"),
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "runner_passport",
+                "identity_network",
+                "runner_passport:identity-network")
         });
     }
 
@@ -5020,18 +5039,40 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/community/open-runs/{packetId}.md")]
     [Produces("text/markdown")]
     public IActionResult CommunityOpenRunPacketMarkdown([FromRoute] string packetId)
-        => Content(_communityCreatorHorizons.BuildCommunityMarkdown(packetId), "text/markdown");
+        => !IsKnownCommunityCreatorDocumentId(_communityCreatorHorizons.ListCommunityDocuments(), packetId)
+            ? NotFound()
+            : Content(_communityCreatorHorizons.BuildCommunityMarkdown(packetId), "text/markdown");
 
     [HttpGet("/community/open-runs/{packetId}.json")]
     [Produces("application/json")]
-    public IActionResult CommunityOpenRunPacketJson([FromRoute] string packetId)
-        => Content(_communityCreatorHorizons.BuildCommunityJson(packetId), "application/json");
+    public async Task<IActionResult> CommunityOpenRunPacketJson([FromRoute] string packetId, CancellationToken cancellationToken)
+        => await BuildCommunityCreatorReceiptJsonAsync(
+            operationLabel: "community hub open-run packet",
+            currentPath: $"/community/open-runs/{Uri.EscapeDataString(packetId)}.json",
+            horizonId: "community_hub",
+            artifactKindOrCapabilityId: "open_run_network",
+            receiptId: packetId,
+            documents: _communityCreatorHorizons.ListCommunityDocuments(),
+            buildJson: _communityCreatorHorizons.BuildCommunityJson,
+            cancellationToken: cancellationToken);
 
     [HttpGet("/community/open-run-network")]
     [HttpGet("/community/receipts/open-run-network.json")]
     [Produces("application/json")]
-    public IActionResult CommunityHubReceiptJson()
+    public async Task<IActionResult> CommunityHubReceiptJson(CancellationToken cancellationToken)
     {
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "community hub open-run network",
+            currentPath: "/community/open-run-network",
+            sourceRef: "community_hub:open-run-network",
+            horizonId: "community_hub",
+            artifactKindOrCapabilityId: "open_run_network",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
+        }
+
         CommunityHubPublicSummary summary = _communityCreatorHorizons.BuildCommunitySummary();
         return Ok(new
         {
@@ -5067,25 +5108,52 @@ document.addEventListener('DOMContentLoaded', function () {
                 RulesOwner = "Chummer",
                 WorldOwner = "Chummer",
                 Surveillance = "Not claimed"
-            }
+            },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("community_hub", "open_run_network"),
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "community_hub",
+                "open_run_network",
+                "community_hub:open-run-network")
         });
     }
 
     [HttpGet("/creator/packets/{packetId}.md")]
     [Produces("text/markdown")]
     public IActionResult CreatorPacketMarkdown([FromRoute] string packetId)
-        => Content(_communityCreatorHorizons.BuildCreatorMarkdown(packetId), "text/markdown");
+        => !IsKnownCommunityCreatorDocumentId(_communityCreatorHorizons.ListCreatorDocuments(), packetId)
+            ? NotFound()
+            : Content(_communityCreatorHorizons.BuildCreatorMarkdown(packetId), "text/markdown");
 
     [HttpGet("/creator/packets/{packetId}.json")]
     [Produces("application/json")]
-    public IActionResult CreatorPacketJson([FromRoute] string packetId)
-        => Content(_communityCreatorHorizons.BuildCreatorJson(packetId), "application/json");
+    public async Task<IActionResult> CreatorPacketJson([FromRoute] string packetId, CancellationToken cancellationToken)
+        => await BuildCommunityCreatorReceiptJsonAsync(
+            operationLabel: "creator publication packet",
+            currentPath: $"/creator/packets/{Uri.EscapeDataString(packetId)}.json",
+            horizonId: "creator_os",
+            artifactKindOrCapabilityId: "publication_network",
+            receiptId: packetId,
+            documents: _communityCreatorHorizons.ListCreatorDocuments(),
+            buildJson: _communityCreatorHorizons.BuildCreatorJson,
+            cancellationToken: cancellationToken);
 
     [HttpGet("/creator/publication-network")]
     [HttpGet("/creator/receipts/publication-network.json")]
     [Produces("application/json")]
-    public IActionResult CreatorOsReceiptJson()
+    public async Task<IActionResult> CreatorOsReceiptJson(CancellationToken cancellationToken)
     {
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "creator publication network",
+            currentPath: "/creator/publication-network",
+            sourceRef: "creator_os:publication-network",
+            horizonId: "creator_os",
+            artifactKindOrCapabilityId: "publication_network",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
+        }
+
         CreatorOsPublicSummary summary = _communityCreatorHorizons.BuildCreatorSummary();
         return Ok(new
         {
@@ -5115,7 +5183,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 ProviderDashboards = "Not truth",
                 PublicationTruth = "Chummer-owned",
                 ReviewState = "Signed-in only"
-            }
+            },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes("creator_os", "publication_network"),
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "creator_os",
+                "publication_network",
+                "creator_os:publication-network")
         });
     }
 
@@ -5123,37 +5196,67 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/passport/receipts/{receiptId}.md")]
     [Produces("text/markdown")]
     public IActionResult PassportReceiptMarkdown([FromRoute] string receiptId)
-        => Content(_communityCreatorHorizons.BuildPassportMarkdown(receiptId), "text/markdown");
+        => !IsKnownCommunityCreatorDocumentId(_communityCreatorHorizons.ListPassportDocuments(), receiptId)
+            ? NotFound()
+            : Content(_communityCreatorHorizons.BuildPassportMarkdown(receiptId), "text/markdown");
 
     [HttpGet("/passport/{receiptId}.json")]
     [HttpGet("/passport/receipts/{receiptId}.json")]
     [Produces("application/json")]
-    public IActionResult PassportReceiptJson([FromRoute] string receiptId)
-        => Content(_communityCreatorHorizons.BuildPassportJson(receiptId), "application/json");
+    public async Task<IActionResult> PassportReceiptJson([FromRoute] string receiptId, CancellationToken cancellationToken)
+        => await BuildCommunityCreatorReceiptJsonAsync(
+            operationLabel: "runner passport receipt",
+            currentPath: $"/passport/receipts/{Uri.EscapeDataString(receiptId)}.json",
+            horizonId: "runner_passport",
+            artifactKindOrCapabilityId: "identity_network",
+            receiptId: receiptId,
+            documents: _communityCreatorHorizons.ListPassportDocuments(),
+            buildJson: _communityCreatorHorizons.BuildPassportJson,
+            cancellationToken: cancellationToken);
 
     [HttpGet("/signal-deck/{receiptId}.md")]
     [HttpGet("/signal-deck/receipts/{receiptId}.md")]
     [Produces("text/markdown")]
     public IActionResult SignalDeckReceiptMarkdown([FromRoute] string receiptId)
-        => Content(_communityCreatorHorizons.BuildSignalDeckMarkdown(receiptId), "text/markdown");
+        => !IsKnownCommunityCreatorDocumentId(_communityCreatorHorizons.ListSignalDeckDocuments(), receiptId)
+            ? NotFound()
+            : Content(_communityCreatorHorizons.BuildSignalDeckMarkdown(receiptId), "text/markdown");
 
     [HttpGet("/signal-deck/{receiptId}.json")]
     [HttpGet("/signal-deck/receipts/{receiptId}.json")]
     [Produces("application/json")]
-    public IActionResult SignalDeckReceiptJson([FromRoute] string receiptId)
-        => Content(_communityCreatorHorizons.BuildSignalDeckJson(receiptId), "application/json");
+    public async Task<IActionResult> SignalDeckReceiptJson([FromRoute] string receiptId, CancellationToken cancellationToken)
+        => await BuildCommunityCreatorReceiptJsonAsync(
+            operationLabel: "signal deck receipt",
+            currentPath: $"/signal-deck/receipts/{Uri.EscapeDataString(receiptId)}.json",
+            horizonId: "signal_deck",
+            artifactKindOrCapabilityId: "command_network",
+            receiptId: receiptId,
+            documents: _communityCreatorHorizons.ListSignalDeckDocuments(),
+            buildJson: _communityCreatorHorizons.BuildSignalDeckJson,
+            cancellationToken: cancellationToken);
 
     [HttpGet("/living-world/{receiptId}.md")]
     [HttpGet("/living-world/receipts/{receiptId}.md")]
     [Produces("text/markdown")]
     public IActionResult LivingWorldReceiptMarkdown([FromRoute] string receiptId)
-        => Content(_communityCreatorHorizons.BuildLivingWorldMarkdown(receiptId), "text/markdown");
+        => !IsKnownCommunityCreatorDocumentId(_communityCreatorHorizons.ListLivingWorldDocuments(), receiptId)
+            ? NotFound()
+            : Content(_communityCreatorHorizons.BuildLivingWorldMarkdown(receiptId), "text/markdown");
 
     [HttpGet("/living-world/{receiptId}.json")]
     [HttpGet("/living-world/receipts/{receiptId}.json")]
     [Produces("application/json")]
-    public IActionResult LivingWorldReceiptJson([FromRoute] string receiptId)
-        => Content(_communityCreatorHorizons.BuildLivingWorldJson(receiptId), "application/json");
+    public async Task<IActionResult> LivingWorldReceiptJson([FromRoute] string receiptId, CancellationToken cancellationToken)
+        => await BuildCommunityCreatorReceiptJsonAsync(
+            operationLabel: "living world receipt",
+            currentPath: $"/living-world/receipts/{Uri.EscapeDataString(receiptId)}.json",
+            horizonId: "living_world",
+            artifactKindOrCapabilityId: "watch_network",
+            receiptId: receiptId,
+            documents: _communityCreatorHorizons.ListLivingWorldDocuments(),
+            buildJson: _communityCreatorHorizons.BuildLivingWorldJson,
+            cancellationToken: cancellationToken);
 
     [HttpGet("/karma-forge")]
     public IActionResult KarmaForgeAliasPage()
@@ -10808,6 +10911,88 @@ Boundary:
             return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: $"Unable to process {operationLabel} request right now.");
         }
     }
+
+    private async Task<IActionResult> BuildCommunityCreatorReceiptJsonAsync(
+        string operationLabel,
+        string currentPath,
+        string horizonId,
+        string artifactKindOrCapabilityId,
+        string receiptId,
+        IReadOnlyList<CommunityCreatorDocument> documents,
+        Func<string, string> buildJson,
+        CancellationToken cancellationToken)
+    {
+        if (!IsKnownCommunityCreatorDocumentId(documents, receiptId))
+        {
+            return NotFound();
+        }
+
+        string normalizedReceiptId = NormalizeRouteToken(receiptId);
+        string sourceRef = $"{horizonId}:{normalizedReceiptId}";
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel,
+            currentPath,
+            sourceRef,
+            horizonId,
+            artifactKindOrCapabilityId,
+            cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
+        }
+
+        string json = buildJson(normalizedReceiptId);
+        string payload = AppendPublicArtifactCapabilityJson(json, horizonId, artifactKindOrCapabilityId, sourceRef);
+        return Content(payload, "application/json");
+    }
+
+    private string AppendPublicArtifactCapabilityJson(
+        string json,
+        string horizonId,
+        string artifactKindOrCapabilityId,
+        string sourceRef)
+    {
+        JsonNode? node = JsonNode.Parse(json);
+        if (node is not JsonObject payload)
+        {
+            return json;
+        }
+
+        payload["artifact_capability"] = BuildPublicArtifactCapabilityNode(horizonId, artifactKindOrCapabilityId, sourceRef);
+        return payload.ToJsonString(PublicJsonContentOptions);
+    }
+
+    private JsonObject BuildPublicArtifactCapabilityNode(
+        string horizonId,
+        string artifactKindOrCapabilityId,
+        string sourceRef)
+    {
+        PublicHorizonCapabilityViewModel capability = BuildPublicHorizonCapability(horizonId, artifactKindOrCapabilityId, sourceRef);
+        return new JsonObject
+        {
+            ["horizon_id"] = capability.HorizonId,
+            ["capability_id"] = capability.CapabilityId,
+            ["artifact_kind"] = capability.ArtifactKind,
+            ["public_label"] = capability.PublicLabel,
+            ["capability_slot"] = capability.CapabilitySlot,
+            ["status"] = capability.Status,
+            ["request_supported"] = capability.RequestSupported,
+            ["requires_authentication"] = capability.RequiresAuthentication,
+            ["public_visible"] = capability.PublicVisible,
+            ["source_ref"] = capability.SourceRef,
+            ["visibility"] = capability.Visibility
+        };
+    }
+
+    private static bool IsKnownCommunityCreatorDocumentId(IReadOnlyList<CommunityCreatorDocument> documents, string? documentId)
+    {
+        string normalizedDocumentId = NormalizeRouteToken(documentId);
+        return !string.IsNullOrWhiteSpace(normalizedDocumentId)
+            && documents.Any(item => string.Equals(item.Id, normalizedDocumentId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeRouteToken(string? value)
+        => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
 
     private async Task<TrustPageViewModel> BuildContactPageModelAsync(
         SiteChromeViewModel chrome,

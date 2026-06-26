@@ -400,11 +400,11 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
-    public void PublicNewsreelJsonReturnsTurnZeroToOneContract()
+    public async Task PublicNewsreelJsonReturnsTurnZeroToOneContract()
     {
         using Fixture fixture = new();
 
-        IActionResult result = fixture.Controller.LedgerTurnNewsreelJson("1", CancellationToken.None).GetAwaiter().GetResult();
+        IActionResult result = await fixture.Controller.LedgerTurnNewsreelJson("1", CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
@@ -554,9 +554,17 @@ public sealed class PublicLandingDownloadDispatchTests
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("origin-dossier-media", capability.GetProperty("CapabilityId").GetString());
         Assert.Equal("origin-dossier:public-story-packet", capability.GetProperty("SourceRef").GetString());
-        Assert.DoesNotContain("First Book", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("vidBoard", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        JsonElement boundary = payload.RootElement.GetProperty("Boundary");
+        Assert.Equal("approved_chummer_owned_packet", boundary.GetProperty("StoryTruth").GetString());
+        Assert.Equal("not_claimed", boundary.GetProperty("SilentMechanicsMutation").GetString());
+        Assert.Equal("not_claimed", boundary.GetProperty("ProviderTruth").GetString());
+        string serialized = JsonSerializer.Serialize(ok.Value);
+        Assert.DoesNotContain("Subscribr", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("First Book", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("vidBoard", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("source packet", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("webhook", serialized, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -615,14 +623,22 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("available", model.HorizonCapability.Status);
         Assert.True(model.HorizonCapability.RequestSupported);
         Assert.Equal("origin-dossier:public-story-packet", model.HorizonCapability.SourceRef);
+        Assert.Contains("story packet", model.Intro, StringComparison.Ordinal);
+        Assert.Contains("sheet stays authoritative", model.Intro, StringComparison.Ordinal);
+        TrustPageSectionViewModel boundarySection = Assert.Single(model.Sections, section => section.Id == "origin_boundary");
+        Assert.Contains("does not get to do", boundarySection.Heading, StringComparison.Ordinal);
+        Assert.Contains("does not get to smuggle in ware", boundarySection.Body, StringComparison.Ordinal);
         Assert.Contains(model.Actions, action =>
             action.Label == "Watch the narrated overview"
             && action.Href == "/origin-dossier/media");
-        string serialized = JsonSerializer.Serialize(model.HorizonCapability);
+        string serialized = JsonSerializer.Serialize(model);
+        Assert.DoesNotContain("Subscribr", serialized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("First Book", serialized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("vidBoard", serialized, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Soundmadeseen", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("source packet", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("webhook", serialized, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -654,11 +670,15 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
-    public void RunnerPassportReceiptJsonReturnsSignedInContinuityContract()
+    public async Task RunnerPassportReceiptJsonReturnsSignedInContinuityContract()
     {
         using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
 
-        IActionResult result = fixture.Controller.RunnerPassportIdentityNetworkReceiptJson();
+        IActionResult result = await fixture.Controller.RunnerPassportIdentityNetworkReceiptJson(CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
@@ -670,6 +690,87 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/account/passport/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
         Assert.Equal("/account/ledger/notifications", payload.RootElement.GetProperty("SignedInBench").GetProperty("LiveNotificationsHref").GetString());
         Assert.Equal("/account/work#aftermath-packages", payload.RootElement.GetProperty("SignedInBench").GetProperty("AftermathHref").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=runner_passport&artifactKindOrCapabilityId=runner_passport-identity-network", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("runner_passport", capability.GetProperty("HorizonId").GetString());
+        Assert.Equal("runner_passport-identity-network", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("identity_network", capability.GetProperty("ArtifactKind").GetString());
+        Assert.Equal("Identity Network", capability.GetProperty("PublicLabel").GetString());
+        Assert.Equal("public_identity_return", capability.GetProperty("CapabilitySlot").GetString());
+        Assert.Equal("available", capability.GetProperty("Status").GetString());
+        Assert.True(capability.GetProperty("RequestSupported").GetBoolean());
+        Assert.Equal("runner_passport:identity-network", capability.GetProperty("SourceRef").GetString());
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+        Assert.Equal($"/api/v1/public/horizons/artifact-requests/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+    }
+
+    [Fact]
+    public async Task CommunityHubReceiptJsonReturnsSharedOpenRunContract()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.CommunityHubReceiptJson(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("community_hub", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("/community/open-runs/open_run_board.md", payload.RootElement.GetProperty("PublicBoard").GetProperty("BoardMarkdownHref").GetString());
+        Assert.Equal("/community/open-runs/open_run_board.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("BoardJsonHref").GetString());
+        Assert.Equal("/account/community", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountEntryHref").GetString());
+        Assert.Equal("/account/community/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=community_hub&artifactKindOrCapabilityId=community_hub-open-run-network", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("community_hub-open-run-network", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("open_run_network", capability.GetProperty("ArtifactKind").GetString());
+        Assert.Equal("community_hub:open-run-network", capability.GetProperty("SourceRef").GetString());
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+        Assert.Equal($"/api/v1/public/horizons/artifact-requests/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+    }
+
+    [Fact]
+    public async Task CreatorOsReceiptJsonReturnsSharedPublicationContract()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.CreatorOsReceiptJson(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("creator_os", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("/creator/packets/publication_board.md", payload.RootElement.GetProperty("PublicBoard").GetProperty("BoardMarkdownHref").GetString());
+        Assert.Equal("/creator/packets/publication_board.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("BoardJsonHref").GetString());
+        Assert.Equal("/account/creator", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountEntryHref").GetString());
+        Assert.Equal("/account/creator/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=creator_os&artifactKindOrCapabilityId=creator_os-publication-network", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("creator_os-publication-network", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("publication_network", capability.GetProperty("ArtifactKind").GetString());
+        Assert.Equal("creator_os:publication-network", capability.GetProperty("SourceRef").GetString());
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+        Assert.Equal($"/api/v1/public/horizons/artifact-requests/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
     }
 
     [Fact]
@@ -726,8 +827,49 @@ public sealed class PublicLandingDownloadDispatchTests
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("runbook-export", capability.GetProperty("CapabilityId").GetString());
         Assert.Equal("runbook-press:primer-network", capability.GetProperty("SourceRef").GetString());
-        Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Documentation.AI", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
+        JsonElement boundary = payload.RootElement.GetProperty("Boundary");
+        Assert.Equal("not_claimed", boundary.GetProperty("PublicationStudio").GetString());
+        Assert.Equal("chummer_owned_primer_packets", boundary.GetProperty("SourceTruth").GetString());
+        Assert.Equal("not_claimed", boundary.GetProperty("ProviderTruth").GetString());
+        string serialized = JsonSerializer.Serialize(ok.Value);
+        Assert.DoesNotContain("Subscribr", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("First Book", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Documentation.AI", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("source packet", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("webhook", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunbookPageKeepsPublicCopyProviderNeutralAndBoundarySafe()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/runbook";
+
+        IActionResult result = await fixture.Controller.RunbookPreviewPage(CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        MediaArtifactHorizonPageViewModel model = Assert.IsType<MediaArtifactHorizonPageViewModel>(view.Model);
+        Assert.Equal("RUNBOOK PRESS", model.Heading);
+        Assert.Equal("RUNBOOK PRESS now ships real primers: guides you can hand to a player or GM without sending them into scattered docs.", model.Intro);
+        Assert.Equal("Printable onboarding and prep guides only. This path does not claim a full long-form publication studio yet.", model.BoundaryLine);
+        Assert.Contains(model.SummaryPoints, point => point == "Printable guides");
+        Assert.Equal("/runbook/primers/new-runner-primer.md", model.PrimaryAction.Href);
+        Assert.Equal("/runbook/primers/new-runner-primer.json", model.SecondaryAction.Href);
+        Assert.Contains(model.Documents, document =>
+            document.MarkdownRoute == "/runbook/primers/new-runner-primer.md"
+            && document.JsonRoute == "/runbook/primers/new-runner-primer.json");
+        string serialized = JsonSerializer.Serialize(model);
+        Assert.DoesNotContain("Subscribr", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("First Book", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("MarkupGo", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Documentation.AI", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("source packet", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("webhook", serialized, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -868,6 +1010,76 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.True(capability.GetProperty("request_supported").GetBoolean());
         Assert.Equal("runbook-press:new-runner-primer", capability.GetProperty("source_ref").GetString());
         Assert.DoesNotContain("MarkupGo", JsonSerializer.Serialize(capability), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SignalDeckReceiptJsonIncludesPublicSafeSharedCapabilityMetadata()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.SignalDeckReceiptJson("pressure_posture", CancellationToken.None);
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
+        Assert.Equal("signal_deck", capability.GetProperty("horizon_id").GetString());
+        Assert.Equal("signal_deck-command-network", capability.GetProperty("capability_id").GetString());
+        Assert.Equal("command_network", capability.GetProperty("artifact_kind").GetString());
+        Assert.Equal("Command Network", capability.GetProperty("public_label").GetString());
+        Assert.Equal("public_command_pressure", capability.GetProperty("capability_slot").GetString());
+        Assert.Equal("available", capability.GetProperty("status").GetString());
+        Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.False(capability.GetProperty("requires_authentication").GetBoolean());
+        Assert.True(capability.GetProperty("public_visible").GetBoolean());
+        Assert.Equal("signal_deck:pressure_posture", capability.GetProperty("source_ref").GetString());
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+        Assert.Equal($"/api/v1/public/horizons/artifact-requests/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+    }
+
+    [Fact]
+    public async Task LivingWorldReceiptJsonIncludesPublicSafeSharedCapabilityMetadata()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.LivingWorldReceiptJson("watch_package_posture", CancellationToken.None);
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument payload = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
+        Assert.Equal("living_world", capability.GetProperty("horizon_id").GetString());
+        Assert.Equal("living_world-watch-network", capability.GetProperty("capability_id").GetString());
+        Assert.Equal("watch_network", capability.GetProperty("artifact_kind").GetString());
+        Assert.Equal("Watch Network", capability.GetProperty("public_label").GetString());
+        Assert.Equal("public_world_watch", capability.GetProperty("capability_slot").GetString());
+        Assert.Equal("available", capability.GetProperty("status").GetString());
+        Assert.True(capability.GetProperty("request_supported").GetBoolean());
+        Assert.False(capability.GetProperty("requires_authentication").GetBoolean());
+        Assert.True(capability.GetProperty("public_visible").GetBoolean());
+        Assert.Equal("living_world:watch_package_posture", capability.GetProperty("source_ref").GetString());
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+        Assert.Equal($"/api/v1/public/horizons/artifact-requests/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+    }
+
+    [Fact]
+    public async Task CommunityCreatorReceiptJsonRoutesReturnNotFoundForUnknownIds()
+    {
+        using Fixture fixture = new();
+
+        Assert.IsType<NotFoundResult>(await fixture.Controller.CommunityOpenRunPacketJson("unknown-packet", CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await fixture.Controller.CreatorPacketJson("unknown-packet", CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await fixture.Controller.PassportReceiptJson("unknown-receipt", CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await fixture.Controller.SignalDeckReceiptJson("unknown-receipt", CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await fixture.Controller.LivingWorldReceiptJson("unknown-receipt", CancellationToken.None));
     }
 
     [Fact]
