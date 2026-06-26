@@ -370,6 +370,7 @@ public sealed class OriginDossierPublicationService
             RequestSupported: string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
             RequiresAuthentication: true,
             PublicVisible: true,
+            QuotaTracked: health.QuotaTracked,
             SourceRef: $"origin-dossier:{projectId}:media",
             Visibility: "private");
     }

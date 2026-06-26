@@ -64,7 +64,7 @@ public sealed class HorizonCapabilityService
             ArtifactKind: "document_export",
             PublicLabel: "Formatted Export",
             CapabilitySlot: "document_render",
-            InternalProviderLane: "MarkupGo / Documentation.AI",
+            InternalProviderLane: "Subscribr.ai / First Book ai / MarkupGo / Documentation.AI",
             FreeWeeklyLimit: 0,
             SupporterWeeklyLimit: 2,
             RequiresAuthentication: true,
@@ -214,7 +214,7 @@ public sealed class HorizonCapabilityService
             ArtifactKind: "dossier_media",
             PublicLabel: "Dossier Media",
             CapabilitySlot: "approved_origin_media",
-            InternalProviderLane: "First Book ai / MarkupGo / vidBoard / Soundmadeseen",
+            InternalProviderLane: "Subscribr.ai / First Book ai / MarkupGo / vidBoard / Soundmadeseen",
             FreeWeeklyLimit: 0,
             SupporterWeeklyLimit: 2,
             RequiresAuthentication: true,
@@ -262,7 +262,8 @@ public sealed class HorizonCapabilityService
             capability.PublicVisible,
             capability.FreeWeeklyLimit,
             capability.SupporterWeeklyLimit,
-            capability.CostClass);
+            capability.CostClass,
+            capability.QuotaTracked);
     }
 
     private HorizonCapabilityDefinition ApplyConfiguration(HorizonCapabilityDefinition capability)
@@ -325,4 +326,5 @@ public sealed record HorizonCapabilityHealthSnapshot(
     bool PublicVisible,
     int FreeWeeklyLimit,
     int SupporterWeeklyLimit,
-    string CostClass);
+    string CostClass,
+    bool QuotaTracked);

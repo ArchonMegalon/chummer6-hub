@@ -4432,7 +4432,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"Unable to create a Chummer-owned {operationLabel} request receipt.");
                 }
 
-                if (receipt.Quota is null)
+                if (receipt.QuotaTracked && receipt.Quota is null)
                 {
                     _logger.LogWarning("{Operation} dispatch accepted without quota receipt for {UserId} on {SourceId}.", operationLabel, subject.SubjectId, sourceId);
                     return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: fallbackQuotaUnavailableMessage);
@@ -10979,6 +10979,7 @@ Boundary:
             ["request_supported"] = capability.RequestSupported,
             ["requires_authentication"] = capability.RequiresAuthentication,
             ["public_visible"] = capability.PublicVisible,
+            ["quota_tracked"] = capability.QuotaTracked,
             ["source_ref"] = capability.SourceRef,
             ["visibility"] = capability.Visibility
         };
@@ -11929,6 +11930,7 @@ Boundary:
             RequestSupported: string.Equals(health.Status, "available", StringComparison.OrdinalIgnoreCase),
             RequiresAuthentication: health.RequiresAuthentication,
             PublicVisible: health.PublicVisible,
+            QuotaTracked: health.QuotaTracked,
             SourceRef: sourceRef,
             Visibility: visibility);
     }

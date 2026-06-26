@@ -119,6 +119,7 @@ public sealed class HorizonArtifactRequestsController : ControllerBase
             Visibility: receipt.Visibility,
             PublicSafe: true,
             CreatedAtUtc: receipt.CreatedAtUtc,
+            QuotaTracked: receipt.QuotaTracked,
             CapabilityHealthHref: $"/api/v1/public/horizons/capabilities?horizonId={encodedHorizonId}&artifactKindOrCapabilityId={encodedCapabilityId}",
             PublicReceiptHref: $"/api/v1/public/horizons/artifact-requests/{encodedRequestId}");
     }
@@ -136,5 +137,6 @@ public sealed record PublicHorizonArtifactRequestReceipt(
     string Visibility,
     bool PublicSafe,
     DateTimeOffset CreatedAtUtc,
+    bool QuotaTracked,
     string CapabilityHealthHref,
     string PublicReceiptHref);

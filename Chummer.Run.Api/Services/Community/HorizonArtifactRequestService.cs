@@ -33,7 +33,8 @@ public sealed class HorizonArtifactRequestService
         string requestId = BuildRequestId(request, capability, createdAtUtc);
         List<string> blocked = [.. Validate(request, capability, requireEnabledCapability, requireRequestingUser)];
         HorizonArtifactQuotaSnapshot? quota = null;
-        if (consumeQuota && blocked.Count == 0)
+        bool quotaTracked = capability.QuotaTracked;
+        if (consumeQuota && quotaTracked && blocked.Count == 0)
         {
             if (_quota is null)
             {
@@ -74,6 +75,7 @@ public sealed class HorizonArtifactRequestService
             ExternalProcessingConsent: request.ExternalProcessingConsent,
             BlockedReasons: blocked,
             CreatedAtUtc: createdAtUtc,
+            QuotaTracked: quotaTracked,
             Quota: quota);
         _receipts?.Append(receipt);
         return receipt;
@@ -202,4 +204,5 @@ public sealed record HorizonArtifactRequestReceipt(
     bool ExternalProcessingConsent,
     IReadOnlyList<string> BlockedReasons,
     DateTimeOffset CreatedAtUtc,
+    bool QuotaTracked,
     HorizonArtifactQuotaSnapshot? Quota = null);

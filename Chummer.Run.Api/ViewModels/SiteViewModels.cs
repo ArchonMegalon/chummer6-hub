@@ -1114,6 +1114,7 @@ public sealed record PublicHorizonCapabilityViewModel(
     bool RequestSupported,
     bool RequiresAuthentication,
     bool PublicVisible,
+    bool QuotaTracked,
     string SourceRef,
     string Visibility);
 

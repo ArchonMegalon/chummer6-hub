@@ -1662,6 +1662,25 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public void InternalCapabilityLanesTrackCurrentOriginAndRunbookProviderBoundary()
+    {
+        using Fixture fixture = new();
+        HorizonCapabilityService capabilities = new(fixture.Configuration);
+
+        HorizonCapabilityHealthSnapshot runbook = capabilities.GetHealth("runbook-press", "document_export", publicSafe: false);
+        HorizonCapabilityHealthSnapshot origin = capabilities.GetHealth("origin-dossier", "dossier_media", publicSafe: false);
+        HorizonCapabilityHealthSnapshot publicSafeRunbook = capabilities.GetHealth("runbook-press", "document_export", publicSafe: true);
+        HorizonCapabilityHealthSnapshot publicSafeOrigin = capabilities.GetHealth("origin-dossier", "dossier_media", publicSafe: true);
+
+        Assert.Contains("Subscribr.ai", runbook.InternalProviderLane, StringComparison.Ordinal);
+        Assert.Contains("First Book ai", runbook.InternalProviderLane, StringComparison.Ordinal);
+        Assert.Contains("Subscribr.ai", origin.InternalProviderLane, StringComparison.Ordinal);
+        Assert.Contains("First Book ai", origin.InternalProviderLane, StringComparison.Ordinal);
+        Assert.Null(publicSafeRunbook.InternalProviderLane);
+        Assert.Null(publicSafeOrigin.InternalProviderLane);
+    }
+
+    [Fact]
     public void InternalHorizonArtifactRequestEndpointConsumesGenericQuota()
     {
         using Fixture fixture = new(configureSettings: settings =>
