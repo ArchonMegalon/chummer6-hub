@@ -2289,6 +2289,16 @@ public sealed record AccountHubCardViewModel(
     string? SecondaryLabel = null,
     string? SecondaryHref = null);
 
+public sealed record AccountSectionPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    IReadOnlyList<string> Highlights,
+    IReadOnlyList<AccountHubCardViewModel> Cards,
+    string BackLabel,
+    string BackHref);
+
 public sealed record AccountPageViewModel(
     SiteChromeViewModel Chrome,
     string CurrentSection,

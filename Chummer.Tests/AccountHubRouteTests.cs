@@ -81,6 +81,113 @@ public sealed class AccountHubRouteTests
         Assert.Equal("/account", redirect.Url);
     }
 
+    [Fact]
+    public async Task AccountAccessRouteShowsMinimalSectionPage()
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.AccountPage("access", null, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Accounts/Section.cshtml", view.ViewName);
+        AccountSectionPageViewModel model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        Assert.Equal("Installs", model.Eyebrow);
+        Assert.Equal("Downloads, installs, and recovery.", model.Heading);
+        Assert.Equal(3, model.Cards.Count);
+        Assert.Equal("Current downloads", model.Cards[0].Title);
+        Assert.Equal("Linked copies", model.Cards[1].Title);
+        Assert.Equal("Recovery and relink", model.Cards[2].Title);
+    }
+
+    [Fact]
+    public async Task AccountWorkRouteShowsMinimalSectionPage()
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.AccountPage("work", null, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Accounts/Section.cshtml", view.ViewName);
+        AccountSectionPageViewModel model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        Assert.Equal("Campaigns", model.Eyebrow);
+        Assert.Equal("Runners and groups.", model.Heading);
+        Assert.Equal(3, model.Cards.Count);
+    }
+
+    [Fact]
+    public async Task AccountParticipationRouteShowsMinimalSectionPage()
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.AccountPage("participation", null, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Accounts/Section.cshtml", view.ViewName);
+        AccountSectionPageViewModel model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        Assert.Equal("Participation", model.Eyebrow);
+        Assert.Equal("Feedback and roadmap.", model.Heading);
+        Assert.Equal(3, model.Cards.Count);
+        Assert.Equal("Feedback and roadmap", model.Cards[0].Title);
+        Assert.Equal("Membership", model.Cards[1].Title);
+    }
+
+    [Fact]
+    public async Task AccountSupportRouteKeepsLegacyDetailedSurface()
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.AccountPage("support", null, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Accounts/Account.cshtml", view.ViewName);
+        Assert.IsType<AccountPageViewModel>(view.Model);
+    }
+
+    [Fact]
+    public async Task AccountWorkDetailRouteKeepsLegacyDetailedSurface()
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.AccountPage("work", null, CancellationToken.None, workspaceId: "workspace-demo", runId: null, handoffId: null, entryId: null, publicationId: null, prepQuery: null);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Accounts/Account.cshtml", view.ViewName);
+        Assert.IsType<AccountPageViewModel>(view.Model);
+    }
+
+    [Fact]
+    public async Task AccountWorkEditionQueryKeepsLegacyDetailedSurface()
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        AccountsController controller = fixture.CreateController();
+        controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?edition=sr6");
+
+        IActionResult result = await controller.AccountPage("work", null, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Accounts/Account.cshtml", view.ViewName);
+        Assert.IsType<AccountPageViewModel>(view.Model);
+    }
+
+    [Fact]
+    public async Task AccountAccessLocalCoProcessorQueryKeepsLegacyDetailedSurface()
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        AccountsController controller = fixture.CreateController();
+        controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?localCoProcessor=paranoid");
+
+        IActionResult result = await controller.AccountPage("access", null, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Accounts/Account.cshtml", view.ViewName);
+        Assert.IsType<AccountPageViewModel>(view.Model);
+    }
+
     private sealed class AccountHubRouteFixture : IDisposable
     {
         private const string AccessToken = "account-hub-route-token";

@@ -11,6 +11,7 @@ using Chummer.Run.Api.Contracts;
 using Chummer.Run.Contracts.Billing;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Ledger;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
@@ -209,6 +210,22 @@ public sealed class AccountsController : Controller
                     BuildAccountHubModel(user, installLinking, supportCases, campaignSpine));
             }
 
+            if (ShouldShowMinimalAccountSection(selectedSection, caseId, workspaceId, runId, handoffId, entryId, publicationId, prepQuery, Request.Query))
+            {
+                return View(
+                    "~/Views/Accounts/Section.cshtml",
+                    BuildAccountSectionModel(
+                        selectedSection,
+                        user,
+                        installLinking,
+                        supportCases,
+                        campaignSpine,
+                        _originAuthoringAllowance.TryGetAllowance(user.UserId, user.Email),
+                        _leaderboards.UserRecognitionSummary(user.UserId),
+                        _packageCatalog.ListReceiptsForSubject(subject.SubjectId, 8),
+                        _participationNotifications.ListReceiptsForUser(user.UserId, 6)));
+            }
+
             var model = new AccountPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email),
                 CurrentSection: selectedSection,
@@ -351,6 +368,336 @@ public sealed class AccountsController : Controller
                     "/account/work")
             ]);
     }
+
+    private AccountSectionPageViewModel BuildAccountSectionModel(
+        string section,
+        HubUserDto user,
+        InstallLinkingSummaryDto installLinking,
+        IReadOnlyList<SupportCaseProjection> supportCases,
+        AccountCampaignSummary campaignSpine,
+        HorizonArtifactAllowanceViewModel? allowance,
+        Chummer.Run.Contracts.Leaderboards.UserRecognitionSummaryDto? participationRecognition,
+        IReadOnlyList<PublicPackageReceipt> participationPackageReceipts,
+        IReadOnlyList<ParticipationOperatorNotificationReceipt> participationActivityReceipts)
+        => section switch
+        {
+            "access" => BuildAccountAccessSectionModel(user, installLinking, supportCases),
+            "work" => BuildAccountWorkSectionModel(user, installLinking, campaignSpine),
+            "participation" => BuildAccountParticipationSectionModel(user, allowance, participationRecognition, participationPackageReceipts, participationActivityReceipts),
+            _ => throw new InvalidOperationException($"Unsupported account section '{section}'.")
+        };
+
+    private AccountSectionPageViewModel BuildAccountAccessSectionModel(
+        HubUserDto user,
+        InstallLinkingSummaryDto installLinking,
+        IReadOnlyList<SupportCaseProjection> supportCases)
+    {
+        int linkedInstallCount = installLinking.ClaimedInstallations?.Count ?? 0;
+        int pendingClaimCount = installLinking.PendingClaimTickets.Count;
+        int installSupportCount = supportCases.Count(item =>
+            string.Equals(item.Kind, "install_help", StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrWhiteSpace(item.InstallationId)
+            || !string.IsNullOrWhiteSpace(item.ReleaseChannel)
+            || !string.IsNullOrWhiteSpace(item.Platform));
+        ClaimedInstallationDto? leadInstall = installLinking.ClaimedInstallations?
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+
+        string linkedInstallSummary = leadInstall is null
+            ? "No copy is linked yet. Downloads claimed while signed in come back here."
+            : $"{CountLabel(linkedInstallCount, "linked copy", "linked copies")}. Latest: {DescribeInstallation(leadInstall)}.";
+        string claimSummary = pendingClaimCount > 0
+            ? $"{CountLabel(pendingClaimCount, "claim ticket", "claim tickets")} waiting to be redeemed."
+            : "If a copy stops opening, recovery and relink start from the same account path.";
+        string supportSummary = installSupportCount > 0
+            ? $"{CountLabel(installSupportCount, "install case", "install cases")} already tracked on this account."
+            : "No install-specific support case is open right now.";
+
+        return new AccountSectionPageViewModel(
+            Chrome: _chrome.BuildAuthenticatedChrome(
+                "Account · Installs",
+                "Downloads, linked copies, and recovery.",
+                "/account/access",
+                user.DisplayName,
+                user.Email),
+            Eyebrow: "Installs",
+            Heading: "Downloads, installs, and recovery.",
+            Summary: "Keep setup tied to this account. Real character work still belongs in the desktop app.",
+            Highlights:
+            [
+                $"Signed in as {user.DisplayName}",
+                $"{CountLabel(linkedInstallCount, "linked copy", "linked copies")}.",
+                pendingClaimCount > 0
+                    ? $"{CountLabel(pendingClaimCount, "claim ticket", "claim tickets")} waiting."
+                    : "No pending claim ticket."
+            ],
+            Cards:
+            [
+                new AccountHubCardViewModel(
+                    "Downloads",
+                    "Current downloads",
+                    "Stable and nightly stay on the public shelf. Signed-in downloads claim themselves back to this account.",
+                    "Open downloads",
+                    "/downloads",
+                    "Install help",
+                    "/account/support"),
+                new AccountHubCardViewModel(
+                    "Linked copies",
+                    "Linked copies",
+                    linkedInstallSummary,
+                    linkedInstallCount > 0 ? "Open support" : "Open downloads",
+                    linkedInstallCount > 0 ? "/account/support" : "/downloads",
+                    "Account home",
+                    "/account"),
+                new AccountHubCardViewModel(
+                    "Recovery",
+                    "Recovery and relink",
+                    $"{claimSummary} {supportSummary}",
+                    "Open support",
+                    "/account/support",
+                    "Downloads",
+                    "/downloads")
+            ],
+            BackLabel: "Back to account",
+            BackHref: "/account");
+    }
+
+    private AccountSectionPageViewModel BuildAccountWorkSectionModel(
+        HubUserDto user,
+        InstallLinkingSummaryDto installLinking,
+        AccountCampaignSummary campaignSpine)
+    {
+        bool hasLinkedDesktop = (installLinking.ClaimedInstallations?.Count ?? 0) > 0
+            || (installLinking.ActiveGrants?.Count ?? 0) > 0
+            || installLinking.PendingClaimTickets.Count > 0;
+        RunnerDossierProjection? latestDossier = campaignSpine.Dossiers
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        CampaignWorkspaceProjection? latestWorkspace = campaignSpine.Workspaces
+            .OrderByDescending(static item => item.Runs.Count)
+            .ThenBy(static item => item.CampaignName)
+            .FirstOrDefault();
+        RunProjection? latestRun = campaignSpine.Runs
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        CommunityOperatorProjection? latestGroup = campaignSpine.CommunityOperations
+            .OrderByDescending(static item => item.GroupName)
+            .FirstOrDefault();
+
+        AccountHubCardViewModel runnerCard = latestDossier is null
+            ? new AccountHubCardViewModel(
+                "Starter",
+                "Start from an example runner",
+                "No runner is attached to this account yet. Open a clear archetype and turn it into your own sheet in Chummer.",
+                "Open street samurai",
+                "/account/open/example/street-samurai",
+                "Open decker",
+                "/account/open/example/decker")
+            : new AccountHubCardViewModel(
+                "Runner",
+                latestDossier.DisplayName,
+                string.IsNullOrWhiteSpace(latestDossier.CurrentRunId)
+                    ? "Most recently updated runner on this account."
+                    : "This runner already has an active campaign return waiting.",
+                "Open in Chummer",
+                $"/account/open/character/{Uri.EscapeDataString(latestDossier.DossierId)}",
+                hasLinkedDesktop ? "Installs" : "Finish setup",
+                "/account/access");
+
+        AccountHubCardViewModel campaignCard = latestWorkspace is not null
+            ? new AccountHubCardViewModel(
+                "Campaign",
+                latestWorkspace.CampaignName,
+                latestWorkspace.ReturnSummary,
+                "Open in Chummer",
+                $"/account/open/campaign/{Uri.EscapeDataString(latestWorkspace.CampaignId)}",
+                "Open browser return",
+                $"/account/work/workspaces/{Uri.EscapeDataString(latestWorkspace.WorkspaceId)}")
+            : latestGroup is not null
+                ? new AccountHubCardViewModel(
+                    "Group",
+                    latestGroup.GroupName,
+                    latestGroup.CampaignVisibilitySummary,
+                    "Open in Chummer",
+                    $"/account/open/group/{Uri.EscapeDataString(latestGroup.GroupId)}",
+                    "Back to account",
+                    "/account")
+                : new AccountHubCardViewModel(
+                    "Campaign",
+                    "No campaign return yet",
+                    "When a runner joins a group or campaign, the next return path shows up here.",
+                    hasLinkedDesktop ? "Open examples" : "Finish setup",
+                    hasLinkedDesktop ? "/account/open/example/face" : "/account/access",
+                    "Account home",
+                    "/account");
+
+        AccountHubCardViewModel browserCard = latestRun is not null
+            ? new AccountHubCardViewModel(
+                "Browser return",
+                latestRun.Title,
+                latestRun.Summary,
+                "Open browser return",
+                $"/account/work/runs/{Uri.EscapeDataString(latestRun.RunId)}",
+                latestWorkspace is null
+                    ? "Account home"
+                    : "Campaign return",
+                latestWorkspace is null
+                    ? "/account"
+                    : $"/account/work/workspaces/{Uri.EscapeDataString(latestWorkspace.WorkspaceId)}")
+            : new AccountHubCardViewModel(
+                "Browser return",
+                "Nothing is waiting in the browser",
+                "The browser side stays small. Once a campaign return exists, it lands here without replacing the desktop flow.",
+                "Open account",
+                "/account",
+                hasLinkedDesktop ? "Open examples" : "Finish setup",
+                hasLinkedDesktop ? "/account/open/example/combat-mage" : "/account/access");
+
+        return new AccountSectionPageViewModel(
+            Chrome: _chrome.BuildAuthenticatedChrome(
+                "Account · Campaigns",
+                "Runners, groups, and browser return paths.",
+                "/account/work",
+                user.DisplayName,
+                user.Email),
+            Eyebrow: "Campaigns",
+            Heading: "Runners and groups.",
+            Summary: "Pick what to reopen. Real edits stay in Chummer, while the browser keeps only the return paths.",
+            Highlights:
+            [
+                $"{CountLabel(campaignSpine.Dossiers.Count, "runner", "runners")}.",
+                $"{CountLabel(campaignSpine.Workspaces.Count, "campaign return", "campaign returns")}.",
+                $"{CountLabel(campaignSpine.CommunityOperations.Count, "group lane", "group lanes")}."
+            ],
+            Cards:
+            [
+                runnerCard,
+                campaignCard,
+                browserCard
+            ],
+            BackLabel: "Back to account",
+            BackHref: "/account");
+    }
+
+    private AccountSectionPageViewModel BuildAccountParticipationSectionModel(
+        HubUserDto user,
+        HorizonArtifactAllowanceViewModel? allowance,
+        Chummer.Run.Contracts.Leaderboards.UserRecognitionSummaryDto? participationRecognition,
+        IReadOnlyList<PublicPackageReceipt> participationPackageReceipts,
+        IReadOnlyList<ParticipationOperatorNotificationReceipt> participationActivityReceipts)
+    {
+        int followAndVoteCount = participationPackageReceipts.Count(item =>
+            string.Equals(item.ActionKind, "follow", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.ActionKind, "vote", StringComparison.OrdinalIgnoreCase));
+        int badgeCount = (participationRecognition?.CurrentStatusBadges?.Count ?? 0)
+            + (participationRecognition?.PersistentBadges?.Count ?? 0);
+        string supporterSummary = allowance?.SupporterActive ?? false
+            ? "Supporter is active. It only increases the monthly Origin Book allowance right now."
+            : "Free and Supporter run the same app. Supporter only changes the monthly Origin Book allowance right now.";
+
+        return new AccountSectionPageViewModel(
+            Chrome: _chrome.BuildAuthenticatedChrome(
+                "Account · Participation",
+                "Public feedback, private standing, and supporter membership.",
+                "/account/participation",
+                user.DisplayName,
+                user.Email),
+            Eyebrow: "Participation",
+            Heading: "Feedback and roadmap.",
+            Summary: "Public requests live in Participate. Private account standing and supporter checkout stay separate.",
+            Highlights:
+            [
+                $"{(participationRecognition?.LifetimePoints ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)} lifetime points.",
+                $"{CountLabel(followAndVoteCount, "public follow or vote", "public follows or votes")}.",
+                $"{CountLabel(participationActivityReceipts.Count, "private activity receipt", "private activity receipts")}."
+            ],
+            Cards:
+            [
+                new AccountHubCardViewModel(
+                    "Participate",
+                    "Feedback and roadmap",
+                    "Public requests, votes, and shipped notes live on the Participate surface instead of inside the account shell.",
+                    "Open participate",
+                    "/participate",
+                    "Changelog",
+                    "/changelog"),
+                new AccountHubCardViewModel(
+                    "Supporter",
+                    "Membership",
+                    supporterSummary,
+                    "Open billing",
+                    "/account/billing"),
+                new AccountHubCardViewModel(
+                    "Recognition",
+                    "Community standing",
+                    badgeCount > 0
+                        ? $"{CountLabel(badgeCount, "badge", "badges")} attached to this account."
+                        : "Recognition stays optional and quiet unless you choose to look at it.",
+                    "Open leaderboards",
+                    "/leaderboards",
+                    "Back to account",
+                    "/account")
+            ],
+            BackLabel: "Back to account",
+            BackHref: "/account");
+    }
+
+    private static bool ShouldShowMinimalAccountSection(
+        string selectedSection,
+        string? caseId,
+        string? workspaceId,
+        string? runId,
+        string? handoffId,
+        string? entryId,
+        string? publicationId,
+        string? prepQuery,
+        IQueryCollection query)
+    {
+        if (!string.IsNullOrWhiteSpace(caseId)
+            || HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId)
+            || !string.IsNullOrWhiteSpace(prepQuery))
+        {
+            return false;
+        }
+
+        if (query.ContainsKey("edition") || query.ContainsKey("localCoProcessor"))
+        {
+            return false;
+        }
+
+        return string.Equals(selectedSection, "access", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(selectedSection, "work", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(selectedSection, "participation", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string DescribeInstallation(ClaimedInstallationDto installation)
+    {
+        List<string> parts = [];
+        if (!string.IsNullOrWhiteSpace(installation.HostLabel))
+        {
+            parts.Add(installation.HostLabel);
+        }
+        else
+        {
+            string platform = installation.Platform ?? "desktop";
+            if (!string.IsNullOrWhiteSpace(installation.Arch))
+            {
+                platform = $"{platform} {installation.Arch}";
+            }
+
+            parts.Add(platform);
+        }
+
+        if (!string.IsNullOrWhiteSpace(installation.Channel))
+        {
+            parts.Add(installation.Channel);
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    private static string CountLabel(int count, string singular, string plural)
+        => $"{count.ToString(System.Globalization.CultureInfo.InvariantCulture)} {(count == 1 ? singular : plural)}";
 
     private static string DescribeAllowanceWindowPeriod(string? windowKind)
         => string.Equals(windowKind, "monthly", StringComparison.OrdinalIgnoreCase)

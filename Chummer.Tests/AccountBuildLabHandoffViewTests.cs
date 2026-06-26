@@ -10,13 +10,17 @@ public sealed class AccountBuildLabHandoffViewTests
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string hubViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Hub.cshtml");
+        string sectionViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Section.cshtml");
         string controller = File.ReadAllText(controllerPath);
         string view = File.ReadAllText(viewPath);
         string hubView = File.ReadAllText(hubViewPath);
+        string sectionView = File.ReadAllText(sectionViewPath);
 
         Assert.Contains("string.Equals(selectedSection, \"profile\", StringComparison.OrdinalIgnoreCase)", controller, StringComparison.Ordinal);
         Assert.Contains("return View(", controller, StringComparison.Ordinal);
         Assert.Contains("\"~/Views/Accounts/Hub.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.Contains("\"~/Views/Accounts/Section.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.Contains("ShouldShowMinimalAccountSection", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect(\"/account\")", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("IsBillingSectionAlias", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("section.Trim().ToLowerInvariant() is \"billing\" or \"settings\" or \"advanced\"", controller, StringComparison.Ordinal);
@@ -49,6 +53,9 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("@foreach (var card in Model.Cards)", hubView, StringComparison.Ordinal);
         Assert.Contains("@card.Title", hubView, StringComparison.Ordinal);
         Assert.Contains("@card.PrimaryLabel", hubView, StringComparison.Ordinal);
+        Assert.Contains("@Model.Eyebrow", sectionView, StringComparison.Ordinal);
+        Assert.Contains("@Model.Heading", sectionView, StringComparison.Ordinal);
+        Assert.Contains("@foreach (var card in Model.Cards)", sectionView, StringComparison.Ordinal);
     }
 
     [Fact]

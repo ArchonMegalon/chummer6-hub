@@ -1,0 +1,45 @@
+@model AccountSectionPageViewModel
+@{
+    ViewData["Title"] = Model.Chrome.Title;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+}
+<section class="minimal-page-hero">
+    <div>
+        <p class="eyebrow">Account · @Model.Eyebrow</p>
+        <h1>@Model.Heading</h1>
+        <p>@Model.Summary</p>
+        @if (Model.Highlights.Count > 0)
+        {
+            <ul class="minimal-hero__points">
+                @foreach (var highlight in Model.Highlights)
+                {
+                    <li>@highlight</li>
+                }
+            </ul>
+        }
+        <div class="minimal-actions">
+            <a class="button-like button-like--ghost" href="@Model.BackHref">@Model.BackLabel</a>
+        </div>
+    </div>
+</section>
+
+<section class="minimal-section">
+    <div class="minimal-lane-grid minimal-platform-list">
+        @foreach (var card in Model.Cards)
+        {
+            <article class="minimal-lane-card">
+                <span class="tag">@card.Eyebrow</span>
+                <h2>@card.Title</h2>
+                <p>@card.Summary</p>
+                <div class="minimal-actions">
+                    <a class="button-like button-like--primary" href="@card.PrimaryHref">@card.PrimaryLabel</a>
+                    @if (!string.IsNullOrWhiteSpace(card.SecondaryHref) && !string.IsNullOrWhiteSpace(card.SecondaryLabel))
+                    {
+                        <a class="button-like button-like--ghost" href="@card.SecondaryHref">@card.SecondaryLabel</a>
+                    }
+                </div>
+            </article>
+        }
+    </div>
+</section>
