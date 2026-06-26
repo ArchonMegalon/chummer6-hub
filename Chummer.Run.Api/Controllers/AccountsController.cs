@@ -45,6 +45,7 @@ public sealed class AccountsController : Controller
     private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly OriginDossierPublicationService _originDossierPublications;
     private readonly BrilliantDirectoriesBillingService? _billing;
+    private readonly HorizonArtifactQuotaService? _horizonArtifactQuota;
     private readonly MediaArtifactHorizonsService? _mediaHorizons;
     private readonly HorizonArtifactRequestService? _artifactRequests;
     private readonly ILogger<AccountsController> _logger;
@@ -77,7 +78,8 @@ public sealed class AccountsController : Controller
         BrilliantDirectoriesBillingService? billing,
         ILogger<AccountsController> logger,
         HorizonArtifactRequestService? artifactRequests = null,
-        MediaArtifactHorizonsService? mediaHorizons = null)
+        MediaArtifactHorizonsService? mediaHorizons = null,
+        HorizonArtifactQuotaService? horizonArtifactQuota = null)
     {
         _accounts = accounts;
         _identity = identity;
@@ -104,6 +106,7 @@ public sealed class AccountsController : Controller
         _signedInTrustStatus = signedInTrustStatus;
         _originDossierPublications = originDossierPublications;
         _billing = billing;
+        _horizonArtifactQuota = horizonArtifactQuota;
         _artifactRequests = artifactRequests;
         _mediaHorizons = mediaHorizons;
         _logger = logger;
@@ -293,15 +296,38 @@ public sealed class AccountsController : Controller
             }
         }
 
-        string membershipLabel = quota?.PlanName ?? "Free";
-        string membershipSummary = quota is null
+        HorizonArtifactQuotaSnapshot? originBookQuota = null;
+        if (_horizonArtifactQuota is not null)
+        {
+            try
+            {
+                originBookQuota = _horizonArtifactQuota.GetQuota(
+                    new HorizonArtifactQuotaRequest(
+                        UserId: user.UserId,
+                        HorizonId: "origin-dossier",
+                        ArtifactKindOrCapabilityId: "premium_authoring_credit",
+                        Email: user.Email));
+            }
+            catch (InvalidOperationException)
+            {
+                originBookQuota = null;
+            }
+        }
+
+        string membershipLabel = quota?.PlanName
+            ?? originBookQuota?.AllowanceTier switch
+            {
+                "supporter" => "Supporter",
+                _ => "Free"
+            };
+        string membershipSummary = originBookQuota is null
             ? "Supporter handoff is not configured yet."
-            : quota.SupporterActive
+            : originBookQuota.SupporterActive
                 ? "Supporter only changes the monthly Origin Book allowance."
                 : "Free and Supporter use the same app.";
-        string bookQuotaSummary = quota is null
+        string bookQuotaSummary = originBookQuota is null
             ? "Origin book quota shows up here after billing is configured."
-            : $"{quota.MonthlyRemaining} of {quota.MonthlyLimit} origin books left this month.";
+            : $"{originBookQuota.WindowRemaining} of {originBookQuota.WindowLimit} origin books left this {DescribeAllowanceWindowPeriod(originBookQuota.WindowKind)}.";
 
         string installSummary = hasLinkedInstall
             ? $"{linkedInstallCount} linked install{(linkedInstallCount == 1 ? string.Empty : "s")}."
@@ -359,6 +385,13 @@ public sealed class AccountsController : Controller
                     "/account/work")
             ]);
     }
+
+    private static string DescribeAllowanceWindowPeriod(string? windowKind)
+        => string.Equals(windowKind, "monthly", StringComparison.OrdinalIgnoreCase)
+            ? "month"
+            : string.Equals(windowKind, "weekly", StringComparison.OrdinalIgnoreCase)
+                ? "week"
+                : "window";
 
     [HttpGet("/account/work/origin-dossiers/{originDossierProjectId}")]
     [Produces("text/html")]

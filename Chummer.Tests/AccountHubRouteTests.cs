@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
+using Chummer.Run.Contracts.Billing;
 using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -30,7 +32,35 @@ public sealed class AccountHubRouteTests
         AccountHubPageViewModel model = Assert.IsType<AccountHubPageViewModel>(view.Model);
         Assert.Equal("Account", model.Chrome.Title);
         Assert.Equal("Free", model.MembershipLabel);
+        Assert.Equal("Free and Supporter use the same app.", model.MembershipSummary);
+        Assert.Equal("1 of 1 origin books left this month.", model.BookQuotaSummary);
         Assert.Equal(4, model.Cards.Count);
+    }
+
+    [Fact]
+    public async Task AccountRootReflectsSupporterOriginAllowanceFromSharedQuota()
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        fixture.Billing.SyncMember(
+            new BrilliantDirectoriesMemberSyncRequest(
+                UserId: "subject.account-hub-route",
+                MemberId: "supporter-membership",
+                Email: "account.runner@example.invalid",
+                PlanKey: "supporter",
+                PlanName: "Supporter",
+                MembershipStatus: "active",
+                SupporterActive: true,
+                ObservedAtUtc: new DateTimeOffset(2026, 6, 26, 12, 0, 0, TimeSpan.Zero)),
+            "sync-secret");
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.AccountPage(null, null, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        AccountHubPageViewModel model = Assert.IsType<AccountHubPageViewModel>(view.Model);
+        Assert.Equal("Supporter", model.MembershipLabel);
+        Assert.Equal("Supporter only changes the monthly Origin Book allowance.", model.MembershipSummary);
+        Assert.Equal("2 of 2 origin books left this month.", model.BookQuotaSummary);
     }
 
     [Fact]
@@ -57,6 +87,7 @@ public sealed class AccountHubRouteTests
         }
 
         public string Root { get; }
+        public BrilliantDirectoriesBillingService Billing => _provider.GetRequiredService<BrilliantDirectoriesBillingService>();
 
         public static AccountHubRouteFixture Create()
         {
@@ -72,6 +103,9 @@ public sealed class AccountHubRouteTests
                     ["CHUMMER_KARMA_FORGE_STORE_PATH"] = Path.Combine(root, "karma-forge.json"),
                     ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd-billing.json"),
                     ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = Path.Combine(root, "myfirstbook-usage.json"),
+                    ["CHUMMER_BILLING_SYNC_SECRET"] = "sync-secret",
+                    ["BRILLIANT_DIRECTORIES_SYNC_SECRET"] = "sync-secret",
+                    ["BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL"] = "https://billing.example.test/supporter",
                     ["CHUMMER_PAYFUNNELS_BILLING_STORE_PATH"] = Path.Combine(root, "payfunnels-billing.json"),
                     ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
                     ["CHUMMER_LOCAL_E2E_ACCESS_TOKEN"] = AccessToken,
