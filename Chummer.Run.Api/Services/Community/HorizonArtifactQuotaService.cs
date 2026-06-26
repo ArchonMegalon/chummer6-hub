@@ -120,6 +120,7 @@ public sealed class HorizonArtifactQuotaService
                 && (normalizedSelector is null
                     || string.Equals(capability.ArtifactKind, normalizedSelector, StringComparison.OrdinalIgnoreCase)
                     || string.Equals(capability.CapabilityId, normalizedSelector, StringComparison.OrdinalIgnoreCase))
+                && capability.QuotaTracked
                 && (!request.PublicVisibleOnly || capability.PublicVisible))
             .OrderBy(capability => capability.HorizonId, StringComparer.OrdinalIgnoreCase)
             .ThenBy(capability => capability.CapabilityId, StringComparer.OrdinalIgnoreCase)

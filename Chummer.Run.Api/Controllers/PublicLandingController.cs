@@ -51,6 +51,7 @@ public sealed class PublicLandingController : Controller
     private readonly ParticipationOperatorNotificationService _participationNotifications;
     private readonly RunsiteTourQuotaService _runsiteTourQuota;
     private readonly HorizonArtifactRequestService? _artifactRequests;
+    private readonly HorizonArtifactAccessTokenService? _artifactAccessTokens;
     private readonly HorizonCapabilityService _horizonCapabilities;
     private readonly InstallLinkingService _installLinking;
     private readonly CampaignSpineService _campaignSpine;
@@ -153,7 +154,8 @@ public sealed class PublicLandingController : Controller
         IWebHostEnvironment webHostEnvironment,
         ILogger<PublicLandingController> logger,
         HorizonArtifactRequestService? artifactRequests = null,
-        HorizonCapabilityService? horizonCapabilities = null)
+        HorizonCapabilityService? horizonCapabilities = null,
+        HorizonArtifactAccessTokenService? artifactAccessTokens = null)
     {
         _landing = landing;
         _flipLinkDocumentPortal = flipLinkDocumentPortal;
@@ -169,6 +171,7 @@ public sealed class PublicLandingController : Controller
         _participationNotifications = participationNotifications;
         _runsiteTourQuota = runsiteTourQuota;
         _artifactRequests = artifactRequests;
+        _artifactAccessTokens = artifactAccessTokens;
         _horizonCapabilities = horizonCapabilities ?? new HorizonCapabilityService(configuration);
         _installLinking = installLinking;
         _campaignSpine = campaignSpine;
@@ -270,7 +273,8 @@ public sealed class PublicLandingController : Controller
         IWebHostEnvironment webHostEnvironment,
         ILogger<PublicLandingController> logger,
         HorizonArtifactRequestService? artifactRequests = null,
-        HorizonCapabilityService? horizonCapabilities = null)
+        HorizonCapabilityService? horizonCapabilities = null,
+        HorizonArtifactAccessTokenService? artifactAccessTokens = null)
         : this(
             landing,
             flipLinkDocumentPortal,
@@ -326,7 +330,8 @@ public sealed class PublicLandingController : Controller
             webHostEnvironment,
             logger,
             artifactRequests,
-            horizonCapabilities)
+            horizonCapabilities,
+            artifactAccessTokens)
     {
     }
 
@@ -2495,6 +2500,10 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> ParticipateBoardProviderAssetProxy(string assetHost, string? assetPath, CancellationToken cancellationToken)
         => await ParticipateBoardProviderAssetProxyCore(assetHost, assetPath, cancellationToken).ConfigureAwait(false);
 
+    [HttpGet("/roadmap/provider-assets/{assetHost}/{**assetPath}")]
+    public async Task<IActionResult> RoadmapBoardProviderAssetProxy(string assetHost, string? assetPath, CancellationToken cancellationToken)
+        => await ParticipateBoardProviderAssetProxyCore(assetHost, assetPath, cancellationToken).ConfigureAwait(false);
+
     private async Task<IActionResult> ParticipateBoardProxyCore(
         string? boardPath,
         CancellationToken cancellationToken,
@@ -2552,6 +2561,14 @@ public sealed class PublicLandingController : Controller
                     firstLinkLabel: "Roadmap",
                     secondLinkHref: fallbackPath,
                     secondLinkLabel: "Board",
+                    canonicalHref: localOrigin,
+                    assetProxyBasePath: "/participate/provider-assets",
+                    pageTitle: "Participate - Chummer.run",
+                    hostedHeadingReplacement: "What should Chummer do next?",
+                    hostedSummaryReplacement: "Short requests, clear bugs, useful ideas.",
+                    hostedPrimaryActionReplacement: "Add a note",
+                    hostedLeadReplacement: "Tell us what would help.",
+                    applyFeedbackPolish: true,
                     failureTitle: "The board is unavailable",
                     failureSummary: "Try again shortly. Use Support only for private or blocked issues.",
                     failurePrimaryHref: "/roadmap",
@@ -2849,6 +2866,14 @@ public sealed class PublicLandingController : Controller
         string firstLinkLabel,
         string secondLinkHref,
         string secondLinkLabel,
+        string canonicalHref,
+        string assetProxyBasePath,
+        string pageTitle,
+        string? hostedHeadingReplacement,
+        string? hostedSummaryReplacement,
+        string? hostedPrimaryActionReplacement,
+        string? hostedLeadReplacement,
+        bool applyFeedbackPolish,
         string failureTitle,
         string failureSummary,
         string failurePrimaryHref,
@@ -2865,11 +2890,31 @@ public sealed class PublicLandingController : Controller
         rewritten = rewritten.Replace("src=\"/", $"src=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("action=\"/", $"action=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("content=\"/", $"content=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
-        rewritten = rewritten.Replace("What do you want to see next? - Chummer.run", "Participate - Chummer.run", StringComparison.OrdinalIgnoreCase);
-        rewritten = rewritten.Replace("What do you want to see next?", "What should Chummer do next?", StringComparison.OrdinalIgnoreCase);
-        rewritten = rewritten.Replace("Tell us how we could make Chummer6 more useful to you", "Short requests, clear bugs, useful ideas.", StringComparison.OrdinalIgnoreCase);
-        rewritten = rewritten.Replace("Add Feature or Bug", "Add a note", StringComparison.OrdinalIgnoreCase);
-        rewritten = rewritten.Replace("Let us know how we can improve Chummer6.", "Tell us what would help.", StringComparison.OrdinalIgnoreCase);
+        rewritten = Regex.Replace(
+            rewritten,
+            @"<title>.*?</title>",
+            $"<title>{HtmlEncoder.Default.Encode(pageTitle)}</title>",
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
+        if (!string.IsNullOrWhiteSpace(hostedHeadingReplacement))
+        {
+            rewritten = rewritten.Replace("What do you want to see next?", hostedHeadingReplacement, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!string.IsNullOrWhiteSpace(hostedSummaryReplacement))
+        {
+            rewritten = rewritten.Replace("Tell us how we could make Chummer6 more useful to you", hostedSummaryReplacement, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!string.IsNullOrWhiteSpace(hostedPrimaryActionReplacement))
+        {
+            rewritten = rewritten.Replace("Add Feature or Bug", hostedPrimaryActionReplacement, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (!string.IsNullOrWhiteSpace(hostedLeadReplacement))
+        {
+            rewritten = rewritten.Replace("Let us know how we can improve Chummer6.", hostedLeadReplacement, StringComparison.OrdinalIgnoreCase);
+        }
 
         if (!rewritten.Contains("<base ", StringComparison.OrdinalIgnoreCase))
         {
@@ -2890,19 +2935,47 @@ public sealed class PublicLandingController : Controller
         rewritten = Regex.Replace(
             rewritten,
             @"(<base\b[^>]*>)",
-            $"$1<link rel=\"canonical\" href=\"{localOrigin}\" />",
+            $"$1<link rel=\"canonical\" href=\"{canonicalHref}\" />",
             RegexOptions.IgnoreCase | RegexOptions.Singleline,
             TimeSpan.FromMilliseconds(250));
         rewritten = Regex.Replace(
             rewritten,
             @"(<meta\b[^>]*\b(?:property|name)\s*=\s*[""'](?:og:url|twitter:url)[""'][^>]*\bcontent\s*=\s*[""'])[^""']*([""'][^>]*>)",
-            $"$1{localOrigin}$2",
+            $"$1{canonicalHref}$2",
             RegexOptions.IgnoreCase | RegexOptions.Singleline,
             TimeSpan.FromMilliseconds(250));
 
         if (!rewritten.Contains("data-chummer-home-link-patch", StringComparison.Ordinal))
         {
             string escapedPublicHomeHref = JavaScriptEncoder.Default.Encode(publicHomeHref);
+            string pageTitleJson = JsonSerializer.Serialize(pageTitle);
+            string localOriginJson = JsonSerializer.Serialize(localOrigin);
+            string canonicalHrefJson = JsonSerializer.Serialize(canonicalHref);
+            string headingReplacementJs = string.IsNullOrWhiteSpace(hostedHeadingReplacement)
+                ? string.Empty
+                : $"[new RegExp('\\\\bWhat do you want' + ' to see next\\\\?', 'g'), {JsonSerializer.Serialize(hostedHeadingReplacement)}],";
+            string summaryReplacementJs = string.IsNullOrWhiteSpace(hostedSummaryReplacement)
+                ? string.Empty
+                : $"[new RegExp('\\\\bTell us how we could make Chummer6' + ' more useful to you\\\\b', 'g'), {JsonSerializer.Serialize(hostedSummaryReplacement)}],";
+            string primaryActionReplacementJs = string.IsNullOrWhiteSpace(hostedPrimaryActionReplacement)
+                ? string.Empty
+                : $"[/\\\\bAdd Feature or Bug\\\\b/g, {JsonSerializer.Serialize(hostedPrimaryActionReplacement)}],";
+            string leadReplacementJs = string.IsNullOrWhiteSpace(hostedLeadReplacement)
+                ? string.Empty
+                : $"[/\\\\bLet us know how we can improve Chummer6\\\\./g, {JsonSerializer.Serialize(hostedLeadReplacement)}],";
+            string feedbackOnlyReplacementsJs = applyFeedbackPolish
+                ? """
+      [/\bShort title of your feedback\.\.\./g, 'Short title'],
+      [/\bDescribe your idea or bug\.\.\./g, 'What happened, or what should exist?'],
+      [/-- Choose a category --/g, 'Choose a category'],
+      [/\bGathering votes\b/g, ''],
+      [/\bFeature\b/g, 'Idea'],
+      [/\bvotes\b/gi, 'requests'],
+"""
+                : string.Empty;
+            string hiddenStatusTermsJs = applyFeedbackPolish
+                ? "['gathering votes', 'planned', 'in progress']"
+                : "[]";
             const string boardSkin = """
 <style data-chummer-board-skin>
 :root {
@@ -3000,6 +3073,10 @@ main,
             string homeLinkPatch = """
 <script data-chummer-home-link-patch>
 document.addEventListener('DOMContentLoaded', function () {
+  const pageTitle = __CHUMMER_PAGE_TITLE__;
+  const localOrigin = __CHUMMER_LOCAL_ORIGIN__;
+  const canonicalHref = __CHUMMER_CANONICAL_HREF__;
+  const hiddenStatusTerms = __CHUMMER_HIDDEN_STATUS_TERMS__;
   const polishVisibleCopy = function () {
     const replacements = [
       [/\bAI-powered\b/gi, ''],
@@ -3009,20 +3086,15 @@ document.addEventListener('DOMContentLoaded', function () {
       [/\bArtificial intelligence\b/gi, ''],
       [/\bAutomatically generate\b/gi, 'Create'],
       [/\bautomatically generate\b/g, 'create'],
-      [new RegExp('\\bWhat do you want' + ' to see next\\?', 'g'), 'What should Chummer do next?'],
-      [new RegExp('\\bTell us how we could make Chummer6' + ' more useful to you\\b', 'g'), 'Short requests, clear bugs, useful ideas.'],
-      [/\bAdd Feature or Bug\b/g, 'Add a note'],
-      [/\bLet us know how we can improve Chummer6\./g, 'Tell us what would help.'],
-      [/\bShort title of your feedback\.\.\./g, 'Short title'],
-      [/\bDescribe your idea or bug\.\.\./g, 'What happened, or what should exist?'],
-      [/-- Choose a category --/g, 'Choose a category'],
-      [/\bGathering votes\b/g, ''],
-      [/\bFeature\b/g, 'Idea'],
-      [/\bvotes\b/gi, 'requests'],
+      __CHUMMER_HEADING_REPLACEMENT__
+      __CHUMMER_SUMMARY_REPLACEMENT__
+      __CHUMMER_PRIMARY_ACTION_REPLACEMENT__
+      __CHUMMER_LEAD_REPLACEMENT__
+      __CHUMMER_FEEDBACK_ONLY_REPLACEMENTS__
       [/\s{2,}/g, ' ']
     ];
 
-    document.title = 'Participate - Chummer.run';
+    document.title = pageTitle;
 
     const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
     const textNodes = [];
@@ -3066,7 +3138,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const nodes = Array.from(document.querySelectorAll('span, small, label, div, button, option, a, nav, header'));
     nodes.forEach(function (node) {
       const text = (node.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-      if (text === 'gathering votes' || text === 'planned' || text === 'in progress') {
+      if (hiddenStatusTerms.includes(text)) {
         node.setAttribute('data-chummer-hidden-status', 'true');
       }
 
@@ -3074,7 +3146,7 @@ document.addEventListener('DOMContentLoaded', function () {
         node.setAttribute('data-chummer-hidden-status', 'true');
       }
 
-      if (node instanceof HTMLButtonElement && text === 'create') {
+      if (node instanceof HTMLButtonElement && text === 'create' && hiddenStatusTerms.length > 0) {
         node.textContent = 'Send';
       }
     });
@@ -3135,7 +3207,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const text = (anchor.textContent || '').trim().toLowerCase();
     const hasBrandText = text === 'chummer' || text === ('product' + 'lift') || text.includes('feedback') || text.includes('roadmap');
     const hasLogo = !!anchor.querySelector('img, svg');
-    const pointsToRoot = href === '/' || href === '/participate' || href === '/participate/' || href === '/participate/board' || href === '/participate/board/' || href === '/partizipate' || href === '/partizipate/' || /^https:\/\/[^/]+\/?$/.test(href);
+    const pointsToRoot = href === '/'
+      || href === canonicalHref
+      || href === canonicalHref + '/'
+      || href === localOrigin
+      || href === localOrigin + '/'
+      || href === '/partizipate'
+      || href === '/partizipate/'
+      || /^https:\/\/[^/]+\/?$/.test(href);
 
     return pointsToRoot && (hasBrandText || hasLogo);
   });
@@ -3150,7 +3229,16 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 """
-                .Replace("__CHUMMER_PUBLIC_HOME_HREF__", escapedPublicHomeHref, StringComparison.Ordinal);
+                .Replace("__CHUMMER_PUBLIC_HOME_HREF__", escapedPublicHomeHref, StringComparison.Ordinal)
+                .Replace("__CHUMMER_PAGE_TITLE__", pageTitleJson, StringComparison.Ordinal)
+                .Replace("__CHUMMER_LOCAL_ORIGIN__", localOriginJson, StringComparison.Ordinal)
+                .Replace("__CHUMMER_CANONICAL_HREF__", canonicalHrefJson, StringComparison.Ordinal)
+                .Replace("__CHUMMER_HIDDEN_STATUS_TERMS__", hiddenStatusTermsJs, StringComparison.Ordinal)
+                .Replace("__CHUMMER_HEADING_REPLACEMENT__", headingReplacementJs, StringComparison.Ordinal)
+                .Replace("__CHUMMER_SUMMARY_REPLACEMENT__", summaryReplacementJs, StringComparison.Ordinal)
+                .Replace("__CHUMMER_PRIMARY_ACTION_REPLACEMENT__", primaryActionReplacementJs, StringComparison.Ordinal)
+                .Replace("__CHUMMER_LEAD_REPLACEMENT__", leadReplacementJs, StringComparison.Ordinal)
+                .Replace("__CHUMMER_FEEDBACK_ONLY_REPLACEMENTS__", feedbackOnlyReplacementsJs, StringComparison.Ordinal);
 
             string boardFailurePatch = """
 <script data-chummer-board-failure-patch>
@@ -3274,7 +3362,7 @@ document.addEventListener('DOMContentLoaded', function () {
         rewritten = rewritten.Replace("productlift-", "board-", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("ProductLift.dev", "Chummer", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("Powered by ProductLift", "Hosted by Chummer", StringComparison.OrdinalIgnoreCase);
-        rewritten = RewriteHostedBoardAssetHosts(rewritten);
+        rewritten = RewriteHostedBoardAssetHosts(rewritten, assetProxyBasePath);
 
         return rewritten;
     }
@@ -3372,19 +3460,19 @@ document.addEventListener('DOMContentLoaded', function () {
         return false;
     }
 
-    private static string RewriteHostedBoardAssetHosts(string html)
+    private static string RewriteHostedBoardAssetHosts(string html, string assetProxyBasePath)
     {
         string providerDomain = string.Concat("product", "lift.dev");
         string rewritten = Regex.Replace(
             html,
             $"https://(?<assetHost>media|cdn)\\.{Regex.Escape(providerDomain)}(?=[/\"'>\\s])",
-            match => $"/participate/provider-assets/{match.Groups["assetHost"].Value}",
+            match => $"{assetProxyBasePath}/{match.Groups["assetHost"].Value}",
             RegexOptions.IgnoreCase,
             TimeSpan.FromMilliseconds(250));
         return Regex.Replace(
             rewritten,
             @"https://(?<assetHost>media|cdn)\.chummer(?=[/""'>\s])",
-            match => $"/participate/provider-assets/{match.Groups["assetHost"].Value}",
+            match => $"{assetProxyBasePath}/{match.Groups["assetHost"].Value}",
             RegexOptions.IgnoreCase,
             TimeSpan.FromMilliseconds(250));
     }
@@ -3403,6 +3491,14 @@ document.addEventListener('DOMContentLoaded', function () {
             firstLinkLabel: "Roadmap",
             secondLinkHref: "/participate",
             secondLinkLabel: "Board",
+            canonicalHref: "/participate/board",
+            assetProxyBasePath: "/participate/provider-assets",
+            pageTitle: "Participate - Chummer.run",
+            hostedHeadingReplacement: "What should Chummer do next?",
+            hostedSummaryReplacement: "Short requests, clear bugs, useful ideas.",
+            hostedPrimaryActionReplacement: "Add a note",
+            hostedLeadReplacement: "Tell us what would help.",
+            applyFeedbackPolish: true,
             failureTitle: "The board is unavailable",
             failureSummary: "Try again shortly. Use Support only for private or blocked issues.",
             failurePrimaryHref: "/roadmap",
@@ -4139,7 +4235,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return NotFound();
         }
 
-        if (_blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn) is null)
+        if (BuildProtectedBlackLedgerWorldTurnBriefing(requestedTurn) is null)
         {
             return NotFound();
         }
@@ -4370,7 +4466,7 @@ document.addEventListener('DOMContentLoaded', function () {
             runsiteQuota?.WeeklyRemaining,
             runsiteQuota?.WeeklyLimit);
 
-        return Redirect(dispatchTarget);
+        return Redirect(ProtectHorizonArtifactDispatchTarget(dispatchTarget));
     }
 
     [HttpGet("/runsites/tour-quota/me")]
@@ -5193,30 +5289,46 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpGet("/ledger/turns/{turn}/newsreel.json")]
     [Produces("application/json")]
-    public IActionResult LedgerTurnNewsreelJson([FromRoute] string turn)
+    public async Task<IActionResult> LedgerTurnNewsreelJson([FromRoute] string turn, CancellationToken cancellationToken)
     {
         if (!int.TryParse(turn, out int requestedTurn) || requestedTurn < 0)
         {
             return NotFound();
         }
 
-        BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn);
-        return briefing is null
-            ? NotFound()
-            : Ok(briefing with
-            {
-                ArtifactCapability = BuildPublicHorizonCapability(
-                    "black-ledger",
-                    "world_tick_digest",
-                    $"black-ledger:turn-{requestedTurn}:newsreel")
-            });
+        BlackLedgerWorldTurnBriefingViewModel? briefing = BuildProtectedBlackLedgerWorldTurnBriefing(requestedTurn);
+        if (briefing is null)
+        {
+            return NotFound();
+        }
+
+        string sourceRef = $"black-ledger:turn-{requestedTurn}:newsroom";
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "black ledger newsroom bulletin",
+            currentPath: $"/ledger/turns/{requestedTurn}/newsreel.json",
+            sourceRef: sourceRef,
+            horizonId: "black-ledger",
+            artifactKindOrCapabilityId: "newsroom_bulletin",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
+        }
+
+        return Ok(briefing with
+        {
+            ArtifactCapability = BuildPublicHorizonCapability(
+                "black-ledger",
+                "newsroom_bulletin",
+                sourceRef)
+        });
     }
 
     [HttpGet("/ledger/newsroom")]
     [Produces("text/html")]
     public IActionResult LedgerNewsroomHome()
     {
-        BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(null);
+        BlackLedgerWorldTurnBriefingViewModel? briefing = BuildProtectedBlackLedgerWorldTurnBriefing(null);
         if (briefing?.Broadcast is null)
         {
             return NotFound();
@@ -5235,10 +5347,22 @@ document.addEventListener('DOMContentLoaded', function () {
             return NotFound();
         }
 
-        BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn);
+        BlackLedgerWorldTurnBriefingViewModel? briefing = BuildProtectedBlackLedgerWorldTurnBriefing(requestedTurn);
         if (briefing?.Broadcast is null || briefing.ToTurn != requestedTurn)
         {
             return NotFound();
+        }
+
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "black ledger newsroom bulletin",
+            currentPath: $"/ledger/newsroom/{episodeId}",
+            sourceRef: $"black-ledger:turn-{requestedTurn}:newsroom",
+            horizonId: "black-ledger",
+            artifactKindOrCapabilityId: "newsroom_bulletin",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
         }
 
         ApplyNoStoreHeaders(Response.Headers);
@@ -5248,17 +5372,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpGet("/ledger/newsroom/{episodeId}/transcript")]
     [Produces("text/vtt")]
-    public IActionResult LedgerNewsroomEpisodeTranscript([FromRoute] string episodeId)
+    public async Task<IActionResult> LedgerNewsroomEpisodeTranscript([FromRoute] string episodeId, CancellationToken cancellationToken)
     {
         if (!TryParseNewsroomEpisodeTurn(episodeId, out int requestedTurn))
         {
             return NotFound();
         }
 
-        BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn);
+        BlackLedgerWorldTurnBriefingViewModel? briefing = BuildProtectedBlackLedgerWorldTurnBriefing(requestedTurn);
         if (briefing?.Broadcast is null || briefing.ToTurn != requestedTurn)
         {
             return NotFound();
+        }
+
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "black ledger newsroom transcript",
+            currentPath: $"/ledger/newsroom/{episodeId}/transcript",
+            sourceRef: $"black-ledger:turn-{requestedTurn}:newsroom",
+            horizonId: "black-ledger",
+            artifactKindOrCapabilityId: "newsroom_bulletin",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
         }
 
         ApplyNoStoreHeaders(Response.Headers);
@@ -5267,11 +5403,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpGet("/ledger/newsroom/{episodeId}/receipts")]
     [Produces("application/json")]
-    public IActionResult LedgerNewsroomEpisodeReceipts([FromRoute] string episodeId)
+    public async Task<IActionResult> LedgerNewsroomEpisodeReceipts([FromRoute] string episodeId, CancellationToken cancellationToken)
     {
         if (!TryParseNewsroomEpisodeTurn(episodeId, out int requestedTurn))
         {
             return NotFound();
+        }
+
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "black ledger newsroom receipt packet",
+            currentPath: $"/ledger/newsroom/{episodeId}/receipts",
+            sourceRef: $"black-ledger:turn-{requestedTurn}:newsroom",
+            horizonId: "black-ledger",
+            artifactKindOrCapabilityId: "newsroom_bulletin",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
         }
 
         BlackLedgerWorldTickValidationPacketViewModel? packet = _blackLedgerBriefings.BuildValidationPacket(requestedTurn, null);
@@ -5282,8 +5430,8 @@ document.addEventListener('DOMContentLoaded', function () {
             {
                 ArtifactCapability = BuildPublicHorizonCapability(
                     "black-ledger",
-                    "world_tick_digest",
-                    $"black-ledger:turn-{requestedTurn}:validation")
+                    "newsroom_bulletin",
+                    $"black-ledger:turn-{requestedTurn}:newsroom")
             });
     }
 
@@ -5350,6 +5498,18 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("text/html")]
     public async Task<IActionResult> LedgerFactionPromoPage([FromRoute] string factionId, CancellationToken cancellationToken)
     {
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "black ledger faction promo",
+            currentPath: $"/ledger/factions/{factionId}/promo",
+            sourceRef: $"black-ledger:faction-{factionId}:promo",
+            horizonId: "black-ledger",
+            artifactKindOrCapabilityId: "faction_promo",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
+        }
+
         BlackLedgerFactionPromoPageViewModel? model = await BuildLedgerFactionPromoPageModel(factionId, cancellationToken);
         return model is null
             ? NotFound()
@@ -5358,61 +5518,93 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpGet("/ledger/factions/{factionId}/promo.json")]
     [Produces("application/json")]
-    public IActionResult LedgerFactionPromoJson([FromRoute] string factionId)
-    {
-        BlackLedgerFactionPromoArtifactViewModel? promo = _blackLedgerFactions.GetPromoArtifact(factionId);
-        return promo is null
-            ? NotFound()
-            : Ok(new
-            {
-                promo.FactionId,
-                promo.PublicName,
-                provider_status = promo.ProviderStatus,
-                render_mode = promo.RenderMode,
-                fallback_render_mode = promo.FallbackRenderMode,
-                storyline_summary = promo.StorylineSummary,
-                narrator_posture = promo.NarratorPosture,
-                render_pipeline = promo.RenderPipelineLabel,
-                formats = promo.FormatLabels,
-                static_card_label = promo.StaticCardLabel,
-                playback_label = promo.PlaybackLabel,
-                captions = promo.CaptionLines,
-                campaign_hook = promo.CampaignHook,
-                audience_promise = promo.AudiencePromise,
-                validation_href = promo.ValidationHref,
-                storyboard_shots = promo.StoryboardShots,
-                storyboard_frames = promo.StoryboardFrames.Select(frame => new
-                {
-                    label = frame.Label,
-                    visual_hook = frame.VisualHook,
-                    action_beat = frame.ActionBeat,
-                    proof_payoff = frame.ProofPayoff,
-                }),
-                screenplay_scenes = promo.ScreenplayScenes.Select(scene => new
-                {
-                    scene_id = scene.SceneId,
-                    label = scene.Label,
-                    duration = scene.DurationLabel,
-                    purpose = scene.Purpose,
-                    visual_direction = scene.VisualDirection,
-                    narrator_line = scene.NarratorLine,
-                }),
-                html_href = promo.HtmlHref,
-                captions_href = promo.CaptionsHref,
-                poster_href = promo.PosterHref,
-                video_mp4_href = promo.VideoMp4Href,
-                video_webm_href = promo.VideoWebmHref,
-            });
-    }
-
-    [HttpGet("/ledger/factions/{factionId}/promo.vtt")]
-    [Produces("text/vtt")]
-    public IActionResult LedgerFactionPromoCaptions([FromRoute] string factionId)
+    public async Task<IActionResult> LedgerFactionPromoJson([FromRoute] string factionId, CancellationToken cancellationToken)
     {
         BlackLedgerFactionPromoArtifactViewModel? promo = _blackLedgerFactions.GetPromoArtifact(factionId);
         if (promo is null)
         {
             return NotFound();
+        }
+
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "black ledger faction promo",
+            currentPath: $"/ledger/factions/{promo.FactionId}/promo.json",
+            sourceRef: $"black-ledger:faction-{promo.FactionId}:promo",
+            horizonId: "black-ledger",
+            artifactKindOrCapabilityId: "faction_promo",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
+        }
+
+        BlackLedgerFactionPromoArtifactViewModel publicPromo = BuildPublicFactionPromoArtifact(promo);
+        return Ok(new
+        {
+            publicPromo.FactionId,
+            publicPromo.PublicName,
+            provider_status = publicPromo.ProviderStatus,
+            render_mode = publicPromo.RenderMode,
+            fallback_render_mode = publicPromo.FallbackRenderMode,
+            storyline_summary = publicPromo.StorylineSummary,
+            narrator_posture = publicPromo.NarratorPosture,
+            render_pipeline = publicPromo.RenderPipelineLabel,
+            formats = publicPromo.FormatLabels,
+            static_card_label = publicPromo.StaticCardLabel,
+            playback_label = publicPromo.PlaybackLabel,
+            captions = publicPromo.CaptionLines,
+            campaign_hook = publicPromo.CampaignHook,
+            audience_promise = publicPromo.AudiencePromise,
+            validation_href = publicPromo.ValidationHref,
+            storyboard_shots = publicPromo.StoryboardShots,
+            storyboard_frames = publicPromo.StoryboardFrames.Select(frame => new
+            {
+                label = frame.Label,
+                visual_hook = frame.VisualHook,
+                action_beat = frame.ActionBeat,
+                proof_payoff = frame.ProofPayoff,
+            }),
+            screenplay_scenes = publicPromo.ScreenplayScenes.Select(scene => new
+            {
+                scene_id = scene.SceneId,
+                label = scene.Label,
+                duration = scene.DurationLabel,
+                purpose = scene.Purpose,
+                visual_direction = scene.VisualDirection,
+                narrator_line = scene.NarratorLine,
+            }),
+            html_href = publicPromo.HtmlHref,
+            captions_href = publicPromo.CaptionsHref,
+            poster_href = publicPromo.PosterHref,
+            video_mp4_href = publicPromo.VideoMp4Href,
+            video_webm_href = publicPromo.VideoWebmHref,
+            artifact_capability = BuildPublicHorizonCapability(
+                "black-ledger",
+                "faction_promo",
+                $"black-ledger:faction-{publicPromo.FactionId}:promo")
+        });
+    }
+
+    [HttpGet("/ledger/factions/{factionId}/promo.vtt")]
+    [Produces("text/vtt")]
+    public async Task<IActionResult> LedgerFactionPromoCaptions([FromRoute] string factionId, CancellationToken cancellationToken)
+    {
+        BlackLedgerFactionPromoArtifactViewModel? promo = _blackLedgerFactions.GetPromoArtifact(factionId);
+        if (promo is null)
+        {
+            return NotFound();
+        }
+
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "black ledger faction promo captions",
+            currentPath: $"/ledger/factions/{promo.FactionId}/promo.vtt",
+            sourceRef: $"black-ledger:faction-{promo.FactionId}:promo",
+            horizonId: "black-ledger",
+            artifactKindOrCapabilityId: "faction_promo",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
         }
 
         var lines = new List<string> { "WEBVTT", string.Empty };
@@ -6035,42 +6227,42 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/roadmap")]
     [Produces("text/html")]
     public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)
-    {
-        const string currentPath = "/roadmap";
-        var surface = _landing.LoadSurface();
-        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
-        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
-        var signalLoop = BuildPublicSignalLoopSnapshot(surface, assetCatalog, authenticated, currentPath);
-        var signalProjection = BuildOptionalSignalProjectionPacket(currentPath);
-        ProductLiftParticipateSnapshot publicRequests = await TryFetchFirstPartyParticipatePostsAsync(cancellationToken).ConfigureAwait(false);
-        string? hostedBoardHref = ResolveProductLiftHostedRoadmapHref();
-        var model = new RoadmapPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Roadmap", "What Chummer is fixing next.", currentPath, cancellationToken),
-            Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, currentPath),
-            Milestones: BuildRoadmapMilestones(),
-            SignalLoop: signalLoop,
-            PublicRequests: publicRequests.Posts.Take(3).ToArray(),
-            PublicRequestCount: publicRequests.TotalCount,
-            PublicRequestSyncedLabel: publicRequests.Posts.Count > 0 ? FormatParticipateSyncedLabel(publicRequests.SyncedAtUtc) : "Requests unavailable",
-            HostedBoardHref: hostedBoardHref,
-            SignalProjection: signalProjection,
-            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience));
-        return View("~/Views/PublicLanding/Roadmap.cshtml", model);
-    }
+        => await RoadmapBoardProxyCore(
+            boardPath: string.Empty,
+            cancellationToken,
+            localOrigin: "/roadmap/board",
+            localBaseHref: "/roadmap/board/",
+            canonicalHref: "/roadmap",
+            fallbackPath: "/roadmap").ConfigureAwait(false);
 
     [HttpGet("/roadmap/board")]
     [HttpGet("/roadmap/board/{**boardPath}")]
     public async Task<IActionResult> RoadmapBoardProxy(string? boardPath, CancellationToken cancellationToken)
-        => await RoadmapBoardProxyCore(NormalizeParticipateBoardPath(boardPath), cancellationToken).ConfigureAwait(false);
+        => await RoadmapBoardProxyCore(
+            NormalizeParticipateBoardPath(boardPath),
+            cancellationToken).ConfigureAwait(false);
 
-    private async Task<IActionResult> RoadmapBoardProxyCore(string? boardPath, CancellationToken cancellationToken)
+    private async Task<IActionResult> RoadmapBoardProxyCore(
+        string? boardPath,
+        CancellationToken cancellationToken,
+        string localOrigin = "/roadmap/board",
+        string localBaseHref = "/roadmap/board/",
+        string? canonicalHref = null,
+        string fallbackPath = "/roadmap")
     {
         Uri? upstream = ResolveProductLiftHostedRoadmapUri();
         if (upstream is null)
         {
-            return NotFound();
+            return HostedBoardUnavailable(
+                "Roadmap unavailable",
+                "ProductLift owns the roadmap, and it is not configured on this host right now.",
+                "Use Participate for requests or the changelog for shipped work.",
+                "/participate",
+                "Participate",
+                "/changelog",
+                "Open changelog",
+                fallbackPath,
+                "Retry");
         }
 
         string relativePath = string.IsNullOrWhiteSpace(boardPath) ? string.Empty : boardPath.TrimStart('/');
@@ -6091,7 +6283,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
             {
-                string redirected = RewriteHostedBoardLocation(response.Headers.Location, upstream, "/roadmap", "/roadmap/board");
+                string redirected = RewriteHostedBoardLocation(response.Headers.Location, upstream, fallbackPath, localOrigin);
                 return Redirect(redirected);
             }
 
@@ -6099,26 +6291,48 @@ document.addEventListener('DOMContentLoaded', function () {
             if (mediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
             {
                 string html = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (!response.IsSuccessStatusCode || HostedBoardHtmlLooksUnavailable(html))
+                {
+                    return HostedBoardUnavailable(
+                        "Roadmap temporarily unavailable",
+                        "The hosted roadmap did not respond. The first-party route is still working.",
+                        "Use the changelog for shipped work or Participate for new requests.",
+                        "/changelog",
+                        "Open changelog",
+                        "/participate",
+                        "Participate",
+                        fallbackPath,
+                        "Back to roadmap");
+                }
+
                 string rewritten = RewriteHostedBoardHtml(
                     html,
                     upstream,
                     ResolveParticipateBoardHomeHref(),
                     supporterHref: null,
-                    localOrigin: "/roadmap/board",
-                    localBaseHref: "/roadmap/board/",
+                    localOrigin: localOrigin,
+                    localBaseHref: localBaseHref,
                     railTitle: "Chummer Roadmap",
                     railNavLabel: "Roadmap actions",
                     firstLinkHref: "/participate",
                     firstLinkLabel: "Participate",
                     secondLinkHref: "/changelog",
                     secondLinkLabel: "Changelog",
+                    canonicalHref: canonicalHref ?? localOrigin,
+                    assetProxyBasePath: "/roadmap/provider-assets",
+                    pageTitle: "Roadmap - Chummer.run",
+                    hostedHeadingReplacement: null,
+                    hostedSummaryReplacement: null,
+                    hostedPrimaryActionReplacement: null,
+                    hostedLeadReplacement: null,
+                    applyFeedbackPolish: false,
                     failureTitle: "Roadmap temporarily unavailable",
                     failureSummary: "The hosted roadmap did not respond. Use the changelog for shipped work or Participate for new requests.",
                     failurePrimaryHref: "/changelog",
                     failurePrimaryLabel: "Open changelog",
                     failureSecondaryHref: "/participate",
                     failureSecondaryLabel: "Participate",
-                    failureReturnHref: "/roadmap",
+                    failureReturnHref: fallbackPath,
                     failureReturnLabel: "Back to roadmap");
                 return Content(rewritten, "text/html; charset=utf-8");
             }
@@ -7603,7 +7817,7 @@ document.addEventListener('DOMContentLoaded', function () {
             PrimaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Runner Passport" : "Open Runner Passport", subject is null ? "/login?next=%2Faccount%2Fpassport" : "/account/passport", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Open identity overview", "/passport/identity-network", "secondary"),
             TertiaryAction: new TrustPageActionViewModel("Open return details", "/passport/runner_return_posture.md", "ghost"),
-            ConnectedLanePacket: BuildRunnerPassportConnectedLanePacket(summary, workspaceServerPlane, factionId, _blackLedgerBriefings.BuildWorldTurnBriefing(1)),
+            ConnectedLanePacket: BuildRunnerPassportConnectedLanePacket(summary, workspaceServerPlane, factionId, BuildProtectedBlackLedgerWorldTurnBriefing(1)),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
     }
@@ -7620,7 +7834,7 @@ document.addEventListener('DOMContentLoaded', function () {
             : await BuildPublicOrAuthenticatedChromeAsync("Signal Deck", "Current command pressure, consequence status, and aftermath continuity in Chummer.", "/signal-deck", cancellationToken);
         CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = null;
         string? factionId = null;
-        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = BuildProtectedBlackLedgerWorldTurnBriefing(1);
         if (user is not null && subject is not null)
         {
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
@@ -7667,7 +7881,7 @@ document.addEventListener('DOMContentLoaded', function () {
             : await BuildPublicOrAuthenticatedChromeAsync("Living World", "Between-session command, bulletin framing, and aftermath continuity in Chummer.", "/living-world", cancellationToken);
         CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = null;
         string? factionId = null;
-        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = BuildProtectedBlackLedgerWorldTurnBriefing(1);
         if (user is not null && subject is not null)
         {
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
@@ -10420,6 +10634,129 @@ Boundary:
         {
             _logger.LogWarning(ex, "Skipping signed-in public trust projection after identity failure for {Path}.", currentPath);
             return null;
+        }
+    }
+
+    private string ProtectHorizonArtifactDispatchTarget(string dispatchTarget)
+        => _artifactAccessTokens?.IssueProtectedUrl(dispatchTarget) ?? dispatchTarget;
+
+    private BlackLedgerWorldTurnBriefingViewModel? BuildProtectedBlackLedgerWorldTurnBriefing(int? requestedTurn)
+    {
+        BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn);
+        if (briefing?.Broadcast is null)
+        {
+            return briefing;
+        }
+
+        return briefing with
+        {
+            Broadcast = ProtectBlackLedgerBroadcast(briefing.Broadcast)
+        };
+    }
+
+    private BlackLedgerNewsreelBroadcastViewModel? ProtectBlackLedgerBroadcast(BlackLedgerNewsreelBroadcastViewModel? broadcast)
+        => broadcast is null
+            ? null
+            : broadcast with
+            {
+                VideoMp4Href = ProtectHorizonArtifactDispatchTarget(broadcast.VideoMp4Href),
+                VideoWebmHref = ProtectHorizonArtifactDispatchTarget(broadcast.VideoWebmHref),
+                PosterHref = ProtectHorizonArtifactDispatchTarget(broadcast.PosterHref),
+                CaptionsHref = ProtectHorizonArtifactDispatchTarget(broadcast.CaptionsHref)
+            };
+
+    private BlackLedgerFactionPromoArtifactViewModel BuildPublicFactionPromoArtifact(BlackLedgerFactionPromoArtifactViewModel promo)
+    {
+        string renderMode = string.Equals(promo.ProviderStatus, "VERIFIED_PROVIDER", StringComparison.OrdinalIgnoreCase)
+            ? "verified_cinematic_faction_bulletin"
+            : "first_party_motion_video";
+        string playbackLabel = string.Equals(promo.ProviderStatus, "VERIFIED_PROVIDER", StringComparison.OrdinalIgnoreCase)
+            ? "Playable verified faction reel"
+            : promo.PlaybackLabel;
+        string narratorPosture = ReplacePublicVendorTruth(promo.NarratorPosture);
+        string renderPipelineLabel = ReplacePublicVendorTruth(promo.RenderPipelineLabel)
+            .Replace("Verified scene render", "Verified cinematic render", StringComparison.OrdinalIgnoreCase);
+        string audiencePromise = ReplacePublicVendorTruth(promo.AudiencePromise)
+            .Replace("rendered cinematic faction reel", "cinematic faction reel", StringComparison.OrdinalIgnoreCase);
+        string storylineSummary = ReplacePublicVendorTruth(promo.StorylineSummary);
+        string campaignHook = ReplacePublicVendorTruth(promo.CampaignHook);
+        string[] formatLabels = promo.FormatLabels
+            .Select(ReplacePublicVendorTruth)
+            .Select(label => label.Replace("Verified-rendered", "Verified", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        return promo with
+        {
+            RenderMode = renderMode,
+            FallbackRenderMode = "storyboard_fallback",
+            NarratorPosture = narratorPosture,
+            RenderPipelineLabel = renderPipelineLabel,
+            PlaybackLabel = playbackLabel,
+            FormatLabels = formatLabels,
+            StorylineSummary = storylineSummary,
+            CampaignHook = campaignHook,
+            AudiencePromise = audiencePromise,
+            PosterHref = ProtectHorizonArtifactDispatchTarget(promo.PosterHref),
+            VideoMp4Href = ProtectHorizonArtifactDispatchTarget(promo.VideoMp4Href),
+            VideoWebmHref = ProtectHorizonArtifactDispatchTarget(promo.VideoWebmHref)
+        };
+    }
+
+    private static string ReplacePublicVendorTruth(string value)
+        => value
+            .Replace("MagicFit-rendered", "Verified", StringComparison.OrdinalIgnoreCase)
+            .Replace("MagicFit scene render", "Verified scene render", StringComparison.OrdinalIgnoreCase)
+            .Replace("MagicFit scene composite", "verified scene composite", StringComparison.OrdinalIgnoreCase)
+            .Replace("MagicFit", "Verified", StringComparison.OrdinalIgnoreCase);
+
+    private async Task<IActionResult?> TryCreatePublicArtifactReceiptAsync(
+        string operationLabel,
+        string currentPath,
+        string sourceRef,
+        string horizonId,
+        string artifactKindOrCapabilityId,
+        CancellationToken cancellationToken)
+    {
+        if (_artifactRequests is null)
+        {
+            _logger.LogWarning("{Operation} public route could not record a shared artifact request because the request service is unavailable for {Path}.", operationLabel, currentPath);
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "Shared horizon artifact request service is not available right now.");
+        }
+
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync(currentPath, cancellationToken);
+        try
+        {
+            HorizonArtifactRequestReceipt receipt = _artifactRequests.BuildRequest(
+                new HorizonArtifactRequestCreateRequest(
+                    HorizonId: horizonId,
+                    ArtifactKindOrCapabilityId: artifactKindOrCapabilityId,
+                    UserId: subject?.SubjectId ?? string.Empty,
+                    SourceRef: sourceRef,
+                    Visibility: "public_safe",
+                    ExternalProcessingConsent: true,
+                    Email: subject?.Email),
+                consumeQuota: false,
+                requireRequestingUser: false);
+
+            if (!string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "{Operation} public route denied for {Path}; blocked reasons: {BlockedReasons}.",
+                    operationLabel,
+                    currentPath,
+                    string.Join(", ", receipt.BlockedReasons));
+                return Problem(statusCode: StatusCodes.Status400BadRequest, detail: $"Unable to create a Chummer-owned {operationLabel} request receipt.");
+            }
+
+            if (HttpContext?.Response?.Headers is { } responseHeaders)
+            {
+                responseHeaders["X-Horizon-Artifact-Request-Id"] = receipt.RequestId;
+            }
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "{Operation} public route failed while recording shared artifact request for {Path}.", operationLabel, currentPath);
+            return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: $"Unable to process {operationLabel} request right now.");
         }
     }
 
@@ -15501,7 +15838,7 @@ echo "Help: ${HELP_URL}"
             notificationsHref: "/account/ledger/notifications",
             turnHref: $"/ledger/turns/{newsTurn}",
             dispatchHref: string.IsNullOrWhiteSpace(selectedFactionId) ? $"/ledger/turns/{newsTurn}/dispatches" : $"/ledger/factions/{selectedFactionId}/dispatches");
-        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(newsTurn);
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = BuildProtectedBlackLedgerWorldTurnBriefing(newsTurn);
         string worldTitle = world?.PublicName ?? "Emerald Sprawl: First Pressure";
         string sectionEyebrow =
             string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase) ? "Black Ledger newsroom"
@@ -15655,7 +15992,7 @@ echo "Help: ${HELP_URL}"
         CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = starterWorkspace is null
             ? null
             : _workspaceServerPlane.GetWorkspaceServerPlane(user, starterWorkspace.WorkspaceId, installLinking);
-        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = BuildProtectedBlackLedgerWorldTurnBriefing(1);
         RunnerPassportPublicSummary runnerPassportSummary = _communityCreatorHorizons.BuildPassportSummary();
         BlackLedgerPrivateLoreOverlayDto? overlay = string.IsNullOrWhiteSpace(resolvedCampaignId)
             ? null
@@ -15731,7 +16068,7 @@ echo "Help: ${HELP_URL}"
         RunnerPassportPublicSummary runnerPassportSummary = _communityCreatorHorizons.BuildPassportSummary();
         BlackLedgerFactionHomeViewModel model = _blackLedgerFactions.BuildFactionHome(chrome, user);
         string factionId = model.Faction.FactionId.Replace('_', '-');
-        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = BuildProtectedBlackLedgerWorldTurnBriefing(1);
         return model with
         {
             NewsreelStatus = _blackLedgerTickNews.BuildStatusViewModel(
@@ -16062,7 +16399,7 @@ echo "Help: ${HELP_URL}"
             turnHref: "/ledger/turns/1",
             dispatchHref: "/ledger/turns/1/dispatches",
             recipientUserId: user.UserId);
-        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = BuildProtectedBlackLedgerWorldTurnBriefing(1);
         BlackLedgerWorldTickValidationPacketViewModel? validationPacket = _blackLedgerBriefings.BuildValidationPacket(1, factionId);
         BlackLedgerFactionLeaderDigestViewModel? leaderDigest = string.IsNullOrWhiteSpace(factionId)
             ? null
@@ -16354,7 +16691,7 @@ echo "Help: ${HELP_URL}"
             ? null
             : _workspaceServerPlane.GetWorkspaceServerPlane(user, starterWorkspace.WorkspaceId, installLinking);
         RunnerPassportPublicSummary runnerPassportSummary = _communityCreatorHorizons.BuildPassportSummary();
-        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = BuildProtectedBlackLedgerWorldTurnBriefing(1);
 
         return new BlackLedgerLeaderBriefingPageViewModel(
             Chrome: _chrome.BuildAuthenticatedChrome(
@@ -16453,7 +16790,7 @@ echo "Help: ${HELP_URL}"
             Heading: "World turn",
             Intro: "Use this page to review the inbox newsreel, the public turn update, and the faction-leader readout against the same current turn details.",
             Packet: packet,
-            WorldTurnBriefing: _blackLedgerBriefings.BuildWorldTurnBriefing(1),
+            WorldTurnBriefing: BuildProtectedBlackLedgerWorldTurnBriefing(1),
             LeaderDigest: string.IsNullOrWhiteSpace(factionId) ? null : _blackLedgerBriefings.BuildLeaderDigest(factionId, 1));
     }
 
@@ -16483,15 +16820,17 @@ echo "Help: ${HELP_URL}"
             return null;
         }
 
+        BlackLedgerFactionPromoArtifactViewModel publicPromo = BuildPublicFactionPromoArtifact(promo);
+
         return new BlackLedgerFactionPromoPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
-                $"{promo.PublicName} war bulletin",
+                $"{publicPromo.PublicName} war bulletin",
                 "Public-safe faction bulletin media with cinematic playback, captions, and storyboard fallback.",
-                $"/ledger/factions/{promo.FactionId}/promo",
+                $"/ledger/factions/{publicPromo.FactionId}/promo",
                 cancellationToken),
-            Heading: $"{promo.PublicName} mobilization bulletin",
+            Heading: $"{publicPromo.PublicName} mobilization bulletin",
             Intro: "This page presents the faction reel with visible characters, action, captions, supporting data, and a storyboard fallback. It should feel cinematic while staying tied to the current campaign state.",
-            Promo: promo,
+            Promo: publicPromo,
             DeliveryNotes:
             [
                 "The video stays tied to the same faction and turn data as the rest of Black Ledger.",

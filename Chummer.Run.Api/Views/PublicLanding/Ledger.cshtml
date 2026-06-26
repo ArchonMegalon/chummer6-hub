@@ -123,9 +123,9 @@
     var heroNewsreelPosterHref = mapFocused
         ? "/media/ledger/globe/black-ledger-video-globe-idle-poster.png"
         : (newsreelBroadcast?.PosterHref ?? "/media/ledger/newsreels/turn-1-newsreel-poster.png");
-    var heroGlobeRenderMode = mapFocused ? "command-map" : "magicfit-newsreel";
+    var heroGlobeRenderMode = mapFocused ? "command-map" : "newsroom-bulletin";
     var heroDisableWebGl = mapFocused ? "false" : "true";
-    var heroVideoLayer = mapFocused ? "first-party-raster-overlay" : "magicfit-newsreel";
+    var heroVideoLayer = mapFocused ? "first-party-raster-overlay" : "newsroom-bulletin";
 }
 
 <section class="ledger-flagship ledger-flagship--public" data-ledger-redesign="command-deck">
@@ -215,9 +215,9 @@
             <p>Latest dispatches, table hooks, and the current bulletin.</p>
         </a>
         <a class="ledger-flagship__nav-card" href="@accountCtaHref" data-analytics-event="ledger_open_account_lane" data-analytics-surface="ledger_nav" data-analytics-label="@UndetectableHumanizerCopyAdapter.Humanize(accountCtaLabel)">
-            <span class="tag">Faction workspace</span>
+            <span class="tag">Faction page</span>
             <strong>@UndetectableHumanizerCopyAdapter.Humanize(accountCtaLabel)</strong>
-            <p>Step from the public map into the faction workspace in your account.</p>
+            <p>Open the private faction page in your account.</p>
         </a>
     </nav>
 </section>

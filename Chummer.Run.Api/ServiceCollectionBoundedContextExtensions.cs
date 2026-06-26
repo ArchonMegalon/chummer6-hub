@@ -82,6 +82,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<MyFirstBookUsageStore>();
         services.AddSingleton<BrilliantDirectoriesBillingService>();
         services.AddSingleton<HorizonCapabilityService>();
+        services.AddSingleton<HorizonArtifactAccessTokenService>();
         services.AddSingleton<HorizonArtifactUsageStore>();
         services.AddSingleton<HorizonArtifactQuotaService>();
         services.AddSingleton<HorizonArtifactRequestReceiptStore>();

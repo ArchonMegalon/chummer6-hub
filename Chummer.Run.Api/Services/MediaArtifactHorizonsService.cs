@@ -6,12 +6,34 @@ namespace Chummer.Run.Api.Services;
 
 public sealed class MediaArtifactHorizonsService
 {
-    private const string DefaultRunsiteTourHref = "https://my.matterport.com/show/?m=ax2JhiPGk5P";
+    private const string DefaultMatterportTourHref = "https://my.matterport.com/show/?m=ax2JhiPGk5P";
+    private const string DefaultFactoryMatterportTourHref = "https://my.matterport.com/show/?m=ax2JhiPGk5P&play=1";
+    private const string DefaultThreeDvVistaTourHref = "https://www.3dvista.com/samples/new_york_loft.html";
+    private const string DefaultRunsiteTourHref = DefaultMatterportTourHref;
     private const string DefaultRunsiteTourLabel = "3D Tour";
     private const string DefaultRunsiteTourActionLabel = "Open 3D Tour";
-    private const string DefaultPropertyquarryTourHref = "https://my.matterport.com/show/?m=ax2JhiPGk5P";
+    private const string DefaultPropertyquarryTourHref = DefaultMatterportTourHref;
     private const string DefaultPropertyquarryTourLabel = "3D Tour";
     private const string DefaultPropertyquarryTourActionLabel = "Open 3D Tour";
+    private static readonly IReadOnlyDictionary<string, SpatialTourStyleDefaults> DefaultSpatialTourStyles =
+        new Dictionary<string, SpatialTourStyleDefaults>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ResearchLab"] = new(
+                DisplayStyle: "Research Lab",
+                PreferredProvider: "matterport",
+                MatterportHref: DefaultMatterportTourHref,
+                ThreeDvVistaHref: DefaultThreeDvVistaTourHref),
+            ["Factory"] = new(
+                DisplayStyle: "Factory",
+                PreferredProvider: "matterport",
+                MatterportHref: DefaultFactoryMatterportTourHref,
+                ThreeDvVistaHref: DefaultThreeDvVistaTourHref),
+            ["OfficeBuilding"] = new(
+                DisplayStyle: "Office Building",
+                PreferredProvider: "3dvista",
+                MatterportHref: DefaultMatterportTourHref,
+                ThreeDvVistaHref: DefaultThreeDvVistaTourHref)
+        };
 
     private static readonly IReadOnlyList<MediaArtifactDocument> JackpointBriefings =
     [
@@ -140,33 +162,55 @@ public sealed class MediaArtifactHorizonsService
         string resolvedRunsiteTourHref = ResolveRunsiteTourHref(configuration);
         string resolvedRunsiteTourLabel = ResolveRunsiteTourLabel(configuration);
         string resolvedRunsiteTourActionLabel = ResolveRunsiteTourActionLabel(configuration, resolvedRunsiteTourLabel);
+        bool useBuiltInRunsiteStyleDefaults = string.Equals(resolvedRunsiteTourHref, DefaultRunsiteTourHref, StringComparison.Ordinal);
         string resolvedPropertyquarryTourHref = ResolvePropertyquarryTourHref(configuration);
         string resolvedPropertyquarryTourLabel = ResolvePropertyquarryTourLabel(configuration);
         string resolvedPropertyquarryTourActionLabel = ResolvePropertyquarryTourActionLabel(configuration, resolvedPropertyquarryTourLabel);
+        bool useBuiltInPropertyquarryStyleDefaults = string.Equals(resolvedPropertyquarryTourHref, DefaultPropertyquarryTourHref, StringComparison.Ordinal);
 
         _runsitePacks = BaseRunsitePacks
-            .Select(item => item with
+            .Select(item =>
             {
-                TourHref = $"/runsites/packs/{item.Id}/tour",
-                TourLabel = resolvedRunsiteTourLabel,
-                TourActionHref = $"/runsites/packs/{item.Id}/tour",
-                TourActionLabel = resolvedRunsiteTourActionLabel,
-                TourActionOpenInNewTab = false,
-                TourOpenInNewTab = false,
-                DispatchTargetHref = resolvedRunsiteTourHref
+                SpatialTourResolution tour = ResolveSpatialTour(
+                    configuration,
+                    item.Style,
+                    resolvedRunsiteTourHref,
+                    resolvedRunsiteTourLabel,
+                    resolvedRunsiteTourActionLabel,
+                    useBuiltInRunsiteStyleDefaults);
+                return item with
+                {
+                    TourLabel = tour.Label,
+                    TourHref = $"/runsites/packs/{item.Id}/tour",
+                    TourActionHref = $"/runsites/packs/{item.Id}/tour",
+                    TourActionLabel = tour.ActionLabel,
+                    TourActionOpenInNewTab = false,
+                    TourOpenInNewTab = false,
+                    DispatchTargetHref = tour.DispatchTargetHref
+                };
             })
             .ToArray();
 
         _propertyquarryProperties = BasePropertyquarryProperties
-            .Select(item => item with
+            .Select(item =>
             {
-                TourHref = $"/propertyquarry/properties/{item.Id}/tour",
-                TourLabel = resolvedPropertyquarryTourLabel,
-                TourActionHref = $"/propertyquarry/properties/{item.Id}/tour",
-                TourActionLabel = resolvedPropertyquarryTourActionLabel,
-                TourActionOpenInNewTab = false,
-                TourOpenInNewTab = false,
-                DispatchTargetHref = resolvedPropertyquarryTourHref
+                SpatialTourResolution tour = ResolveSpatialTour(
+                    configuration,
+                    item.Style,
+                    resolvedPropertyquarryTourHref,
+                    resolvedPropertyquarryTourLabel,
+                    resolvedPropertyquarryTourActionLabel,
+                    useBuiltInPropertyquarryStyleDefaults);
+                return item with
+                {
+                    TourLabel = tour.Label,
+                    TourHref = $"/propertyquarry/properties/{item.Id}/tour",
+                    TourActionHref = $"/propertyquarry/properties/{item.Id}/tour",
+                    TourActionLabel = tour.ActionLabel,
+                    TourActionOpenInNewTab = false,
+                    TourOpenInNewTab = false,
+                    DispatchTargetHref = tour.DispatchTargetHref
+                };
             })
             .ToArray();
     }
@@ -334,11 +378,108 @@ public sealed class MediaArtifactHorizonsService
         return configuredActionLabel ?? $"Open {fallbackLabel}";
     }
 
+    private static SpatialTourResolution ResolveSpatialTour(
+        IConfiguration? configuration,
+        string? style,
+        string fallbackHref,
+        string fallbackLabel,
+        string fallbackActionLabel,
+        bool useBuiltInStyleDefaults)
+    {
+        string? styleToken = NormalizeStyleToken(style);
+        if (string.IsNullOrWhiteSpace(styleToken))
+        {
+            return new SpatialTourResolution(fallbackHref, fallbackLabel, fallbackActionLabel);
+        }
+
+        SpatialTourStyleDefaults? defaults = null;
+        if (useBuiltInStyleDefaults)
+        {
+            DefaultSpatialTourStyles.TryGetValue(styleToken, out defaults);
+        }
+        string? matterportHref = FirstConfiguredValue(
+            configuration?[$"SpatialTours:Styles:{styleToken}:MatterportHref"],
+            configuration?[$"SpatialTours:Styles:{styleToken}:MatterportViewerHref"],
+            defaults?.MatterportHref);
+        string? threeDvVistaHref = FirstConfiguredValue(
+            configuration?[$"SpatialTours:Styles:{styleToken}:ThreeDvVistaHref"],
+            configuration?[$"SpatialTours:Styles:{styleToken}:3DVistaHref"],
+            configuration?[$"SpatialTours:Styles:{styleToken}:ThreeDvVistaViewerHref"],
+            configuration?[$"SpatialTours:Styles:{styleToken}:3DVistaViewerHref"],
+            defaults?.ThreeDvVistaHref);
+        string? preferredProvider = FirstConfiguredValue(
+            configuration?[$"SpatialTours:Styles:{styleToken}:PreferredProvider"],
+            configuration?["SpatialTours:ProviderPreference"],
+            defaults?.PreferredProvider);
+        string dispatchTargetHref = ResolveSpatialTourDispatchTarget(preferredProvider, matterportHref, threeDvVistaHref) ?? fallbackHref;
+        string label = FirstConfiguredValue(
+            configuration?[$"SpatialTours:Styles:{styleToken}:Label"],
+            configuration?[$"SpatialTours:Styles:{styleToken}:TourLabel"])
+            ?? fallbackLabel;
+        string actionLabel = ResolveSpatialTourActionLabel(
+            configuredActionLabel: FirstConfiguredValue(
+                configuration?[$"SpatialTours:Styles:{styleToken}:ActionLabel"],
+                configuration?[$"SpatialTours:Styles:{styleToken}:OpenLabel"],
+                configuration?[$"SpatialTours:Styles:{styleToken}:ButtonLabel"]),
+            resolvedLabel: label,
+            fallbackLabel: fallbackLabel,
+            fallbackActionLabel: fallbackActionLabel);
+        return new SpatialTourResolution(dispatchTargetHref, label, actionLabel);
+    }
+
+    private static string ResolveSpatialTourActionLabel(
+        string? configuredActionLabel,
+        string resolvedLabel,
+        string fallbackLabel,
+        string fallbackActionLabel)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredActionLabel))
+        {
+            return configuredActionLabel.Trim();
+        }
+
+        return string.Equals(resolvedLabel, fallbackLabel, StringComparison.Ordinal)
+            ? fallbackActionLabel
+            : $"Open {resolvedLabel}";
+    }
+
+    private static string? ResolveSpatialTourDispatchTarget(string? preferredProvider, string? matterportHref, string? threeDvVistaHref)
+    {
+        string providerToken = NormalizeProviderToken(preferredProvider);
+        return providerToken switch
+        {
+            "3dvista" or "threedvista" => FirstConfiguredValue(threeDvVistaHref, matterportHref),
+            "matterport" => FirstConfiguredValue(matterportHref, threeDvVistaHref),
+            _ => FirstConfiguredValue(matterportHref, threeDvVistaHref)
+        };
+    }
+
+    private static string? NormalizeStyleToken(string? style)
+        => string.IsNullOrWhiteSpace(style)
+            ? null
+            : new string(style.Where(char.IsLetterOrDigit).ToArray());
+
+    private static string NormalizeProviderToken(string? provider)
+        => string.IsNullOrWhiteSpace(provider)
+            ? string.Empty
+            : new string(provider.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
     private static string? FirstConfiguredValue(params string?[] values)
         => values
             .Select(static item => string.IsNullOrWhiteSpace(item) ? null : item.Trim())
             .FirstOrDefault(static item => item is not null);
 }
+
+internal sealed record SpatialTourStyleDefaults(
+    string DisplayStyle,
+    string PreferredProvider,
+    string? MatterportHref,
+    string? ThreeDvVistaHref);
+
+internal sealed record SpatialTourResolution(
+    string DispatchTargetHref,
+    string Label,
+    string ActionLabel);
 
 public sealed record MediaArtifactDocument(
     string Id,

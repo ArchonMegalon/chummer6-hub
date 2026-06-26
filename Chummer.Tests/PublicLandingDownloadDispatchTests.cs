@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net;
@@ -30,6 +31,26 @@ public sealed class PublicLandingDownloadDispatchTests
 
     private static string NormalizeHorizonCapabilityEnvToken(string value)
         => new(value.Select(static c => char.IsLetterOrDigit(c) ? char.ToUpperInvariant(c) : '_').ToArray());
+
+    private static void AssertProtectedMediaRedirect(string? url, string expectedPath)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(url));
+        Uri uri = new(new Uri("https://chummer.run"), url!);
+        Assert.Equal(expectedPath, uri.AbsolutePath);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        Assert.True(query.TryGetValue("artifactAccess", out var artifactAccess));
+        Assert.False(string.IsNullOrWhiteSpace(artifactAccess.ToString()));
+    }
+
+    private static void AssertProtectedMediaUrl(string? url, string expectedPath)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(url));
+        Uri uri = new(new Uri("https://chummer.run"), url!);
+        Assert.Equal(expectedPath, uri.AbsolutePath);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        Assert.True(query.TryGetValue("artifactAccess", out var artifactAccess));
+        Assert.False(string.IsNullOrWhiteSpace(artifactAccess.ToString()));
+    }
 
     [Fact]
     public void DownloadDispatchPage_Advertises_Head_And_Get_For_Probe_Safe_Install_Handoff()
@@ -383,7 +404,7 @@ public sealed class PublicLandingDownloadDispatchTests
     {
         using Fixture fixture = new();
 
-        IActionResult result = fixture.Controller.LedgerTurnNewsreelJson("1");
+        IActionResult result = fixture.Controller.LedgerTurnNewsreelJson("1", CancellationToken.None).GetAwaiter().GetResult();
 
         var ok = Assert.IsType<OkObjectResult>(result);
         using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
@@ -394,12 +415,17 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.True(payload.RootElement.GetProperty("NewsreelBullets").GetArrayLength() > 0);
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("black-ledger", capability.GetProperty("HorizonId").GetString());
-        Assert.Equal("black-ledger-digest", capability.GetProperty("CapabilityId").GetString());
-        Assert.Equal("world_tick_digest", capability.GetProperty("ArtifactKind").GetString());
-        Assert.Equal("World Tick Digest", capability.GetProperty("PublicLabel").GetString());
-        Assert.Equal("outbound_digest", capability.GetProperty("CapabilitySlot").GetString());
-        Assert.Equal("disabled", capability.GetProperty("Status").GetString());
-        Assert.Equal("black-ledger:turn-1:newsreel", capability.GetProperty("SourceRef").GetString());
+        Assert.Equal("black-ledger-newsroom", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("newsroom_bulletin", capability.GetProperty("ArtifactKind").GetString());
+        Assert.Equal("Newsroom Bulletin", capability.GetProperty("PublicLabel").GetString());
+        Assert.Equal("public_bulletin_media", capability.GetProperty("CapabilitySlot").GetString());
+        Assert.Equal("available", capability.GetProperty("Status").GetString());
+        Assert.Equal("black-ledger:turn-1:newsroom", capability.GetProperty("SourceRef").GetString());
+        JsonElement broadcast = payload.RootElement.GetProperty("Broadcast");
+        AssertProtectedMediaUrl(broadcast.GetProperty("VideoMp4Href").GetString(), "/media/ledger/newsreels/turn-1-newsreel.mp4");
+        AssertProtectedMediaUrl(broadcast.GetProperty("VideoWebmHref").GetString(), "/media/ledger/newsreels/turn-1-newsreel.webm");
+        AssertProtectedMediaUrl(broadcast.GetProperty("PosterHref").GetString(), "/media/ledger/newsreels/turn-1-newsreel-poster.png");
+        AssertProtectedMediaUrl(broadcast.GetProperty("CaptionsHref").GetString(), "/media/ledger/newsreels/turn-1-newsreel.vtt");
         Assert.DoesNotContain("Emailit", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Signitic", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("vidBoard", JsonSerializer.Serialize(ok.Value), StringComparison.OrdinalIgnoreCase);
@@ -818,6 +844,44 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("Open Property 3DVista", firstProperty.TourActionLabel);
         Assert.False(firstProperty.TourActionOpenInNewTab);
         Assert.Equal("https://3dvista.example.test/tour/pq", firstProperty.DispatchTargetHref);
+    }
+
+    [Fact]
+    public void SharedSpatialTourStyleConfigCanDriveRunsiteAndPropertyquarryTogether()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SpatialTours:ProviderPreference"] = "3dvista",
+                ["SpatialTours:Styles:ResearchLab:3DVistaHref"] = "https://3dvista.example.test/tours/research-lab",
+                ["SpatialTours:Styles:ResearchLab:Label"] = "Lab Tour"
+            })
+            .Build();
+
+        MediaArtifactHorizonsService mediaHorizons = new(configuration);
+        MediaArtifactDocument runsitePack = mediaHorizons.GetRunsitePack("redmond-dockyard-pack");
+        MediaArtifactDocument property = mediaHorizons.GetPropertyquarryProperty("northbound-research-lab");
+
+        Assert.Equal("https://3dvista.example.test/tours/research-lab", runsitePack.DispatchTargetHref);
+        Assert.Equal("Lab Tour", runsitePack.TourLabel);
+        Assert.Equal("Open Lab Tour", runsitePack.TourActionLabel);
+        Assert.Equal(runsitePack.DispatchTargetHref, property.DispatchTargetHref);
+        Assert.Equal(runsitePack.TourLabel, property.TourLabel);
+        Assert.Equal(runsitePack.TourActionLabel, property.TourActionLabel);
+    }
+
+    [Fact]
+    public void SharedSpatialTourCatalogUsesStyleAwareBuiltInTargets()
+    {
+        MediaArtifactHorizonsService mediaHorizons = new();
+
+        MediaArtifactDocument officeRunsite = mediaHorizons.GetRunsitePack("everett-switchyard-pack");
+        MediaArtifactDocument factoryProperty = mediaHorizons.GetPropertyquarryProperty("shoreline-automation-factory");
+        MediaArtifactDocument officeProperty = mediaHorizons.GetPropertyquarryProperty("eastriver-office-hub");
+
+        Assert.Equal("https://www.3dvista.com/samples/new_york_loft.html", officeRunsite.DispatchTargetHref);
+        Assert.Equal("https://my.matterport.com/show/?m=ax2JhiPGk5P&play=1", factoryProperty.DispatchTargetHref);
+        Assert.Equal("https://www.3dvista.com/samples/new_york_loft.html", officeProperty.DispatchTargetHref);
     }
 
     [Fact]
@@ -1836,7 +1900,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         IActionResult first = await fixture.Controller.JackpointBriefingVideoDispatch("emerald-sprawl-briefing", CancellationToken.None);
         var firstRedirect = Assert.IsType<RedirectResult>(first);
-        Assert.Equal("/media/horizons/jackpoint-90s-deepdive.mp4", firstRedirect.Url);
+        AssertProtectedMediaRedirect(firstRedirect.Url, "/media/horizons/jackpoint-90s-deepdive.mp4");
         Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
 
         IActionResult second = await fixture.Controller.JackpointBriefingVideoDispatch("dockyard-contact-dossier", CancellationToken.None);
@@ -1934,7 +1998,7 @@ public sealed class PublicLandingDownloadDispatchTests
 
         IActionResult first = await fixture.Controller.RunbookPrimerExportDispatch("new-runner-primer", CancellationToken.None);
         var firstRedirect = Assert.IsType<RedirectResult>(first);
-        Assert.Equal("/media/horizons/runbook-press-90s-deepdive.mp4", firstRedirect.Url);
+        AssertProtectedMediaRedirect(firstRedirect.Url, "/media/horizons/runbook-press-90s-deepdive.mp4");
         Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
 
         IActionResult second = await fixture.Controller.RunbookPrimerExportDispatch("gm-first-night-primer", CancellationToken.None);
@@ -2037,6 +2101,61 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task LedgerNewsroomEpisodePagePersistsAnonymousPublicSafeArtifactReceipt()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/ledger/newsroom/turn-1-newsreel";
+
+        IActionResult result = await fixture.Controller.LedgerNewsroomEpisodePage("turn-1-newsreel", CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        BlackLedgerHubPageViewModel model = Assert.IsType<BlackLedgerHubPageViewModel>(view.Model);
+        Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
+        AssertProtectedMediaUrl(model.WorldTurnBriefing!.Broadcast!.VideoMp4Href, "/media/ledger/newsreels/turn-1-newsreel.mp4");
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("black-ledger", limit: 10);
+        HorizonArtifactRequestReceipt receipt = Assert.Single(receipts);
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("black-ledger-newsroom", receipt.CapabilityId);
+        Assert.Equal("newsroom_bulletin", receipt.ArtifactKind);
+        Assert.Equal("black-ledger:turn-1:newsroom", receipt.SourceRef);
+        Assert.Equal("public_safe", receipt.Visibility);
+        Assert.True(string.IsNullOrWhiteSpace(receipt.RequestedByUserId));
+        Assert.Null(receipt.Quota);
+    }
+
+    [Fact]
+    public async Task LedgerFactionPromoJsonSanitizesVendorTruthAndProtectsMedia()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/ledger/factions/ashline-circle/promo.json";
+
+        IActionResult result = await fixture.Controller.LedgerFactionPromoJson("ashline-circle", CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("VERIFIED_PROVIDER", payload.RootElement.GetProperty("provider_status").GetString());
+        Assert.Equal("verified_cinematic_faction_bulletin", payload.RootElement.GetProperty("render_mode").GetString());
+        Assert.Equal("storyboard_fallback", payload.RootElement.GetProperty("fallback_render_mode").GetString());
+        AssertProtectedMediaUrl(payload.RootElement.GetProperty("video_mp4_href").GetString(), "/media/ledger/factions/ashline-circle-promo-mobile.mp4");
+        AssertProtectedMediaUrl(payload.RootElement.GetProperty("video_webm_href").GetString(), "/media/ledger/factions/ashline-circle-promo.webm");
+        AssertProtectedMediaUrl(payload.RootElement.GetProperty("poster_href").GetString(), "/media/ledger/factions/ashline-circle-promo-poster.png");
+        JsonElement capability = payload.RootElement.GetProperty("artifact_capability");
+        Assert.Equal("black-ledger-faction-promo", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("faction_promo", capability.GetProperty("ArtifactKind").GetString());
+        Assert.Equal("black-ledger:faction-ashline-circle:promo", capability.GetProperty("SourceRef").GetString());
+        string serialized = JsonSerializer.Serialize(ok.Value);
+        Assert.DoesNotContain("MagicFit", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task OriginDossierMediaDispatchPersistsSharedArtifactReceipt()
     {
         using Fixture fixture = new(authenticated: true, configureSettings: settings =>
@@ -2053,7 +2172,7 @@ public sealed class PublicLandingDownloadDispatchTests
         IActionResult result = await fixture.Controller.OriginDossierMediaDispatch(CancellationToken.None);
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4", redirect.Url);
+        AssertProtectedMediaRedirect(redirect.Url, "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4");
         HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("origin-dossier", "subject.dispatch", limit: 10));
         Assert.Equal("accepted", receipt.Status);
         Assert.Equal("origin-dossier-media", receipt.CapabilityId);
@@ -2647,6 +2766,7 @@ public sealed class PublicLandingDownloadDispatchTests
             IDataProtectionProvider dataProtectionProvider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
             InstallBootstrapTickets = new InstallBootstrapTicketService(dataProtectionProvider, Configuration);
             PersonalizedInstallScripts = new PersonalizedInstallScriptService(InstallLinkingStore, Configuration);
+            HorizonArtifactAccessTokenService artifactAccessTokens = new(dataProtectionProvider, Configuration);
             HubPublicationDraftService draftService = new();
             PublicCreatorPublicationDiscoveryService publicCreatorDiscovery = new(Accounts, campaignSpine, draftService);
             CommunityCreatorHorizonsService communityCreatorHorizons = new(communityStore, InstallLinkingStore, publicCreatorDiscovery);
@@ -2705,7 +2825,8 @@ public sealed class PublicLandingDownloadDispatchTests
                 aurPackages: new AurPackageCatalogService(Configuration),
                 webHostEnvironment: null!,
                 logger: NullLogger<PublicLandingController>.Instance,
-                artifactRequests: artifactRequests);
+                artifactRequests: artifactRequests,
+                artifactAccessTokens: artifactAccessTokens);
             Billing = brilliantDirectoriesBilling;
         }
 

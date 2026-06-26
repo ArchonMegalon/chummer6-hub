@@ -111,6 +111,34 @@ public sealed class HorizonCapabilityService
             EnabledByDefault: false,
             CostClass: "medium"),
         new(
+            HorizonId: "black-ledger",
+            CapabilityId: "black-ledger-newsroom",
+            ArtifactKind: "newsroom_bulletin",
+            PublicLabel: "Newsroom Bulletin",
+            CapabilitySlot: "public_bulletin_media",
+            InternalProviderLane: "First-party bulletin media",
+            FreeWeeklyLimit: 0,
+            SupporterWeeklyLimit: 0,
+            RequiresAuthentication: false,
+            PublicVisible: true,
+            EnabledByDefault: true,
+            CostClass: "medium",
+            QuotaTracked: false),
+        new(
+            HorizonId: "black-ledger",
+            CapabilityId: "black-ledger-faction-promo",
+            ArtifactKind: "faction_promo",
+            PublicLabel: "Faction Promo",
+            CapabilitySlot: "public_bulletin_media",
+            InternalProviderLane: "First-party faction promo media",
+            FreeWeeklyLimit: 0,
+            SupporterWeeklyLimit: 0,
+            RequiresAuthentication: false,
+            PublicVisible: true,
+            EnabledByDefault: true,
+            CostClass: "medium",
+            QuotaTracked: false),
+        new(
             HorizonId: "origin-dossier",
             CapabilityId: "origin-dossier-media",
             ArtifactKind: "dossier_media",
@@ -212,7 +240,8 @@ public sealed record HorizonCapabilityDefinition(
     bool PublicVisible,
     bool EnabledByDefault,
     string CostClass,
-    bool Enabled = true);
+    bool Enabled = true,
+    bool QuotaTracked = true);
 
 public sealed record HorizonCapabilityHealthSnapshot(
     string HorizonId,

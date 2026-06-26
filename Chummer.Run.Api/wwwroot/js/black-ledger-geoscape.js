@@ -135,7 +135,7 @@ class BlackLedgerGeoscapeRoot {
     this.tertiarySignalLabel = root.dataset.signalTertiary || 'newsroom feed armed';
     this.selectedFactionSlug = slugify(root.dataset.selectedFaction || '');
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.disableWebGl = root.dataset.disableWebgl === 'true' || this.renderMode === 'magicfit-newsreel' || IS_AUTOMATED_QA;
+    this.disableWebGl = root.dataset.disableWebgl === 'true' || this.renderMode === 'newsroom-bulletin' || IS_AUTOMATED_QA;
     this.disableAmbientVideo = root.dataset.disableAmbientVideo === 'true' || IS_AUTOMATED_QA;
     this.state = {
       mode: root.dataset.initialMode || 'influence',
@@ -225,8 +225,8 @@ class BlackLedgerGeoscapeRoot {
       this.renderFallbackList();
       this.attachEvents();
       this.selectInitialFaction();
-      if (this.renderMode === 'magicfit-newsreel') {
-        this.root.dataset.renderer = 'magicfit-newsreel';
+      if (this.renderMode === 'newsroom-bulletin') {
+        this.root.dataset.renderer = 'newsroom-bulletin';
       } else {
         this.root.dataset.renderer = 'canvas-geoscape';
       }
@@ -256,8 +256,8 @@ class BlackLedgerGeoscapeRoot {
 
   mount() {
     this.root.classList.add('black-ledger-geoscape');
-    if (this.renderMode === 'magicfit-newsreel') {
-      this.root.classList.add('black-ledger-geoscape--magicfit-newsreel');
+    if (this.renderMode === 'newsroom-bulletin') {
+      this.root.classList.add('black-ledger-geoscape--newsroom-bulletin');
     }
     if (IS_AUTOMATED_QA) {
       this.root.dataset.qaRenderer = 'canvas-only';
@@ -1041,7 +1041,7 @@ class BlackLedgerGeoscapeRoot {
     const ctx = this.ctx;
     const width = parseFloat(this.canvas.style.width || '640');
     const height = parseFloat(this.canvas.style.height || '420');
-    if (this.renderMode === 'magicfit-newsreel') {
+    if (this.renderMode === 'newsroom-bulletin') {
       this.renderNewsreelFrame(ctx, width, height, time);
       return;
     }

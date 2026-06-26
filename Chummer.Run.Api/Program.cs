@@ -4,6 +4,7 @@ using System.Net;
 using Chummer.Contracts.Presentation;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Community;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -179,6 +180,19 @@ app.Use(async (context, next) =>
 });
 FileExtensionContentTypeProvider contentTypeProvider = new();
 contentTypeProvider.Mappings[".vtt"] = "text/vtt";
+HorizonArtifactAccessTokenService horizonArtifactAccessTokens = app.Services.GetRequiredService<HorizonArtifactAccessTokenService>();
+
+app.Use(async (context, next) =>
+{
+    if (horizonArtifactAccessTokens.RequiresToken(context.Request.Path)
+        && !horizonArtifactAccessTokens.IsAuthorized(context.Request.Path, context.Request.Query["artifactAccess"]))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    await next();
+});
 
 app.UseStaticFiles(new StaticFileOptions
 {

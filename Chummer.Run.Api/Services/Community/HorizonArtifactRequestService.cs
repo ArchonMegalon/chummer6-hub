@@ -22,14 +22,16 @@ public sealed class HorizonArtifactRequestService
     public HorizonArtifactRequestReceipt BuildRequest(
         HorizonArtifactRequestCreateRequest request,
         DateTimeOffset? now = null,
-        bool consumeQuota = false)
+        bool consumeQuota = false,
+        bool requireEnabledCapability = true,
+        bool requireRequestingUser = true)
     {
         ArgumentNullException.ThrowIfNull(request);
 
         DateTimeOffset createdAtUtc = (now ?? DateTimeOffset.UtcNow).ToUniversalTime();
         HorizonCapabilityDefinition capability = _capabilities.GetCapability(request.HorizonId, request.ArtifactKindOrCapabilityId);
         string requestId = BuildRequestId(request, capability, createdAtUtc);
-        List<string> blocked = [.. Validate(request, capability)];
+        List<string> blocked = [.. Validate(request, capability, requireEnabledCapability, requireRequestingUser)];
         HorizonArtifactQuotaSnapshot? quota = null;
         if (consumeQuota && blocked.Count == 0)
         {
@@ -85,11 +87,19 @@ public sealed class HorizonArtifactRequestService
 
     private static IReadOnlyList<string> Validate(
         HorizonArtifactRequestCreateRequest request,
-        HorizonCapabilityDefinition capability)
+        HorizonCapabilityDefinition capability,
+        bool requireEnabledCapability,
+        bool requireRequestingUser)
     {
         List<string> blocked = [];
-        AddIfMissing(blocked, capability.Enabled, "capability enabled");
-        AddIfMissing(blocked, !string.IsNullOrWhiteSpace(request.UserId), "requesting user");
+        if (requireEnabledCapability)
+        {
+            AddIfMissing(blocked, capability.Enabled, "capability enabled");
+        }
+        if (requireRequestingUser)
+        {
+            AddIfMissing(blocked, !string.IsNullOrWhiteSpace(request.UserId), "requesting user");
+        }
         AddIfMissing(blocked, !string.IsNullOrWhiteSpace(request.SourceRef), "source reference");
         AddIfMissing(blocked, IsHorizonOwnedSourceRef(request.SourceRef, capability.HorizonId), "horizon source reference");
         AddIfMissing(blocked, IsAllowedVisibility(request.Visibility), "allowed visibility");

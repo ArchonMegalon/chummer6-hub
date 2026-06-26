@@ -2,7 +2,6 @@ import { test, expect } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
-const requireMagicFit = process.env.REQUIRE_MAGICFIT_FACTION_PROMOS !== '0';
 const factions = [
   'glass-tower-compact',
   'rust-market-syndicate',
@@ -12,7 +11,7 @@ const factions = [
   'barrens-free-wardens',
 ];
 
-test('black ledger faction promo routes stay public-safe and expose cinematic render metadata', async ({ request }) => {
+test('black ledger faction promo routes stay public-safe and keep vendor truth out of public metadata', async ({ request }) => {
   test.setTimeout(90000);
   const results: Array<Record<string, unknown>> = [];
   for (const faction of factions) {
@@ -28,11 +27,9 @@ test('black ledger faction promo routes stay public-safe and expose cinematic re
     expect(vtt.status()).toBe(200);
     expect(typeof payload.provider_status).toBe('string');
     expect(typeof payload.render_mode).toBe('string');
-    if (requireMagicFit) {
-      expect(payload.provider_status).toBe('VERIFIED_PROVIDER');
-      expect(payload.render_mode).toBe('magicfit_cinematic_faction_promo_with_narration');
-    }
-    expect(payload.fallback_render_mode).toBe('first_party_storyboard');
+    expect(payload.provider_status).toBe('VERIFIED_PROVIDER');
+    expect(payload.render_mode).toBe('verified_cinematic_faction_bulletin');
+    expect(payload.fallback_render_mode).toBe('storyboard_fallback');
     expect(typeof payload.storyline_summary).toBe('string');
     expect(typeof payload.narrator_posture).toBe('string');
     expect(typeof payload.render_pipeline).toBe('string');
@@ -47,6 +44,12 @@ test('black ledger faction promo routes stay public-safe and expose cinematic re
     expect(Array.isArray(payload.screenplay_scenes)).toBeTruthy();
     expect(payload.screenplay_scenes.length).toBeGreaterThanOrEqual(3);
     expect(pageText).toContain('<video');
+    expect(JSON.stringify(payload)).not.toContain('MagicFit');
+    expect(pageText).not.toContain('MagicFit');
+    const protectedVideoUrl = new URL(payload.video_mp4_href, baseUrl);
+    expect(protectedVideoUrl.searchParams.get('artifactAccess')).toBeTruthy();
+    const rawVideoResponse = await request.get(`${protectedVideoUrl.origin}${protectedVideoUrl.pathname}`);
+    expect(rawVideoResponse.status()).toBe(404);
     results.push({
       faction,
       page: page.status(),
@@ -54,7 +57,6 @@ test('black ledger faction promo routes stay public-safe and expose cinematic re
       vtt: vtt.status(),
       provider_status: payload.provider_status,
       render_mode: payload.render_mode,
-      magicfit_required: requireMagicFit,
       fallback_render_mode: payload.fallback_render_mode,
       narrator_posture: payload.narrator_posture,
       validation_href: payload.validation_href,

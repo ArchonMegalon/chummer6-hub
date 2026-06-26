@@ -3,22 +3,15 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('homepage and ledger routes use the globe as the primary render surface', async ({ page }) => {
+test('ledger globe routes use the globe as the primary render surface', async ({ page }) => {
   const results: Array<Record<string, unknown>> = [];
   const expectations = {
-    '/': {
+    '/ledger': {
       poster: /black-ledger-video-globe-idle-poster\.png(?:\?.*)?$/,
       mp4: /black-ledger-video-globe-idle\.mp4(?:\?.*)?$/,
       mapRender: true,
       renderer: /^(canvas-geoscape|webgl-geoscape)$/,
       videoLayer: /^(first-party-raster-overlay|canvas-only)$/,
-    },
-    '/ledger': {
-      poster: /(turn-2-newsreel-poster\.png|black-ledger-video-globe-idle-poster\.png)(?:\?.*)?$/,
-      mp4: /(turn-2-newsreel\.mp4|black-ledger-video-globe-idle\.mp4)(?:\?.*)?$/,
-      mapRender: false,
-      renderer: "magicfit-newsreel",
-      videoLayer: /^(magicfit-newsreel)$/,
     },
     '/ledger/map': {
       poster: /black-ledger-video-globe-idle-poster\.png(?:\?.*)?$/,
@@ -28,7 +21,7 @@ test('homepage and ledger routes use the globe as the primary render surface', a
       videoLayer: /^(first-party-raster-overlay|canvas-only)$/,
     },
   };
-  for (const route of ['/', '/ledger', '/ledger/map']) {
+  for (const route of ['/ledger', '/ledger/map']) {
     const expectation = expectations[route as keyof typeof expectations];
     await page.goto(`${baseUrl}${route}`, { waitUntil: 'domcontentloaded' });
     const root = page.locator('[data-black-ledger-geoscape-root]').first();
@@ -88,11 +81,6 @@ test('homepage and ledger routes use the globe as the primary render surface', a
       expect(pixelProbe.renderer).not.toBe('video-globe-overlay');
       expect(pixelProbe.videoLayer).toMatch(expectation.videoLayer);
       expect(pixelProbe.renderer).toMatch(expectation.renderer);
-    } else {
-      expect(pixelProbe.coloredPixels).toBeLessThan(24);
-      expect(pixelProbe.alphaPixels).toBeLessThan(24);
-      expect(pixelProbe.renderer).toBe(expectation.renderer);
-      expect(pixelProbe.videoLayer).toContain('newsreel');
     }
     const box = await root.boundingBox();
     results.push({

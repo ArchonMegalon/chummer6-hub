@@ -29,10 +29,12 @@ public sealed class BlackLedgerFactionTests
         Assert.DoesNotContain("Public faction lanes", ledgerView, StringComparison.Ordinal);
         string workspaceView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionWorkspace.cshtml"));
         Assert.Contains("Private labels stay private.", workspaceView, StringComparison.Ordinal);
-        Assert.Contains("Connected workspace section", workspaceView, StringComparison.Ordinal);
+        Assert.Contains("Connected section", workspaceView, StringComparison.Ordinal);
+        Assert.Contains("Current section.", workspaceView, StringComparison.Ordinal);
         Assert.DoesNotContain("Connected command lane", workspaceView, StringComparison.Ordinal);
         Assert.DoesNotContain("Connected command path", workspaceView, StringComparison.Ordinal);
         Assert.DoesNotContain("Faction workspace lanes", workspaceView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Current workspace.", workspaceView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -54,10 +56,10 @@ public sealed class BlackLedgerFactionTests
         string promoView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionPromo.cshtml"));
         string service = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Community", "BlackLedgerFactionOnboardingService.cs"));
 
-        Assert.Contains("storyline_summary = promo.StorylineSummary", publicLanding, StringComparison.Ordinal);
-        Assert.Contains("narrator_posture = promo.NarratorPosture", publicLanding, StringComparison.Ordinal);
-        Assert.Contains("render_pipeline = promo.RenderPipelineLabel", publicLanding, StringComparison.Ordinal);
-        Assert.Contains("screenplay_scenes = promo.ScreenplayScenes.Select", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("storyline_summary = publicPromo.StorylineSummary", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("narrator_posture = publicPromo.NarratorPosture", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("render_pipeline = publicPromo.RenderPipelineLabel", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("screenplay_scenes = publicPromo.ScreenplayScenes.Select", publicLanding, StringComparison.Ordinal);
         Assert.Contains("TryLoadPublicMagicFitFactionReceipt", service, StringComparison.Ordinal);
         Assert.Contains("-promo.receipt.json", service, StringComparison.Ordinal);
         Assert.Contains("How the reel is structured", promoView, StringComparison.Ordinal);
