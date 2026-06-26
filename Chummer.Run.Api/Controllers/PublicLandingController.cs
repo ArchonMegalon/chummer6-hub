@@ -3579,6 +3579,19 @@ document.addEventListener('DOMContentLoaded', function () {
         return File(artifact.Bytes, artifact.ContentType, artifact.FileName);
     }
 
+    [HttpGet("/docs/{slug}/source.md")]
+    [Produces("text/markdown")]
+    public IActionResult DocumentPortalSourceDownload([FromRoute] string slug)
+    {
+        var artifact = _flipLinkDocumentPortal.TryBuildSourceArtifact(slug);
+        if (artifact is null)
+        {
+            return NotFound();
+        }
+
+        return File(artifact.Bytes, artifact.ContentType, artifact.FileName);
+    }
+
     [HttpGet("/docs/{slug}")]
     [Produces("text/html")]
     public async Task<IActionResult> DocumentPortalDetailPage([FromRoute] string slug, CancellationToken cancellationToken)
@@ -10552,6 +10565,7 @@ Boundary:
             [
                 new TrustPageActionViewModel("Open Document Portal", "/docs", "primary"),
                 new TrustPageActionViewModel("Open reader view", $"/docs/embed/{document.Slug}", "secondary"),
+                new TrustPageActionViewModel("Download source", $"/docs/{document.Slug}/source.md", "ghost"),
                 new TrustPageActionViewModel("Download PDF", $"/docs/{document.Slug}/download.pdf", "ghost")
             ],
             cancellationToken: cancellationToken,

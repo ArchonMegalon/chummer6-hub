@@ -147,6 +147,28 @@ public sealed class FlipLinkDocumentPortalService
             ContentType: "application/pdf");
     }
 
+    public DocumentPortalSourceArtifact? TryBuildSourceArtifact(string slug)
+    {
+        DocumentDefinition? definition = TryFindDefinitionBySlug(slug);
+        if (definition is null)
+        {
+            return null;
+        }
+
+        string sourceFullPath = Path.Combine(_productRoot, definition.RelativeGuidePath);
+        if (!File.Exists(sourceFullPath))
+        {
+            return null;
+        }
+
+        byte[] bytes = Encoding.UTF8.GetBytes(File.ReadAllText(sourceFullPath, Encoding.UTF8));
+        return new DocumentPortalSourceArtifact(
+            FileName: $"{definition.Slug}.md",
+            Bytes: bytes,
+            Sha256: ComputeSha256(bytes),
+            ContentType: "text/markdown; charset=utf-8");
+    }
+
     private ChummerDocument BuildDocument(DocumentDefinition definition)
     {
         string sourceFullPath = Path.Combine(_productRoot, definition.RelativeGuidePath);
@@ -373,6 +395,12 @@ public sealed class FlipLinkDocumentPortalService
     }
 
     public sealed record DocumentPortalPdfArtifact(
+        string FileName,
+        byte[] Bytes,
+        string Sha256,
+        string ContentType);
+
+    public sealed record DocumentPortalSourceArtifact(
         string FileName,
         byte[] Bytes,
         string Sha256,

@@ -179,6 +179,7 @@ public sealed class FlipLinkDocumentPortalServiceTests
         ChummerDocument? document = service.TryGetPublicDocument("origin-book-studio");
         var receipt = service.TryBuildPublicationReceipt("origin-book-studio");
         var pdf = service.TryBuildPdfArtifact("origin-book-studio");
+        var source = service.TryBuildSourceArtifact("origin-book-studio");
 
         Assert.NotNull(document);
         Assert.Equal("origin_book_studio", document!.Id);
@@ -197,5 +198,10 @@ public sealed class FlipLinkDocumentPortalServiceTests
         Assert.NotNull(pdf);
         Assert.Equal("origin-book-studio.pdf", pdf!.FileName);
         Assert.Equal("application/pdf", pdf.ContentType);
+        Assert.NotNull(source);
+        Assert.Equal("origin-book-studio.md", source!.FileName);
+        Assert.Equal("text/markdown; charset=utf-8", source.ContentType);
+        Assert.Equal(document.SourceHash, source.Sha256);
+        Assert.Contains("OriginBookEngine", System.Text.Encoding.UTF8.GetString(source.Bytes), StringComparison.Ordinal);
     }
 }
