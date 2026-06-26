@@ -43,6 +43,35 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
         self.assertIn("python3 scripts/verify_next90_m144_hub_release_truth_alignment.py", verify_script)
         self.assertIn("python3 -m unittest tests/test_next90_m144_hub_release_truth_alignment.py", verify_script)
 
+    def test_release_proof_install_routes_match_published_artifact_rows(self) -> None:
+        audit_script = (REPO_ROOT / "scripts" / "audit-ui-parity.sh").read_text(encoding="utf-8")
+        self.assertIn("proofRoutes includes install routes without published artifacts", audit_script)
+
+        for relative_path in (
+            "Chummer.Portal/downloads/releases.json",
+            "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
+        ):
+            payload = json.loads((REPO_ROOT / relative_path).read_text(encoding="utf-8"))
+            artifact_ids = {
+                str(item.get("artifactId") or item.get("id") or "").strip()
+                for collection_name in ("downloads", "artifacts")
+                for item in payload.get(collection_name, [])
+                if isinstance(item, dict)
+            }
+            artifact_ids.discard("")
+            proof_routes = (payload.get("releaseProof") or {}).get("proofRoutes") or []
+            install_route_ids = {
+                str(route).removeprefix("/downloads/install/").split("/", 1)[0]
+                for route in proof_routes
+                if str(route).startswith("/downloads/install/")
+            }
+
+            self.assertTrue(install_route_ids, msg=relative_path)
+            self.assertTrue(
+                install_route_ids.issubset(artifact_ids),
+                msg=f"{relative_path} has install proof routes without artifact rows: {sorted(install_route_ids - artifact_ids)}",
+            )
+
     def test_verifier_fails_when_identity_registry_route_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m144-route-drift-") as temp_dir:
             temp_root = Path(temp_dir)

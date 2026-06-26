@@ -1208,6 +1208,29 @@ def validate_release_channel_proof(release_channel_path: pathlib.Path, release_c
             "parity audit failed: release-channel nested receipt releaseProof.proofRoutes declares unexpected flagship routes: "
             f"{release_channel_path} ({', '.join(unexpected_routes)})"
         )
+    published_artifact_ids: set[str] = set()
+    for collection_name in ("downloads", "artifacts"):
+        collection = release_channel_data.get(collection_name)
+        if not isinstance(collection, list):
+            continue
+        for item in collection:
+            if not isinstance(item, dict):
+                continue
+            artifact_id = normalized_token(item.get("artifactId") or item.get("id"))
+            if artifact_id:
+                published_artifact_ids.add(artifact_id)
+    stale_install_routes = []
+    for route in normalized_routes:
+        if not route.startswith("/downloads/install/"):
+            continue
+        route_artifact_id = normalized_token(route.removeprefix("/downloads/install/").split("/", 1)[0])
+        if route_artifact_id and route_artifact_id not in published_artifact_ids:
+            stale_install_routes.append(route)
+    if stale_install_routes:
+        raise SystemExit(
+            "parity audit failed: release-channel nested receipt releaseProof.proofRoutes includes install routes without published artifacts: "
+            f"{release_channel_path} ({', '.join(stale_install_routes)})"
+        )
     if additional_routes != sorted(additional_routes):
         raise SystemExit(
             "parity audit failed: release-channel nested receipt releaseProof.proofRoutes must preserve canonical flagship route ordering: "
