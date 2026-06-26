@@ -151,6 +151,7 @@ test('core public pages stay inside a minimal interaction budget', async ({ page
     { path: '/status', maxWords: 110, maxLinks: 5, maxButtons: 3, maxSections: 3 },
     { path: '/help', maxWords: 450, maxLinks: 16, maxButtons: 3, maxSections: 3 },
     { path: '/contact', maxWords: 430, maxLinks: 14, maxButtons: 6, maxSections: 4 },
+    { path: '/account/billing', maxWords: 190, maxLinks: 4, maxButtons: 3, maxSections: 2 },
     { path: '/roadmap', maxWords: 420, maxLinks: 12, maxButtons: 6, maxSections: 3 },
     { path: '/what-is-chummer', maxWords: 130, maxLinks: 4, maxButtons: 3, maxSections: 3 },
     { path: '/downloads/concierge', maxWords: 260, maxLinks: 7, maxButtons: 2, maxSections: 4 },
