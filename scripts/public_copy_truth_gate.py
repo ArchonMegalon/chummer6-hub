@@ -15,11 +15,13 @@ PROJECTION_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "
 
 REQUIRED_HTML_PHRASES = (
     "data-chummer-board-skin",
-    "Short requests, clear bugs, useful ideas.",
+    'base href="/participate/"',
+    "Public bugs and requests - Chummer.run",
 )
 FORBIDDEN_HTML_PHRASES = (
-    "Tell us what slows the table down.",
-    "Use the right place",
+    "Something went wrong on our side. Could not load posts.",
+    "Network error while loading tab configuration.",
+    "chummer6.productlift.dev",
     "webhook verification",
     "recipient projection",
     "consent basis",
@@ -34,7 +36,6 @@ REQUIRED_SOURCE_PHRASES = (
     "localOrigin: \"/participate\"",
     "localBaseHref: \"/participate/\"",
     "data-chummer-board-skin",
-    "Short requests, clear bugs, useful ideas.",
     "Chummer follow-up is not visible here yet.",
     "account follow-up waits until the shipped path is available on this host",
 )

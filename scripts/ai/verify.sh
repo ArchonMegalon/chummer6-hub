@@ -173,6 +173,7 @@ python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_materialize_participa
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_origin_reachability_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_chummer_online_launch_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_clickability_gate.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_minimal_truth_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_live_public_web_recrawl_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_download_shelf_truth_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_fleet_proof_discoverability_materializer.py' >/dev/null
