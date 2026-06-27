@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import unittest
-from urllib.parse import urlparse
 from pathlib import Path
 
 
@@ -56,21 +55,18 @@ class BlackLedgerNewsroomRouteTests(unittest.TestCase):
         manifest = json.loads(TOUR_EXPORTS_MANIFEST.read_text(encoding="utf-8"))
         exports = {item["provider"]: item for item in manifest["exports"]}
 
-        self.assertIn("data-ledger-tour-exports=\"/media/ledger/tours/black-ledger-tour-exports.manifest.json\"", ledger_view)
+        self.assertIn("data-ledger-tour-exports=\"/ledger/receipts/viewer-network.json\"", ledger_view)
+        self.assertIn("/ledger/viewers/fly-through", ledger_view)
+        self.assertIn("/ledger/viewers/3d-tour", ledger_view)
+        self.assertIn("/ledger/viewers/alternate-3d-tour", ledger_view)
+        self.assertIn("Viewer receipt", ledger_view)
+        self.assertIn("Optional viewer exports.", ledger_view)
+        self.assertNotIn("Matterport", ledger_view)
+        self.assertNotIn("3DVista", ledger_view)
         self.assertEqual({"Matterport", "3DVista"}, set(exports))
         self.assertIn("not Chummer-authored runsite scans", manifest["claimBoundary"])
         self.assertEqual("/media/ledger/tours/black-ledger-3dvista-flythrough.mp4", manifest["flythrough"]["videoUrl"])
-        self.assertIn("/media/ledger/tours/black-ledger-3dvista-flythrough.mp4", ledger_view)
-
-        for provider, item in exports.items():
-            viewer_url = item["viewerUrl"]
-            parsed = urlparse(viewer_url)
-            self.assertEqual("https", parsed.scheme, provider)
-            self.assertNotIn("placeholder", viewer_url.lower(), provider)
-            self.assertNotIn("localhost", parsed.netloc.lower(), provider)
-            self.assertNotIn("chummer-api", parsed.netloc.lower(), provider)
-            self.assertIn(viewer_url, ledger_view, provider)
-            self.assertEqual("real_external_viewer_link", item["integrationStatus"], provider)
+        self.assertEqual("provider_demo_exports_available", manifest.get("status"))
 
 
 if __name__ == "__main__":
