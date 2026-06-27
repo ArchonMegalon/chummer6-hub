@@ -7533,6 +7533,8 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpPost("/contact")]
     [ValidateAntiForgeryToken]
     [Consumes("multipart/form-data", "application/x-www-form-urlencoded")]
+    [RequestFormLimits(MultipartBodyLengthLimit = SupportAttachmentStorageService.MaxMultipartBodyBytes, ValueCountLimit = 64)]
+    [RequestSizeLimit(SupportAttachmentStorageService.MaxMultipartBodyBytes)]
     [Produces("text/html")]
     public async Task<IActionResult> SubmitContactCase(
         [FromForm] string? kind,
@@ -7579,7 +7581,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 BuildSupportRailQuery(ResolveSupportIntakeRailFromQuery()));
             return Redirect(submittedHref);
         }
-        catch (ArgumentException ex)
+        catch (Exception ex) when (ex is ArgumentException or InvalidDataException)
         {
             var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Discord for normal questions. Keep the form for private details.", "/contact", cancellationToken);
             var installDefaults = await ResolveSupportIntakeDefaultsAsync(cancellationToken);
@@ -14006,12 +14008,22 @@ Boundary:
             return Array.Empty<SupportAttachmentUpload>();
         }
 
+        if (files.Count > SupportAttachmentStorageService.MaxAttachmentCount)
+        {
+            throw new InvalidDataException("Support intake accepts up to five attachments per case.");
+        }
+
         List<SupportAttachmentUpload> uploads = new(files.Count);
         foreach (var file in files)
         {
             if (file.Length <= 0)
             {
                 continue;
+            }
+
+            if (file.Length > SupportAttachmentStorageService.MaxAttachmentBytes)
+            {
+                throw new InvalidDataException($"Attachment '{file.FileName}' exceeds the 8 MB limit.");
             }
 
             await using var stream = file.OpenReadStream();
