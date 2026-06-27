@@ -29,6 +29,10 @@ FORBIDDEN_TEXT_PATTERNS = [
     r"Load Demo Runner",
     r"Open Demo",
 ]
+SUSPICIOUS_DUPLICATED_SHELL_PATH = re.compile(
+    r"^/(?P<slug>participate|partizipate|roadmap|downloads|status|help|contact|faq|feedback|login|signup|what-is-chummer)/(?P=slug)(?:/|$)",
+    re.IGNORECASE,
+)
 ACCEPTABLE_STATUSES = {200, 301, 302, 303, 307, 308}
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 8
 DEFAULT_RUNTIME_BUDGET_SECONDS = 90
@@ -66,6 +70,7 @@ class PageResult:
     success: bool
     status_code: int | None
     forbidden_text_hits: list[str]
+    suspicious_link_hits: list[str]
     link_count: int
     failed_link_count: int
     detail: str | None = None
@@ -107,6 +112,13 @@ def extract_same_origin_links(page_url: str, html: str, base_origin: str) -> lis
         if resolved not in seen:
             seen.append(resolved)
     return seen
+
+
+def find_suspicious_same_origin_link(resolved_url: str) -> str | None:
+    path = urlparse(resolved_url).path or "/"
+    if SUSPICIOUS_DUPLICATED_SHELL_PATH.match(path):
+        return path
+    return None
 
 
 def walk_link(session: requests.Session, resolved_url: str, base_origin: str) -> LinkResult:
@@ -201,12 +213,13 @@ def verify_page(session: requests.Session, base_origin: str, page: str, link_cac
         response = session.get(page_url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS)
     except Exception as exc:
         return (
-            PageResult(page=page, success=False, status_code=None, forbidden_text_hits=[], link_count=0, failed_link_count=0, detail=str(exc)),
+            PageResult(page=page, success=False, status_code=None, forbidden_text_hits=[], suspicious_link_hits=[], link_count=0, failed_link_count=0, detail=str(exc)),
             [],
         )
 
     forbidden_hits = find_forbidden_text_hits(response.text)
     links = extract_same_origin_links(page_url, response.text, base_origin)
+    suspicious_link_hits: list[str] = []
     link_results: list[LinkResult] = []
     failed_link_count = 0
     for link in links:
@@ -224,16 +237,23 @@ def verify_page(session: requests.Session, base_origin: str, page: str, link_cac
             final_url=cached.final_url,
             detail=cached.detail,
         )
+        suspicious_path = find_suspicious_same_origin_link(link)
+        if suspicious_path is not None:
+            result.success = False
+            result.detail = f"suspicious duplicated shell path {suspicious_path}"
+            suspicious_link_hits.append(suspicious_path)
         link_results.append(result)
         if not result.success:
             failed_link_count += 1
 
-    success = response.status_code == 200 and not forbidden_hits and failed_link_count == 0
+    success = response.status_code == 200 and not forbidden_hits and not suspicious_link_hits and failed_link_count == 0
     detail = None
     if response.status_code != 200:
         detail = f"page returned {response.status_code}"
     elif forbidden_hits:
         detail = "forbidden internal-host or debug/demo copy found"
+    elif suspicious_link_hits:
+        detail = "one or more same-origin links duplicate a first-party shell path segment"
     elif failed_link_count:
         detail = "one or more same-origin links were not clickable"
 
@@ -243,6 +263,7 @@ def verify_page(session: requests.Session, base_origin: str, page: str, link_cac
             success=success,
             status_code=response.status_code,
             forbidden_text_hits=forbidden_hits,
+            suspicious_link_hits=suspicious_link_hits,
             link_count=len(links),
             failed_link_count=failed_link_count,
             detail=detail,
@@ -256,6 +277,7 @@ def build_payload(base_url: str, page_results: Iterable[PageResult], link_result
     link_results_list = list(link_results)
     failed_pages = [result.page for result in page_results_list if not result.success]
     failed_links = [result.resolved_url for result in link_results_list if not result.success]
+    suspicious_links = sorted({hit for result in page_results_list for hit in result.suspicious_link_hits})
     status = "pass" if not failed_pages and not failed_links else "fail"
     return {
         "status": status,
@@ -268,6 +290,8 @@ def build_payload(base_url: str, page_results: Iterable[PageResult], link_result
             "failed_link_count": len(failed_links),
             "failed_pages": failed_pages,
             "failed_links": failed_links,
+            "suspicious_link_count": len(suspicious_links),
+            "suspicious_links": suspicious_links,
         },
         "pages": [asdict(result) for result in page_results_list],
         "links": [asdict(result) for result in link_results_list],
@@ -293,6 +317,7 @@ def main(argv: list[str] | None = None) -> int:
                     success=False,
                     status_code=None,
                     forbidden_text_hits=[],
+                    suspicious_link_hits=[],
                     link_count=0,
                     failed_link_count=0,
                     detail="runtime budget exceeded before this page could be verified",

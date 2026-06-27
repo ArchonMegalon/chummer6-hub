@@ -16,6 +16,7 @@ SCRIPT = REPO_ROOT / "scripts" / "verify_public_shell_clickability.py"
 class _PublicShellFixtureHandler(BaseHTTPRequestHandler):
     BAD_COPY = False
     BAD_LINK = False
+    BAD_DUPLICATE_LINK = False
     GOOD_HITS = 0
 
     def do_GET(self) -> None:  # noqa: N802
@@ -32,6 +33,7 @@ class _PublicShellFixtureHandler(BaseHTTPRequestHandler):
               <a href="/participate">participate</a>
               <a href="/roadmap">roadmap</a>
               <a href="/what-is-chummer">what-is-chummer</a>
+              {"<a href='/participate/participate'>bad-duplicate</a>" if self.BAD_DUPLICATE_LINK else ""}
               <a href="/auth/google/start?next=%2Fdownloads">sign-in</a>
               <a href="/good">good</a>
               {"<a href='/missing'>missing</a>" if self.BAD_LINK else ""}
@@ -66,6 +68,7 @@ class PublicShellClickabilityGateTests(unittest.TestCase):
     def setUp(self) -> None:
         _PublicShellFixtureHandler.BAD_COPY = False
         _PublicShellFixtureHandler.BAD_LINK = False
+        _PublicShellFixtureHandler.BAD_DUPLICATE_LINK = False
         _PublicShellFixtureHandler.GOOD_HITS = 0
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _PublicShellFixtureHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -112,6 +115,15 @@ class PublicShellClickabilityGateTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertEqual(payload["status"], "fail")
         self.assertGreater(payload["summary"]["failed_link_count"], 0)
+
+    def test_gate_fails_on_duplicated_first_party_shell_link(self) -> None:
+        _PublicShellFixtureHandler.BAD_DUPLICATE_LINK = True
+        completed, payload = self.run_script()
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(payload["status"], "fail")
+        self.assertIn("/participate/participate", payload["summary"]["suspicious_links"])
+        self.assertIn("/", payload["summary"]["failed_pages"])
 
     def test_gate_reuses_cached_result_for_repeated_same_origin_links(self) -> None:
         completed, payload = self.run_script()
