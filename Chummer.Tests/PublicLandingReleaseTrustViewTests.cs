@@ -145,7 +145,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Start the installer. Link this copy later only if you want recovery and support history attached.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Pick another installer", view, StringComparison.Ordinal);
-        Assert.Contains("Manage linked devices", view, StringComparison.Ordinal);
+        Assert.Contains("Manage linked installs", view, StringComparison.Ordinal);
         Assert.Contains("See the latest update", view, StringComparison.Ordinal);
         Assert.Contains("Get help when setup stalls", view, StringComparison.Ordinal);
         Assert.Contains("\"Install history\"", view, StringComparison.Ordinal);
