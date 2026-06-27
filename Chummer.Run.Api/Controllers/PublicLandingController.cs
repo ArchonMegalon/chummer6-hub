@@ -2895,6 +2895,7 @@ public sealed class PublicLandingController : Controller
         rewritten = rewritten.Replace("src=\"/", $"src=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("action=\"/", $"action=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
         rewritten = rewritten.Replace("content=\"/", $"content=\"{localOrigin}/", StringComparison.OrdinalIgnoreCase);
+        rewritten = NormalizeHostedBoardFirstPartyHrefs(rewritten, localOrigin);
         rewritten = Regex.Replace(
             rewritten,
             @"<title>.*?</title>",
@@ -3597,6 +3598,45 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         return false;
+    }
+
+    private static string NormalizeHostedBoardFirstPartyHrefs(string html, string localOrigin)
+    {
+        string normalizedOrigin = string.IsNullOrWhiteSpace(localOrigin)
+            ? string.Empty
+            : localOrigin.TrimEnd('/');
+        if (string.IsNullOrEmpty(normalizedOrigin))
+        {
+            return html;
+        }
+
+        string[] routes =
+        [
+            "/",
+            "/participate",
+            "/partizipate",
+            "/roadmap",
+            "/downloads",
+            "/status",
+            "/help",
+            "/contact",
+            "/faq",
+            "/feedback",
+            "/login",
+            "/signup",
+            "/changelog",
+            "/what-is-chummer"
+        ];
+
+        string rewritten = html;
+        foreach (string route in routes)
+        {
+            string prefixed = $"{normalizedOrigin}{route}";
+            rewritten = rewritten.Replace($"href=\"{prefixed}\"", $"href=\"{route}\"", StringComparison.OrdinalIgnoreCase);
+            rewritten = rewritten.Replace($"href='{prefixed}'", $"href='{route}'", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return rewritten;
     }
 
     private static string RewriteHostedBoardAssetHosts(string html, string assetProxyBasePath)

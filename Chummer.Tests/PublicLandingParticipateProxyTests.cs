@@ -74,6 +74,8 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Contains("Public bugs and requests.", html, StringComparison.Ordinal);
         Assert.Contains("Short requests. Clear bugs. Useful ideas.", html, StringComparison.Ordinal);
         Assert.Contains("Add a note", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/participate\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("/participate/participate", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer Participate", html, StringComparison.Ordinal);
         Assert.DoesNotContain("<title>What do you want to see next?", html, StringComparison.Ordinal);
         Assert.DoesNotContain("content=\"Tell us how we could make Chummer6 more useful to you\"", html, StringComparison.Ordinal);
@@ -110,6 +112,8 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Contains("Public bugs and requests.", html, StringComparison.Ordinal);
         Assert.Contains("Short requests. Clear bugs. Useful ideas.", html, StringComparison.Ordinal);
         Assert.Contains("Add a note", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/participate\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("/participate/participate", html, StringComparison.Ordinal);
         Assert.DoesNotContain("chummer6.productlift.dev", html, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -134,6 +138,8 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Contains("Roadmap - Chummer.run", html, StringComparison.Ordinal);
         Assert.Contains("Now and next", html, StringComparison.Ordinal);
         Assert.Contains("What is shipping, and what still needs work.", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"/participate\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("/roadmap/board/participate", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Participate - Chummer.run", html, StringComparison.Ordinal);
         Assert.DoesNotContain("Public bugs and requests", html, StringComparison.Ordinal);
         Assert.DoesNotContain("chummer6.productlift.dev", html, StringComparison.OrdinalIgnoreCase);
@@ -422,6 +428,7 @@ public sealed class PublicLandingParticipateProxyTests
     </li>
   </ul>
 </nav>
+<a class="navbar-brand" href="/participate">Chummer.run</a>
 <main><h1>What do you want to see next?</h1></main>
 <div class="modal fade" id="imageModal" tabindex="-1" role="dialog" aria-hidden="true">
   <div class="modal-dialog modal-xl">
