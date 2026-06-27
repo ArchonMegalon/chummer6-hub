@@ -45,6 +45,17 @@ public sealed class RuleGhostServiceTests
         Assert.NotEmpty(response.Citations);
     }
 
+    [Fact]
+    public void Ask_RejectsOversizedQuery()
+    {
+        RuleGhostService service = CreateService();
+
+        ArgumentException ex = Assert.Throws<ArgumentException>(() => service.Ask(new string('q', RuleGhostService.MaxQueryLength + 1)));
+
+        Assert.Equal("query", ex.ParamName);
+        Assert.Contains("maximum length", ex.Message, StringComparison.Ordinal);
+    }
+
     private static RuleGhostService CreateService()
     {
         IConfiguration configuration = new ConfigurationBuilder()

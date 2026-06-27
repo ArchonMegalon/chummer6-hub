@@ -180,6 +180,7 @@ public sealed class SupportCasesController : ControllerBase
     }
 
     [HttpPost]
+    [RequestSizeLimit(SupportCaseService.MaxSubmitRequestBodyBytes)]
     [ProducesResponseType<SupportCaseProjection>(StatusCodes.Status202Accepted)]
     public async Task<ActionResult<SupportCaseProjection>> Submit(
         [FromBody] SupportCaseSubmitRequest? request,
@@ -276,6 +277,7 @@ public sealed class SupportCasesController : ControllerBase
     }
 
     [HttpPost("assistant")]
+    [RequestSizeLimit(SupportAssistantService.MaxRequestBodyBytes)]
     [ProducesResponseType<SupportAssistantResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<SupportAssistantResponse>> AskAssistant(
         [FromBody] SupportAssistantRequest? request,
@@ -303,6 +305,7 @@ public sealed class SupportCasesController : ControllerBase
     }
 
     [HttpPost("{caseId}/verify")]
+    [RequestSizeLimit(SupportCaseService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<SupportCaseProjection>(StatusCodes.Status200OK)]
     public async Task<ActionResult<SupportCaseProjection>> VerifyReporterFix(
         [FromRoute] string caseId,
@@ -371,6 +374,7 @@ public sealed class SupportCasesController : ControllerBase
 
     [HttpPost("{caseId}/transition")]
     [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(SupportCaseService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<SupportCaseProjection>(StatusCodes.Status200OK)]
     public ActionResult<SupportCaseProjection> Transition([FromRoute] string caseId, [FromBody] SupportCaseTransitionRequest? request)
     {
@@ -397,6 +401,7 @@ public sealed class SupportCasesController : ControllerBase
 
     [HttpPost("{caseId}/notify")]
     [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(SupportCaseService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<SupportCaseProjection>(StatusCodes.Status200OK)]
     public ActionResult<SupportCaseProjection> NotifyReporter([FromRoute] string caseId, [FromBody] SupportCaseNotificationRequest? request)
     {

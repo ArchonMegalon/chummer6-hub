@@ -26,6 +26,7 @@ public sealed class RuleGhostController : ControllerBase
     }
 
     [HttpPost("ask")]
+    [RequestSizeLimit(RuleGhostService.MaxRequestBodyBytes)]
     [ProducesResponseType<RuleGhostResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<RuleGhostResponse>> Ask(
         [FromBody] RuleGhostAskRequest? request,
@@ -45,6 +46,10 @@ public sealed class RuleGhostController : ControllerBase
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
         }
     }
 }

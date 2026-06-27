@@ -8,6 +8,8 @@ namespace Chummer.Run.Api.Services.Support;
 
 public sealed class SupportAssistantService : IFirstPartySupportAssistant
 {
+    public const int MaxRequestBodyBytes = 16 * 1024;
+
     private static readonly char[] TokenSeparators =
     [
         ' ', '\t', '\r', '\n', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '/', '\\', '-', '_', '"', '\''

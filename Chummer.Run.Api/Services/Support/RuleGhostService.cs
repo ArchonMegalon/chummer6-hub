@@ -5,6 +5,10 @@ namespace Chummer.Run.Api.Services.Support;
 
 public sealed class RuleGhostService
 {
+    public const int MaxQueryLength = 2000;
+    public const int MaxPreferredRulesetLength = 16;
+    public const int MaxRequestBodyBytes = 16 * 1024;
+
     private static readonly string[] RefusalTerms = ["quote", "verbatim", "full text", "page ", "chapter ", "table ", "scan", "pdf", "list every"];
     private static readonly string[] PrivateTerms = ["gm only", "secret", "private campaign", "hidden npc", "runner note"];
     private static readonly string[] AmbiguousTerms = ["edge", "initiative", "matrix", "magic", "drain", "glitch", "armor", "damage", "availability"];
@@ -20,9 +24,10 @@ public sealed class RuleGhostService
 
     public RuleGhostResponse Ask(string query, string? preferredRuleset = null)
     {
-        string normalized = string.IsNullOrWhiteSpace(query) ? string.Empty : query.Trim();
+        string normalized = NormalizeOptional(query, nameof(query), MaxQueryLength) ?? string.Empty;
+        string? normalizedPreferredRuleset = NormalizeOptional(preferredRuleset, nameof(preferredRuleset), MaxPreferredRulesetLength);
         string lowered = normalized.ToLowerInvariant();
-        string rulesetId = ResolveRuleset(preferredRuleset, lowered);
+        string rulesetId = ResolveRuleset(normalizedPreferredRuleset, lowered);
 
         if (string.IsNullOrWhiteSpace(normalized))
         {
@@ -276,5 +281,23 @@ public sealed class RuleGhostService
         }
 
         return "auto";
+    }
+
+    private static string? NormalizeOptional(string? value, string parameterName, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string normalized = value.Trim();
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException(
+                $"{parameterName} exceeds the maximum length of {maxLength} characters.",
+                parameterName);
+        }
+
+        return normalized;
     }
 }

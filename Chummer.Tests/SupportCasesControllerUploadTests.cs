@@ -10,6 +10,22 @@ namespace Chummer.Tests;
 
 public sealed class SupportCasesControllerUploadTests
 {
+    [Theory]
+    [InlineData(nameof(SupportCasesController.Submit), SupportCaseService.MaxSubmitRequestBodyBytes)]
+    [InlineData(nameof(SupportCasesController.AskAssistant), SupportAssistantService.MaxRequestBodyBytes)]
+    [InlineData(nameof(SupportCasesController.VerifyReporterFix), SupportCaseService.MaxMutationRequestBodyBytes)]
+    [InlineData(nameof(SupportCasesController.Transition), SupportCaseService.MaxMutationRequestBodyBytes)]
+    [InlineData(nameof(SupportCasesController.NotifyReporter), SupportCaseService.MaxMutationRequestBodyBytes)]
+    public void JsonSupportRoutesCapRequestBodySize(string methodName, long expectedMaxRequestBodySize)
+    {
+        MethodInfo method = typeof(SupportCasesController).GetMethod(methodName)
+            ?? throw new InvalidOperationException($"SupportCasesController.{methodName} was not found.");
+        RequestSizeLimitAttribute requestSize = method.GetCustomAttribute<RequestSizeLimitAttribute>()
+            ?? throw new InvalidOperationException($"{methodName} is missing RequestSizeLimitAttribute.");
+
+        Assert.Equal(expectedMaxRequestBodySize, ((IRequestSizeLimitMetadata)requestSize).MaxRequestBodySize);
+    }
+
     [Fact]
     public void SubmitFromFormPinsMultipartBodyLimitsToAttachmentBudget()
     {

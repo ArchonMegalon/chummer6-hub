@@ -7,6 +7,9 @@ namespace Chummer.Run.Api.Services.Support;
 
 public sealed class SupportCaseService
 {
+    public const int MaxSubmitRequestBodyBytes = 64 * 1024;
+    public const int MaxMutationRequestBodyBytes = 16 * 1024;
+
     private static readonly HashSet<string> AllowedKinds =
     [
         SupportCaseKinds.CrashReport,
