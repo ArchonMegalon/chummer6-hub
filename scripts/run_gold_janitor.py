@@ -31,6 +31,7 @@ def build_commands(base_url: str) -> list[list[str]]:
         ["python3", "scripts/gamification_public_copy_gate.py", "--base-url", base_url],
         ["python3", "scripts/public_copy_readability_gate.py", "--base-url", base_url],
         ["python3", "scripts/public_copy_truth_gate.py", "--base-url", base_url, "--route", "/feedback"],
+        ["python3", "scripts/public_shell_minimal_truth_gate.py", "--base-url", base_url],
         ["python3", "scripts/verify_public_routes_from_manifest.py", "--strict-positive", "--seed-receipts", "--base-url", base_url],
     ]
 

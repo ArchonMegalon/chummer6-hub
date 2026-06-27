@@ -198,11 +198,13 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
     def test_publish_lane_calls_public_shell_minimal_truth_gate(self) -> None:
         publish_script = (ROOT / "scripts" / "publish-download-bundle-http.sh").read_text(encoding="utf-8")
         verify_script = (ROOT / "scripts" / "ai" / "verify.sh").read_text(encoding="utf-8")
+        janitor_script = (ROOT / "scripts" / "run_gold_janitor.py").read_text(encoding="utf-8")
 
         self.assertIn("CHUMMER_RELEASE_UPLOAD_VERIFY_PUBLIC_SHELL_TRUTH", publish_script)
         self.assertIn('python3 "$SCRIPT_DIR/public_shell_minimal_truth_gate.py"', publish_script)
         self.assertIn("test_public_shell_minimal_truth_gate.py", verify_script)
         self.assertIn('python3 "$ROOT_DIR/scripts/public_shell_minimal_truth_gate.py"', verify_script)
+        self.assertIn('["python3", "scripts/public_shell_minimal_truth_gate.py", "--base-url", base_url]', janitor_script)
 
 
 if __name__ == "__main__":
