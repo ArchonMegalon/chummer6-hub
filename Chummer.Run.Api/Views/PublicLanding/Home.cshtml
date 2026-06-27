@@ -188,7 +188,7 @@
     };
     var summary = Model.CurrentSection switch
     {
-        "access" => "See linked copies, setup codes, downloads, and install help.",
+        "access" => "One place for linking, recovery, and install help.",
         "work" => "Return to runners, campaigns, and the next useful page.",
         "setup" => "Finish the short setup flow first, then come back to installs and campaigns with a steadier account.",
         _ => "Pick up where you left off: finish the basics, install the current release, and keep track of what is planned next."
@@ -414,9 +414,9 @@
                 </article>
                 <article class="app-action-card">
                     <span class="tag">Installs</span>
-                    <h2>Keep this copy connected</h2>
-                    <p>Link this copy, check setup codes, and recover a local install without digging through support copy.</p>
-                    <a class="button-like button-like--ghost" href="/account/access">Open installs</a>
+                    <h2>Link or recover this copy</h2>
+                    <p>Open one quiet place for linking, recovery, and install help.</p>
+                    <a class="button-like button-like--ghost" href="/home/access">Open installs</a>
                 </article>
             </div>
         }
@@ -426,25 +426,25 @@
             <section class="release-shelf release-shelf--manual release-shelf--compact">
                 <div class="home-stream__lead">
                     <p class="eyebrow">Access</p>
-                    <h2 class="home-stream__title">Your install path</h2>
-                    <p class="home-stream__summary">Release, devices, and support status in one place.</p>
+                    <h2 class="home-stream__title">Installs</h2>
+                    <p class="home-stream__summary">Linking, recovery, and install help in one place.</p>
                 </div>
                 <div class="app-rail app-rail--compact">
                     <article class="app-rail__item">
-                        <span class="tag">Release</span>
+                        <span class="tag">Build</span>
                         <div class="app-rail__copy">
                             <h3>@HomeText(accessReleaseLabel)</h3>
-                            <p>Use /now when your desktop client should stay aligned.</p>
+                            <p>Use the release page when your desktop client should stay aligned.</p>
                         </div>
                         <a class="inline-link" href="/now">Open release</a>
                     </article>
                     <article class="app-rail__item">
-                        <span class="tag">Device</span>
+                        <span class="tag">Installs</span>
                         <div class="app-rail__copy">
                             <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} linked copy access" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install")</h3>
-                            <p>Open one place to reconnect, replace, or recover.</p>
+                            <p>Open installs to reconnect, replace, or recover this copy.</p>
                         </div>
-                        <a class="inline-link" href="/account/access">Open devices</a>
+                        <a class="inline-link" href="/account/access">Open installs</a>
                     </article>
                     <article class="app-rail__item">
                         <span class="tag">Support</span>

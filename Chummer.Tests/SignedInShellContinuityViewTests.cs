@@ -39,6 +39,24 @@ public sealed class SignedInShellContinuityViewTests
     }
 
     [Fact]
+    public void HomeAccessSurfaceUsesInstallsLanguageInsteadOfDeviceJargon()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("\"access\" => \"One place for linking, recovery, and install help.\"", view, StringComparison.Ordinal);
+        Assert.Contains("<h2>Link or recover this copy</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("<h2 class=\"home-stream__title\">Installs</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("Open one quiet place for linking, recovery, and install help.", view, StringComparison.Ordinal);
+        Assert.Contains("Use the release page when your desktop client should stay aligned.", view, StringComparison.Ordinal);
+        Assert.Contains("Open installs to reconnect, replace, or recover this copy.", view, StringComparison.Ordinal);
+        Assert.Contains(">Open installs</a>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open devices", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("See linked copies, setup codes, downloads, and install help.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Release, devices, and support status in one place.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AccountViewPublishesCalmAccountRailAndRecoveryFallbackCopy()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
