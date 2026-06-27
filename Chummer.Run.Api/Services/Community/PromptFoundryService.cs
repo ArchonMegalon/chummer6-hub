@@ -11,6 +11,10 @@ public sealed class PromptFoundryService
 {
     public const string Provider = "PromptArchitects";
     public const string AccountId = "prompt_architects_tier4_prompt_foundry";
+    public const int MaxDraftRequestBodyBytes = 64 * 1024;
+    public const int MaxApprovalRequestBodyBytes = 4 * 1024;
+    public const int MaxPublicSafeSummaryLength = 4000;
+    public const int MaxEnhancedPromptLength = 12 * 1024;
 
     private static readonly Regex EmailRegex = new(@"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly string[] SourcebookBlockers =
@@ -39,6 +43,25 @@ public sealed class PromptFoundryService
     private readonly PromptFoundryStore _store;
     private readonly CommunityStore _communityStore;
     private readonly IConfiguration _configuration;
+    private const int MaxTemplateIdLength = 128;
+    private const int MaxCampaignIdLength = 128;
+    private const int MaxGroupIdLength = 128;
+    private const int MaxUserIdLength = 128;
+    private const int MaxVideoTypeLength = 64;
+    private const int MaxAudienceLength = 64;
+    private const int MaxToneLength = 64;
+    private const int MaxLocationAliasLength = 128;
+    private const int MaxOutputFormatLength = 64;
+    private const int MaxProviderModeLength = 64;
+    private const int MaxStyleTagCount = 16;
+    private const int MaxStyleTagLength = 64;
+    private const int MaxCharacterDescriptorCount = 16;
+    private const int MaxCharacterDescriptorLength = 160;
+    private const int MaxFaceReferenceCount = 16;
+    private const int MaxFaceReferenceLength = 128;
+    private const int MaxNegativePromptLength = 4096;
+    private const int MaxApprovalNoteLength = 256;
+    private const int MaxTokenLength = 128;
 
     public PromptFoundryService(PromptFoundryStore store, CommunityStore communityStore, IConfiguration configuration)
     {
@@ -132,33 +155,34 @@ public sealed class PromptFoundryService
     public PromptFoundryDraftProjection CreateDraft(string userId, PromptFoundryCreateDraftRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (!string.IsNullOrWhiteSpace(request.CampaignId))
+        PromptFoundryCreateDraftRequest normalizedRequest = NormalizeCreateDraftRequest(request);
+        if (!string.IsNullOrWhiteSpace(normalizedRequest.CampaignId))
         {
-            EnsureCampaignAccess(userId, request.CampaignId, requireManage: true);
+            EnsureCampaignAccess(userId, normalizedRequest.CampaignId, requireManage: true);
         }
 
         lock (_store.Gate)
         {
-            PromptTemplateProjection template = RequireTemplateLocked(request.TemplateId);
-            string mode = NormalizeProviderMode(request.ProviderMode);
+            PromptTemplateProjection template = RequireTemplateLocked(normalizedRequest.TemplateId);
+            string mode = NormalizeProviderMode(normalizedRequest.ProviderMode);
             if (mode == PromptFoundryProviderModes.PromptArchitectsRuntime && !BuildProviderVerification().IntegrationModeAllowed["runtime_gm_assist"])
             {
                 mode = PromptFoundryProviderModes.LocalTemplate;
             }
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            string basePrompt = BuildBasePrompt(template, request);
+            string basePrompt = BuildBasePrompt(template, normalizedRequest);
             string enhanced = mode is PromptFoundryProviderModes.PromptArchitectsTemplateSeed or PromptFoundryProviderModes.PromptArchitectsOperatorAssist
-                ? EnhanceFromSeedTemplate(template, request, basePrompt)
+                ? EnhanceFromSeedTemplate(template, normalizedRequest, basePrompt)
                 : basePrompt;
-            ScanResult scan = ScanPrompt(enhanced, template.NegativePrompt, request, mode);
+            ScanResult scan = ScanPrompt(enhanced, template.NegativePrompt, normalizedRequest, mode);
             PromptFoundryDraftProjection draft = new(
-                Id: StableId("prompt-foundry-draft", userId, request.CampaignId ?? "operator", now.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                Id: StableId("prompt-foundry-draft", userId, normalizedRequest.CampaignId ?? "operator", now.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 TemplateId: template.Id,
-                CampaignId: NormalizeOptional(request.CampaignId),
-                GroupId: NormalizeOptional(request.GroupId),
-                GmUserId: NormalizeOptional(request.CampaignId) is null ? null : userId,
-                OperatorUserId: NormalizeOptional(request.CampaignId) is null ? userId : null,
+                CampaignId: normalizedRequest.CampaignId,
+                GroupId: normalizedRequest.GroupId,
+                GmUserId: normalizedRequest.CampaignId is null ? null : userId,
+                OperatorUserId: normalizedRequest.CampaignId is null ? userId : null,
                 ProviderMode: mode,
                 BasePrompt: basePrompt,
                 EnhancedPrompt: enhanced,
@@ -183,6 +207,7 @@ public sealed class PromptFoundryService
     public PromptFoundryDraftProjection EditDraft(string userId, string promptDraftId, PromptFoundryEditDraftRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        PromptFoundryEditDraftRequest normalizedRequest = NormalizeEditDraftRequest(request);
         lock (_store.Gate)
         {
             PromptFoundryDraftProjection draft = RequireDraftLocked(userId, null, promptDraftId);
@@ -193,15 +218,15 @@ public sealed class PromptFoundryService
                 VideoType: null,
                 Audience: "campaign_players",
                 Tone: "edited",
-                PublicSafeSummary: request.EnhancedPrompt,
+                PublicSafeSummary: normalizedRequest.EnhancedPrompt,
                 LocationAlias: "edited-draft");
-            ScanResult scan = ScanPrompt(request.EnhancedPrompt, request.NegativePrompt, scanRequest, draft.ProviderMode);
+            ScanResult scan = ScanPrompt(normalizedRequest.EnhancedPrompt, normalizedRequest.NegativePrompt, scanRequest, draft.ProviderMode);
             DateTimeOffset now = DateTimeOffset.UtcNow;
             PromptFoundryDraftProjection updated = draft with
             {
-                EnhancedPrompt = NormalizeRequired(request.EnhancedPrompt, "enhanced_prompt"),
-                NegativePrompt = NormalizeRequired(request.NegativePrompt, "negative_prompt"),
-                DiffSummary = BuildDiffSummary(draft.BasePrompt, request.EnhancedPrompt),
+                EnhancedPrompt = normalizedRequest.EnhancedPrompt,
+                NegativePrompt = normalizedRequest.NegativePrompt,
+                DiffSummary = BuildDiffSummary(draft.BasePrompt, normalizedRequest.EnhancedPrompt),
                 PrivacyWarnings = scan.Warnings,
                 PrivacyScanStatus = scan.Status,
                 Status = "reviewed",
@@ -218,7 +243,8 @@ public sealed class PromptFoundryService
     public PromptFoundryDraftProjection ApproveDraft(string userId, string promptDraftId, PromptFoundryApproveDraftRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (!request.Approved)
+        PromptFoundryApproveDraftRequest normalizedRequest = NormalizeApprovalRequest(request);
+        if (!normalizedRequest.Approved)
         {
             throw new ArgumentException("explicit prompt approval is required.");
         }
@@ -247,7 +273,7 @@ public sealed class PromptFoundryService
 
     public string HumanizeRulesSafeSupport(string safeSummary, IReadOnlyList<string> ruleFactIds, IReadOnlyList<string> explainReceiptIds)
     {
-        string normalized = NormalizeRequired(safeSummary, nameof(safeSummary));
+        string normalized = NormalizeRequired(safeSummary, nameof(safeSummary), MaxPublicSafeSummaryLength);
         foreach (string blocker in SourcebookBlockers)
         {
             if (normalized.Contains(blocker, StringComparison.OrdinalIgnoreCase))
@@ -345,7 +371,7 @@ public sealed class PromptFoundryService
 
     private PromptTemplateProjection RequireTemplateLocked(string templateId)
     {
-        string normalized = NormalizeRequired(templateId, nameof(templateId));
+        string normalized = NormalizeRequired(templateId, nameof(templateId), MaxTemplateIdLength);
         if (!_store.TemplatesById.TryGetValue(normalized, out PromptTemplateProjection? template) || template.Status != "approved")
         {
             throw new KeyNotFoundException($"Unknown prompt template: {templateId}");
@@ -377,8 +403,8 @@ public sealed class PromptFoundryService
 
     private CampaignAccess EnsureCampaignAccess(string userId, string campaignId, bool requireManage)
     {
-        string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId));
-        string normalizedUserId = NormalizeRequired(userId, nameof(userId));
+        string normalizedCampaignId = NormalizeRequired(campaignId, nameof(campaignId), MaxCampaignIdLength);
+        string normalizedUserId = NormalizeRequired(userId, nameof(userId), MaxUserIdLength);
         lock (_communityStore.Gate)
         {
             if (!_communityStore.CampaignsById.TryGetValue(normalizedCampaignId, out BoostCampaignDto? campaign))
@@ -517,7 +543,7 @@ public sealed class PromptFoundryService
 
     private string NormalizeProviderMode(string? mode)
     {
-        string normalized = string.IsNullOrWhiteSpace(mode) ? PromptFoundryProviderModes.LocalTemplate : mode.Trim();
+        string normalized = NormalizeOptional(mode, nameof(mode), MaxProviderModeLength) ?? PromptFoundryProviderModes.LocalTemplate;
         return normalized switch
         {
             PromptFoundryProviderModes.LocalTemplate => PromptFoundryProviderModes.LocalTemplate,
@@ -539,14 +565,87 @@ public sealed class PromptFoundryService
         return text;
     }
 
-    private static string NormalizeRequired(string? value, string name)
+    private static PromptFoundryCreateDraftRequest NormalizeCreateDraftRequest(PromptFoundryCreateDraftRequest request)
+        => request with
+        {
+            TemplateId = NormalizeRequired(request.TemplateId, nameof(request.TemplateId), MaxTemplateIdLength),
+            CampaignId = NormalizeOptional(request.CampaignId, nameof(request.CampaignId), MaxCampaignIdLength),
+            GroupId = NormalizeOptional(request.GroupId, nameof(request.GroupId), MaxGroupIdLength),
+            VideoType = NormalizeOptional(request.VideoType, nameof(request.VideoType), MaxVideoTypeLength),
+            Audience = NormalizeRequired(request.Audience, nameof(request.Audience), MaxAudienceLength),
+            Tone = NormalizeRequired(request.Tone, nameof(request.Tone), MaxToneLength),
+            PublicSafeSummary = NormalizeRequired(request.PublicSafeSummary, nameof(request.PublicSafeSummary), MaxPublicSafeSummaryLength),
+            LocationAlias = NormalizeRequired(request.LocationAlias, nameof(request.LocationAlias), MaxLocationAliasLength),
+            StyleTags = NormalizeList(request.StyleTags, nameof(request.StyleTags), MaxStyleTagCount, MaxStyleTagLength),
+            GenericCharacterDescriptors = NormalizeList(request.GenericCharacterDescriptors, nameof(request.GenericCharacterDescriptors), MaxCharacterDescriptorCount, MaxCharacterDescriptorLength),
+            FaceReferencePlaceholders = NormalizeList(request.FaceReferencePlaceholders, nameof(request.FaceReferencePlaceholders), MaxFaceReferenceCount, MaxFaceReferenceLength),
+            DurationSeconds = Math.Clamp(request.DurationSeconds, 8, 90),
+            OutputFormat = NormalizeRequired(request.OutputFormat, nameof(request.OutputFormat), MaxOutputFormatLength),
+            ProviderMode = NormalizeOptional(request.ProviderMode, nameof(request.ProviderMode), MaxProviderModeLength) ?? PromptFoundryProviderModes.LocalTemplate
+        };
+
+    private static PromptFoundryEditDraftRequest NormalizeEditDraftRequest(PromptFoundryEditDraftRequest request)
+        => request with
+        {
+            EnhancedPrompt = NormalizeRequired(request.EnhancedPrompt, nameof(request.EnhancedPrompt), MaxEnhancedPromptLength),
+            NegativePrompt = NormalizeRequired(request.NegativePrompt, nameof(request.NegativePrompt), MaxNegativePromptLength)
+        };
+
+    private static PromptFoundryApproveDraftRequest NormalizeApprovalRequest(PromptFoundryApproveDraftRequest request)
+        => request with
+        {
+            ApprovalNote = NormalizeOptional(request.ApprovalNote, nameof(request.ApprovalNote), MaxApprovalNoteLength) ?? string.Empty
+        };
+
+    private static IReadOnlyList<string>? NormalizeList(IReadOnlyList<string>? values, string name, int maxCount, int maxItemLength)
     {
-        string? normalized = NormalizeOptional(value);
-        return normalized ?? throw new ArgumentException($"{name} is required.");
+        if (values is null)
+        {
+            return null;
+        }
+
+        if (values.Count > maxCount)
+        {
+            throw new ArgumentException($"{name} may contain at most {maxCount} items.", name);
+        }
+
+        List<string> normalized = new(values.Count);
+        for (int index = 0; index < values.Count; index++)
+        {
+            string? item = NormalizeOptional(values[index], $"{name}[{index}]", maxItemLength);
+            if (item is not null)
+            {
+                normalized.Add(item);
+            }
+        }
+
+        return normalized.Count == 0 ? null : normalized;
+    }
+
+    private static string NormalizeRequired(string? value, string name, int maxLength)
+    {
+        string? normalized = NormalizeOptional(value, name, maxLength);
+        return normalized ?? throw new ArgumentException($"{name} is required.", name);
     }
 
     private static string NormalizeRequiredToken(string value)
-        => NormalizeRequired(value, "token").Replace(" ", "_", StringComparison.Ordinal);
+        => NormalizeRequired(value, "token", MaxTokenLength).Replace(" ", "_", StringComparison.Ordinal);
+
+    private static string? NormalizeOptional(string? value, string name, int maxLength)
+    {
+        string? normalized = NormalizeOptional(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException($"{name} exceeds the maximum length of {maxLength} characters.", name);
+        }
+
+        return normalized;
+    }
 
     private static string? NormalizeOptional(string? value)
     {

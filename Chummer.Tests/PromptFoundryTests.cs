@@ -131,6 +131,48 @@ public sealed class PromptFoundryTests
         Assert.Contains(ctx.Service.GetHome("gm-a", "campaign-1").UsageLedger, item => item.EventType == "consume");
     }
 
+    [Fact]
+    public void CreateDraftRejectsOversizedPublicSafeSummary()
+    {
+        TestPromptFoundryContext ctx = CreateContext();
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() => ctx.Service.CreateDraft("gm-a", new PromptFoundryCreateDraftRequest(
+            TemplateId: "magicfit_video_bridge_v1",
+            CampaignId: "campaign-1",
+            GroupId: "group-1",
+            VideoType: "matrix_alert",
+            Audience: "campaign_players",
+            Tone: "glitchy tactical",
+            PublicSafeSummary: new string('s', PromptFoundryService.MaxPublicSafeSummaryLength + 1),
+            LocationAlias: "Kestrel",
+            ProviderMode: PromptFoundryProviderModes.PromptArchitectsTemplateSeed)));
+
+        Assert.Equal(nameof(PromptFoundryCreateDraftRequest.PublicSafeSummary), error.ParamName);
+    }
+
+    [Fact]
+    public void EditDraftRejectsOversizedEnhancedPrompt()
+    {
+        TestPromptFoundryContext ctx = CreateContext();
+        PromptFoundryDraftProjection draft = ctx.Service.CreateDraft("gm-a", new PromptFoundryCreateDraftRequest(
+            TemplateId: "gm_session_video_aftermath_v1",
+            CampaignId: "campaign-1",
+            GroupId: "group-1",
+            VideoType: "newsreel",
+            Audience: "campaign_players",
+            Tone: "noir",
+            PublicSafeSummary: "A public-safe summary.",
+            LocationAlias: "Kestrel",
+            ProviderMode: PromptFoundryProviderModes.PromptArchitectsTemplateSeed));
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() => ctx.Service.EditDraft(
+            "gm-a",
+            draft.Id,
+            new PromptFoundryEditDraftRequest(new string('e', PromptFoundryService.MaxEnhancedPromptLength + 1), draft.NegativePrompt)));
+
+        Assert.Equal(nameof(PromptFoundryEditDraftRequest.EnhancedPrompt), error.ParamName);
+    }
+
     private static TestPromptFoundryContext CreateContext()
     {
         string root = Path.Combine(Path.GetTempPath(), "chummer-prompt-foundry-tests", Guid.NewGuid().ToString("N"));

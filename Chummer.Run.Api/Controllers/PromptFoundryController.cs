@@ -36,6 +36,7 @@ public sealed class PromptFoundryController : ControllerBase
         => await WithUser(cancellationToken, userId => Ok(_foundry.SyncSeedTemplates(userId)));
 
     [HttpPost("/prompt-foundry/drafts")]
+    [RequestSizeLimit(PromptFoundryService.MaxDraftRequestBodyBytes)]
     [ProducesResponseType<PromptFoundryDraftProjection>(StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateDraft([FromBody] PromptFoundryCreateDraftRequest? request, CancellationToken cancellationToken)
         => request is null
@@ -43,6 +44,7 @@ public sealed class PromptFoundryController : ControllerBase
             : await WithUser(cancellationToken, userId => Ok(_foundry.CreateDraft(userId, request)));
 
     [HttpPost("/prompt-foundry/drafts/{promptDraftId}")]
+    [RequestSizeLimit(PromptFoundryService.MaxDraftRequestBodyBytes)]
     [ProducesResponseType<PromptFoundryDraftProjection>(StatusCodes.Status200OK)]
     public async Task<IActionResult> EditDraft(
         [FromRoute] string promptDraftId,
@@ -53,6 +55,7 @@ public sealed class PromptFoundryController : ControllerBase
             : await WithUser(cancellationToken, userId => Ok(_foundry.EditDraft(userId, promptDraftId, request)));
 
     [HttpPost("/prompt-foundry/drafts/{promptDraftId}/approve")]
+    [RequestSizeLimit(PromptFoundryService.MaxApprovalRequestBodyBytes)]
     [ProducesResponseType<PromptFoundryDraftProjection>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ApproveDraft(
         [FromRoute] string promptDraftId,
