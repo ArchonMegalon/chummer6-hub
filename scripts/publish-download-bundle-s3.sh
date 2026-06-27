@@ -43,6 +43,17 @@ python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" \
   --manifest "$CANONICAL_MANIFEST_SOURCE" \
   --allow-empty
 
+if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" ]]; then
+  echo "Missing Windows installer visual proof gate: $SCRIPT_DIR/verify-windows-installer-visual-proof.py" >&2
+  exit 1
+fi
+
+python3 "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" \
+  --files-dir "$FILES_SOURCE" \
+  --manifest "$MANIFEST_SOURCE" \
+  --manifest "$CANONICAL_MANIFEST_SOURCE" \
+  --allow-empty
+
 if [[ -z "$S3_TARGET_URI" ]]; then
   echo "Set CHUMMER_PORTAL_DOWNLOADS_S3_URI (for example: s3://bucket/path)." >&2
   exit 1

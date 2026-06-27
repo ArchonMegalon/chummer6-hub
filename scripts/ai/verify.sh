@@ -174,6 +174,7 @@ python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_origin_reachab
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_chummer_online_launch_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_clickability_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_live_public_web_recrawl_gate.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_download_shelf_truth_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_fleet_proof_discoverability_materializer.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_rules_authority_minimum_coverage_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_provider_proof_discoverability_gate.py' >/dev/null
@@ -181,6 +182,7 @@ python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_live_med
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_table_pulse_scenario_replay_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_final_gold_janitor.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_release_bundle_promotion_shelf_replacement.py' >/dev/null
+python3 -m pytest "$ROOT_DIR/tests/test_windows_installer_visual_proof_gate.py" -q >/dev/null
 python3 "$ROOT_DIR/scripts/materialize_participate_billing_honesty.py" --completion-dir "$CHUMMER_COMPLETION_DIR" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_participate_billing_honesty.py" --completion-dir "$CHUMMER_COMPLETION_DIR" >/dev/null
 python3 "$ROOT_DIR/tests/test_stack_smoke.py" >/dev/null
@@ -188,6 +190,7 @@ python3 "$ROOT_DIR/scripts/verify_public_origin_reachability.py" --base-url "${C
 python3 "$ROOT_DIR/scripts/verify_chummer_online_launch.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_public_shell_clickability.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_live_public_web_recrawl.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
+python3 "$ROOT_DIR/scripts/public_download_shelf_truth_gate.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_black_ledger_live_media_proof.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 CHUMMER_PORTAL_BASE_URL="${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" \
 CHUMMER_PORTAL_PUBLIC_HOST= \

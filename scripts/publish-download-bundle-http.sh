@@ -27,6 +27,7 @@ ALLOW_DIRECT_FALLBACK="${CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-1}"
 DRY_RUN="${CHUMMER_RELEASE_UPLOAD_DRY_RUN:-0}"
 VERIFY_MANIFEST="${CHUMMER_RELEASE_UPLOAD_VERIFY_MANIFEST:-1}"
 VERIFY_ROUTES="${CHUMMER_RELEASE_UPLOAD_VERIFY_ROUTES:-1}"
+VERIFY_SHELF_TRUTH="${CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH:-1}"
 CHUNK_BYTES="${CHUMMER_RELEASE_UPLOAD_CHUNK_BYTES:-52428800}"
 DIRECT_LIMIT_BYTES="${CHUMMER_RELEASE_UPLOAD_DIRECT_LIMIT_BYTES:-$CHUNK_BYTES}"
 ARTIFACT_FACTORY_REQUEST_MATERIALIZER="$SCRIPT_DIR/materialize_artifact_factory_source_pack_batch.py"
@@ -58,6 +59,17 @@ if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-payloads.py" ]]; then
 fi
 
 python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" \
+  --files-dir "$BUNDLE_DIR/files" \
+  --manifest "$MANIFEST_PATH" \
+  --manifest "$CANONICAL_MANIFEST_PATH" \
+  --allow-empty
+
+if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" ]]; then
+  echo "Missing Windows installer visual proof gate: $SCRIPT_DIR/verify-windows-installer-visual-proof.py" >&2
+  exit 1
+fi
+
+python3 "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" \
   --files-dir "$BUNDLE_DIR/files" \
   --manifest "$MANIFEST_PATH" \
   --manifest "$CANONICAL_MANIFEST_PATH" \
@@ -771,6 +783,13 @@ if to_bool "$VERIFY_ROUTES"; then
     [[ -n "$route" ]] || continue
     verify_route "$route"
   done <<< "$verify_routes"
+fi
+
+if to_bool "$VERIFY_SHELF_TRUTH"; then
+  python3 "$SCRIPT_DIR/public_download_shelf_truth_gate.py" \
+    --base-url "$PUBLIC_BASE_URL" \
+    --local-manifest "$MANIFEST_PATH" \
+    --local-canonical-manifest "$CANONICAL_MANIFEST_PATH"
 fi
 
 echo "Live publish verification completed."

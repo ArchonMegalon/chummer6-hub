@@ -558,15 +558,27 @@ if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-payloads.py" ]]; then
   exit 1
 fi
 
+if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" ]]; then
+  echo "Missing Windows installer visual proof gate: $SCRIPT_DIR/verify-windows-installer-visual-proof.py" >&2
+  exit 1
+fi
+
 windows_payload_gate_args=(
+  --files-dir "$combined_files_root"
+  --manifest "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH"
+  --allow-empty
+)
+windows_visual_proof_gate_args=(
   --files-dir "$combined_files_root"
   --manifest "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH"
   --allow-empty
 )
 if [[ -n "$DISABLED_ARTIFACT_IDS" ]]; then
   windows_payload_gate_args+=(--disabled-artifact-id "$DISABLED_ARTIFACT_IDS")
+  windows_visual_proof_gate_args+=(--disabled-artifact-id "$DISABLED_ARTIFACT_IDS")
 fi
 python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" "${windows_payload_gate_args[@]}"
+python3 "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" "${windows_visual_proof_gate_args[@]}"
 
 if [[ -d "$PRESENTATION_STARTUP_SMOKE_ROOT" ]]; then
   find "$PRESENTATION_STARTUP_SMOKE_ROOT" -maxdepth 1 -type f -name 'startup-smoke-*.receipt.json' -print0 \

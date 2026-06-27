@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -13,9 +16,8 @@ OUT_PATHS = (
     Path("/docker/chummercomplete/chummer-design/_completion/full_product_every_aspect/PUBLIC_DOWNLOAD_SHELF_TRUTH.generated.json"),
     Path("/docker/chummercomplete/_completion/full_product_every_aspect/PUBLIC_DOWNLOAD_SHELF_TRUTH.generated.json"),
 )
-DOWNLOAD_DOC = Path("/docker/chummercomplete/Chummer6/DOWNLOAD.md")
-STATUS_DOC = Path("/docker/chummercomplete/Chummer6/STATUS.md")
-RELEASE_CHANNEL = Path("/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json")
+DEFAULT_LOCAL_MANIFEST = Path("/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/releases.json")
+DEFAULT_LOCAL_CANONICAL_MANIFEST = Path("/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json")
 
 
 def now_iso() -> str:
@@ -25,141 +27,471 @@ def now_iso() -> str:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", required=True)
+    parser.add_argument("--local-manifest", default=str(DEFAULT_LOCAL_MANIFEST))
+    parser.add_argument("--local-canonical-manifest", default=str(DEFAULT_LOCAL_CANONICAL_MANIFEST))
+    parser.add_argument("--timeout", type=float, default=30.0)
+    parser.add_argument("--skip-artifact-probes", action="store_true")
     return parser.parse_args()
 
 
-def main() -> int:
-    args = parse_args()
-    base = args.base_url.rstrip("/")
-    downloads = requests.get(f"{base}/downloads", timeout=30)
-    status = requests.get(f"{base}/status", timeout=30)
-    live_releases_response = requests.get(f"{base}/downloads/releases.json", timeout=30)
+def normalize_token(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def normalize_optional_text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def normalize_iso(value: Any) -> str:
+    raw = normalize_optional_text(value)
+    if not raw:
+        return ""
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
     try:
-        live_releases = live_releases_response.json()
+        parsed = datetime.fromisoformat(raw)
     except ValueError:
-        live_releases = {}
-    download_doc = DOWNLOAD_DOC.read_text(encoding="utf-8")
-    status_doc = STATUS_DOC.read_text(encoding="utf-8") if STATUS_DOC.exists() else ""
-    release_channel_payload = json.loads(RELEASE_CHANNEL.read_text(encoding="utf-8")) if RELEASE_CHANNEL.exists() else {}
+        return str(value or "").strip()
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-    live_download_text = downloads.text.lower()
-    live_status_text = status.text.lower()
-    live_download_copy_text = (
-        live_download_text.replace("max-image-preview", "max-image-robots-directive")
-        .replace("max-video-preview", "max-video-robots-directive")
-    )
-    live_status_copy_text = (
-        live_status_text.replace("max-image-preview", "max-image-robots-directive")
-        .replace("max-video-preview", "max-video-robots-directive")
-    )
-    doc_text = download_doc.lower() + "\n" + status_doc.lower()
 
-    promoted_platforms = sorted(
-        {
-            str(download.get("platformId") or download.get("platform") or "").strip().lower()
-            for download in live_releases.get("downloads") or []
-            if isinstance(download, dict)
-        }
-    )
-    platform_mentions = {
-        "windows": "windows" in live_download_text,
-        "linux": "linux" in live_download_text,
-        "macos": "macos" in live_download_text or "mac" in live_download_text,
+def safe_int(value: Any) -> int:
+    if value in (None, ""):
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path} did not contain a JSON object")
+    return payload
+
+
+def fetch_json(url: str, *, timeout: float) -> tuple[requests.Response, dict[str, Any]]:
+    response = requests.get(url, timeout=timeout)
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise ValueError(f"{url} did not contain a JSON object")
+    return response, payload
+
+
+def top_level_manifest_view(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "version": normalize_optional_text(payload.get("version")),
+        "publicVersion": normalize_optional_text(payload.get("publicVersion")),
+        "channel": normalize_optional_text(payload.get("channelId") or payload.get("channel")),
+        "rolloutState": normalize_optional_text(payload.get("rolloutState")),
+        "supportabilityState": normalize_optional_text(payload.get("supportabilityState")),
+        "status": normalize_optional_text(payload.get("status")),
+        "publishedAt": normalize_iso(payload.get("publishedAt")),
     }
-    missing_promoted_platform_mentions = [
-        platform for platform in promoted_platforms
-        if platform in platform_mentions and not platform_mentions[platform]
-    ]
-    windows_live = platform_mentions["windows"]
-    linux_live = platform_mentions["linux"]
-    mac_live = "mac" in live_download_text or "macos" in live_status_text
-    mac_doc_note = "no public macos" in doc_text or "macos download today" in doc_text or "mac setup-script preview" in live_download_text
-    review_required = "review-required" in live_status_text or "review required" in live_status_text
-    rollout_state = str(release_channel_payload.get("rolloutState") or release_channel_payload.get("channelId") or "").strip()
-    supportability_state = str(release_channel_payload.get("supportabilityState") or "").strip()
-    live_channel = str(live_releases.get("channel") or live_releases.get("channelId") or "").strip()
-    live_rollout_state = str(live_releases.get("rolloutState") or "").strip()
-    live_supportability_state = str(live_releases.get("supportabilityState") or "").strip()
-    live_download_channels = sorted(
-        {
-            str(download.get("channel") or download.get("channelId") or "").strip()
-            for download in live_releases.get("downloads") or []
-            if isinstance(download, dict)
+
+
+def manifest_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = payload.get("downloads")
+    if isinstance(rows, list):
+        return [row for row in rows if isinstance(row, dict)]
+    rows = payload.get("artifacts")
+    if isinstance(rows, list):
+        return [row for row in rows if isinstance(row, dict)]
+    return []
+
+
+def normalize_url(base_url: str, value: Any) -> str:
+    raw = normalize_optional_text(value)
+    if not raw:
+        return ""
+    return urljoin(base_url.rstrip("/") + "/", raw)
+
+
+def file_name_from_row(row: dict[str, Any], *, base_url: str) -> str:
+    file_name = normalize_optional_text(row.get("fileName"))
+    if file_name:
+        return file_name
+    for key in ("downloadUrl", "url"):
+        raw_url = normalize_optional_text(row.get(key))
+        if raw_url:
+            path = urlparse(normalize_url(base_url, raw_url)).path
+            return Path(path).name
+    return ""
+
+
+def rid_from_row(row: dict[str, Any]) -> str:
+    rid = normalize_token(row.get("rid"))
+    if rid:
+        return rid
+    platform_id = normalize_token(row.get("platformId"))
+    if platform_id.startswith(("win-", "linux-", "osx-")):
+        return platform_id
+    return ""
+
+
+def normalized_artifact_row(row: dict[str, Any], *, base_url: str) -> dict[str, Any]:
+    artifact_id = normalize_optional_text(row.get("artifactId") or row.get("id"))
+    file_name = file_name_from_row(row, base_url=base_url)
+    return {
+        "artifactId": artifact_id,
+        "fileName": file_name,
+        "url": normalize_url(base_url, row.get("downloadUrl") or row.get("url")),
+        "sha256": normalize_token(row.get("sha256")),
+        "sizeBytes": safe_int(row.get("sizeBytes")),
+        "head": normalize_token(row.get("head")),
+        "rid": rid_from_row(row),
+        "channel": normalize_token(row.get("channelId") or row.get("channel")),
+        "installAccessClass": normalize_token(row.get("installAccessClass")),
+        "installerMode": normalize_token(row.get("installerMode")),
+        "kind": normalize_token(row.get("kind")),
+        "payloadFileName": normalize_optional_text(row.get("payloadFileName")),
+        "payloadDownloadUrl": normalize_url(base_url, row.get("payloadDownloadUrl")),
+        "payloadSha256": normalize_token(row.get("payloadSha256")),
+        "payloadSizeBytes": safe_int(row.get("payloadSizeBytes")),
+    }
+
+
+def artifact_index(payload: dict[str, Any], *, base_url: str) -> dict[str, dict[str, Any]]:
+    indexed: dict[str, dict[str, Any]] = {}
+    for row in manifest_rows(payload):
+        normalized = normalized_artifact_row(row, base_url=base_url)
+        artifact_id = normalized["artifactId"] or normalized["fileName"]
+        if not artifact_id:
+            continue
+        indexed[artifact_id] = normalized
+    return indexed
+
+
+def extract_page_artifact_ids(page_html: str) -> list[str]:
+    matches = re.findall(r'data-download-artifact="([^"]+)"', page_html, flags=re.IGNORECASE)
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for match in matches:
+        token = normalize_optional_text(match)
+        if token and token not in seen:
+            ordered.append(token)
+            seen.add(token)
+    return ordered
+
+
+def compare_views(
+    left_name: str,
+    left_value: dict[str, Any],
+    right_name: str,
+    right_value: dict[str, Any],
+    *,
+    failures: list[str],
+) -> None:
+    for key in sorted(set(left_value) | set(right_value)):
+        if left_value.get(key) != right_value.get(key):
+            failures.append(
+                f"{left_name} and {right_name} differ for {key}: {left_value.get(key)!r} != {right_value.get(key)!r}"
+            )
+
+
+def compare_artifact_indexes(
+    left_name: str,
+    left_rows: dict[str, dict[str, Any]],
+    right_name: str,
+    right_rows: dict[str, dict[str, Any]],
+    *,
+    failures: list[str],
+) -> None:
+    left_keys = set(left_rows)
+    right_keys = set(right_rows)
+    missing_from_right = sorted(left_keys - right_keys)
+    missing_from_left = sorted(right_keys - left_keys)
+    if missing_from_right:
+        failures.append(f"{right_name} is missing artifact(s): {', '.join(missing_from_right)}")
+    if missing_from_left:
+        failures.append(f"{left_name} is missing artifact(s): {', '.join(missing_from_left)}")
+    for artifact_id in sorted(left_keys & right_keys):
+        if left_rows[artifact_id] != right_rows[artifact_id]:
+            failures.append(
+                f"{left_name} and {right_name} differ for artifact {artifact_id}: "
+                f"{json.dumps(left_rows[artifact_id], sort_keys=True)} != {json.dumps(right_rows[artifact_id], sort_keys=True)}"
+            )
+
+
+def manifest_summary(payload: dict[str, Any], *, base_url: str) -> dict[str, Any]:
+    rows = artifact_index(payload, base_url=base_url)
+    return {
+        "topLevel": top_level_manifest_view(payload),
+        "artifactCount": len(rows),
+        "artifactIds": sorted(rows),
+        "artifacts": rows,
+    }
+
+
+def parse_total_size_from_content_range(value: str) -> int:
+    match = re.match(r"^bytes\s+\d+-\d+/(\d+)$", value.strip(), flags=re.IGNORECASE)
+    if not match:
+        return 0
+    return safe_int(match.group(1))
+
+
+def probe_artifact_url(url: str, *, expected_size: int, timeout: float) -> dict[str, Any]:
+    head_response = None
+    try:
+        head_response = requests.head(url, allow_redirects=True, timeout=timeout)
+        head_status = head_response.status_code
+        head_length = safe_int(head_response.headers.get("Content-Length"))
+        if head_response.ok:
+            return {
+                "url": url,
+                "method": "HEAD",
+                "statusCode": head_status,
+                "resolvedUrl": head_response.url,
+                "reportedSizeBytes": head_length,
+                "sizeMatches": expected_size == 0 or head_length == 0 or head_length == expected_size,
+            }
+    except requests.RequestException as exc:
+        head_error = str(exc)
+    else:
+        head_error = f"HTTP {head_response.status_code}" if head_response is not None else "HEAD failed"
+
+    try:
+        get_response = requests.get(
+            url,
+            headers={"Range": "bytes=0-0"},
+            allow_redirects=True,
+            timeout=timeout,
+            stream=True,
+        )
+        get_status = get_response.status_code
+        reported_size = parse_total_size_from_content_range(get_response.headers.get("Content-Range", ""))
+        if reported_size == 0:
+            reported_size = safe_int(get_response.headers.get("Content-Length"))
+        result = {
+            "url": url,
+            "method": "GET",
+            "statusCode": get_status,
+            "resolvedUrl": get_response.url,
+            "reportedSizeBytes": reported_size,
+            "sizeMatches": expected_size == 0 or reported_size == 0 or reported_size == expected_size,
         }
+        get_response.close()
+        return result
+    except requests.RequestException as exc:
+        return {
+            "url": url,
+            "method": "GET",
+            "statusCode": 0,
+            "resolvedUrl": "",
+            "reportedSizeBytes": 0,
+            "sizeMatches": False,
+            "error": f"HEAD failed: {head_error}; GET failed: {exc}",
+        }
+
+
+def build_probe_plan(rows: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    probes: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for artifact_id, row in sorted(rows.items()):
+        if row["installAccessClass"] not in {"", "open_public"}:
+            continue
+        if row["url"] and row["url"] not in seen:
+            probes.append(
+                {
+                    "label": f"{artifact_id}:installer",
+                    "url": row["url"],
+                    "expectedSizeBytes": row["sizeBytes"],
+                }
+            )
+            seen.add(row["url"])
+        if row["payloadDownloadUrl"] and row["payloadDownloadUrl"] not in seen:
+            probes.append(
+                {
+                    "label": f"{artifact_id}:payload",
+                    "url": row["payloadDownloadUrl"],
+                    "expectedSizeBytes": row["payloadSizeBytes"],
+                }
+            )
+            seen.add(row["payloadDownloadUrl"])
+    return probes
+
+
+def evaluate(
+    *,
+    base_url: str,
+    local_manifest_path: Path,
+    local_canonical_manifest_path: Path,
+    timeout: float,
+    artifact_probes_enabled: bool,
+) -> dict[str, Any]:
+    base = base_url.rstrip("/")
+    downloads_response = requests.get(f"{base}/downloads", timeout=timeout)
+    downloads_response.raise_for_status()
+    live_releases_response, live_releases_payload = fetch_json(f"{base}/downloads/releases.json", timeout=timeout)
+    live_canonical_response, live_canonical_payload = fetch_json(
+        f"{base}/downloads/RELEASE_CHANNEL.generated.json",
+        timeout=timeout,
     )
-    release_rollout_states = {"public_stable", "stable"}
-    public_stable = rollout_state in release_rollout_states
-    gold_supported = supportability_state == "gold_supported"
-    live_public_stable = live_channel in release_rollout_states or live_rollout_state in release_rollout_states
-    live_gold_supported = live_supportability_state == "gold_supported"
-    preview_machine_truth = any(
-        value in {"preview", "promoted_preview", "preview_supported"}
-        for value in [
-            str(release_channel_payload.get("channelId") or "").strip(),
-            str(release_channel_payload.get("channel") or "").strip(),
-            rollout_state,
-            supportability_state,
-            live_channel,
-            live_rollout_state,
-            live_supportability_state,
-            *live_download_channels,
-        ]
+
+    local_manifest_payload = load_json(local_manifest_path)
+    local_canonical_payload = load_json(local_canonical_manifest_path)
+
+    local_manifest_summary = manifest_summary(local_manifest_payload, base_url=base)
+    local_canonical_summary = manifest_summary(local_canonical_payload, base_url=base)
+    live_manifest_summary = manifest_summary(live_releases_payload, base_url=base)
+    live_canonical_summary = manifest_summary(live_canonical_payload, base_url=base)
+
+    failures: list[str] = []
+
+    compare_views(
+        "local releases.json",
+        local_manifest_summary["topLevel"],
+        "local RELEASE_CHANNEL.generated.json",
+        local_canonical_summary["topLevel"],
+        failures=failures,
     )
-    failures = []
-    if review_required:
-        failures.append("review-required desktop proof language is still live")
-    if not public_stable or not gold_supported:
-        failures.append("local release channel is not public_stable/gold_supported")
-    if not live_public_stable or not live_gold_supported:
-        failures.append("live releases.json is not public_stable/gold_supported")
-    if preview_machine_truth:
-        failures.append("public download machine truth still contains preview posture")
-    if missing_promoted_platform_mentions:
-        failures.append(f"live downloads page does not mention promoted platform(s): {', '.join(missing_promoted_platform_mentions)}")
+    compare_views(
+        "live releases.json",
+        live_manifest_summary["topLevel"],
+        "live RELEASE_CHANNEL.generated.json",
+        live_canonical_summary["topLevel"],
+        failures=failures,
+    )
+    compare_views(
+        "local releases.json",
+        local_manifest_summary["topLevel"],
+        "live releases.json",
+        live_manifest_summary["topLevel"],
+        failures=failures,
+    )
+    compare_views(
+        "local RELEASE_CHANNEL.generated.json",
+        local_canonical_summary["topLevel"],
+        "live RELEASE_CHANNEL.generated.json",
+        live_canonical_summary["topLevel"],
+        failures=failures,
+    )
+
+    compare_artifact_indexes(
+        "local releases.json",
+        local_manifest_summary["artifacts"],
+        "local RELEASE_CHANNEL.generated.json",
+        local_canonical_summary["artifacts"],
+        failures=failures,
+    )
+    compare_artifact_indexes(
+        "live releases.json",
+        live_manifest_summary["artifacts"],
+        "live RELEASE_CHANNEL.generated.json",
+        live_canonical_summary["artifacts"],
+        failures=failures,
+    )
+    compare_artifact_indexes(
+        "local releases.json",
+        local_manifest_summary["artifacts"],
+        "live releases.json",
+        live_manifest_summary["artifacts"],
+        failures=failures,
+    )
+    compare_artifact_indexes(
+        "local RELEASE_CHANNEL.generated.json",
+        local_canonical_summary["artifacts"],
+        "live RELEASE_CHANNEL.generated.json",
+        live_canonical_summary["artifacts"],
+        failures=failures,
+    )
+
+    page_artifact_ids = extract_page_artifact_ids(downloads_response.text)
+    live_public_artifact_ids = sorted(
+        artifact_id
+        for artifact_id, row in live_manifest_summary["artifacts"].items()
+        if row["installAccessClass"] in {"", "open_public"}
+    )
+    unknown_page_artifact_ids = sorted(set(page_artifact_ids) - set(live_manifest_summary["artifactIds"]))
+    if unknown_page_artifact_ids:
+        failures.append(
+            "downloads page exposes artifact ids missing from live releases.json: "
+            + ", ".join(unknown_page_artifact_ids)
+        )
+    missing_page_artifact_ids = sorted(set(live_public_artifact_ids) - set(page_artifact_ids))
+    if live_public_artifact_ids and missing_page_artifact_ids:
+        failures.append(
+            "downloads page is missing public artifact call-to-action ids: "
+            + ", ".join(missing_page_artifact_ids)
+        )
+
+    artifact_probes: list[dict[str, Any]] = []
+    if artifact_probes_enabled:
+        for probe in build_probe_plan(live_manifest_summary["artifacts"]):
+            result = probe_artifact_url(
+                probe["url"],
+                expected_size=safe_int(probe["expectedSizeBytes"]),
+                timeout=timeout,
+            )
+            result["label"] = probe["label"]
+            artifact_probes.append(result)
+            if result["statusCode"] < 200 or result["statusCode"] >= 300:
+                failures.append(f"artifact probe failed for {probe['label']}: HTTP {result['statusCode']}")
+            elif not result["sizeMatches"]:
+                failures.append(
+                    f"artifact probe size mismatch for {probe['label']}: "
+                    f"reported {result['reportedSizeBytes']} vs expected {probe['expectedSizeBytes']}"
+                )
 
     payload = {
         "generated_at_utc": now_iso(),
         "contract_name": "chummer.public_download_shelf_truth",
         "base_url": base,
         "status": "fail" if failures else "pass",
+        "local": {
+            "manifestPath": str(local_manifest_path),
+            "canonicalManifestPath": str(local_canonical_manifest_path),
+            "manifest": local_manifest_summary,
+            "canonicalManifest": local_canonical_summary,
+        },
         "live": {
-            "downloads_status_code": downloads.status_code,
-            "status_status_code": status.status_code,
-            "releases_status_code": live_releases_response.status_code,
-            "windows_mentioned": windows_live,
-            "linux_mentioned": linux_live,
-            "promoted_platforms": promoted_platforms,
-            "missing_promoted_platform_mentions": missing_promoted_platform_mentions,
-            "mac_mentioned": mac_live,
-            "preview_mentioned": "preview" in live_download_copy_text or "preview" in live_status_copy_text,
-            "review_required_mentioned": review_required,
-            "releases_channel": live_channel,
-            "releases_rollout_state": live_rollout_state,
-            "releases_supportability_state": live_supportability_state,
-            "download_channels": live_download_channels,
-        },
-        "docs": {
-            "download_doc_exists": DOWNLOAD_DOC.exists(),
-            "status_doc_exists": STATUS_DOC.exists(),
-            "preview_mentioned": "preview" in doc_text,
-            "mac_unavailable_mentioned": mac_doc_note,
-        },
-        "release_channel": {
-            "path": str(RELEASE_CHANNEL),
-            "channel_id": str(release_channel_payload.get("channelId") or "").strip(),
-            "rollout_state": rollout_state,
-            "supportability_state": supportability_state,
+            "downloadsStatusCode": downloads_response.status_code,
+            "releasesStatusCode": live_releases_response.status_code,
+            "canonicalStatusCode": live_canonical_response.status_code,
+            "manifest": live_manifest_summary,
+            "canonicalManifest": live_canonical_summary,
+            "pageArtifactIds": page_artifact_ids,
+            "publicArtifactIds": live_public_artifact_ids,
+            "artifactProbes": artifact_probes,
         },
         "alignment": {
-            "public_release_truth_aligned": public_stable and gold_supported,
-            "live_public_release_truth_aligned": live_public_stable and live_gold_supported,
-            "preview_machine_truth_absent": not preview_machine_truth,
-            "promoted_platform_truth_aligned": not missing_promoted_platform_mentions,
-            "mac_truth_aligned": mac_live or public_stable,
+            "localManifestsAligned": (
+                local_manifest_summary["topLevel"] == local_canonical_summary["topLevel"]
+                and local_manifest_summary["artifacts"] == local_canonical_summary["artifacts"]
+            ),
+            "liveManifestsAligned": (
+                live_manifest_summary["topLevel"] == live_canonical_summary["topLevel"]
+                and live_manifest_summary["artifacts"] == live_canonical_summary["artifacts"]
+            ),
+            "localMatchesLive": (
+                local_manifest_summary == live_manifest_summary
+                and local_canonical_summary == live_canonical_summary
+            ),
+            "pageArtifactIdsAligned": not unknown_page_artifact_ids and not missing_page_artifact_ids,
+            "artifactProbesPassed": all(
+                probe["statusCode"] in range(200, 300) and probe["sizeMatches"]
+                for probe in artifact_probes
+            ),
         },
         "failures": failures,
-        "summary": "pass: current download shelf truth is aligned" if not failures else "fail: " + "; ".join(failures),
+        "summary": "pass: public download shelf truth is aligned" if not failures else "fail: " + "; ".join(failures),
     }
+    return payload
+
+
+def main() -> int:
+    args = parse_args()
+    payload = evaluate(
+        base_url=args.base_url,
+        local_manifest_path=Path(args.local_manifest),
+        local_canonical_manifest_path=Path(args.local_canonical_manifest),
+        timeout=args.timeout,
+        artifact_probes_enabled=not args.skip_artifact_probes,
+    )
     for out_path in OUT_PATHS:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

@@ -98,6 +98,17 @@ verify_windows_installer_payload_gate() {
   python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" "${gate_args[@]}"
 }
 
+verify_windows_installer_visual_proof_gate() {
+  if [[ ! -f "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" ]]; then
+    echo "Missing Windows installer visual proof gate: $SCRIPT_DIR/verify-windows-installer-visual-proof.py" >&2
+    exit 1
+  fi
+
+  local -a gate_args=(--files-dir "$FILES_SOURCE" --allow-empty)
+  [[ -f "$MANIFEST_SOURCE" ]] && gate_args+=(--manifest "$MANIFEST_SOURCE")
+  python3 "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" "${gate_args[@]}"
+}
+
 bundle_manifest_matches_files() {
   local manifest_path="$1"
   local files_root="$2"
@@ -200,6 +211,7 @@ if [[ "${#artifacts[@]}" -eq 0 ]]; then
 fi
 
 verify_windows_installer_payload_gate
+verify_windows_installer_visual_proof_gate
 
 sync_source_dir="$(mktemp -d)"
 cleanup() {
