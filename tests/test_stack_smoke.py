@@ -559,9 +559,16 @@ class StackConfigSmokeTests(unittest.TestCase):
         script_text = script_path.read_text(encoding="utf-8")
 
         function_body = script_text.split("build_default_verify_routes() {", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn('f"{base_url}/status"', function_body)
+        self.assertIn('f"{base_url}/contact"', function_body)
+        self.assertIn('f"{base_url}/login?next=%2F"', function_body)
+        self.assertIn('f"{base_url}/account/billing"', function_body)
+        self.assertIn('f"{base_url}/participate"', function_body)
+        self.assertIn('f"{base_url}/partizipate"', function_body)
         self.assertIn('payload.get("downloads") or payload.get("artifacts")', function_body)
         self.assertIn('if not isinstance(row, dict) or row.get("disabled") is True:', function_body)
         self.assertIn('routes.append(f"{base_url}/downloads/install/{artifact_id}")', function_body)
+        self.assertIn('print("\\n".join(dict.fromkeys(routes)))', function_body)
         self.assertNotIn("avalonia-win-x64-installer", function_body)
         self.assertNotIn("chummer-avalonia-win-x64-installer.exe", function_body)
 

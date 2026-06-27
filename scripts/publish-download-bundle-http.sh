@@ -507,7 +507,15 @@ from urllib.parse import urlparse
 
 manifest_path = Path(sys.argv[1])
 base_url = str(sys.argv[2]).rstrip("/")
-routes = [f"{base_url}/downloads/"]
+routes = [
+    f"{base_url}/downloads/",
+    f"{base_url}/status",
+    f"{base_url}/contact",
+    f"{base_url}/login?next=%2F",
+    f"{base_url}/account/billing",
+    f"{base_url}/participate",
+    f"{base_url}/partizipate",
+]
 
 try:
     payload = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
