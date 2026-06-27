@@ -18,37 +18,41 @@
         <p class="eyebrow">Membership</p>
         <h1>@Model.Heading</h1>
         <p>@Model.Summary</p>
-        <ul class="minimal-hero__points">
-            <li>Same app.</li>
-            <li>Origin Books: 1/month on Free. 2/month on Supporter.</li>
-            @if (usingSignedInAccount)
-            {
-                <li>Signed in as @signedInLabel</li>
-            }
-            @if (quota is not null)
-            {
-                <li>This month: @quota.WindowUsed / @quota.WindowLimit books</li>
-            }
-        </ul>
+        @if (Model.Unavailable)
+        {
+            <div class="minimal-actions">
+                @if (!hasUserId)
+                {
+                    <a class="button-like button-like--secondary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
+                }
+                <a class="button-like button-like--primary" href="/downloads">Downloads</a>
+            </div>
+        }
+        else
+        {
+            <ul class="minimal-hero__points">
+                <li>Same app.</li>
+                <li>Origin Books: 1/month on Free. 2/month on Supporter.</li>
+                @if (usingSignedInAccount)
+                {
+                    <li>Signed in as @signedInLabel</li>
+                }
+                @if (quota is not null)
+                {
+                    <li>This month: @quota.WindowUsed / @quota.WindowLimit books</li>
+                }
+            </ul>
+        }
     </div>
 </section>
 
 @if (Model.Unavailable)
 {
     <section class="minimal-section minimal-section--tight">
-        <div class="minimal-lane-grid minimal-platform-list">
-            <article class="minimal-lane-card billing-plan-card">
-                <span class="tag">Unavailable</span>
-                <h2>Free access stays the same</h2>
-                <p>Supporter checkout is unavailable right now.</p>
-                <div class="minimal-actions">
-                    @if (!hasUserId)
-                    {
-                        <a class="button-like button-like--secondary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
-                    }
-                    <a class="button-like button-like--primary" href="/downloads">Downloads</a>
-                </div>
-            </article>
+        <div class="minimal-section__lead">
+            <p class="eyebrow">Unavailable</p>
+            <h2>Free access stays the same</h2>
+            <p>Supporter checkout is unavailable right now.</p>
         </div>
     </section>
 }
