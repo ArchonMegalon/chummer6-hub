@@ -8,6 +8,28 @@ namespace Chummer.Run.Api.Services.Support;
 
 public sealed class CrashSupportService
 {
+    private const int MaxCrashIdLength = 64;
+    private const int MaxHeadIdLength = 64;
+    private const int MaxApplicationVersionLength = 64;
+    private const int MaxRuntimeVersionLength = 128;
+    private const int MaxOperatingSystemLength = 256;
+    private const int MaxProcessArchitectureLength = 32;
+    private const int MaxCrashFingerprintLength = 128;
+    private const int MaxExceptionTypeLength = 256;
+    private const int MaxReleaseChannelLength = 64;
+    private const int MaxPlatformLength = 64;
+    private const int MaxDesktopHeadLength = 64;
+    private const int MaxRuntimeHeadLength = 64;
+    private const int MaxInstallationIdLength = 64;
+    private const int MaxInstallationGrantTokenLength = 256;
+    private const int MaxUserIdLength = 64;
+    private const int MaxSubjectIdLength = 128;
+    private const int MaxLastActionCategoryLength = 128;
+    public const int MaxExceptionMessageLength = 2048;
+    public const int MaxExceptionDetailLength = 16 * 1024;
+    public const int MaxLogTailEntries = 16;
+    public const int MaxLogTailLineLength = 1024;
+    public const int MaxRequestBodyBytes = 128 * 1024;
     private readonly SupportStore _store;
     private readonly SupportCaseService _supportCases;
     private readonly InstallLinkingService _installLinking;
@@ -31,7 +53,7 @@ public sealed class CrashSupportService
 
         lock (_store.Gate)
         {
-            string normalizedCrashId = NormalizeRequired(envelope.CrashId, nameof(envelope.CrashId));
+            string normalizedCrashId = NormalizeRequired(envelope.CrashId, nameof(envelope.CrashId), MaxCrashIdLength);
             if (_store.IncidentIdByCrashId.TryGetValue(normalizedCrashId, out string? existingIncidentId)
                 && _store.IncidentsById.TryGetValue(existingIncidentId, out CrashIncidentProjection? existingIncident))
             {
@@ -149,7 +171,7 @@ public sealed class CrashSupportService
 
     private string GetOrCreateClusterIdLocked(string crashFingerprint)
     {
-        string normalizedFingerprint = NormalizeRequired(crashFingerprint, nameof(crashFingerprint));
+        string normalizedFingerprint = NormalizeRequired(crashFingerprint, nameof(crashFingerprint), MaxCrashFingerprintLength);
         if (_store.ClusterIdByFingerprint.TryGetValue(normalizedFingerprint, out string? existingClusterId))
         {
             return existingClusterId;
@@ -175,25 +197,25 @@ public sealed class CrashSupportService
     private static CrashEnvelope NormalizeEnvelope(CrashEnvelope envelope)
         => envelope with
         {
-            CrashId = NormalizeRequired(envelope.CrashId, nameof(envelope.CrashId)),
-            HeadId = NormalizeRequired(envelope.HeadId, nameof(envelope.HeadId)),
-            ApplicationVersion = NormalizeRequired(envelope.ApplicationVersion, nameof(envelope.ApplicationVersion)),
-            RuntimeVersion = NormalizeRequired(envelope.RuntimeVersion, nameof(envelope.RuntimeVersion)),
-            OperatingSystem = NormalizeRequired(envelope.OperatingSystem, nameof(envelope.OperatingSystem)),
-            ProcessArchitecture = NormalizeRequired(envelope.ProcessArchitecture, nameof(envelope.ProcessArchitecture)),
-            CrashFingerprint = NormalizeRequired(envelope.CrashFingerprint, nameof(envelope.CrashFingerprint)),
-            ExceptionType = NormalizeRequired(envelope.ExceptionType, nameof(envelope.ExceptionType)),
-            ExceptionMessage = NormalizeRequired(envelope.ExceptionMessage, nameof(envelope.ExceptionMessage)),
-            ExceptionDetail = NormalizeRequired(envelope.ExceptionDetail, nameof(envelope.ExceptionDetail)),
-            ReleaseChannel = NormalizeOptional(envelope.ReleaseChannel),
-            Platform = NormalizeOptional(envelope.Platform),
-            DesktopHead = NormalizeOptional(envelope.DesktopHead),
-            RuntimeHead = NormalizeOptional(envelope.RuntimeHead),
-            InstallationId = NormalizeOptional(envelope.InstallationId),
-            InstallationGrantToken = NormalizeOptional(envelope.InstallationGrantToken),
-            UserId = NormalizeOptional(envelope.UserId),
-            SubjectId = NormalizeOptional(envelope.SubjectId),
-            LastActionCategory = NormalizeOptional(envelope.LastActionCategory),
+            CrashId = NormalizeRequired(envelope.CrashId, nameof(envelope.CrashId), MaxCrashIdLength),
+            HeadId = NormalizeRequired(envelope.HeadId, nameof(envelope.HeadId), MaxHeadIdLength),
+            ApplicationVersion = NormalizeRequired(envelope.ApplicationVersion, nameof(envelope.ApplicationVersion), MaxApplicationVersionLength),
+            RuntimeVersion = NormalizeRequired(envelope.RuntimeVersion, nameof(envelope.RuntimeVersion), MaxRuntimeVersionLength),
+            OperatingSystem = NormalizeRequired(envelope.OperatingSystem, nameof(envelope.OperatingSystem), MaxOperatingSystemLength),
+            ProcessArchitecture = NormalizeRequired(envelope.ProcessArchitecture, nameof(envelope.ProcessArchitecture), MaxProcessArchitectureLength),
+            CrashFingerprint = NormalizeRequired(envelope.CrashFingerprint, nameof(envelope.CrashFingerprint), MaxCrashFingerprintLength),
+            ExceptionType = NormalizeRequired(envelope.ExceptionType, nameof(envelope.ExceptionType), MaxExceptionTypeLength),
+            ExceptionMessage = NormalizeRequired(envelope.ExceptionMessage, nameof(envelope.ExceptionMessage), MaxExceptionMessageLength),
+            ExceptionDetail = NormalizeRequired(envelope.ExceptionDetail, nameof(envelope.ExceptionDetail), MaxExceptionDetailLength),
+            ReleaseChannel = NormalizeOptional(envelope.ReleaseChannel, nameof(envelope.ReleaseChannel), MaxReleaseChannelLength),
+            Platform = NormalizeOptional(envelope.Platform, nameof(envelope.Platform), MaxPlatformLength),
+            DesktopHead = NormalizeOptional(envelope.DesktopHead, nameof(envelope.DesktopHead), MaxDesktopHeadLength),
+            RuntimeHead = NormalizeOptional(envelope.RuntimeHead, nameof(envelope.RuntimeHead), MaxRuntimeHeadLength),
+            InstallationId = NormalizeOptional(envelope.InstallationId, nameof(envelope.InstallationId), MaxInstallationIdLength),
+            InstallationGrantToken = NormalizeOptional(envelope.InstallationGrantToken, nameof(envelope.InstallationGrantToken), MaxInstallationGrantTokenLength),
+            UserId = NormalizeOptional(envelope.UserId, nameof(envelope.UserId), MaxUserIdLength),
+            SubjectId = NormalizeOptional(envelope.SubjectId, nameof(envelope.SubjectId), MaxSubjectIdLength),
+            LastActionCategory = NormalizeOptional(envelope.LastActionCategory, nameof(envelope.LastActionCategory), MaxLastActionCategoryLength),
             LogTail = NormalizeLogTail(envelope.LogTail)
         };
 
@@ -212,9 +234,9 @@ public sealed class CrashSupportService
 
         return envelope with
         {
-            InstallationId = NormalizeOptional(installation.InstallationId),
-            UserId = NormalizeOptional(installation.UserId),
-            SubjectId = NormalizeOptional(installation.SubjectId)
+            InstallationId = NormalizeOptional(installation.InstallationId, nameof(envelope.InstallationId), MaxInstallationIdLength),
+            UserId = NormalizeOptional(installation.UserId, nameof(envelope.UserId), MaxUserIdLength),
+            SubjectId = NormalizeOptional(installation.SubjectId, nameof(envelope.SubjectId), MaxSubjectIdLength)
         };
     }
 
@@ -340,9 +362,25 @@ public sealed class CrashSupportService
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static string NormalizeRequired(string value, string parameterName)
+    private static string? NormalizeOptional(string? value, string parameterName, int maxLength)
     {
         string? normalized = NormalizeOptional(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException($"{parameterName} exceeds the maximum length of {maxLength} characters.", parameterName);
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeRequired(string value, string parameterName, int maxLength)
+    {
+        string? normalized = NormalizeOptional(value, parameterName, maxLength);
         return normalized ?? throw new ArgumentException($"{parameterName} is required.", parameterName);
     }
 
@@ -355,9 +393,9 @@ public sealed class CrashSupportService
 
         return logTail
             .Where(static line => !string.IsNullOrWhiteSpace(line))
-            .Select(static line => line.Trim())
+            .Select(static line => NormalizeRequired(line, nameof(CrashEnvelope.LogTail), MaxLogTailLineLength))
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(16)
+            .Take(MaxLogTailEntries)
             .ToArray();
     }
 

@@ -61,6 +61,10 @@ public sealed class PublicSignalOperationsService
     private const string EmailitProvider = "emailit";
     private const string ProductLiftCloseoutTemplateId = "productlift_voter_shipped";
     private const string ProductLiftCloseoutTemplateVersion = "1";
+    public const int MaxWebhookBodyBytes = 64 * 1024;
+    public const int MaxIngressTokenLength = 128;
+    public const int MaxIngressLabelLength = 160;
+    public const int MaxIngressReasonLength = 512;
     private const int MaxStoredReceipts = 200;
     private static readonly string[] ProductLiftRoutePaths = ["/feedback", "/roadmap", "/changelog"];
     private static readonly string[] PublicWebhookRoutes =
@@ -564,19 +568,36 @@ public sealed class PublicSignalOperationsService
         JsonElement item = ExtractPrimaryItem(envelope);
         string serializedPayload = JsonSerializer.Serialize(payload);
         string payloadSha256 = ComputeSha256Hex(serializedPayload);
-        string providerEventId = NormalizeOptional(
+        string providerEventId = NormalizeIngressToken(
                 TryReadString(payload, "event_id", "eventId", "webhook_id", "id")
-                ?? TryReadString(envelope, "event_id", "eventId", "webhook_id", "id"))
+                ?? TryReadString(envelope, "event_id", "eventId", "webhook_id", "id"),
+                "productlift webhook event id")
             ?? $"sha256:{payloadSha256[..12]}";
-        string eventType = NormalizeOptional(
+        string eventType = NormalizeIngressToken(
                 TryReadString(payload, "type", "event", "action")
-                ?? TryReadString(envelope, "type", "event", "action"))
+                ?? TryReadString(envelope, "type", "event", "action"),
+                "productlift webhook event type")
             ?? "unknown";
-        string boardLabel = ResolveEntityLabel(item, envelope, payload, fallback: "Unassigned board", "board", "project", "space");
-        string categoryLabel = ResolveEntityLabel(item, envelope, payload, fallback: "Unclassified", "category", "bucket", "group");
-        string itemReference = ResolveItemReference(item, envelope, payload, providerEventId);
-        string statusLabel = ResolveStatusLabel(item, envelope, payload, eventType);
-        string actionLabel = ResolveActionLabel(eventType, statusLabel);
+        string boardLabel = NormalizeIngressLabel(
+                ResolveEntityLabel(item, envelope, payload, fallback: "Unassigned board", "board", "project", "space"),
+                "productlift webhook board label")
+            ?? "Unassigned board";
+        string categoryLabel = NormalizeIngressLabel(
+                ResolveEntityLabel(item, envelope, payload, fallback: "Unclassified", "category", "bucket", "group"),
+                "productlift webhook category label")
+            ?? "Unclassified";
+        string itemReference = NormalizeIngressLabel(
+                ResolveItemReference(item, envelope, payload, providerEventId),
+                "productlift webhook item reference")
+            ?? $"provider-event:{providerEventId}";
+        string statusLabel = NormalizeIngressLabel(
+                ResolveStatusLabel(item, envelope, payload, eventType),
+                "productlift webhook status label")
+            ?? "Unknown";
+        string actionLabel = NormalizeIngressLabel(
+                ResolveActionLabel(eventType, statusLabel),
+                "productlift webhook action label")
+            ?? "Provider event";
         bool closeoutCandidate = IsCloseoutCandidate(eventType, statusLabel);
         MatchedFeedbackCategory matchedCategory = ResolveMatchedCategory(item, envelope, payload, categoryLabel, canonDocument.Taxonomy.Categories);
         bool voterNotificationAllowed = TryReadBoolean(item, "voter_notification_allowed", "notify_voters", "send_notifications", "notification_allowed")
@@ -852,23 +873,42 @@ public sealed class PublicSignalOperationsService
         JsonElement primary = ExtractPrimaryItem(envelope);
         string serializedPayload = JsonSerializer.Serialize(payload);
         string payloadSha256 = ComputeSha256Hex(serializedPayload);
-        string providerKey = ResolveDeliveryOutcomeProviderKey(providerHint, primary, envelope, payload);
-        string provider = ResolveDeliveryOutcomeProviderLabel(providerKey);
-        string outcomeEventId = NormalizeOptional(
+        string providerKey = NormalizeIngressToken(
+                ResolveDeliveryOutcomeProviderKey(providerHint, primary, envelope, payload),
+                "delivery outcome provider")
+            ?? "unknown";
+        string provider = NormalizeIngressLabel(
+                ResolveDeliveryOutcomeProviderLabel(providerKey),
+                "delivery outcome provider label")
+            ?? "Unknown provider";
+        string outcomeEventId = NormalizeIngressToken(
                 TryReadString(payload, "event_id", "eventId", "outcome_id", "outcomeId", "id")
                 ?? TryReadString(envelope, "event_id", "eventId", "outcome_id", "outcomeId", "id")
-                ?? TryReadString(primary, "event_id", "eventId", "outcome_id", "outcomeId", "id"))
+                ?? TryReadString(primary, "event_id", "eventId", "outcome_id", "outcomeId", "id"),
+                "delivery outcome event id")
             ?? $"sha256:{payloadSha256[..12]}";
-        string deliveryId = ResolveDeliveryOutcomeDeliveryId(providerKey, primary, envelope, payload);
-        string? providerMessageId = ResolveDeliveryOutcomeProviderMessageId(providerKey, primary, envelope, payload);
-        string? sourceReceiptId = ResolveDeliveryOutcomeSourceReceiptId(primary, envelope, payload);
-        string? recipientRef = ResolveDeliveryOutcomeRecipientRef(primary, envelope, payload);
+        string deliveryId = NormalizeIngressToken(
+                ResolveDeliveryOutcomeDeliveryId(providerKey, primary, envelope, payload),
+                "delivery outcome delivery id")
+            ?? "delivery-pending";
+        string? providerMessageId = NormalizeIngressToken(
+            ResolveDeliveryOutcomeProviderMessageId(providerKey, primary, envelope, payload),
+            "delivery outcome provider message id");
+        string? sourceReceiptId = NormalizeIngressToken(
+            ResolveDeliveryOutcomeSourceReceiptId(primary, envelope, payload),
+            "delivery outcome source receipt id");
+        string? recipientRef = NormalizeIngressToken(
+            ResolveDeliveryOutcomeRecipientRef(primary, envelope, payload),
+            "delivery outcome recipient ref");
         string? recipientEmail = ResolveDeliveryOutcomeRecipientEmail(primary, envelope, payload);
         string? addressHash = string.IsNullOrWhiteSpace(recipientEmail)
             ? null
             : ComputeSha256Hex(recipientEmail.Trim().ToLowerInvariant());
-        string providerState = ResolveDeliveryOutcomeState(providerKey, primary, envelope, payload);
-        string? reason = NormalizeOptional(
+        string providerState = NormalizeIngressLabel(
+                ResolveDeliveryOutcomeState(providerKey, primary, envelope, payload),
+                "delivery outcome state")
+            ?? "Unknown";
+        string? reason = NormalizeIngressReason(
             TryReadString(primary, "reason", "error", "detail", "description")
             ?? TryReadString(envelope, "reason", "error", "detail", "description")
             ?? TryReadString(payload, "reason", "error", "detail", "description"));
@@ -5746,6 +5786,31 @@ public sealed class PublicSignalOperationsService
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizeIngressToken(string? value, string description)
+        => NormalizeIngressText(value, MaxIngressTokenLength, description);
+
+    private static string? NormalizeIngressLabel(string? value, string description)
+        => NormalizeIngressText(value, MaxIngressLabelLength, description);
+
+    private static string? NormalizeIngressReason(string? value)
+        => NormalizeIngressText(value, MaxIngressReasonLength, "delivery outcome reason");
+
+    private static string? NormalizeIngressText(string? value, int maxLength, string description)
+    {
+        string? normalized = NormalizeOptional(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException($"{description} exceeds the maximum length of {maxLength} characters.");
+        }
+
+        return normalized;
+    }
 
     private static string NormalizeToken(string? value)
         => string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();

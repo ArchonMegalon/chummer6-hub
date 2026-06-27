@@ -20,6 +20,7 @@ public sealed class SupportCrashesController : ControllerBase
     }
 
     [HttpPost]
+    [RequestSizeLimit(CrashSupportService.MaxRequestBodyBytes)]
     [ProducesResponseType<CrashIntakeAcceptedResponse>(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<CrashIntakeAcceptedResponse> Submit([FromBody] CrashEnvelope? envelope)
@@ -29,11 +30,18 @@ public sealed class SupportCrashesController : ControllerBase
             return BadRequest("crash envelope is required.");
         }
 
-        CrashIntakeAcceptedResponse accepted = _crashSupport.Submit(envelope);
-        return AcceptedAtAction(
-            nameof(GetIncident),
-            new { incidentId = accepted.Incident.IncidentId },
-            accepted);
+        try
+        {
+            CrashIntakeAcceptedResponse accepted = _crashSupport.Submit(envelope);
+            return AcceptedAtAction(
+                nameof(GetIncident),
+                new { incidentId = accepted.Incident.IncidentId },
+                accepted);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpGet("incidents/{incidentId}")]

@@ -33,6 +33,7 @@ public sealed class AnswerlyOpenAiCompatController : ControllerBase
     [HttpPost("/v1/chat/completions")]
     [HttpPost("/api/v1/chat/completions")]
     [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(AnswerlyOpenAiCompatService.MaxRequestBodyBytes)]
     [ProducesResponseType<OpenAiCompatChatCompletionResponse>(StatusCodes.Status200OK)]
     public ActionResult<OpenAiCompatChatCompletionResponse> ChatCompletions([FromBody] OpenAiCompatChatCompletionRequest? request)
     {

@@ -37,6 +37,9 @@ public sealed class PublicLandingController : Controller
 {
     private const string ReleaseUploadTicketEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TICKET";
     private const string ReleaseUploadTokenEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TOKEN";
+    private const string DefaultBlackLedgerViewerPrimaryHref = "https://my.matterport.com/show/?m=ax2JhiPGk5P";
+    private const string DefaultBlackLedgerViewerAlternateHref = "https://www.3dvista.com/samples/new_york_loft.html";
+    private const string DefaultBlackLedgerViewerFlyThroughHref = "/media/ledger/tours/black-ledger-3dvista-flythrough.mp4";
     private static readonly JsonSerializerOptions PublicJsonContentOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     private readonly PublicLandingService _landing;
@@ -2572,7 +2575,7 @@ public sealed class PublicLandingController : Controller
                     hostedLeadReplacement: "Short requests. Clear bugs. Useful ideas.",
                     applyFeedbackPolish: true,
                     failureTitle: "The board is unavailable",
-                    failureSummary: "Try again later. Use Contact only for private details.",
+                    failureSummary: "Try again shortly. Use Contact only for private details.",
                     failurePrimaryHref: "/roadmap",
                     failurePrimaryLabel: "Roadmap",
                     failureSecondaryHref: "/contact#support-intake",
@@ -3615,16 +3618,13 @@ document.addEventListener('DOMContentLoaded', function () {
             "/",
             "/participate",
             "/partizipate",
-            "/roadmap",
             "/downloads",
             "/status",
             "/help",
             "/contact",
             "/faq",
-            "/feedback",
             "/login",
             "/signup",
-            "/changelog",
             "/what-is-chummer"
         ];
 
@@ -3679,7 +3679,7 @@ document.addEventListener('DOMContentLoaded', function () {
             hostedLeadReplacement: "Short requests. Clear bugs. Useful ideas.",
             applyFeedbackPolish: true,
             failureTitle: "The board is unavailable",
-            failureSummary: "Try again later. Use Contact only for private details.",
+            failureSummary: "Try again shortly. Use Contact only for private details.",
             failurePrimaryHref: "/roadmap",
             failurePrimaryLabel: "Roadmap",
             failureSecondaryHref: "/contact#support-intake",
@@ -5700,6 +5700,86 @@ document.addEventListener('DOMContentLoaded', function () {
     public IActionResult BlackLedgerRoadmapAlias()
         => Redirect("/horizons");
 
+    [HttpGet("/ledger/viewer-network")]
+    [HttpGet("/ledger/receipts/viewer-network.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> LedgerViewerNetworkReceiptJson(CancellationToken cancellationToken)
+    {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "viewer_network");
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel: "black ledger viewer network",
+            currentPath: "/ledger/receipts/viewer-network.json",
+            surface: surface,
+            sourceId: "viewer-network",
+            cancellationToken: cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
+        }
+
+        return Ok(new
+        {
+            Horizon = "black-ledger",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                FlyThroughHref = "/ledger/viewers/fly-through",
+                ViewerHref = "/ledger/viewers/3d-tour",
+                AlternateViewerHref = "/ledger/viewers/alternate-3d-tour",
+                Summary = "Optional 3D viewer routes stay on Chummer-owned URLs before any viewer handoff."
+            },
+            Boundary = new
+            {
+                ProviderTruth = "not_claimed",
+                TacticalTruth = "not_claimed",
+                RouteTruth = "chummer_owned_receipts_only"
+            },
+            SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
+            ArtifactCapability = BuildPublicHorizonCapability(
+                surface,
+                _horizonCapabilities.BuildSourceRef(surface, "viewer-network"))
+        });
+    }
+
+    [HttpGet("/ledger/viewers/fly-through")]
+    public async Task<IActionResult> LedgerViewerFlyThrough(CancellationToken cancellationToken)
+    {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "viewer_network");
+        return await DispatchPublicReceiptBackedArtifactAsync(
+            operationLabel: "black ledger viewer fly-through",
+            currentPath: "/ledger/viewers/fly-through",
+            surface: surface,
+            sourceId: "viewer-fly-through",
+            dispatchTarget: ResolveBlackLedgerViewerFlyThroughHref(),
+            cancellationToken: cancellationToken);
+    }
+
+    [HttpGet("/ledger/viewers/3d-tour")]
+    public async Task<IActionResult> LedgerViewerPrimaryTour(CancellationToken cancellationToken)
+    {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "viewer_network");
+        return await DispatchPublicReceiptBackedArtifactAsync(
+            operationLabel: "black ledger 3D tour",
+            currentPath: "/ledger/viewers/3d-tour",
+            surface: surface,
+            sourceId: "viewer-primary",
+            dispatchTarget: ResolveBlackLedgerViewerPrimaryHref(),
+            cancellationToken: cancellationToken);
+    }
+
+    [HttpGet("/ledger/viewers/alternate-3d-tour")]
+    public async Task<IActionResult> LedgerViewerAlternateTour(CancellationToken cancellationToken)
+    {
+        HorizonArtifactSurfaceDefinition surface = _horizonCapabilities.GetSurface("black-ledger", "viewer_network");
+        return await DispatchPublicReceiptBackedArtifactAsync(
+            operationLabel: "black ledger alternate 3D tour",
+            currentPath: "/ledger/viewers/alternate-3d-tour",
+            surface: surface,
+            sourceId: "viewer-alternate",
+            dispatchTarget: ResolveBlackLedgerViewerAlternateHref(),
+            cancellationToken: cancellationToken);
+    }
+
     [HttpGet("/ledger/stats")]
     [Produces("text/html")]
     public async Task<IActionResult> LedgerStatsPage([FromQuery] int? turn, CancellationToken cancellationToken)
@@ -5961,6 +6041,57 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return false;
     }
+
+    private async Task<IActionResult> DispatchPublicReceiptBackedArtifactAsync(
+        string operationLabel,
+        string currentPath,
+        HorizonArtifactSurfaceDefinition surface,
+        string sourceId,
+        string dispatchTarget,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(dispatchTarget))
+        {
+            _logger.LogInformation("{Operation} dispatch skipped because no public dispatch target is configured for {Path}.", operationLabel, currentPath);
+            return NotFound();
+        }
+
+        IActionResult? receiptFailure = await TryCreatePublicArtifactReceiptAsync(
+            operationLabel,
+            currentPath,
+            surface,
+            sourceId,
+            cancellationToken);
+        if (receiptFailure is not null)
+        {
+            return receiptFailure;
+        }
+
+        return Redirect(ProtectHorizonArtifactDispatchTarget(dispatchTarget));
+    }
+
+    private string ResolveBlackLedgerViewerPrimaryHref()
+        => FirstConfiguredValue(
+            _configuration["BlackLedgerViewerTours:PrimaryHref"],
+            _configuration["BlackLedgerViewerTours:MatterportHref"],
+            _configuration["BlackLedgerViewerTours:ViewerHref"])
+            ?? DefaultBlackLedgerViewerPrimaryHref;
+
+    private string ResolveBlackLedgerViewerAlternateHref()
+        => FirstConfiguredValue(
+            _configuration["BlackLedgerViewerTours:AlternateHref"],
+            _configuration["BlackLedgerViewerTours:3DVistaHref"],
+            _configuration["BlackLedgerViewerTours:ThreeDvVistaHref"])
+            ?? DefaultBlackLedgerViewerAlternateHref;
+
+    private string ResolveBlackLedgerViewerFlyThroughHref()
+        => FirstConfiguredValue(
+            _configuration["BlackLedgerViewerTours:FlyThroughHref"],
+            _configuration["BlackLedgerViewerTours:VideoHref"])
+            ?? DefaultBlackLedgerViewerFlyThroughHref;
+
+    private static string? FirstConfiguredValue(params string?[] values)
+        => values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
 
     [HttpGet("/ledger/factions/{factionId}/dispatches")]
     [Produces("text/html")]
@@ -6467,6 +6598,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpPost("/feedback/providers/productlift/webhook")]
     [HttpPost("/api/v1/public/feedback/providers/productlift/webhook")]
+    [RequestSizeLimit(PublicSignalOperationsService.MaxWebhookBodyBytes)]
     [ProducesResponseType<PublicSignalWebhookAckResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -6631,6 +6763,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpPost("/feedback/providers/emailit/webhook")]
     [HttpPost("/api/v1/public/feedback/providers/emailit/webhook")]
+    [RequestSizeLimit(PublicSignalOperationsService.MaxWebhookBodyBytes)]
     [ProducesResponseType<PublicSignalDeliveryOutcomeAckResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -6661,6 +6794,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpPost("/feedback/providers/ea/delivery/webhook")]
     [HttpPost("/api/v1/public/feedback/providers/ea/delivery/webhook")]
+    [RequestSizeLimit(PublicSignalOperationsService.MaxWebhookBodyBytes)]
     [ProducesResponseType<PublicSignalDeliveryOutcomeAckResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -6691,6 +6825,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [HttpPost("/feedback/providers/delivery/outcome")]
     [HttpPost("/api/v1/public/feedback/providers/delivery/outcome")]
+    [RequestSizeLimit(PublicSignalOperationsService.MaxWebhookBodyBytes)]
     [ProducesResponseType<PublicSignalDeliveryOutcomeAckResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

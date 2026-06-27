@@ -9,6 +9,13 @@ public sealed class AnswerlyOpenAiCompatService
 {
     private const string DefaultModelId = "answerly-support-assistant";
     private const string DefaultRuleGhostModelId = "sr-rulebot";
+    private const int MaxMessageRoleLength = 32;
+    private const int MaxMultipartContentParts = 16;
+    public const int MaxRequestBodyBytes = 64 * 1024;
+    public const int MaxMessageCount = 24;
+    public const int MaxModelLength = 128;
+    public const int MaxUserLength = 128;
+    public const int MaxMessageTextLength = 4000;
     private readonly IChummerAssistantAdapter _assistant;
     private readonly RuleGhostService _ruleGhost;
     private readonly AnswerlyRuntimePolicy _policy;
@@ -110,6 +117,8 @@ public sealed class AnswerlyOpenAiCompatService
         {
             throw new InvalidDataException("stream=true is not supported by the Answerly compatibility endpoint.");
         }
+
+        ValidateRequest(request);
 
         if (PreferEaUpstream && TryCompleteWithEa(request, out OpenAiCompatChatCompletionResponse? upstream))
         {
@@ -277,11 +286,7 @@ public sealed class AnswerlyOpenAiCompatService
 
     private string ResolveRequestedModel(string? requestedModel)
     {
-        string candidate = requestedModel?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(candidate))
-        {
-            throw new InvalidDataException("model is required.");
-        }
+        string candidate = RequireBoundedText(requestedModel, MaxModelLength, "model");
 
         foreach (string supported in SupportedModelIds)
         {
@@ -292,6 +297,81 @@ public sealed class AnswerlyOpenAiCompatService
         }
 
         throw new InvalidDataException($"model '{requestedModel}' is not available on this endpoint.");
+    }
+
+    private static void ValidateRequest(OpenAiCompatChatCompletionRequest request)
+    {
+        RequireBoundedText(request.Model, MaxModelLength, "model");
+        ValidateOptionalText(request.User, MaxUserLength, "user");
+
+        if (request.Messages is null || request.Messages.Count == 0)
+        {
+            throw new InvalidDataException("messages must contain at least one user message.");
+        }
+
+        if (request.Messages.Count > MaxMessageCount)
+        {
+            throw new InvalidDataException($"messages may contain at most {MaxMessageCount} items.");
+        }
+
+        foreach (OpenAiCompatInputMessage message in request.Messages)
+        {
+            RequireBoundedText(message.Role, MaxMessageRoleLength, "message role");
+            ValidateMessageContent(message.Content);
+        }
+    }
+
+    private static void ValidateMessageContent(JsonElement content)
+    {
+        switch (content.ValueKind)
+        {
+            case JsonValueKind.Null:
+            case JsonValueKind.Undefined:
+                return;
+
+            case JsonValueKind.String:
+                ValidateOptionalText(content.GetString(), MaxMessageTextLength, "message content");
+                return;
+
+            case JsonValueKind.Array:
+            {
+                int itemCount = 0;
+                int totalTextLength = 0;
+                foreach (JsonElement item in content.EnumerateArray())
+                {
+                    itemCount++;
+                    if (itemCount > MaxMultipartContentParts)
+                    {
+                        throw new InvalidDataException($"message content may contain at most {MaxMultipartContentParts} parts.");
+                    }
+
+                    if (item.ValueKind != JsonValueKind.Object)
+                    {
+                        continue;
+                    }
+
+                    if (!item.TryGetProperty("type", out JsonElement type)
+                        || !string.Equals(type.GetString(), "text", StringComparison.OrdinalIgnoreCase)
+                        || !item.TryGetProperty("text", out JsonElement text)
+                        || text.ValueKind != JsonValueKind.String)
+                    {
+                        continue;
+                    }
+
+                    string normalized = ValidateOptionalText(text.GetString(), MaxMessageTextLength, "message content") ?? string.Empty;
+                    totalTextLength += normalized.Length;
+                    if (totalTextLength > MaxMessageTextLength)
+                    {
+                        throw new InvalidDataException($"message content exceeds the maximum length of {MaxMessageTextLength} characters.");
+                    }
+                }
+
+                return;
+            }
+
+            default:
+                throw new InvalidDataException("message content must be a string or an array of text parts.");
+        }
     }
 
     private static string ExtractQuery(IReadOnlyList<OpenAiCompatInputMessage>? messages)
@@ -365,6 +445,26 @@ public sealed class AnswerlyOpenAiCompatService
         => string.IsNullOrWhiteSpace(value)
             ? null
             : value.Trim();
+
+    private static string RequireBoundedText(string? value, int maxLength, string description)
+        => ValidateOptionalText(value, maxLength, description)
+            ?? throw new InvalidDataException($"{description} is required.");
+
+    private static string? ValidateOptionalText(string? value, int maxLength, string description)
+    {
+        string? normalized = NormalizeOptional(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        if (normalized.Length > maxLength)
+        {
+            throw new InvalidDataException($"{description} exceeds the maximum length of {maxLength} characters.");
+        }
+
+        return normalized;
+    }
 
     private bool ReadBoolean(string key, bool fallback)
         => bool.TryParse(_configuration[key], out bool parsed) ? parsed : fallback;

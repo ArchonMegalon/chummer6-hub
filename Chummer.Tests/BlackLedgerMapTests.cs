@@ -65,6 +65,8 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("[HttpGet(\"/ledger/factions/{factionId}\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/turns/{turn}\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/turns/{turn}/newsreel.json\")]", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/ledger/receipts/viewer-network.json\")]", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/ledger/viewers/3d-tour\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/ledger/worldtick/validation\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/ledger/factions/{factionId}/leader-briefing\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}/map\")]", ledgerApi, StringComparison.Ordinal);
@@ -107,6 +109,13 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("<strong>Open newsroom</strong>", view, StringComparison.Ordinal);
         Assert.Contains("Optional viewer exports.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Optional external viewer links stay here. The live board stays on this command map.", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"/ledger/viewers/3d-tour\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"/ledger/viewers/alternate-3d-tour\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"/ledger/receipts/viewer-network.json\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("https://my.matterport.com/show/?m=ax2JhiPGk5P", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("https://www.3dvista.com/samples/new_york_loft.html", view, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Matterport<", view, StringComparison.Ordinal);
+        Assert.DoesNotContain(">3DVista<", view, StringComparison.Ordinal);
         Assert.Contains("Turn 1 board", view, StringComparison.Ordinal);
         Assert.Contains("Awakened pressure", view, StringComparison.Ordinal);
         Assert.DoesNotContain("MysAd Density", view, StringComparison.Ordinal);

@@ -479,6 +479,84 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task LedgerViewerNetworkReceiptJsonReturnsProviderSafeSharedArtifactContract()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.LedgerViewerNetworkReceiptJson(CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("black-ledger", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        JsonElement publicBoard = payload.RootElement.GetProperty("PublicBoard");
+        Assert.Equal("/ledger/viewers/fly-through", publicBoard.GetProperty("FlyThroughHref").GetString());
+        Assert.Equal("/ledger/viewers/3d-tour", publicBoard.GetProperty("ViewerHref").GetString());
+        Assert.Equal("/ledger/viewers/alternate-3d-tour", publicBoard.GetProperty("AlternateViewerHref").GetString());
+        JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
+        Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
+        Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-viewer-network", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
+        Assert.Equal("/api/v1/public/horizons/artifact-requests/{requestId}", sharedArtifacts.GetProperty("PublicRequestReceiptDetailHrefTemplate").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInCapabilityCatalogHref").GetString());
+        Assert.Null(sharedArtifacts.GetProperty("SignedInQuotaCatalogHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=black-ledger&artifactKindOrCapabilityId=black-ledger-viewer-network", sharedArtifacts.GetProperty("SignedInRequestReceiptHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
+        JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
+        Assert.Equal("black-ledger", capability.GetProperty("HorizonId").GetString());
+        Assert.Equal("black-ledger-viewer-network", capability.GetProperty("CapabilityId").GetString());
+        Assert.Equal("viewer_network", capability.GetProperty("ArtifactKind").GetString());
+        Assert.Equal("3D Tour", capability.GetProperty("PublicLabel").GetString());
+        Assert.Equal("public_viewer_handoff", capability.GetProperty("CapabilitySlot").GetString());
+        Assert.Equal("available", capability.GetProperty("Status").GetString());
+        Assert.True(capability.GetProperty("RequestSupported").GetBoolean());
+        Assert.False(capability.GetProperty("QuotaTracked").GetBoolean());
+        Assert.Equal("black-ledger:viewer-network", capability.GetProperty("SourceRef").GetString());
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+        Assert.Equal($"/api/v1/public/horizons/artifact-requests/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+
+        string serialized = JsonSerializer.Serialize(ok.Value);
+        Assert.DoesNotContain("Matterport", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("3DVista", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task LedgerViewerPrimaryTourPersistsAnonymousPublicSafeArtifactReceipt()
+    {
+        using Fixture fixture = new(configureSettings: settings =>
+        {
+            settings["BlackLedgerViewerTours:PrimaryHref"] = "https://viewer.example.test/primary";
+        });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.LedgerViewerPrimaryTour(CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("https://viewer.example.test/primary", redirect.Url);
+
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("black-ledger", limit: 10);
+        HorizonArtifactRequestReceipt receipt = Assert.Single(receipts);
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("black-ledger-viewer-network", receipt.CapabilityId);
+        Assert.Equal("viewer_network", receipt.ArtifactKind);
+        Assert.Equal("black-ledger:viewer-primary", receipt.SourceRef);
+        Assert.Equal("public_safe", receipt.Visibility);
+        Assert.False(receipt.QuotaTracked);
+        Assert.Empty(receipt.BlockedReasons);
+
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+        Assert.Equal($"/api/v1/public/horizons/artifact-requests/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+    }
+
+    [Fact]
     public void BuildGhostConciergeJsonReturnsBoundedSplitContract()
     {
         using Fixture fixture = new();

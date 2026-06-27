@@ -3,11 +3,13 @@ using Chummer.Control.Contracts.Support;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.Support;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text;
 using Xunit;
 
@@ -86,6 +88,37 @@ public sealed class AnswerlyOpenAiCompatServiceTests
 
         Assert.Contains("stream=true", ex.Message);
         Assert.Equal(0, requestCount);
+    }
+
+    [Fact]
+    public void Complete_RejectsTooManyMessages()
+    {
+        AnswerlyOpenAiCompatService service = CreateService();
+        OpenAiCompatInputMessage[] messages = Enumerable
+            .Range(0, AnswerlyOpenAiCompatService.MaxMessageCount + 1)
+            .Select(index => Message("user", $"Question {index}"))
+            .ToArray();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.Complete(
+            new OpenAiCompatChatCompletionRequest(
+                Model: service.ModelId,
+                Messages: messages)));
+
+        Assert.Contains("messages may contain at most", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Complete_RejectsOversizedUserMessage()
+    {
+        AnswerlyOpenAiCompatService service = CreateService();
+        string content = new('q', AnswerlyOpenAiCompatService.MaxMessageTextLength + 1);
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.Complete(
+            new OpenAiCompatChatCompletionRequest(
+                Model: service.ModelId,
+                Messages: [Message("user", content)])));
+
+        Assert.Contains("message content exceeds the maximum length", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -317,6 +350,18 @@ public sealed class AnswerlyOpenAiCompatControllerTests
         Assert.Contains("/api/v1/models", modelRoutes);
         Assert.Contains("/v1/chat/completions", chatRoutes);
         Assert.Contains("/api/v1/chat/completions", chatRoutes);
+    }
+
+    [Fact]
+    public void ChatCompletions_CapsRequestBodySize()
+    {
+        MethodInfo method = typeof(AnswerlyOpenAiCompatController)
+            .GetMethod(nameof(AnswerlyOpenAiCompatController.ChatCompletions))
+            ?? throw new InvalidOperationException("Missing ChatCompletions method.");
+        RequestSizeLimitAttribute requestSize = method.GetCustomAttribute<RequestSizeLimitAttribute>()
+            ?? throw new InvalidOperationException("ChatCompletions is missing RequestSizeLimitAttribute.");
+
+        Assert.Equal(AnswerlyOpenAiCompatService.MaxRequestBodyBytes, ((IRequestSizeLimitMetadata)requestSize).MaxRequestBodySize);
     }
 
     private static AnswerlyOpenAiCompatController CreateController(string apiToken, string verificationState)

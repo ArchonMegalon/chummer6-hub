@@ -6,8 +6,12 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Api.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.AspNetCore.Http.Metadata;
+using Microsoft.AspNetCore.Mvc;
+using System.Reflection;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -83,6 +87,116 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal("Recipient list pending", packet.RecipientProjectionStatusLabel);
         Assert.Contains("ready for a bounded domain split", packet.HostedProjectionSummary, StringComparison.OrdinalIgnoreCase);
         Assert.All(packet.HostedRoutes, route => Assert.Equal("Configured", route.StatusLabel));
+    }
+
+    [Fact]
+    public void PublicFeedbackIngressRoutesCapWebhookBodies()
+    {
+        string[] methodNames =
+        [
+            nameof(PublicLandingController.ReceiveProductLiftWebhook),
+            nameof(PublicLandingController.ReceiveEmailitDeliveryOutcome),
+            nameof(PublicLandingController.ReceiveEaDeliveryOutcome),
+            nameof(PublicLandingController.ReceiveDeliveryOutcome)
+        ];
+
+        foreach (string methodName in methodNames)
+        {
+            MethodInfo method = typeof(PublicLandingController).GetMethod(methodName)
+                ?? throw new InvalidOperationException($"Missing controller method {methodName}.");
+            RequestSizeLimitAttribute requestSize = method.GetCustomAttribute<RequestSizeLimitAttribute>()
+                ?? throw new InvalidOperationException($"{methodName} is missing RequestSizeLimitAttribute.");
+
+            Assert.Equal(PublicSignalOperationsService.MaxWebhookBodyBytes, ((IRequestSizeLimitMetadata)requestSize).MaxRequestBodySize);
+        }
+    }
+
+    [Fact]
+    public void RecordWebhookRejectsOversizedProviderEventId()
+    {
+        using var fixture = new PublicSignalOperationsFixture(new Dictionary<string, string?>
+        {
+            ["CHUMMER_PRODUCTLIFT_WEBHOOK_SECRET"] = "secret"
+        });
+        fixture.WriteSupportFiles();
+        PublicSignalOperationsService service = fixture.CreateService();
+        JsonElement payload = JsonDocument.Parse(
+            $$"""
+            {
+              "id": "{{new string('x', PublicSignalOperationsService.MaxIngressTokenLength + 1)}}",
+              "type": "idea.status_changed",
+              "data": {
+                "item": {
+                  "slug": "oversized-webhook-id"
+                }
+              }
+            }
+            """).RootElement.Clone();
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() => service.RecordWebhook(payload));
+
+        Assert.Contains("productlift webhook event id", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RecordDeliveryOutcomeRejectsOversizedReason()
+    {
+        using var fixture = new PublicSignalOperationsFixture(new Dictionary<string, string?>
+        {
+            ["CHUMMER_PRODUCTLIFT_WEBHOOK_SECRET"] = "secret",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EMAILIT_API_KEY"] = "emailit-api-key",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_RECIPIENT_PROJECTION_ENABLED"] = "true",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_CONSENT_BASIS"] = "hub_transactional_follow",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EA_PRINCIPAL_ID"] = "principal-001",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EA_BINDING_ID"] = "binding-001",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_GOVERNOR_APPROVED"] = "true",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_GOVERNOR_DECISION_REF"] = "gov-2026-05-06-productlift-closeout",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EA_BASE_URL"] = "https://ea.test",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EMAILIT_BASE_URL"] = "https://emailit.test",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_PUBLIC_BASE_URL"] = "https://chummer.run"
+        }, enableHttpCapture: true);
+        fixture.WriteSupportFiles();
+        fixture.WriteReleaseProofFile("/changelog");
+        fixture.SeedVerifiedFollowRecipient();
+        PublicSignalOperationsService service = fixture.CreateService();
+        JsonElement sourcePayload = JsonDocument.Parse(
+            """
+            {
+              "id": "evt_guardrail_001",
+              "type": "idea.status_changed",
+              "data": {
+                "category": {
+                  "slug": "mobile_companion"
+                },
+                "item": {
+                  "slug": "oversized-delivery-reason",
+                  "status": {
+                    "name": "shipped"
+                  },
+                  "voter_notification_allowed": true
+                }
+              }
+            }
+            """).RootElement.Clone();
+        JsonElement callbackPayload = JsonDocument.Parse(
+            $$"""
+            {
+              "type": "email.failed",
+              "data": {
+                "id": "emailit-oversized-reason",
+                "delivery_id": "delivery-1",
+                "to": "runner@example.invalid",
+                "reason": "{{new string('r', PublicSignalOperationsService.MaxIngressReasonLength + 1)}}",
+                "created_at": "2026-05-06T12:45:00Z"
+              }
+            }
+            """).RootElement.Clone();
+
+        service.RecordWebhook(sourcePayload);
+        ArgumentException error = Assert.Throws<ArgumentException>(() => service.RecordDeliveryOutcome("emailit", callbackPayload));
+
+        Assert.Contains("delivery outcome reason", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
