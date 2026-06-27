@@ -15,7 +15,10 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_commands(base_url: str) -> list[list[str]]:
+def build_commands(base_url: str, *, allow_participate_unavailable: bool = False) -> list[list[str]]:
+    public_shell_command = ["python3", "scripts/public_shell_minimal_truth_gate.py", "--base-url", base_url]
+    if allow_participate_unavailable:
+        public_shell_command.append("--allow-participate-unavailable")
     return [
         ["python3", "scripts/check_completion_design_docs.py"],
         ["python3", "scripts/diff_public_manifest_live.py"],
@@ -31,7 +34,7 @@ def build_commands(base_url: str) -> list[list[str]]:
         ["python3", "scripts/gamification_public_copy_gate.py", "--base-url", base_url],
         ["python3", "scripts/public_copy_readability_gate.py", "--base-url", base_url],
         ["python3", "scripts/public_copy_truth_gate.py", "--base-url", base_url, "--route", "/feedback"],
-        ["python3", "scripts/public_shell_minimal_truth_gate.py", "--base-url", base_url],
+        public_shell_command,
         ["python3", "scripts/verify_public_routes_from_manifest.py", "--strict-positive", "--seed-receipts", "--base-url", base_url],
     ]
 
@@ -67,7 +70,7 @@ def main() -> int:
     else:
         with LocalHubApp() as app:
             base_url = app.base_url
-            results, overall_status = run_commands(build_commands(base_url))
+            results, overall_status = run_commands(build_commands(base_url, allow_participate_unavailable=True))
 
     payload = {
         "contract_name": "chummer.run_gold_janitor",

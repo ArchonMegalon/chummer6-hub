@@ -24,6 +24,7 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
     BAD_ALIAS = False
     PRODUCTLIFT_LEAK = False
     UPSTREAM_ERROR = False
+    PARTICIPATE_UNAVAILABLE = False
 
     def do_GET(self) -> None:  # noqa: N802
         path = self.path
@@ -33,6 +34,26 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         if path == "/participate":
+            if type(self).PARTICIPATE_UNAVAILABLE:
+                self._send_html(
+                    200,
+                    """
+                    <html>
+                      <head>
+                        <title>The board is unavailable</title>
+                        <link rel="canonical" href="/participate" />
+                        <meta property="og:url" content="/participate" />
+                        <meta name="twitter:url" content="/participate" />
+                      </head>
+                      <body>
+                        <h1>The board is unavailable</h1>
+                        <p>Use Contact only for private details.</p>
+                        <a href="/contact#support-intake">Private support</a>
+                      </body>
+                    </html>
+                    """,
+                )
+                return
             self._send_html(
                 200,
                 """
@@ -40,7 +61,10 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                   <head>
                     <base href="/participate/" />
                     <title>Participate - Chummer.run</title>
+                    <link rel="canonical" href="/participate" />
                     <meta property="og:title" content="Public bugs and requests - Chummer.run" />
+                    <meta property="og:url" content="/participate" />
+                    <meta name="twitter:url" content="/participate" />
                   </head>
                   <body>
                     <style data-chummer-board-skin></style>
@@ -162,6 +186,7 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         _PublicShellMinimalTruthHandler.BAD_ALIAS = False
         _PublicShellMinimalTruthHandler.PRODUCTLIFT_LEAK = False
         _PublicShellMinimalTruthHandler.UPSTREAM_ERROR = False
+        _PublicShellMinimalTruthHandler.PARTICIPATE_UNAVAILABLE = False
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _PublicShellMinimalTruthHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -221,6 +246,15 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         self.assertEqual(payload["status"], "fail")
         self.assertTrue(any("Something went wrong on our side. Could not load posts." in failure for failure in payload["failures"]))
 
+    def test_gate_can_allow_local_participate_unavailable_fallback_explicitly(self) -> None:
+        _PublicShellMinimalTruthHandler.PARTICIPATE_UNAVAILABLE = True
+
+        failed_payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
+        passing_payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0, allow_participate_unavailable=True)
+
+        self.assertEqual(failed_payload["status"], "fail")
+        self.assertEqual(passing_payload["status"], "pass")
+
     def test_publish_lane_calls_public_shell_minimal_truth_gate(self) -> None:
         publish_script = (ROOT / "scripts" / "publish-download-bundle-http.sh").read_text(encoding="utf-8")
         verify_script = (ROOT / "scripts" / "ai" / "verify.sh").read_text(encoding="utf-8")
@@ -230,7 +264,8 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         self.assertIn('python3 "$SCRIPT_DIR/public_shell_minimal_truth_gate.py"', publish_script)
         self.assertIn("test_public_shell_minimal_truth_gate.py", verify_script)
         self.assertIn('python3 "$ROOT_DIR/scripts/public_shell_minimal_truth_gate.py"', verify_script)
-        self.assertIn('["python3", "scripts/public_shell_minimal_truth_gate.py", "--base-url", base_url]', janitor_script)
+        self.assertIn('public_shell_command = ["python3", "scripts/public_shell_minimal_truth_gate.py", "--base-url", base_url]', janitor_script)
+        self.assertIn('public_shell_command.append("--allow-participate-unavailable")', janitor_script)
 
 
 if __name__ == "__main__":

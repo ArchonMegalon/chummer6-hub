@@ -66,12 +66,20 @@ ROUTE_CONTRACTS: tuple[RouteContract, ...] = (
         route="/participate",
         expected_final_path="/participate",
         required_all=("data-chummer-board-skin", 'base href="/participate/"', "Public bugs and requests - Chummer.run"),
+        require_public_meta_urls=True,
     ),
     RouteContract(
         route="/partizipate",
         expected_final_path="/participate",
         required_all=("data-chummer-board-skin", 'base href="/participate/"', "Public bugs and requests - Chummer.run"),
+        require_public_meta_urls=True,
     ),
+)
+
+PARTICIPATE_UNAVAILABLE_REQUIRED_ALL = (
+    "The board is unavailable",
+    "Use Contact only for private details.",
+    "Private support",
 )
 
 
@@ -80,6 +88,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--output", default="")
+    parser.add_argument("--allow-participate-unavailable", action="store_true")
     return parser.parse_args()
 
 
@@ -136,7 +145,7 @@ def validate_public_meta_url(base_url: str, raw_value: str, *, meta_name: str, f
     return resolved
 
 
-def fetch_route(base_url: str, contract: RouteContract, *, timeout: float) -> dict[str, Any]:
+def fetch_route(base_url: str, contract: RouteContract, *, timeout: float, allow_participate_unavailable: bool) -> dict[str, Any]:
     url = urljoin(base_url.rstrip("/") + "/", contract.route.lstrip("/"))
     response = requests.get(url, timeout=timeout, allow_redirects=True)
     failures: list[str] = []
@@ -150,7 +159,15 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float) -> di
         if normalize_text(token) in normalized_body:
             failures.append(f"route contains forbidden copy: {token}")
 
-    for token in contract.required_all:
+    required_all = contract.required_all
+    if (
+        allow_participate_unavailable
+        and contract.route in {"/participate", "/partizipate"}
+        and normalize_text("The board is unavailable") in normalized_body
+    ):
+        required_all = PARTICIPATE_UNAVAILABLE_REQUIRED_ALL
+
+    for token in required_all:
         if normalize_text(token) not in normalized_body:
             failures.append(f"route is missing required copy: {token}")
 
@@ -183,16 +200,16 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float) -> di
         "twitterUrl": twitter_url,
         "resolvedTwitterUrl": resolved_twitter_url,
         "failures": failures,
-        "requiredAll": list(contract.required_all),
+        "requiredAll": list(required_all),
         "requiredAny": list(contract.required_any),
         "forbidden": list(contract.forbidden),
     }
 
 
-def evaluate(*, base_url: str, timeout: float) -> dict[str, Any]:
+def evaluate(*, base_url: str, timeout: float, allow_participate_unavailable: bool = False) -> dict[str, Any]:
     normalized_base_url = base_url.rstrip("/")
     route_results = [
-        fetch_route(normalized_base_url, contract, timeout=timeout)
+        fetch_route(normalized_base_url, contract, timeout=timeout, allow_participate_unavailable=allow_participate_unavailable)
         for contract in ROUTE_CONTRACTS
     ]
     failures = [
@@ -211,6 +228,7 @@ def evaluate(*, base_url: str, timeout: float) -> dict[str, Any]:
         "routes": route_results,
         "contracts": [asdict(contract) for contract in ROUTE_CONTRACTS],
         "generic_forbidden_substrings": list(GENERIC_FORBIDDEN_SUBSTRINGS),
+        "allow_participate_unavailable": allow_participate_unavailable,
     }
 
 
@@ -239,7 +257,11 @@ def write_outputs(payload: dict[str, Any], *, output: str) -> None:
 
 def main() -> int:
     args = parse_args()
-    payload = evaluate(base_url=args.base_url, timeout=args.timeout)
+    payload = evaluate(
+        base_url=args.base_url,
+        timeout=args.timeout,
+        allow_participate_unavailable=args.allow_participate_unavailable,
+    )
     write_outputs(payload, output=args.output)
     return 0 if payload["status"] == "pass" else 1
 

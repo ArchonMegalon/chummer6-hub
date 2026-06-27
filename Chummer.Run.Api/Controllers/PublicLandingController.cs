@@ -2745,6 +2745,9 @@ public sealed class PublicLandingController : Controller
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{title}}</title>
+  <link rel="canonical" href="{{returnHref}}" />
+  <meta property="og:url" content="{{returnHref}}" />
+  <meta name="twitter:url" content="{{returnHref}}" />
   <style>
     :root { color-scheme: dark; }
     body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #11131a; color: #f3f4f7; }
@@ -2946,6 +2949,25 @@ public sealed class PublicLandingController : Controller
             $"$1{canonicalHref}$2",
             RegexOptions.IgnoreCase | RegexOptions.Singleline,
             TimeSpan.FromMilliseconds(250));
+        if (!Regex.IsMatch(rewritten, @"<meta\b[^>]*\bproperty\s*=\s*[""']og:url[""']", RegexOptions.IgnoreCase | RegexOptions.Singleline, TimeSpan.FromMilliseconds(250)))
+        {
+            rewritten = Regex.Replace(
+                rewritten,
+                @"(<link\b[^>]*\brel\s*=\s*[""']canonical[""'][^>]*>)",
+                $"$1<meta property=\"og:url\" content=\"{canonicalHref}\" />",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline,
+                TimeSpan.FromMilliseconds(250));
+        }
+
+        if (!Regex.IsMatch(rewritten, @"<meta\b[^>]*\bname\s*=\s*[""']twitter:url[""']", RegexOptions.IgnoreCase | RegexOptions.Singleline, TimeSpan.FromMilliseconds(250)))
+        {
+            rewritten = Regex.Replace(
+                rewritten,
+                @"(<meta\b[^>]*\bproperty\s*=\s*[""']og:url[""'][^>]*>)",
+                $"$1<meta name=\"twitter:url\" content=\"{canonicalHref}\" />",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline,
+                TimeSpan.FromMilliseconds(250));
+        }
 
         if (!rewritten.Contains("data-chummer-home-link-patch", StringComparison.Ordinal))
         {
