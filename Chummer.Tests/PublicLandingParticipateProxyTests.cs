@@ -28,6 +28,10 @@ public sealed class PublicLandingParticipateProxyTests
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
         Assert.Contains("The board is unavailable", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("rel=\"canonical\" href=\"/participate\"", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("property=\"og:url\"", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("content=\"/participate\"", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("name=\"twitter:url\"", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.Contains("href=\"/roadmap\"", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.DoesNotContain("Unexpected server error", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ProductLift", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
@@ -99,6 +103,9 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Equal("text/html; charset=utf-8", contentResult.ContentType);
         Assert.Contains("rel=\"canonical\" href=\"/participate\"", html, StringComparison.Ordinal);
         Assert.Contains("<base href=\"/participate/\" />", html, StringComparison.Ordinal);
+        Assert.Contains("property=\"og:url\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"twitter:url\"", html, StringComparison.Ordinal);
+        Assert.Contains("content=\"/participate\"", html, StringComparison.Ordinal);
         Assert.Contains("Public bugs and requests", html, StringComparison.Ordinal);
         Assert.Contains("Public bugs and requests.", html, StringComparison.Ordinal);
         Assert.Contains("Short requests. Clear bugs. Useful ideas.", html, StringComparison.Ordinal);
@@ -121,6 +128,9 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.Equal("text/html; charset=utf-8", contentResult.ContentType);
         Assert.Contains("rel=\"canonical\" href=\"/roadmap\"", html, StringComparison.Ordinal);
         Assert.Contains("<base href=\"/roadmap/board/\" />", html, StringComparison.Ordinal);
+        Assert.Contains("property=\"og:url\"", html, StringComparison.Ordinal);
+        Assert.Contains("name=\"twitter:url\"", html, StringComparison.Ordinal);
+        Assert.Contains("content=\"/roadmap\"", html, StringComparison.Ordinal);
         Assert.Contains("Roadmap - Chummer.run", html, StringComparison.Ordinal);
         Assert.Contains("Now and next", html, StringComparison.Ordinal);
         Assert.Contains("What is shipping, and what still needs work.", html, StringComparison.Ordinal);
