@@ -190,6 +190,7 @@ python3 "$ROOT_DIR/tests/test_stack_smoke.py" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_public_origin_reachability.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_chummer_online_launch.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_public_shell_clickability.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
+python3 "$ROOT_DIR/scripts/public_shell_minimal_truth_gate.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_live_public_web_recrawl.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/public_download_shelf_truth_gate.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_black_ledger_live_media_proof.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
