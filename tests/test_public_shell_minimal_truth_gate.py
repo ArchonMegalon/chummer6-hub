@@ -22,6 +22,8 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
     BAD_CONTACT_COPY = False
     EMPTY_LOGIN_META = False
     BAD_ALIAS = False
+    PRODUCTLIFT_LEAK = False
+    UPSTREAM_ERROR = False
 
     def do_GET(self) -> None:  # noqa: N802
         path = self.path
@@ -51,11 +53,14 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
             self._send_html(200, "<html><body>wrong alias target</body></html>")
             return
         if path == "/contact":
+            twitter_url = "/contact"
+            if type(self).PRODUCTLIFT_LEAK:
+                twitter_url = "https://chummer6.productlift.dev/posts"
             body = """
             <html>
               <head>
                 <meta property="og:url" content="/contact" />
-                <meta name="twitter:url" content="/contact" />
+                <meta name="twitter:url" content="{twitter_url}" />
               </head>
               <body>
                 <a href="https://discord.gg/chummer">Open Discord</a>
@@ -63,8 +68,11 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
               </body>
             </html>
             """
+            body = body.format(twitter_url=twitter_url)
             if type(self).BAD_CONTACT_COPY:
                 body = body.replace("</body>", "<p>Open Participate</p></body>")
+            if type(self).UPSTREAM_ERROR:
+                body = body.replace("</body>", "<p>Something went wrong on our side. Could not load posts.</p></body>")
             self._send_html(200, body)
             return
         if path == "/login?next=%2F":
@@ -152,6 +160,8 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         _PublicShellMinimalTruthHandler.BAD_CONTACT_COPY = False
         _PublicShellMinimalTruthHandler.EMPTY_LOGIN_META = False
         _PublicShellMinimalTruthHandler.BAD_ALIAS = False
+        _PublicShellMinimalTruthHandler.PRODUCTLIFT_LEAK = False
+        _PublicShellMinimalTruthHandler.UPSTREAM_ERROR = False
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _PublicShellMinimalTruthHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -194,6 +204,22 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         self.assertEqual(payload["status"], "fail")
         self.assertTrue(any("/partizipate:" in failure for failure in payload["failures"]))
         self.assertTrue(any("instead of /participate" in failure for failure in payload["failures"]))
+
+    def test_gate_fails_when_public_route_leaks_third_party_productlift_host(self) -> None:
+        _PublicShellMinimalTruthHandler.PRODUCTLIFT_LEAK = True
+
+        payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
+
+        self.assertEqual(payload["status"], "fail")
+        self.assertTrue(any("twitter:url escaped the public host" in failure for failure in payload["failures"]))
+
+    def test_gate_fails_when_upstream_error_copy_reappears(self) -> None:
+        _PublicShellMinimalTruthHandler.UPSTREAM_ERROR = True
+
+        payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
+
+        self.assertEqual(payload["status"], "fail")
+        self.assertTrue(any("Something went wrong on our side. Could not load posts." in failure for failure in payload["failures"]))
 
     def test_publish_lane_calls_public_shell_minimal_truth_gate(self) -> None:
         publish_script = (ROOT / "scripts" / "publish-download-bundle-http.sh").read_text(encoding="utf-8")
