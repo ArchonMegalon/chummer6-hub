@@ -44,7 +44,7 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Roadmap.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", changelogView, StringComparison.Ordinal);
         Assert.Contains("What changed, and what comes next.", changelogView, StringComparison.Ordinal);
-        Assert.Contains("Browse roadmap", changelogView, StringComparison.Ordinal);
+        Assert.Contains("Open Participate", changelogView, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.FollowSettingsHref", changelogView, StringComparison.Ordinal);
     }
 

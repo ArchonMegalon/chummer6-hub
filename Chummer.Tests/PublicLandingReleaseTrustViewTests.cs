@@ -387,7 +387,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Recommended for this browser.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<summary>Other downloads</summary>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Download script", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Home or Roadmap", nowView, StringComparison.Ordinal);
+        Assert.Contains("Open Participate", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Newer than Stable.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("workflow-card__note", nowView, StringComparison.Ordinal);
@@ -400,7 +400,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("guided starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Inspect the bundled", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("start from Home or Roadmap after the first launch", nowView, StringComparison.Ordinal);
+        Assert.Contains("start from Home after the first launch", nowView, StringComparison.Ordinal);
         Assert.Contains("current downloads page", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("included sample runner", nowView, StringComparison.Ordinal);
     }

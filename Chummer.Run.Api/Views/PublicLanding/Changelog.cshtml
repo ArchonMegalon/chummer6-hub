@@ -113,7 +113,7 @@
             <span>Next</span>
             <h2>What comes next</h2>
             <p>What changed, and what comes next.</p>
-            <p>Use Roadmap when you want direction instead of live changes.</p>
+            <p>Use Participate when you want to follow or request what comes next.</p>
             @if (milestoneFollowUp.Length > 0)
             {
                 <details class="minimal-help-card__details">
@@ -139,7 +139,7 @@
                 </details>
             }
             <div class="minimal-actions">
-                <a class="button-like button-like--ghost" href="/roadmap">Browse roadmap</a>
+                <a class="button-like button-like--ghost" href="/participate">Open Participate</a>
                 <a class="button-like button-like--ghost" href="@signalLoop.FollowSettingsHref">@signalLoop.FollowSettingsLabel</a>
             </div>
         </article>
@@ -173,11 +173,11 @@
     <div class="minimal-section__lead">
         <p class="eyebrow">Next</p>
         <h2>Read the changes, then move on.</h2>
-        <p>Open Downloads for the app, Roadmap for direction, or Chummer help for support.</p>
+        <p>Open Downloads for the app, Participate for planned work, or Chummer help for support.</p>
     </div>
     <div class="minimal-actions">
         <a class="button-like button-like--primary" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
-        <a class="button-like button-like--ghost" href="/roadmap">Open roadmap</a>
+        <a class="button-like button-like--ghost" href="/participate">Open Participate</a>
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </div>
     <p class="muted-copy">Need the quick status? <a class="inline-link" href="/now">Open current release</a>.</p>
