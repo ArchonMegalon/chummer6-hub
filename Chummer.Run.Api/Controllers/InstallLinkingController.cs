@@ -608,6 +608,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     [HttpPost("continuation/workspaces/upsert")]
+    [RequestSizeLimit(InstallLinkedWorkspaceSnapshotService.MaxUpsertRequestBodyBytes)]
     [ProducesResponseType<InstallLinkedWorkspaceSnapshotUpsertResponse>(StatusCodes.Status200OK)]
     public ActionResult<InstallLinkedWorkspaceSnapshotUpsertResponse> UpsertClaimedInstallWorkspace([FromBody] InstallLinkedWorkspaceSnapshotUpsertRequest? request)
     {

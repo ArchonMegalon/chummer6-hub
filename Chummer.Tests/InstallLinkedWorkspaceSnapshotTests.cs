@@ -6,9 +6,11 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.DataProtection;
 using Chummer.Run.Api.Services.Support;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Reflection;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -169,6 +171,51 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
 
         ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+    }
+
+    [Fact]
+    public void Controller_workspace_upsert_caps_request_body_size()
+    {
+        MethodInfo method = typeof(InstallLinkingController).GetMethod(nameof(InstallLinkingController.UpsertClaimedInstallWorkspace))
+            ?? throw new InvalidOperationException("InstallLinkingController.UpsertClaimedInstallWorkspace was not found.");
+        RequestSizeLimitAttribute requestSize = method.GetCustomAttribute<RequestSizeLimitAttribute>()
+            ?? throw new InvalidOperationException("UpsertClaimedInstallWorkspace is missing RequestSizeLimitAttribute.");
+
+        Assert.Equal(InstallLinkedWorkspaceSnapshotService.MaxUpsertRequestBodyBytes, ((IRequestSizeLimitMetadata)requestSize).MaxRequestBodySize);
+    }
+
+    [Fact]
+    public void Controller_workspace_upsert_rejects_oversized_payload()
+    {
+        using Fixture fixture = new();
+        InstallationGrantDto grant = fixture.SeedClaimedInstall("ins-a", "user-archon", "subject-archon");
+
+        ActionResult<InstallLinkedWorkspaceSnapshotUpsertResponse> result = fixture.Controller.UpsertClaimedInstallWorkspace(
+            new InstallLinkedWorkspaceSnapshotUpsertRequest(
+                InstallationId: "ins-a",
+                AccessToken: grant.AccessToken,
+                WorkspaceId: "ws-oversized",
+                RulesetId: "sr6",
+                Format: "NativeXml",
+                SchemaVersion: 1,
+                PayloadKind: "workspace",
+                Payload: new string('x', InstallLinkedWorkspaceSnapshotService.MaxUpsertPayloadCharacters + 1),
+                UpdatedAtUtc: DateTimeOffset.UtcNow,
+                OriginInstallationId: "ins-a",
+                Name: "Archive",
+                Alias: "Archive",
+                Metatype: "Ork",
+                BuildMethod: "BP",
+                CreatedVersion: "4",
+                AppVersion: "4",
+                Karma: 8,
+                Nuyen: 2400,
+                Created: true));
+
+        ObjectResult problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+        ProblemDetails details = Assert.IsType<ProblemDetails>(problem.Value);
+        Assert.Contains("payload exceeds the maximum length", details.Detail, StringComparison.Ordinal);
     }
 
     [Fact]

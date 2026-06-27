@@ -1495,6 +1495,56 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task RunsiteTourDispatchUsesStyleAwareSpatialTourDispatchTarget()
+    {
+        using Fixture fixture = new(
+            authenticated: true,
+            configureSettings: settings =>
+            {
+                settings["SpatialTours:ProviderPreference"] = "3dvista";
+                settings["SpatialTours:Styles:ResearchLab:3DVistaHref"] = "https://3dvista.example.test/tours/research-lab/runsite";
+                settings["SpatialTours:Styles:ResearchLab:Label"] = "Runsite Lab Tour";
+                settings["SpatialTours:Styles:ResearchLab:ActionLabel"] = "Launch Runsite Lab Tour";
+            });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.RunsiteTourDispatch("redmond-dockyard-pack", CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("https://3dvista.example.test/tours/research-lab/runsite", redirect.Url);
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PropertyquarryPropertyTourDispatchUsesStyleAwareSpatialTourDispatchTarget()
+    {
+        using Fixture fixture = new(
+            authenticated: true,
+            configureSettings: settings =>
+            {
+                settings["SpatialTours:ProviderPreference"] = "3dvista";
+                settings["SpatialTours:Styles:ResearchLab:3DVistaHref"] = "https://3dvista.example.test/tours/research-lab/property";
+                settings["SpatialTours:Styles:ResearchLab:Label"] = "Property Lab Tour";
+                settings["SpatialTours:Styles:ResearchLab:ActionLabel"] = "Launch Property Lab Tour";
+            });
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.PropertyquarryPropertyTourDispatch("northbound-research-lab", CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("https://3dvista.example.test/tours/research-lab/property", redirect.Url);
+    }
+
+    [Fact]
     public void RunsitePacksIgnoreBlankWhiteLabelConfigAndKeepDefaults()
     {
         IConfiguration configuration = new ConfigurationBuilder()
