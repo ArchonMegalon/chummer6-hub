@@ -114,14 +114,6 @@
             Href: "#support-intake",
             Label: "Open private form",
             Details: new[] { "Guest allowed", "Private reply", "Tracked if you sign in" }));
-        contactRouteChoices.Add((
-            Id: "public-feedback",
-            Badge: "Participate",
-            Title: "Public bugs and requests",
-            Summary: "Use Participate for roadmap items, public bugs, and visible feedback.",
-            Href: "/participate",
-            Label: "Open Participate",
-            Details: new[] { "Public requests", "Roadmap", "Optional" }));
     }
 }
 
@@ -364,12 +356,11 @@ else if (!contactPage)
                 </div>
             </form>
             <p class="muted-copy">
-                Public ideas belong on <a class="inline-link" href="/participate">Participate</a>.
                 @if (Model.SupportIntake.Authenticated
                     && !string.IsNullOrWhiteSpace(Model.SupportIntake.AccountSupportHref)
                     && !string.IsNullOrWhiteSpace(Model.SupportIntake.AccountSupportLabel))
                 {
-                    <text> Signed-in history stays in <a class="inline-link" href="@Model.SupportIntake.AccountSupportHref">@PublicText(Model.SupportIntake.AccountSupportLabel)</a>.</text>
+                    <text>Signed-in history stays in <a class="inline-link" href="@Model.SupportIntake.AccountSupportHref">@PublicText(Model.SupportIntake.AccountSupportLabel)</a>.</text>
                 }
                 @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.InstallAccessHref)
                     && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallAccessLabel))

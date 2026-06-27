@@ -49,4 +49,20 @@ public sealed class PublicAccountCopyTests
         Assert.DoesNotContain("Public issue threads are optional and not the default help door.", trustContent, StringComparison.Ordinal);
         Assert.DoesNotContain("Participation is optional and separate from the normal customer help path.", trustContent, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ContactPageStaysDiscordFirstWithoutParticipateDetour()
+    {
+        string trustPageView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml"));
+
+        Assert.Contains("Title: \"Chummer5 server\"", trustPageView, StringComparison.Ordinal);
+        Assert.Contains("Label: \"Open Discord\"", trustPageView, StringComparison.Ordinal);
+        Assert.Contains("Title: \"Private message\"", trustPageView, StringComparison.Ordinal);
+        Assert.Contains("Label: \"Open private form\"", trustPageView, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("Id: \"public-feedback\"", trustPageView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Title: \"Public bugs and requests\"", trustPageView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label: \"Open Participate\"", trustPageView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Public ideas belong on <a class=\"inline-link\" href=\"/participate\">Participate</a>.", trustPageView, StringComparison.Ordinal);
+    }
 }
