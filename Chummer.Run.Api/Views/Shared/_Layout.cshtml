@@ -168,7 +168,16 @@
     var rybbitSiteId = requestHost is "chummer.run" or "www.chummer.run"
         ? (System.Environment.GetEnvironmentVariable("RYBBIT_CHUMMER_RUN_SITE_ID") ?? string.Empty).Trim()
         : string.Empty;
+    var requestScheme = Context?.Request?.Scheme ?? "https";
+    var requestHostValue = Context?.Request?.Host.Value ?? string.Empty;
+    var resolvedRequestHost = requestHost is "chummer.run" or "www.chummer.run"
+        ? "https://chummer.run"
+        : string.IsNullOrWhiteSpace(requestHostValue)
+            ? string.Empty
+            : $"{requestScheme}://{requestHostValue}";
+    var requestPathBase = Context?.Request?.PathBase.Value ?? string.Empty;
     var requestPath = Context?.Request?.Path.Value ?? string.Empty;
+    var requestQuery = Context?.Request?.QueryString.Value ?? string.Empty;
     var normalizedRequestPath = string.IsNullOrWhiteSpace(requestPath) ? "/" : requestPath.TrimEnd('/');
     var requestPathSegments = normalizedRequestPath.AsSpan();
     var clickRankEligible = !authSurface
@@ -201,11 +210,15 @@
         ? string.Empty
         : normalizedRequestPath;
     var canonicalUrl = string.Empty;
+    var absoluteRequestUrl = string.IsNullOrWhiteSpace(resolvedRequestHost)
+        ? string.Empty
+        : $"{resolvedRequestHost}{requestPathBase}{(string.IsNullOrWhiteSpace(requestPath) ? "/" : requestPath)}{requestQuery}";
     if (indexablePublicRoute)
     {
-        var canonicalHost = requestHost is "chummer.run" or "www.chummer.run" ? "https://chummer.run" : $"{Context?.Request?.Scheme}://{Context?.Request?.Host.Value}";
+        var canonicalHost = requestHost is "chummer.run" or "www.chummer.run" ? "https://chummer.run" : resolvedRequestHost;
         canonicalUrl = $"{canonicalHost}{canonicalPath}";
     }
+    var socialUrl = string.IsNullOrWhiteSpace(canonicalUrl) ? absoluteRequestUrl : canonicalUrl;
     object? publicSchema = null;
     if (indexablePublicRoute)
     {
@@ -254,7 +267,11 @@
     <meta name="apple-mobile-web-app-title" content="Chummer" />
     <meta property="og:title" content="@pageTitle · Chummer" />
     <meta property="og:description" content="@chrome.Description" />
-    <meta property="og:url" content="@canonicalUrl" />
+    @if (!string.IsNullOrWhiteSpace(socialUrl))
+    {
+        <meta property="og:url" content="@socialUrl" />
+        <meta name="twitter:url" content="@socialUrl" />
+    }
     <meta property="og:site_name" content="Chummer" />
     <meta property="og:image" content="/favicon.svg" />
     <meta name="twitter:card" content="summary_large_image" />

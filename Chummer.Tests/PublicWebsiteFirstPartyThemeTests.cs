@@ -90,4 +90,16 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("SoftwareApplicationOperatingSystem", layout, StringComparison.Ordinal);
         Assert.Contains("softwareApplicationOperatingSystem = \"Linux\"", layout, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void LayoutKeepsAbsoluteSocialUrlOnNoIndexRoutes()
+    {
+        string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
+
+        Assert.Contains("var absoluteRequestUrl = string.IsNullOrWhiteSpace(resolvedRequestHost)", layout, StringComparison.Ordinal);
+        Assert.Contains("var socialUrl = string.IsNullOrWhiteSpace(canonicalUrl) ? absoluteRequestUrl : canonicalUrl;", layout, StringComparison.Ordinal);
+        Assert.Contains("<meta property=\"og:url\" content=\"@socialUrl\" />", layout, StringComparison.Ordinal);
+        Assert.Contains("<meta name=\"twitter:url\" content=\"@socialUrl\" />", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("<meta property=\"og:url\" content=\"@canonicalUrl\" />", layout, StringComparison.Ordinal);
+    }
 }
