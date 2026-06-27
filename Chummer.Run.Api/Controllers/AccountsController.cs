@@ -1105,7 +1105,7 @@ public sealed class AccountsController : Controller
                 SecondaryHref: "/account/work",
                 Notes: new[]
                 {
-                    "If the app does not answer, use downloads or devices and access instead of repeating the same dead click.",
+                    "If the app does not answer, use downloads or Installs instead of repeating the same dead click.",
                     "This browser page is only the launch bridge. The real editing flow stays in the desktop app."
                 }));
         }

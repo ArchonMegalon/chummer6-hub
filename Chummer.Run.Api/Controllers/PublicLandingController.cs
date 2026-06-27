@@ -10430,7 +10430,7 @@ Boundary:
         return new HomePrimaryActionViewModel(
             "Current release",
             "Stay on the current release",
-            "Open the current release, your linked devices, and what changed before you spend attention on optional contribution work.",
+            "Open the current release, your linked installs, and what changed before you spend attention on optional contribution work.",
             "Open current release",
             "/now",
             "primary");
@@ -15015,7 +15015,7 @@ Boundary:
         builder.AppendLine("  local executable_path");
         builder.AppendLine("  executable_path=\"$(find \"$target_app/Contents/MacOS\" -maxdepth 1 -type f -perm -111 -print -quit)\"");
         builder.AppendLine("  if [[ -z \"$executable_path\" ]]; then");
-        builder.AppendLine("    INSTALL_WARNINGS+=(\"Could not find a launchable executable in $target_app. Open it manually once if Devices and access does not show it yet.\")");
+        builder.AppendLine("    INSTALL_WARNINGS+=(\"Could not find a launchable executable in $target_app. Open it manually once if Installs does not show it yet.\")");
         builder.AppendLine("    return 1");
         builder.AppendLine("  fi");
         builder.AppendLine("  env CHUMMER_INSTALL_CLAIM_CODE=\"$claim_code\" CHUMMER_API_BASE_URL=\"$PUBLIC_BASE_URL\" CHUMMER_WEB_BASE_URL=\"$PUBLIC_BASE_URL\" \"$executable_path\" >/dev/null 2>&1 &");
@@ -15206,7 +15206,7 @@ Boundary:
         builder.AppendLine("    return 0");
         builder.AppendLine("  }");
         builder.AppendLine("  if ! wait_for_launch_observation \"$target_app\"; then");
-        builder.AppendLine("    INSTALL_WARNINGS+=(\"$artifact_title did not stay running long enough to confirm first-launch linking. Open it once manually from $target_app if Devices and access does not show it yet.\")");
+        builder.AppendLine("    INSTALL_WARNINGS+=(\"$artifact_title did not stay running long enough to confirm first-launch linking. Open it once manually from $target_app if Installs does not show it yet.\")");
         builder.AppendLine("  fi");
         builder.AppendLine("  if wait_for_claim_success \"$state_path\" 25; then");
         builder.AppendLine("    LINKED_CONFIRMED_COUNT=$((LINKED_CONFIRMED_COUNT + 1))");
@@ -15220,11 +15220,11 @@ Boundary:
         builder.AppendLine("    claim_error=\"$(read_install_state_field \"$state_path\" lastClaimError || true)\"");
         builder.AppendLine("    claim_status=\"$(read_install_state_field \"$state_path\" status || true)\"");
         builder.AppendLine("    if [[ -n \"$claim_error\" ]]; then");
-        builder.AppendLine("      INSTALL_WARNINGS+=(\"$artifact_title could not confirm account linking automatically: $claim_error Re-run the current Mac install command or open $target_app manually once if Devices and access does not show it yet.\")");
+        builder.AppendLine("      INSTALL_WARNINGS+=(\"$artifact_title could not confirm account linking automatically: $claim_error Re-run the current Mac install command or open $target_app manually once if Installs does not show it yet.\")");
         builder.AppendLine("    elif [[ -n \"$claim_status\" ]]; then");
-        builder.AppendLine("      INSTALL_WARNINGS+=(\"$artifact_title finished first-launch work with status '$claim_status' instead of a confirmed linked state. Re-run the current Mac install command or open $target_app manually once if Devices and access does not show it yet.\")");
+        builder.AppendLine("      INSTALL_WARNINGS+=(\"$artifact_title finished first-launch work with status '$claim_status' instead of a confirmed linked state. Re-run the current Mac install command or open $target_app manually once if Installs does not show it yet.\")");
         builder.AppendLine("    else");
-        builder.AppendLine("      INSTALL_WARNINGS+=(\"$artifact_title did not write a confirmed install-link receipt yet. Re-run the current Mac install command or open $target_app manually once if Devices and access does not show it yet.\")");
+        builder.AppendLine("      INSTALL_WARNINGS+=(\"$artifact_title did not write a confirmed install-link receipt yet. Re-run the current Mac install command or open $target_app manually once if Installs does not show it yet.\")");
         builder.AppendLine("    fi");
         builder.AppendLine("  fi");
         builder.AppendLine("  if [[ \"$OPEN_SELECTED_AFTER_INSTALL\" == \"1\" && \"${LAUNCH_AFTER_INSTALL[$artifact_idx]}\" == \"1\" ]]; then");
@@ -15264,7 +15264,7 @@ Boundary:
         builder.AppendLine("  COMPLETION_MESSAGE=\"The selected Chummer apps are installed in $INSTALL_SCOPE_DESCRIPTION and verified as linked to this account.\"");
         builder.AppendLine("else");
         builder.AppendLine("  echo \"The selected Chummer app or apps were installed, but setup could not confirm linking for every app yet.\"");
-        builder.AppendLine("  echo \"If Devices and access does not show them, rerun the current install command or open the app manually once.\"");
+        builder.AppendLine("  echo \"If Installs does not show them, rerun the current install command or open the app manually once.\"");
         builder.AppendLine("  COMPLETION_MESSAGE=\"The selected Chummer apps are installed in $INSTALL_SCOPE_DESCRIPTION, but setup could not confirm linking for every app yet. Review the setup notes before closing this window.\"");
         builder.AppendLine("fi");
         builder.AppendLine("if [[ \"${#INSTALL_WARNINGS[@]}\" -gt 0 ]]; then");
@@ -15275,7 +15275,7 @@ Boundary:
         builder.AppendLine("    echo \" - $warning\"");
         builder.AppendLine("  done");
         builder.AppendLine("fi");
-        builder.AppendLine("echo \"Devices and access: $ACCOUNT_URL\"");
+        builder.AppendLine("echo \"Installs: $ACCOUNT_URL\"");
         builder.AppendLine("echo \"Downloads shelf: $DOWNLOADS_URL\"");
         builder.AppendLine("echo \"Help: $HELP_URL\"");
         builder.AppendLine("if [[ \"$GUI_ENABLED\" == \"1\" ]]; then");
@@ -16165,7 +16165,7 @@ SCRIPT
   local head_id="${HEAD_IDS[$idx]}"
   local artifact_arch="${ARTIFACT_ARCHES[$idx]}"
   claim_code="$(fetch_install_claim_code "$claim_url")" || {
-    INSTALL_WARNINGS+=("${artifact_title} could not fetch a short-lived setup ticket for account linking. Setup will continue, but Devices and access may stay guest-only until you rerun the guided installer.")
+    INSTALL_WARNINGS+=("${artifact_title} could not fetch a short-lived setup ticket for account linking. Setup will continue, but Installs may stay guest-only until you rerun the guided installer.")
     return 0
   }
   persist_pending_claim_code "$head_id" "$artifact_arch" "$claim_code"
@@ -16260,7 +16260,7 @@ if [[ "${LINKED_CONFIRMED_COUNT}" -eq "${#INSTALLED_PATHS[@]}" ]]; then
   echo "When you open them, they should attach to this account without asking you to copy a claim code from the website."
 else
   echo "The selected Chummer app or apps were installed, but setup could not pre-stage account linking for every app."
-  echo "If Devices and access does not show them after first open, rerun the current guided installer."
+  echo "If Installs does not show them after first open, rerun the current guided installer."
 fi
 if [[ "${#INSTALL_WARNINGS[@]}" -gt 0 ]]; then
   echo
@@ -16269,7 +16269,7 @@ if [[ "${#INSTALL_WARNINGS[@]}" -gt 0 ]]; then
     echo " - ${warning}"
   done
 fi
-echo "Devices and access: ${ACCOUNT_URL}"
+echo "Installs: ${ACCOUNT_URL}"
 echo "Downloads shelf: ${DOWNLOADS_URL}"
 echo "Help: ${HELP_URL}"
 """;

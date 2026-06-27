@@ -93,7 +93,7 @@ public sealed class SignedInTrustStatusService
                 Heading: "Relink the affected install",
                 Summary: followThrough.InstallReadinessSummary,
                 Rows: rows,
-                PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
+                PrimaryAction: new TrustPageActionViewModel("Open installs", "/account/access", "primary"),
                 SecondaryAction: new TrustPageActionViewModel("Open support timeline", "/account/support", "secondary"));
         }
 
@@ -138,9 +138,9 @@ public sealed class SignedInTrustStatusService
             return new SignedInTrustStatusPanelViewModel(
                 Eyebrow: "Signed-in trust status",
                 Heading: "No linked install is attached yet",
-                Summary: "Claim the current public release first so downloads, support closure, and recovery stay attached to this account instead of turning into a fresh unknown device next time.",
+                Summary: "Claim the current public release first so downloads, support closure, and recovery stay attached to this account instead of turning into a fresh unknown install next time.",
                 Rows: rows,
-                PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
+                PrimaryAction: new TrustPageActionViewModel("Open installs", "/account/access", "primary"),
                 SecondaryAction: installAction);
         }
 
@@ -156,7 +156,7 @@ public sealed class SignedInTrustStatusService
             Heading: $"{installationLabel} is attached",
             Summary: summary,
             Rows: rows,
-            PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
+            PrimaryAction: new TrustPageActionViewModel("Open installs", "/account/access", "primary"),
             SecondaryAction: recommendedAction);
     }
 

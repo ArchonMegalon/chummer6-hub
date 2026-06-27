@@ -293,7 +293,7 @@ public sealed class InstallLinkingController : ControllerBase
                     : "Your account approved this copy. If Chummer does not open automatically, use the button below from this same browser.",
                 primaryLabel: "Claim this copy",
                 primaryHref: callbackRedirectUri,
-                secondaryLabel: "Open devices and access",
+                secondaryLabel: "Open installs",
                 secondaryHref: "/account/access",
                 stateLabel: "Copy ready to claim",
                 highlights:
@@ -848,7 +848,7 @@ public sealed class InstallLinkingController : ControllerBase
             UpdateAvailable: updateAvailable,
             RollbackPlan: BuildNativeRollbackPlan(installation, receipt),
             RollbackAction: continuation?.RollbackAction
-                ?? "Keep the previous installed copy and return to Devices and access for this linked copy before starting another recovery path.",
+                ?? "Keep the previous installed copy and return to Installs for this linked copy before starting another recovery path.",
             NativePrimaryActionHref: NativeRollbackHref,
             SupportHref: supportHref,
             NativeContinuationHref: "/api/v1/install-linking/continuation",
@@ -1581,7 +1581,7 @@ public sealed class InstallLinkingController : ControllerBase
                     ? $"Update this linked copy from {installation.Channel} {installation.Version} to {manifest.Channel} {manifest.Version}, then refresh the case through grant-bound support follow-through."
                     : continuation?.UpdateAction ?? "Refresh support from the app before starting another install or support path.",
                 RollbackAction: continuation?.RollbackAction
-                    ?? "If support, update, or setup fails, keep the previous installed copy and return to Devices and access for this linked copy.",
+                    ?? "If support, update, or setup fails, keep the previous installed copy and return to Installs for this linked copy.",
                 NativeContinuationHref: "/api/v1/install-linking/continuation",
                 NativeSupportHref: "/api/v1/install-linking/continuation/support",
                 NativeUpdateHref: "/api/v1/install-linking/continuation/update",

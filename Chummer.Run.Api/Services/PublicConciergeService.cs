@@ -434,9 +434,9 @@ public sealed class PublicConciergeService
             ("contact", "install_continuity") => new ConciergeBranchPresentation(
                 "I need account return",
                 authenticated
-                    ? "Open Devices and access so the affected install stays attached to the same return path."
+                    ? "Open Installs so the affected install stays attached to the same return path."
                     : "Open Downloads first, then attach the installed copy when you are ready for account return.",
-                authenticated ? "Open devices and access" : "Open downloads",
+                authenticated ? "Open installs" : "Open downloads",
                 "ghost",
                 authenticated ? "Account return" : "Downloads"),
             ("contact", "human_help") => new ConciergeBranchPresentation(

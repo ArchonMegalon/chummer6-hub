@@ -3616,7 +3616,7 @@ public sealed class CampaignSpineService
                     : $"artifact:{installation.ArtifactId}; grant:{grantId}",
                 ObservedAtUtc: observedAtUtc,
                 Authority: "hub_registry_install_linking",
-                RecoveryHint: "Open Devices and access from this install when the restore rail needs a fresh claim or relink receipt."));
+                RecoveryHint: "Open Installs from this install when the restore rail needs a fresh claim or relink receipt."));
             installationIndex++;
         }
 
@@ -5816,9 +5816,9 @@ public sealed class CampaignSpineService
             },
             restore.ClaimedDevices.Count switch
             {
-                0 => "Claimed install: no linked device is attached yet for install-aware follow-through.",
-                1 => "Claimed install: 1 linked device is already attached for install-aware follow-through.",
-                _ => $"Claimed install: {restore.ClaimedDevices.Count} linked devices are already attached for install-aware follow-through."
+                0 => "Claimed install: no linked install is attached yet for install-aware follow-through.",
+                1 => "Claimed install: 1 linked install is already attached for install-aware follow-through.",
+                _ => $"Claimed install: {restore.ClaimedDevices.Count} linked installs are already attached for install-aware follow-through."
             },
             workspace is null
                 ? "Crew-fit: no campaign workspace is attached yet, so role-overlap and roster-fit grounding are still pending."

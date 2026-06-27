@@ -484,7 +484,7 @@ public sealed class SupportCasePresentationService
                     NeedsInstallUpdate: false,
                     NeedsLinkedInstall: true)
                 : new InstallVerificationReadiness(
-                    Summary: "The current linked devices do not include the install this case was filed against.",
+                    Summary: "The current linked installs do not include the install this case was filed against.",
                     FixReadyOnLinkedInstall: false,
                     NeedsInstallUpdate: false,
                     NeedsLinkedInstall: true);

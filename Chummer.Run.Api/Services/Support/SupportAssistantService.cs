@@ -325,7 +325,7 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
 
             if (caseMatches.Any(static item => item.NeedsLinkedInstall))
             {
-                Add("open_account_access", "Open Devices and access", "/account/access", "Link or reclaim the affected install before you verify the fix.");
+                Add("open_account_access", "Open installs", "/account/access", "Link or reclaim the affected install before you verify the fix.");
             }
 
             if (caseMatches.Any(static item => item.NeedsInstallUpdate))
