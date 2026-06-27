@@ -31,8 +31,8 @@ public sealed class AccountHubRouteTests
         Assert.Equal("~/Views/Accounts/Hub.cshtml", view.ViewName);
         AccountHubPageViewModel model = Assert.IsType<AccountHubPageViewModel>(view.Model);
         Assert.Equal("Account", model.Chrome.Title);
-        Assert.Equal("Installs, billing, and support live here.", model.Heading);
-        Assert.Equal("Use the desktop app for actual character work. Use this page for recovery, billing, and help.", model.Summary);
+        Assert.Equal("Use this page for installs, membership, and support.", model.Heading);
+        Assert.Equal("Open Chummer for actual character work. Stay here for recovery, billing, and help.", model.Summary);
         Assert.Equal("Free", model.MembershipLabel);
         Assert.Equal("Same app. Supporter only changes the monthly Origin Book limit.", model.MembershipSummary);
         Assert.Equal("1 of 1 Origin Book left this month.", model.BookQuotaSummary);
