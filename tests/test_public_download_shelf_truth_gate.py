@@ -68,7 +68,8 @@ def make_releases_manifest() -> dict:
                 "sha256": "a" * 64,
                 "sizeBytes": 1234,
                 "head": "avalonia",
-                "rid": "linux-x64",
+                "platformId": "linux",
+                "arch": "x64",
                 "channel": "public_stable",
                 "channelId": "public_stable",
                 "installAccessClass": "open_public",
@@ -110,6 +111,20 @@ def make_canonical_manifest() -> dict:
 
 
 class PublicDownloadShelfTruthGateTests(unittest.TestCase):
+    def test_rid_from_row_derives_windows_and_linux_runtime_ids(self) -> None:
+        self.assertEqual(
+            MODULE.rid_from_row({"platformId": "windows", "arch": "x64"}),
+            "win-x64",
+        )
+        self.assertEqual(
+            MODULE.rid_from_row({"platformId": "linux", "arch": "arm64"}),
+            "linux-arm64",
+        )
+        self.assertEqual(
+            MODULE.rid_from_row({"platformId": "macos", "arch": "x64"}),
+            "osx-x64",
+        )
+
     def test_matching_local_and_live_bundle_truth_passes(self) -> None:
         releases_payload = make_releases_manifest()
         canonical_payload = make_canonical_manifest()
@@ -160,6 +175,49 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         self.assertEqual(receipt["status"], "pass")
         self.assertEqual(receipt["live"]["pageArtifactIds"], ["avalonia-linux-x64-installer"])
         self.assertEqual(len(receipt["live"]["artifactProbes"]), 1)
+
+    def test_transient_downloads_502_retries_and_passes(self) -> None:
+        releases_payload = make_releases_manifest()
+        canonical_payload = make_canonical_manifest()
+
+        with tempfile.TemporaryDirectory(prefix="download-shelf-truth-") as temp_root:
+            root = Path(temp_root)
+            local_manifest = root / "releases.json"
+            local_canonical = root / "RELEASE_CHANNEL.generated.json"
+            write_json(local_manifest, releases_payload)
+            write_json(local_canonical, canonical_payload)
+            call_count = {"downloads": 0}
+
+            def fake_get(url: str, *args, **kwargs) -> FakeResponse:
+                if url == "https://chummer.run/downloads":
+                    call_count["downloads"] += 1
+                    if call_count["downloads"] == 1:
+                        return FakeResponse(url=url, status_code=502)
+                    return FakeResponse(
+                        url=url,
+                        text='<a data-download-artifact="avalonia-linux-x64-installer" href="/downloads/get/avalonia-linux-x64-installer">Download</a>',
+                    )
+                if url == "https://chummer.run/downloads/releases.json":
+                    return FakeResponse(url=url, json_payload=releases_payload)
+                if url == "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json":
+                    return FakeResponse(url=url, json_payload=canonical_payload)
+                raise AssertionError(f"unexpected GET {url}")
+
+            with mock.patch.object(MODULE.requests, "get", side_effect=fake_get), mock.patch.object(
+                MODULE.time,
+                "sleep",
+                return_value=None,
+            ):
+                receipt = MODULE.evaluate(
+                    base_url="https://chummer.run",
+                    local_manifest_path=local_manifest,
+                    local_canonical_manifest_path=local_canonical,
+                    timeout=5.0,
+                    artifact_probes_enabled=False,
+                )
+
+        self.assertEqual(receipt["status"], "pass")
+        self.assertEqual(call_count["downloads"], 2)
 
     def test_live_page_unknown_artifact_id_fails(self) -> None:
         releases_payload = make_releases_manifest()

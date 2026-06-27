@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,9 @@ OUT_PATHS = (
 )
 DEFAULT_LOCAL_MANIFEST = Path("/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/releases.json")
 DEFAULT_LOCAL_CANONICAL_MANIFEST = Path("/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json")
+RETRYABLE_STATUS_CODES = {502, 503, 504}
+DEFAULT_REQUEST_ATTEMPTS = 6
+DEFAULT_RETRY_DELAY_SECONDS = 2.0
 
 
 def now_iso() -> str:
@@ -74,12 +78,40 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def fetch_json(url: str, *, timeout: float) -> tuple[requests.Response, dict[str, Any]]:
-    response = requests.get(url, timeout=timeout)
-    response.raise_for_status()
+    response = fetch_response(url, timeout=timeout)
     payload = response.json()
     if not isinstance(payload, dict):
         raise ValueError(f"{url} did not contain a JSON object")
     return response, payload
+
+
+def fetch_response(url: str, *, timeout: float) -> requests.Response:
+    last_response: requests.Response | None = None
+    last_error: Exception | None = None
+    for attempt in range(1, DEFAULT_REQUEST_ATTEMPTS + 1):
+        try:
+            response = requests.get(url, timeout=timeout)
+        except requests.RequestException as exc:
+            last_error = exc
+            if attempt < DEFAULT_REQUEST_ATTEMPTS:
+                time.sleep(DEFAULT_RETRY_DELAY_SECONDS)
+                continue
+            raise
+
+        last_response = response
+        if response.status_code not in RETRYABLE_STATUS_CODES:
+            response.raise_for_status()
+            return response
+        if attempt < DEFAULT_REQUEST_ATTEMPTS:
+            time.sleep(DEFAULT_RETRY_DELAY_SECONDS)
+            continue
+        response.raise_for_status()
+
+    if last_error is not None:
+        raise last_error
+    if last_response is not None:
+        last_response.raise_for_status()
+    raise RuntimeError(f"Failed to fetch {url}")
 
 
 def top_level_manifest_view(payload: dict[str, Any]) -> dict[str, Any]:
@@ -130,6 +162,14 @@ def rid_from_row(row: dict[str, Any]) -> str:
     platform_id = normalize_token(row.get("platformId"))
     if platform_id.startswith(("win-", "linux-", "osx-")):
         return platform_id
+    arch = normalize_token(row.get("arch"))
+    if platform_id and arch:
+        if platform_id in {"windows", "win"}:
+            return f"win-{arch}"
+        if platform_id == "linux":
+            return f"linux-{arch}"
+        if platform_id in {"mac", "macos", "osx"}:
+            return f"osx-{arch}"
     return ""
 
 
@@ -324,8 +364,7 @@ def evaluate(
     artifact_probes_enabled: bool,
 ) -> dict[str, Any]:
     base = base_url.rstrip("/")
-    downloads_response = requests.get(f"{base}/downloads", timeout=timeout)
-    downloads_response.raise_for_status()
+    downloads_response = fetch_response(f"{base}/downloads", timeout=timeout)
     live_releases_response, live_releases_payload = fetch_json(f"{base}/downloads/releases.json", timeout=timeout)
     live_canonical_response, live_canonical_payload = fetch_json(
         f"{base}/downloads/RELEASE_CHANNEL.generated.json",
