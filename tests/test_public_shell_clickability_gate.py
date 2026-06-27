@@ -19,12 +19,15 @@ class _PublicShellFixtureHandler(BaseHTTPRequestHandler):
     GOOD_HITS = 0
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path in {"/", "/status", "/downloads", "/help", "/feedback", "/participate", "/roadmap", "/what-is-chummer"}:
+        if self.path in {"/", "/status", "/downloads", "/help", "/contact", "/login?next=%2F", "/account/billing", "/feedback", "/participate", "/roadmap", "/what-is-chummer"}:
             body = f"""
             <html><body>
               <a href="/status">status</a>
               <a href="/downloads">downloads</a>
               <a href="/help">help</a>
+              <a href="/contact">contact</a>
+              <a href="/login?next=%2F">login</a>
+              <a href="/account/billing">billing</a>
               <a href="/feedback">feedback</a>
               <a href="/participate">participate</a>
               <a href="/roadmap">roadmap</a>

@@ -20,7 +20,7 @@ from requests import exceptions as requests_exceptions
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 DEFAULT_OUTPUT = REPO_ROOT / ".codex-studio" / "published" / "PUBLIC_SHELL_CLICKABILITY_GATE.generated.json"
-DEFAULT_PAGES = ["/", "/status", "/downloads", "/help", "/feedback", "/participate", "/roadmap", "/what-is-chummer"]
+DEFAULT_PAGES = ["/", "/status", "/downloads", "/help", "/contact", "/login?next=%2F", "/account/billing", "/feedback", "/participate", "/roadmap", "/what-is-chummer"]
 FORBIDDEN_TEXT_PATTERNS = [
     r"chummer-api",
     r"127\.0\.0\.1",
