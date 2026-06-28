@@ -42,6 +42,10 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   const ledgerPayload = await pwaLedgerResponse.json();
   expect(ledgerPayload.mode).toBe("mobile_pwa_living_world");
   expect(["opt_in_required", "no_world_data", "live", "world_not_followed"]).toContain(ledgerPayload.status);
+  expect(ledgerPayload.updates_route).toBe("/mobile/pwa/ledger.json");
+  if (ledgerPayload.status === "opt_in_required") {
+    expect(ledgerPayload.opt_in_route).toBe("/account");
+  }
 
   await page.goto(`${baseUrl}/mobile`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Mobile and PWA entry' })).toBeVisible();

@@ -6,11 +6,15 @@ const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 test('black ledger viewer network stays first-party and provider-safe', async ({ request, page }) => {
   const mapResponse = await request.get(`${baseUrl}/ledger/map`);
   const viewerReceiptResponse = await request.get(`${baseUrl}/ledger/receipts/viewer-network.json`);
+  const flyThroughResponse = await request.get(`${baseUrl}/ledger/viewers/fly-through`, { maxRedirects: 0 });
   const primaryViewerResponse = await request.get(`${baseUrl}/ledger/viewers/3d-tour`, { maxRedirects: 0 });
+  const alternateViewerResponse = await request.get(`${baseUrl}/ledger/viewers/alternate-3d-tour`, { maxRedirects: 0 });
 
   expect(mapResponse.status()).toBe(200);
   expect(viewerReceiptResponse.status()).toBe(200);
+  expect(flyThroughResponse.status()).toBe(302);
   expect(primaryViewerResponse.status()).toBe(302);
+  expect(alternateViewerResponse.status()).toBe(302);
 
   const payload = await viewerReceiptResponse.json();
   expect(payload.horizon).toBe('black-ledger');
@@ -28,9 +32,15 @@ test('black ledger viewer network stays first-party and provider-safe', async ({
   expect(JSON.stringify(payload)).not.toContain('Matterport');
   expect(JSON.stringify(payload)).not.toContain('3DVista');
 
+  const flyThroughLocation = flyThroughResponse.headers()['location'] ?? '';
+  expect(flyThroughLocation).toContain('/media/ledger/tours/black-ledger-3dvista-flythrough.mp4');
+  expect(flyThroughLocation).toContain('artifactAccess=');
   expect(primaryViewerResponse.headers()['location'] ?? '').toContain('my.matterport.com/show/');
+  expect(alternateViewerResponse.headers()['location'] ?? '').toContain('3dvista');
   expect(primaryViewerResponse.headers()['x-horizon-artifact-request-id'] ?? '').toMatch(/^horizon-artifact-/);
   expect(primaryViewerResponse.headers()['x-horizon-artifact-request-href'] ?? '').toContain('/api/v1/public/horizons/artifact-requests/');
+  expect(flyThroughResponse.headers()['x-horizon-artifact-request-id'] ?? '').toMatch(/^horizon-artifact-/);
+  expect(flyThroughResponse.headers()['x-horizon-artifact-request-href'] ?? '').toContain('/api/v1/public/horizons/artifact-requests/');
 
   await page.goto(`${baseUrl}/ledger/map`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('body')).toContainText('Optional viewer exports.');
@@ -45,8 +55,11 @@ test('black ledger viewer network stays first-party and provider-safe', async ({
     base_url: baseUrl,
     route: '/ledger/map',
     viewer_receipt_route: '/ledger/receipts/viewer-network.json',
+    fly_through_redirect_route: '/ledger/viewers/fly-through',
     viewer_redirect_route: '/ledger/viewers/3d-tour',
     payload,
+    fly_through_redirect_location: flyThroughLocation,
     redirect_location: primaryViewerResponse.headers()['location'] ?? '',
+    alternate_redirect_location: alternateViewerResponse.headers()['location'] ?? '',
   });
 });

@@ -10,12 +10,14 @@ using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Run.Contracts.Identity;
 using Chummer.Run.Registry.Services;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net;
 using System.Net.Http;
@@ -73,7 +75,7 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
-    public async Task UnauthenticatedDownloadDispatchPageRedirectsToWebsiteLogin()
+    public async Task UnauthenticatedPublicDesktopDownloadDispatchPageRedirectsToDirectDownload()
     {
         using Fixture fixture = new(authenticated: false);
         fixture.Controller.ControllerContext = new ControllerContext
@@ -86,7 +88,24 @@ public sealed class PublicLandingDownloadDispatchTests
         IActionResult result = await fixture.Controller.DownloadDispatchPage("avalonia-win-x64-installer", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/login?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", redirect.Url);
+        Assert.Equal("/downloads/get/avalonia-win-x64-installer", redirect.Url);
+    }
+
+    [Fact]
+    public async Task UnauthenticatedAccountRequiredDownloadDispatchPageRedirectsToWebsiteLogin()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
+        fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
+
+        IActionResult result = await fixture.Controller.DownloadDispatchPage("avalonia-osx-arm64-installer", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", redirect.Url);
     }
 
     [Fact]
@@ -547,6 +566,36 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("black-ledger-viewer-network", receipt.CapabilityId);
         Assert.Equal("viewer_network", receipt.ArtifactKind);
         Assert.Equal("black-ledger:viewer-primary", receipt.SourceRef);
+        Assert.Equal("public_safe", receipt.Visibility);
+        Assert.False(receipt.QuotaTracked);
+        Assert.Empty(receipt.BlockedReasons);
+
+        string requestId = fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString();
+        Assert.StartsWith("horizon-artifact-", requestId, StringComparison.Ordinal);
+        Assert.Equal($"/api/v1/public/horizons/artifact-requests/{requestId}", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Href"].ToString());
+    }
+
+    [Fact]
+    public async Task LedgerViewerFlyThroughProtectsFirstPartyMediaAndPersistsAnonymousPublicSafeArtifactReceipt()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.LedgerViewerFlyThrough(CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        AssertProtectedMediaRedirect(redirect.Url, "/media/ledger/tours/black-ledger-3dvista-flythrough.mp4");
+        Assert.Equal("false", fixture.Controller.Response.Headers["X-Horizon-Artifact-Quota-Tracked"].ToString());
+
+        IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("black-ledger", limit: 10);
+        HorizonArtifactRequestReceipt receipt = Assert.Single(receipts);
+        Assert.Equal("accepted", receipt.Status);
+        Assert.Equal("black-ledger-viewer-network", receipt.CapabilityId);
+        Assert.Equal("viewer_network", receipt.ArtifactKind);
+        Assert.Equal("black-ledger:viewer-fly-through", receipt.SourceRef);
         Assert.Equal("public_safe", receipt.Visibility);
         Assert.False(receipt.QuotaTracked);
         Assert.Empty(receipt.BlockedReasons);
@@ -4478,6 +4527,13 @@ public sealed class PublicLandingDownloadDispatchTests
             CommunityCreatorHorizonsService communityCreatorHorizons = new(communityStore, InstallLinkingStore, publicCreatorDiscovery);
             WaveEightHorizonsService waveEightHorizons = new(communityStore, anarchyPreview);
             MediaArtifactHorizonsService mediaHorizons = new(Configuration, horizonCapabilities);
+            IWebHostEnvironment webHostEnvironment = new TestWebHostEnvironment();
+            PublicParticipateSnapshotService participateSnapshots = new(
+                new PublicParticipateSnapshotStore(Configuration),
+                Configuration,
+                new StaticHttpClientFactory(new HttpClient(new StaticJsonHandler("""{"data":[],"total":0}"""))),
+                webHostEnvironment,
+                NullLogger<PublicParticipateSnapshotService>.Instance);
             Controller = new PublicLandingController(
                 landing: landing,
                 flipLinkDocumentPortal: new FlipLinkDocumentPortalService(Configuration),
@@ -4529,7 +4585,8 @@ public sealed class PublicLandingDownloadDispatchTests
                 releaseUploadTickets: null!,
                 windowsProofInstallers: new WindowsProofInstallerService(Configuration),
                 aurPackages: new AurPackageCatalogService(Configuration),
-                webHostEnvironment: null!,
+                participateSnapshots: participateSnapshots,
+                webHostEnvironment: webHostEnvironment,
                 logger: NullLogger<PublicLandingController>.Instance,
                 artifactRequests: artifactRequests,
                 artifactAccessTokens: artifactAccessTokens);
@@ -4565,6 +4622,16 @@ public sealed class PublicLandingDownloadDispatchTests
         public PublicLandingController Controller { get; }
         public BrilliantDirectoriesBillingService Billing { get; }
         public HorizonArtifactRequestReceiptStore ArtifactRequestReceipts { get; }
+
+        private sealed class TestWebHostEnvironment : IWebHostEnvironment
+        {
+            public string EnvironmentName { get; set; } = "Production";
+            public string ApplicationName { get; set; } = "Chummer.Tests";
+            public string WebRootPath { get; set; } = RepoPaths.Root;
+            public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+            public string ContentRootPath { get; set; } = RepoPaths.Root;
+            public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+        }
 
         private sealed class IdentityHandler : HttpMessageHandler
         {

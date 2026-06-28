@@ -21,6 +21,7 @@ EXPECTED_FINAL_ROUTES = {
 }
 EXPECTED_SHORTCUTS = {"/mobile", "/play", "/play/continuity"}
 EXPECTED_SHELL_CACHE_PATHS = {"/mobile", "/play", "/play/continuity", "/mobile/pwa.json", "/ready/handoff/mobile.json"}
+EXPECTED_PWA_LEDGER_STATUSES = {"opt_in_required", "no_world_data", "live", "world_not_followed"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -54,6 +55,8 @@ def run(base_url: str) -> int:
     continuity_html.raise_for_status()
     mobile_json_response = session.get(f"{base_url}/mobile/pwa.json", timeout=30)
     mobile_json_response.raise_for_status()
+    ledger_stream_response = session.get(f"{base_url}/mobile/pwa/ledger.json", timeout=30)
+    ledger_stream_response.raise_for_status()
     receipt_index_response = session.get(f"{base_url}/play/continuity/receipts", timeout=30)
     receipt_index_response.raise_for_status()
     manifest_response = session.get(f"{base_url}/manifest.json", timeout=30)
@@ -63,6 +66,7 @@ def run(base_url: str) -> int:
 
     manifest = manifest_response.json()
     mobile_json = mobile_json_response.json()
+    ledger_stream = ledger_stream_response.json()
     receipt_index = receipt_index_response.json()
     has_manifest_link = 'rel="manifest"' in mobile_html.text and "/manifest.json" in mobile_html.text
     has_sw_registration = "serviceWorker.register(\"/service-worker.js\"" in mobile_html.text
@@ -86,6 +90,17 @@ def run(base_url: str) -> int:
         and mobile_json.get("continuity_route") == "/play/continuity"
         and mobile_json.get("receipt_index_route") == "/play/continuity/receipts"
     )
+    ledger_stream_mode = ledger_stream.get("mode")
+    ledger_stream_status = ledger_stream.get("status")
+    ledger_stream_has_updates_route = ledger_stream.get("updates_route") == "/mobile/pwa/ledger.json"
+    ledger_stream_has_valid_status = ledger_stream_status in EXPECTED_PWA_LEDGER_STATUSES
+    ledger_stream_is_living_world = ledger_stream_mode == "mobile_pwa_living_world"
+    ledger_stream_contract_holds = (
+        isinstance(ledger_stream, dict)
+        and ledger_stream_is_living_world
+        and ledger_stream_has_valid_status
+        and ledger_stream_has_updates_route
+    )
     role_routes_hold = all(
         result["final_route"] == result["expected_final_route"]
         for result in route_results
@@ -108,6 +123,7 @@ def run(base_url: str) -> int:
         continuity_receipt_count >= 3,
         continuity_boundary_present,
         mobile_json_has_routes,
+        ledger_stream_contract_holds,
         role_routes_hold,
     ]
 
@@ -150,6 +166,11 @@ def run(base_url: str) -> int:
             "receipt_count": continuity_receipt_count,
             "has_boundary": continuity_boundary_present,
             "mobile_json_has_routes": mobile_json_has_routes,
+        },
+        "ledger_stream": {
+            "status": ledger_stream_status,
+            "mode": ledger_stream_mode,
+            "has_contract": ledger_stream_contract_holds,
         },
     }
     write_json(completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"), payload)

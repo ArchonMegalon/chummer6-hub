@@ -70,6 +70,19 @@ class _FakeSession:
                     "receipt_index_route": "/play/continuity/receipts",
                 },
             )
+        if url.endswith("/mobile/pwa/ledger.json"):
+            return _FakeResponse(
+                url,
+                json_data={
+                    "mode": "mobile_pwa_living_world",
+                    "status": "opt_in_required",
+                    "status_label": "Opt in required",
+                    "summary": "Black Ledger live updates are available in the PWA when you opt in via account preferences.",
+                    "legal_posture": "Public lane stays aggregate only. No private run table state is published.",
+                    "opt_in_route": "/account",
+                    "updates_route": "/mobile/pwa/ledger.json",
+                },
+            )
         if url.endswith("/play/continuity/receipts"):
             return _FakeResponse(
                 url,
