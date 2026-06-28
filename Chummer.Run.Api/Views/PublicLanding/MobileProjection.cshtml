@@ -106,8 +106,17 @@
         <article class="gateway-card">
             <div class="gateway-card__header">
                 <span class="tag">Top districts</span>
-                <h3>Current heat snapshot</h3>
+                <h3>Continuity and heat</h3>
             </div>
+            <p class="muted-copy">
+                <span>Continuity turn:</span>
+                <span data-pwa-continuity-turn>—</span>
+            </p>
+            <p class="muted-copy" data-pwa-continuity-summary>No continuity snapshot loaded yet.</p>
+            <ul class="gateway-card__list" data-pwa-continuity-events>
+                <li>No continuity events yet.</li>
+            </ul>
+            <p class="muted-copy">Current heat top list:</p>
             <ul class="gateway-card__list" data-pwa-ledger-top-districts>
                 <li>No live district data yet.</li>
             </ul>
@@ -121,6 +130,14 @@
             <p>
                 <span>Route:</span>
                 <span>/mobile/pwa/ledger.json</span>
+            </p>
+            <p>
+                <span>Turn detail:</span>
+                <a class="editorial-strip__action" data-pwa-ledger-turn-route href="/ledger/turns/1">Open live turn</a>
+            </p>
+            <p>
+                <span>Turn newsreel:</span>
+                <a class="editorial-strip__action" data-pwa-ledger-newsreel-route href="/ledger/turns/1/newsreel.json">Open live newsreel</a>
             </p>
             <p class="muted-copy">Updates refresh every 30 seconds while the page is open.</p>
             <p class="muted-copy">
@@ -202,6 +219,11 @@
             var ledgerMapRoute = document.querySelector("[data-pwa-ledger-map-route]");
             var ledgerOptInRoute = document.querySelector("[data-pwa-ledger-opt-in-route]");
             var ledgerUpdated = document.querySelector("[data-pwa-ledger-updated]");
+            var ledgerTurnRoute = document.querySelector("[data-pwa-ledger-turn-route]");
+            var ledgerNewsreelRoute = document.querySelector("[data-pwa-ledger-newsreel-route]");
+            var ledgerContinuityTurn = document.querySelector("[data-pwa-continuity-turn]");
+            var ledgerContinuitySummary = document.querySelector("[data-pwa-continuity-summary]");
+            var ledgerContinuityEvents = document.querySelector("[data-pwa-continuity-events]");
 
             function setOnlineState() {
                 if (!onlineState) {
@@ -293,6 +315,30 @@
                 }
             }
 
+            function updateContinuityEvents(events) {
+                if (!ledgerContinuityEvents) {
+                    return;
+                }
+
+                if (!events || events.length === 0) {
+                    ledgerContinuityEvents.innerHTML = "<li>No continuity events yet.</li>";
+                    return;
+                }
+
+                ledgerContinuityEvents.innerHTML = "";
+                for (var i = 0; i < events.length; i += 1) {
+                    var eventItem = events[i];
+                    var delta = typeof eventItem.delta === "number" ? eventItem.delta : 0;
+                    var formattedDelta = delta >= 0 ? "+" + delta : String(delta);
+                    var target = eventItem.target || "Unknown zone";
+                    var metric = eventItem.metric || "impact";
+                    var reason = eventItem.reason || "";
+                    var listItem = document.createElement("li");
+                    listItem.textContent = target + ": " + metric + " " + formattedDelta + (reason ? " — " + reason : "");
+                    ledgerContinuityEvents.appendChild(listItem);
+                }
+            }
+
             function renderLedgerPayload(payload) {
                 if (!payload || typeof payload !== "object") {
                     updateLedgerStatus("error", "Stream unavailable");
@@ -303,6 +349,9 @@
                     safeText(ledgerTopMovement, "Unavailable");
                     safeText(ledgerUpdated, "Unavailable");
                     safeText(ledgerFollowHint, "");
+                    safeText(ledgerContinuityTurn, "Unavailable");
+                    safeText(ledgerContinuitySummary, "Continuity snapshot is not available in this lane.");
+                    updateContinuityEvents([]);
                     return;
                 }
 
@@ -359,6 +408,42 @@
 
                 if (ledgerOptInRoute && payload.opt_in_route) {
                     ledgerOptInRoute.href = payload.opt_in_route;
+                }
+
+                if (ledgerTurnRoute && payload.tracker && payload.tracker.turn_route) {
+                    ledgerTurnRoute.setAttribute("href", payload.tracker.turn_route);
+                }
+
+                if (ledgerNewsreelRoute && payload.tracker && payload.tracker.newsreel_route) {
+                    ledgerNewsreelRoute.setAttribute("href", payload.tracker.newsreel_route);
+                }
+
+                if (payload.continuity) {
+                    safeText(
+                        ledgerContinuityTurn,
+                        typeof payload.continuity.turn === "number"
+                            ? "Turn " + payload.continuity.turn
+                            : "No live turn yet");
+                    safeText(
+                        ledgerContinuitySummary,
+                        payload.continuity.turn_summary || "No continuity summary available.");
+                    updateContinuityEvents(payload.continuity.events);
+                    if (ledgerTurnRoute && payload.continuity.turn_route) {
+                        ledgerTurnRoute.setAttribute("href", payload.continuity.turn_route);
+                    }
+                    if (ledgerNewsreelRoute && payload.continuity.turn_route) {
+                        var newsreelRoute = (payload.tracker && payload.tracker.newsreel_route) || (typeof payload.continuity.turn === "number"
+                            ? "/ledger/turns/" + payload.continuity.turn + "/newsreel.json"
+                            : null);
+                        if (newsreelRoute) {
+                            ledgerNewsreelRoute.setAttribute("href", newsreelRoute);
+                        }
+                    }
+                }
+                else {
+                    safeText(ledgerContinuityTurn, "Unavailable");
+                    safeText(ledgerContinuitySummary, "Continuity snapshot is not available in this lane.");
+                    updateContinuityEvents([]);
                 }
 
                 safeText(ledgerFollowHint, payload.summary && payload.summary.follow_hint ? payload.summary.follow_hint : "");

@@ -8271,6 +8271,31 @@ document.addEventListener('DOMContentLoaded', function () {
                 trend = district.Trend
             })
             .ToArray();
+        var continuityEvents = world.LastTick is null
+            ? Array.Empty<object>()
+            : world.LastTick.Effects
+                .Select(effect => new
+                {
+                    effect.Target,
+                    effect.Metric,
+                    delta = effect.Delta,
+                    reason = effect.PublicReason
+                })
+                .ToArray();
+        var continuity = world.LastTick is null
+            ? null
+            : new
+            {
+                turn = world.LastTick.Turn,
+                turn_summary = world.LastTick.Summary,
+                turn_route = $"/ledger/turns/{world.LastTick.Turn}",
+                receipt_id = world.LastTick.ReceiptId,
+                receipt_mode = world.LastTick.Mode,
+                events = continuityEvents,
+                privacy_passed = world.LastTick.PrivacyPassed,
+                generated_at_utc = world.LastTick.CreatedAtUtc,
+                effects_count = world.LastTick.Effects.Count
+            };
 
         return JsonSerializer.Serialize(new
         {
@@ -8323,6 +8348,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 newsreel_route = $"/ledger/turns/{world.CurrentTurn}/newsreel.json",
                 world_status = world.Status
             },
+            continuity,
             updates_route = "/mobile/pwa/ledger.json",
             generated_at_utc = DateTimeOffset.UtcNow
         }, PublicJsonContentOptions);

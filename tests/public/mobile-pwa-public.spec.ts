@@ -45,6 +45,15 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   expect(ledgerPayload.updates_route).toBe("/mobile/pwa/ledger.json");
   if (ledgerPayload.status === "opt_in_required") {
     expect(ledgerPayload.opt_in_route).toBe("/account");
+  } else if (ledgerPayload.status === "live" || ledgerPayload.status === "world_not_followed") {
+    expect(ledgerPayload.world).toBeTruthy();
+    expect(Array.isArray(ledgerPayload.top_districts)).toBeTruthy();
+    expect(typeof ledgerPayload.continuity).toBe("object");
+    expect(typeof ledgerPayload.continuity?.turn).toBe("number");
+    expect(Array.isArray(ledgerPayload.continuity?.events)).toBeTruthy();
+    expect(ledgerPayload.tracker).toEqual(expect.objectContaining({ turn_route: expect.any(String), newsreel_route: expect.any(String) }));
+  } else {
+    expect(ledgerPayload.status).toBe("no_world_data");
   }
 
   await page.goto(`${baseUrl}/mobile`, { waitUntil: 'domcontentloaded' });
