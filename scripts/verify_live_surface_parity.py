@@ -202,7 +202,7 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             ],
             "required_any_texts": [
                 "Current work opens below.",
-                "Board not loading right now",
+                "Current requests live in Participate.",
             ],
             "forbidden_texts": [
                 "ProductLift",
@@ -221,7 +221,7 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             ],
             "required_any_texts": [
                 "Current work opens below.",
-                "Board not loading right now",
+                "Current requests live in Participate.",
             ],
             "required_final_url_prefix": "/roadmap",
             "forbidden_texts": [

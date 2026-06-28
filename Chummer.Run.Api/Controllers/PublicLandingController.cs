@@ -2622,11 +2622,31 @@ public sealed class PublicLandingController : Controller
         }
 
         string relativePath = NormalizeParticipateBoardPath(boardPath);
-        Uri target = string.IsNullOrWhiteSpace(relativePath)
-            ? AppendQueryString(upstream, Request.QueryString.Value)
-            : AppendQueryString(ResolveHostedBoardContentUri(upstream, relativePath), Request.QueryString.Value);
+        string route = string.IsNullOrWhiteSpace(relativePath)
+            ? "/participate/board"
+            : $"/participate/board/{relativePath}";
+        var queryBuilder = new QueryBuilder
+        {
+            { "embed", "1" }
+        };
 
-        return Redirect(target.ToString());
+        foreach ((string key, var values) in Request.Query)
+        {
+            if (string.Equals(key, "embed", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            foreach (string? value in values)
+            {
+                if (value is not null)
+                {
+                    queryBuilder.Add(key, value);
+                }
+            }
+        }
+
+        return Redirect($"{route}{queryBuilder.ToQueryString()}");
     }
 
     [AcceptVerbs("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", Route = "/http_api/{**boardPath}")]
@@ -2794,7 +2814,7 @@ public sealed class PublicLandingController : Controller
     {
         if (Request.Query.TryGetValue("embed", out var values))
         {
-            foreach (string value in values)
+            foreach (string? value in values)
             {
                 if (string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase))

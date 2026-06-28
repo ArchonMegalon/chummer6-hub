@@ -835,7 +835,7 @@ def test_public_copy_cleanup_is_centralized_for_planning_and_package_pages() -> 
         source = read(view_path)
         if view_path == "Chummer.Run.Api/Views/PublicLanding/Roadmap.cshtml":
             assert "Now and next." in source
-            assert "Board not loading right now" in source
+            assert "Current requests live in Participate." in source
             assert "Planned work is here. Shipped work stays in Changelog." in source
             assert "Current work opens below." in source
             assert 'href="/participate"' in source
@@ -1041,7 +1041,7 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
     for required in (
         "Roadmap",
         "Now and next.",
-        "Board not loading right now",
+        "Current requests live in Participate.",
         "Planned work is here. Shipped work stays in Changelog.",
     ):
         assert required in roadmap

@@ -11,7 +11,7 @@ public sealed class RoadmapMilestoneProjectionViewTests
         string source = File.ReadAllText(viewPath);
 
         Assert.Contains("Now and next.", source, StringComparison.Ordinal);
-        Assert.Contains("Board not loading right now", source, StringComparison.Ordinal);
+        Assert.Contains("Current requests live in Participate.", source, StringComparison.Ordinal);
         Assert.Contains("Planned work is here. Shipped work stays in Changelog.", source, StringComparison.Ordinal);
         Assert.Contains("Current work opens below.", source, StringComparison.Ordinal);
         Assert.Contains("Changelog", source, StringComparison.Ordinal);

@@ -328,7 +328,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         IActionResult result = controller.ParticipateBoardFrame("posts/mobile-companion");
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("https://ideas.example.test/feedback/posts/mobile-companion", redirect.Url);
+        Assert.Equal("/participate/board/posts/mobile-companion?embed=1", redirect.Url);
     }
 
     [Fact]
@@ -341,7 +341,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         IActionResult result = controller.ParticipateBoardFrame("posts/mobile-companion");
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("https://chummer6.productlift.dev/posts/mobile-companion", redirect.Url);
+        Assert.Equal("/participate/board/posts/mobile-companion?embed=1", redirect.Url);
     }
 
     [Fact]

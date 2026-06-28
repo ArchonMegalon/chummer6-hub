@@ -129,7 +129,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                     b"<title>Roadmap \xc2\xb7 Chummer</title>"
                     b"<h1>Now and next.</h1>"
                     b"<p>Planned work is here. Shipped work stays in Changelog.</p>"
-                    b"<h2>Board not loading right now</h2>"
+                    b"<h2>Current requests live in Participate.</h2>"
                     b"</body></html>"
                 )
             else:
