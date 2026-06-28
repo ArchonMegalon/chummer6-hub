@@ -85,14 +85,14 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
             route="/participate",
             expected_final_path="/participate",
             required_all=("What should Chummer do next?", "Public requests, clear bugs, useful ideas."),
-            required_any=("Open board", "Board offline right now"),
+            required_any=("Board is live.", "Board offline right now"),
             require_public_meta_urls=True,
         ),
         RouteContract(
             route="/partizipate",
             expected_final_path="/participate",
             required_all=("What should Chummer do next?", "Public requests, clear bugs, useful ideas."),
-            required_any=("Open board", "Board offline right now"),
+            required_any=("Board is live.", "Board offline right now"),
             require_public_meta_urls=True,
         ),
     )

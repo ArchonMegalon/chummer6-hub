@@ -152,10 +152,8 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 <h1>What should Chummer do next?</h1>
                 <p>Public requests, clear bugs, useful ideas.</p>
                 <h2>Current requests</h2>
-                <p>Open board</p>
                 <p>data-chummer-participate-frame</p>
                 <p>Board is live.</p>
-                <p>7 requests live</p>
                 <a href="/login?next=%2Fparticipate">Sign in to Chummer</a>
                 </body></html>
                 """

@@ -42,7 +42,6 @@ test('billing and participate stay first-party for guests and signed-in users', 
   expect(guestParticipateText).toContain('Board is live.');
   expect(guestParticipateText).toContain('Current requests');
   expect(guestParticipateText).toContain('Sign in to Chummer');
-  expect(guestParticipateText).toContain('7 requests live');
   expect(guestParticipateText).toContain('data-chummer-participate-frame');
   expect(guestParticipateText).not.toContain('ProductLift');
 
@@ -144,7 +143,7 @@ test('billing and participate stay first-party for guests and signed-in users', 
   await expect(page.locator('body')).toContainText('Current requests');
   await expect(page.locator('body')).not.toContainText('Board offline right now');
   await expect(page.locator('[data-chummer-participate-frame]')).toHaveCount(1);
-  await expect(page.locator('body')).toContainText('7 requests live');
+  await expect(page.locator('body')).toContainText('Board is live.');
   await expect(page.getByRole('link', { name: 'Account' })).toHaveAttribute('href', '/account');
   await expect(page.getByRole('link', { name: 'Supporter' })).toHaveAttribute('href', '/account/billing');
   await expect(page.locator('body')).not.toContainText('ProductLift');

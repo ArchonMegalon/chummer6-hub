@@ -44,7 +44,6 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.DoesNotContain("label: Get Chummer", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev", appNavigation, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
-        Assert.Contains("Open board", participateView, StringComparison.Ordinal);
         Assert.Contains("@PublicParticipateText(Model.Summary)", participateView, StringComparison.Ordinal);
         Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
         Assert.Contains("Board is live.", participateView, StringComparison.Ordinal);

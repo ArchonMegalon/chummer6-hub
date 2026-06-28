@@ -455,7 +455,8 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "Private support" in participate
     assert "Supporter" in participate
     assert "Support Chummer" not in participate
-    assert "Open board" in participate
+    assert "participate-preview-list" not in participate
+    assert "participate-preview-card" not in participate
     assert "BuildParticipatePageModel(" not in controller
     assert "ExternalBoardUrl" not in controller
     assert "ExternalBoardUrl" not in read("Chummer.Run.Api/ViewModels/SiteViewModels.cs")

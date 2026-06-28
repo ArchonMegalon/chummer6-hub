@@ -64,7 +64,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("text.includes('What should Chummer do next?')", text)
         self.assertIn("text.includes('Public requests, clear bugs, useful ideas.')", text)
         self.assertIn("text.includes('Current requests')", text)
-        self.assertIn("text.includes('Open board')", text)
+        self.assertIn("text.includes('Board is live.')", text)
         self.assertIn("text.includes('data-chummer-participate-frame')", text)
         self.assertIn("!text.includes('data-chummer-board-skin')", text)
         self.assertIn("!text.includes('ProductLift')", text)

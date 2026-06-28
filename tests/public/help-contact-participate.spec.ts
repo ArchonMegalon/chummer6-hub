@@ -51,7 +51,6 @@ test('help, contact, and participate keep public and private paths clear', async
   expect(participateText).toContain('Current requests');
   expect(participateText).toContain('Board is live.');
   expect(participateText).toContain('Sign in to Chummer');
-  expect(participateText).toContain('7 requests live');
   expect(participateText).toContain('data-chummer-participate-frame');
   expect(participateText).not.toContain('ProductLift');
   expect(new URL(participateBoardResponse.url()).pathname).toBe('/participate');
@@ -81,7 +80,6 @@ test('help, contact, and participate keep public and private paths clear', async
   await expect(participatePage.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
   await expect(participatePage.locator('body')).toContainText('Current requests');
   await expect(participatePage.locator('body')).toContainText('Board is live.');
-  await expect(participatePage.locator('body')).toContainText('7 requests live');
   await expect(participatePage.getByRole('link', { name: 'Sign in to Chummer' })).toBeVisible();
   await expect(participatePage.locator('[data-chummer-participate-frame]')).toHaveCount(1);
   await expect(participatePage.locator('body')).not.toContainText('ProductLift');

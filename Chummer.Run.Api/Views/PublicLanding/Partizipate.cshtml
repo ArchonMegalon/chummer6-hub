@@ -4,24 +4,9 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-minimal surface-participate surface-partizipate";
 
-    var boardSummary = string.IsNullOrWhiteSpace(Model.EntrySummary)
-        ? (Model.EmbeddedBoardEnabled ? "The board opens here." : "Board offline right now.")
-        : Model.EntrySummary;
     var boardStateSummary = Model.EmbeddedBoardEnabled
         ? "Board is live."
-        : Model.LoadedFromBoard
-            ? "Showing the last saved request snapshot."
-            : "Board offline right now.";
-    var requestCountLabel = Model.TotalRequestCount switch
-    {
-        > 1 => $"{Model.TotalRequestCount} requests live",
-        1 => "1 request live",
-        _ => string.Empty
-    };
-    var previewPosts = Model.Posts.Take(3).ToArray();
-    var previewFallbackItems = previewPosts.Length == 0 ? Model.FallbackItems.Take(3).ToArray() : System.Array.Empty<ParticipateItemViewModel>();
-    var hasPreviewItems = previewPosts.Length > 0 || previewFallbackItems.Length > 0;
-    var showPreview = hasPreviewItems && !Model.EmbeddedBoardEnabled;
+        : "Board offline right now.";
     static string PublicParticipateText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
@@ -40,10 +25,6 @@
         {
             <a class="button-like button-like--ghost" href="@Model.SupporterHref">Supporter</a>
         }
-        @if (!string.IsNullOrWhiteSpace(Model.DirectBoardHref))
-        {
-            <a class="button-like button-like--secondary" href="@Model.DirectBoardHref">Open board</a>
-        }
     </div>
 </section>
 
@@ -53,83 +34,6 @@
             <div class="participate-hosted__lead">
                 <h2>Current requests</h2>
                 <p>@boardStateSummary</p>
-            </div>
-            <div class="participate-hosted__status">
-                @if (!string.IsNullOrWhiteSpace(requestCountLabel))
-                {
-                    <span class="participate-count">@requestCountLabel</span>
-                }
-                @if (!string.IsNullOrWhiteSpace(Model.SyncedLabel) && !string.Equals(Model.SyncedLabel, boardStateSummary, StringComparison.Ordinal))
-                {
-                    <span class="participate-chip">@PublicParticipateText(Model.SyncedLabel)</span>
-                }
-            </div>
-        </div>
-
-        @if (!Model.EmbeddedBoardEnabled && !string.IsNullOrWhiteSpace(boardSummary))
-        {
-            <div class="participate-toolbar">
-                <p class="participate-toolbar__note">@PublicParticipateText(boardSummary)</p>
-            </div>
-        }
-
-        @if (showPreview)
-        {
-            <div class="participate-preview-list" aria-label="Request preview list">
-                @foreach (var post in previewPosts)
-                {
-                    var scoreLabel = post.Score == 1 ? "1 request" : $"{post.Score} requests";
-                    <article class="participate-preview-card">
-                        <div class="participate-preview-card__facts" aria-label="Request facts">
-                            <span>@scoreLabel</span>
-                            @if (post.CommentCount > 0)
-                            {
-                                <span>@post.CommentCount comment@(post.CommentCount == 1 ? string.Empty : "s")</span>
-                            }
-                            @if (!string.IsNullOrWhiteSpace(post.UpdatedLabel))
-                            {
-                                <span>@post.UpdatedLabel</span>
-                            }
-                            <span>@post.Status</span>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(post.Href))
-                        {
-                            <a class="participate-preview-card__title" href="@post.Href">@post.Title</a>
-                        }
-                        else
-                        {
-                            <h3>@post.Title</h3>
-                        }
-                        <p>@post.Summary</p>
-                        @if (!string.IsNullOrWhiteSpace(post.Href))
-                        {
-                            <a class="inline-link participate-preview-card__link" href="@post.Href">Open details</a>
-                        }
-                    </article>
-                }
-                @foreach (var item in previewFallbackItems)
-                {
-                    var scoreLabel = item.Score == 1 ? "1 request" : $"{item.Score} requests";
-                    <article class="participate-preview-card">
-                        <div class="participate-preview-card__facts" aria-label="Request facts">
-                            <span>@scoreLabel</span>
-                            <span>@item.Status</span>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(item.Href))
-                        {
-                            <a class="participate-preview-card__title" href="@item.Href">@item.Title</a>
-                        }
-                        else
-                        {
-                            <h3>@item.Title</h3>
-                        }
-                        <p>@item.Summary</p>
-                        @if (!string.IsNullOrWhiteSpace(item.Href))
-                        {
-                            <a class="inline-link participate-preview-card__link" href="@item.Href">Open details</a>
-                        }
-                    </article>
-                }
             </div>
         }
 

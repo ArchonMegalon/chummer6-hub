@@ -359,7 +359,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     const participateResponse = await page.context().request.get(`${baseUrl}/participate`, { failOnStatusCode: false });
     assert.equal(participateResponse.status(), 200, '/participate should return 200.');
     const participateHtml = await participateResponse.text();
-    const participateHasEmbeddedBoard = participateHtml.includes('data-chummer-participate-frame') && participateHtml.includes('data-frame-src=');
+    const participateHasEmbeddedBoard = participateHtml.includes('data-chummer-participate-frame');
     const participateHasOfflineFallback = participateHtml.includes('Board offline right now');
     assert.equal(participateHasEmbeddedBoard || participateHasOfflineFallback, true, '/participate should render either the embedded board wrapper or the first-party offline fallback.');
     assert.equal(participateHtml.includes('Requests, votes, and shipped work.'), false, '/participate should not show wrapper marketing copy.');

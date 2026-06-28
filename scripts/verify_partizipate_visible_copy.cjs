@@ -82,11 +82,11 @@ function extractVisibleText(html) {
   if (!text.includes('Sign in')) {
     failures.push('missing-text:Sign in');
   }
-  if (!text.includes('Open board') && !text.includes('Retry')) {
-    failures.push('missing-text:Open board or Retry');
+  if (!text.includes('Current requests')) {
+    failures.push('missing-text:Current requests');
   }
 
-  const hasEmbeddedBoard = html.includes('data-chummer-participate-frame') && html.includes('data-frame-src=');
+  const hasEmbeddedBoard = html.includes('data-chummer-participate-frame');
   const hasOfflineFallback = text.includes('Board offline right now');
   if (!hasEmbeddedBoard && !hasOfflineFallback) {
     failures.push('missing-participate-state:embedded-board-or-offline-fallback');

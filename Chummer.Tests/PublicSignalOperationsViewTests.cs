@@ -33,8 +33,9 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
         Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
         Assert.Contains("Board is live.", participateView, StringComparison.Ordinal);
-        Assert.Contains("showPreview = hasPreviewItems && !Model.EmbeddedBoardEnabled;", participateView, StringComparison.Ordinal);
-        Assert.Contains("@if (!Model.EmbeddedBoardEnabled && !string.IsNullOrWhiteSpace(boardSummary))", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("participate-preview-list", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("participate-preview-card", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("participate-toolbar", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Preview current requests", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Feedback and roadmap live here.", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);

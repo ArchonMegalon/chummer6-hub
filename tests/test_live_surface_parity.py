@@ -105,9 +105,9 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 b"<h1>What should Chummer do next?</h1>"
                 b"<p>Public requests, clear bugs, useful ideas.</p>"
                 b"<h2>Current requests</h2>"
-                b"<a href=\"/participate/board\">Open board</a>"
+                b"<p>Board is live.</p>"
                 b"<a href=\"/login?next=%2Fparticipate\">Sign in to Chummer</a>"
-                b"<a href=\"/participate/board/posts/mobile-companion\">Mobile companion app for dice rolling</a>"
+                b"<iframe data-chummer-participate-frame src=\"/participate/frame\"></iframe>"
                 b"</body></html>"
             )
             return
@@ -243,7 +243,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("What should Chummer do next?", participate_surface["required_texts"])
         self.assertIn("Public requests, clear bugs, useful ideas.", participate_surface["required_texts"])
         self.assertIn("Current requests", participate_surface["required_texts"])
-        self.assertIn("Open board", participate_surface["required_texts"])
+        self.assertIn("Board is live.", participate_surface["required_texts"])
         self.assertIn("data-chummer-board-skin", participate_surface["forbidden_html_texts"])
 
     def test_verify_blocks_provider_chrome_on_participate_board(self) -> None:
@@ -257,7 +257,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("Ctrl K", board_surface["forbidden_texts"])
         self.assertIn("×", board_surface["forbidden_texts"])
         self.assertIn("Could not load posts", board_surface["forbidden_texts"])
-        self.assertIn("Open board", board_surface["required_texts"])
+        self.assertIn("Board is live.", board_surface["required_texts"])
         self.assertIn("Current requests", board_surface["required_texts"])
         self.assertIn("<title>Participate · Chummer</title>", board_surface["required_html_texts"])
         self.assertIn("data-chummer-board-skin", board_surface["forbidden_html_texts"])

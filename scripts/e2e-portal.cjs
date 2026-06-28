@@ -150,7 +150,7 @@ const checks = [
       text.includes('What should Chummer do next?')
       && text.includes('Public requests, clear bugs, useful ideas.')
       && text.includes('Current requests')
-      && text.includes('Open board')
+      && text.includes('Board is live.')
       && text.includes('data-chummer-participate-frame')
       && !text.includes('data-chummer-board-skin')
       && !text.includes('ProductLift')
