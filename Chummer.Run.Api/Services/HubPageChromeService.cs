@@ -37,7 +37,8 @@ public sealed class HubPageChromeService
             {
                 string normalized = NormalizeRoute(link.Href);
                 return !string.Equals(normalized, "/participate", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(normalized, "/partizipate", StringComparison.OrdinalIgnoreCase);
+                    && !string.Equals(normalized, "/partizipate", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(normalized, "/mobile", StringComparison.OrdinalIgnoreCase);
             })
             .ToArray();
         var guestPublicSignalNavigation = nav.PublicSignal

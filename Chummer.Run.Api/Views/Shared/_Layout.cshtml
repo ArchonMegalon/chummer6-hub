@@ -100,6 +100,8 @@
             .Concat(buildAction is null ? Array.Empty<SiteChromeActionViewModel>() : new[] { buildAction })
             .ToArray();
     var showPrimaryNavInHeader = !minimalSurface && routeKey is not "landing";
+    const string launcherDesktopLabel = "Desktop";
+    const string launcherWebLabel = "Web";
     var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass}".Trim();
     var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "artifacts" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "privacy" or "terms" or "contact"
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
@@ -432,8 +434,8 @@
                                                         <span class="site-account-menu__label">@action.Label</span>
                                                     </summary>
                                                     <div class="site-account-menu__panel">
-                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">Build</a>
-                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">Play</a>
+                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">@launcherDesktopLabel</a>
+                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">@launcherWebLabel</a>
                                                     </div>
                                                 </details>
                                             }
@@ -471,8 +473,8 @@
                                                 <span class="site-account-menu__label">@action.Label</span>
                                             </summary>
                                             <div class="site-account-menu__panel">
-                                                <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">Build</a>
-                                                <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">Play</a>
+                                                <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">@launcherDesktopLabel</a>
+                                                <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">@launcherWebLabel</a>
                                             </div>
                                         </details>
                                     }
@@ -556,8 +558,8 @@
                                                         <span class="site-account-menu__label">@action.Label</span>
                                                     </summary>
                                                     <div class="site-account-menu__panel">
-                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">Build</a>
-                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">Play</a>
+                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">@launcherDesktopLabel</a>
+                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">@launcherWebLabel</a>
                                                     </div>
                                                 </details>
                                             }
@@ -595,8 +597,8 @@
                                         <span class="site-account-menu__label">@action.Label</span>
                                     </summary>
                                     <div class="site-account-menu__panel">
-                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">Build</a>
-                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">Play</a>
+                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">@launcherDesktopLabel</a>
+                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">@launcherWebLabel</a>
                                     </div>
                                 </details>
                             }
