@@ -1,8 +1,8 @@
 {
   "contractName": "chummer.downloads.aur_packages.v1",
   "contract_name": "chummer.downloads.aur_packages.v1",
-  "generatedAt": "2026-06-28T16:52:03Z",
-  "generated_at": "2026-06-28T16:52:03Z",
+  "generatedAt": "2026-06-28T19:52:00Z",
+  "generated_at": "2026-06-28T19:52:00Z",
   "version": "run-20260627-005402",
   "channel": "public_stable",
   "packages": [

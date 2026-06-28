@@ -28,7 +28,7 @@
   "artifactInstallLaunchCapturePath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/startup-smoke/installed-launch-avalonia-linux-x64.bin",
   "artifactInstallWrapperCapturePath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/startup-smoke/installed-wrapper-avalonia-linux-x64.sh",
   "artifactInstallDesktopEntryCapturePath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/startup-smoke/installed-desktop-entry-avalonia-linux-x64.desktop",
-  "artifactPath": "/docker/chummercomplete/chummer-presentation/.tmp/publish-guidance-deploy/files/chummer-avalonia-linux-x64-installer.deb",
+  "artifactPath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/files/chummer-avalonia-linux-x64-installer.deb",
   "artifactFileName": "chummer-avalonia-linux-x64-installer.deb",
   "fileName": "chummer-avalonia-linux-x64-installer.deb",
   "artifactRelativePath": "files/chummer-avalonia-linux-x64-installer.deb",
