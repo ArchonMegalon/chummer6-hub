@@ -2176,11 +2176,13 @@ async Task VerifyPublicLandingProjectionAsync()
             ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
             ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
             ["CHUMMER_SUPPORT_ATTACHMENT_ROOT"] = Path.Combine(tempRoot, "support-attachments"),
+            ["CHUMMER_PUBLIC_PARTICIPATE_SNAPSHOT_STORE_PATH"] = Path.Combine(tempRoot, "public-participate-snapshot.json"),
             ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(tempRoot, "billing-store.json"),
             ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = Path.Combine(tempRoot, "myfirstbook-usage-store.json"),
             ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORE_PATH"] = Path.Combine(tempRoot, "horizon-artifact-usage-store.json"),
             ["CHUMMER_HORIZON_ARTIFACT_REQUEST_RECEIPT_STORE_PATH"] = Path.Combine(tempRoot, "horizon-artifact-request-receipts.json"),
             ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
+            ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = "https://participate.example.invalid",
             ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
             ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "true",
             ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_BASE_URL"] = "http://ea-smoke:8090",
@@ -3024,14 +3026,45 @@ async Task VerifyPublicLandingProjectionAsync()
     };
     var windowsProofInstallers = new WindowsProofInstallerService(configuration);
     var aurPackages = new AurPackageCatalogService(configuration);
-    var controller = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, participationNotifications, runsiteTourQuota, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>(), horizonArtifactRequests)
+    var participateStore = new PublicParticipateSnapshotStore(configuration, loggerFactory.CreateLogger<PublicParticipateSnapshotStore>());
+    var participateSnapshotHttpClientFactory = new StubHttpClientFactory(
+        new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(
+            new
+            {
+                total = 1,
+                data = new[]
+                {
+                    new
+                    {
+                        id = "readable-dark-mode",
+                        title = "Readable dark mode",
+                        description_short = "Keep controls legible in dark mode.",
+                        description = "<p>Ensure text, fields, and overlays stay readable across every dark surface.</p>",
+                        votes_count = 17,
+                        comments_count = 4,
+                        updated_at = "2026-06-29T08:00:00Z",
+                        proxy_url = "/p/readable-dark-mode",
+                        status = new { name = "Gathering votes" },
+                        category = new { name = "Feature" }
+                    }
+                }
+            },
+            HttpStatusCode.OK))));
+    var participateSnapshots = new PublicParticipateSnapshotService(
+        participateStore,
+        configuration,
+        participateSnapshotHttpClientFactory,
+        publicWebHostEnvironment,
+        loggerFactory.CreateLogger<PublicParticipateSnapshotService>());
+    await participateSnapshots.RefreshAsync(CancellationToken.None);
+    var controller = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, participationNotifications, runsiteTourQuota, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, participateSnapshots, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>(), horizonArtifactRequests)
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, runsiteTourQuota, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>(), horizonArtifactRequests)
+    var authenticatedLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, runsiteTourQuota, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, participateSnapshots, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>(), horizonArtifactRequests)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -5776,7 +5809,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, runsiteTourQuota, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, runsiteTourQuota, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, aurPackages, participateSnapshots, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
