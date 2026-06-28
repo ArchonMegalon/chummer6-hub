@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-28T23:48:02Z",
+  "generated_at_utc": "2026-06-28T23:57:17Z",
   "base_url": "https://chummer.run",
   "require_brilliant_directories_checkout": false,
   "status": "pass",
@@ -288,12 +288,12 @@
       "redirect_chain": [],
       "required_texts": [
         "Roadmap",
-        "Now and next.",
-        "Planned work is here. Shipped work stays in Changelog."
+        "In progress.",
+        "Planned work lives here. Shipped work moves to Changelog."
       ],
       "required_any_texts": [
-        "Current work opens below.",
-        "Current requests live in Participate."
+        "Work opens below.",
+        "Requests stay in Participate."
       ],
       "required_html_texts": [],
       "missing_required_texts": [],
@@ -326,12 +326,12 @@
       ],
       "required_texts": [
         "Roadmap",
-        "Now and next.",
-        "Planned work is here. Shipped work stays in Changelog."
+        "In progress.",
+        "Planned work lives here. Shipped work moves to Changelog."
       ],
       "required_any_texts": [
-        "Current work opens below.",
-        "Current requests live in Participate."
+        "Work opens below.",
+        "Requests stay in Participate."
       ],
       "required_html_texts": [],
       "missing_required_texts": [],
