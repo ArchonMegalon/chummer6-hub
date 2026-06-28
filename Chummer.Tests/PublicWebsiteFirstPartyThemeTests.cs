@@ -48,7 +48,7 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.DoesNotContain("productlift.dev", appNavigation, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
         Assert.Contains("@PublicParticipateText(Model.Summary)", participateView, StringComparison.Ordinal);
-        Assert.Contains("Requests", participateView, StringComparison.Ordinal);
+        Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
         Assert.Contains("Board is live.", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Feedback and roadmap live here.", participateView, StringComparison.Ordinal);
         Assert.Contains("Model.EmbeddedBoardHref", participateView, StringComparison.Ordinal);
@@ -79,13 +79,13 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("\"~/Views/PublicLanding/Roadmap.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/roadmap{Request.QueryString}\");", controller, StringComparison.Ordinal);
         Assert.Contains("pageTitle: \"Roadmap - Chummer.run\"", controller, StringComparison.Ordinal);
-        Assert.Contains("hostedHeadingReplacement: \"Now and next\"", controller, StringComparison.Ordinal);
+        Assert.Contains("hostedHeadingReplacement: \"In progress.\"", controller, StringComparison.Ordinal);
         Assert.Contains("HostedBoardHtmlLooksUnavailable(html)", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("BuildRoadmapFallbackPageModelAsync", controller, StringComparison.Ordinal);
         Assert.Contains("RoadmapBoardFallbackAsync", controller, StringComparison.Ordinal);
         Assert.Contains("data-chummer-roadmap-frame", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Current work opens below.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Work opens below.", roadmapView, StringComparison.Ordinal);
     }
 
     [Fact]

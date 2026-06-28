@@ -196,8 +196,8 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
         Assert.Contains("<base href=\"/roadmap/\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
         Assert.Contains("<link rel=\"canonical\" href=\"/roadmap\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("Now and next", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("Planned work is here. Shipped work stays in Changelog.", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("In progress.", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("Planned work lives here. Shipped work moves to Changelog.", content.Content ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -345,7 +345,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("Now and next", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("In progress.", content.Content ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -369,7 +369,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("hit", staleController.Response.Headers["X-Chummer-Hosted-Board-Cache"].ToString());
-        Assert.Contains("Now and next", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("In progress.", content.Content ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]

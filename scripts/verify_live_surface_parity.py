@@ -196,12 +196,12 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             "path": "/roadmap",
             "required_texts": [
                 "Roadmap",
-                "Now and next.",
-                "Planned work is here. Shipped work stays in Changelog.",
+                "In progress.",
+                "Planned work lives here. Shipped work moves to Changelog.",
             ],
             "required_any_texts": [
-                "Current work opens below.",
-                "Current requests live in Participate.",
+                "Work opens below.",
+                "Requests stay in Participate.",
             ],
             "forbidden_texts": [
                 "ProductLift",
@@ -215,12 +215,12 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             "path": "/roadmap/board",
             "required_texts": [
                 "Roadmap",
-                "Now and next.",
-                "Planned work is here. Shipped work stays in Changelog.",
+                "In progress.",
+                "Planned work lives here. Shipped work moves to Changelog.",
             ],
             "required_any_texts": [
-                "Current work opens below.",
-                "Current requests live in Participate.",
+                "Work opens below.",
+                "Requests stay in Participate.",
             ],
             "required_final_url_prefix": "/roadmap",
             "forbidden_texts": [

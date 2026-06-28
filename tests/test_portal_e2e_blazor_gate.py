@@ -171,9 +171,9 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 """
                 <html><body>
                 <h1>Roadmap</h1>
-                <p>Now and next.</p>
-                <p>Planned work is here. Shipped work stays in Changelog.</p>
-                <p>Current work opens below.</p>
+                <p>In progress.</p>
+                <p>Planned work lives here. Shipped work moves to Changelog.</p>
+                <p>Work opens below.</p>
                 <div>data-chummer-roadmap-frame</div>
                 </body></html>
                 """

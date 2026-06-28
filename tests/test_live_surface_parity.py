@@ -127,18 +127,18 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 self.wfile.write(
                     b"<html><body>"
                     b"<title>Roadmap \xc2\xb7 Chummer</title>"
-                    b"<h1>Now and next.</h1>"
-                    b"<p>Planned work is here. Shipped work stays in Changelog.</p>"
-                    b"<h2>Current requests live in Participate.</h2>"
+                    b"<h1>In progress.</h1>"
+                    b"<p>Planned work lives here. Shipped work moves to Changelog.</p>"
+                    b"<h2>Requests stay in Participate.</h2>"
                     b"</body></html>"
                 )
             else:
                 self.wfile.write(
                     b"<html><body>"
                     b"<title>Roadmap \xc2\xb7 Chummer</title>"
-                    b"<h1>Now and next.</h1>"
-                    b"<p>Planned work is here. Shipped work stays in Changelog.</p>"
-                    b"<p>Current work opens below.</p>"
+                    b"<h1>In progress.</h1>"
+                    b"<p>Planned work lives here. Shipped work moves to Changelog.</p>"
+                    b"<p>Work opens below.</p>"
                     b"</body></html>"
                 )
             return

@@ -148,19 +148,19 @@ const checks = [
     url: `${baseUrl}/roadmap`,
     assert: text =>
       text.includes('Roadmap')
-      && text.includes('Now and next.')
-      && text.includes('Planned work is here. Shipped work stays in Changelog.')
-      && (text.includes('Current work opens below.') || text.includes('Current requests live in Participate.'))
-      && (text.includes('data-chummer-roadmap-frame') || text.includes('Current requests live in Participate.'))
+      && text.includes('In progress.')
+      && text.includes('Planned work lives here. Shipped work moves to Changelog.')
+      && (text.includes('Work opens below.') || text.includes('Requests stay in Participate.'))
+      && (text.includes('data-chummer-roadmap-frame') || text.includes('Requests stay in Participate.'))
       && !text.includes('ProductLift')
   },
   {
     url: `${baseUrl}/roadmap/board`,
     assert: (text, response) =>
       /\/roadmap\/?$/.test(response.url)
-      && text.includes('Now and next.')
-      && text.includes('Planned work is here. Shipped work stays in Changelog.')
-      && (text.includes('Current work opens below.') || text.includes('Current requests live in Participate.'))
+      && text.includes('In progress.')
+      && text.includes('Planned work lives here. Shipped work moves to Changelog.')
+      && (text.includes('Work opens below.') || text.includes('Requests stay in Participate.'))
       && !text.includes('ProductLift')
   },
   {
