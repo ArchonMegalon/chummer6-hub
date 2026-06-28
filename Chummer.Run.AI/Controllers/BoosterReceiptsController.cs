@@ -9,6 +9,8 @@ namespace Chummer.Run.AI.Controllers;
 [Route("api/v1/ai/booster")]
 public sealed class BoosterReceiptsController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly BoosterProjectionAccessGuard _accessGuard;
     private readonly BoosterReceiptProjectionService _projections;
     private readonly BoosterReceiptVerifier _verifier;
@@ -21,6 +23,7 @@ public sealed class BoosterReceiptsController : ControllerBase
     }
 
     [HttpPost("receipts")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<ReceiptIngestResultDto>(StatusCodes.Status200OK)]
     public ActionResult<ReceiptIngestResultDto> IngestReceipt([FromBody] JsonElement receipt)
     {

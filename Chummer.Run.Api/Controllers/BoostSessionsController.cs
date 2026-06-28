@@ -30,6 +30,7 @@ public sealed class BoostSessionsController : ControllerBase
     public IActionResult BoostPage() => Redirect("/participate/codex");
 
     [HttpPost]
+    [RequestSizeLimit(BoostSessionService.MaxCreateRequestBodyBytes)]
     [ProducesResponseType<SponsorSessionStatusDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<SponsorSessionStatusDto>> Create([FromBody] CreateSponsorSessionRequest? request, CancellationToken cancellationToken)
     {

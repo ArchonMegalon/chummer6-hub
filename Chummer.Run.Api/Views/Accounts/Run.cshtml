@@ -1,0 +1,153 @@
+@using System.Globalization
+@model AccountPageViewModel
+@{
+    ViewData["Title"] = "Roster";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+
+    var selectedRun = Model.SelectedRun;
+    var selectedRunWorkspace = selectedRun is null
+        ? null
+        : Model.CampaignSpine.Workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, selectedRun.CampaignId, StringComparison.OrdinalIgnoreCase));
+    var selectedRunWorkspaceHref = selectedRunWorkspace is null
+        ? "/account/work"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}";
+    var selectedRunAftermathHref = selectedRunWorkspace is null
+        ? "/account/work#aftermath-packages"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#aftermath-packages";
+    var selectedRunCarryForwardHref = selectedRunWorkspace is null
+        ? "/account/work#selected-next-session-carry-forward"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#selected-next-session-carry-forward";
+    var statusLabel = string.IsNullOrWhiteSpace(selectedRun?.Status)
+        ? "Active"
+        : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(selectedRun.Status.Replace('_', ' '));
+    var activeScene = selectedRun?.Scenes.FirstOrDefault(scene => string.Equals(scene.SceneId, selectedRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase));
+    var selectedRunTablePulseSummary = selectedRun is null
+        ? string.Empty
+        : selectedRun.LatestContinuity is not null
+            ? "A follow-up is already live."
+            : "Ready for the next Table Pulse reaction.";
+}
+
+@if (selectedRun is null)
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">Roster</p>
+            <h1>Run not found</h1>
+            <p>This run is not attached to this account anymore.</p>
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" href="/account/work">Back to roster</a>
+            </div>
+        </div>
+    </section>
+}
+else
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">Roster</p>
+            <h1>@selectedRun.Title</h1>
+            <p>@selectedRun.Summary</p>
+            <ul class="minimal-hero__points">
+                <li>@statusLabel</li>
+                <li>@selectedRun.Objectives.Count objective@(selectedRun.Objectives.Count == 1 ? string.Empty : "s")</li>
+                <li>@selectedRun.Scenes.Count scene@(selectedRun.Scenes.Count == 1 ? string.Empty : "s")</li>
+            </ul>
+            <div class="minimal-actions">
+                <a class="button-like button-like--ghost" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--secondary" href="@selectedRunWorkspaceHref">Open campaign</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="minimal-section">
+        <div class="minimal-lane-grid minimal-platform-list">
+            <article class="minimal-lane-card">
+                <span class="tag">State</span>
+                <h2>@statusLabel</h2>
+                <p>@(activeScene is null ? "No active scene is pinned yet." : $"Active scene: {activeScene.Title}.")</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Campaign</span>
+                <h2>@(selectedRunWorkspace?.CampaignName ?? "Campaign")</h2>
+                <p>@(selectedRunWorkspace?.ReturnSummary ?? "Open the campaign for this run.")</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Continuity</span>
+                <h2>@(selectedRun.LatestContinuity is null ? "Ready" : "Live")</h2>
+                <p>@(selectedRun.LatestContinuity?.Summary ?? "The next reaction can land here.")</p>
+            </article>
+        </div>
+    </section>
+
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <h2>Next</h2>
+            <p>Current run and the next step.</p>
+        </div>
+        <article class="minimal-lane-card">
+            <div class="settings-summary-list">
+                <div class="settings-summary-row">
+                    <span>Table Pulse</span>
+                    <strong>@selectedRunTablePulseSummary</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Campaign</span>
+                    <strong>@(selectedRunWorkspace is null ? "Open campaign" : $"{selectedRunWorkspace.CampaignName} · next step")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Aftermath</span>
+                    <strong>@(selectedRunWorkspace?.AftermathPackages is { Count: > 0 } ? $"{selectedRunWorkspace.AftermathPackages.Count} package(s)" : "Armed")</strong>
+                </div>
+            </div>
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" href="/account/ledger/notifications">Open Table Pulse</a>
+                <a class="button-like button-like--ghost" href="/signal-deck">Signal Deck</a>
+                <a class="button-like button-like--ghost" href="/living-world">Living World</a>
+                <a class="button-like button-like--ghost" href="@selectedRunCarryForwardHref">Next session note</a>
+                <a class="button-like button-like--ghost" href="@selectedRunAftermathHref">Aftermath</a>
+            </div>
+        </article>
+    </section>
+
+    @if (selectedRun.Objectives.Count > 0)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Objectives</h2>
+                <p>Current pressure only.</p>
+            </div>
+            <div class="minimal-lane-grid minimal-platform-list">
+                @foreach (var objective in selectedRun.Objectives.Take(3))
+                {
+                    <article class="minimal-lane-card">
+                        <span class="tag">@objective.Pressure</span>
+                        <h3>@objective.Title</h3>
+                        <p>@objective.Summary</p>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    @if (selectedRun.Scenes.Count > 0)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Scenes</h2>
+                <p>Latest visible scenes.</p>
+            </div>
+            <div class="minimal-lane-grid minimal-platform-list">
+                @foreach (var scene in selectedRun.Scenes.Take(3))
+                {
+                    <article class="minimal-lane-card">
+                        <span class="tag">@scene.Status</span>
+                        <h3>@scene.Title</h3>
+                        <p>@scene.Summary</p>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+}

@@ -107,6 +107,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     [HttpPost("redeem")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<RedeemInstallClaimResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<RedeemInstallClaimResponseDto> Redeem([FromBody] RedeemInstallClaimRequestDto? request)
     {
@@ -126,6 +127,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     [HttpPost("grants/refresh")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<RefreshInstallationGrantResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<RefreshInstallationGrantResponseDto> RefreshGrant([FromBody] RefreshInstallationGrantRequestDto? request)
     {
@@ -145,6 +147,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     [HttpPost("grants/revoke")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<RevokeInstallationGrantResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<RevokeInstallationGrantResponseDto> RevokeGrant([FromBody] RevokeInstallationGrantRequestDto? request)
     {
@@ -164,6 +167,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     [HttpPost("callbacks/exchange")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<ExchangeInstallBrowserCallbackResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<ExchangeInstallBrowserCallbackResponseDto> ExchangeBrowserCallback([FromBody] ExchangeInstallBrowserCallbackRequestDto? request)
     {
@@ -183,6 +187,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     [HttpPost("desktop-launch/exchange")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<DesktopAccountLaunchExchangeResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<DesktopAccountLaunchExchangeResponseDto> ExchangeDesktopLaunch([FromBody] DesktopAccountLaunchExchangeRequestDto? request)
     {
@@ -505,6 +510,7 @@ public sealed class InstallLinkingController : ControllerBase
         => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
 
     [HttpPost("continuation")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<DesktopInstallNativeContinuationResponse>(StatusCodes.Status200OK)]
     public ActionResult<DesktopInstallNativeContinuationResponse> ContinueClaimedInstall([FromBody] DesktopInstallNativeContinuationRequest? request)
     {
@@ -587,6 +593,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     [HttpPost("continuation/workspaces/list")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<InstallLinkedWorkspaceSnapshotListResponse>(StatusCodes.Status200OK)]
     public ActionResult<InstallLinkedWorkspaceSnapshotListResponse> ListClaimedInstallWorkspaces([FromBody] DesktopInstallNativeContinuationRequest? request)
     {
@@ -655,6 +662,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     [HttpPost("continuation/support")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<DesktopInstallNativeSupportResponse>(StatusCodes.Status202Accepted)]
     public ActionResult<DesktopInstallNativeSupportResponse> SubmitClaimedInstallSupport([FromBody] DesktopInstallNativeSupportRequest? request)
     {
@@ -730,6 +738,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     [HttpPost("continuation/update")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<DesktopInstallNativeUpdateResponse>(StatusCodes.Status200OK)]
     public ActionResult<DesktopInstallNativeUpdateResponse> PlanClaimedInstallUpdate([FromBody] DesktopInstallNativeContinuationRequest? request)
     {
@@ -796,6 +805,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     [HttpPost("continuation/rollback")]
+    [RequestSizeLimit(InstallLinkingService.MaxRequestBodyBytes)]
     [ProducesResponseType<DesktopInstallNativeRollbackResponse>(StatusCodes.Status200OK)]
     public ActionResult<DesktopInstallNativeRollbackResponse> PlanClaimedInstallRollback([FromBody] DesktopInstallNativeContinuationRequest? request)
     {

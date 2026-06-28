@@ -21,9 +21,9 @@
         .Where(option => stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase))
         .Where(option => nightly is null || !string.Equals(option.Artifact.Id, nightly.Artifact.Id, StringComparison.OrdinalIgnoreCase))
         .ToArray();
-    var showLinuxSourcePrimary = true;
-    var hasOtherDownloads = true;
     var sourceScriptHref = "/downloads/build-chummer6-linux.sh";
+    var showLinuxSourcePrimary = !string.IsNullOrWhiteSpace(sourceScriptHref);
+    var hasOtherDownloads = showLinuxSourcePrimary || otherPlatformOptions.Length > 0;
     static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     static string PlatformId(ReleaseOptionViewModel? option)
@@ -84,7 +84,7 @@
 <section class="minimal-page-hero downloads-simple-hero">
     <div>
         <h1>Downloads</h1>
-        <p>Recommended from your browser. Other platforms stay out of the way.</p>
+        <p>Main build for this browser. Other downloads stay below.</p>
     </div>
 </section>
 
@@ -103,7 +103,7 @@ else
             <div>
                 <span>Stable</span>
                 <h2>@(stable is null ? $"{release.RequestedPlatformLabel} unavailable" : stable.PlatformLabel)</h2>
-                <p>@(stable is null ? "No public installer for this browser yet." : "Recommended for this browser.")</p>
+                <p>@(stable is null ? "No public installer for this browser yet." : "Main build for this browser.")</p>
             </div>
             @if (stable is null)
             {
@@ -185,7 +185,7 @@ else
                         <div>
                             <span>@option.PlatformLabel</span>
                             <h2>@option.HeadLabel</h2>
-                            <p>Use this only when you need this platform.</p>
+                            <p>Only if you need this platform.</p>
                         </div>
                         <a class="button-like button-like--ghost"
                            href="@option.DispatchHref"

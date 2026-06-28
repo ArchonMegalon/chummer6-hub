@@ -239,7 +239,7 @@ public sealed class HostedBoundedContextCoverageService
             ? "/account/support"
             : $"/account/support/{Uri.EscapeDataString(supportCase.CaseId)}";
         string summary = supportCase is null
-            ? "Support context stays first-party and account-aware even when no tracked case exists yet."
+            ? "Support context stays first-party and account-aware even when no support case exists yet."
             : $"{supportCase.Status} support case {supportCase.CaseId} keeps crash, feedback, fix-availability, and reporter followthrough on the account support page.";
 
         return new HostedBoundedContextCoverageProjection(
@@ -257,10 +257,10 @@ public sealed class HostedBoundedContextCoverageService
             EvidenceLines:
             [
                 supportCase is null
-                    ? "No tracked support case exists yet, so first-party support intake remains the only safe support route."
+                    ? "No support case exists yet, so first-party support intake remains the only safe support route."
                     : $"Support case {supportCase.CaseId} currently reports {supportCase.Status} on the account support page.",
                 "Support status, crash routing, and reporter followthrough stay first-party and privacy-bounded instead of becoming public folklore.",
-                "/contact#support-intake is the public comparison route when a user needs first-party intake before a tracked case exists."
+                "/contact#support-intake is the public comparison route when a user needs first-party intake before a support case exists."
             ],
             Actions:
             [

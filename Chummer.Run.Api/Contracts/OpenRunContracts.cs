@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Chummer.Contracts.Receipts;
 
 namespace Chummer.Run.Api.Contracts;
@@ -110,54 +111,54 @@ public sealed record OpenRunOrchestrationProjection(
     OpenRunCloseoutProjection? Closeout);
 
 public sealed record OpenRunCreateRequest(
-    string? RunId,
-    string ListingTitle,
-    string? Summary,
-    string Visibility,
-    string TableContractSummary,
-    string AdmissionMode,
+    [property: StringLength(128)] string? RunId,
+    [property: Required(AllowEmptyStrings = false), StringLength(160)] string ListingTitle,
+    [property: StringLength(4000)] string? Summary,
+    [property: Required(AllowEmptyStrings = false), StringLength(32)] string Visibility,
+    [property: Required(AllowEmptyStrings = false), StringLength(4000)] string TableContractSummary,
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string AdmissionMode,
     int SeatsTotal,
     bool RequireRunnerDossier,
     bool AllowQuickstartRunner,
-    string SchedulingMode,
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string SchedulingMode,
     int ExpectedDurationMinutes,
-    string Platform,
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string Platform,
     bool VoiceRequired,
-    string ObserverMode,
-    IReadOnlyList<string>? ReservedSeatRoles,
-    string? Note = null);
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string ObserverMode,
+    [property: MaxLength(8)] IReadOnlyList<string>? ReservedSeatRoles,
+    [property: StringLength(1024)] string? Note = null);
 
 public sealed record OpenRunJoinRequestCommand(
-    string? DossierId,
-    string? QuickstartPackId,
+    [property: StringLength(128)] string? DossierId,
+    [property: StringLength(128)] string? QuickstartPackId,
     bool TableContractAcknowledged,
     bool VoiceConsentAcknowledged,
     bool PlatformReady,
-    string? Note = null);
+    [property: StringLength(1024)] string? Note = null);
 
 public sealed record OpenRunJoinReviewRequest(
-    string Decision,
-    string? Note = null);
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string Decision,
+    [property: StringLength(1024)] string? Note = null);
 
 public sealed record OpenRunScheduleRequest(
     DateTimeOffset StartsAtUtc,
-    string Timezone,
-    string? Note = null);
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string Timezone,
+    [property: StringLength(1024)] string? Note = null);
 
 public sealed record OpenRunMeetingHandoffRequest(
-    string ProviderKind,
-    string ProviderLabel,
-    string AccessPolicy,
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string ProviderKind,
+    [property: Required(AllowEmptyStrings = false), StringLength(160)] string ProviderLabel,
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string AccessPolicy,
     DateTimeOffset ExpiresAtUtc,
-    string? Note = null);
+    [property: StringLength(1024)] string? Note = null);
 
 public sealed record OpenRunCloseoutRequest(
-    string Summary,
-    string WorldTickSummary,
-    string ConsequenceSummary,
-    string NewsTitle,
-    string NewsSummary,
-    string? NewsSource = null,
-    string? NewsUrl = null,
-    string? NextSafeAction = null,
-    string? Note = null);
+    [property: Required(AllowEmptyStrings = false), StringLength(4000)] string Summary,
+    [property: Required(AllowEmptyStrings = false), StringLength(4000)] string WorldTickSummary,
+    [property: Required(AllowEmptyStrings = false), StringLength(4000)] string ConsequenceSummary,
+    [property: Required(AllowEmptyStrings = false), StringLength(160)] string NewsTitle,
+    [property: Required(AllowEmptyStrings = false), StringLength(4000)] string NewsSummary,
+    [property: StringLength(160)] string? NewsSource = null,
+    [property: StringLength(2048)] string? NewsUrl = null,
+    [property: StringLength(1024)] string? NextSafeAction = null,
+    [property: StringLength(1024)] string? Note = null);

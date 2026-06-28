@@ -10,6 +10,8 @@ namespace Chummer.Run.Api.Controllers;
 [AutoValidateAntiforgeryToken]
 public sealed class AuthController : Controller
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly HubBrowserAuthService _browserAuth;
     private readonly HubIdentityClient _identity;
     private readonly PublicLandingService _landing;
@@ -114,6 +116,7 @@ public sealed class AuthController : Controller
     }
 
     [HttpPost("/auth/email/start")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ValidateAntiForgeryToken]
     [Consumes("application/x-www-form-urlencoded")]
     [Produces("text/html")]
@@ -153,17 +156,17 @@ public sealed class AuthController : Controller
             && !string.IsNullOrWhiteSpace(started.TicketId)
             && HubBrowserAuthService.ShouldExposeInlinePreviewLink(Request);
         string supportLine = inlinePreviewAllowed
-            ? $"{started.PreviewNote} After confirmation, Chummer sends you back to {nextTarget}."
+            ? $"{started.PreviewNote} After confirmation, Chummer returns to {nextTarget}."
             : string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
-                ? $"Email delivery is not available on this host right now. Chummer did not expose a browser sign-in link. After delivery is restored, sign-in will return you to {nextTarget}."
-                : $"{started.PreviewNote} After confirmation, Chummer sends you back to {nextTarget}.";
+                ? $"Email delivery is not available on this host right now. Try again later or use Google. Chummer will still return to {nextTarget}."
+                : $"{started.PreviewNote} After confirmation, Chummer returns to {nextTarget}.";
         var model = new AuthMessagePageViewModel(
             Chrome: _chrome.BuildPublicChrome("Open your email", "Finish the magic-link step and come back to your account.", "/login"),
             Heading: "Open your email",
             SupportLine: supportLine,
-            Notice: $"Email: {started.Email} · expires {started.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC · next stop: {nextTarget}",
+            Notice: started.Email,
             PrimaryLabel: inlinePreviewAllowed
-                ? $"Open the confirmation link for {nextTarget}"
+                ? "Open confirmation link"
                 : string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase) && _google.IsConfigured()
                     ? "Continue with Google"
                     : "Return to sign in",
@@ -177,11 +180,11 @@ public sealed class AuthController : Controller
             StateLabel: "Magic link sent",
             Highlights:
             [
-                $"Check {started.Email} for the Chummer sign-in email.",
+                $"Link expires {started.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC.",
                 inlinePreviewAllowed
-                    ? "Open the confirmation link in the same browser when possible."
+                    ? "Open it in this browser when you can."
                     : "If delivery is not available yet, use Google or try again after email delivery is restored.",
-                $"After confirmation, Chummer sends you back to {nextTarget}."
+                $"After confirmation, Chummer returns to {nextTarget}."
             ]);
         return View("~/Views/Auth/Message.cshtml", model);
     }
@@ -526,6 +529,7 @@ public sealed class AuthController : Controller
     }
 
     [HttpPost("/auth/google/merge")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ConfirmGoogleMerge([FromForm] string? mergeToken, CancellationToken cancellationToken)
     {
@@ -667,13 +671,16 @@ public sealed class AuthController : Controller
         _landing.LoadSurface();
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, Request.Headers.UserAgent.ToString(), authenticated: false);
+        var nextTarget = DescribeNextTarget(nextPath);
         var supportLine = createAccount
-            ? "Claiming only connects this copy to your account. Use email first. Google is optional."
-            : "Keep this copy attached to your account. Use email first. Google is optional.";
+            ? "Claim this copy when you want installs, support, and recovery together."
+            : "Email first. Google if you prefer.";
+        var returnLine = $"After this step, Chummer returns to {nextTarget}.";
         return new AuthPageViewModel(
             Chrome: _chrome.BuildPublicChrome(heading, supportLine, createAccount ? "/signup" : "/login"),
             Heading: heading,
             SupportLine: supportLine,
+            ReturnLine: returnLine,
             NextPath: nextPath,
             CreateAccount: createAccount,
             GoogleAvailable: _google.IsConfigured(),

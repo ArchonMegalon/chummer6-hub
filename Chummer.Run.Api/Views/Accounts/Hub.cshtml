@@ -10,8 +10,8 @@
         <h1>@Model.Heading</h1>
         <p>@Model.Summary</p>
         <ul class="minimal-hero__points">
-            <li>Signed in as @Model.User.DisplayName</li>
-            <li>Membership: @Model.MembershipLabel</li>
+            <li>@Model.User.DisplayName</li>
+            <li>@Model.MembershipLabel · @Model.MembershipSummary</li>
             <li>@Model.BookQuotaSummary</li>
         </ul>
     </div>

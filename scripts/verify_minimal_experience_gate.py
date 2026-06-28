@@ -111,8 +111,12 @@ def build_payload(
     hero_image_loaded = bool(image_urls) and all(asset_checker(url) for url in image_urls)
     video_sources_load = all(asset_checker(urljoin(f"{normalized_base_url}/", source)) for source in product_video_sources)
     promo_video_link_load = all(asset_checker(urljoin(f"{normalized_base_url}/", link)) for link in product_video_links)
-    stable_visible = 'id="stable"' in downloads_html and "Current build" in downloads_html
-    nightly_visible = 'id="nightly"' in downloads_html and "Newest build" in downloads_html
+    stable_visible = (
+        'id="stable"' in downloads_html
+        and "Stable" in downloads_html
+        and "Main build for this browser." in downloads_html
+    )
+    nightly_visible = 'id="nightly"' in downloads_html and "Nightly" in downloads_html
     decision_card_count = count_class_token(status_html, "minimal-status-pill")
     next_action_count = count_occurrences(status_html, 'data-analytics-event="status_next_action"')
     status_updated_count = count_occurrences(status_html, "Updated")
@@ -136,8 +140,8 @@ def build_payload(
         failures.append("downloads nightly lane is not visible")
     if decision_card_count != 1:
         failures.append("status page should expose exactly one decision card")
-    if next_action_count < 3:
-        failures.append("status page should expose at least three next actions")
+    if next_action_count != 2:
+        failures.append("status page should expose exactly two next actions")
     if status_updated_count > 1:
         failures.append("status page repeats the update date")
     if downloads_updated_count > 1:
@@ -194,7 +198,7 @@ def write_outputs(payload: dict, completion_root: Path) -> None:
                 "",
                 f"- Generated: {payload['generated_at_utc']}",
                 f"- Base URL: {payload['base_url']}",
-                "- Checks: navigation closed by default, homepage hero image plus promo-video entry reachable, downloads exposes Stable and Nightly, status exposes one release decision plus next actions.",
+                "- Checks: navigation closed by default, homepage hero image plus promo-video entry reachable, downloads exposes Stable and Nightly, status exposes one release decision plus two next actions.",
                 "",
                 *[f"- {failure}" for failure in payload["failures"]],
                 *[f"- {result['surface']} checked" for result in payload["results"]],

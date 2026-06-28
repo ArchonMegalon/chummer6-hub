@@ -1,0 +1,36 @@
+{
+  "generated_at_utc": "2026-06-28T14:57:30Z",
+  "status": "pass",
+  "verdict": "READY",
+  "failures": [],
+  "billing": {
+    "mode": "unavailable",
+    "checkout_live_required": false,
+    "supporter_plan": {
+      "present": false,
+      "https": false,
+      "origin": null,
+      "path": null
+    },
+    "member_portal": {
+      "present": false,
+      "https": false,
+      "origin": null,
+      "path": null
+    },
+    "checkout_parameters": {
+      "user_id": null,
+      "email": null,
+      "plan": null
+    }
+  },
+  "release_upload": {
+    "mode": "default_single_operator",
+    "default_operator_email": "tibor.girschele@gmail.com",
+    "configured_allowed_email_count": 0,
+    "invalid_allowed_email_entries": [],
+    "effective_allowed_emails": [
+      "tibor.girschele@gmail.com"
+    ]
+  }
+}

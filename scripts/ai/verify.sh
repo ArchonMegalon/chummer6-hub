@@ -84,6 +84,12 @@ HUB_RELEASE_PROOF_TIMEOUT_SECONDS="${CHUMMER_HUB_RELEASE_PROOF_TIMEOUT_SECONDS:-
 HUB_RELEASE_PROOF_SKIP_REBUILD="${CHUMMER_HUB_RELEASE_PROOF_SKIP_REBUILD:-true}"
 if [[ -n "${CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH:-}" ]]; then
   LOCAL_FLAGSHIP_READINESS_PATH="$CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH"
+elif [[ -f "$ROOT_DIR/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json" && -f "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json" ]]; then
+  if [[ "$ROOT_DIR/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json" -nt "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json" ]]; then
+    LOCAL_FLAGSHIP_READINESS_PATH="$ROOT_DIR/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
+  else
+    LOCAL_FLAGSHIP_READINESS_PATH="/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
+  fi
 elif [[ -f "$ROOT_DIR/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json" ]]; then
   LOCAL_FLAGSHIP_READINESS_PATH="$ROOT_DIR/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
 elif [[ -f "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json" ]]; then
@@ -169,6 +175,7 @@ python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_analytic
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_codex_guest_fallback.py' >/dev/null
 python3 -m pytest "$ROOT_DIR/tests/test_public_minimal_humanized_surface.py" "$ROOT_DIR/tests/test_participate_codex_guest_fallback.py" -q >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_billing_honesty_gate.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_account_handoff_runtime_config.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_materialize_participate_billing_honesty.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_origin_reachability_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_chummer_online_launch_gate.py' >/dev/null
@@ -186,6 +193,7 @@ python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_release_bundle_promot
 python3 -m pytest "$ROOT_DIR/tests/test_windows_installer_visual_proof_gate.py" -q >/dev/null
 python3 "$ROOT_DIR/scripts/materialize_participate_billing_honesty.py" --completion-dir "$CHUMMER_COMPLETION_DIR" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_participate_billing_honesty.py" --completion-dir "$CHUMMER_COMPLETION_DIR" >/dev/null
+python3 "$ROOT_DIR/scripts/verify_account_handoff_runtime_config.py" >/dev/null
 python3 "$ROOT_DIR/tests/test_stack_smoke.py" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_public_origin_reachability.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_chummer_online_launch.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
@@ -197,6 +205,7 @@ python3 "$ROOT_DIR/scripts/verify_black_ledger_live_media_proof.py" --base-url "
 CHUMMER_PORTAL_BASE_URL="${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" \
 CHUMMER_PORTAL_PUBLIC_HOST= \
 CHUMMER_PORTAL_FORWARDED_PROTO= \
+CHUMMER_PORTAL_REQUIRE_BLAZOR="${CHUMMER_HUB_PUBLIC_REQUIRE_BLAZOR:-0}" \
 node "$ROOT_DIR/scripts/e2e-portal.cjs" >/dev/null
 node "$ROOT_DIR/scripts/verify_partizipate_runtime_fallback.cjs" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null
 run_slice_safe_dotnet_test "FullyQualifiedName~HubPageChromeServiceTests"

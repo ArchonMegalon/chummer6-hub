@@ -95,6 +95,8 @@ def build_payload() -> dict[str, Any]:
     copy_gate = load_json(copy_path)
     participate_billing_honesty_path = PUBLISHED_ROOT / "PARTICIPATE_BILLING_HONESTY.generated.json"
     participate_billing_honesty = load_json(participate_billing_honesty_path)
+    account_handoff_runtime_config_path = PUBLISHED_ROOT / "ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json"
+    account_handoff_runtime_config = load_json(account_handoff_runtime_config_path)
     release_ready_path = PUBLISHED_ROOT / "RELEASE_READY.generated.json"
     release_ready = load_json(release_ready_path)
     final_gold_path = PUBLISHED_ROOT / "FINAL_GOLD_JANITOR.generated.json"
@@ -110,6 +112,7 @@ def build_payload() -> dict[str, Any]:
         "design_quality_gate": gate("design_quality_gate", design_path, design),
         "public_copy_leak_gate": gate("public_copy_leak_gate", copy_path, copy_gate),
         "participate_billing_honesty": gate("participate_billing_honesty", participate_billing_honesty_path, participate_billing_honesty),
+        "account_handoff_runtime_config": gate("account_handoff_runtime_config", account_handoff_runtime_config_path, account_handoff_runtime_config),
         "release_ready": gate("release_ready", release_ready_path, release_ready),
         "final_gold_janitor": gate("final_gold_janitor", final_gold_path, final_gold),
         "google_oauth_linking_proof": gate("google_oauth_linking_proof", oauth_path, oauth),
@@ -169,6 +172,10 @@ def build_payload() -> dict[str, Any]:
             "frame_failure_count": frame_summary.get("failure_count"),
             "design_verdict": design.get("verdict"),
         },
+        "account_handoffs": {
+            "billing_mode": ((account_handoff_runtime_config.get("billing") or {}) if isinstance(account_handoff_runtime_config.get("billing"), dict) else {}).get("mode"),
+            "release_upload_mode": ((account_handoff_runtime_config.get("release_upload") or {}) if isinstance(account_handoff_runtime_config.get("release_upload"), dict) else {}).get("mode"),
+        },
         "checks": checks,
         "failures": failures,
     }
@@ -179,6 +186,7 @@ def build_markdown(payload: dict[str, Any]) -> str:
     mirrors = payload.get("mirrors") if isinstance(payload.get("mirrors"), dict) else {}
     rulesets = payload.get("rulesets") if isinstance(payload.get("rulesets"), dict) else {}
     checks = payload.get("checks") if isinstance(payload.get("checks"), dict) else {}
+    account_handoffs = payload.get("account_handoffs") if isinstance(payload.get("account_handoffs"), dict) else {}
     lines = [
         f"# {payload.get('verdict')}",
         "",
@@ -188,6 +196,8 @@ def build_markdown(payload: dict[str, Any]) -> str:
         f"- Published: `{release.get('published_at')}`",
         f"- Supportability: `{release.get('supportability_state')}`",
         f"- Mirrors: {', '.join(f'{name}={status}' for name, status in sorted((mirrors.get('providers') or {}).items()))}",
+        f"- Billing mode: `{account_handoffs.get('billing_mode')}`",
+        f"- Release-upload mode: `{account_handoffs.get('release_upload_mode')}`",
         "",
         "## Rulesets",
     ]

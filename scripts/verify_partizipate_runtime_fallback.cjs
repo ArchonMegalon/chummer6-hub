@@ -15,18 +15,79 @@ for (let index = 0; index < args.length; index += 1) {
 
 baseUrl = baseUrl.replace(/\/+$/, '');
 
-const boardErrorHtml = `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><title>Board</title></head>
-<body>
-  <main id="board-root">
-    <h1>Something went wrong on our side.</h1>
-    <p>Could not load posts.</p>
-    <p>Network error while loading tab configuration.</p>
-    <p>Please try again or contact support@productlift.dev</p>
-  </main>
-</body>
-</html>`;
+const defaultUserAgent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
+
+async function navigateLenient(page, url, preferredState = 'domcontentloaded') {
+  try {
+    return await page.goto(url, { waitUntil: preferredState });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes('Timeout')) {
+      throw error;
+    }
+
+    const fallback = await page.goto(url, { waitUntil: 'commit', timeout: 15000 });
+    await page.locator('body').waitFor({ state: 'attached', timeout: 5000 }).catch(() => undefined);
+    await page.waitForTimeout(750);
+    return fallback;
+  }
+}
+
+async function fetchText(url) {
+  const response = await fetch(url, {
+    headers: {
+      'user-agent': defaultUserAgent,
+      'accept-language': 'en-US,en;q=0.9',
+    },
+    redirect: 'follow',
+  });
+
+  return {
+    status: response.status,
+    url: response.url,
+    text: await response.text(),
+  };
+}
+
+function stripNonVisibleHtml(html) {
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<template\b[^>]*>[\s\S]*?<\/template>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function assertBoardShell(page, path) {
+  const response = await navigateLenient(page, `${baseUrl}${path}`, 'domcontentloaded');
+  assert(response, `${path} should return a response.`);
+  assert.equal(response.status(), 200, `${path} should return 200.`);
+
+  const text = await page.locator('body').innerText();
+  assert.equal(/What should Chummer do next\?/i.test(text), true, `${path} should render the first-party heading.`);
+  assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), true, `${path} should render the first-party summary.`);
+  assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(text), false, `${path} must not show provider failure copy.`);
+  assert.equal(/productlift\.dev/i.test(text), false, `${path} must not leak provider domains.`);
+  assert.equal(await page.locator('iframe[data-chummer-participate-frame]').count(), 1, `${path} should keep the hosted board inside the first-party shell.`);
+
+  const offline = /Board offline right now/i.test(text);
+  if (!offline) {
+    assert.equal(/Board is live\./i.test(text), true, `${path} should explain that the board is live.`);
+    assert.equal(/Current requests/i.test(text), true, `${path} should keep the request entry point visible.`);
+  }
+
+  const detailLink = page.locator('a[href^="/participate/board/"]').first();
+  const detailHref = await detailLink.count() > 0
+    ? await detailLink.getAttribute('href')
+    : null;
+
+  return {
+    offline,
+    detailHref,
+  };
+}
 
 async function main() {
   const browser = await chromium.launch({
@@ -35,34 +96,39 @@ async function main() {
   });
   const context = await browser.newContext({
     viewport: { width: 1366, height: 768 },
+    userAgent: defaultUserAgent,
   });
   context.setDefaultTimeout(10000);
   context.setDefaultNavigationTimeout(15000);
 
-  await context.route('**/participate/board**', route => route.fulfill({
-    status: 200,
-    contentType: 'text/html; charset=utf-8',
-    body: boardErrorHtml,
-  }));
-
   const page = await context.newPage();
   try {
-    const response = await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
-    assert(response, '/participate should return a response.');
-    assert.equal(response.status(), 200, '/participate should return 200.');
+    const wrapper = await assertBoardShell(page, '/participate');
+    const board = await assertBoardShell(page, '/participate/board');
 
-    const boardSkin = page.locator('[data-chummer-board-skin]');
+    let mode = wrapper.offline
+      ? 'first_party_wrapper_offline_fallback'
+      : 'first_party_wrapper_embedded_hosted_board';
 
-    await boardSkin.waitFor({ state: 'attached' });
-    assert.equal(await boardSkin.count(), 1, 'public participate should hide hosted provider errors.');
-
-    const visibleText = await page.locator('body').innerText();
-    assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(visibleText), false, 'vendor error copy must not be visible.');
+    const detailHref = wrapper.detailHref || board.detailHref;
+    if (detailHref) {
+      const detailResponse = await fetchText(`${baseUrl}${detailHref}`);
+      assert.equal(detailResponse.status, 200, `${detailHref} should return 200.`);
+      const detailVisibleText = stripNonVisibleHtml(detailResponse.text);
+      assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(detailVisibleText), false, 'vendor error copy must not be visible in the proxied request detail.');
+      assert.equal(/productlift\.dev/i.test(detailResponse.text), false, 'first-party request detail must not leak provider domains.');
+      assert.equal(/Back to requests/i.test(detailVisibleText), true, 'request detail should provide a first-party way back to the request list.');
+      assert.equal(/Request detail/i.test(detailVisibleText), true, 'request detail should render a first-party detail heading.');
+      assert.equal(/id="menubar"/i.test(detailResponse.text), false, 'provider menubar must stay hidden in the proxied request detail.');
+      assert.equal(/id="global_search_mount"/i.test(detailResponse.text), false, 'provider search mount must stay hidden in the proxied request detail.');
+      assert.equal(/data-chummer-board-skin|data-chummer-home-link-patch/i.test(detailResponse.text), false, 'request detail should not render the hosted board chrome anymore.');
+      mode = `${mode}_with_first_party_detail`;
+    }
 
     console.log(JSON.stringify({
       status: 'pass',
       url: `${baseUrl}/participate`,
-      mode: 'whitelabeled_productlift_board',
+      mode,
     }));
   } finally {
     await browser.close();

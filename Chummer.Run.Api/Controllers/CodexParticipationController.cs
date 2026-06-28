@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
@@ -14,6 +15,8 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/participation/codex")]
 public sealed class CodexParticipationController : Controller
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private const string DefaultProjectId = "hub";
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
@@ -120,6 +123,7 @@ public sealed class CodexParticipationController : Controller
 
     [HttpPost("contributions/start")]
     [HttpPost("/api/v1/participation/contributions/start")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ValidateAntiForgeryToken]
     public async Task<ActionResult<object>> StartContribution(CancellationToken cancellationToken)
     {
@@ -295,6 +299,7 @@ public sealed class CodexParticipationController : Controller
 
     [HttpPost("intents")]
     [HttpPost("/api/v1/participation/intents")]
+    [RequestSizeLimit(BoostSessionService.MaxCreateRequestBodyBytes)]
     public async Task<ActionResult<object>> CreateIntent([FromBody] CreateCodexParticipationIntentRequest? request, CancellationToken cancellationToken)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.ProjectId))
@@ -1051,15 +1056,15 @@ public sealed class CodexParticipationController : Controller
 }
 
 public sealed record CreateCodexParticipationIntentRequest(
-    string? SubjectId,
-    string? SubjectLabel,
-    string ProjectId,
-    string? ParticipantCodexCode = null,
-    string? GroupId = null,
-    string? BoostCode = null,
-    string? CampaignId = null,
-    string? Visibility = null,
-    string? RequestedLaneType = null,
-    string? RequestedLaneRole = null,
-    string? AuthorizationTier = null,
-    string? TierSource = null);
+    [property: StringLength(128)] string? SubjectId,
+    [property: StringLength(160)] string? SubjectLabel,
+    [property: Required(AllowEmptyStrings = false), StringLength(128)] string ProjectId,
+    [property: StringLength(64)] string? ParticipantCodexCode = null,
+    [property: StringLength(128)] string? GroupId = null,
+    [property: StringLength(128)] string? BoostCode = null,
+    [property: StringLength(128)] string? CampaignId = null,
+    [property: StringLength(32)] string? Visibility = null,
+    [property: StringLength(64)] string? RequestedLaneType = null,
+    [property: StringLength(64)] string? RequestedLaneRole = null,
+    [property: StringLength(64)] string? AuthorizationTier = null,
+    [property: StringLength(64)] string? TierSource = null);

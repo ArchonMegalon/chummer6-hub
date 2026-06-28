@@ -1,0 +1,220 @@
+@model AccountPageViewModel
+@{
+    ViewData["Title"] = "Support";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+
+    var supportCase = Model.SelectedSupportCase;
+    var supportCaseSummary = Model.SelectedSupportCaseSummary;
+    var timeline = supportCaseSummary?.TimelineHighlights?.ToArray() ?? Array.Empty<SupportCaseTimelineHighlightViewModel>();
+    var attachments = supportCase?.Attachments?.ToArray() ?? Array.Empty<Chummer.Control.Contracts.Support.SupportCaseAttachmentProjection>();
+}
+
+<section class="minimal-page-hero">
+    <div>
+        <p class="eyebrow">Support</p>
+        <h1>@(supportCase?.Title ?? "Case")</h1>
+        <p>@(supportCase?.Summary ?? "This case is not available on this account.")</p>
+        @if (supportCaseSummary is not null)
+        {
+            <ul class="minimal-hero__points">
+                <li>@supportCaseSummary.StatusLabel</li>
+                <li>@supportCaseSummary.StageLabel</li>
+                <li>@supportCaseSummary.UpdatedLabel</li>
+            </ul>
+        }
+        <div class="minimal-actions">
+            <a class="button-like button-like--ghost" href="/account/support">Back to support</a>
+            @if (!string.IsNullOrWhiteSpace(supportCaseSummary?.PrimaryActionHref)
+                && !string.IsNullOrWhiteSpace(supportCaseSummary?.PrimaryActionLabel))
+            {
+                <a class="button-like button-like--secondary" href="@supportCaseSummary.PrimaryActionHref">@supportCaseSummary.PrimaryActionLabel</a>
+            }
+        </div>
+    </div>
+</section>
+
+@if (supportCase is null || supportCaseSummary is null)
+{
+    <section class="minimal-section minimal-section--tight">
+        <article class="minimal-lane-card">
+            <span class="tag">Missing</span>
+            <h2>Case not found</h2>
+            <p>This case is not attached to this account anymore.</p>
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" href="/account/support">Open support</a>
+            </div>
+        </article>
+    </section>
+}
+else
+{
+    <section class="minimal-section">
+        <div class="minimal-lane-grid minimal-platform-list">
+            <article class="minimal-lane-card">
+                <span class="tag">State</span>
+                <h2>@supportCaseSummary.StatusLabel</h2>
+                <p>@supportCaseSummary.ClosureSummary</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Next</span>
+                <h2>@supportCaseSummary.StageLabel</h2>
+                <p>@supportCaseSummary.NextSafeAction</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Release</span>
+                <h2>@(string.IsNullOrWhiteSpace(supportCaseSummary.FixedReleaseLabel) ? "No release yet" : supportCaseSummary.FixedReleaseLabel)</h2>
+                <p>@supportCaseSummary.ReleaseProgressSummary</p>
+            </article>
+        </div>
+    </section>
+
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <h2>Case details</h2>
+            <p>One case id. One next step.</p>
+        </div>
+        <article class="minimal-lane-card">
+            <div class="settings-summary-list">
+                <div class="settings-summary-row">
+                    <span>Case id</span>
+                    <strong>@supportCase.CaseId</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Status</span>
+                    <strong>@supportCaseSummary.StatusLabel</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Stage</span>
+                    <strong>@supportCaseSummary.StageLabel</strong>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(supportCaseSummary.AffectedInstallSummary))
+                {
+                    <div class="settings-summary-row">
+                        <span>Install</span>
+                        <strong>@supportCaseSummary.AffectedInstallSummary</strong>
+                    </div>
+                }
+                <div class="settings-summary-row">
+                    <span>Follow-up</span>
+                    <strong>@supportCaseSummary.FollowUpLaneSummary</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Updated</span>
+                    <strong>@supportCaseSummary.UpdatedLabel</strong>
+                </div>
+            </div>
+            <div class="stacked-copy">
+                <p><strong>Release:</strong> @supportCaseSummary.ReleaseProgressSummary</p>
+                <p><strong>Linked install:</strong> @supportCaseSummary.InstallReadinessSummary</p>
+                <p><strong>Fix status:</strong> @supportCaseSummary.VerificationSummary</p>
+            </div>
+            @if (supportCaseSummary.CanVerifyFix)
+            {
+                <div class="stacked-actions">
+                    <button class="button-like button-like--primary" type="button" data-support-verification-outcome="confirmed_fixed" data-support-case-id="@supportCase.CaseId">Fix worked here</button>
+                    <button class="button-like button-like--ghost" type="button" data-support-verification-outcome="still_broken" data-support-case-id="@supportCase.CaseId">Still broken</button>
+                </div>
+                <p id="supportVerificationStatusNotice" class="muted-copy" hidden></p>
+            }
+        </article>
+    </section>
+
+    @if (attachments.Length > 0)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <details class="details-drawer" open>
+                <summary>Attachments</summary>
+                <div class="settings-summary-list">
+                    @foreach (var attachment in attachments)
+                    {
+                        <div class="settings-summary-row">
+                            <span>@attachment.FileName</span>
+                            <strong>
+                                @($"{attachment.SizeBytes / 1024.0:F1} KB")
+                                @if (!string.IsNullOrWhiteSpace(attachment.DownloadHref))
+                                {
+                                    <a class="inline-link" href="@attachment.DownloadHref">Download</a>
+                                }
+                            </strong>
+                        </div>
+                    }
+                </div>
+            </details>
+        </section>
+    }
+
+    @if (timeline.Length > 0)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <details class="details-drawer" open>
+                <summary>Timeline</summary>
+                <div class="settings-summary-list">
+                    @foreach (var eventItem in timeline)
+                    {
+                        <div class="settings-summary-row">
+                            <span>@eventItem.OccurredLabel · @eventItem.Label</span>
+                            <strong>@eventItem.Summary</strong>
+                        </div>
+                    }
+                </div>
+            </details>
+        </section>
+    }
+
+    @if (supportCaseSummary.CanVerifyFix)
+    {
+        <script>
+            (() => {
+              const ui = window.chummerUi;
+              const notice = document.getElementById("supportVerificationStatusNotice");
+              if (!ui || !notice) {
+                return;
+              }
+
+              document.querySelectorAll("[data-support-verification-outcome]").forEach((button) => {
+                button.addEventListener("click", async () => {
+                  const outcome = button.getAttribute("data-support-verification-outcome");
+                  const caseId = button.getAttribute("data-support-case-id");
+                  if (!outcome || !caseId) {
+                    return;
+                  }
+
+                  let note = "";
+                  if (outcome === "still_broken") {
+                    const response = window.prompt("What still looks broken on this install? Optional, but it helps support reopen the right issue.", "");
+                    if (response === null) {
+                      return;
+                    }
+
+                    note = response.trim();
+                  }
+
+                  ui.clearNotice(notice);
+                  const siblingButtons = Array.from(document.querySelectorAll(`[data-support-case-id="${caseId}"]`));
+                  siblingButtons.forEach((item) => ui.setButtonBusy(item, true, "Saving..."));
+                  try {
+                    await ui.requestJson(`/api/v1/support/cases/${encodeURIComponent(caseId)}/verify`, {
+                      method: "POST",
+                      json: {
+                        outcome,
+                        note: note || null
+                      }
+                    });
+                    ui.setNotice(
+                      notice,
+                      outcome === "confirmed_fixed"
+                        ? "Thanks. This case now shows that the fix worked on this install."
+                        : "Thanks. This case reopened for follow-up on this install.");
+                    window.location.reload();
+                  } catch (error) {
+                    ui.setNotice(notice, ui.describeError(error, "Fix status could not be recorded right now."), true);
+                  } finally {
+                    siblingButtons.forEach((item) => ui.setButtonBusy(item, false, "Saving..."));
+                  }
+                });
+              });
+            })();
+        </script>
+    }
+}

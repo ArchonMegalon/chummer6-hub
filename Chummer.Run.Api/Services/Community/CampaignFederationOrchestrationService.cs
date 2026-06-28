@@ -9,6 +9,11 @@ namespace Chummer.Run.Api.Services.Community;
 
 public sealed class CampaignFederationOrchestrationService
 {
+    private const int MaxListCount = 8;
+    private const int MaxSourceIdLength = 128;
+    private const int MaxRequestedFormatLength = 32;
+    private const int MaxAudienceLength = 64;
+    private const int MaxLocaleLength = 32;
     private readonly CampaignSpineService _campaignSpine;
     private readonly ArtifactFactoryOrchestrationService _artifactFactory;
 
@@ -29,6 +34,7 @@ public sealed class CampaignFederationOrchestrationService
         ArgumentNullException.ThrowIfNull(user);
         ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
         ArgumentNullException.ThrowIfNull(request);
+        CampaignFederationBatchRequest normalizedRequest = NormalizeRequest(request);
 
         AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
         CampaignWorkspaceProjection? workspace = summary.Workspaces
@@ -47,23 +53,23 @@ public sealed class CampaignFederationOrchestrationService
             throw new InvalidOperationException("campaign federation requires at least one governed dossier, replay, or recap publication-safe source pack.");
         }
 
-        FederationCandidate[] selected = SelectCandidates(candidates, request.SourceIds);
+        FederationCandidate[] selected = SelectCandidates(candidates, normalizedRequest.SourceIds);
         if (selected.Length == 0)
         {
             throw new InvalidOperationException("campaign federation could not resolve any governed dossier, replay, or recap source packs from the selected workspace.");
         }
 
         CampaignFederationSourcePackProjection[] sourcePacks = selected
-            .Select(candidate => BuildSourcePackProjection(candidate, request))
+            .Select(candidate => BuildSourcePackProjection(candidate, normalizedRequest))
             .ToArray();
-        ArtifactFactoryFamilyFormatOverride[]? requestedFormats = NormalizeRequestedFormats(request.RequestedFormats);
+        ArtifactFactoryFamilyFormatOverride[]? requestedFormats = NormalizeRequestedFormats(normalizedRequest.RequestedFormats);
         ArtifactFactoryJobBatchLaunchResult batch = _artifactFactory.LaunchSourcePackBatch(new ArtifactFactorySourcePackBatchLaunchRequest(
             BatchId: BuildBatchId(workspace.WorkspaceId, sourcePacks),
             RequestedBy: "hub.campaign-federation",
-            SourcePacks: sourcePacks.Select(candidate => candidate.ToSourcePack(request)).ToArray(),
+            SourcePacks: sourcePacks.Select(candidate => candidate.ToSourcePack(normalizedRequest)).ToArray(),
             RequestedFormats: requestedFormats,
-            Audience: NormalizeOptional(request.Audience),
-            Locale: NormalizeOptional(request.Locale),
+            Audience: normalizedRequest.Audience,
+            Locale: normalizedRequest.Locale,
             RequiredFamilies: ["publication"]));
 
         string selectionSummary = $"Federated {sourcePacks.Length} governed source pack(s) from {workspace.CampaignName}: {string.Join(", ", sourcePacks.Select(static item => item.Label))}.";
@@ -103,6 +109,15 @@ public sealed class CampaignFederationOrchestrationService
             SourcePacks: sourcePacks,
             Batch: batch);
     }
+
+    private static CampaignFederationBatchRequest NormalizeRequest(CampaignFederationBatchRequest request)
+        => request with
+        {
+            SourceIds = NormalizeSourceIds(request.SourceIds),
+            RequestedFormats = NormalizeRequestedFormatInputs(request.RequestedFormats),
+            Audience = NormalizeOptional(request.Audience, nameof(CampaignFederationBatchRequest.Audience), MaxAudienceLength),
+            Locale = NormalizeOptional(request.Locale, nameof(CampaignFederationBatchRequest.Locale), MaxLocaleLength)
+        };
 
     private static FederationCandidate[] BuildCandidates(
         CampaignWorkspaceProjection workspace,
@@ -405,6 +420,71 @@ public sealed class CampaignFederationOrchestrationService
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizeOptional(string? value, string parameterName, int maxLength)
+    {
+        string? normalized = NormalizeOptional(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException($"{parameterName} exceeds the maximum length of {maxLength}.", parameterName);
+        }
+
+        return normalized;
+    }
+
+    private static string[]? NormalizeSourceIds(IReadOnlyList<string>? sourceIds)
+    {
+        if (sourceIds is null || sourceIds.Count == 0)
+        {
+            return null;
+        }
+
+        if (sourceIds.Count > MaxListCount)
+        {
+            throw new ArgumentException($"{nameof(CampaignFederationBatchRequest.SourceIds)} exceeds the maximum item count of {MaxListCount}.", nameof(CampaignFederationBatchRequest.SourceIds));
+        }
+
+        List<string> normalized = new(sourceIds.Count);
+        foreach (string rawSourceId in sourceIds)
+        {
+            string sourceId = NormalizeOptional(rawSourceId, nameof(CampaignFederationBatchRequest.SourceIds), MaxSourceIdLength)
+                ?? throw new ArgumentException($"{nameof(CampaignFederationBatchRequest.SourceIds)} cannot contain blank items.", nameof(CampaignFederationBatchRequest.SourceIds));
+            if (!normalized.Contains(sourceId, StringComparer.OrdinalIgnoreCase))
+            {
+                normalized.Add(sourceId);
+            }
+        }
+
+        return normalized.ToArray();
+    }
+
+    private static string[]? NormalizeRequestedFormatInputs(IReadOnlyList<string>? requestedFormats)
+    {
+        if (requestedFormats is null || requestedFormats.Count == 0)
+        {
+            return null;
+        }
+
+        if (requestedFormats.Count > MaxListCount)
+        {
+            throw new ArgumentException($"{nameof(CampaignFederationBatchRequest.RequestedFormats)} exceeds the maximum item count of {MaxListCount}.", nameof(CampaignFederationBatchRequest.RequestedFormats));
+        }
+
+        string[] normalized = requestedFormats
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => NormalizeOptional(item, nameof(CampaignFederationBatchRequest.RequestedFormats), MaxRequestedFormatLength)!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return normalized.Length == 0
+            ? null
+            : normalized;
+    }
 
     private static string StableToken(string value)
     {

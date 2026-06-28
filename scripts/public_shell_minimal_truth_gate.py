@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -33,48 +34,71 @@ class RouteContract:
     require_public_meta_urls: bool = False
 
 
-ROUTE_CONTRACTS: tuple[RouteContract, ...] = (
-    RouteContract(
-        route="/contact",
-        required_all=("Open Discord", "private details"),
-        forbidden=("Open Participate", "Public ideas belong on", "Public requests belong on"),
-        require_public_meta_urls=True,
-    ),
-    RouteContract(
-        route="/login?next=%2F",
-        required_all=("Continue with email",),
-        require_public_meta_urls=True,
-    ),
-    RouteContract(
-        route="/account/billing",
-        required_any=("Supporter checkout is unavailable right now.", "Support Chummer"),
-        require_public_meta_urls=True,
-    ),
-    RouteContract(
-        route="/downloads",
-        required_all=("Stable", "Nightly"),
-        forbidden=("Released",),
-        require_public_meta_urls=True,
-    ),
-    RouteContract(
-        route="/status",
-        required_all=("Updated",),
-        forbidden=("Released", "Checks passed"),
-        require_public_meta_urls=True,
-    ),
-    RouteContract(
-        route="/participate",
-        expected_final_path="/participate",
-        required_all=("data-chummer-board-skin", 'base href="/participate/"', "Public bugs and requests - Chummer.run"),
-        require_public_meta_urls=True,
-    ),
-    RouteContract(
-        route="/partizipate",
-        expected_final_path="/participate",
-        required_all=("data-chummer-board-skin", 'base href="/participate/"', "Public bugs and requests - Chummer.run"),
-        require_public_meta_urls=True,
-    ),
-)
+def truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tuple[RouteContract, ...]:
+    billing_contract = (
+        RouteContract(
+            route="/account/billing",
+            expected_final_path="/login",
+            required_all=("Open Chummer", "Email first. Google if you prefer.", "Continue with email", "Continue with Google"),
+            forbidden=("Membership", "Supporter is not open right now."),
+            require_public_meta_urls=True,
+        )
+        if require_brilliant_directories_checkout
+        else RouteContract(
+            route="/account/billing",
+            required_all=("Membership",),
+            required_any=("1 book/month on Free. 2/month on Supporter.", "Supporter checkout is not open right now."),
+            require_public_meta_urls=True,
+        )
+    )
+
+    return (
+        RouteContract(
+            route="/contact",
+            required_all=("Open Discord", "private details"),
+            forbidden=("Open Participate", "Public ideas belong on", "Public requests belong on"),
+            require_public_meta_urls=True,
+        ),
+        RouteContract(
+            route="/login?next=%2F",
+            required_all=("Continue with email",),
+            require_public_meta_urls=True,
+        ),
+        billing_contract,
+        RouteContract(
+            route="/downloads",
+            required_all=("Stable", "Nightly"),
+            forbidden=("Released",),
+            require_public_meta_urls=True,
+        ),
+        RouteContract(
+            route="/status",
+            required_all=("Updated",),
+            forbidden=("Released", "Checks passed"),
+            require_public_meta_urls=True,
+        ),
+        RouteContract(
+            route="/participate",
+            expected_final_path="/participate",
+            required_all=("What should Chummer do next?", "Public requests, clear bugs, useful ideas."),
+            required_any=("Open board", "Board offline right now"),
+            require_public_meta_urls=True,
+        ),
+        RouteContract(
+            route="/partizipate",
+            expected_final_path="/participate",
+            required_all=("What should Chummer do next?", "Public requests, clear bugs, useful ideas."),
+            required_any=("Open board", "Board offline right now"),
+            require_public_meta_urls=True,
+        ),
+    )
+
+
+ROUTE_CONTRACTS = build_route_contracts(require_brilliant_directories_checkout=False)
 
 PARTICIPATE_UNAVAILABLE_REQUIRED_ALL = (
     "The board is unavailable",
@@ -160,22 +184,24 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float, allow
             failures.append(f"route contains forbidden copy: {token}")
 
     required_all = contract.required_all
+    required_any = contract.required_any
     if (
         allow_participate_unavailable
         and contract.route in {"/participate", "/partizipate"}
         and normalize_text("The board is unavailable") in normalized_body
     ):
         required_all = PARTICIPATE_UNAVAILABLE_REQUIRED_ALL
+        required_any = ()
 
     for token in required_all:
         if normalize_text(token) not in normalized_body:
             failures.append(f"route is missing required copy: {token}")
 
-    if contract.required_any:
-        if not any(normalize_text(token) in normalized_body for token in contract.required_any):
+    if required_any:
+        if not any(normalize_text(token) in normalized_body for token in required_any):
             failures.append(
                 "route is missing every allowed state token: "
-                + ", ".join(contract.required_any)
+                + ", ".join(required_any)
             )
 
     final_path = urlparse(response.url).path or "/"
@@ -201,16 +227,18 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float, allow
         "resolvedTwitterUrl": resolved_twitter_url,
         "failures": failures,
         "requiredAll": list(required_all),
-        "requiredAny": list(contract.required_any),
+        "requiredAny": list(required_any),
         "forbidden": list(contract.forbidden),
     }
 
 
 def evaluate(*, base_url: str, timeout: float, allow_participate_unavailable: bool = False) -> dict[str, Any]:
     normalized_base_url = base_url.rstrip("/")
+    require_brilliant_directories_checkout = truthy_env("CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT")
+    route_contracts = build_route_contracts(require_brilliant_directories_checkout=require_brilliant_directories_checkout)
     route_results = [
         fetch_route(normalized_base_url, contract, timeout=timeout, allow_participate_unavailable=allow_participate_unavailable)
-        for contract in ROUTE_CONTRACTS
+        for contract in route_contracts
     ]
     failures = [
         f"{result['route']}: {failure}"
@@ -226,9 +254,10 @@ def evaluate(*, base_url: str, timeout: float, allow_participate_unavailable: bo
         "failure_count": len(failures),
         "failures": failures,
         "routes": route_results,
-        "contracts": [asdict(contract) for contract in ROUTE_CONTRACTS],
+        "contracts": [asdict(contract) for contract in route_contracts],
         "generic_forbidden_substrings": list(GENERIC_FORBIDDEN_SUBSTRINGS),
         "allow_participate_unavailable": allow_participate_unavailable,
+        "require_brilliant_directories_checkout": require_brilliant_directories_checkout,
     }
 
 

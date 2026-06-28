@@ -8,6 +8,8 @@ namespace Chummer.Run.AI.Controllers;
 [Route("api/v1/ai/spider")]
 public sealed class SpiderController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly IFastSignalDetector _detector;
     private readonly ISpiderDeepIngestionService _deepIngestion;
     private readonly IDirectorPolicyEngine _policyEngine;
@@ -35,6 +37,7 @@ public sealed class SpiderController : ControllerBase
     }
 
     [HttpPost("observe")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PolicyDecision>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     public async Task<ActionResult<PolicyDecision>> Observe([FromBody] SpiderObservation? observation, CancellationToken cancellationToken)
@@ -95,6 +98,7 @@ public sealed class SpiderController : ControllerBase
     }
 
     [HttpPost("outbox")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<DeliveryOutboxMessage>(StatusCodes.Status200OK)]
     public ActionResult<DeliveryOutboxMessage> QueueManual([FromBody] DeliveryOutboxCreateRequest? request)
     {
@@ -124,6 +128,7 @@ public sealed class SpiderController : ControllerBase
     }
 
     [HttpPost("outbox/{messageId}/actions/{actionId}")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<SpiderActionExecutionResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

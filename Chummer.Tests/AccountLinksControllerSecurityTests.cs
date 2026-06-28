@@ -18,6 +18,28 @@ namespace Chummer.Tests;
 public sealed class AccountLinksControllerSecurityTests
 {
     [Fact]
+    public void InlinePreviewLinkRequiresLoopbackInsteadOfTrustingRemoteEqualsLocal()
+    {
+        DefaultHttpContext httpContext = new();
+        httpContext.Request.Host = new HostString("chummer.run");
+        httpContext.Connection.RemoteIpAddress = IPAddress.Parse("10.0.0.5");
+        httpContext.Connection.LocalIpAddress = IPAddress.Parse("10.0.0.5");
+
+        Assert.False(HubBrowserAuthService.ShouldExposeInlinePreviewLink(httpContext.Request));
+    }
+
+    [Fact]
+    public void InlinePreviewLinkStillAllowsLocalDevelopmentLoopbackRequests()
+    {
+        DefaultHttpContext httpContext = new();
+        httpContext.Request.Host = new HostString("localhost");
+        httpContext.Connection.RemoteIpAddress = IPAddress.Loopback;
+        httpContext.Connection.LocalIpAddress = IPAddress.Loopback;
+
+        Assert.True(HubBrowserAuthService.ShouldExposeInlinePreviewLink(httpContext.Request));
+    }
+
+    [Fact]
     public async Task RecoveryEmailStartDoesNotExposePreviewTicketToRemoteBrowsers()
     {
         const string rawTicket = "eml_remote_preview_secret";

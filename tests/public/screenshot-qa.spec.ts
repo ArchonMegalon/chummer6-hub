@@ -20,13 +20,13 @@ const supportingSurfaces = [
     id: 'downloads',
     route: '/downloads',
     screenshotPrefix: 'downloads',
-    requiredText: ['Downloads', 'Stable', 'Nightly', 'Build from source'],
+    requiredText: ['Downloads', 'Stable', 'Nightly', 'Main build for this browser', 'Build from source'],
   },
   {
     id: 'status',
     route: '/status',
     screenshotPrefix: 'status',
-    requiredText: ['Chummer is available.', 'Updated', 'Downloads', 'Help'],
+    requiredText: ['Current release', 'Downloads', 'Help'],
   },
   {
     id: 'ledger-map',
@@ -38,13 +38,13 @@ const supportingSurfaces = [
     id: 'help',
     route: '/help',
     screenshotPrefix: 'help',
-    requiredText: ['Get help without guessing', 'Choose the right help path'],
+    requiredText: ['What is wrong?', 'Pick the next step'],
   },
   {
     id: 'contact',
     route: '/contact',
     screenshotPrefix: 'contact',
-      requiredText: ['Contact Chummer', 'Contact paths', 'Send support request'],
+      requiredText: ['Contact', 'Discord or private', 'Send support request'],
   },
 ] as const;
 
@@ -71,7 +71,7 @@ test('public flagship screenshots stay readable across live surfaces', async ({ 
     await expect(page.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
     await expect(page.locator('.minimal-inline-links')).toContainText('Help');
     await expect(page.locator('.minimal-inline-links')).not.toContainText('Participate');
-    await expect(page.locator('.minimal-inline-links')).toContainText('Status');
+    await expect(page.locator('.minimal-inline-links')).not.toContainText('Status');
     await expect(footer).toBeVisible();
 
     const overflow = await page.evaluate(() => {

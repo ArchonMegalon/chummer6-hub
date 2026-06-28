@@ -43,8 +43,8 @@ test('help page stays practical instead of exposing internal policy language', a
 
   const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
 
-  await expect(page.locator('h1')).toContainText('Get help without guessing');
-  expect(bodyText).toContain('Choose the right help path');
+  await expect(page.locator('h1')).toContainText('What is wrong?');
+  expect(bodyText).toContain('Pick the next step');
   expect(bodyText).not.toContain('Pick the problem');
   expect(bodyText).not.toContain('Provider-backed help');
   expect(bodyText).not.toContain('Retention window');
@@ -62,12 +62,13 @@ test('contact page keeps routing and private intake clear without extra ceremony
 
   const bodyText = ((await page.locator('body').textContent()) || '').replace(/\s+/g, ' ');
 
-  await expect(page.locator('h1')).toContainText('Contact Chummer');
-  expect(bodyText).toContain('Contact paths');
-  expect(bodyText).toContain('Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.');
-  expect(bodyText).toContain('Public requests belong on Participate.');
+  await expect(page.locator('h1')).toContainText('Contact');
+  expect(bodyText).toContain('Discord or private');
+  expect(bodyText).toContain('Discord for normal questions. Private form when needed.');
+  expect(bodyText).toContain('Discord for normal questions. Private form for account or crash details.');
   expect(bodyText).not.toContain('Discord for normal contact. Private form for logs or account details.');
   expect(bodyText).not.toContain('Public ideas go to Participate. Private problems stay here.');
+  expect(bodyText).not.toContain('Public requests belong on Participate.');
   expect(bodyText).not.toContain('Choose one');
   expect(bodyText).not.toContain('Discord first. Private form only for logs or account details.');
   expect(bodyText).toContain('One problem per message keeps the reply clear.');
@@ -115,8 +116,9 @@ test('public user pages do not expose AI or repo-process copy', async ({ page, r
   const participateResponse = await request.get(`${baseUrl}/participate`);
   expect(participateResponse.status()).toBe(200);
   const participateText = await participateResponse.text();
-  expect(participateText).toContain('data-chummer-board-skin');
-  expect(participateText).not.toContain('Requests, votes, and shipped work.');
+  expect(participateText).toContain('What should Chummer do next?');
+  expect(participateText).toContain('Public requests, clear bugs, useful ideas.');
+  expect(participateText).not.toContain('data-chummer-board-skin');
   expect(participateText).not.toContain('ProductLift');
   expect(participateText).not.toContain('productlift.dev');
 

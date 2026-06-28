@@ -73,7 +73,7 @@ public sealed class SupportCasePresentationService
             SupportCaseVerificationStates.ConfirmedFixed => (
                 "Closed and confirmed",
                 installRailCase
-                    ? "Update the affected claimed install normally. Reopen this same tracked case only if the same issue returns on a later update."
+                    ? "Update the affected claimed install normally. Reopen this same case only if the same issue returns on a later update."
                     : "No further action is needed unless the same issue returns on a later update.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "The closure notice already went out, and the reporter confirmed that the fix worked on the affected install."
@@ -83,9 +83,9 @@ public sealed class SupportCasePresentationService
                 false),
             SupportCaseVerificationStates.StillBroken => (
                 "Needs follow-up",
-                "Add the newest reproduction detail or log on this same tracked case so support can reopen the fix path without losing continuity.",
+                "Add the newest reproduction detail or log on this same case so support can reopen the fix path without losing continuity.",
                 "The reporter said the fix did not hold on the affected install, so the case reopened for follow-up.",
-                "Open tracked case",
+                "Open case",
                 detailHref,
                 true),
             _ => status switch
@@ -93,29 +93,29 @@ public sealed class SupportCasePresentationService
             SupportCaseStatuses.Clustered => (
                 "Merged",
                 "No reply is needed yet unless the case asks for more detail later.",
-                "Matching reports were merged so one tracked case keeps the visible history.",
-                "Open tracked case",
+                "Matching reports were merged so one case keeps the visible history.",
+                "Open case",
                 detailHref,
                 false),
             SupportCaseStatuses.Routed => (
                 "Routed",
                 "Wait for triage unless a clearer reproduction step or log becomes available.",
                 "The case is already pointed at the right queue.",
-                "Open tracked case",
+                "Open case",
                 detailHref,
                 false),
             SupportCaseStatuses.AwaitingEvidence => (
                 "Needs detail",
                 "Add a clearer reproduction path, screenshot, or log so the case can move again.",
                 "Chummer needs more evidence before the fix path can continue.",
-                "Open tracked case",
+                "Open case",
                 detailHref,
                 true),
             SupportCaseStatuses.Accepted => (
                 "In progress",
                 "Wait for a routed fix or release update. Use the case id if you need to follow up.",
                 "Chummer accepted this as a real issue and is tracking the fix path.",
-                "Open tracked case",
+                "Open case",
                 detailHref,
                 false),
             SupportCaseStatuses.Fixed => (
@@ -155,21 +155,21 @@ public sealed class SupportCasePresentationService
                 "Deferred",
                 "Do not wait on an immediate fix. Open a new case only if the situation changes materially.",
                 "Chummer kept the context, but active work is deferred for now.",
-                "Open tracked case",
+                "Open case",
                 detailHref,
                 false),
             SupportCaseStatuses.Rejected => (
                 "Closed",
                 "Open a new case only if you can provide corrected context or a clearer reproduction path.",
                 "Chummer closed this report without taking it forward.",
-                "Open tracked case",
+                "Open case",
                 detailHref,
                 false),
             _ => (
                 "Queued",
                 "No reply is needed yet. Chummer is still recording and routing the first triage step.",
                 "The report is attached to one stable case id and is waiting for first triage.",
-                "Open tracked case",
+                "Open case",
                 detailHref,
                 false)
         }};
@@ -312,7 +312,7 @@ public sealed class SupportCasePresentationService
         {
             if (HasInstallRailContext(supportCase))
             {
-                return "Follow-up stays attached to the affected claimed install. Use Account > Support for tracked history and Installs only when you need to relink or reclaim that copy.";
+                return "Follow-up stays attached to the affected claimed install. Use Account > Support for case history and Installs only when you need to relink or reclaim that copy.";
             }
 
             return "Follow-up stays inside Account > Support for this signed-in report.";

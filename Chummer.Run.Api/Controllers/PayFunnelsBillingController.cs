@@ -9,6 +9,8 @@ namespace Chummer.Run.Api.Controllers;
 [ApiController]
 public sealed class PayFunnelsBillingController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly PayFunnelsBillingService _billing;
 
     public PayFunnelsBillingController(PayFunnelsBillingService billing)
@@ -49,6 +51,7 @@ public sealed class PayFunnelsBillingController : ControllerBase
     public ActionResult<PayFunnelsTestBillingPageDto> TestBillingProjection() => Ok(_billing.GetTestPage());
 
     [HttpPost("/account/billing/test")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [Consumes("application/x-www-form-urlencoded")]
     public IActionResult CreateIntentFromForm([FromForm] PaymentIntentCreateRequest request)
     {
@@ -64,6 +67,7 @@ public sealed class PayFunnelsBillingController : ControllerBase
     }
 
     [HttpPost("/api/billing/payfunnels/test-intents")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PaymentIntentDto>(StatusCodes.Status200OK)]
     public ActionResult<PaymentIntentDto> CreateIntent([FromBody] PaymentIntentCreateRequest request)
     {
@@ -78,6 +82,7 @@ public sealed class PayFunnelsBillingController : ControllerBase
     }
 
     [HttpPost("/api/billing/payfunnels/webhook")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PayFunnelsWebhookResultDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]

@@ -41,14 +41,16 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("Windows preview build", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("preview rollout", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Create account to get preview", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Recommended from your browser. Other platforms stay out of the way.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Main build for this browser. Other downloads stay below.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"stable\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"nightly\"", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Recommended for this browser.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Main build for this browser.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Newer than Stable.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<summary>Other downloads</summary>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("No sudo. Updates default to notify.", downloadsView, StringComparison.Ordinal);
+        Assert.DoesNotContain("var showLinuxSourcePrimary = true;", downloadsView, StringComparison.Ordinal);
+        Assert.DoesNotContain("var hasOtherDownloads = true;", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Current public installer", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Current build", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Newest build", downloadsView, StringComparison.Ordinal);

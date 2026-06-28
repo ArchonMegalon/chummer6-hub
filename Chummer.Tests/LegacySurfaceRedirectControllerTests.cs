@@ -70,6 +70,24 @@ public sealed class LegacySurfaceRedirectControllerTests
         Assert.Equal("https://browser.example/blazor/app/?command=character_roster", handler.RequestUri?.ToString());
     }
 
+    [Fact]
+    public async Task WorkbenchRoutePreservesDialogActionQueryForHostedBlazorExecutionProof()
+    {
+        var handler = new RecordingHandler(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StringContent("<html><body>contact</body></html>")
+        });
+        var controller = CreateBrowserController(new StaticHttpClientFactory(new HttpClient(handler)));
+        controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?fixture=blue&tab=tab-contacts&control=contact_add&dialog_action=add");
+
+        IActionResult result = await controller.Workbench(path: "workbench", CancellationToken.None);
+
+        Assert.IsType<EmptyResult>(result);
+        Assert.Equal(
+            "https://browser.example/blazor/workbench?fixture=blue&tab=tab-contacts&control=contact_add&dialog_action=add",
+            handler.RequestUri?.ToString());
+    }
+
     private static LegacySurfaceRedirectController CreateBrowserController(IHttpClientFactory factory)
     {
         var configuration = new ConfigurationBuilder()

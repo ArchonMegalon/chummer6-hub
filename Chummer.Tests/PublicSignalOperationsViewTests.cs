@@ -12,14 +12,31 @@ public sealed class PublicSignalOperationsViewTests
         string feedbackViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
         string participateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml");
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string routeControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "ParticipateController.cs");
 
         Assert.False(File.Exists(feedbackViewPath));
         string participateView = File.ReadAllText(participateViewPath);
         string controller = File.ReadAllText(controllerPath);
+        string routeController = File.ReadAllText(routeControllerPath);
 
-        Assert.Contains("data-chummer-board-skin", controller, StringComparison.Ordinal);
-        Assert.Contains("localOrigin: \"/participate\"", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("participate-hosted__frame", participateView, StringComparison.Ordinal);
+        Assert.Contains("private static string BuildParticipateFrameHref(", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
+        Assert.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", controller, StringComparison.Ordinal);
+        Assert.Contains("[NonController]", routeController, StringComparison.Ordinal);
+        Assert.Contains("public sealed class ParticipateController : Controller", routeController, StringComparison.Ordinal);
+        Assert.DoesNotContain("RunsiteTourQuotaService", routeController, StringComparison.Ordinal);
+        Assert.DoesNotContain("InstallLinkingService", routeController, StringComparison.Ordinal);
+        Assert.DoesNotContain("CommunityCreatorHorizonsService", routeController, StringComparison.Ordinal);
+        Assert.DoesNotContain("SignedInTrustStatusService", routeController, StringComparison.Ordinal);
+        Assert.Contains("@PublicParticipateText(Model.Summary)", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-hosted__frame", participateView, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
+        Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
+        Assert.Contains("Board is live.", participateView, StringComparison.Ordinal);
+        Assert.Contains("showPreview = hasPreviewItems && !Model.EmbeddedBoardEnabled;", participateView, StringComparison.Ordinal);
+        Assert.Contains("@if (!Model.EmbeddedBoardEnabled && !string.IsNullOrWhiteSpace(boardSummary))", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Preview current requests", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Feedback and roadmap live here.", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("var signalOperations = Model.SignalOperations;", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicSignalOperationsPacket", participateView, StringComparison.Ordinal);
@@ -126,12 +143,11 @@ public sealed class PublicSignalOperationsViewTests
 
         Assert.Contains("private readonly PublicSignalOperationsService _signalOperations;", controller, StringComparison.Ordinal);
         Assert.Contains("BuildOptionalSignalOperationsPacket()", controller, StringComparison.Ordinal);
-        Assert.Contains("ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveProductLiftHostedBoardUri()", controller, StringComparison.Ordinal);
-        Assert.Contains("ResolveParticipateBoardHomeHref()", controller, StringComparison.Ordinal);
+        Assert.Contains("ResolvePublicHomeHref()", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/participate/board\")]", controller, StringComparison.Ordinal);
         Assert.Contains("ParticipateBoardProxy", controller, StringComparison.Ordinal);
-        Assert.Contains("RewriteParticipateBoardHtml", controller, StringComparison.Ordinal);
+        Assert.Contains("RewriteHostedBoardHtml", controller, StringComparison.Ordinal);
         Assert.Contains("data-chummer-home-link-patch", controller, StringComparison.Ordinal);
         Assert.Contains("brand.setAttribute('href', '__CHUMMER_PUBLIC_HOME_HREF__')", controller, StringComparison.Ordinal);
         Assert.Contains("brand.setAttribute('target', '_top')", controller, StringComparison.Ordinal);
@@ -208,10 +224,10 @@ public sealed class PublicSignalOperationsViewTests
     }
 
     [Fact]
-    public void ParticipateBoardHtmlRewriteInjectsHomeLinkPatchAndKeepsBoardLocal()
+    public void HostedBoardHtmlRewriteInjectsHomeLinkPatchAndKeepsBoardLocal()
     {
         MethodInfo? method = typeof(PublicLandingController).GetMethod(
-            "RewriteParticipateBoardHtml",
+            "RewriteHostedBoardHtml",
             BindingFlags.Static | BindingFlags.NonPublic);
 
         Assert.NotNull(method);
@@ -242,7 +258,36 @@ public sealed class PublicSignalOperationsViewTests
 
         string rewritten = (string)method!.Invoke(
             null,
-            [html, new Uri("https://chummer6.productlift.dev/feedback"), "https://chummer.run/", "/account/billing/supporter/start"])!;
+            [
+                html,
+                new Uri("https://chummer6.productlift.dev/feedback"),
+                "https://chummer.run/",
+                "/account/billing",
+                "/participate/board",
+                "/participate/board/",
+                "Chummer Participate",
+                "Participate actions",
+                "/roadmap",
+                "Roadmap",
+                "/participate",
+                "Board",
+                "/participate/board",
+                "/participate/provider-assets",
+                "Participate - Chummer.run",
+                "What should Chummer do next?",
+                "Public requests, clear bugs, useful ideas.",
+                "Add a note",
+                "Public requests, clear bugs, useful ideas.",
+                true,
+                "Board offline right now",
+                "Try again shortly. Use private support only when it should stay private.",
+                "/roadmap",
+                "Roadmap",
+                "/contact#support-intake",
+                "Private support",
+                "/participate",
+                "Retry"
+            ])!;
 
         Assert.Contains("<base href=\"/participate/board/\" />", rewritten, StringComparison.Ordinal);
         Assert.Contains("<meta property=\"og:url\" content=\"/participate/board\">", rewritten, StringComparison.Ordinal);
@@ -264,13 +309,13 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("could not load posts", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("network error while loading tab configuration", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-chummer-board-failure-root", rewritten, StringComparison.Ordinal);
-        Assert.Contains("The board is unavailable", rewritten, StringComparison.Ordinal);
+        Assert.Contains("Board offline right now", rewritten, StringComparison.Ordinal);
         Assert.Contains("Try again shortly.", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("data-chummer-board-rail", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("href=\"/account/billing/supporter/start\"", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("Support Chummer", rewritten, StringComparison.Ordinal);
         Assert.Contains("document.body.replaceChildren();", rewritten, StringComparison.Ordinal);
-        Assert.Contains("document.title = 'The board is unavailable';", rewritten, StringComparison.Ordinal);
+        Assert.Contains("document.title = 'Board offline right now';", rewritten, StringComparison.Ordinal);
         Assert.Contains("new MutationObserver", rewritten, StringComparison.Ordinal);
         Assert.Contains("removeHostedAuth", rewritten, StringComparison.Ordinal);
         Assert.Contains("authObserver.observe(document.documentElement", rewritten, StringComparison.Ordinal);
@@ -291,10 +336,10 @@ public sealed class PublicSignalOperationsViewTests
     }
 
     [Fact]
-    public void ParticipateBoardHtmlRewriteSkipsSupporterLinkWhenBillingUnavailable()
+    public void HostedBoardHtmlRewriteSkipsSupporterLinkWhenBillingUnavailable()
     {
         MethodInfo? method = typeof(PublicLandingController).GetMethod(
-            "RewriteParticipateBoardHtml",
+            "RewriteHostedBoardHtml",
             BindingFlags.Static | BindingFlags.NonPublic);
 
         Assert.NotNull(method);
@@ -309,7 +354,36 @@ public sealed class PublicSignalOperationsViewTests
 
         string rewritten = (string)method!.Invoke(
             null,
-            [html, new Uri("https://chummer6.productlift.dev/feedback"), "https://chummer.run/", null])!;
+            [
+                html,
+                new Uri("https://chummer6.productlift.dev/feedback"),
+                "https://chummer.run/",
+                null,
+                "/participate/board",
+                "/participate/board/",
+                "Chummer Participate",
+                "Participate actions",
+                "/roadmap",
+                "Roadmap",
+                "/participate",
+                "Board",
+                "/participate/board",
+                "/participate/provider-assets",
+                "Participate - Chummer.run",
+                "What should Chummer do next?",
+                "Public requests, clear bugs, useful ideas.",
+                "Add a note",
+                "Public requests, clear bugs, useful ideas.",
+                true,
+                "Board offline right now",
+                "Try again shortly. Use private support only when it should stay private.",
+                "/roadmap",
+                "Roadmap",
+                "/contact#support-intake",
+                "Private support",
+                "/participate",
+                "Retry"
+            ])!;
 
         Assert.DoesNotContain("href=\"/account/billing/supporter/start\"", rewritten, StringComparison.Ordinal);
         Assert.DoesNotContain("Support Chummer", rewritten, StringComparison.Ordinal);

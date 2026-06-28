@@ -8,7 +8,17 @@
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@UndetectableHumanizerCopyAdapter.Humanize(Model.Eyebrow)</p>
-        <h1 class="page-title">@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</h1>
+        <h1 class="page-title heading-with-help">
+            <span>@UndetectableHumanizerCopyAdapter.Humanize(Model.Heading)</span>
+            @if (!string.IsNullOrWhiteSpace(CopyrightTooltipForHeading(Model.Heading)))
+            {
+                <span class="inline-help-dot"
+                      tabindex="0"
+                      role="note"
+                      title="@CopyrightTooltipForHeading(Model.Heading)"
+                      aria-label="@CopyrightTooltipForHeading(Model.Heading)">?</span>
+            }
+        </h1>
         <p class="page-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
         <div class="trust-claim__details">
             @foreach (var point in Model.SummaryPoints)
@@ -114,4 +124,17 @@
     <section class="release-footnote">
         @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
     </section>
+}
+
+@functions {
+    private static string? CopyrightTooltipForHeading(string? heading)
+    {
+        if (string.IsNullOrWhiteSpace(heading)
+            || heading.IndexOf("runbook", StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            return null;
+        }
+
+        return "Not legal advice. Runbook rights are strongest in your human curation, editing, commentary, and arrangement. Raw session signals and untouched model-only wording may not carry the same protection on their own, so review before publishing or selling.";
+    }
 }

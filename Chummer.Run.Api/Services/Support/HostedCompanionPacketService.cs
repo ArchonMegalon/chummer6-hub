@@ -299,7 +299,7 @@ public sealed class HostedCompanionPacketService
             FactSummary: summary,
             AllowedActions:
             [
-                new HostedCompanionActionProjection("open_support_case", "Open support case", detailRoute, "Inspect the tracked support case, next-safe action, and closure timeline."),
+                new HostedCompanionActionProjection("open_support_case", "Open support case", detailRoute, "Inspect the support case, next-safe action, and closure timeline."),
                 new HostedCompanionActionProjection("show_fix_receipt", "Show fix record", concierge.ReleaseExplainer.FirstPartyRoutes.FirstOrDefault(static route => route.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)) ?? "/downloads", "Check the same Chummer release path that support says fixes the issue."),
                 new HostedCompanionActionProjection("open_install_support", "Open install support", "/api/v1/install-linking/continuation/support", "Keep support and install follow-up on the same linked copy.")
             ],

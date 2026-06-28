@@ -10,6 +10,8 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/account/campaigns/{campaignId}/sessions/{sessionId}/venue")]
 public sealed class GmSessionVenueController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly HubIdentityClient _identity;
     private readonly AccountService _accounts;
     private readonly GmSessionVenueService _venues;
@@ -49,6 +51,7 @@ public sealed class GmSessionVenueController : ControllerBase
     }
 
     [HttpPost("manual-link")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<VenueLinkReceiptProjection>(StatusCodes.Status200OK)]
     public async Task<ActionResult<VenueLinkReceiptProjection>> AddManualVenueLink(
         [FromRoute] string campaignId,
@@ -86,6 +89,7 @@ public sealed class GmSessionVenueController : ControllerBase
     }
 
     [HttpPost("behuman")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<VenueCreatedReceiptProjection>(StatusCodes.Status200OK)]
     public async Task<ActionResult<VenueCreatedReceiptProjection>> CreateBeHumanVenue(
         [FromRoute] string campaignId,
@@ -132,6 +136,7 @@ public sealed class GmSessionVenueController : ControllerBase
     }
 
     [HttpPost("closeout")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<SessionVenueCloseoutReceiptProjection>(StatusCodes.Status200OK)]
     public async Task<ActionResult<SessionVenueCloseoutReceiptProjection>> CloseVenue(
         [FromRoute] string campaignId,

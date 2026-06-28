@@ -458,17 +458,17 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS", controller, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadTicketService", controller, StringComparison.Ordinal);
-        Assert.Contains("self-contained bootstrap command", controller, StringComparison.Ordinal);
+        Assert.Contains("digest-pinned bootstrap command", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveReleaseUploadCommandAuth", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadTicketEnvironmentVariable", controller, StringComparison.Ordinal);
         Assert.Contains("\"export \" + releaseUploadAuthEnvironmentVariable + \"=\"", controller, StringComparison.Ordinal);
         Assert.Contains("Release upload authorization was attached", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadPageViewModel", viewModel, StringComparison.Ordinal);
-        Assert.Contains("Release upload", view, StringComparison.Ordinal);
-        Assert.Contains("handles release upload in Chummer", view, StringComparison.Ordinal);
+        Assert.Contains("Build macOS", view, StringComparison.Ordinal);
+        Assert.Contains("keeps the Mac build handoff in Chummer", view, StringComparison.Ordinal);
         Assert.Contains("recovery-aware status path", view, StringComparison.Ordinal);
         Assert.Contains("recovery-only code", view, StringComparison.Ordinal);
-        Assert.Contains("carries the current short-lived upload access code", view, StringComparison.Ordinal);
+        Assert.Contains("carries the current short-lived access code", view, StringComparison.Ordinal);
         Assert.Contains("This release command contains a short-lived access code", view, StringComparison.Ordinal);
         Assert.Contains("delete the local release work root and temporary packaging files again", view, StringComparison.Ordinal);
         Assert.Contains("Short-lived access code", view, StringComparison.Ordinal);
@@ -3369,9 +3369,11 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("wait_for_portal_edge", shell, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PORTAL_PUBLIC_HOST", shell, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PORTAL_FORWARDED_PROTO", shell, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_PORTAL_REQUIRE_BLAZOR", shell, StringComparison.Ordinal);
         Assert.Contains("X-Forwarded-Proto", node, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PORTAL_PUBLIC_HOST", node, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PORTAL_FORWARDED_PROTO", node, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_PORTAL_REQUIRE_BLAZOR", node, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -3665,6 +3667,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("LoadWeeklyPulseJson", service, StringComparison.Ordinal);
         Assert.Contains("/api/public/weekly-pulse", audit, StringComparison.Ordinal);
         Assert.Contains("chummer.weekly_product_pulse", audit, StringComparison.Ordinal);
+        Assert.Contains("<p class=\"progress-shell-signed-in\">{Encode(chrome.SignedInLabel!)}</p>", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Signed in as {Encode(chrome.SignedInLabel!)}", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -3748,7 +3752,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("PRIVACY_AND_RETENTION_BOUNDARIES.md", service, StringComparison.Ordinal);
         Assert.Contains("PUBLIC_TRUST_CONTENT.yaml", service, StringComparison.Ordinal);
         Assert.Contains("PrivacyBoundaryPanelViewModel? PrivacyBoundary", viewModel, StringComparison.Ordinal);
-        Assert.Contains("Kept for:", partial, StringComparison.Ordinal);
+        Assert.Contains("Stored:", partial, StringComparison.Ordinal);
         Assert.Contains("Model.PrivacyBoundary", accountView, StringComparison.Ordinal);
         Assert.Contains("/api/public/privacy-boundaries", audit, StringComparison.Ordinal);
         Assert.Contains("chummer.public_privacy_boundaries", audit, StringComparison.Ordinal);

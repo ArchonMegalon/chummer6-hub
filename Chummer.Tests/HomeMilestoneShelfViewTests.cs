@@ -5,22 +5,20 @@ namespace Chummer.Tests;
 public sealed class RoadmapMilestoneProjectionViewTests
 {
     [Fact]
-    public void RoadmapViewIncludesMilestoneLedgerLabels()
+    public void RoadmapViewStaysMinimalWhenTheLiveBoardFallsBack()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml");
         string source = File.ReadAllText(viewPath);
 
-        Assert.Contains("roadmap-signal", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("roadmap-signal-grid", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Feedback, planning, shipped updates, and private help stay on different pages.", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Votes inform demand", source, StringComparison.Ordinal);
-        Assert.Contains("Open changelog", source, StringComparison.Ordinal);
-        Assert.Contains("Model.Milestones", source, StringComparison.Ordinal);
-        Assert.Contains("roadmap-milestones", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Difficulty:", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Claimed:", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Dependencies:", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("milestone-drawer__tease", source, StringComparison.Ordinal);
+        Assert.Contains("Now and next.", source, StringComparison.Ordinal);
+        Assert.Contains("Board not loading right now", source, StringComparison.Ordinal);
+        Assert.Contains("Planned work is here. Shipped work stays in Changelog.", source, StringComparison.Ordinal);
+        Assert.Contains("Current work opens below.", source, StringComparison.Ordinal);
+        Assert.Contains("Changelog", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Model.Milestones", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Top requests", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProductLift owns the roadmap.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Private issue", source, StringComparison.Ordinal);
     }
 
     [Fact]

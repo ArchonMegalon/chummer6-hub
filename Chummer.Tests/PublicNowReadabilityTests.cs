@@ -17,9 +17,9 @@ public sealed class PublicNowReadabilityTests
         Assert.Contains(".surface-now .status-decision-strip__card h2,", css, StringComparison.Ordinal);
         Assert.Contains("color: #13233a;", css, StringComparison.Ordinal);
 
-        Assert.True(ContrastRatio("#43566f", "#fff9f1") >= 7.0, "What works today body copy must stay readable on its card background.");
-        Assert.True(ContrastRatio("#13233a", "#fff9f1") >= 12.0, "What works today headings must stay strongly readable on their card background.");
-        Assert.True(ContrastRatio("#8b4f12", "#fff9f1") >= 5.0, "What works today eyebrow and tag color must stay readable on the light surface.");
+        Assert.True(ContrastRatio("#43566f", "#fff9f1") >= 7.0, "Current release body copy must stay readable on its card background.");
+        Assert.True(ContrastRatio("#13233a", "#fff9f1") >= 12.0, "Current release headings must stay strongly readable on their card background.");
+        Assert.True(ContrastRatio("#8b4f12", "#fff9f1") >= 5.0, "Current release eyebrow and tag color must stay readable on the light surface.");
     }
 
     private static double ContrastRatio(string foregroundHex, string backgroundHex)

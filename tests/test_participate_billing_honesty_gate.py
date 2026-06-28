@@ -28,7 +28,7 @@ class ParticipateBillingHonestyGateTests(unittest.TestCase):
                 json.dumps(
                     {
                         "status": "pass",
-                        "signed_in_participate_proxy_verified": True,
+                        "signed_in_participate_first_party_verified": True,
                         "signed_in_supporter_checkout_location": "https://billing.example.test/supporter?membership_plan=supporter",
                     }
                 )
@@ -59,7 +59,7 @@ class ParticipateBillingHonestyGateTests(unittest.TestCase):
                 json.dumps(
                     {
                         "status": "pass",
-                        "signed_in_participate_proxy_verified": True,
+                        "signed_in_participate_first_party_verified": True,
                         "signed_in_supporter_checkout_location": "https://billing.example.test/supporter?membership_plan=supporter",
                     }
                 )
@@ -90,7 +90,7 @@ class ParticipateBillingHonestyGateTests(unittest.TestCase):
                 json.dumps(
                     {
                         "status": "pass",
-                        "signed_in_participate_proxy_verified": True,
+                        "signed_in_participate_first_party_verified": True,
                         "signed_in_supporter_checkout_location": "https://billing.example.test/supporter?membership_plan=supporter",
                     }
                 )

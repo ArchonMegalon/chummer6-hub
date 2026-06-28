@@ -3,17 +3,17 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 const identityToken = process.env.CHUMMER_E2E_IDENTITY_TOKEN?.trim() || '';
-const boardSentinel = process.env.CHUMMER_E2E_BOARD_SENTINEL?.trim() || 'board sentinel';
-const boardBaseUrl = process.env.CHUMMER_E2E_BOARD_BASE_URL?.trim() || '';
+
+function containsSupportedBookLimitCopy(text: string) {
+  return text.includes('1 book/month on Free. 2/month on Supporter.')
+    || text.includes('Same app. 1 book each month on Free. 2 on Supporter.');
+}
 
 test('guest billing and account entry stay first-party', async ({ request }) => {
   const guestBilling = await request.get(`${baseUrl}/account/billing`, { maxRedirects: 0 });
-  expect(guestBilling.status()).toBe(200);
-  const guestBillingText = await guestBilling.text();
-  expect(guestBillingText).toContain('Same app.');
-  expect(guestBillingText).toContain('Origin books: 1/month free. 2/month supporter.');
-  expect(guestBillingText).toContain('Continue with email');
-  expect(guestBillingText).not.toContain('/auth/google/start?next=');
+  expect([302, 303, 307, 308]).toContain(guestBilling.status());
+  const guestBillingLocation = guestBilling.headers()['location'] || '';
+  expect(guestBillingLocation).toBe('/login?next=%2Faccount%2Fbilling');
 
   const guestAccount = await request.get(`${baseUrl}/account`, { maxRedirects: 0 });
   expect([302, 303, 307, 308]).toContain(guestAccount.status());
@@ -23,35 +23,33 @@ test('guest billing and account entry stay first-party', async ({ request }) => 
   const guestSupporterStart = await request.get(`${baseUrl}/account/billing/supporter/start`, { maxRedirects: 0 });
   expect([302, 303, 307, 308]).toContain(guestSupporterStart.status());
   const guestSupporterStartLocation = guestSupporterStart.headers()['location'] || '';
-  expect(guestSupporterStartLocation).toBe('/account/billing');
+  expect(guestSupporterStartLocation).toBe('/login?next=%2Faccount%2Fbilling');
 });
 
 test('billing and participate stay first-party for guests and signed-in users', async ({ request, browser }) => {
   test.setTimeout(90_000);
 
   const guestBilling = await request.get(`${baseUrl}/account/billing`, { maxRedirects: 0 });
-  expect(guestBilling.status()).toBe(200);
-  const guestBillingText = await guestBilling.text();
-  expect(guestBillingText).toContain('Same app.');
-  expect(guestBillingText).toContain('Origin books: 1/month free. 2/month supporter.');
-  expect(guestBillingText).toContain('Continue with email');
-  expect(guestBillingText).not.toContain('/auth/google/start?next=');
+  expect([302, 303, 307, 308]).toContain(guestBilling.status());
+  const guestBillingLocation = guestBilling.headers()['location'] || '';
+  expect(guestBillingLocation).toBe('/login?next=%2Faccount%2Fbilling');
 
   const guestParticipate = await request.get(`${baseUrl}/participate`);
   expect(guestParticipate.status()).toBe(200);
   const guestParticipateText = await guestParticipate.text();
-  expect(
-    guestParticipateText.includes('data-chummer-board-skin')
-      || guestParticipateText.includes('The board is unavailable')
-  ).toBeTruthy();
-  expect(guestParticipateText).not.toContain('Requests, votes, and shipped work.');
-  expect(guestParticipateText).not.toContain('Support Chummer');
+  expect(guestParticipateText).toContain('What should Chummer do next?');
+  expect(guestParticipateText).toContain('Public requests, clear bugs, useful ideas.');
+  expect(guestParticipateText).toContain('Board is live.');
+  expect(guestParticipateText).toContain('Current requests');
+  expect(guestParticipateText).toContain('Sign in to Chummer');
+  expect(guestParticipateText).toContain('7 requests live');
+  expect(guestParticipateText).toContain('data-chummer-participate-frame');
   expect(guestParticipateText).not.toContain('ProductLift');
 
   const guestSupporterStart = await request.get(`${baseUrl}/account/billing/supporter/start`, { maxRedirects: 0 });
   expect([302, 303, 307, 308]).toContain(guestSupporterStart.status());
   const guestSupporterStartLocation = guestSupporterStart.headers()['location'] || '';
-  expect(guestSupporterStartLocation).toBe('/account/billing');
+  expect(guestSupporterStartLocation).toBe('/login?next=%2Faccount%2Fbilling');
 
   const guestAccount = await request.get(`${baseUrl}/account`, { maxRedirects: 0 });
   expect([302, 303, 307, 308]).toContain(guestAccount.status());
@@ -75,18 +73,23 @@ test('billing and participate stay first-party for guests and signed-in users', 
   ]);
   const page = await context.newPage();
 
-  await page.goto(`${baseUrl}/account/billing`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${baseUrl}/account/billing?preview=true`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('h1')).toContainText('Membership');
-  await expect(page.locator('body')).toContainText('Same app.');
-  await expect(page.locator('body')).toContainText('Origin books: 1/month free. 2/month supporter.');
-  await expect(page.locator('body')).toContainText('Signed in as');
-  await expect(page.locator('body')).toContainText('No extra app features right now.');
-  await expect(page.locator('body')).toContainText('Checkout stays attached to this account.');
+  const billingBodyText = await page.locator('body').innerText();
+  const signedInSupporterActive = billingBodyText.includes('Supporter is already attached to this account.');
+  expect(containsSupportedBookLimitCopy(billingBodyText)).toBeTruthy();
+  await expect(page.locator('body')).toContainText('No extra app features today.');
+  if (signedInSupporterActive) {
+    await expect(page.locator('body')).toContainText('Supporter is already attached to this account.');
+  } else {
+    await expect(page.locator('body')).toContainText('Checkout stays attached to this account.');
+  }
   await expect(page.locator('body')).not.toContainText('external billing checkout');
   await expect(page.locator('body')).not.toContainText('hosted billing route');
-  await expect(page.locator('form[action="/account/billing/supporter"]')).toBeVisible();
-  const attachedUserId = await page.locator('input[name="userId"]').inputValue();
-  const antiForgeryToken = await page.locator('input[name="__RequestVerificationToken"]').inputValue();
+  const supporterForm = page.locator('form[action="/account/billing/supporter"]');
+  await expect(supporterForm).toBeVisible();
+  const attachedUserId = await supporterForm.locator('input[name="userId"]').inputValue();
+  const antiForgeryToken = await supporterForm.locator('input[name="__RequestVerificationToken"]').inputValue();
   expect(attachedUserId.length).toBeGreaterThan(0);
   expect(antiForgeryToken.length).toBeGreaterThan(0);
 
@@ -99,6 +102,18 @@ test('billing and participate stay first-party for guests and signed-in users', 
       Cookie: cookieHeader,
     },
   });
+  const signedInBillingHandoff = await signedInRequest.get(`${baseUrl}/account/billing`, {
+    maxRedirects: 0,
+  });
+  expect([302, 303]).toContain(signedInBillingHandoff.status());
+  const signedInBillingLocation = signedInBillingHandoff.headers()['location'] || '';
+  if (signedInSupporterActive) {
+    expect(signedInBillingLocation).toContain('billing.example.test/portal');
+  } else {
+    expect(signedInBillingLocation).toContain('billing.example.test/supporter');
+    expect(signedInBillingLocation).toContain('external_user=');
+    expect(signedInBillingLocation).toContain('membership_plan=supporter');
+  }
   const signedInSupporterCheckout = await signedInRequest.post(`${baseUrl}/account/billing/supporter`, {
     maxRedirects: 0,
     form: {
@@ -123,30 +138,18 @@ test('billing and participate stay first-party for guests and signed-in users', 
   expect(signedInSupporterDirectLocation).toContain('membership_plan=supporter');
   await signedInRequest.dispose();
 
-  if (boardBaseUrl) {
-    await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('body')).toContainText(boardSentinel);
-    await expect(page.getByRole('link', { name: 'Support Chummer' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Support Chummer' })).toHaveAttribute('href', '/account/billing/supporter/start');
-    await expect(page.locator('body')).not.toContainText('Log in');
-    await expect(page.locator('body')).not.toContainText('Sign up');
-    await expect(page.locator('body')).not.toContainText('Sign in');
-
-    const signedInParticipate = await request.get(`${baseUrl}/participate`, {
-      maxRedirects: 0,
-      headers: {
-        Cookie: `chummer_hub_access_token=${identityToken}`,
-      },
-    });
-    expect(signedInParticipate.status()).toBe(200);
-    const signedInParticipateText = await signedInParticipate.text();
-    expect(signedInParticipateText).toContain(boardSentinel);
-    expect(signedInParticipateText).not.toContain(boardBaseUrl);
-    expect(signedInParticipateText).toContain('/participate/');
-    expect(signedInParticipateText).toContain('/account/billing/supporter/start');
-    expect(signedInParticipateText).toContain('Support Chummer');
-    expect(signedInParticipateText).not.toContain('Sign in');
-  }
+  await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: 'What should Chummer do next?' })).toBeVisible();
+  await expect(page.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
+  await expect(page.locator('body')).toContainText('Current requests');
+  await expect(page.locator('body')).not.toContainText('Board offline right now');
+  await expect(page.locator('[data-chummer-participate-frame]')).toHaveCount(1);
+  await expect(page.locator('body')).toContainText('7 requests live');
+  await expect(page.getByRole('link', { name: 'Account' })).toHaveAttribute('href', '/account');
+  await expect(page.getByRole('link', { name: 'Supporter' })).toHaveAttribute('href', '/account/billing');
+  await expect(page.locator('body')).not.toContainText('ProductLift');
+  await expect(page.locator('body')).not.toContainText('Log in');
+  await expect(page.locator('body')).not.toContainText('Sign up');
   await page.close();
   await context.close();
 
@@ -155,9 +158,10 @@ test('billing and participate stay first-party for guests and signed-in users', 
     status: 'pass',
     base_url: baseUrl,
     guest_billing_status: guestBilling.status(),
-    guest_billing_email_first: guestBillingText.includes('Continue with email'),
+    guest_billing_location: guestBillingLocation,
     guest_participate_status: guestParticipate.status(),
     guest_participate_public_wrapper: true,
+    guest_participate_surface: 'first_party_iframe_shell',
     guest_supporter_start_status: guestSupporterStart.status(),
     guest_supporter_start_location: guestSupporterStartLocation,
     guest_account_status: guestAccount.status(),
@@ -166,8 +170,12 @@ test('billing and participate stay first-party for guests and signed-in users', 
     signed_in_supporter_checkout_location: signedInSupporterLocation,
     signed_in_supporter_direct_status: signedInSupporterDirect.status(),
     signed_in_supporter_direct_location: signedInSupporterDirectLocation,
-    signed_in_participate_proxy_verified: Boolean(boardBaseUrl),
+    signed_in_billing_handoff_status: signedInBillingHandoff.status(),
+    signed_in_billing_handoff_location: signedInBillingLocation,
+    signed_in_supporter_active: signedInSupporterActive,
+    signed_in_participate_first_party_verified: true,
+    signed_in_participate_surface: 'first_party_iframe_shell',
     signed_in_identity_token_present: true,
-    first_party_sign_in_redirect: guestSupporterStartLocation === '/account/billing',
+    first_party_sign_in_redirect: guestSupporterStartLocation === '/login?next=%2Faccount%2Fbilling',
   });
 });

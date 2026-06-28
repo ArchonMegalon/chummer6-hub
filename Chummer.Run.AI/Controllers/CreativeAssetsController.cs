@@ -12,6 +12,8 @@ namespace Chummer.Run.AI.Controllers;
 [Route("api/v1/ai/creative")]
 public sealed class CreativeAssetsController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly IPortraitForgeService _portraitForge;
     private readonly IPacketFactoryService _packetFactory;
     private readonly IAssetLifecycleService _assetLifecycle;
@@ -42,6 +44,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("portrait-forge")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PortraitForgeResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PortraitForgeResult>> ForgePortrait([FromBody] PortraitForgeRequest? request, CancellationToken cancellationToken)
     {
@@ -71,6 +74,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("portrait-forge/{portraitDraftId}/approve")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PortraitForgeResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -96,6 +100,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("packet-factory")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PacketFactoryResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PacketFactoryResult>> CreatePacket([FromBody] PacketFactoryRequest? request, CancellationToken cancellationToken)
     {
@@ -118,6 +123,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("packet-factory/{packetId}/attachments")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<IEnumerable<PacketAttachmentRecord>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<PacketAttachmentRecord>>> AttachPacket(
@@ -157,6 +163,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("assets/{assetId}/lifecycle")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<AssetCatalogItem>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -205,6 +212,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("news-network/brief")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<NewsBriefResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<NewsBriefResult>> CreateNewsBrief(
         [FromBody] NewsBriefRequest? request,
@@ -228,6 +236,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("news-network/brief/{briefId}/deliver")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<NewsBriefDeliveryResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -251,6 +260,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("route-cinema")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<RouteCinemaResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<RouteCinemaResult>> BuildRouteCinema(
         [FromBody] RouteCinemaRequest? request,
@@ -281,6 +291,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("shadowfeed")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<ShadowfeedResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<ShadowfeedResult>> DraftShadowfeed(
         [FromBody] ShadowfeedRequest? request,
@@ -295,6 +306,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("npc-message-video")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<NpcVideoMessageResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<NpcVideoMessageResult>> BuildNpcMessageVideo(
         [FromBody] NpcVideoMessageRequest? request,
@@ -318,6 +330,7 @@ public sealed class CreativeAssetsController : ControllerBase
     }
 
     [HttpPost("npc-message-video/{messageId}/publish")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<NpcVideoMessagePublishResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

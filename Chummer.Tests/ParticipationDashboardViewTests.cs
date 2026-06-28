@@ -10,9 +10,9 @@ public sealed class ParticipationDashboardViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Participation dashboard", view, StringComparison.Ordinal);
-        Assert.Contains("Contribution cred", view, StringComparison.Ordinal);
-        Assert.Contains("Impact closeout notifications", view, StringComparison.Ordinal);
+        Assert.Contains("<h2>Participate</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("Contribution points", view, StringComparison.Ordinal);
+        Assert.Contains("Result updates", view, StringComparison.Ordinal);
         Assert.Contains("publicContributionProfileOptIn", view, StringComparison.Ordinal);
         Assert.Contains("impactCloseoutNotifications", view, StringComparison.Ordinal);
         Assert.Contains("Impact journal", view, StringComparison.Ordinal);
@@ -55,9 +55,11 @@ public sealed class ParticipationDashboardViewTests
         Assert.Contains("Public contribution code", consoleView, StringComparison.Ordinal);
         Assert.Contains("Chummer attaches this code to your contribution session", consoleView, StringComparison.Ordinal);
         Assert.Contains("specific Chummer tasks", consoleView, StringComparison.Ordinal);
+        Assert.Contains("@Model.User.DisplayName. Codes expire quickly", consoleView, StringComparison.Ordinal);
         Assert.DoesNotContain("bounded product work", consoleView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("blank check", consoleView, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("token-backed", consoleView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Signed in as @Model.User.DisplayName", consoleView, StringComparison.Ordinal);
         Assert.Contains("Contribution usage", leaderboardView, StringComparison.Ordinal);
         Assert.Contains("Contribution code", leaderboardView, StringComparison.Ordinal);
         Assert.Contains("Codex contribution code", workflowCanon, StringComparison.Ordinal);

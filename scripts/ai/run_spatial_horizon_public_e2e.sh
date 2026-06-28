@@ -67,6 +67,7 @@ SERVER_PID="$!"
 wait_for_server "$BASE_URL"
 
 BASE_URL="$BASE_URL" npx playwright test \
+  tests/public/black-ledger-viewer-network.spec.ts \
   tests/public/runsite-public.spec.ts \
   tests/public/propertyquarry-public.spec.ts
 

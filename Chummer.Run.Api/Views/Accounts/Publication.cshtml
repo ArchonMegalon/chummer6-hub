@@ -1,0 +1,276 @@
+@using System.Globalization
+@model AccountPageViewModel
+@{
+    var publication = Model.SelectedCreatorPublication;
+    ViewData["Title"] = publication?.Title ?? "Roster";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+
+    var detail = Model.SelectedCreatorPublicationDraftDetail;
+    var receipt = Model.SelectedCreatorPublicationReceipt;
+    var buildHref = !string.IsNullOrWhiteSpace(publication?.BuildHandoffId)
+        ? $"/account/work/build-handoffs/{Uri.EscapeDataString(publication.BuildHandoffId)}"
+        : "/account/work";
+    var publicHref = publication is not null
+        ? $"/artifacts/publications/{Uri.EscapeDataString(publication.PublicationId)}"
+        : "/artifacts";
+    var discoverable = publication?.Discoverable == true
+        && string.Equals(publication.PublicationStatus, "published", StringComparison.OrdinalIgnoreCase);
+    var reviewPending = string.Equals(detail?.Moderation?.State, Chummer.Hub.Registry.Contracts.HubModerationStates.PendingReview, StringComparison.OrdinalIgnoreCase);
+    var reviewApproved = string.Equals(receipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Approved, StringComparison.OrdinalIgnoreCase);
+    var reviewRejected = string.Equals(receipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Rejected, StringComparison.OrdinalIgnoreCase);
+    var alreadyPublished = string.Equals(receipt?.PublicationStatus, Chummer.Hub.Registry.Contracts.HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase);
+    var archived = string.Equals(detail?.Draft.State, Chummer.Hub.Registry.Contracts.HubPublicationStates.Archived, StringComparison.OrdinalIgnoreCase);
+    var canSubmit = detail is not null
+        && !reviewPending
+        && !reviewApproved
+        && !archived;
+    var canPublish = detail is not null
+        && reviewApproved
+        && !alreadyPublished
+        && !archived;
+    var correctionResubmission = reviewRejected;
+
+    static string Humanize(string? value, string fallback = "Ready")
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
+    }
+}
+
+@if (publication is null)
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">Roster</p>
+            <h1>Publication not found</h1>
+            <p>This publication is not attached to this account anymore.</p>
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" href="/account/work">Back to roster</a>
+            </div>
+        </div>
+    </section>
+}
+else
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">Roster</p>
+            <h1>@publication.Title</h1>
+            <p>@publication.Summary</p>
+            <ul class="minimal-hero__points">
+                <li>@Humanize(publication.Kind, "Publication")</li>
+                <li>@Humanize(receipt?.PublicationStatus ?? publication.PublicationStatus, "Draft")</li>
+                <li>@publication.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</li>
+            </ul>
+            <div class="minimal-actions">
+                <a class="button-like button-like--ghost" href="/account/work">Back to roster</a>
+                @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
+                {
+                    <a class="button-like button-like--secondary" href="@buildHref">Open build details</a>
+                }
+                @if (discoverable)
+                {
+                    <a class="button-like button-like--secondary" href="@publicHref">Open public page</a>
+                }
+            </div>
+        </div>
+    </section>
+
+    <section class="minimal-section">
+        <div class="minimal-lane-grid minimal-platform-list">
+            <article class="minimal-lane-card">
+                <span class="tag">State</span>
+                <h2>@Humanize(receipt?.PublicationStatus ?? publication.PublicationStatus, "Draft")</h2>
+                <p>@(publication.NextSafeAction ?? "Review the current status before you move this forward.")</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Review</span>
+                <h2>@Humanize(receipt?.ReviewState ?? detail?.Moderation?.State, "Not required")</h2>
+                <p>@(string.IsNullOrWhiteSpace(publication.ModerationSummary) ? "No moderation note is attached right now." : publication.ModerationSummary)</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Sharing</span>
+                <h2>@Humanize(receipt?.Visibility ?? publication.Visibility, "Shared")</h2>
+                <p>@(string.IsNullOrWhiteSpace(publication.DiscoverySummary) ? "This publication is still private to the campaign." : publication.DiscoverySummary)</p>
+            </article>
+        </div>
+    </section>
+
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <h2>Current lane</h2>
+            <p>Only the current status and the next useful move.</p>
+        </div>
+        <article class="minimal-lane-card">
+            <div class="settings-summary-list">
+                @if (detail is not null)
+                {
+                    <div class="settings-summary-row">
+                        <span>Draft</span>
+                        <strong>@Humanize(detail.Draft.State, "Draft")</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Draft type</span>
+                        <strong>@Humanize(detail.Draft.ProjectKind, "Publication")</strong>
+                    </div>
+                }
+                <div class="settings-summary-row">
+                    <span>Review</span>
+                    <strong>@Humanize(receipt?.ReviewState ?? detail?.Moderation?.State, "Not required")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Publication</span>
+                    <strong>@Humanize(receipt?.PublicationStatus ?? publication.PublicationStatus, "Draft")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Visibility</span>
+                    <strong>@Humanize(receipt?.Visibility ?? publication.Visibility, "Shared")</strong>
+                </div>
+                @if (receipt?.PublishedAtUtc is not null)
+                {
+                    <div class="settings-summary-row">
+                        <span>Published</span>
+                        <strong>@receipt.PublishedAtUtc.Value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(detail?.LatestModerationNotes))
+                {
+                    <div class="settings-summary-row">
+                        <span>Latest note</span>
+                        <strong>@detail.LatestModerationNotes</strong>
+                    </div>
+                }
+            </div>
+        </article>
+    </section>
+
+    @if (canSubmit)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Send forward</h2>
+                <p>Move this publication into the next review step.</p>
+            </div>
+            <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(publication.PublicationId)/submit">
+                @Html.AntiForgeryToken()
+                <label for="creatorPublicationSubmitNotes">@(correctionResubmission ? "Correction notes" : "Notes")</label>
+                <textarea id="creatorPublicationSubmitNotes" name="notes" rows="3" placeholder="@(correctionResubmission ? "State what changed before it goes back into review." : "State why this is ready to move forward.")"></textarea>
+                <div class="stacked-actions">
+                    <button class="button-like button-like--primary" type="submit">@(correctionResubmission ? "Resubmit" : "Send forward")</button>
+                </div>
+            </form>
+        </section>
+    }
+
+    @if (reviewPending)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Decision</h2>
+                <p>Advance it or send it back with one clear note.</p>
+            </div>
+            <div class="minimal-lane-grid minimal-platform-list">
+                <form class="settings-form minimal-lane-card" method="post" action="/account/work/publications/@Uri.EscapeDataString(publication.PublicationId)/approve">
+                    @Html.AntiForgeryToken()
+                    <span class="tag">Approve</span>
+                    <label for="creatorPublicationApproveNotes">Advance notes</label>
+                    <textarea id="creatorPublicationApproveNotes" name="notes" rows="3" placeholder="Record why this is safe to advance."></textarea>
+                    <div class="stacked-actions">
+                        <button class="button-like button-like--primary" type="submit">Approve review</button>
+                    </div>
+                </form>
+                <form class="settings-form minimal-lane-card" method="post" action="/account/work/publications/@Uri.EscapeDataString(publication.PublicationId)/reject">
+                    @Html.AntiForgeryToken()
+                    <span class="tag">Changes</span>
+                    <label for="creatorPublicationRejectNotes">Revision notes</label>
+                    <textarea id="creatorPublicationRejectNotes" name="notes" rows="3" placeholder="State what needs to change before it can move again."></textarea>
+                    <div class="stacked-actions">
+                        <button class="button-like button-like--secondary" type="submit">Request changes</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+    }
+
+    @if (canPublish)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Publish</h2>
+                <p>Make it discoverable when it is actually ready.</p>
+            </div>
+            <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(publication.PublicationId)/publish">
+                @Html.AntiForgeryToken()
+                <label for="creatorPublicationPublishNotes">Publish notes</label>
+                <textarea id="creatorPublicationPublishNotes" name="notes" rows="3" placeholder="State why this is ready for public discovery."></textarea>
+                <div class="stacked-actions">
+                    <button class="button-like button-like--primary" type="submit">Publish</button>
+                </div>
+            </form>
+        </section>
+    }
+
+    @if (publication.Watchouts is { Count: > 0 }
+        || !string.IsNullOrWhiteSpace(publication.ProvenanceSummary)
+        || !string.IsNullOrWhiteSpace(publication.TrustSummary)
+        || !string.IsNullOrWhiteSpace(publication.ComparisonSummary)
+        || !string.IsNullOrWhiteSpace(publication.LineageSummary)
+        || !string.IsNullOrWhiteSpace(publication.CampaignReturnSummary)
+        || !string.IsNullOrWhiteSpace(publication.SupportClosureSummary)
+        || detail is not null
+        || receipt is not null)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <details class="details-drawer">
+                <summary>More context</summary>
+                <div class="stacked-copy">
+                    @if (!string.IsNullOrWhiteSpace(publication.ProvenanceSummary))
+                    {
+                        <p><strong>Origin:</strong> @publication.ProvenanceSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
+                    {
+                        <p><strong>Trust:</strong> @publication.TrustSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
+                    {
+                        <p><strong>Comparison:</strong> @publication.ComparisonSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
+                    {
+                        <p><strong>Lineage:</strong> @publication.LineageSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
+                    {
+                        <p><strong>Return:</strong> @publication.CampaignReturnSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
+                    {
+                        <p><strong>Support:</strong> @publication.SupportClosureSummary</p>
+                    }
+                    @if (detail is not null)
+                    {
+                        <p><strong>Draft id:</strong> @detail.Draft.DraftId</p>
+                        @if (detail.Moderation is not null)
+                        {
+                            <p><strong>Review case:</strong> @detail.Moderation.CaseId</p>
+                        }
+                    }
+                    @if (receipt is not null)
+                    {
+                        <p><strong>Public file:</strong> @receipt.Artifact.Kind · @receipt.Artifact.ArtifactId · @receipt.Artifact.Version</p>
+                    }
+                    @if (publication.Watchouts is { Count: > 0 })
+                    {
+                        <p><strong>Needs attention:</strong> @string.Join(" ", publication.Watchouts.Take(3))</p>
+                    }
+                </div>
+            </details>
+        </section>
+    }
+}

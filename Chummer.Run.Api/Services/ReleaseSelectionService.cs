@@ -190,38 +190,38 @@ public sealed class ReleaseSelectionService
         if (guestInstallAvailable && accountRequiredInstallAvailable)
         {
             availabilitySummary = $"{PublicDownloadSentence(publicPlatforms)} {GatedInstallSentence(accountPlatforms)}";
-            accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still attach account return after the first launch link.";
-            createAccountSummary = "Some platforms are published directly now. Create an account only when you want guided recovery, tracked support, or linked install history on the same return path.";
+            accountValueSummary = "The account does not change the published file. It keeps recovery, support follow-up, and linked install history on the same return path, and it unlocks the routes that still attach account return after the first launch link.";
+            createAccountSummary = "Some platforms are published directly now. Create an account only when you want guided recovery, support follow-up, or linked install history on the same return path.";
             signInSummary = "Sign in to reopen linked installs, recovery history, and support history.";
             downloadFaqAnswer = $"It depends on the platform. {PublicDownloadSentence(publicPlatforms)} {GatedInstallSentence(accountPlatforms)}";
-            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to routes that keep account return attached after linking.";
+            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, support follow-up, linked install history, and access to routes that keep account return attached after linking.";
         }
         else if (guestInstallAvailable)
         {
-            availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} Create an account when you want recovery, tracked support, or linked install history on the same return path.";
-            accountValueSummary = "The account does not change the published file. It adds recovery, tracked support, and linked install history when you want a calmer return path.";
-            createAccountSummary = "Create an account when you want recovery, tracked support, and linked install history on the same return path. The download file stays the same for everyone.";
+            availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} Create an account when you want recovery, support follow-up, or linked install history on the same return path.";
+            accountValueSummary = "The account does not change the published file. It adds recovery, support follow-up, and linked install history when you want a calmer return path.";
+            createAccountSummary = "Create an account when you want recovery, support follow-up, and linked install history on the same return path. The download file stays the same for everyone.";
             signInSummary = "Sign in to reopen your recovery history, support history, and linked installs.";
             downloadFaqAnswer = availabilitySummary;
-            accountFaqAnswer = "Account creation gives you recovery, tracked support, and linked install history. It does not change the published file.";
+            accountFaqAnswer = "Account creation gives you recovery, support follow-up, and linked install history. It does not change the published file.";
         }
         else if (accountRequiredInstallAvailable)
         {
             availabilitySummary = $"{GatedInstallSentence(accountPlatforms)} Sign in when you want recovery, support, and install return attached to the same account.";
-            accountValueSummary = "The account does not change the published file. It is part of the current install route, and it keeps recovery, tracked support, and linked install history on the same return path.";
+            accountValueSummary = "The account does not change the published file. It is part of the current install route, and it keeps recovery, support follow-up, and linked install history on the same return path.";
             createAccountSummary = "Create an account only when you want the guided handoff, recovery, support history, and linked install return attached.";
             signInSummary = "Sign in to continue the current install route and reopen the same recovery and support path.";
             downloadFaqAnswer = $"Yes for the current route. {GatedInstallSentence(accountPlatforms)} Signing in keeps recovery, support, and install return attached.";
-            accountFaqAnswer = "Account creation starts the current install route, and it keeps recovery, tracked support, and linked install history on the same return path.";
+            accountFaqAnswer = "Account creation starts the current install route, and it keeps recovery, support follow-up, and linked install history on the same return path.";
         }
         else
         {
             availabilitySummary = "No public download is available right now. Create an account if you want release updates and support when the next build lands.";
-            accountValueSummary = "The account keeps recovery, tracked support, and release updates together when the next build lands.";
-            createAccountSummary = "Create an account if you want release updates, tracked support, and a calmer return path when the next build lands.";
+            accountValueSummary = "The account keeps recovery, support follow-up, and release updates together when the next build lands.";
+            createAccountSummary = "Create an account if you want release updates, support follow-up, and a calmer return path when the next build lands.";
             signInSummary = "Sign in to reopen your linked release history and support history.";
             downloadFaqAnswer = "Not right now. No public download is available yet.";
-            accountFaqAnswer = "Account creation gives you recovery, tracked support, and release updates when the next build lands.";
+            accountFaqAnswer = "Account creation gives you recovery, support follow-up, and release updates when the next build lands.";
         }
 
         return new PublicAccessPostureViewModel(

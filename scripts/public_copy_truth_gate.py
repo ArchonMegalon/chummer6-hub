@@ -14,14 +14,14 @@ OPERATIONS_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "
 PROJECTION_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_PublicSignalProjectionPacket.cshtml"
 
 REQUIRED_HTML_PHRASES = (
-    "data-chummer-board-skin",
-    'base href="/participate/"',
-    "Public bugs and requests - Chummer.run",
+    "What should Chummer do next?",
+    "Public requests, clear bugs, useful ideas.",
 )
 FORBIDDEN_HTML_PHRASES = (
     "Something went wrong on our side. Could not load posts.",
     "Network error while loading tab configuration.",
     "chummer6.productlift.dev",
+    "data-chummer-board-skin",
     "webhook verification",
     "recipient projection",
     "consent basis",
@@ -33,9 +33,11 @@ FORBIDDEN_HTML_PHRASES = (
     "proof-bound",
 )
 REQUIRED_SOURCE_PHRASES = (
-    "localOrigin: \"/participate\"",
-    "localBaseHref: \"/participate/\"",
-    "data-chummer-board-skin",
+    "public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)",
+    "return Redirect($\"/participate{Request.QueryString}\");",
+    "BuildParticipateBoardRouteHref(normalizedBoardPath)",
+    "Current requests",
+    "data-chummer-participate-frame",
     "Chummer follow-up is not visible here yet.",
     "account follow-up waits until the shipped path is available on this host",
 )

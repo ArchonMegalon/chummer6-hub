@@ -10,6 +10,8 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/boost-codes")]
 public sealed class BoostCodesController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly GroupService _groups;
     private readonly HubIdentityClient _identity;
 
@@ -21,6 +23,7 @@ public sealed class BoostCodesController : ControllerBase
 
     [HttpPost]
     [ProducesResponseType<BoostCodeDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<BoostCodeDto>> Create([FromBody] CreateBoostCodeRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
@@ -49,6 +52,7 @@ public sealed class BoostCodesController : ControllerBase
 
     [HttpPost("redeem")]
     [ProducesResponseType<BoostCodeDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<BoostCodeDto>> Redeem([FromBody] RedeemBoostCodeRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)

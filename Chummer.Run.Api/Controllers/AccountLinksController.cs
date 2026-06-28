@@ -10,6 +10,8 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/accounts/me")]
 public sealed class AccountLinksController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly IdentityLinkService _links;
     private readonly ExecutiveAssistantChannelMessagingService _channelMessaging;
     private readonly HubIdentityClient _identity;
@@ -56,6 +58,7 @@ public sealed class AccountLinksController : ControllerBase
 
     [HttpPost("links/confirm")]
     [ProducesResponseType<LinkedIdentityDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public ActionResult<LinkedIdentityDto> ConfirmLink([FromBody] ConfirmIdentityLinkRequest? request)
     {
         return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "Identity links are confirmed through provider callbacks or email verification, not this API.");
@@ -64,6 +67,7 @@ public sealed class AccountLinksController : ControllerBase
     [HttpPost("links/email/start")]
     [ValidateAntiForgeryToken]
     [ProducesResponseType<RecoveryEmailLinkStartResponse>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<RecoveryEmailLinkStartResponse>> StartRecoveryEmailLink([FromBody] StartRecoveryEmailLinkRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
@@ -185,6 +189,7 @@ public sealed class AccountLinksController : ControllerBase
     [ValidateAntiForgeryToken]
     [ProducesResponseType<ExecutiveAssistantChannelSendResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<ExecutiveAssistantChannelSendResult>> SendChannelMessage(
         string channelKind,
         [FromBody] ExecutiveAssistantChannelSendRequest? request,
@@ -217,6 +222,7 @@ public sealed class AccountLinksController : ControllerBase
     [HttpPost("channels")]
     [ValidateAntiForgeryToken]
     [ProducesResponseType<ChannelLinkDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<ChannelLinkDto>> LinkChannel([FromBody] LinkChannelRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
@@ -265,6 +271,7 @@ public sealed class AccountLinksController : ControllerBase
     [HttpPost("channels/{channelKind}/executive-assistant")]
     [ValidateAntiForgeryToken]
     [ProducesResponseType<ChannelLinkDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<ChannelLinkDto>> LinkChannelToExecutiveAssistant(
         string channelKind,
         [FromBody] LinkChannelToExecutiveAssistantRequest? request,

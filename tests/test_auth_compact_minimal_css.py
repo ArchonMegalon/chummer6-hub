@@ -18,7 +18,7 @@ def test_compact_auth_buttons_stay_quiet_and_readable() -> None:
 
     assert "linear-gradient" not in css
     assert "0 14px 34px" not in css
-    assert "text-transform: uppercase;" in css
+    assert "text-transform: uppercase;" not in css
     assert "border-top-color: rgba(243, 234, 219, 0.16);" in css
 
 
@@ -27,10 +27,10 @@ def test_login_entry_stays_compact_and_single_purpose() -> None:
     view = AUTH_ENTRY.read_text(encoding="utf-8")
     controller = AUTH_CONTROLLER.read_text(encoding="utf-8")
 
-    assert "width: min(326px, calc(100vw - 32px));" in css
-    assert "font-size: 1.45rem;" in css
-    assert "min-height: 40px;" in css
-    assert "padding: 15px;" in css
+    assert "width: min(316px, calc(100vw - 24px));" in css
+    assert "font-size: 1.38rem;" in css
+    assert "min-height: 38px;" in css
+    assert "padding: 14px;" in css
     assert "box-shadow: none;" in css
     assert "background-image: none;" in css
 
@@ -38,7 +38,8 @@ def test_login_entry_stays_compact_and_single_purpose() -> None:
     assert "hero-brand" not in view
     assert "<img" not in view
 
-    assert "Use email first. Google is optional." in controller
+    assert "Email first. Google if you prefer." in controller
+    assert "Claim this copy when you want installs, support, and recovery together." in controller
     assert "Open your account. Keep installs and support together." not in controller
     assert "Use the same copy. Add recovery and support history." not in controller
     assert "Keep this copy attached to your account." not in controller

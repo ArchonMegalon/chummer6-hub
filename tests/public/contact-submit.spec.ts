@@ -6,7 +6,7 @@ const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 test('guest support case submission reaches the confirmation route', async ({ page }) => {
   await page.goto(`${baseUrl}/contact`, { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByRole('heading', { name: 'Contact Chummer' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Contact' })).toBeVisible();
   await page.selectOption('#supportKind', 'bug_report');
   await page.fill('#supportTitle', 'Public contact flow E2E');
   await page.fill('#supportSummary', 'Guest support submission should reach the confirmation route.');

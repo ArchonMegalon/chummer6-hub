@@ -57,7 +57,7 @@ A publish that claims live Brilliant Directories billing must run the public bil
 CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT=1
 ```
 
-That gate fails if `/account/billing` still shows the placeholder copy. Do not describe billing as live until `BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL`, `BRILLIANT_DIRECTORIES_MEMBER_PORTAL_URL` when available, and `BRILLIANT_DIRECTORIES_SYNC_SECRET` are configured in the public deployment environment.
+That gate fails if `/account/billing` still shows the placeholder copy. `verify_account_handoff_runtime_config.py`, `verify_live_surface_parity.py`, and `scripts/e2e-portal.cjs` all honor the same flag. Do not describe billing as live until `BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL`, `BRILLIANT_DIRECTORIES_MEMBER_PORTAL_URL` when available, and `BRILLIANT_DIRECTORIES_SYNC_SECRET` are configured in the public deployment environment.
 
 ## Production boundary
 

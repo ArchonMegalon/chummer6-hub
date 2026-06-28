@@ -3,33 +3,33 @@
 @{
     var pageTitle = Model.CurrentSection switch
     {
-        "participation" => "Account · Participation",
+        "participation" => "Account · Participate",
         "support" => "Account · Support",
         "access" => "Account · Installs",
-        "work" => "Account · Campaigns",
+        "work" => "Account · Roster",
         _ => "Account"
     };
     var sectionTitle = Model.CurrentSection switch
     {
-        "participation" => "Participation",
+        "participation" => "Participate",
         "support" => "Support",
         "access" => "Installs",
-        "work" => "Campaigns",
+        "work" => "Roster",
         _ => "Account"
     };
     var sectionCopy = Model.CurrentSection switch
     {
-        "participation" => "Public feedback and recognition.",
-        "support" => "Tracked cases and the next step.",
-        "access" => "Linked installs, downloads, and recovery.",
+        "participation" => "Membership and billing.",
+        "support" => "Private cases and the next step.",
+        "access" => "Downloads, installs, and recovery.",
         "work" => "Characters, groups, and campaigns.",
-        _ => "Installs, campaigns, support, and billing."
+        _ => "Installs, campaigns, support, billing, and participation."
     };
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account";
     ViewData["ContextSidebarHeading"] = "Account";
-    ViewData["ContextSidebarSummary"] = "Installs, campaigns, support, billing, and participation.";
+    ViewData["ContextSidebarSummary"] = "Downloads, runners, support, and membership.";
     ViewData["ContextSidebarLinks"] = Model.CoreSections
         .Concat(Model.SecondarySections)
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
@@ -190,6 +190,7 @@
     var selectedRunWorkspace = selectedRun is null
         ? null
         : Model.CampaignSpine.Workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, selectedRun.CampaignId, StringComparison.OrdinalIgnoreCase));
+    var selectedRunActiveScene = selectedRun?.Scenes.FirstOrDefault(scene => string.Equals(scene.SceneId, selectedRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase));
     var selectedRunWorkspaceHref = selectedRunWorkspace is null
         ? "/account/work"
         : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}";
@@ -206,8 +207,8 @@
     var selectedRunTablePulseSummary = selectedRun is null
         ? string.Empty
         : selectedRun.LatestContinuity is not null
-            ? "This run already has a live follow-up."
-            : "This run is ready for the next Table Pulse update.";
+            ? "A follow-up is already live."
+            : "Ready for the next Table Pulse reaction.";
     var launcherDossiers = Model.CampaignSpine.Dossiers
         .OrderByDescending(static item => item.UpdatedAtUtc)
         .Take(4)
@@ -242,7 +243,7 @@
         || selectedRulesNavigatorAnswer is not null
         || selectedCreatorPublication is not null;
     var installRailHeading = "Start here";
-    var installRailSummary = "Open Downloads while signed in to keep setup and support tied to this account.";
+    var installRailSummary = "Open Downloads while signed in so setup, recovery, and support stay with this account.";
     var installRailPrimaryLabel = "Open downloads";
     var installRailPrimaryHref = "/downloads";
     var installRailSecondaryLabel = "Open install help";
@@ -250,11 +251,11 @@
 
     if (leadInstallRailSupport is not null)
     {
-        installRailHeading = "Tracked install next steps";
+        installRailHeading = "Install next steps";
         installRailSummary = $"{leadInstallRailSupport.NextSafeAction} {leadInstallRailSupport.InstallReadinessSummary}";
         installRailPrimaryLabel = leadInstallRailSupport.PrimaryActionLabel;
         installRailPrimaryHref = leadInstallRailSupport.PrimaryActionHref;
-        installRailSecondaryLabel = "Open tracked support";
+        installRailSecondaryLabel = "Open case";
         installRailSecondaryHref = leadInstallRailSupport.DetailHref;
     }
     else if (leadPendingClaim is not null)
@@ -263,7 +264,7 @@
         installRailSummary = "Finish setup in the Chummer app on that device. Use the code only if the app asks for it.";
         installRailPrimaryLabel = "Open downloads";
         installRailPrimaryHref = "/downloads";
-        installRailSecondaryLabel = "Open tracked support";
+        installRailSecondaryLabel = "Open support";
         installRailSecondaryHref = "/account/support";
         @* The next safe action is still inside Chummer on the already-downloaded device. Only use the recovery code if that copy explicitly enters recovery mode. Claim, update, rollback, recovery, and support stay on this same account page once the install is linked. *@
         @* Claim, update, rollback, recovery, and support stay on this same account path once the install is linked. *@
@@ -271,11 +272,11 @@
     }
     else if (leadInstallation is not null)
     {
-        installRailHeading = "Use the linked install first";
+        installRailHeading = "Use the linked app first";
         installRailSummary = "Use the linked desktop app first for updates, recovery, and support. Use Installs only when you need to relink or reclaim it.";
         installRailPrimaryLabel = "Open downloads";
         installRailPrimaryHref = "/downloads";
-        installRailSecondaryLabel = "Open tracked support";
+        installRailSecondaryLabel = "Open support";
         installRailSecondaryHref = "/account/support";
         @* Continue claim, update, rollback, recovery, and support from the claimed desktop install first. Use Installs only to relink or reclaim that copy, and keep browser pages as backup help instead of the normal path. *@
         @* Claim, update, rollback, recovery, and support stay on this same account path once the install is linked. *@
@@ -1673,15 +1674,15 @@
                             </div>
                             <div class="settings-summary-row">
                                 <span>Current device</span>
-                                <strong>@(selectedWorkspaceServerPlane?.Workspace.DeviceRoleSummary ?? "No claimed device role is attached yet.")</strong>
+                                <strong>@(selectedWorkspaceServerPlane?.Workspace.DeviceRoleSummary ?? "No device role is attached yet.")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Runs</span>
-                                <strong>@(selectedWorkspace.Runs.Count == 0 ? "No active run" : $"{selectedWorkspace.Runs.Count} tracked")</strong>
+                                <strong>@(selectedWorkspace.Runs.Count == 0 ? "No active run" : $"{selectedWorkspace.Runs.Count} run(s)")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Active scene</span>
-                                <strong>@(selectedWorkspace.ActiveSceneSummary ?? "No active scene summary yet")</strong>
+                                <strong>@(selectedWorkspace.ActiveSceneSummary ?? "No active scene yet")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>First session</span>
@@ -1698,13 +1699,13 @@
                                     <strong>@PublicText(selectedWorkspaceFirstPlayableSession.ReturnLaneSummary)</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Table ready</span>
+                                    <span>Campaign ready</span>
                                     <strong>@selectedWorkspaceFirstPlayableSession.CampaignReadySummary</strong>
                                 </div>
                             }
                             <div class="settings-summary-row">
                                 <span>Support</span>
-                                <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support continuity stays attached to the linked install and release details that reopen this campaign.")</strong>
+                                <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Install and release follow-up stay with this campaign.")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Next step</span>
@@ -1727,7 +1728,7 @@
                         <div class="stacked-copy">
                             @if (selectedWorkspace.LatestContinuity is not null)
                             {
-                                <p><strong>Current return:</strong> @selectedWorkspace.LatestContinuity.Summary</p>
+                                <p><strong>Current note:</strong> @selectedWorkspace.LatestContinuity.Summary</p>
                             }
                             @if (!string.IsNullOrWhiteSpace(selectedWorkspaceServerPlane?.CampaignSummary.RestoreSummary))
                             {
@@ -1738,7 +1739,7 @@
                                 <p><strong>Next step:</strong> @selectedWorkspaceServerPlane.NextSafeAction.Summary</p>
                             }
                             <details class="details-drawer">
-                                <summary>More about this campaign</summary>
+                                <summary>Campaign details</summary>
                                 <div class="stacked-copy">
                                     @if (selectedWorkspaceFirstPlayableSession is not null)
                                     {
@@ -1749,8 +1750,8 @@
                                     }
                                     @if (selectedWorkspaceServerPlane is not null)
                                     {
-                                        <p><strong>GM prep:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
-                                        <p><strong>Travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
+                                        <p><strong>Prep:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
+                                        <p><strong>Offline use:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                                     }
                                     @if (!string.IsNullOrWhiteSpace(selectedWorkspacePortableExchangeSummary))
                                     {
@@ -1758,11 +1759,11 @@
                                     }
                                     @if (selectedWorkspace.RecapShelf.Count > 0)
                                     {
-                                        <p><strong>Recent return file:</strong> @PublicText(selectedWorkspace.RecapShelf[0].Summary)</p>
+                                        <p><strong>Latest recap:</strong> @PublicText(selectedWorkspace.RecapShelf[0].Summary)</p>
                                     }
                                     @if (selectedWorkspaceLeadAftermathPackage is not null)
                                     {
-                                        <p><strong>Lead aftermath package:</strong> @selectedWorkspaceLeadAftermathPackage.Summary</p>
+                                        <p><strong>Latest aftermath:</strong> @selectedWorkspaceLeadAftermathPackage.Summary</p>
                                     }
                                     @if (selectedWorkspaceDowntimePackage is not null)
                                     {
@@ -1786,12 +1787,12 @@
                                     }
                                     @if (selectedWorkspace.RosterTransfers is { Count: > 0 })
                                     {
-                                        <p><strong>Lead transfer:</strong> @selectedWorkspace.RosterTransfers[0].Summary</p>
+                                        <p><strong>Latest move:</strong> @selectedWorkspace.RosterTransfers[0].Summary</p>
                                     }
                                 </div>
                             </details>
                             <div class="settings-form">
-                                <p><strong>Table Pulse live follow-up</strong></p>
+                                <p><strong>Table Pulse follow-up</strong></p>
                                 <p class="muted-copy">@selectedWorkspaceTablePulseSummary</p>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
@@ -1816,7 +1817,7 @@
                                     </div>
                                 </div>
                                 <div class="stacked-actions">
-                                    <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse Live inbox</a>
+                                    <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse</a>
                                     <a class="button-like button-like--ghost" href="/signal-deck">Open Signal Deck</a>
                                     <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
                                     <a class="button-like button-like--ghost" href="@selectedWorkspaceCarryForwardHref">Open next session note</a>
@@ -2489,7 +2490,7 @@
                                     <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "No packages yet" : $"{selectedWorkspaceAftermathPackages.Count} packaged")</strong>
                                 </div>
                             </div>
-                            <p><strong>GM prep:</strong> @PublicText(selectedWorkspaceServerPlane.PrepLibrary.Summary)</p>
+                            <p><strong>Prep:</strong> @PublicText(selectedWorkspaceServerPlane.PrepLibrary.Summary)</p>
                             <p><strong>Linked prep:</strong> @PublicText(selectedWorkspaceServerPlane.PrepLibrary.BindingSummary)</p>
                             <p><strong>GM operations:</strong> @selectedWorkspaceServerPlane.GmOperations.Summary</p>
                             <p><strong>Account support:</strong> @selectedWorkspaceServerPlane.GmOperations.AccountBackboneSummary</p>
@@ -2506,7 +2507,7 @@
                                     }
                                 </div>
                             }
-                            <p><strong>Travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
+                            <p><strong>Offline use:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                             <p><strong>Prefetch inventory:</strong> @selectedWorkspaceServerPlane.TravelMode.PrefetchInventorySummary</p>
                             <p><strong>Cache freshness:</strong> @selectedWorkspaceServerPlane.TravelMode.CacheFreshnessSummary</p>
                             <p><strong>Offline actionability:</strong> @selectedWorkspaceServerPlane.TravelMode.OfflineActionabilitySummary</p>
@@ -2823,7 +2824,7 @@
                                             <input id="aftermathPackageTitle" maxlength="128" placeholder="Filled from the run and recap type by default" />
                                         </div>
                                         <div class="field">
-                                            <label for="aftermathPackageNote">Why this matters</label>
+                                            <label for="aftermathPackageNote">Package reason</label>
                                             <textarea id="aftermathPackageNote" rows="3" placeholder="What should this recap or replay keep visible for the next session?"></textarea>
                                         </div>
                                         <div id="aftermathPackagePreview" class="settings-summary-list" hidden></div>
@@ -2833,7 +2834,7 @@
                                 }
                                 else
                                 {
-                                    <p class="muted-copy">Recaps and replays become available once this campaign has a tracked run.</p>
+                                    <p class="muted-copy">Recaps and replays become available once this campaign has a live run.</p>
                                 }
                                 @if (selectedWorkspaceAftermathPackages.Count > 0)
                                 {
@@ -2865,7 +2866,7 @@
                             </div>
                             <div class="settings-summary-row">
                                 <span>Active scene</span>
-                                <strong>@(selectedRun.ActiveSceneId ?? "No active scene")</strong>
+                                <strong>@(selectedRunActiveScene?.Title ?? "No active scene")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Objectives</span>
@@ -2886,11 +2887,11 @@
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
                                     <span>Inbox and reactions</span>
-                                    <strong>Use the Table Pulse Live inbox to trigger or open the next response.</strong>
+                                    <strong>Use Table Pulse to trigger or open the next response.</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Campaign</span>
-                                    <strong>@(selectedRunWorkspace is null ? "Open campaign" : $"{selectedRunWorkspace.CampaignName} · next return")</strong>
+                                    <strong>@(selectedRunWorkspace is null ? "Open campaign" : $"{selectedRunWorkspace.CampaignName} · next step")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Aftermath</span>
@@ -2898,7 +2899,7 @@
                                 </div>
                             </div>
                             <div class="stacked-actions">
-                                <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse Live inbox</a>
+                                <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse</a>
                                 <a class="button-like button-like--ghost" href="/signal-deck">Open Signal Deck</a>
                                 <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
                                 <a class="button-like button-like--ghost" href="@selectedRunWorkspaceHref">Open campaign</a>
@@ -3470,7 +3471,7 @@
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Runs</span>
-                                    <strong>@(workspace.Runs.Count == 0 ? "No active run" : $"{workspace.Runs.Count} tracked")</strong>
+                                    <strong>@(workspace.Runs.Count == 0 ? "No active run" : $"{workspace.Runs.Count} run(s)")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Active scene</span>
@@ -3491,7 +3492,7 @@
                                         <strong>@PublicText(workspace.FirstPlayableSession.ReturnLaneSummary)</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Table ready</span>
+                                        <span>Campaign ready</span>
                                         <strong>@workspace.FirstPlayableSession.CampaignReadySummary</strong>
                                     </div>
                                 }
@@ -3508,7 +3509,7 @@
                                 <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open campaign</a>
                                 @if (workspace.Runs.Count > 0)
                                 {
-                                    <a class="button-like button-like--secondary" href="@RunDetailHref(workspace.Runs[0].RunId)">Open run context</a>
+                                    <a class="button-like button-like--secondary" href="@RunDetailHref(workspace.Runs[0].RunId)">Open run</a>
                                 }
                             </div>
 
@@ -4462,11 +4463,11 @@
             @if (showParticipationSettings && showParticipationSection)
             {
             <details class="details-drawer" @(showParticipationPage ? "open" : null)>
-            <summary>@(showParticipationPage ? "Participation dashboard" : "Participation")</summary>
+            <summary>@(showParticipationPage ? "Participate" : "Participate")</summary>
             <section id="participation" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
-                    <h2>Participation</h2>
-                    <p>Return to followed work, guided contribution history, and optional public recognition without turning votes into shipping decisions.</p>
+                    <h2>Participate</h2>
+                    <p>Open public feedback, roadmap, and the private updates tied to this account.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
@@ -4474,19 +4475,19 @@
                         <strong id="participationOverviewState">@(showParticipationSection ? "Configured" : "Available")</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Contribution cred</span>
+                        <span>Contribution points</span>
                         <strong>@((participationRecognition?.LifetimePoints ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Guided contribution</span>
+                        <span>Contribution session</span>
                         <strong>@(participationSession is null ? "Not started" : HumanizeStatus(participationSession.Status, "Active"))</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Public participation profile</span>
+                        <span>Public profile</span>
                         <strong>@(Model.Experience.PublicContributionProfileOptIn ? "Opted in" : "Off")</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Impact closeout notifications</span>
+                        <span>Result updates</span>
                         <strong>@(Model.Experience.ImpactCloseoutNotifications ? "Enabled" : "Off")</strong>
                     </div>
                 </div>
@@ -4499,12 +4500,12 @@
                         }
                     </div>
                 }
-                <p class="muted-copy">Contribution credit follows useful closeout and continuity. Votes show demand; only finished work ships. Public recognition stays off unless you opt in.</p>
+                <p class="muted-copy">Contribution points follow useful work. Votes show demand; only finished work ships. Public recognition stays off unless you opt in.</p>
                 <p class="muted-copy">Recovery codes stay below as a fallback, not the first instruction.</p>
                 <section class="compact-rail">
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>Followed work</h3>
+                            <h3>Followed items</h3>
                             <p>@packageFollowCount package follow@(packageFollowCount == 1 ? string.Empty : "s"), @packageVoteCount package vote@(packageVoteCount == 1 ? string.Empty : "s"), and @(Model.Experience.FollowHorizons ? "upcoming updates on" : "upcoming updates off").</p>
                         </div>
                         <a class="editorial-strip__action" href="/packages">Open packages</a>
@@ -4512,13 +4513,13 @@
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
                             <h3>KARMA FORGE</h3>
-                            <p>@participationKarmaSubmissions.Length recent submission@(participationKarmaSubmissions.Length == 1 ? string.Empty : "s"). Guided discovery stays separate from support and only moves forward when work is picked up.</p>
+                            <p>@participationKarmaSubmissions.Length recent submission@(participationKarmaSubmissions.Length == 1 ? string.Empty : "s"). Requests stay separate from support and only move when someone picks them up.</p>
                         </div>
                         <a class="editorial-strip__action" href="/participate/karma-forge">Open KARMA FORGE</a>
                     </article>
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>Guided contribution history</h3>
+                            <h3>Contribution history</h3>
                             <p>@participationReceipts.Length recent event@(participationReceipts.Length == 1 ? string.Empty : "s"), @(participationRecognition?.LandedSlices ?? 0) landed slice@(participationRecognition?.LandedSlices == 1 ? string.Empty : "s"), and @(participationRecognition?.ActiveSessionCount ?? 0) active session@(participationRecognition?.ActiveSessionCount == 1 ? string.Empty : "s").</p>
                         </div>
                         <a class="editorial-strip__action" href="/participate/codex">Open guided contribution</a>
@@ -4530,7 +4531,7 @@
                         <article class="compact-rail__item">
                             <div class="compact-rail__copy">
                                 <h3>Participation journal</h3>
-                                <p>Follow a package, join the beta waitlist, or start guided contribution to make this journal useful without exposing anything publicly by default.</p>
+                                <p>Follow a package, join the beta waitlist, or start a contribution session to make this journal useful without exposing anything publicly by default.</p>
                             </div>
                         </article>
                     }
@@ -4586,12 +4587,12 @@
                         <label class="check-row"><input type="checkbox" value="player" @(laneInterests.Contains("player") ? "checked" : null) /> <span>Player</span></label>
                         <label class="check-row"><input type="checkbox" value="gm" @(laneInterests.Contains("gm") ? "checked" : null) /> <span>GM</span></label>
                         <label class="check-row"><input type="checkbox" value="creator" @(laneInterests.Contains("creator") ? "checked" : null) /> <span>Creator</span></label>
-                        <label class="check-row"><input id="followHorizons" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow upcoming updates</span></label>
+                        <label class="check-row"><input id="followHorizons" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow new updates</span></label>
                         <label class="check-row"><input id="betaInterest" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Invite me when the right beta opens</span></label>
-                        <label class="check-row"><input id="impactCloseoutNotifications" type="checkbox" @(Model.Experience.ImpactCloseoutNotifications ? "checked" : null) /> <span>Send me closeout updates when something I followed actually changes</span></label>
+                        <label class="check-row"><input id="impactCloseoutNotifications" type="checkbox" @(Model.Experience.ImpactCloseoutNotifications ? "checked" : null) /> <span>Send me result updates when something I followed actually changes</span></label>
                         <label class="check-row"><input id="publicContributionProfileOptIn" type="checkbox" @(Model.Experience.PublicContributionProfileOptIn ? "checked" : null) /> <span>Allow public participation recognition if my account visibility is already public</span></label>
                     </div>
-                    <button class="button-like button-like--primary" type="submit">Save participation preferences</button>
+                    <button class="button-like button-like--primary" type="submit">Save settings</button>
                     <p id="experienceStatusNotice" class="muted-copy" hidden></p>
                 </form>
             </section>
@@ -5235,9 +5236,9 @@
       if (participationOverview) {
         participationOverview.textContent = "Configured";
       }
-      ui.setNotice(notice, "Participation preferences saved.");
+      ui.setNotice(notice, "Settings saved.");
     } catch (error) {
-      ui.setNotice(notice, ui.describeError(error, "Participation preferences could not be saved."), true);
+      ui.setNotice(notice, ui.describeError(error, "Settings could not be saved."), true);
     } finally {
       ui.setButtonBusy(button, false, "Saving...");
     }
@@ -5655,8 +5656,8 @@
         ui.setNotice(
           notice,
           outcome === "confirmed_fixed"
-            ? "Thanks. The tracked case now shows that the fix worked on this install."
-            : "Thanks. The tracked case reopened for follow-up on this install.");
+            ? "Thanks. This case now shows that the fix worked on this install."
+            : "Thanks. This case reopened for follow-up on this install.");
         window.location.reload();
       } catch (error) {
         const rateLimited = setRateLimitNotice(

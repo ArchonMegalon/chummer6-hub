@@ -1,11 +1,13 @@
 # OPERABLE_RELEASE_READY
 
-- Generated: 2026-06-24T07:57:38Z
-- Version: `run-20260623-102621`
+- Generated: 2026-06-28T14:41:51Z
+- Version: `run-20260627-005402`
 - Channel: `public_stable`
-- Published: `2026-06-23T10:26:21Z`
+- Published: `2026-06-27T07:51:47Z`
 - Supportability: `gold_supported`
 - Mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass
+- Billing mode: `unavailable`
+- Release-upload mode: `default_single_operator`
 
 ## Rulesets
 - `sr4`: status `None`, workflow parity `pass`, assumption `False`
@@ -13,6 +15,7 @@
 - `sr6`: status `None`, workflow parity `pass`, assumption `False`
 
 ## Checks
+- PASS `account_handoff_runtime_config`: `pass`
 - PASS `design_quality_gate`: `pass`
 - PASS `external_distribution_mirror_proof`: `pass`
 - INFO `final_gold_janitor`: `fail` (operator context, not release-blocking)

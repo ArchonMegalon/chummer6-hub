@@ -1,0 +1,191 @@
+@model AccountPageViewModel
+@{
+    ViewData["Title"] = "Roster";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+
+    var handoff = Model.SelectedBuildLabHandoff;
+    var insights = Model.SelectedBuildLabInsights?.ToArray() ?? Array.Empty<Chummer.Run.Api.Services.KarmaForge.BuildGhostConciergeInsightProjection>();
+    var rulesHref = handoff is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(handoff.ExplainEntryId)}";
+}
+
+@if (handoff is null)
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">Roster</p>
+            <h1>Build handoff not found</h1>
+            <p>This handoff is not attached to this account anymore.</p>
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" href="/account/work">Back to roster</a>
+            </div>
+        </div>
+    </section>
+}
+else
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">Roster</p>
+            <h1>@handoff.Title</h1>
+            <p>@handoff.Summary</p>
+            <ul class="minimal-hero__points">
+                <li>@handoff.VariantLabel</li>
+                <li>@handoff.ProgressionLabel</li>
+                <li>@handoff.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</li>
+            </ul>
+            <div class="minimal-actions">
+                <a class="button-like button-like--ghost" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--secondary" href="@rulesHref">Open rules answer</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="minimal-section">
+        <div class="minimal-lane-grid minimal-platform-list">
+            <article class="minimal-lane-card">
+                <span class="tag">Next</span>
+                <h2>@(handoff.NextSafeAction ?? "Review this handoff before you apply anything.")</h2>
+                <p>@(string.IsNullOrWhiteSpace(handoff.RuntimeCompatibilitySummary) ? "No runtime warning is attached to this handoff." : handoff.RuntimeCompatibilitySummary)</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Return</span>
+                <h2>@(string.IsNullOrWhiteSpace(handoff.CampaignReturnSummary) ? "No campaign attached" : handoff.CampaignReturnSummary)</h2>
+                <p>@(string.IsNullOrWhiteSpace(handoff.SupportClosureSummary) ? "Support is quiet on this handoff." : handoff.SupportClosureSummary)</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Coverage</span>
+                <h2>@(string.IsNullOrWhiteSpace(handoff.PlannerCoverageSummary) ? "Coverage not summarized" : handoff.PlannerCoverageSummary)</h2>
+                <p>@(string.IsNullOrWhiteSpace(handoff.PortabilityPillarSummary) ? "No portability summary attached." : handoff.PortabilityPillarSummary)</p>
+            </article>
+        </div>
+    </section>
+
+    @if (handoff.RuleEnvironmentDiff is not null)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Rules change</h2>
+                <p>Before and after stay explicit here.</p>
+            </div>
+            <article class="minimal-lane-card">
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Status</span>
+                        <strong>@handoff.RuleEnvironmentDiff.Status</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Before</span>
+                        <strong>@handoff.RuleEnvironmentDiff.BeforeScope · @handoff.RuleEnvironmentDiff.BeforeFingerprint</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>After</span>
+                        <strong>@handoff.RuleEnvironmentDiff.AfterScope · @handoff.RuleEnvironmentDiff.AfterFingerprint</strong>
+                    </div>
+                </div>
+                <p>@handoff.RuleEnvironmentDiff.Summary</p>
+            </article>
+        </section>
+    }
+
+    @if (handoff.Outputs.Count > 0)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Outputs</h2>
+                <p>Only the current next steps.</p>
+            </div>
+            <div class="minimal-lane-grid minimal-platform-list">
+                @foreach (var output in handoff.Outputs.Take(3))
+                {
+                    <article class="minimal-lane-card">
+                        <span class="tag">@output.Kind</span>
+                        <h3>@output.Label</h3>
+                        <p>@(string.IsNullOrWhiteSpace(output.NextSafeAction) ? "No next action attached." : output.NextSafeAction)</p>
+                        <div class="stacked-copy">
+                            @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
+                            {
+                                <p><strong>Publication:</strong> @output.PublicationSummary</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(output.CompatibilitySummary))
+                            {
+                                <p><strong>Compatibility:</strong> @output.CompatibilitySummary</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(output.LineageSummary))
+                            {
+                                <p><strong>Lineage:</strong> @output.LineageSummary</p>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    @if (handoff.Watchouts is { Count: > 0 }
+        || handoff.ProgressionOutcomes.Count > 0
+        || !string.IsNullOrWhiteSpace(handoff.BuildSurfaceSummary)
+        || !string.IsNullOrWhiteSpace(handoff.ExchangeParitySummary)
+        || !string.IsNullOrWhiteSpace(handoff.CrewFitSummary)
+        || !string.IsNullOrWhiteSpace(handoff.ConditionalStateSummary)
+        || !string.IsNullOrWhiteSpace(handoff.SourceHintSummary))
+    {
+        <section class="minimal-section minimal-section--tight">
+            <details class="details-drawer">
+                <summary>More context</summary>
+                <div class="stacked-copy">
+                    @if (!string.IsNullOrWhiteSpace(handoff.CrewFitSummary))
+                    {
+                        <p><strong>Crew fit:</strong> @handoff.CrewFitSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(handoff.ConditionalStateSummary))
+                    {
+                        <p><strong>Current conditions:</strong> @handoff.ConditionalStateSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(handoff.SourceHintSummary))
+                    {
+                        <p><strong>Helpful notes:</strong> @handoff.SourceHintSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(handoff.BuildSurfaceSummary))
+                    {
+                        <p><strong>Builder view:</strong> @handoff.BuildSurfaceSummary</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(handoff.ExchangeParitySummary))
+                    {
+                        <p><strong>Import/export fit:</strong> @handoff.ExchangeParitySummary</p>
+                    }
+                    @if (handoff.ProgressionOutcomes.Count > 0)
+                    {
+                        <p><strong>Outcome:</strong> @string.Join(" ", handoff.ProgressionOutcomes.Take(3))</p>
+                    }
+                    @if (handoff.Watchouts is { Count: > 0 })
+                    {
+                        <p><strong>Needs attention:</strong> @string.Join(" ", handoff.Watchouts)</p>
+                    }
+                </div>
+            </details>
+        </section>
+    }
+
+    @if (insights.Length > 0)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <details class="details-drawer">
+                <summary>ALICE boards</summary>
+                <div class="minimal-lane-grid minimal-platform-list">
+                    @foreach (var insight in insights)
+                    {
+                        <article class="minimal-lane-card">
+                            <span class="tag">ChartBrick</span>
+                            <h3>@insight.Title</h3>
+                            <p>@insight.Summary</p>
+                            <div class="minimal-actions">
+                                <a class="button-like button-like--ghost" href="@insight.OpenHref" rel="noreferrer" target="_blank">@insight.ActionLabel</a>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </details>
+        </section>
+    }
+}

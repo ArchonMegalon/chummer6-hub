@@ -11,6 +11,8 @@ namespace Chummer.Run.Identity.Controllers;
 [Route("api/v1/identity")]
 public sealed class IdentityController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly IIdentityAccessService _identity;
     private readonly IIdentityEmailDeliveryService _emailDelivery;
     private readonly IConfiguration _configuration;
@@ -23,6 +25,7 @@ public sealed class IdentityController : ControllerBase
     }
 
     [HttpPost("sessions")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<IdentitySessionIssueResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<IdentitySessionIssueResponse> IssueSession([FromBody] IdentitySessionIssueRequest? request)
@@ -42,6 +45,7 @@ public sealed class IdentityController : ControllerBase
     }
 
     [HttpPost("email/start")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<EmailAuthStartResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<EmailAuthStartResponse> StartEmailEntry([FromBody] EmailAuthStartRequest? request)
@@ -60,6 +64,7 @@ public sealed class IdentityController : ControllerBase
         => Ok(_emailDelivery.GetStatus());
 
     [HttpPost("email/providers/emailit/webhook")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<IdentityEmailWebhookAckResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
@@ -75,6 +80,7 @@ public sealed class IdentityController : ControllerBase
     }
 
     [HttpPost("email/complete")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<IdentitySessionIssueResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<IdentitySessionIssueResponse> CompleteEmailEntry([FromBody] EmailAuthCompleteRequest? request)
@@ -134,6 +140,7 @@ public sealed class IdentityController : ControllerBase
     }
 
     [HttpPost("sessions/revoke")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<IdentitySessionRevokeResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<IdentitySessionRevokeResponse> RevokeSession([FromBody] IdentitySessionRevokeRequest? request)
@@ -147,6 +154,7 @@ public sealed class IdentityController : ControllerBase
     }
 
     [HttpPost("introspect")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<IdentityIntrospectionResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<IdentityIntrospectionResponse> Introspect([FromBody] IdentityIntrospectionRequest? request)

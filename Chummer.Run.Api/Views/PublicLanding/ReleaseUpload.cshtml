@@ -1,6 +1,6 @@
 @model ReleaseUploadPageViewModel
 @{
-    ViewData["Title"] = "Release upload";
+    ViewData["Title"] = "Build macOS";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads";
     var expires = Model.TicketExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'");
@@ -10,9 +10,9 @@
 <section class="recommended-download" id="release-upload-command">
     <article class="recommended-download__card">
         <div class="recommended-download__copy">
-            <span class="tag">Mac release one-liner</span>
-            <h2>Run this in your Mac release shell</h2>
-            <p>The command clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes the signed upload bundle, and carries the current short-lived upload access code so unattended runs do not stop during final checks.</p>
+            <span class="tag">Mac build command</span>
+            <h2>Run this on your Mac</h2>
+            <p>The command clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes the upload bundle, and carries the current short-lived access code so the run can finish unattended.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Command</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadCommand">@Model.Command</pre>
@@ -49,11 +49,11 @@
 
 <section class="release-stage">
     <div class="release-stage__lead">
-        <p class="eyebrow">Release upload</p>
+        <p class="eyebrow">Build macOS</p>
         <h1 class="page-title">@PublicReleaseUploadText(Model.Heading)</h1>
         <p class="page-copy">@PublicReleaseUploadText(Model.Summary)</p>
         <p class="release-stage__note">
-            This page handles release upload in Chummer: one authenticated access code, one setup command, and one recovery-aware status path.
+            This page keeps the Mac build handoff in Chummer: one authenticated access code, one setup command, and one recovery-aware status path.
         </p>
     </div>
 </section>

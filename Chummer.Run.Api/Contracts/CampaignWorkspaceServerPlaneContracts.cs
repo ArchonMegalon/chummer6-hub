@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Chummer.Campaign.Contracts;
 using Chummer.Control.Contracts.Support;
 
@@ -76,12 +77,12 @@ public sealed record DowntimeAftermathApiProjection(
     DateTimeOffset GeneratedAtUtc);
 
 public sealed record CampaignConsequenceUpdateRequest(
-    string Kind,
-    string State,
-    string Summary,
-    string? ReturnLoopAction,
-    string? ReturnLoopRoute,
-    string? Note = null);
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string Kind,
+    [property: Required(AllowEmptyStrings = false), StringLength(64)] string State,
+    [property: Required(AllowEmptyStrings = false), StringLength(4000)] string Summary,
+    [property: StringLength(160)] string? ReturnLoopAction,
+    [property: StringLength(256)] string? ReturnLoopRoute,
+    [property: StringLength(1024)] string? Note = null);
 
 public sealed record WorkspaceRestoreReceiptSurfaceProjection(
     string Surface,

@@ -15,6 +15,8 @@
         2 => $"Current public installers: {publicPlatformLabels[0]} and {publicPlatformLabels[1]}.",
         _ => $"Current public installers: {string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]}."
     };
+    var entryHref = Model.Chrome.Authenticated ? "/account" : "/login?next=%2Faccount%2Faccess";
+    var entryLabel = Model.Chrome.Authenticated ? "Account" : "Sign in";
 }
 
 <section class="minimal-hero" data-homepage-section="hero">
@@ -26,12 +28,12 @@
         </div>
         <p class="minimal-meta">@publicPlatformSummary</p>
         <p class="minimal-inline-links">
+            <a href="@entryHref" data-analytics-event="homepage_open_account" data-analytics-surface="minimal_home" data-analytics-label="@entryLabel">@entryLabel</a>
             <a href="/help" data-analytics-event="homepage_open_help" data-analytics-surface="minimal_home" data-analytics-label="Help">Help</a>
             @if (Model.Chrome.Authenticated)
             {
                 <a href="/participate" data-analytics-event="homepage_open_participate" data-analytics-surface="minimal_home" data-analytics-label="Participate">Participate</a>
             }
-            <a href="/status" data-analytics-event="homepage_open_status" data-analytics-surface="minimal_home" data-analytics-label="Status">Status</a>
         </p>
     </div>
     <a class="minimal-hero__visual minimal-hero__visual--screenshot" href="/media/promo/every-wonder-horizon-promo.mp4" aria-label="Watch the Chummer promo video" data-analytics-event="homepage_open_promo_video" data-analytics-surface="minimal_home" data-analytics-label="Watch promo video">

@@ -1018,10 +1018,17 @@ public sealed record FirstPartyParticipateBoardViewModel(
     int TotalRequestCount,
     string SyncedLabel,
     string RoadmapHref,
+    string? HostedBoardHref,
     string SupportHref,
     string RetryHref,
     string? SupporterHref,
-    bool LoadedFromBoard);
+    bool LoadedFromBoard,
+    bool EmbeddedBoardEnabled = false,
+    string? EmbeddedBoardHref = null,
+    string? DirectBoardHref = null,
+    string? EntryHref = null,
+    string? EntryLabel = null,
+    string? EntrySummary = null);
 
 public sealed record FirstPartyParticipatePostViewModel(
     string Id,
@@ -1033,6 +1040,18 @@ public sealed record FirstPartyParticipatePostViewModel(
     string Category,
     string UpdatedLabel,
     string? Href);
+
+public sealed record FirstPartyParticipatePostDetailViewModel(
+    SiteChromeViewModel Chrome,
+    FirstPartyParticipatePostViewModel Post,
+    IReadOnlyList<string> BodyParagraphs,
+    string SyncedLabel,
+    string BackHref,
+    string SupportHref,
+    string? EntryHref = null,
+    string? EntryLabel = null,
+    string? EntrySummary = null,
+    string? SupporterHref = null);
 
 public sealed record KarmaForgeIntakePageViewModel(
     SiteChromeViewModel Chrome,
@@ -2289,6 +2308,12 @@ public sealed record AccountHubCardViewModel(
     string? SecondaryLabel = null,
     string? SecondaryHref = null);
 
+public sealed record AccountAccessInstallationViewModel(
+    string InstallationId,
+    string Title,
+    string Summary,
+    bool CanUnlink);
+
 public sealed record AccountSectionPageViewModel(
     SiteChromeViewModel Chrome,
     string Eyebrow,
@@ -2297,7 +2322,8 @@ public sealed record AccountSectionPageViewModel(
     IReadOnlyList<string> Highlights,
     IReadOnlyList<AccountHubCardViewModel> Cards,
     string BackLabel,
-    string BackHref);
+    string BackHref,
+    IReadOnlyList<AccountAccessInstallationViewModel>? AccessInstallations = null);
 
 public sealed record AccountPageViewModel(
     SiteChromeViewModel Chrome,
@@ -2352,6 +2378,7 @@ public sealed record AuthPageViewModel(
     SiteChromeViewModel Chrome,
     string Heading,
     string SupportLine,
+    string ReturnLine,
     string NextPath,
     bool CreateAccount,
     bool GoogleAvailable,

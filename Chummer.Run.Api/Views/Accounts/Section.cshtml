@@ -1,12 +1,14 @@
 @model AccountSectionPageViewModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     ViewData["Title"] = Model.Chrome.Title;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account surface-minimal";
+    var antiForgery = Antiforgery.GetAndStoreTokens(Context);
 }
 <section class="minimal-page-hero">
     <div>
-        <p class="eyebrow">Account · @Model.Eyebrow</p>
+        <p class="eyebrow">@Model.Eyebrow</p>
         <h1>@Model.Heading</h1>
         <p>@Model.Summary</p>
         @if (Model.Highlights.Count > 0)
@@ -23,6 +25,41 @@
         </div>
     </div>
 </section>
+
+@if (Model.AccessInstallations is { Count: > 0 })
+{
+    <section class="minimal-section minimal-section--tight">
+        <div class="minimal-section__lead">
+            <p class="eyebrow">Linked copies</p>
+            <h2>Manage attached installs</h2>
+            <p>Unlink a copy here if it should stop following this account.</p>
+        </div>
+        <div class="minimal-lane-grid minimal-platform-list">
+            @foreach (var installation in Model.AccessInstallations)
+            {
+                <article class="minimal-lane-card">
+                    <span class="tag">Copy</span>
+                    <h2>@installation.Title</h2>
+                    <p>@installation.Summary</p>
+                    <div class="minimal-actions">
+                        @if (installation.CanUnlink)
+                        {
+                            <form method="post" action="/account/access/unlink">
+                                <input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken" />
+                                <input type="hidden" name="installationId" value="@installation.InstallationId" />
+                                <button class="button-like button-like--ghost" type="submit">Unlink</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <span class="muted-copy">Open this copy once before unlinking it here.</span>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
 
 <section class="minimal-section">
     <div class="minimal-lane-grid minimal-platform-list">

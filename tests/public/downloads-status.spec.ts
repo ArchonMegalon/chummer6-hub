@@ -28,14 +28,14 @@ test('downloads and status stay concise and point to the right next steps', asyn
   await expect(downloadsPage.getByRole('heading', { name: 'Downloads' })).toBeVisible();
   await expect(downloadsPage.locator('body')).toContainText('Stable');
   await expect(downloadsPage.locator('body')).toContainText('Nightly');
+  await expect(downloadsPage.locator('body')).toContainText('Main build for this browser. Other downloads stay below.');
   await expect(downloadsPage.locator('body')).toContainText('Build from source');
   await expect(downloadsMain.getByRole('link', { name: /Download for|Download script|Use Stable/ })).toHaveCount(2);
   await downloadsPage.close();
 
   const statusPage = await openPublicPage(browser, '/status');
-  await expect(statusPage.getByRole('heading', { name: 'Status' })).toBeVisible();
-  await expect(statusPage.locator('.minimal-page-hero.minimal-status-pill')).toContainText('Current release');
   const statusHero = statusPage.locator('.minimal-page-hero.minimal-status-pill');
+  await expect(statusHero).toContainText('Current release');
   await expect(statusHero.getByRole('link', { name: 'Downloads' })).toBeVisible();
   await expect(statusHero.getByRole('link', { name: 'Help' })).toBeVisible();
   await expect(statusPage.getByRole('heading', { name: 'Platforms' })).toHaveCount(0);

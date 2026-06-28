@@ -1,0 +1,80 @@
+@model FirstPartyParticipatePostDetailViewModel
+@{
+    ViewData["Title"] = Model.Post.Title;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-minimal surface-participate surface-partizipate surface-participate-detail";
+
+    var signedIn = Model.Chrome.Authenticated;
+    var signedInLabel = string.IsNullOrWhiteSpace(Model.Chrome.SignedInLabel) ? "Signed in" : Model.Chrome.SignedInLabel;
+    var leadSummary = string.IsNullOrWhiteSpace(Model.EntrySummary)
+        ? (signedIn
+            ? $"{signedInLabel} is already signed in here."
+            : "Reading stays here. Adding notes and follow-up still happen on the board.")
+        : Model.EntrySummary;
+    var requestLabel = Model.Post.Score == 1 ? "1 request" : $"{Model.Post.Score} requests";
+    var requestKind = string.IsNullOrWhiteSpace(Model.Post.Category) ? "Request" : Model.Post.Category;
+
+    static string HouseText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
+}
+
+<section class="minimal-page-hero participate-hero route-anchor-target" aria-labelledby="participate-post-title">
+    <div class="participate-hero__copy">
+        <p class="eyebrow">Request</p>
+        <h1 id="participate-post-title">@Model.Post.Title</h1>
+        <p>@Model.Post.Summary</p>
+    </div>
+    <div class="participate-hero__status">
+        <span class="participate-chip">@Model.Post.Status</span>
+    </div>
+</section>
+
+<section class="participate-shell" aria-label="Request detail">
+    <div class="participate-hosted">
+        <div class="participate-hosted__header">
+            <div class="participate-hosted__lead">
+                <h2>Request status</h2>
+                <p>@HouseText(leadSummary)</p>
+            </div>
+            <div class="participate-hosted__status">
+                <a class="button-like button-like--secondary" href="@Model.BackHref">Back to requests</a>
+                @if (!string.IsNullOrWhiteSpace(Model.EntryHref) && !string.IsNullOrWhiteSpace(Model.EntryLabel))
+                {
+                    <a class="button-like button-like--ghost" href="@Model.EntryHref">@HouseText(Model.EntryLabel)</a>
+                }
+            </div>
+        </div>
+
+        <section class="minimal-section minimal-section--tight" aria-labelledby="participate-detail-title">
+            <div class="minimal-section__lead">
+                <p class="eyebrow">@requestKind</p>
+                <h2 id="participate-detail-title">Request detail</h2>
+                <p>@Model.SyncedLabel</p>
+            </div>
+            <article class="minimal-lane-card participate-detail-card">
+                <div class="minimal-inline-facts" aria-label="Request facts">
+                    <span>@requestLabel</span>
+                    @if (Model.Post.CommentCount > 0)
+                    {
+                        <span>@Model.Post.CommentCount comment@(Model.Post.CommentCount == 1 ? string.Empty : "s")</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.Post.UpdatedLabel))
+                    {
+                        <span>@Model.Post.UpdatedLabel</span>
+                    }
+                    <span>@Model.Post.Status</span>
+                </div>
+                @if (Model.BodyParagraphs.Count > 0)
+                {
+                    @foreach (var paragraph in Model.BodyParagraphs)
+                    {
+                        <p>@paragraph</p>
+                    }
+                }
+                else
+                {
+                    <p>@Model.Post.Summary</p>
+                }
+            </article>
+        </section>
+    </div>
+</section>

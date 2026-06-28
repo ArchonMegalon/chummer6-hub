@@ -1,182 +1,301 @@
 using System.Net;
 using System.Text;
+using System.Diagnostics;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Chummer.Tests;
 
-public sealed class PublicLandingParticipateProxyTests
+public sealed class PublicLandingParticipateProxyTests : IDisposable
 {
+    private static readonly string ParticipateSnapshotStorePath = Path.Combine(Path.GetTempPath(), "public-landing-participate-snapshot-store.json");
+
+    public PublicLandingParticipateProxyTests()
+        => CleanupDurableState();
+
+    public void Dispose()
+        => CleanupDurableState();
+
     [Fact]
-    public async Task ParticipateBoardProxyReturnsFirstPartyFallbackWhenUpstreamIsUnavailable()
+    public async Task ParticipateBoardProxyRedirectsRootBoardRouteToCanonicalParticipateSurface()
     {
-        var controller = CreateController(new ThrowingHttpClientFactory());
+        var controller = CreatePublicLandingController(new ThrowingHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.ParticipateBoardProxy(null, CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("The board is unavailable", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("rel=\"canonical\" href=\"/participate\"", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("property=\"og:url\"", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("content=\"/participate\"", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("name=\"twitter:url\"", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("href=\"/roadmap\"", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.DoesNotContain("Unexpected server error", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("ProductLift", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/participate", redirect.Url);
     }
 
     [Fact]
     public async Task ParticipateBoardProxyReturnsFirstPartyFallbackWhenHostedBoardShowsProviderError()
     {
-        var controller = CreateController(new HostedBoardErrorHttpClientFactory());
+        var controller = CreatePublicLandingController(new HostedBoardErrorHttpClientFactory());
+        IActionResult result = await controller.ParticipateBoardProxy("posts/mobile-companion", CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.False(model.EmbeddedBoardEnabled);
+        Assert.Equal("Board offline right now", model.SyncedLabel);
+    }
+
+    [Fact]
+    public async Task ParticipatePageFailsFastToFirstPartyFallbackWhenHostedBoardSnapshotTimesOut()
+    {
+        var controller = CreatePublicLandingController(new SlowHostedBoardPostsHttpClientFactory());
+        var stopwatch = Stopwatch.StartNew();
+
+        IActionResult result = await controller.ParticipatePage(CancellationToken.None);
+
+        stopwatch.Stop();
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.True(model.EmbeddedBoardEnabled);
+        Assert.Equal("Live", model.StatusLabel);
+        Assert.Equal("Board is live.", model.SyncedLabel);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"participate page should return the first-party shell immediately even when the hosted board is slow, but took {stopwatch.Elapsed}.");
+    }
+
+    [Fact]
+    public async Task ParticipatePageSkipsPlaceholderHostedBoardCallsInDevelopment()
+    {
+        var controller = CreatePublicLandingController(
+            new SlowHostedBoardPostsHttpClientFactory(),
+            webHostEnvironment: new FakeWebHostEnvironment("Development"));
+        var stopwatch = Stopwatch.StartNew();
+
+        IActionResult result = await controller.ParticipatePage(CancellationToken.None);
+
+        stopwatch.Stop();
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.False(model.EmbeddedBoardEnabled);
+        Assert.Equal("Offline", model.StatusLabel);
+        Assert.Equal("Board offline right now", model.SyncedLabel);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"development placeholder hosted-board fetch should short-circuit, but took {stopwatch.Elapsed}.");
+    }
+
+    [Fact]
+    public async Task ParticipatePageServesDurableSnapshotWithoutCallingUpstream()
+    {
+        const string cachedFeedbackUrl = "https://ideas.chummer-preview.test/feedback";
+        var seedingController = CreatePublicLandingController(
+            new HostedBoardPostsHttpClientFactory(),
+            feedbackUrl: cachedFeedbackUrl,
+            seedParticipateSnapshot: true);
+        _ = await seedingController.ParticipatePage(CancellationToken.None);
+
+        var staleController = CreatePublicLandingController(
+            new ThrowingHttpClientFactory(),
+            feedbackUrl: cachedFeedbackUrl,
+            seedParticipateSnapshot: false);
+        staleController.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        staleController.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        staleController.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        var stopwatch = Stopwatch.StartNew();
+        IActionResult result = await staleController.ParticipatePage(CancellationToken.None);
+        stopwatch.Stop();
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.True(model.LoadedFromBoard);
+        Assert.Equal("Live", model.StatusLabel);
+        Assert.True(model.EmbeddedBoardEnabled);
+        Assert.Single(model.Posts);
+        Assert.StartsWith("Synced ", model.SyncedLabel, StringComparison.Ordinal);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"durable participate snapshot should return immediately, but took {stopwatch.Elapsed}.");
+    }
+
+    [Fact]
+    public async Task ParticipateBoardProxyRendersFirstPartyRequestDetailFromBoardJson()
+    {
+        var controller = CreatePublicLandingController(new HostedBoardPostsHttpClientFactory(), seedParticipateSnapshot: true);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
-        IActionResult result = await controller.ParticipateBoardProxy(null, CancellationToken.None);
+        IActionResult result = await controller.ParticipateBoardProxy("p/mobile-companion-app-for-dice-rolling-sq49UU", CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("The board is unavailable", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("Use Contact only for private details.", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.DoesNotContain("Could not load posts", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("support@productlift.dev", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("internet connection", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/PublicLanding/ParticipatePost.cshtml", view.ViewName);
+        FirstPartyParticipatePostDetailViewModel model = Assert.IsType<FirstPartyParticipatePostDetailViewModel>(view.Model);
+        Assert.Equal("Mobile companion app for dice rolling", model.Post.Title);
+        Assert.Equal("Open", model.Post.Status);
+        Assert.Equal("/participate", model.BackHref);
+        Assert.Equal("/login?next=%2Fparticipate%2Fboard%2Fp%2Fmobile-companion-app-for-dice-rolling-sq49UU", model.EntryHref);
+        Assert.Contains("Adding notes and follow-up still happen on the board.", model.EntrySummary, StringComparison.Ordinal);
+        Assert.StartsWith("Synced ", model.SyncedLabel, StringComparison.Ordinal);
+        Assert.Single(model.BodyParagraphs);
     }
 
     [Fact]
-    public async Task ParticipateBoardProxyRemovesHostedProviderAuthAndSearchChrome()
+    public async Task ParticipateBoardProviderAssetProxyStreamsWhitelistedProviderAssets()
     {
-        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
+        var factory = new RecordingAssetHttpClientFactory();
+        var controller = CreatePublicLandingController(factory);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
-        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/css";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
-        IActionResult result = await controller.ParticipateBoardProxy(null, CancellationToken.None);
+        IActionResult result = await controller.ParticipateBoardProviderAssetProxy("media", "branding-stylesheets/theme.css", CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        string html = content.Content ?? string.Empty;
-        Assert.Contains("Participate - Chummer.run", html, StringComparison.Ordinal);
-        Assert.Contains("rel=\"canonical\" href=\"/participate/board\"", html, StringComparison.Ordinal);
-        Assert.Contains("Public bugs and requests", html, StringComparison.Ordinal);
-        Assert.Contains("Public bugs and requests.", html, StringComparison.Ordinal);
-        Assert.Contains("Short requests. Clear bugs. Useful ideas.", html, StringComparison.Ordinal);
-        Assert.Contains("Add a note", html, StringComparison.Ordinal);
-        Assert.Contains("href=\"/participate\"", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("/participate/participate", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Chummer Participate", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("<title>What do you want to see next?", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("content=\"Tell us how we could make Chummer6 more useful to you\"", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("global-search-trigger", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(">Ctrl K<", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(">Search<", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(">Sign up<", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain(">Log in<", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("menubar_signup", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("menubar_login", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("id=\"imageModal\"", html, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("&times;", html, StringComparison.OrdinalIgnoreCase);
+        FileContentResult file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("text/css", file.ContentType);
+        Assert.Equal("body{}", Encoding.UTF8.GetString(file.FileContents));
+        Assert.NotNull(factory.Request);
+        Assert.Equal("https://media.productlift.dev/branding-stylesheets/theme.css", factory.Request!.RequestUri!.ToString());
     }
 
     [Fact]
-    public async Task ParticipatePageRendersCanonicalParticipateBoard()
+    public async Task ParticipatePageServesFirstPartyIframeShellForHostedBoard()
     {
-        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), seedParticipateSnapshot: false);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.ParticipatePage(CancellationToken.None);
 
-        ContentResult contentResult = Assert.IsType<ContentResult>(result);
-        string html = contentResult.Content ?? string.Empty;
-        Assert.Equal("text/html; charset=utf-8", contentResult.ContentType);
-        Assert.Contains("rel=\"canonical\" href=\"/participate\"", html, StringComparison.Ordinal);
-        Assert.Contains("<base href=\"/participate/\" />", html, StringComparison.Ordinal);
-        Assert.Contains("property=\"og:url\"", html, StringComparison.Ordinal);
-        Assert.Contains("name=\"twitter:url\"", html, StringComparison.Ordinal);
-        Assert.Contains("content=\"/participate\"", html, StringComparison.Ordinal);
-        Assert.Contains("Public bugs and requests", html, StringComparison.Ordinal);
-        Assert.Contains("Public bugs and requests.", html, StringComparison.Ordinal);
-        Assert.Contains("Short requests. Clear bugs. Useful ideas.", html, StringComparison.Ordinal);
-        Assert.Contains("Add a note", html, StringComparison.Ordinal);
-        Assert.Contains("href=\"/participate\"", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("/participate/participate", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("chummer6.productlift.dev", html, StringComparison.OrdinalIgnoreCase);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.True(model.EmbeddedBoardEnabled);
+        Assert.Equal("/participate/frame", model.EmbeddedBoardHref);
+        Assert.Equal("/participate/board", model.DirectBoardHref);
+        Assert.Equal("What should Chummer do next?", model.Heading);
+        Assert.Equal("Public requests, clear bugs, useful ideas.", model.Summary);
+        Assert.Equal("/login?next=%2Fparticipate", model.EntryHref);
     }
 
     [Fact]
-    public async Task RoadmapPageRendersCanonicalRoadmapBoard()
+    public async Task RoadmapPageProxiesHostedBoardIntoCanonicalRoadmapSurface()
     {
-        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), seedParticipateSnapshot: true);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.RoadmapPage(CancellationToken.None);
 
-        ContentResult contentResult = Assert.IsType<ContentResult>(result);
-        string html = contentResult.Content ?? string.Empty;
-        Assert.Equal("text/html; charset=utf-8", contentResult.ContentType);
-        Assert.Contains("rel=\"canonical\" href=\"/roadmap\"", html, StringComparison.Ordinal);
-        Assert.Contains("<base href=\"/roadmap/board/\" />", html, StringComparison.Ordinal);
-        Assert.Contains("property=\"og:url\"", html, StringComparison.Ordinal);
-        Assert.Contains("name=\"twitter:url\"", html, StringComparison.Ordinal);
-        Assert.Contains("content=\"/roadmap\"", html, StringComparison.Ordinal);
-        Assert.Contains("Roadmap - Chummer.run", html, StringComparison.Ordinal);
-        Assert.Contains("Now and next", html, StringComparison.Ordinal);
-        Assert.Contains("What is shipping, and what still needs work.", html, StringComparison.Ordinal);
-        Assert.Contains("href=\"/participate\"", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("/roadmap/board/participate", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Participate - Chummer.run", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Public bugs and requests", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("chummer6.productlift.dev", html, StringComparison.OrdinalIgnoreCase);
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("<base href=\"/roadmap/\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("<link rel=\"canonical\" href=\"/roadmap\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("Now and next", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("Planned work is here. Shipped work stays in Changelog.", content.Content ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RoadmapBoardProxyRedirectsRootBoardRouteToCanonicalRoadmapSurface()
+    {
+        var controller = CreatePublicLandingController(new HostedBoardPostsHttpClientFactory());
+
+        IActionResult result = await controller.RoadmapBoardProxy(null, CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/roadmap", redirect.Url);
     }
 
     [Fact]
     public async Task RoadmapPageReturnsFirstPartyFallbackWhenUpstreamIsUnavailable()
     {
-        var controller = CreateController(new ThrowingHttpClientFactory());
+        var controller = CreatePublicLandingController(new ThrowingHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.RoadmapPage(CancellationToken.None);
 
-        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/participate", redirect.Url);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/PublicLanding/Roadmap.cshtml", view.ViewName);
+        RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
+        Assert.Null(model.HostedBoardHref);
+        Assert.True(model.Milestones.Count >= 0);
+        Assert.False(string.IsNullOrWhiteSpace(model.PublicRequestSyncedLabel));
     }
 
     [Fact]
     public async Task RoadmapPageFallsBackToParticipateWhenDedicatedRoadmapUrlIsMissing()
     {
-        var controller = CreateController(new HostedBoardChromeHttpClientFactory(), roadmapUrl: null);
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), roadmapUrl: null);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.RoadmapPage(CancellationToken.None);
 
-        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/participate", redirect.Url);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/PublicLanding/Roadmap.cshtml", view.ViewName);
+        RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
+        Assert.Null(model.HostedBoardHref);
+        Assert.False(string.IsNullOrWhiteSpace(model.PublicRequestSyncedLabel));
+    }
+
+    [Fact]
+    public async Task RoadmapPageDisablesHostedBoardLinkWhenRoadmapUrlMatchesFeedbackUrl()
+    {
+        var controller = CreatePublicLandingController(new HostedBoardPostsHttpClientFactory(), roadmapUrl: "https://ideas.example.test/feedback", seedParticipateSnapshot: true);
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.RoadmapPage(CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
+        Assert.Null(model.HostedBoardHref);
+    }
+
+    [Fact]
+    public async Task ParticipateBoardProxyServesEmbeddedShellForIframeRequests()
+    {
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.ParticipateBoardProxy(null, CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RoadmapBoardProxyServesEmbeddedShellForIframeRequests()
+    {
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.RoadmapBoardProxy(null, CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("Now and next", content.Content ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task PartizipateAliasRedirectsToCanonicalParticipateUrl()
     {
-        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
@@ -190,7 +309,7 @@ public sealed class PublicLandingParticipateProxyTests
     [Fact]
     public async Task PartizipateLegacyAliasEmptyPathRedirectsToCanonicalParticipate()
     {
-        var controller = CreateController(new HostedBoardChromeHttpClientFactory());
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
@@ -202,10 +321,34 @@ public sealed class PublicLandingParticipateProxyTests
     }
 
     [Fact]
+    public void ParticipateFrameRedirectsToFirstPartyBoardRoute()
+    {
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory());
+
+        IActionResult result = controller.ParticipateBoardFrame("posts/mobile-companion");
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("https://ideas.example.test/feedback/posts/mobile-companion", redirect.Url);
+    }
+
+    [Fact]
+    public void ParticipateFrameNormalizesProductLiftFeedbackRouteToHostedRoot()
+    {
+        var controller = CreatePublicLandingController(
+            new HostedBoardChromeHttpClientFactory(),
+            feedbackUrl: "https://chummer6.productlift.dev/feedback");
+
+        IActionResult result = controller.ParticipateBoardFrame("posts/mobile-companion");
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("https://chummer6.productlift.dev/posts/mobile-companion", redirect.Url);
+    }
+
+    [Fact]
     public async Task ParticipateBoardRootApiProxyDoesNotForwardChummerCredentials()
     {
         var factory = new RecordingHttpClientFactory();
-        var controller = CreateController(factory);
+        var controller = CreatePublicLandingController(factory);
         HttpRequest request = controller.ControllerContext.HttpContext.Request;
         request.Method = HttpMethods.Get;
         request.Headers.UserAgent = "xunit";
@@ -230,7 +373,7 @@ public sealed class PublicLandingParticipateProxyTests
         Assert.False(controller.Response.Headers.ContainsKey("Set-Cookie"));
     }
 
-    private static PublicLandingController CreateController(IHttpClientFactory httpClientFactory, string? roadmapUrl = "https://ideas.example.test/roadmap")
+    private static ParticipateController CreateParticipateController(IHttpClientFactory httpClientFactory, string? roadmapUrl = "https://ideas.example.test/roadmap")
     {
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -239,6 +382,7 @@ public sealed class PublicLandingParticipateProxyTests
                 ["CHUMMER_PRODUCTLIFT_ROADMAP_URL"] = roadmapUrl,
                 ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
                 ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
+                ["CHUMMER_PUBLIC_PARTICIPATE_SNAPSHOT_STORE_PATH"] = ParticipateSnapshotStorePath,
                 ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = "/tmp/public-landing-participate-billing-store.json",
                 ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = "/tmp/public-landing-participate-myfirstbook-usage-store.json",
                 ["CHUMMER_RUNSITE_TOUR_USAGE_STORE_PATH"] = "/tmp/public-landing-participate-runsite-tour-usage-store.json"
@@ -251,6 +395,64 @@ public sealed class PublicLandingParticipateProxyTests
             new PublicReleaseManifestService(configuration),
             new ReleaseSelectionService(canon),
             new HttpContextAccessor());
+        var services = new ServiceCollection();
+        services.AddControllersWithViews();
+        return new ParticipateController(
+            identity: new HubIdentityClient(new HttpClient(), configuration, NullLogger<HubIdentityClient>.Instance),
+            chrome: chrome,
+            configuration: configuration,
+            logger: NullLogger<ParticipateController>.Instance,
+            httpClientFactory: httpClientFactory)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    RequestServices = services.BuildServiceProvider()
+                }
+            }
+        };
+    }
+
+    private static PublicLandingController CreatePublicLandingController(
+        IHttpClientFactory httpClientFactory,
+        string? roadmapUrl = "https://ideas.example.test/roadmap",
+        string feedbackUrl = "https://ideas.example.test/feedback",
+        IWebHostEnvironment? webHostEnvironment = null,
+        bool seedParticipateSnapshot = false)
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = feedbackUrl,
+                ["CHUMMER_PRODUCTLIFT_ROADMAP_URL"] = roadmapUrl,
+                ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
+                ["CHUMMER_PUBLIC_PARTICIPATE_SNAPSHOT_STORE_PATH"] = ParticipateSnapshotStorePath,
+                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = "/tmp/public-landing-participate-billing-store.json",
+                ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = "/tmp/public-landing-participate-myfirstbook-usage-store.json",
+                ["CHUMMER_RUNSITE_TOUR_USAGE_STORE_PATH"] = "/tmp/public-landing-participate-runsite-tour-usage-store.json"
+            })
+            .Build();
+        var canon = new PublicCanonFileLoader(configuration);
+        var chrome = new HubPageChromeService(
+            new PublicLandingService(canon, new PublicActionResolver()),
+            new PublicNavigationService(canon, new PublicRouteCatalogService(canon)),
+            new PublicReleaseManifestService(configuration),
+            new ReleaseSelectionService(canon),
+            new HttpContextAccessor());
+        IWebHostEnvironment environment = webHostEnvironment ?? new FakeWebHostEnvironment("Production");
+        var participateStore = new PublicParticipateSnapshotStore(configuration);
+        var participateSnapshots = new PublicParticipateSnapshotService(
+            participateStore,
+            configuration,
+            httpClientFactory,
+            environment,
+            NullLogger<PublicParticipateSnapshotService>.Instance);
+        if (seedParticipateSnapshot)
+        {
+            participateSnapshots.RefreshAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
         var services = new ServiceCollection();
         services.AddControllersWithViews();
         return new PublicLandingController(
@@ -304,8 +506,9 @@ public sealed class PublicLandingParticipateProxyTests
             releaseUploadTickets: null!,
             windowsProofInstallers: null!,
             aurPackages: null!,
+            participateSnapshots: participateSnapshots,
             httpClientFactory: httpClientFactory,
-            webHostEnvironment: null!,
+            webHostEnvironment: environment,
             logger: NullLogger<PublicLandingController>.Instance)
         {
             ControllerContext = new ControllerContext
@@ -327,6 +530,39 @@ public sealed class PublicLandingParticipateProxyTests
         HorizonCapabilityService capabilities = new(configuration);
         HorizonArtifactQuotaService quota = new(new HorizonArtifactUsageStore(configuration), capabilities, billing);
         return new RunsiteTourQuotaService(quota, capabilities);
+    }
+
+    private sealed class FakeWebHostEnvironment(string environmentName) : IWebHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = environmentName;
+        public string ApplicationName { get; set; } = "Chummer.Tests";
+        public string WebRootPath { get; set; } = RepoPaths.Root;
+        public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
+        public string ContentRootPath { get; set; } = RepoPaths.Root;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private static void CleanupDurableState()
+    {
+        TryDeleteFile(ParticipateSnapshotStorePath);
+        TryDeleteFile("/tmp/public-landing-participate-billing-store.json");
+        TryDeleteFile("/tmp/public-landing-participate-myfirstbook-usage-store.json");
+        TryDeleteFile("/tmp/public-landing-participate-runsite-tour-usage-store.json");
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch
+        {
+            // Test cleanup should not hide the actual assertion failure.
+        }
     }
 
     private sealed class ThrowingHttpClientFactory : IHttpClientFactory
@@ -405,30 +641,38 @@ public sealed class PublicLandingParticipateProxyTests
                 const string html = """
 <!doctype html>
 <html lang="en">
-<head><title>What do you want to see next?</title></head>
+<head>
+  <title>What do you want to see next?</title>
+  <link rel="preload" href="https://media.productlift.dev/branding-stylesheets/theme.css" as="style" />
+  <script>window._themePrimaryUrl = 'https://media.productlift.dev/branding-stylesheets/theme.css';</script>
+  <script src="https://cdn.productlift.dev/js/all.js?id=370f0b336fe725b13230"></script>
+</head>
 <body>
-<nav>
-  <ul class="navbar-nav navbar-right ml-auto align-items-center">
-    <li class="nav-item mr-2 d-none d-md-block">
-      <a class="nav-link p-0" href="#" id="global-search-trigger">
-        <span class="global-search-trigger-btn">
-          <span>Search</span>
-          <kbd class="global-search-trigger-kbd">Ctrl K</kbd>
-        </span>
-      </a>
-    </li>
-    <li class="nav-item mr-2 d-block d-md-none">
-      <a class="nav-link" href="#" id="global-search-trigger-mobile">Search</a>
-    </li>
-    <li class="nav-item pl-0">
-      <a class="nav-link pl-0" href="/register" rel="nofollow" id="menubar_signup" title="Sign up">Sign up</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link" href="/login" rel="nofollow" id="menubar_login" title="Log in">Log in</a>
-    </li>
-  </ul>
-</nav>
-<a class="navbar-brand" href="/participate">Chummer.run</a>
+<div id="menubar">
+  <nav>
+    <ul class="navbar-nav navbar-right ml-auto align-items-center">
+      <li class="nav-item mr-2 d-none d-md-block">
+        <a class="nav-link p-0" href="#" id="global-search-trigger">
+          <span class="global-search-trigger-btn">
+            <span>Search</span>
+            <kbd class="global-search-trigger-kbd">Ctrl K</kbd>
+          </span>
+        </a>
+      </li>
+      <li class="nav-item mr-2 d-block d-md-none">
+        <a class="nav-link" href="#" id="global-search-trigger-mobile">Search</a>
+      </li>
+      <li class="nav-item pl-0">
+        <a class="nav-link pl-0" href="/register" rel="nofollow" id="menubar_signup" title="Sign up">Sign up</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/login" rel="nofollow" id="menubar_login" title="Log in">Log in</a>
+      </li>
+    </ul>
+  </nav>
+</div>
+<div id="global_search_mount"></div>
+<a class="navbar-brand" href="/participate/board">Chummer.run</a>
 <main><h1>What do you want to see next?</h1></main>
 <div class="modal fade" id="imageModal" tabindex="-1" role="dialog" aria-hidden="true">
   <div class="modal-dialog modal-xl">
@@ -486,6 +730,45 @@ public sealed class PublicLandingParticipateProxyTests
                 var response = new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
+                };
+                return Task.FromResult(response);
+            }
+        }
+    }
+
+    private sealed class SlowHostedBoardPostsHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name)
+            => new(new SlowHostedBoardPostsHandler());
+
+        private sealed class SlowHostedBoardPostsHandler : HttpMessageHandler
+        {
+            protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{}", Encoding.UTF8, "application/json")
+                };
+            }
+        }
+    }
+
+    private sealed class RecordingAssetHttpClientFactory : IHttpClientFactory
+    {
+        public HttpRequestMessage? Request { get; private set; }
+
+        public HttpClient CreateClient(string name)
+            => new(new RecordingAssetHandler(this));
+
+        private sealed class RecordingAssetHandler(RecordingAssetHttpClientFactory owner) : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                owner.Request = request;
+                var response = new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("body{}", Encoding.UTF8, "text/css")
                 };
                 return Task.FromResult(response);
             }

@@ -8,7 +8,10 @@ namespace Chummer.Run.AI.Controllers;
 [Route("api/v1/ai/director")]
 public sealed class AiDirectorController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     [HttpPost("observations")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<SubmitObservationResponse>(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<SubmitObservationResponse> SubmitObservation([FromBody] SubmitObservationRequest? request)

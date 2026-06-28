@@ -69,7 +69,7 @@ public sealed class SupportCasePresentationServiceTests
     }
 
     [Fact]
-    public void Build_NonInstallSignedInCaseKeepsReporterInsideTrackedSupport()
+    public void Build_NonInstallSignedInCaseKeepsReporterInsideAccountSupport()
     {
         var service = new SupportCasePresentationService();
         var supportCase = new SupportCaseProjection(
@@ -90,7 +90,7 @@ public sealed class SupportCasePresentationServiceTests
 
         var presentation = service.Build(supportCase);
 
-        Assert.Equal("Open tracked case", presentation.PrimaryActionLabel);
+        Assert.Equal("Open case", presentation.PrimaryActionLabel);
         Assert.Equal("/account/support/case-bug", presentation.PrimaryActionHref);
         Assert.Equal("Follow-up stays inside Account > Support for this signed-in report.", presentation.FollowUpLaneSummary);
     }
@@ -214,7 +214,7 @@ public sealed class SupportCasePresentationServiceTests
         Assert.Equal("Closed and confirmed", presentation.StageLabel);
         Assert.False(presentation.NeedsLinkedInstall);
         Assert.Contains("Update the affected claimed install normally", presentation.NextSafeAction, StringComparison.Ordinal);
-        Assert.Contains("Reopen this same tracked case", presentation.NextSafeAction, StringComparison.Ordinal);
+        Assert.Contains("Reopen this same case", presentation.NextSafeAction, StringComparison.Ordinal);
         Assert.DoesNotContain("Open installs", presentation.NextSafeAction, StringComparison.Ordinal);
         Assert.Contains("stays linked on preview 0.7.1-preview", presentation.InstallReadinessSummary, StringComparison.Ordinal);
     }

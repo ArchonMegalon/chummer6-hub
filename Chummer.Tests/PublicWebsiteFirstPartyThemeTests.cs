@@ -23,6 +23,7 @@ public sealed class PublicWebsiteFirstPartyThemeTests
     public void ParticipateRouteAndLegacyTypoStayFirstParty()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string participateView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml"));
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
         string appNavigation = File.ReadAllText(RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_NAVIGATION.yaml"));
 
@@ -30,27 +31,28 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/participate{Request.QueryString}\");", controller, StringComparison.Ordinal);
         Assert.Contains("BuildFirstPartyParticipateBoardAsync", controller, StringComparison.Ordinal);
-        Assert.Contains("ParticipateBoardProxyCore(", controller, StringComparison.Ordinal);
-        Assert.Contains("localOrigin: \"/participate\"", controller, StringComparison.Ordinal);
-        Assert.Contains("private string? ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
+        Assert.Contains("\"~/Views/PublicLanding/Partizipate.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.Contains("private static string BuildParticipateFrameHref(", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
+        Assert.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);
-        Assert.Contains("var showBuildActionInHeader = !minimalSurface;", layout, StringComparison.Ordinal);
         Assert.Contains("!(minimalSurface && normalizeHeaderActionPath(action.Href).StartsWith(\"/downloads\"", layout, StringComparison.Ordinal);
-        Assert.Contains("showBuildActionInHeader && buildAction is not null", layout, StringComparison.Ordinal);
+        Assert.Contains("var showPrimaryNavInHeader = !minimalSurface && routeKey is not \"landing\";", layout, StringComparison.Ordinal);
+        Assert.Contains("accountMenuBuildAction = chrome.Authenticated ? buildAction : null", layout, StringComparison.Ordinal);
         Assert.Contains("href: /participate", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Get Chummer", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev", appNavigation, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("body > header,", controller, StringComparison.Ordinal);
-        Assert.Contains("[id*=\"global-search\"]", controller, StringComparison.Ordinal);
-        Assert.Contains("__CHUMMER_HEADING_REPLACEMENT__", controller, StringComparison.Ordinal);
-        Assert.Contains("hiddenStatusTerms", controller, StringComparison.Ordinal);
-        Assert.Contains("text === 'search' || text === 'ctrl k'", controller, StringComparison.Ordinal);
-        Assert.Contains("data-chummer-board-skin", controller, StringComparison.Ordinal);
-        Assert.Contains("--chummer-board-accent: #d4b36b;", controller, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
+        Assert.Contains("Open board", participateView, StringComparison.Ordinal);
+        Assert.Contains("@PublicParticipateText(Model.Summary)", participateView, StringComparison.Ordinal);
+        Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
+        Assert.Contains("Board is live.", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Feedback and roadmap live here.", participateView, StringComparison.Ordinal);
+        Assert.Contains("Model.EmbeddedBoardHref", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-chummer-board-skin", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("#2e7bff", controller, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("#39c6ff", controller, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("RemoveHostedBoardAuthLinks", controller, StringComparison.Ordinal);
 
         string siblingNavigationPath = Path.GetFullPath(Path.Combine(RepoPaths.Root, "..", "chummer-design", "products", "chummer", "PUBLIC_NAVIGATION.yaml"));
         if (!File.Exists(siblingNavigationPath))
@@ -68,17 +70,20 @@ public sealed class PublicWebsiteFirstPartyThemeTests
     public void RoadmapRouteRendersProductLiftRequestsAsFirstPartyData()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string roadmapView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml"));
 
         Assert.Contains("public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/roadmap/board\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("RoadmapBoardProxyCore(", controller, StringComparison.Ordinal);
-        Assert.Contains("canonicalHref: \"/roadmap\"", controller, StringComparison.Ordinal);
-        Assert.Contains("assetProxyBasePath: \"/roadmap/provider-assets\"", controller, StringComparison.Ordinal);
+        Assert.Contains("\"~/Views/PublicLanding/Roadmap.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect($\"/roadmap{Request.QueryString}\");", controller, StringComparison.Ordinal);
         Assert.Contains("pageTitle: \"Roadmap - Chummer.run\"", controller, StringComparison.Ordinal);
         Assert.Contains("hostedHeadingReplacement: \"Now and next\"", controller, StringComparison.Ordinal);
         Assert.Contains("HostedBoardHtmlLooksUnavailable(html)", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Roadmap.cshtml\", model);", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildRoadmapFallbackPageModelAsync", controller, StringComparison.Ordinal);
+        Assert.Contains("RoadmapBoardFallbackAsync", controller, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-roadmap-frame", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Current work opens below.", roadmapView, StringComparison.Ordinal);
     }
 
     [Fact]

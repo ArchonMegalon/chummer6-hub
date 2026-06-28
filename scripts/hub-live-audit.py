@@ -656,14 +656,14 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"/account/settings returned {status}, expected 200")
+    require_snippet(body, "More settings", "/account/settings")
     require_snippet(body, "Choose what stays visible while deeper identifiers remain tucked away.", "/account/settings")
     require_snippet(body, "Visibility", "/account/settings")
-    require_snippet(body, "Recovery status", "/account/settings")
-    require_snippet(body, "Help and policy", "/account/settings")
-    require_snippet(body, "Open help", "/account/settings")
-    require_snippet(body, "Read privacy", "/account/settings")
-    require_snippet(body, "Read terms", "/account/settings")
-    require_snippet(body, "Contact Chummer", "/account/settings")
+    require_snippet(body, "Recovery posture", "/account/settings")
+    require_snippet(body, "Provider-backed help", "/account/settings")
+    require_snippet(body, "Follow upcoming updates", "/account/settings")
+    require_snippet(body, "Invite me when the right beta opens", "/account/settings")
+    require_snippet(body, "When you need support, privacy, or preview-use guidance, use the first-party pages instead of guessing.", "/account/settings")
 
     status, body, _, _ = fetch(
         base_url,
@@ -674,11 +674,12 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"/account/advanced returned {status}, expected 200")
+    require_snippet(body, "Advanced account details", "/account/advanced")
     require_snippet(body, "Hub account id", "/account/advanced")
     require_snippet(body, "Primary auth", "/account/advanced")
     require_snippet(body, "Linked identities", "/account/advanced")
     require_snippet(body, "Linked channels", "/account/advanced")
-    require_snippet(body, "Recovery status", "/account/advanced")
+    require_snippet(body, "Recovery posture", "/account/advanced")
     require_snippet(body, "Follow horizons", "/account/advanced")
 
     status, body, _, _ = fetch(
@@ -1206,7 +1207,7 @@ def verify_signed_in_work_audit(
     signed_in_minimal_expectations = {
         "/downloads": ("Install Chummer", "Stable", "Nightly"),
         "/now": ("Current build", "Known issues and install help"),
-        "/help": ("Get help without guessing", "Open support intake"),
+        "/help": ("What is wrong?", "Open support intake"),
     }
     for signed_in_path, expected_snippets in signed_in_minimal_expectations.items():
         status, body, _, _ = fetch(
@@ -11994,7 +11995,7 @@ def main() -> int:
             "/downloads",
             "Downloads",
             required_texts=(
-                "Recommended from your browser",
+                "Main build for this browser",
                 "Nightly",
                 "Stable",
                 "Linux",
@@ -12005,9 +12006,9 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/status",
-            "Current release",
+            "Status",
             required_texts=(
-                "Updated.",
+                "Updated",
                 "Downloads",
                 "Help"),
             forbidden_texts=("run-20260518-220935", "not gold-ready", "stale proof"),
@@ -12038,7 +12039,7 @@ def main() -> int:
             expects_header_count=0),
         AuditRoute(
             "/help",
-            "Get help without guessing",
+            "What is wrong?",
             required_texts=("Open downloads", "Open support", "Claim your copy"),
             expects_header_count=1),
         AuditRoute(
@@ -12048,7 +12049,7 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/contact",
-            "Contact Chummer",
+            "Contact",
             required_texts=("Send support request", "Open private form", "Open downloads"),
             expects_header_count=1),
         AuditRoute(
@@ -12163,7 +12164,7 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Current release", "Updated.", "Downloads", "Help"):
+    for snippet in ("Status", "Updated", "Downloads", "Help"):
         require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 

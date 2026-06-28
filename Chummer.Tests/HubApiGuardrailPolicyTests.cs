@@ -90,6 +90,26 @@ public sealed class HubApiGuardrailPolicyTests
         Assert.Equal(TimeSpan.FromMinutes(3), timeout);
     }
 
+    [Theory]
+    [InlineData("/blazor/workbench?fixture=blue")]
+    [InlineData("/app?command=character_roster")]
+    [InlineData("/avalonia")]
+    public void BrowserSurfaceProxyRoutesUseExtendedTimeoutBudget(string path)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = path.Split('?', 2)[0];
+        HubApiGuardrailOptions options = new()
+        {
+            DefaultRequestTimeout = TimeSpan.FromSeconds(30),
+            ExtendedRequestTimeout = TimeSpan.FromMinutes(3)
+        };
+
+        TimeSpan timeout = HubApiGuardrailPolicy.ResolveTimeout(context.Request, options);
+
+        Assert.Equal(TimeSpan.FromMinutes(3), timeout);
+    }
+
     [Fact]
     public void RuntimeGuardrailsRaiseMultipartAndRequestCapsForReleaseBundles()
     {

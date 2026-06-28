@@ -8,6 +8,7 @@ namespace Chummer.Run.Api.Services;
 public static class HubBrowserAuthConstants
 {
     public const string AccessTokenCookieName = "chummer_hub_access_token";
+    public const string SubjectHintCookieName = "chummer_hub_subject_hint";
 }
 
 public class HubBrowserAuthUnavailableException : InvalidOperationException
@@ -40,12 +41,18 @@ public sealed class HubBrowserAuthService
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<HubBrowserAuthService> _logger;
+    private readonly HubIdentityHintCookieService? _identityHintCookie;
 
-    public HubBrowserAuthService(HttpClient httpClient, IConfiguration configuration, ILogger<HubBrowserAuthService>? logger = null)
+    public HubBrowserAuthService(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        ILogger<HubBrowserAuthService>? logger = null,
+        HubIdentityHintCookieService? identityHintCookie = null)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _logger = logger ?? NullLogger<HubBrowserAuthService>.Instance;
+        _identityHintCookie = identityHintCookie;
     }
 
     private string BaseUrl =>
@@ -140,6 +147,7 @@ public sealed class HubBrowserAuthService
                 IsEssential = true,
                 Path = "/"
             });
+        _identityHintCookie?.WriteCookie(request, response, session);
     }
 
     public void ClearCookie(HttpRequest request, HttpResponse response)
@@ -155,6 +163,7 @@ public sealed class HubBrowserAuthService
                 Secure = secure,
                 IsEssential = true
             });
+        _identityHintCookie?.ClearCookie(request, response);
     }
 
     public static string SanitizeNextPath(string? nextPath, string fallback = "/home")
@@ -189,15 +198,10 @@ public sealed class HubBrowserAuthService
             return false;
         }
 
-        if (IPAddress.IsLoopback(remote))
-        {
-            return true;
-        }
-
-        return local is not null && remote.Equals(local);
+        return IPAddress.IsLoopback(remote);
     }
 
-    private static bool ShouldUseSecureCookies(HttpRequest request)
+    internal static bool ShouldUseSecureCookies(HttpRequest request)
     {
         if (request.IsHttps)
         {

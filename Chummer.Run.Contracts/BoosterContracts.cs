@@ -83,15 +83,15 @@ public sealed record RedeemBoostCodeRequest(
     [Required(AllowEmptyStrings = false), StringLength(128)] string Code);
 
 public sealed record CreateSponsorSessionRequest(
-    string? SubjectId,
+    [StringLength(128)] string? SubjectId,
     [Required(AllowEmptyStrings = false), StringLength(128)] string ProjectId,
-    string? GroupId = null,
-    string? SubjectLabel = null,
-    string? ParticipantCodexCode = null,
-    string? BoostCode = null,
-    string? CampaignId = null,
-    string Visibility = "group",
-    string RequestedLaneType = "participant_burst",
-    string RequestedLaneRole = "coding",
-    string? AuthorizationTier = null,
-    string? TierSource = null);
+    [StringLength(128)] string? GroupId = null,
+    [StringLength(160)] string? SubjectLabel = null,
+    [StringLength(64)] string? ParticipantCodexCode = null,
+    [StringLength(128)] string? BoostCode = null,
+    [StringLength(128)] string? CampaignId = null,
+    [StringLength(32)] string Visibility = "group",
+    [StringLength(64)] string RequestedLaneType = "participant_burst",
+    [StringLength(64)] string RequestedLaneRole = "coding",
+    [StringLength(64)] string? AuthorizationTier = null,
+    [StringLength(64)] string? TierSource = null);

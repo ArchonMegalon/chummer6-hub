@@ -359,10 +359,12 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     const participateResponse = await page.context().request.get(`${baseUrl}/participate`, { failOnStatusCode: false });
     assert.equal(participateResponse.status(), 200, '/participate should return 200.');
     const participateHtml = await participateResponse.text();
-    assert.equal(participateHtml.includes('data-chummer-board-skin'), true, '/participate should include the first-party hosted board skin.');
+    const participateHasEmbeddedBoard = participateHtml.includes('data-chummer-participate-frame') && participateHtml.includes('data-frame-src=');
+    const participateHasOfflineFallback = participateHtml.includes('Board offline right now');
+    assert.equal(participateHasEmbeddedBoard || participateHasOfflineFallback, true, '/participate should render either the embedded board wrapper or the first-party offline fallback.');
     assert.equal(participateHtml.includes('Requests, votes, and shipped work.'), false, '/participate should not show wrapper marketing copy.');
-    assert.equal(participateHtml.includes('participate-actions'), false, '/participate should not show duplicate wrapper actions.');
-    assert.equal(participateHtml.includes('id="participate-board"'), false, '/participate should not expose the hosted board wrapper id.');
+    assert.equal(participateHtml.includes('participate-quick-form'), false, '/participate should not show the old quick form.');
+    assert.equal(participateHtml.includes('id="participate-board"'), false, '/participate should not expose the legacy hosted board wrapper id.');
     assert.equal(participateHtml.toLowerCase().includes('productlift.dev'), false, '/participate should not leak the ProductLift host.');
   }
 
@@ -420,9 +422,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/help', async () => {
-    await expectVisible(page, 'text=Get help without guessing');
+    await expectVisible(page, 'text=What is wrong?');
     await expectBodyText(page, 'Start here', '/help');
-    await expectBodyText(page, 'Pick the closest path.', '/help');
+    await expectBodyText(page, 'Pick the next step.', '/help');
     await expectBodyText(page, 'Install or update', '/help');
     const helpDownloadsNext = resolveInstallNextFromHref(
       await readFirstHref(page, 'a:has-text("Open downloads")', '/help downloads link'),
@@ -460,7 +462,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Downloads');
     await expectVisible(page, 'text=Nightly');
     await expectVisible(page, 'text=Stable');
-    await expectVisible(page, 'text=Recommended from your browser.');
+    await expectVisible(page, 'text=Main build for this browser.');
     await expectVisible(page, 'text=Other downloads');
     await page.locator('summary:has-text("Other downloads")').click();
     await expectVisible(page, 'text=Build from source');
@@ -468,8 +470,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
-    await expectVisible(page, 'text=Contact Chummer');
-    await expectVisible(page, 'text=Ask in Discord first. Use the form for private details.');
+    await expectVisible(page, 'text=Contact');
+    await expectVisible(page, 'text=Discord for normal questions. Private form when needed.');
+    await expectVisible(page, 'text=Discord for normal questions. Private form for account or crash details.');
     await expectVisible(page, 'text=Open private form');
     await page.locator('summary:has-text("Private message")').click();
     await expectVisible(page, 'text=Send support request');
@@ -479,7 +482,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     pageErrors,
     '/contact?kind=install_help&title=Mobile%20follow-through%20needs%20grounded%20runtime&summary=Scene%20resume%20needs%20support%20review&detail=Session%3A%20session-redmond&sessionId=session-redmond&sceneId=scene-redmond&runtime=sr6.preview.v1&bundle=bundle-redmond',
     async () => {
-      await expectVisible(page, 'text=Contact Chummer');
+      await expectVisible(page, 'text=Contact');
       await page.locator('summary:has-text("Private message")').click();
       assert.equal(await page.locator('#supportKind').inputValue(), 'install_help', 'Prefilled contact route should preserve the support kind.');
       assert.equal(await page.locator('#supportTitle').inputValue(), 'Mobile follow-through needs grounded runtime', 'Prefilled contact route should preserve the support title.');
@@ -489,7 +492,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
       await expectVisible(page, 'text=Context opened with session session-redmond · scene scene-redmond · app sr6.preview.v1 · bundle bundle-redmond.');
     });
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
-    await expectVisible(page, 'text=Contact Chummer');
+    await expectVisible(page, 'text=Contact');
   });
   await page.locator('summary:has-text("Private message")').click();
   await page.selectOption('#supportKind', 'bug_report');
@@ -511,7 +514,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoPageErrors(page, pageErrors, 'Public support confirmation');
 
   await gotoAndAssert(page, pageErrors, '/now', async () => {
-    await expectVisible(page, 'text=What works today');
+    await expectVisible(page, 'text=Current release');
     await expectVisible(page, 'text=Start from downloads.');
     await expectVisible(page, 'text=Known issues and install help');
     await expectVisible(page, 'text=Three things to know first');
@@ -770,7 +773,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Downloads');
     await expectVisible(page, 'text=Stable');
     await expectVisible(page, 'text=Nightly');
-    await expectVisible(page, 'text=Recommended from your browser.');
+    await expectVisible(page, 'text=Main build for this browser.');
     await assertNoBannedCopy(page, 'Signed-in /downloads');
   });
 
@@ -781,7 +784,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/help', async () => {
-    await expectVisible(page, 'text=Get help without guessing');
+    await expectVisible(page, 'text=What is wrong?');
     await expectVisible(page, 'text=Open support intake');
     await assertNoBannedCopy(page, 'Signed-in /help');
   });

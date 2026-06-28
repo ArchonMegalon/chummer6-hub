@@ -9,7 +9,10 @@
 <section class="auth-entry auth-entry--lean" aria-labelledby="auth-message-title">
     <div class="auth-panel auth-panel--entry auth-panel--message">
         <div class="auth-panel__intro auth-panel__intro--masthead">
-            <p class="auth-panel__eyebrow">@(Model.StateLabel ?? "Chummer account")</p>
+            @if (!string.IsNullOrWhiteSpace(Model.StateLabel))
+            {
+                <p class="auth-panel__eyebrow">@Model.StateLabel</p>
+            }
             <h1 id="auth-message-title">@Model.Heading</h1>
             <p class="auth-panel__hint">@Model.SupportLine</p>
         </div>

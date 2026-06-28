@@ -19,6 +19,7 @@ public sealed class HorizonArtifactAccessTokenService
     private static readonly Regex[] ProtectedMediaPathPatterns =
     [
         new(@"^/media/ledger/newsreels/turn-\d+-newsreel(?:-poster)?\.(mp4|webm|vtt|png)$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new(@"^/media/ledger/tours/[a-z0-9-]+(?:-poster)?\.(mp4|webm|vtt|png)$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new(@"^/media/ledger/factions/[a-z0-9-]+-promo-mobile\.mp4$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new(@"^/media/ledger/factions/[a-z0-9-]+-promo\.webm$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new(@"^/media/ledger/factions/[a-z0-9-]+-promo-poster\.png$", RegexOptions.IgnoreCase | RegexOptions.Compiled)

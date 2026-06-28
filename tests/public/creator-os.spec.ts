@@ -22,9 +22,9 @@ test('creator os public route stays available and points at the signed-in public
 
   await page.goto(`${baseUrl}/creator`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Creator OS', exact: true })).toBeVisible();
-  await expect(page.locator('body')).toContainText('Creator OS now ships a real first-party publication network');
+  await expect(page.locator('body')).toContainText('Creator OS keeps publication discovery readable in public');
   await expect(page.locator('body')).toContainText('Sign in for Creator OS');
-  await expect(page.locator('body')).toContainText('External creator tools may assist rendering or promotion, but Chummer owns publication truth');
+  await expect(page.locator('body')).toContainText('External creator tools may assist rendering or promotion, but Chummer owns publication status');
 
   writeJsonArtifact('CREATOR_OS_ROUTE_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),

@@ -23,15 +23,15 @@
   min-height: 100svh;
   display: grid;
   place-items: center;
-  padding: 0.55rem;
+  padding: 0.4rem;
 }
 
 .route-login.surface-auth.surface-minimal .auth-entry,
 .route-signup.surface-auth.surface-minimal .auth-entry,
 .surface-auth.surface-minimal.surface-auth-message .auth-entry {
-  width: min(326px, calc(100vw - 32px));
+  width: min(316px, calc(100vw - 24px));
   border: 1px solid rgba(243, 234, 219, 0.12);
-  border-radius: 8px;
+  border-radius: 7px;
   background: #1b1b19;
   background-image: none;
   box-shadow: none;
@@ -41,8 +41,8 @@
 .route-signup.surface-auth.surface-minimal .auth-panel--entry,
 .surface-auth.surface-minimal.surface-auth-message .auth-panel--entry {
   display: grid;
-  gap: 0.62rem;
-  padding: 15px;
+  gap: 0.58rem;
+  padding: 14px;
 }
 
 .route-login.surface-auth.surface-minimal .auth-panel__intro,
@@ -54,16 +54,30 @@
 .route-login.surface-auth.surface-minimal .auth-panel__intro h1,
 .route-signup.surface-auth.surface-minimal .auth-panel__intro h1,
 .surface-auth.surface-minimal.surface-auth-message .auth-panel__intro h1 {
-  font-size: 1.45rem;
-  line-height: 1.12;
+  font-size: 1.38rem;
+  line-height: 1.08;
 }
 
 .route-login.surface-auth.surface-minimal .auth-panel__intro p,
 .route-signup.surface-auth.surface-minimal .auth-panel__intro p,
 .surface-auth.surface-minimal.surface-auth-message .auth-panel__intro p {
-  max-width: 28ch;
-  font-size: 0.76rem;
+  max-width: 26ch;
+  font-size: 0.74rem;
   line-height: 1.34;
+}
+
+.route-login.surface-auth.surface-minimal .auth-panel__eyebrow,
+.route-signup.surface-auth.surface-minimal .auth-panel__eyebrow {
+  margin: 0;
+  color: rgba(243, 234, 219, 0.58);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.route-login.surface-auth.surface-minimal .auth-panel__meta,
+.route-signup.surface-auth.surface-minimal .auth-panel__meta {
+  margin-top: 0.04rem;
+  color: rgba(243, 234, 219, 0.62);
 }
 
 .route-login.surface-auth.surface-minimal .auth-form,
@@ -84,15 +98,15 @@
 
 .route-login.surface-auth.surface-minimal .field input,
 .route-signup.surface-auth.surface-minimal .field input {
-  min-height: 40px;
-  padding: 0.48rem 0.62rem;
+  min-height: 38px;
+  padding: 0.44rem 0.58rem;
   border-radius: 6px;
 }
 
 .route-login.surface-auth.surface-minimal .button-like,
 .route-signup.surface-auth.surface-minimal .button-like,
 .surface-auth.surface-minimal.surface-auth-message .button-like {
-  min-height: 40px;
+  min-height: 38px;
   border-radius: 6px;
   font-size: 0.82rem;
 }
@@ -141,7 +155,6 @@
   margin: 0;
   color: rgba(243, 234, 219, 0.62);
   font-size: 0.72rem;
-  text-transform: uppercase;
 }
 
 .surface-auth.surface-minimal.surface-auth-message .auth-panel__notice,
@@ -163,7 +176,6 @@
   gap: 0.6rem;
   color: rgba(243, 234, 219, 0.62);
   font-size: 0.72rem;
-  text-transform: uppercase;
 }
 
 .route-login.surface-auth.surface-minimal .auth-divider::before,
@@ -176,11 +188,11 @@
 @media (max-width: 420px) {
   .route-login.surface-auth.surface-minimal .site-main,
   .route-signup.surface-auth.surface-minimal .site-main {
-    padding: 0.55rem;
+    padding: 0.4rem;
   }
 
   .route-login.surface-auth.surface-minimal .auth-panel--entry,
   .route-signup.surface-auth.surface-minimal .auth-panel--entry {
-    padding: 0.72rem;
+    padding: 0.68rem;
   }
 }

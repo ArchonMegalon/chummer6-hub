@@ -21,6 +21,9 @@ public sealed class PublicReleaseManifestService
     private const string ForceAccountRequiredDownloadsKey = "CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS";
     private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows", "macos"];
     private static readonly string[] RequiredDesktopHeads = ["avalonia"];
+    private static readonly TimeSpan ManifestCacheFreshTtl = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ManifestCacheStaleTtl = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan RegistryRuntimeManifestFetchTimeout = TimeSpan.FromMilliseconds(800);
     private static readonly IReadOnlyDictionary<string, string[]> DefaultRequiredDesktopPlatformRids = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
     {
         ["linux"] = ["linux-x64"],
@@ -40,6 +43,8 @@ public sealed class PublicReleaseManifestService
     private readonly HttpClient? _httpClient;
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
     private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
+    private readonly object _manifestCacheLock = new();
+    private CachedManifestState _manifestCache = CachedManifestState.Empty;
 
     public PublicReleaseManifestService(IConfiguration configuration)
         : this(configuration, httpClient: null)
@@ -56,30 +61,44 @@ public sealed class PublicReleaseManifestService
 
     public PublicReleaseManifestDto LoadManifest()
     {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        PublicReleaseManifestDto? cachedManifest = TryGetCachedManifest(now, allowStale: false);
+        if (cachedManifest is not null)
+        {
+            return cachedManifest;
+        }
+
         var root = ResolveDownloadsRoot();
-        var registryManifestUrl = ResolveRegistryManifestUrl();
+        var registryManifestPath = ResolveRegistryManifestPath(root);
+        bool registryManifestExists = File.Exists(registryManifestPath);
+        bool preferLocalRegistryManifest = registryManifestExists && ShouldPreferLocalRegistryManifestInDevelopment();
+        var registryManifestUrl = preferLocalRegistryManifest ? null : ResolveRegistryManifestUrl();
         PublicReleaseManifestDto? runtimeManifest = null;
         if (!string.IsNullOrWhiteSpace(registryManifestUrl))
         {
             runtimeManifest = TryLoadRegistryReleaseManifestFromUrl(registryManifestUrl);
         }
 
-        var registryManifestPath = ResolveRegistryManifestPath(root);
-        if (File.Exists(registryManifestPath))
+        PublicReleaseManifestDto manifest;
+        if (registryManifestExists)
         {
             var canonicalManifest = LoadRegistryReleaseManifestPayload(FilterManifestPayload(File.ReadAllText(registryManifestPath)), "registry");
-            return ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(ChoosePreferredRegistryManifest(runtimeManifest, canonicalManifest)))));
+            manifest = ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(ChoosePreferredRegistryManifest(runtimeManifest, canonicalManifest)))));
+            WriteManifestCache(manifest, now);
+            return manifest;
         }
 
         if (runtimeManifest is not null)
         {
-            return ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(runtimeManifest))));
+            manifest = ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(runtimeManifest))));
+            WriteManifestCache(manifest, now);
+            return manifest;
         }
 
         var manifestPath = Path.Combine(root, "releases.json");
         if (!File.Exists(manifestPath))
         {
-            return ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(new PublicReleaseManifestDto(
+            manifest = ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(new PublicReleaseManifestDto(
                 Version: "unpublished",
                 Channel: "preview",
                 PublishedAt: DateTimeOffset.UtcNow,
@@ -89,9 +108,13 @@ public sealed class PublicReleaseManifestService
                 Message: "No published desktop builds are available yet.",
                 HasFallbackSource: false,
                 GeneratedAt: DateTimeOffset.UtcNow)))));
+            WriteManifestCache(manifest, now);
+            return manifest;
         }
 
-        return ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(LoadReleaseManifestPayload(FilterManifestPayload(File.ReadAllText(manifestPath)))))));
+        manifest = ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(LoadReleaseManifestPayload(FilterManifestPayload(File.ReadAllText(manifestPath)))))));
+        WriteManifestCache(manifest, now);
+        return manifest;
     }
 
     public bool RequiresCanonicalManifestRewrite()
@@ -607,13 +630,63 @@ public sealed class PublicReleaseManifestService
         try
         {
             using var client = _httpClient is null ? new HttpClient() : null;
-            string json = (_httpClient ?? client!).GetStringAsync(manifestUrl).GetAwaiter().GetResult();
+            using var timeoutCts = new CancellationTokenSource(RegistryRuntimeManifestFetchTimeout);
+            string json = (_httpClient ?? client!).GetStringAsync(manifestUrl, timeoutCts.Token).GetAwaiter().GetResult();
             return LoadRegistryReleaseManifestPayload(FilterManifestPayload(json), "registry_runtime");
         }
         catch
         {
             return null;
         }
+    }
+
+    private bool ShouldPreferLocalRegistryManifestInDevelopment()
+    {
+        string environmentName = (_configuration["ASPNETCORE_ENVIRONMENT"] ?? _configuration["DOTNET_ENVIRONMENT"] ?? string.Empty).Trim();
+        return string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(environmentName, "Local", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private PublicReleaseManifestDto? TryGetCachedManifest(DateTimeOffset now, bool allowStale)
+    {
+        lock (_manifestCacheLock)
+        {
+            if (_manifestCache.Manifest is null)
+            {
+                return null;
+            }
+
+            if (now <= _manifestCache.FreshUntilUtc)
+            {
+                return _manifestCache.Manifest;
+            }
+
+            return allowStale && now <= _manifestCache.StaleUntilUtc
+                ? _manifestCache.Manifest
+                : null;
+        }
+    }
+
+    private void WriteManifestCache(PublicReleaseManifestDto manifest, DateTimeOffset now)
+    {
+        lock (_manifestCacheLock)
+        {
+            _manifestCache = new CachedManifestState(
+                manifest,
+                now.Add(ManifestCacheFreshTtl),
+                now.Add(ManifestCacheStaleTtl));
+        }
+    }
+
+    private sealed record CachedManifestState(
+        PublicReleaseManifestDto? Manifest,
+        DateTimeOffset FreshUntilUtc,
+        DateTimeOffset StaleUntilUtc)
+    {
+        public static CachedManifestState Empty { get; } = new(
+            Manifest: null,
+            FreshUntilUtc: DateTimeOffset.MinValue,
+            StaleUntilUtc: DateTimeOffset.MinValue);
     }
 
     private static PublicReleaseManifestDto LoadRegistryReleaseManifestPayload(string json, string source)

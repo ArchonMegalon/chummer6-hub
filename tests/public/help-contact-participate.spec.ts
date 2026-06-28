@@ -31,7 +31,7 @@ test('help, contact, and participate keep public and private paths clear', async
   const helpResponse = await request.get(`${baseUrl}/help`);
   const contactResponse = await request.get(`${baseUrl}/contact`);
   const participateResponse = await request.get(`${baseUrl}/participate`);
-  const participateBoardResponse = await request.get(`${baseUrl}/participate/board`, { maxRedirects: 0 });
+  const participateBoardResponse = await request.get(`${baseUrl}/participate/board`);
 
   expect(helpResponse.status()).toBe(200);
   expect(contactResponse.status()).toBe(200);
@@ -46,32 +46,44 @@ test('help, contact, and participate keep public and private paths clear', async
 
   expect(helpRobots).toContain('index');
   expect(contactRobots).toContain('index');
-  expect(participateText).toContain('data-chummer-board-skin');
-  expect(participateText).toContain('Short requests, clear bugs, useful ideas.');
-  expect(participateText).not.toContain('Requests, votes, and shipped work.');
+  expect(participateText).toContain('What should Chummer do next?');
+  expect(participateText).toContain('Public requests, clear bugs, useful ideas.');
+  expect(participateText).toContain('Current requests');
+  expect(participateText).toContain('Board is live.');
+  expect(participateText).toContain('Sign in to Chummer');
+  expect(participateText).toContain('7 requests live');
+  expect(participateText).toContain('data-chummer-participate-frame');
   expect(participateText).not.toContain('ProductLift');
+  expect(new URL(participateBoardResponse.url()).pathname).toBe('/participate');
+  expect(participateBoardText).toContain('Current requests');
+  expect(participateBoardText).toContain('Board is live.');
   expect(participateBoardText).not.toContain('/auth/google/start?next=');
 
   const helpPage = await openPublicPage(browser, '/help');
-  await expect(helpPage.getByRole('heading', { name: 'Get help without guessing' })).toBeVisible();
-  await expect(helpPage.locator('body')).toContainText('Choose the right help path');
+  await expect(helpPage.getByRole('heading', { name: 'What is wrong?' })).toBeVisible();
+  await expect(helpPage.locator('body')).toContainText('Pick the next step');
   await expect(helpPage.getByRole('link', { name: 'Open downloads' })).toBeVisible();
   await expect(helpPage.getByRole('link', { name: 'Read the FAQ' })).toBeVisible();
   await helpPage.close();
 
   const contactPage = await openPublicPage(browser, '/contact');
-  await expect(contactPage.getByRole('heading', { name: 'Contact Chummer' })).toBeVisible();
-  await expect(contactPage.locator('body')).toContainText('Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.');
-  await expect(contactPage.locator('body')).toContainText('Public requests belong on Participate.');
+  await expect(contactPage.getByRole('heading', { name: 'Contact' })).toBeVisible();
+  await expect(contactPage.locator('body')).toContainText('Discord for normal questions. Private form when needed.');
+  await expect(contactPage.locator('body')).toContainText('Discord for normal questions. Private form for account or crash details.');
   await expect(contactPage.locator('body')).not.toContainText('Public ideas go to Participate. Private problems stay here.');
+  await expect(contactPage.locator('body')).not.toContainText('Public requests belong on Participate.');
   await expect(contactPage.getByRole('link', { name: 'Open Discord' })).toBeVisible();
   await expect(contactPage.getByRole('link', { name: 'Open private form' })).toBeVisible();
   await contactPage.close();
 
   const participatePage = await openPublicPage(browser, '/participate');
-  await expect(participatePage.locator('style[data-chummer-board-skin]')).toHaveCount(1);
-  await expect(participatePage.locator('#participate-board')).toHaveCount(0);
-  await expect(participatePage.locator('body')).not.toContainText('Requests, votes, and shipped work.');
+  await expect(participatePage.getByRole('heading', { name: 'What should Chummer do next?' })).toBeVisible();
+  await expect(participatePage.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
+  await expect(participatePage.locator('body')).toContainText('Current requests');
+  await expect(participatePage.locator('body')).toContainText('Board is live.');
+  await expect(participatePage.locator('body')).toContainText('7 requests live');
+  await expect(participatePage.getByRole('link', { name: 'Sign in to Chummer' })).toBeVisible();
+  await expect(participatePage.locator('[data-chummer-participate-frame]')).toHaveCount(1);
   await expect(participatePage.locator('body')).not.toContainText('ProductLift');
   await participatePage.close();
 
@@ -85,6 +97,6 @@ test('help, contact, and participate keep public and private paths clear', async
     help_robots: helpRobots,
     contact_robots: contactRobots,
     participate_robots: participateRobots,
-    participate_mode: 'whitelabel_productlift_proxy',
+    participate_mode: 'first_party_summary_shell',
   });
 });

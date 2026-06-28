@@ -90,6 +90,29 @@ public sealed class PublicSignalOperationsServiceTests
     }
 
     [Fact]
+    public void BuildPacketNormalizesProductLiftHostedTabsToTheProviderRoot()
+    {
+        using var fixture = new PublicSignalOperationsFixture(new Dictionary<string, string?>
+        {
+            ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = "https://chummer6.productlift.dev/feedback",
+            ["CHUMMER_PRODUCTLIFT_ROADMAP_URL"] = "https://chummer6.productlift.dev/roadmap",
+            ["CHUMMER_PRODUCTLIFT_CHANGELOG_URL"] = "https://chummer6.productlift.dev/changelog",
+            ["CHUMMER_PRODUCTLIFT_WEBHOOK_SECRET"] = "secret"
+        });
+        fixture.WriteSupportFiles();
+
+        var packet = fixture.CreateService().BuildPacket();
+
+        Assert.True(packet.HostedProjectionReady);
+        Assert.Equal("chummer6.productlift.dev", packet.HostedDomainLabel);
+        Assert.All(packet.HostedRoutes, route =>
+        {
+            Assert.Equal("Configured", route.StatusLabel);
+            Assert.Equal("https://chummer6.productlift.dev/", route.HostedHref);
+        });
+    }
+
+    [Fact]
     public void PublicFeedbackIngressRoutesCapWebhookBodies()
     {
         string[] methodNames =

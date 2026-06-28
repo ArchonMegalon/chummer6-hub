@@ -4915,7 +4915,8 @@ public sealed class PublicSignalOperationsService
                 Summary: $"{publicPath} remains the customer-facing default on this instance because no hosted public-board URL is configured for {label.ToLowerInvariant()}.");
         }
 
-        if (!Uri.TryCreate(configuredUrl, UriKind.Absolute, out Uri? uri) || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        Uri? uri = ProductLiftHostedUriResolver.TryResolve(configuredUrl.Trim());
+        if (uri is null)
         {
             return new PublicSignalHostedRouteViewModel(
                 Label: label,
@@ -4928,7 +4929,7 @@ public sealed class PublicSignalOperationsService
         return new PublicSignalHostedRouteViewModel(
             Label: label,
             PublicPath: publicPath,
-            HostedHref: configuredUrl.Trim(),
+            HostedHref: uri.ToString(),
             StatusLabel: "Configured",
             Summary: $"{label} can promote to {uri.Host} once the hosted public-board path is approved, while {publicPath} remains the bounded first-party fallback.");
     }

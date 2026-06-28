@@ -14,6 +14,8 @@ namespace Chummer.Run.AI.Controllers;
 [Route("api/v1/ai")]
 public sealed class AiGatewayController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly IAiGatewayService _gateway;
     private readonly IPromptRegistry _promptRegistry;
     private readonly IConversationStore _conversationStore;
@@ -55,6 +57,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("route")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<GatewayInvocation>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<GatewayInvocation>> Route([FromBody] ProviderRouteRequest? request, CancellationToken cancellationToken)
@@ -74,6 +77,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("route/preview")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<GatewayRoutePreview>(StatusCodes.Status200OK)]
     public ActionResult<GatewayRoutePreview> RoutePreview([FromBody] ProviderRouteRequest? request)
     {
@@ -93,6 +97,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("prompts")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PromptTemplate>(StatusCodes.Status201Created)]
     public ActionResult<PromptTemplate> UpsertPrompt([FromBody] PromptTemplate? template)
     {
@@ -106,6 +111,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("prompts/preview")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PromptRenderResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<PromptRenderResult> PreviewPrompt([FromBody] PromptRenderRequest? request)
@@ -127,6 +133,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("budget/check")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<BudgetCheckResult>(StatusCodes.Status200OK)]
     public ActionResult<BudgetCheckResult> CheckBudget([FromBody] BudgetCheckRequest? request)
     {
@@ -158,6 +165,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("skills/execute")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<GovernedSkillExecutionResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<GovernedSkillExecutionResult>> ExecuteSkill(
@@ -182,6 +190,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("conversations/{sessionId}/turns")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<ConversationAppendResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<ConversationAppendResult>> AddConversationTurn(
         [FromRoute] string sessionId,
@@ -215,6 +224,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("evaluations")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<EvaluationResult>(StatusCodes.Status200OK)]
     public ActionResult<EvaluationResult> RecordEvaluation([FromBody] EvaluationRequest? request)
     {
@@ -242,6 +252,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("evaluations/runs")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PromptEvaluationRunResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<PromptEvaluationRunResult> RunEvaluations([FromBody] PromptEvaluationRunRequest? request)
@@ -277,6 +288,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("lore")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<LoreSearchResult>(StatusCodes.Status200OK)]
     public ActionResult<LoreSearchResult> SearchLore([FromBody] LoreSearchRequest? request)
     {
@@ -289,6 +301,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("lore/lens")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<LoreLensResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<LoreLensResult> QueryLoreLens([FromBody] LoreLensQuery? request)
@@ -302,6 +315,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("lore/chunks")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     public ActionResult<IEnumerable<string>> IngestLore([FromBody] LoreIngestionRequest? request)
     {
@@ -315,6 +329,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("persona/{sessionId}/memory")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PersonaMemoryResult>(StatusCodes.Status200OK)]
     public ActionResult<PersonaMemoryResult> QueryPersonaMemory(
         [FromRoute] string sessionId,
@@ -334,6 +349,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("persona/{sessionId}/cards")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PersonaMemoryCard>(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<PersonaMemoryCard> UpsertPersonaCard(
@@ -358,6 +374,7 @@ public sealed class AiGatewayController : ControllerBase
     }
 
     [HttpPost("session-memory/draft")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<SessionMemoryDraftResult>(StatusCodes.Status200OK)]
     public ActionResult<SessionMemoryDraftResult> DraftFromSession([FromBody] SessionMemoryDraftRequest? request)
     {

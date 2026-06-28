@@ -1,7 +1,7 @@
 @using Chummer.Run.Api.Services
 @model AccountPageViewModel
 @{
-    ViewData["Title"] = "Account · Support";
+    ViewData["Title"] = "Support";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account surface-minimal";
 
@@ -25,13 +25,13 @@
 }
 <section class="minimal-page-hero">
     <div>
-        <p class="eyebrow">Account · Support</p>
-        <h1>Private support stays simple.</h1>
-        <p>Use Discord for normal questions. Use this page when you need private follow-up, files, or tracked case closure.</p>
+        <p class="eyebrow">Support</p>
+        <h1>Support</h1>
+        <p>Discord for normal questions. Private help for installs, crashes, and account issues.</p>
         <ul class="minimal-hero__points">
-            <li>Signed in as @Model.User.DisplayName</li>
             <li>@openSupportCases open case@(openSupportCases == 1 ? string.Empty : "s")</li>
             <li>@linkedInstallations.Count linked install@(linkedInstallations.Count == 1 ? string.Empty : "s")</li>
+            <li>Private cases stay attached to this account.</li>
         </ul>
     </div>
 </section>
@@ -40,25 +40,25 @@
     <div class="minimal-lane-grid minimal-platform-list">
         <article class="minimal-lane-card">
             <span class="tag">Discord</span>
-            <h2>Normal questions</h2>
-            <p>Quick questions, discussion, and ordinary feedback belong in the Chummer5 server.</p>
+            <h2>Discord first</h2>
+            <p>Use Discord for normal questions and quick feedback.</p>
             <div class="minimal-actions">
                 <a class="button-like button-like--primary" href="https://discord.gg/chummer" rel="noopener" target="_blank">Open Discord</a>
             </div>
         </article>
         <article class="minimal-lane-card">
             <span class="tag">Private</span>
-            <h2>Private case</h2>
-            <p>Use the private form for crashes, logs, install trouble, screenshots, or anything tied to your account.</p>
+            <h2>Private issue</h2>
+            <p>Use the private form for crashes, logs, install trouble, screenshots, or anything account-specific.</p>
             <div class="minimal-actions">
                 <a class="button-like button-like--primary" href="#support-intake">Open private form</a>
                 <a class="button-like button-like--ghost" href="/account/access">Installs</a>
             </div>
         </article>
         <article class="minimal-lane-card">
-            <span class="tag">Tracked</span>
-            <h2>@(leadSupportCase is null ? "No case is waiting" : leadSupportCase.Case.Title)</h2>
-            <p>@(leadSupportCase is null ? "When a private case exists, the next step stays attached to it here." : leadSupportCase.NextSafeAction)</p>
+            <span class="tag">Case</span>
+            <h2>@(leadSupportCase is null ? "No case yet" : leadSupportCase.Case.Title)</h2>
+            <p>@(leadSupportCase is null ? "When a private case exists, the next step stays here." : leadSupportCase.NextSafeAction)</p>
             <div class="minimal-actions">
                 @if (leadSupportCase is null)
                 {
@@ -77,14 +77,14 @@
 <section class="minimal-section minimal-section--tight" id="support-cases">
     <div class="minimal-section__lead">
         <h2>Recent cases</h2>
-        <p>@(supportCaseSummaries.Length == 0 ? "Nothing is tracked on this account yet." : "Open a tracked case to see the exact next step, fix state, and follow-up lane.")</p>
+        <p>@(supportCaseSummaries.Length == 0 ? "No private case yet." : "Open a case to continue.")</p>
     </div>
     @if (supportCaseSummaries.Length == 0)
     {
         <article class="minimal-lane-card">
             <span class="tag">Queue</span>
             <h3>No recent case</h3>
-            <p>Start with the private form only when Discord is not enough or the issue needs files, logs, or account-linked follow-up.</p>
+            <p>Start here when Discord is not enough or the issue needs files or private follow-up.</p>
         </article>
     }
     else
@@ -119,7 +119,7 @@
 <section class="minimal-section minimal-section--tight" id="support-intake">
     <div class="minimal-section__lead">
         <h2>Private form</h2>
-        <p>Keep it short. Add files only when they make the fix faster.</p>
+        <p>Keep it short. Add files only when they help.</p>
     </div>
     @if (composeRequested)
     {
@@ -231,52 +231,60 @@
 
 <section class="minimal-section minimal-section--tight">
     <details class="details-drawer">
-        <summary>Need routing help first?</summary>
-        <form id="supportAssistantForm" class="settings-form">
-            <div class="field">
-                <label for="supportAssistantQuery">Describe the problem</label>
-                <textarea id="supportAssistantQuery" rows="4" placeholder="What changed, what hurts, or what are you trying to do?"></textarea>
-            </div>
-            <div class="field">
-                <label for="supportAssistantInstallation">Related install</label>
-                <select id="supportAssistantInstallation">
-                    <option value="" selected="@(string.IsNullOrWhiteSpace(selectedSupportInstallationId) ? "selected" : null)">Any install or no install yet</option>
-                    @foreach (var installation in linkedInstallations)
-                    {
-                        <option value="@installation.InstallationId" selected="@(string.Equals(selectedSupportInstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
-                    }
-                </select>
-            </div>
-            <button class="button-like button-like--secondary" type="submit">Get suggestion</button>
-            <p id="supportAssistantStatusNotice" class="muted-copy" hidden></p>
-            <div id="supportAssistantAnswer" class="stacked-copy" hidden></div>
-            <div id="supportAssistantActions" class="stacked-actions" hidden></div>
-            <div id="supportAssistantCitations" class="settings-summary-list" hidden></div>
-        </form>
-    </details>
+        <summary>Quick help</summary>
+        <div class="minimal-lane-grid minimal-platform-list">
+            <article class="minimal-lane-card">
+                <span class="tag">Routing</span>
+                <h3>Find the next step</h3>
+                <p>Use this when you are not sure whether the issue belongs in installs, a private case, or somewhere else.</p>
+                <form id="supportAssistantForm" class="settings-form">
+                    <div class="field">
+                        <label for="supportAssistantQuery">Describe the problem</label>
+                        <textarea id="supportAssistantQuery" rows="4" placeholder="What changed, what hurts, or what are you trying to do?"></textarea>
+                    </div>
+                    <div class="field">
+                        <label for="supportAssistantInstallation">Related install</label>
+                        <select id="supportAssistantInstallation">
+                            <option value="" selected="@(string.IsNullOrWhiteSpace(selectedSupportInstallationId) ? "selected" : null)">Any install or no install yet</option>
+                            @foreach (var installation in linkedInstallations)
+                            {
+                                <option value="@installation.InstallationId" selected="@(string.Equals(selectedSupportInstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
+                            }
+                        </select>
+                    </div>
+                    <button class="button-like button-like--secondary" type="submit">Get route</button>
+                    <p id="supportAssistantStatusNotice" class="muted-copy" hidden></p>
+                    <div id="supportAssistantAnswer" class="stacked-copy" hidden></div>
+                    <div id="supportAssistantActions" class="stacked-actions" hidden></div>
+                    <div id="supportAssistantCitations" class="settings-summary-list" hidden></div>
+                </form>
+            </article>
 
-    <details class="details-drawer">
-        <summary>Rules help</summary>
-        <form id="ruleGhostForm" class="settings-form">
-            <div class="field">
-                <label for="ruleGhostQuery">Ask a Shadowrun rules question</label>
-                <textarea id="ruleGhostQuery" rows="4" placeholder="Example: In SR6, how should I think about Edge during a firefight?"></textarea>
-            </div>
-            <div class="field">
-                <label for="ruleGhostRuleset">Edition</label>
-                <select id="ruleGhostRuleset">
-                    <option value="" selected>Auto detect</option>
-                    <option value="sr5">SR5</option>
-                    <option value="sr6">SR6</option>
-                </select>
-            </div>
-            <button class="button-like button-like--secondary" type="submit">Explain rule</button>
-            <p class="muted-copy">Chummer summarizes owned material in plain language and avoids book wording.</p>
-            <p id="ruleGhostStatusNotice" class="muted-copy" hidden></p>
-            <div id="ruleGhostAnswer" class="stacked-copy" hidden></div>
-            <div id="ruleGhostFollowUps" class="stacked-actions" hidden></div>
-            <div id="ruleGhostCitations" class="settings-summary-list" hidden></div>
-        </form>
+            <article class="minimal-lane-card">
+                <span class="tag">Rules</span>
+                <h3>Rules help</h3>
+                <p>Ask one question. Chummer explains in plain language and avoids book wording.</p>
+                <form id="ruleGhostForm" class="settings-form">
+                    <div class="field">
+                        <label for="ruleGhostQuery">Ask a Shadowrun rules question</label>
+                        <textarea id="ruleGhostQuery" rows="4" placeholder="Example: In SR6, how should I think about Edge during a firefight?"></textarea>
+                    </div>
+                    <div class="field">
+                        <label for="ruleGhostRuleset">Edition</label>
+                        <select id="ruleGhostRuleset">
+                            <option value="" selected>Auto detect</option>
+                            <option value="sr5">SR5</option>
+                            <option value="sr6">SR6</option>
+                        </select>
+                    </div>
+                    <button class="button-like button-like--secondary" type="submit">Explain rule</button>
+                    <p id="ruleGhostStatusNotice" class="muted-copy" hidden></p>
+                    <div id="ruleGhostAnswer" class="stacked-copy" hidden></div>
+                    <div id="ruleGhostFollowUps" class="stacked-actions" hidden></div>
+                    <div id="ruleGhostCitations" class="settings-summary-list" hidden></div>
+                </form>
+            </article>
+        </div>
     </details>
 </section>
 
@@ -426,7 +434,7 @@
       const rateLimited = setRateLimitNotice(
         notice,
         error,
-        "Support intake is pacing requests to keep tracked queues clean.",
+        "Support intake is pacing requests to keep replies clear.",
         "Wait a moment, then submit one updated case instead of retrying rapidly.");
       if (!rateLimited) {
         ui.setNotice(notice, ui.describeError(error, "Support case could not be submitted right now."), true);

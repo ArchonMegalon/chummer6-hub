@@ -25,6 +25,7 @@ public sealed class BrilliantDirectoriesBillingTests
 
         Assert.Equal("Brilliant Directories", page.Provider);
         Assert.Equal("brilliant_directories", page.ProviderKey);
+        Assert.Equal("Membership", page.Heading);
         Assert.Contains("same app", page.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, page.MyFirstBookQuotaPolicy.FreeMonthlyBooks);
         Assert.Equal(2, page.MyFirstBookQuotaPolicy.SupporterMonthlyBooks);
@@ -59,17 +60,19 @@ public sealed class BrilliantDirectoriesBillingTests
 
         Assert.Contains("ViewData[\"Chrome\"] = Model.Chrome;", view, StringComparison.Ordinal);
         Assert.Contains("ViewData[\"SurfaceClass\"] = \"surface-billing surface-minimal\";", view, StringComparison.Ordinal);
-        Assert.Contains("Same app.", view, StringComparison.Ordinal);
-        Assert.Contains("Origin Books: 1/month on Free. 2/month on Supporter.", view, StringComparison.Ordinal);
+        Assert.Contains("<p class=\"eyebrow\">Supporter</p>", view, StringComparison.Ordinal);
+        Assert.Contains("1 book/month on Free. 2/month on Supporter.", view, StringComparison.Ordinal);
         Assert.Contains("Continue with email", view, StringComparison.Ordinal);
-        Assert.Contains("<h2>Only the book allowance changes</h2>", view, StringComparison.Ordinal);
-        Assert.Contains("Supporter checkout is unavailable right now.", view, StringComparison.Ordinal);
-        Assert.Contains("Chummer attaches supporter status after sign-in.", view, StringComparison.Ordinal);
+        Assert.Contains("<h2>Only the book limit changes</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("@Model.Summary", view, StringComparison.Ordinal);
+        Assert.Contains("Email first. Supporter status attaches after sign-in.", view, StringComparison.Ordinal);
         Assert.Contains("Checkout stays attached to this account.", view, StringComparison.Ordinal);
-        Assert.Contains("Support Chummer", view, StringComparison.Ordinal);
-        Assert.Contains("Default plan. Same app. 1 Origin Book each month.", view, StringComparison.Ordinal);
-        Assert.Contains("Same app. 2 Origin Books each month. Supporter helps pay for Chummer.", view, StringComparison.Ordinal);
-        Assert.Contains("Supporter only changes the monthly Origin Book limit.", view, StringComparison.Ordinal);
+        Assert.Contains("Supporter is already attached to this account.", view, StringComparison.Ordinal);
+        Assert.Contains("Become supporter", view, StringComparison.Ordinal);
+        Assert.Contains("1 Origin Book each month.", view, StringComparison.Ordinal);
+        Assert.Contains("2 Origin Books each month. Helps pay for Chummer.", view, StringComparison.Ordinal);
+        Assert.Contains("No extra app features today.", view, StringComparison.Ordinal);
+        Assert.Contains("Manage supporter", view, StringComparison.Ordinal);
         Assert.Contains("minimal-page-hero", view, StringComparison.Ordinal);
         Assert.Contains("minimal-lane-grid minimal-platform-list", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Layout = null;", view, StringComparison.Ordinal);
@@ -106,8 +109,8 @@ public sealed class BrilliantDirectoriesBillingTests
         string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Billing", "Membership.cshtml"));
 
         Assert.Equal(string.Empty, page.ManageMembershipHref);
-        Assert.Contains("hasManageMembershipHref", view, StringComparison.Ordinal);
-        Assert.Contains("@if (hasManageMembershipHref)", view, StringComparison.Ordinal);
+        Assert.Contains("showManageSupporterAction", view, StringComparison.Ordinal);
+        Assert.Contains("@if (showManageSupporterAction)", view, StringComparison.Ordinal);
         Assert.DoesNotContain("ManageMembershipHref: options.MemberPortalUrl ?? \"/account\"", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Community", "BrilliantDirectoriesBillingService.cs")), StringComparison.Ordinal);
     }
 
@@ -132,15 +135,28 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public void BillingControllerKeepsGuestCheckoutEmailFirst()
+    public void BillingControllerOnlyOwnsBillingRoutes()
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "BrilliantDirectoriesBillingController.cs"));
 
-        Assert.Contains("[HttpGet(\"/account/settings\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("[HttpGet(\"/account/advanced\")]", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("[HttpGet(\"/account/settings\")]", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("[HttpGet(\"/account/advanced\")]", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("AccountSettingsAlias()", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Redirect(\"/account/access\")", controller, StringComparison.Ordinal);
         Assert.Contains("Redirect($\"/login?next={Uri.EscapeDataString(\"/account/billing\")}\")", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("/auth/google/start?next={Uri.EscapeDataString(\"/account/billing\")}", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Response.StatusCode = StatusCodes.Status503ServiceUnavailable", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UnavailableBillingPageDoesNotRepeatTheSameMembershipBlockTwice()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Billing", "Membership.cshtml"));
+
+        Assert.DoesNotContain("href=\"/downloads\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<p class=\"eyebrow\">Unavailable</p>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<h2>Free stays the same</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("if (!Model.Unavailable)", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -293,7 +309,7 @@ public sealed class BrilliantDirectoriesBillingTests
             "sync-secret");
         service.ConsumeMyFirstBookQuota(user.UserId, new DateTimeOffset(2026, 6, 24, 12, 0, 0, TimeSpan.Zero));
 
-        IActionResult result = await controller.BillingPage("ignored-user", "ignored@example.com");
+        IActionResult result = await controller.BillingPage("ignored-user", "ignored@example.com", preview: true);
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
@@ -658,7 +674,7 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public async Task BillingPageWithoutAttachedUserRendersPublicMembershipChoice()
+    public async Task BillingPageWithoutAttachedUserRedirectsToEmailWhenConfigured()
     {
         BrilliantDirectoriesBillingService service = CreateService();
         BrilliantDirectoriesBillingController controller = new(service)
@@ -671,13 +687,30 @@ public sealed class BrilliantDirectoriesBillingTests
 
         IActionResult result = await controller.BillingPage();
 
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login?next=%2Faccount%2Fbilling", redirect.Url);
+    }
+
+    [Fact]
+    public async Task BillingPagePreviewWithoutAttachedUserStillShowsMinimalMembershipViewWhenConfigured()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        IActionResult result = await controller.BillingPage(preview: true);
+
         ViewResult view = Assert.IsType<ViewResult>(result);
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
         Assert.False(model.Chrome.Authenticated);
-        Assert.Equal("/account/billing", model.Chrome.CurrentPath);
         Assert.False(model.UsingSignedInAccount);
-        Assert.Null(model.CurrentOriginAuthoringAllowance);
-        Assert.Equal("Supporter", model.SupporterPlan?.Name);
+        Assert.False(model.Unavailable);
+        Assert.Equal("Membership", model.Heading);
     }
 
     [Fact]
@@ -699,12 +732,48 @@ public sealed class BrilliantDirectoriesBillingTests
             }
         };
 
-        IActionResult result = await controller.BillingPage("user-a", "runner@example.com");
+        IActionResult result = await controller.BillingPage("user-a", "runner@example.com", preview: true);
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
         Assert.False(model.Chrome.Authenticated);
         Assert.True(model.Unavailable);
+    }
+
+    [Fact]
+    public async Task SignedInBillingPageRedirectsToSupporterCheckoutWhenConfigured()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        (BrilliantDirectoriesBillingController controller, _) = CreateAuthenticatedController(service, email: "runner@example.com");
+
+        IActionResult result = await controller.BillingPage();
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Contains("https://billing.example.test/supporter", redirect.Url, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("membership_plan=supporter", redirect.Url, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SignedInSupporterBillingPageRedirectsToProviderPortalWhenConfigured()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        (BrilliantDirectoriesBillingController controller, HubUserDto user) = CreateAuthenticatedController(service, email: "runner@example.com");
+        service.SyncMember(
+            new BrilliantDirectoriesMemberSyncRequest(
+                UserId: user.UserId,
+                MemberId: "bd-42",
+                Email: "runner@example.com",
+                PlanKey: "supporter",
+                PlanName: "Supporter",
+                MembershipStatus: "active",
+                SupporterActive: true,
+                ObservedAtUtc: new DateTimeOffset(2026, 6, 24, 10, 0, 0, TimeSpan.Zero)),
+            "sync-secret");
+
+        IActionResult result = await controller.BillingPage();
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("https://billing.example.test/portal", redirect.Url);
     }
 
     [Fact]
@@ -728,8 +797,49 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.True(model.Chrome.Authenticated);
         Assert.True(model.Unavailable);
         Assert.Equal("Membership", model.Heading);
-        Assert.Contains("supporter checkout is unavailable right now", model.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("supporter is not open right now", model.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Unexpected server error", model.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SignedInBillingPageFallsBackToConfiguredSupporterUrlWhenProviderProjectionIsUnavailable()
+    {
+        string? originalSupporterUrl = Environment.GetEnvironmentVariable("BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL");
+        string? originalUserParameter = Environment.GetEnvironmentVariable("BRILLIANT_DIRECTORIES_CHECKOUT_USER_ID_PARAMETER");
+        string? originalEmailParameter = Environment.GetEnvironmentVariable("BRILLIANT_DIRECTORIES_CHECKOUT_EMAIL_PARAMETER");
+        string? originalPlanParameter = Environment.GetEnvironmentVariable("BRILLIANT_DIRECTORIES_CHECKOUT_PLAN_PARAMETER");
+        try
+        {
+            Environment.SetEnvironmentVariable("BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL", "https://billing.example.test/supporter?source=direct");
+            Environment.SetEnvironmentVariable("BRILLIANT_DIRECTORIES_CHECKOUT_USER_ID_PARAMETER", "external_user");
+            Environment.SetEnvironmentVariable("BRILLIANT_DIRECTORIES_CHECKOUT_EMAIL_PARAMETER", "contact");
+            Environment.SetEnvironmentVariable("BRILLIANT_DIRECTORIES_CHECKOUT_PLAN_PARAMETER", "membership_plan");
+
+            string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
+                })
+                .Build();
+            BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
+            (BrilliantDirectoriesBillingController controller, HubUserDto user) = CreateAuthenticatedController(service, email: "runner@example.com");
+
+            IActionResult result = await controller.BillingPage();
+
+            RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+            Assert.Contains("https://billing.example.test/supporter?source=direct", redirect.Url, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains($"external_user={Uri.EscapeDataString(user.UserId)}", redirect.Url, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("contact=runner%40example.com", redirect.Url, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("membership_plan=supporter", redirect.Url, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL", originalSupporterUrl);
+            Environment.SetEnvironmentVariable("BRILLIANT_DIRECTORIES_CHECKOUT_USER_ID_PARAMETER", originalUserParameter);
+            Environment.SetEnvironmentVariable("BRILLIANT_DIRECTORIES_CHECKOUT_EMAIL_PARAMETER", originalEmailParameter);
+            Environment.SetEnvironmentVariable("BRILLIANT_DIRECTORIES_CHECKOUT_PLAN_PARAMETER", originalPlanParameter);
+        }
     }
 
     [Fact]
@@ -789,7 +899,7 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public async Task DirectSupporterCheckoutWithoutAttachedUserReturnsToBillingChoice()
+    public async Task DirectSupporterCheckoutWithoutAttachedUserReturnsToEmailSignIn()
     {
         BrilliantDirectoriesBillingService service = CreateService();
         BrilliantDirectoriesBillingController controller = new(service)
@@ -803,7 +913,7 @@ public sealed class BrilliantDirectoriesBillingTests
         IActionResult result = await controller.StartSupporterCheckoutDirect();
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/account/billing", redirect.Url);
+        Assert.Equal("/login?next=%2Faccount%2Fbilling", redirect.Url);
     }
 
     [Fact]

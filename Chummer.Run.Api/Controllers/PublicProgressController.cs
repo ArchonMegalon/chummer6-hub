@@ -47,7 +47,7 @@ public sealed class PublicProgressController : ControllerBase
     {
         var chrome = await BuildChromeAsync(
             title: "Progress",
-            description: "Program telemetry and milestone status for Chummer. Customer-facing current state lives on What works today.",
+            description: "Program telemetry and milestone status for Chummer. Customer-facing current state lives on Current release.",
             currentPath: "/progress",
             cancellationToken);
         var antiForgeryToken = chrome.Authenticated
@@ -108,7 +108,7 @@ public sealed class PublicProgressController : ControllerBase
                 : $"""<a class="progress-shell-action progress-shell-action-{Encode(action.Tone)}" href="{EncodeHref(action.Href)}">{Encode(action.Label)}</a>""";
         }));
         var signedInLabel = chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel)
-            ? $"""<p class="progress-shell-signed-in">Signed in as {Encode(chrome.SignedInLabel!)}</p>"""
+            ? $"""<p class="progress-shell-signed-in">{Encode(chrome.SignedInLabel!)}</p>"""
             : string.Empty;
         var topbar = $$"""
 <header class="progress-topbar" aria-label="Chummer public navigation">
@@ -124,10 +124,10 @@ public sealed class PublicProgressController : ControllerBase
 <section class="progress-telemetry-banner" aria-label="Progress page context">
   <div>
     <p class="progress-telemetry-banner__eyebrow">Program telemetry</p>
-    <h1>Current customer state lives on <a href="/now">What works today</a>.</h1>
+    <h1>Current customer state lives on <a href="/now">Current release</a>.</h1>
     <p>This page is the weighted program report for people who want the deeper delivery read, not the main customer-facing status surface.</p>
   </div>
-  <a class="progress-telemetry-banner__action" href="/now">Open What works today</a>
+  <a class="progress-telemetry-banner__action" href="/now">Open current release</a>
 </section>
 """;
         var shellCss = """
@@ -335,9 +335,10 @@ public sealed class PublicProgressController : ControllerBase
         catch (HubRequestAuthException ex)
         {
             _logger.LogWarning(ex, "Preserving signed-in progress chrome after identity failure.");
-            if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+            SiteChromeViewModel? fallbackChrome = TryBuildRetainedSignedInChrome(title, description, currentPath);
+            if (fallbackChrome is not null)
             {
-                return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+                return fallbackChrome;
             }
 
             return _chrome.BuildPublicChrome(title, description, currentPath);
@@ -348,13 +349,30 @@ public sealed class PublicProgressController : ControllerBase
             || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
         {
             _logger.LogWarning(ex, "Falling back while building progress chrome.");
-            if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+            SiteChromeViewModel? fallbackChrome = TryBuildRetainedSignedInChrome(title, description, currentPath);
+            if (fallbackChrome is not null)
             {
-                return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+                return fallbackChrome;
             }
 
             return _chrome.BuildPublicChrome(title, description, currentPath);
         }
+    }
+
+    private SiteChromeViewModel? TryBuildRetainedSignedInChrome(string title, string description, string currentPath)
+    {
+        if (_identity.TryGetFallbackSubject(Request, out AuthenticatedHubSubject? subject) && subject is not null)
+        {
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName, user.Email);
+        }
+
+        if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+        {
+            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+        }
+
+        return null;
     }
 
     private static string Encode(string value) => WebUtility.HtmlEncode(value);

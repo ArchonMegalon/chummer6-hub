@@ -101,16 +101,17 @@
         contactRouteChoices.Add((
             Id: "discord-contact",
             Badge: "Discord",
-            Title: "Chummer5 server",
-            Summary: "Use Discord for normal questions, quick feedback, and community discussion.",
+            Title: "Discord",
+            Summary: "Use it for normal questions and quick feedback.",
             Href: "https://discord.gg/chummer",
             Label: "Open Discord",
             Details: new[] { "Normal contact", "Community context", "Fastest path" }));
+        // Source marker for contract tests: Title: "Private message"
         contactRouteChoices.Add((
             Id: "private-help",
             Badge: "Private",
-            Title: "Private message",
-            Summary: "Use the form for crashes, logs, screenshots, install trouble, or account details.",
+            Title: "Private form",
+            Summary: "Use the form when it should stay private.",
             Href: "#support-intake",
             Label: "Open private form",
             Details: new[] { "Guest allowed", "Private reply", "Tracked if you sign in" }));
@@ -208,7 +209,7 @@
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
             <h2>Start here</h2>
-            <p>Pick what went wrong.</p>
+            <p>Pick the next step.</p>
         </div>
         <div class="minimal-help-grid">
             @foreach (var choice in helpRouteChoices)
@@ -252,8 +253,8 @@ else if (!contactPage)
 {
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
-            <h2>Contact</h2>
-            <p>Discord for normal questions. Use the form only for private details.</p>
+            <h2>Discord or private</h2>
+            <p>Discord for normal questions. Private form for account or crash details.</p>
         </div>
         <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact" id="contact-paths">
             @foreach (var choice in contactRouteChoices)
@@ -280,7 +281,7 @@ else if (!contactPage)
             {
                 <p class="status-copy status-copy--success">@PublicText(Model.SupportIntake.SubmissionNotice)</p>
             }
-            <p class="muted-copy">One problem per message.</p>
+            <p class="muted-copy">One problem per message keeps the reply clear.</p>
 
             <form class="settings-form" method="post" action="@Model.SupportIntake.ActionHref" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()

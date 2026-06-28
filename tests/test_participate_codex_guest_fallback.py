@@ -19,11 +19,13 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
 
     def test_participate_route_uses_whitelabeled_board_proxy_and_supporter_guard(self) -> None:
         controller = PUBLIC_CONTROLLER.read_text(encoding="utf-8")
-        self.assertIn('localOrigin: "/participate"', controller)
-        self.assertIn('localBaseHref: "/participate/"', controller)
+        self.assertIn('private static string BuildParticipateFrameHref(', controller)
+        self.assertIn('embeddedBoardHref = hostedBoardAvailable ? BuildParticipateFrameHref(normalizedBoardPath) : null;', controller)
+        self.assertIn('BuildParticipateBoardRouteHref(normalizedBoardPath)', controller)
         self.assertIn('ResolveParticipateSupporterHref()', controller)
-        self.assertIn('return "/account/billing/supporter/start";', controller)
-        self.assertIn('boardPath: string.Empty', controller)
+        self.assertIn('return "/account/billing";', controller)
+        self.assertIn('BuildFirstPartyParticipateBoardAsync', controller)
+        self.assertIn('public IActionResult ParticipateBoardFrame(string? boardPath)', controller)
         self.assertNotIn('"/auth/google/start?next=%2Fparticipate%2Fcodex"', controller)
         self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', controller)
         self.assertNotIn("Requests, votes, and shipped work.", controller)
@@ -31,21 +33,26 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
     def test_feedback_public_view_stays_on_participation_surface(self) -> None:
         self.assertFalse(FEEDBACK_VIEW.exists())
         controller = PUBLIC_CONTROLLER.read_text(encoding="utf-8")
-        self.assertIn("ParticipateBoardProxyCore", controller)
+        self.assertIn("private static string BuildParticipateFrameHref(", controller)
+        self.assertIn("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller)
         self.assertNotIn("participate-lane", controller)
         self.assertNotIn("participate-quick-form", controller)
         self.assertNotIn("participate-fallback", controller)
         self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', controller)
+        participate = PARTICIPATE_VIEW.read_text(encoding="utf-8")
+        self.assertIn("Current requests", participate)
+        self.assertIn("data-chummer-participate-frame", participate)
+        self.assertIn("Open board", participate)
 
     def test_public_participate_controller_targets_board_proxy_instead_of_recursive_wrapper(self) -> None:
         controller = (REPO_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs").read_text(encoding="utf-8")
-        self.assertIn('=> ResolveProductLiftHostedBoardUri() is null ? null : "/participate/board";', controller)
+        self.assertIn('BuildParticipateBoardRouteHref(normalizedBoardPath)', controller)
+        self.assertIn('public IActionResult ParticipateBoardFrame(string? boardPath)', controller)
         self.assertNotIn('=> ResolveProductLiftHostedBoardUri() is null ? null : "/participate";', controller)
 
     def test_authenticated_participate_e2e_spec_rejects_sign_in_chrome(self) -> None:
         spec = (REPO_ROOT / "tests" / "public" / "participate-billing-auth.spec.ts").read_text(encoding="utf-8")
-        self.assertIn("not.toContainText('Sign in')", spec)
-        self.assertIn("not.toContain('Sign in')", spec)
+        self.assertIn("getByRole('link', { name: 'Account' })", spec)
 
 
 if __name__ == "__main__":

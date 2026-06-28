@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-06-24T07:57:37.953Z",
+  "generated_at_utc": "2026-06-27T18:16:30.078Z",
   "status": "pass",
-  "base_url": "http://127.0.0.1:36505",
-  "board_sentinel": "board sentinel",
+  "base_url": "http://127.0.0.1:43935",
+  "board_state": "offline_first_party",
   "supporter_link_count": 0,
   "supporter_copy_visible": false,
   "billing_state": "unavailable"

@@ -25,7 +25,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
     },
   });
   const brilliantDirectoriesPage = await request.get(`${baseUrl}/account/billing`, { maxRedirects: 0 });
-  const brilliantDirectoriesPreviewPage = await request.get(`${baseUrl}/account/billing?userId=user-a&email=runner@example.com`, { maxRedirects: 0 });
+  const brilliantDirectoriesPreviewPage = await request.get(`${baseUrl}/account/billing?preview=true`, { maxRedirects: 0 });
 
   const originPage = await request.get(`${baseUrl}/origin-dossier`);
   const originStoryPage = await request.get(`${baseUrl}/docs/origin-dossier-the-name-she-chose`);
@@ -41,7 +41,12 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(payfunnelsProjection.status()).toBe(200);
   expect(payfunnelsCheckout.status()).toBe(302);
   expect(payfunnelsCheckout.headers()['location'] || '').toContain('payfunnels');
-  expect(brilliantDirectoriesPage.status()).toBe(200);
+  if (requireBrilliantDirectoriesCheckout) {
+    expect([302, 303, 307, 308]).toContain(brilliantDirectoriesPage.status());
+    expect(brilliantDirectoriesPage.headers()['location'] || '').toBe('/login?next=%2Faccount%2Fbilling');
+  } else {
+    expect(brilliantDirectoriesPage.status()).toBe(200);
+  }
   expect(brilliantDirectoriesPreviewPage.status()).toBe(200);
   expect(brilliantDirectoriesPreviewPage.status()).not.toBe(500);
 

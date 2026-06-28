@@ -1,6 +1,8 @@
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Http;
+using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
 namespace Chummer.Run.Api.Services;
 
@@ -131,11 +133,11 @@ public sealed class HubPageChromeService
             new SiteChromeActionViewModel("Home", "/home", "secondary", normalizedCurrentPath.StartsWith("/home", StringComparison.OrdinalIgnoreCase))
         };
 
-        if (ReleaseUploadAccessPolicy.CanAccess(signedInEmail))
+        if (ReleaseUploadAccessPolicy.CanAccess(ResolveReleaseUploadAccessEmail(signedInLabel, signedInEmail)))
         {
             actions.Add(new SiteChromeActionViewModel(
-                "Build",
-                "/downloads/release-upload",
+                "Build macOS",
+                "/downloads/release-upload/bootstrap.command",
                 "secondary",
                 normalizedCurrentPath.StartsWith("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)));
         }
@@ -160,6 +162,34 @@ public sealed class HubPageChromeService
             FooterCanonicalSource: surface.FooterCanonicalSource,
             FooterGeneratedNote: surface.FooterGeneratedNote,
             PublicSignalNavigation: nav.PublicSignal);
+    }
+
+    private string? ResolveReleaseUploadAccessEmail(string signedInLabel, string? signedInEmail)
+    {
+        if (!string.IsNullOrWhiteSpace(signedInEmail))
+        {
+            return signedInEmail.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(signedInLabel) && new EmailAddressAttribute().IsValid(signedInLabel.Trim()))
+        {
+            return signedInLabel.Trim();
+        }
+
+        ClaimsPrincipal? user = _httpContextAccessor.HttpContext?.User;
+        if (user is not null)
+        {
+            foreach (string claimType in new[] { ClaimTypes.Email, "email", "preferred_username" })
+            {
+                string? claimValue = user.FindFirstValue(claimType);
+                if (!string.IsNullOrWhiteSpace(claimValue) && new EmailAddressAttribute().IsValid(claimValue.Trim()))
+                {
+                    return claimValue.Trim();
+                }
+            }
+        }
+
+        return null;
     }
 
     private PublicLandingActionDto BuildPublicPrimaryCta()

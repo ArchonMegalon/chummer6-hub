@@ -17,6 +17,7 @@
     var canWatch = publication.GoldReady
         && publication.DossierVideoVerified
         && !string.IsNullOrWhiteSpace(publication.DossierVideoUrl);
+    const string rightsTooltip = "Not legal advice. Your strongest copyright claim is in the parts you chose, wrote, edited, and approved. Pure model-only wording may be harder to protect by itself in some jurisdictions, so Chummer keeps the canon, outline, and approvals tied to you.";
 }
 
 <section class="minimal-page-hero" data-origin-dossier-detail>
@@ -201,7 +202,10 @@
          data-no-fallback-media-verified="@publication.GoldReady.ToString().ToLowerInvariant()">
     <article class="app-action-card">
         <span class="tag">Canon Audit</span>
-        <h2>Access notes</h2>
+        <h2 class="heading-with-help">
+            <span>Access notes</span>
+            <span class="inline-help-dot" tabindex="0" role="note" title="@rightsTooltip" aria-label="@rightsTooltip">?</span>
+        </h2>
         <p>Chummer keeps the canon. Book, audio, video, cover, and share links stay locked until the edition is ready.</p>
         <div class="settings-summary-list">
             <div class="settings-summary-row">

@@ -10,7 +10,6 @@ public sealed class SignedInShellContinuityViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("@if (!showAccessSection)", view, StringComparison.Ordinal);
         Assert.Contains("home-cockpit-strip", view, StringComparison.Ordinal);
         Assert.Contains("Home summary", view, StringComparison.Ordinal);
         Assert.Contains("Recent change", view, StringComparison.Ordinal);
@@ -39,21 +38,38 @@ public sealed class SignedInShellContinuityViewTests
     }
 
     [Fact]
-    public void HomeAccessSurfaceUsesInstallsLanguageInsteadOfDeviceJargon()
+    public void HomeHandsOffInstallRecoveryToAccountAccess()
     {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml");
+        string controller = File.ReadAllText(controllerPath);
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("\"access\" => \"One place for linking, recovery, and install help.\"", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Link or recover this copy</h2>", view, StringComparison.Ordinal);
-        Assert.Contains("<h2 class=\"home-stream__title\">Installs</h2>", view, StringComparison.Ordinal);
         Assert.Contains("Open one quiet place for linking, recovery, and install help.", view, StringComparison.Ordinal);
-        Assert.Contains("Use the release page when your desktop client should stay aligned.", view, StringComparison.Ordinal);
-        Assert.Contains("Open installs to reconnect, replace, or recover this copy.", view, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/account/access\");", controller, StringComparison.Ordinal);
+        Assert.Contains("new SectionLinkViewModel(\"access\", \"Installs\", \"/account/access\", false)", controller, StringComparison.Ordinal);
+        Assert.Contains("href=\"/account/access\">Open installs</a>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("href=\"/home/access\">Open installs</a>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"access\" => \"One place for linking, recovery, and install help.\"", view, StringComparison.Ordinal);
         Assert.Contains(">Open installs</a>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Open devices", view, StringComparison.Ordinal);
         Assert.DoesNotContain("See linked copies, setup codes, downloads, and install help.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Release, devices, and support status in one place.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HomeHandsOffCampaignReturnToAccountWork()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.Contains("return Redirect(\"/account/work\");", controller, StringComparison.Ordinal);
+        Assert.Contains("new SectionLinkViewModel(\"work\", \"Roster\", \"/account/work\", false)", controller, StringComparison.Ordinal);
+        Assert.Contains("\"Open campaigns\",", controller, StringComparison.Ordinal);
+        Assert.Contains("\"/account/work\",", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("new SectionLinkViewModel(\"work\", \"Campaigns\", \"/account/work\", false)", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"/home/work\",", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -64,7 +80,7 @@ public sealed class SignedInShellContinuityViewTests
 
         Assert.Contains("account-rail-snapshot", view, StringComparison.Ordinal);
         Assert.Contains("Build next step", view, StringComparison.Ordinal);
-        Assert.Contains("Contribution credit follows useful closeout and continuity.", view, StringComparison.Ordinal);
+        Assert.Contains("Contribution points follow useful work.", view, StringComparison.Ordinal);
         Assert.Contains("Recovery codes stay in reserve.", view, StringComparison.Ordinal);
         Assert.Contains("Recovery codes stay below as a fallback, not the first instruction.", view, StringComparison.Ordinal);
         Assert.Contains("keep browser pages as backup help instead of the normal path", view, StringComparison.Ordinal);

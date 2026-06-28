@@ -50,6 +50,25 @@ public sealed class CampaignSpineService
     private const string OpenRunScheduleSourceKind = "open_run_schedule";
     private const string OpenRunMeetingHandoffSourceKind = "open_run_meeting_handoff";
     private const string OpenRunCloseoutSourceKind = "open_run_closeout";
+    public const int MaxMutationRequestBodyBytes = 64 * 1024;
+    private const int MaxIdentifierLength = 128;
+    private const int MaxVisibilityLength = 32;
+    private const int MaxModeLength = 64;
+    private const int MaxPackageKindLength = 64;
+    private const int MaxListingTitleLength = 160;
+    private const int MaxLabelLength = 160;
+    private const int MaxShortTitleLength = 160;
+    private const int MaxCompactTitleLength = 128;
+    private const int MaxTargetReferenceLength = 256;
+    private const int MaxSummaryLength = 4000;
+    private const int MaxLineLength = 512;
+    private const int MaxActionLength = 160;
+    private const int MaxRouteLength = 256;
+    private const int MaxCompactNoteLength = 256;
+    private const int MaxNextSafeActionLength = 1024;
+    private const int MaxNoteLength = 1024;
+    private const int MaxUrlLength = 2048;
+    private const int MaxLineCount = 8;
 
     private readonly CommunityStore _store;
     private readonly WorkspaceLifecyclePolicyService _lifecyclePolicy;
@@ -348,22 +367,20 @@ public sealed class CampaignSpineService
 
         CampaignWorkspaceProjection workspace = GetWorkspace(user, workspaceId, installLinking)
             ?? throw new KeyNotFoundException($"Unknown workspace: {workspaceId}");
-        string normalizedRunId = AccountService.NormalizeOptional(request.RunId)
+        string normalizedRunId = NormalizeOptional(request.RunId, nameof(OpenRunCreateRequest.RunId), MaxIdentifierLength)
             ?? workspace.Runs.FirstOrDefault()?.RunId
             ?? throw new InvalidOperationException($"{workspace.CampaignName} does not have a governed run to publish.");
         RunProjection run = workspace.Runs.FirstOrDefault(item => string.Equals(item.RunId, normalizedRunId, StringComparison.OrdinalIgnoreCase))
             ?? throw new KeyNotFoundException($"Unknown run {normalizedRunId} for workspace {workspace.WorkspaceId}.");
-        string normalizedListingTitle = AccountService.NormalizeOptional(request.ListingTitle)
-            ?? throw new ArgumentException("open run listing_title is required.", nameof(request));
-        string normalizedVisibility = AccountService.NormalizeOptional(request.Visibility) ?? "community";
-        string normalizedTableContractSummary = AccountService.NormalizeOptional(request.TableContractSummary)
-            ?? throw new ArgumentException("open run table_contract_summary is required.", nameof(request));
-        string normalizedAdmissionMode = AccountService.NormalizeOptional(request.AdmissionMode) ?? "request_to_join";
-        string normalizedSchedulingMode = AccountService.NormalizeOptional(request.SchedulingMode) ?? "lunacal_slots";
-        string normalizedPlatform = AccountService.NormalizeOptional(request.Platform) ?? "discord";
-        string normalizedObserverMode = AccountService.NormalizeOptional(request.ObserverMode) ?? "manual_markers";
-        string? normalizedSummary = AccountService.NormalizeOptional(request.Summary);
-        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        string normalizedListingTitle = NormalizeRequired(request.ListingTitle, nameof(OpenRunCreateRequest.ListingTitle), MaxListingTitleLength);
+        string normalizedVisibility = NormalizeOptional(request.Visibility, nameof(OpenRunCreateRequest.Visibility), MaxVisibilityLength) ?? "community";
+        string normalizedTableContractSummary = NormalizeRequired(request.TableContractSummary, nameof(OpenRunCreateRequest.TableContractSummary), MaxSummaryLength);
+        string normalizedAdmissionMode = NormalizeOptional(request.AdmissionMode, nameof(OpenRunCreateRequest.AdmissionMode), MaxModeLength) ?? "request_to_join";
+        string normalizedSchedulingMode = NormalizeOptional(request.SchedulingMode, nameof(OpenRunCreateRequest.SchedulingMode), MaxModeLength) ?? "lunacal_slots";
+        string normalizedPlatform = NormalizeOptional(request.Platform, nameof(OpenRunCreateRequest.Platform), MaxModeLength) ?? "discord";
+        string normalizedObserverMode = NormalizeOptional(request.ObserverMode, nameof(OpenRunCreateRequest.ObserverMode), MaxModeLength) ?? "manual_markers";
+        string? normalizedSummary = NormalizeOptional(request.Summary, nameof(OpenRunCreateRequest.Summary), MaxSummaryLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(OpenRunCreateRequest.Note), MaxNoteLength);
         if (request.SeatsTotal <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(request), "open run seats_total must be positive.");
@@ -377,7 +394,7 @@ public sealed class CampaignSpineService
         lock (_store.Gate)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            IReadOnlyList<string> reservedSeatRoles = FinalizeLines(request.ReservedSeatRoles ?? Array.Empty<string>());
+            IReadOnlyList<string> reservedSeatRoles = FinalizeLines(NormalizeLines(request.ReservedSeatRoles, nameof(OpenRunCreateRequest.ReservedSeatRoles)));
             var joinPolicy = new OpenRunJoinPolicyProjection(
                 AdmissionMode: normalizedAdmissionMode,
                 SeatsTotal: request.SeatsTotal,
@@ -438,9 +455,9 @@ public sealed class CampaignSpineService
         OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
             ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
         AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
-        string? normalizedDossierId = AccountService.NormalizeOptional(request.DossierId);
-        string? normalizedQuickstartPackId = AccountService.NormalizeOptional(request.QuickstartPackId);
-        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        string? normalizedDossierId = NormalizeOptional(request.DossierId, nameof(OpenRunJoinRequestCommand.DossierId), MaxIdentifierLength);
+        string? normalizedQuickstartPackId = NormalizeOptional(request.QuickstartPackId, nameof(OpenRunJoinRequestCommand.QuickstartPackId), MaxIdentifierLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(OpenRunJoinRequestCommand.Note), MaxNoteLength);
         RunnerDossierProjection? dossier = normalizedDossierId is null
             ? null
             : summary.Dossiers.FirstOrDefault(item => string.Equals(item.DossierId, normalizedDossierId, StringComparison.OrdinalIgnoreCase));
@@ -546,16 +563,15 @@ public sealed class CampaignSpineService
             throw new CommunityAccessDeniedException("Only the open-run owner can review join requests.");
         }
 
-        string normalizedRequestId = AccountService.NormalizeOptional(requestId)
-            ?? throw new ArgumentException("requestId is required.", nameof(requestId));
-        string normalizedDecision = AccountService.NormalizeOptional(request.Decision)?.ToLowerInvariant() switch
+        string normalizedRequestId = NormalizeRequired(requestId, nameof(requestId), MaxIdentifierLength);
+        string normalizedDecision = NormalizeRequired(request.Decision, nameof(OpenRunJoinReviewRequest.Decision), MaxModeLength).ToLowerInvariant() switch
         {
             "accepted" => "accepted",
             "waitlisted" => "waitlisted",
             "rejected" => "rejected",
             _ => throw new ArgumentException($"Unsupported open-run review decision: {request.Decision}", nameof(request))
         };
-        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(OpenRunJoinReviewRequest.Note), MaxNoteLength);
 
         lock (_store.Gate)
         {
@@ -638,8 +654,8 @@ public sealed class CampaignSpineService
             throw new CommunityAccessDeniedException("Only the open-run owner can schedule this run.");
         }
 
-        string normalizedTimezone = AccountService.NormalizeOptional(request.Timezone) ?? "UTC";
-        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        string normalizedTimezone = NormalizeOptional(request.Timezone, nameof(OpenRunScheduleRequest.Timezone), MaxModeLength) ?? "UTC";
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(OpenRunScheduleRequest.Note), MaxNoteLength);
         if (request.StartsAtUtc <= DateTimeOffset.UtcNow.AddMinutes(-1))
         {
             throw new ArgumentOutOfRangeException(nameof(request), "open run schedule must stay in the future.");
@@ -713,13 +729,10 @@ public sealed class CampaignSpineService
 
         OpenRunScheduleReceiptProjection schedule = openRun.Schedule
             ?? throw new InvalidOperationException("Open runs need a governed scheduling receipt before meeting handoff.");
-        string normalizedProviderKind = AccountService.NormalizeOptional(request.ProviderKind)
-            ?? throw new ArgumentException("meeting handoff provider_kind is required.", nameof(request));
-        string normalizedProviderLabel = AccountService.NormalizeOptional(request.ProviderLabel)
-            ?? throw new ArgumentException("meeting handoff provider_label is required.", nameof(request));
-        string normalizedAccessPolicy = AccountService.NormalizeOptional(request.AccessPolicy)
-            ?? throw new ArgumentException("meeting handoff access_policy is required.", nameof(request));
-        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        string normalizedProviderKind = NormalizeRequired(request.ProviderKind, nameof(OpenRunMeetingHandoffRequest.ProviderKind), MaxModeLength);
+        string normalizedProviderLabel = NormalizeRequired(request.ProviderLabel, nameof(OpenRunMeetingHandoffRequest.ProviderLabel), MaxLabelLength);
+        string normalizedAccessPolicy = NormalizeRequired(request.AccessPolicy, nameof(OpenRunMeetingHandoffRequest.AccessPolicy), MaxModeLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(OpenRunMeetingHandoffRequest.Note), MaxNoteLength);
         if (request.ExpiresAtUtc <= DateTimeOffset.UtcNow)
         {
             throw new ArgumentOutOfRangeException(nameof(request), "meeting handoff expiry must stay in the future.");
@@ -792,11 +805,12 @@ public sealed class CampaignSpineService
             throw new InvalidOperationException("Open run closeout requires scheduling and meeting handoff receipts before world-memory promotion.");
         }
 
+        string normalizedSummary = NormalizeRequired(request.Summary, nameof(OpenRunCloseoutRequest.Summary), MaxSummaryLength);
         CampaignWorkspaceProjection workspace = GetWorkspace(user, openRun.Listing.WorkspaceId, installLinking)
             ?? throw new KeyNotFoundException($"Unknown workspace: {openRun.Listing.WorkspaceId}");
         ResolutionReportApprovalProjection approval = ApproveResolutionReport(user, workspace, new ResolutionReportApprovalRequest(
             RunId: openRun.Listing.RunId,
-            Summary: request.Summary,
+            Summary: normalizedSummary,
             WorldTickSummary: request.WorldTickSummary,
             ConsequenceSummary: request.ConsequenceSummary,
             NewsTitle: request.NewsTitle,
@@ -815,10 +829,10 @@ public sealed class CampaignSpineService
                 ResolutionApprovalId: approval.ApprovalId,
                 WorldTickId: approval.WorldTickId,
                 PlayerSafeNewsId: approval.NewsId,
-                Summary: request.Summary,
+                Summary: approval.Summary,
                 EvidenceLines: FinalizeLines(
                 [
-                    request.Summary,
+                    approval.Summary,
                     $"Source kind: {OpenRunCloseoutSourceKind}.",
                     $"Resolution approval: {approval.ApprovalId}.",
                     $"WorldTick: {approval.WorldTickId}.",
@@ -914,14 +928,11 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(workspace);
 
-        string normalizedPacketId = AccountService.NormalizeOptional(packetId)
-            ?? throw new ArgumentException("packetId is required.", nameof(packetId));
-        string normalizedPacketKind = AccountService.NormalizeOptional(packetKind)
-            ?? throw new ArgumentException("packetKind is required.", nameof(packetKind));
-        string normalizedPacketTitle = AccountService.NormalizeOptional(packetTitle)
-            ?? throw new ArgumentException("packetTitle is required.", nameof(packetTitle));
-        string normalizedPacketSummary = AccountService.NormalizeOptional(packetSummary) ?? normalizedPacketTitle;
-        string? normalizedNote = AccountService.NormalizeOptional(note);
+        string normalizedPacketId = NormalizeRequired(packetId, nameof(packetId), MaxIdentifierLength);
+        string normalizedPacketKind = NormalizeRequired(packetKind, nameof(packetKind), MaxPackageKindLength);
+        string normalizedPacketTitle = NormalizeRequired(packetTitle, nameof(packetTitle), MaxShortTitleLength);
+        string normalizedPacketSummary = NormalizeOptional(packetSummary, nameof(packetSummary), MaxSummaryLength) ?? normalizedPacketTitle;
+        string? normalizedNote = NormalizeOptional(note, nameof(note), MaxCompactNoteLength);
 
         lock (_store.Gate)
         {
@@ -977,9 +988,8 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(device);
 
-        string normalizedPrefetchSummary = AccountService.NormalizeOptional(prefetchSummary)
-            ?? throw new ArgumentException("prefetchSummary is required.", nameof(prefetchSummary));
-        string? normalizedNote = AccountService.NormalizeOptional(note);
+        string normalizedPrefetchSummary = NormalizeRequired(prefetchSummary, nameof(prefetchSummary), MaxSummaryLength);
+        string? normalizedNote = NormalizeOptional(note, nameof(note), MaxCompactNoteLength);
 
         lock (_store.Gate)
         {
@@ -1028,11 +1038,9 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(user);
         ArgumentNullException.ThrowIfNull(workspace);
 
-        string normalizedPackageKind = AccountService.NormalizeOptional(packageKind)
-            ?? throw new ArgumentException("packageKind is required.", nameof(packageKind));
-        string normalizedTitle = AccountService.NormalizeOptional(title)
-            ?? throw new ArgumentException("title is required.", nameof(title));
-        string normalizedSummary = AccountService.NormalizeOptional(summary)
+        string normalizedPackageKind = NormalizeRequired(packageKind, nameof(packageKind), MaxPackageKindLength);
+        string normalizedTitle = NormalizeRequired(title, nameof(title), MaxShortTitleLength);
+        string normalizedSummary = NormalizeOptional(summary, nameof(summary), MaxSummaryLength)
             ?? normalizedTitle;
 
         lock (_store.Gate)
@@ -1040,7 +1048,7 @@ public sealed class CampaignSpineService
             DateTimeOffset now = DateTimeOffset.UtcNow;
             string packageId = StableId("aftermath", $"{workspace.WorkspaceId}:{run?.RunId ?? "campaign"}:{normalizedPackageKind}:{now.ToUnixTimeMilliseconds()}");
             string rulesetId = ResolveArtifactRulesetId(workspace.RuleEnvironment);
-            IReadOnlyList<string> finalizedEvidenceLines = FinalizeLines(evidenceLines);
+            IReadOnlyList<string> finalizedEvidenceLines = FinalizeLines(NormalizeLines(evidenceLines, nameof(evidenceLines)));
             CampaignArtifactRegistration artifact = _artifactRegistry.RegisterAftermathPackage(new AftermathArtifactRegistrationRequest(
                 PackageId: packageId,
                 WorkspaceId: workspace.WorkspaceId,
@@ -1112,12 +1120,12 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(request);
 
-        string normalizedKind = NormalizeGovernedConsequenceKind(request.Kind);
-        string normalizedState = AccountService.NormalizeOptional(request.State)
-            ?? throw new ArgumentException("campaign consequence state is required.", nameof(request));
-        string normalizedSummary = AccountService.NormalizeOptional(request.Summary)
-            ?? throw new ArgumentException("campaign consequence summary is required.", nameof(request));
-        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        string normalizedKind = NormalizeGovernedConsequenceKind(NormalizeRequired(request.Kind, nameof(CampaignConsequenceUpdateRequest.Kind), MaxModeLength));
+        string normalizedState = NormalizeRequired(request.State, nameof(CampaignConsequenceUpdateRequest.State), MaxModeLength);
+        string normalizedSummary = NormalizeRequired(request.Summary, nameof(CampaignConsequenceUpdateRequest.Summary), MaxSummaryLength);
+        string? normalizedReturnLoopAction = NormalizeOptional(request.ReturnLoopAction, nameof(CampaignConsequenceUpdateRequest.ReturnLoopAction), MaxActionLength);
+        string? normalizedReturnLoopRoute = NormalizeOptional(request.ReturnLoopRoute, nameof(CampaignConsequenceUpdateRequest.ReturnLoopRoute), MaxRouteLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(CampaignConsequenceUpdateRequest.Note), MaxNoteLength);
 
         lock (_store.Gate)
         {
@@ -1132,8 +1140,8 @@ public sealed class CampaignSpineService
                 normalizedKind,
                 normalizedState,
                 normalizedSummary,
-                request.ReturnLoopAction,
-                request.ReturnLoopRoute,
+                normalizedReturnLoopAction,
+                normalizedReturnLoopRoute,
                 normalizedNote,
                 observedAtUtc);
 
@@ -1157,19 +1165,19 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(request);
 
-        string normalizedRunId = AccountService.NormalizeOptional(request.RunId)
+        string normalizedRunId = NormalizeOptional(request.RunId, nameof(RunboardContinuityUpdateRequest.RunId), MaxIdentifierLength)
             ?? workspace.Runs.FirstOrDefault()?.RunId
             ?? throw new InvalidOperationException($"{workspace.CampaignName} does not have a governed run to persist.");
-        string normalizedTurnLedgerSummary = AccountService.NormalizeOptional(request.TurnLedgerSummary)
-            ?? throw new ArgumentException("turn-ledger summary is required.", nameof(request));
-        string normalizedRunboardStateSummary = AccountService.NormalizeOptional(request.RunboardStateSummary)
-            ?? throw new ArgumentException("runboard state summary is required.", nameof(request));
-        string normalizedResolutionStatus = AccountService.NormalizeOptional(request.ResolutionReportStatus)
-            ?? throw new ArgumentException("resolution-report status is required.", nameof(request));
-        string normalizedResolutionSummary = AccountService.NormalizeOptional(request.ResolutionReportSummary)
-            ?? throw new ArgumentException("resolution-report summary is required.", nameof(request));
-        string? normalizedNextSafeAction = AccountService.NormalizeOptional(request.NextSafeAction);
-        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        string normalizedTurnLedgerSummary = NormalizeRequired(request.TurnLedgerSummary, nameof(RunboardContinuityUpdateRequest.TurnLedgerSummary), MaxSummaryLength);
+        string normalizedRunboardStateSummary = NormalizeRequired(request.RunboardStateSummary, nameof(RunboardContinuityUpdateRequest.RunboardStateSummary), MaxSummaryLength);
+        string normalizedResolutionStatus = NormalizeRequired(request.ResolutionReportStatus, nameof(RunboardContinuityUpdateRequest.ResolutionReportStatus), MaxModeLength);
+        string normalizedResolutionSummary = NormalizeRequired(request.ResolutionReportSummary, nameof(RunboardContinuityUpdateRequest.ResolutionReportSummary), MaxSummaryLength);
+        string? normalizedNextSafeAction = NormalizeOptional(request.NextSafeAction, nameof(RunboardContinuityUpdateRequest.NextSafeAction), MaxNextSafeActionLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(RunboardContinuityUpdateRequest.Note), MaxNoteLength);
+        IReadOnlyList<string> normalizedTurnLedgerEvidenceLines = NormalizeLines(request.TurnLedgerEvidenceLines, nameof(RunboardContinuityUpdateRequest.TurnLedgerEvidenceLines));
+        IReadOnlyList<string> normalizedObjectiveLines = NormalizeLines(request.ObjectiveLines, nameof(RunboardContinuityUpdateRequest.ObjectiveLines));
+        IReadOnlyList<string> normalizedBlockers = NormalizeLines(request.Blockers, nameof(RunboardContinuityUpdateRequest.Blockers));
+        IReadOnlyList<string> normalizedResolutionNotes = NormalizeLines(request.ResolutionNotes, nameof(RunboardContinuityUpdateRequest.ResolutionNotes));
 
         lock (_store.Gate)
         {
@@ -1184,7 +1192,7 @@ public sealed class CampaignSpineService
                 throw new KeyNotFoundException($"Unknown campaign: {workspace.CampaignId}");
             }
 
-            string? normalizedSceneId = AccountService.NormalizeOptional(request.ActiveSceneId);
+            string? normalizedSceneId = NormalizeOptional(request.ActiveSceneId, nameof(RunboardContinuityUpdateRequest.ActiveSceneId), MaxIdentifierLength);
             SceneProjection? activeScene = normalizedSceneId is null
                 ? storedRun.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, storedRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
                     ?? storedRun.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault()
@@ -1196,14 +1204,14 @@ public sealed class CampaignSpineService
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
             IReadOnlyList<string> objectiveLines = FinalizeLines(
-                (request.ObjectiveLines ?? Array.Empty<string>())
+                normalizedObjectiveLines
                     .Concat(
                         storedRun.Objectives
                             .Where(static item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
                                 && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase))
                             .Select(static item => $"{item.Title} stays {item.Status} with {item.Pressure} pressure.")));
             IReadOnlyList<string> blockerLines = FinalizeLines(
-                (request.Blockers ?? Array.Empty<string>())
+                normalizedBlockers
                     .Concat(
                         storedRun.Objectives
                             .Where(static item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
@@ -1220,7 +1228,7 @@ public sealed class CampaignSpineService
                         ? $"Turn ledger handoff stays pinned to {storedRun.Title} without replaying engine math inside hub."
                         : $"Turn ledger handoff stays pinned to {storedRun.Title} / {activeScene.Title} without replaying engine math inside hub.",
                     normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
-                }.Concat(request.TurnLedgerEvidenceLines ?? Array.Empty<string>()));
+                }.Concat(normalizedTurnLedgerEvidenceLines));
             IReadOnlyList<string> runboardStateEvidenceLines = FinalizeLines(
             [
                 normalizedRunboardStateSummary,
@@ -1232,7 +1240,7 @@ public sealed class CampaignSpineService
                 new[]
                 {
                     normalizedResolutionSummary
-                }.Concat(request.ResolutionNotes ?? Array.Empty<string>()));
+                }.Concat(normalizedResolutionNotes));
             IReadOnlyList<string> resolutionEvidenceLines = FinalizeLines(
             [
                 normalizedResolutionSummary,
@@ -1310,10 +1318,11 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(request);
 
-        string normalizedSummary = AccountService.NormalizeOptional(request.Summary)
-            ?? throw new ArgumentException("campaign adoption summary is required.", nameof(request));
-        string? normalizedNextSafeAction = AccountService.NormalizeOptional(request.NextSafeAction);
-        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        string normalizedSummary = NormalizeRequired(request.Summary, nameof(CampaignAdoptionUpdateRequest.Summary), MaxSummaryLength);
+        string? normalizedNextSafeAction = NormalizeOptional(request.NextSafeAction, nameof(CampaignAdoptionUpdateRequest.NextSafeAction), MaxNextSafeActionLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(CampaignAdoptionUpdateRequest.Note), MaxNoteLength);
+        IReadOnlyList<string> normalizedExplicitUnknowns = NormalizeLines(request.ExplicitUnknowns, nameof(CampaignAdoptionUpdateRequest.ExplicitUnknowns));
+        IReadOnlyList<string> normalizedRecommendedNextActions = NormalizeLines(request.RecommendedNextActions, nameof(CampaignAdoptionUpdateRequest.RecommendedNextActions));
         if (request.ConfidencePercent is < 0 or > 100)
         {
             throw new ArgumentOutOfRangeException(nameof(request), "campaign adoption confidence_percent must stay within 0..100.");
@@ -1332,8 +1341,8 @@ public sealed class CampaignSpineService
             }
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            IReadOnlyList<string> explicitUnknowns = FinalizeLines(request.ExplicitUnknowns ?? Array.Empty<string>());
-            IReadOnlyList<string> recommendedNextActions = FinalizeLines(request.RecommendedNextActions ?? Array.Empty<string>());
+            IReadOnlyList<string> explicitUnknowns = FinalizeLines(normalizedExplicitUnknowns);
+            IReadOnlyList<string> recommendedNextActions = FinalizeLines(normalizedRecommendedNextActions);
             string nextSafeAction = normalizedNextSafeAction
                 ?? recommendedNextActions.FirstOrDefault()
                 ?? (request.SafeToPlay
@@ -1396,18 +1405,13 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(request);
 
-        string normalizedDossierId = AccountService.NormalizeOptional(request.DossierId)
-            ?? throw new ArgumentException("runner goal dossier_id is required.", nameof(request));
-        string normalizedLabel = AccountService.NormalizeOptional(request.Label)
-            ?? throw new ArgumentException("runner goal label is required.", nameof(request));
-        string normalizedTargetKind = AccountService.NormalizeOptional(request.TargetKind)
-            ?? throw new ArgumentException("runner goal target_kind is required.", nameof(request));
-        string normalizedTargetReference = AccountService.NormalizeOptional(request.TargetReference)
-            ?? throw new ArgumentException("runner goal target_reference is required.", nameof(request));
-        string normalizedApprovalStatus = AccountService.NormalizeOptional(request.ApprovalStatus)
-            ?? throw new ArgumentException("runner goal approval_status is required.", nameof(request));
-        string? normalizedNextSafeAction = AccountService.NormalizeOptional(request.NextSafeAction);
-        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        string normalizedDossierId = NormalizeRequired(request.DossierId, nameof(RunnerGoalUpdateRequest.DossierId), MaxIdentifierLength);
+        string normalizedLabel = NormalizeRequired(request.Label, nameof(RunnerGoalUpdateRequest.Label), MaxLabelLength);
+        string normalizedTargetKind = NormalizeRequired(request.TargetKind, nameof(RunnerGoalUpdateRequest.TargetKind), MaxModeLength);
+        string normalizedTargetReference = NormalizeRequired(request.TargetReference, nameof(RunnerGoalUpdateRequest.TargetReference), MaxTargetReferenceLength);
+        string normalizedApprovalStatus = NormalizeRequired(request.ApprovalStatus, nameof(RunnerGoalUpdateRequest.ApprovalStatus), MaxModeLength);
+        string? normalizedNextSafeAction = NormalizeOptional(request.NextSafeAction, nameof(RunnerGoalUpdateRequest.NextSafeAction), MaxNextSafeActionLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(RunnerGoalUpdateRequest.Note), MaxNoteLength);
         if (request.SavedNuyen < 0 || request.NuyenRequired < 0 || request.KarmaReserved < 0 || request.DowntimeDays < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(request), "runner goal resource values cannot be negative.");
@@ -1486,24 +1490,19 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(request);
 
-        string normalizedRunId = AccountService.NormalizeOptional(request.RunId)
+        string normalizedRunId = NormalizeOptional(request.RunId, nameof(ResolutionReportApprovalRequest.RunId), MaxIdentifierLength)
             ?? workspace.Runs.FirstOrDefault()?.RunId
             ?? throw new InvalidOperationException($"{workspace.CampaignName} does not have a governed run to close out.");
-        string normalizedSummary = AccountService.NormalizeOptional(request.Summary)
-            ?? throw new ArgumentException("resolution-report approval summary is required.", nameof(request));
-        string normalizedWorldTickSummary = AccountService.NormalizeOptional(request.WorldTickSummary)
-            ?? throw new ArgumentException("world-tick summary is required.", nameof(request));
-        string normalizedConsequenceSummary = AccountService.NormalizeOptional(request.ConsequenceSummary)
-            ?? throw new ArgumentException("consequence summary is required.", nameof(request));
-        string normalizedNewsTitle = AccountService.NormalizeOptional(request.NewsTitle)
-            ?? throw new ArgumentException("news title is required.", nameof(request));
-        string normalizedNewsSummary = AccountService.NormalizeOptional(request.NewsSummary)
-            ?? throw new ArgumentException("news summary is required.", nameof(request));
-        string normalizedNewsSource = AccountService.NormalizeOptional(request.NewsSource) ?? "BLACK LEDGER";
-        string normalizedNewsUrl = AccountService.NormalizeOptional(request.NewsUrl)
+        string normalizedSummary = NormalizeRequired(request.Summary, nameof(ResolutionReportApprovalRequest.Summary), MaxSummaryLength);
+        string normalizedWorldTickSummary = NormalizeRequired(request.WorldTickSummary, nameof(ResolutionReportApprovalRequest.WorldTickSummary), MaxSummaryLength);
+        string normalizedConsequenceSummary = NormalizeRequired(request.ConsequenceSummary, nameof(ResolutionReportApprovalRequest.ConsequenceSummary), MaxSummaryLength);
+        string normalizedNewsTitle = NormalizeRequired(request.NewsTitle, nameof(ResolutionReportApprovalRequest.NewsTitle), MaxShortTitleLength);
+        string normalizedNewsSummary = NormalizeRequired(request.NewsSummary, nameof(ResolutionReportApprovalRequest.NewsSummary), MaxSummaryLength);
+        string normalizedNewsSource = NormalizeOptional(request.NewsSource, nameof(ResolutionReportApprovalRequest.NewsSource), MaxShortTitleLength) ?? "BLACK LEDGER";
+        string normalizedNewsUrl = NormalizeOptional(request.NewsUrl, nameof(ResolutionReportApprovalRequest.NewsUrl), MaxUrlLength)
             ?? $"https://example.invalid/chummer/world-tick/{workspace.CampaignId}/{normalizedRunId}";
-        string? normalizedNextSafeAction = AccountService.NormalizeOptional(request.NextSafeAction);
-        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        string? normalizedNextSafeAction = NormalizeOptional(request.NextSafeAction, nameof(ResolutionReportApprovalRequest.NextSafeAction), MaxNextSafeActionLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(ResolutionReportApprovalRequest.Note), MaxNoteLength);
 
         lock (_store.Gate)
         {
@@ -1993,16 +1992,16 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(request);
 
         var command = new DossierMovementCommand(
-            DossierId: ResolveRosterTransferRequestIdentity(request.DossierId, "dossier"),
-            TargetGroupId: ResolveRosterTransferRequestIdentity(request.TargetGroupId, "target group"),
-            TargetCampaignId: AccountService.NormalizeOptional(request.TargetCampaignId),
-            TargetCampaignTitle: AccountService.NormalizeOptional(request.TargetCampaignTitle),
-            TargetRunId: AccountService.NormalizeOptional(request.TargetRunId),
-            TargetRunTitle: AccountService.NormalizeOptional(request.TargetRunTitle),
-            TargetSceneId: AccountService.NormalizeOptional(request.TargetSceneId),
-            TargetSceneTitle: AccountService.NormalizeOptional(request.TargetSceneTitle),
-            TargetOwnerUserId: AccountService.NormalizeOptional(request.TargetOwnerUserId),
-            Note: AccountService.NormalizeOptional(request.Note));
+            DossierId: ResolveRosterTransferRequestIdentity(request.DossierId, nameof(DossierMovementRequest.DossierId)),
+            TargetGroupId: ResolveRosterTransferRequestIdentity(request.TargetGroupId, nameof(DossierMovementRequest.TargetGroupId)),
+            TargetCampaignId: NormalizeOptional(request.TargetCampaignId, nameof(DossierMovementRequest.TargetCampaignId), MaxIdentifierLength),
+            TargetCampaignTitle: NormalizeOptional(request.TargetCampaignTitle, nameof(DossierMovementRequest.TargetCampaignTitle), MaxShortTitleLength),
+            TargetRunId: NormalizeOptional(request.TargetRunId, nameof(DossierMovementRequest.TargetRunId), MaxIdentifierLength),
+            TargetRunTitle: NormalizeOptional(request.TargetRunTitle, nameof(DossierMovementRequest.TargetRunTitle), MaxShortTitleLength),
+            TargetSceneId: NormalizeOptional(request.TargetSceneId, nameof(DossierMovementRequest.TargetSceneId), MaxIdentifierLength),
+            TargetSceneTitle: NormalizeOptional(request.TargetSceneTitle, nameof(DossierMovementRequest.TargetSceneTitle), MaxShortTitleLength),
+            TargetOwnerUserId: NormalizeOptional(request.TargetOwnerUserId, nameof(DossierMovementRequest.TargetOwnerUserId), MaxIdentifierLength),
+            Note: NormalizeOptional(request.Note, nameof(DossierMovementRequest.Note), MaxCompactNoteLength));
 
         lock (_store.Gate)
         {
@@ -2108,10 +2107,16 @@ public sealed class CampaignSpineService
         ArgumentNullException.ThrowIfNull(requester);
         ArgumentNullException.ThrowIfNull(request);
 
+        string dossierId = ResolveRosterTransferRequestIdentity(request.DossierId, nameof(RosterTransferRequest.DossierId));
+        string targetGroupId = ResolveRosterTransferRequestIdentity(request.TargetGroupId, nameof(RosterTransferRequest.TargetGroupId));
+        string? targetCampaignId = NormalizeOptional(request.TargetCampaignId, nameof(RosterTransferRequest.TargetCampaignId), MaxIdentifierLength);
+        string? targetCampaignTitle = NormalizeOptional(request.TargetCampaignTitle, nameof(RosterTransferRequest.TargetCampaignTitle), MaxCompactTitleLength);
+        string? targetOwnerUserId = NormalizeOptional(request.TargetOwnerUserId, nameof(RosterTransferRequest.TargetOwnerUserId), MaxIdentifierLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(RosterTransferRequest.Note), MaxCompactNoteLength);
+
         lock (_store.Gate)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            string dossierId = ResolveRosterTransferRequestIdentity(request.DossierId, "dossier");
             var dossier = _store.DossiersById.GetValueOrDefault(dossierId)
                 ?? throw new KeyNotFoundException($"Unknown dossier: {dossierId}");
             var sourceCampaign = _store.CampaignSpinesById.GetValueOrDefault(dossier.CampaignId ?? string.Empty)
@@ -2123,7 +2128,6 @@ public sealed class CampaignSpineService
                 throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm on the source group to move roster state.");
             }
 
-            string targetGroupId = ResolveRosterTransferRequestIdentity(request.TargetGroupId, "target group");
             var targetGroup = _store.GroupsById.GetValueOrDefault(targetGroupId)
                 ?? throw new KeyNotFoundException($"Unknown target group: {targetGroupId}");
             if (!CanManageRosterGroup(targetGroup, requester.UserId))
@@ -2133,14 +2137,10 @@ public sealed class CampaignSpineService
 
             string previousOwnerUserId = dossier.OwnerUserId;
             var previousOwner = _store.UsersById.GetValueOrDefault(previousOwnerUserId);
-            string currentOwnerUserId = AccountService.NormalizeOptional(request.TargetOwnerUserId)
-                is not { } normalizedTargetOwnerUserId
-                ? dossier.OwnerUserId
-                : normalizedTargetOwnerUserId;
+            string currentOwnerUserId = targetOwnerUserId ?? dossier.OwnerUserId;
             var currentOwner = _store.UsersById.GetValueOrDefault(currentOwnerUserId)
                 ?? throw new KeyNotFoundException($"Unknown target owner: {currentOwnerUserId}");
-            string? targetCampaignId = AccountService.NormalizeOptional(request.TargetCampaignId);
-            var targetCampaign = ResolveOrCreateTransferCampaignLocked(targetGroup, targetCampaignId, request.TargetCampaignTitle, now);
+            var targetCampaign = ResolveOrCreateTransferCampaignLocked(targetGroup, targetCampaignId, targetCampaignTitle, now);
             if (!string.Equals(previousOwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)
                 && _store.DossiersById.Values.Any(item =>
                     !string.Equals(item.DossierId, dossier.DossierId, StringComparison.OrdinalIgnoreCase)
@@ -2197,7 +2197,7 @@ public sealed class CampaignSpineService
                 SessionId: targetRunId,
                 SceneId: targetSceneId,
                 RecapArtifactId: StableId("recap", targetCampaign.CampaignId));
-            string note = string.IsNullOrWhiteSpace(request.Note) ? "" : $" Note: {request.Note.Trim()}";
+            string note = string.IsNullOrWhiteSpace(normalizedNote) ? string.Empty : $" Note: {normalizedNote}";
             var transferredDossier = dossier with
             {
                 OwnerUserId = currentOwnerUserId,
@@ -5133,8 +5133,53 @@ public sealed class CampaignSpineService
             .Where(static line => !string.IsNullOrWhiteSpace(line))
             .Select(static line => line.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(8)
+            .Take(MaxLineCount)
             .ToArray();
+
+    private static string NormalizeRequired(string? value, string parameterName, int maxLength)
+        => NormalizeOptional(value, parameterName, maxLength)
+            ?? throw new ArgumentException($"{parameterName} is required.", parameterName);
+
+    private static string? NormalizeOptional(string? value, string parameterName, int maxLength)
+    {
+        string? normalized = AccountService.NormalizeOptional(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException($"{parameterName} exceeds the maximum length of {maxLength}.", parameterName);
+        }
+
+        return normalized;
+    }
+
+    private static IReadOnlyList<string> NormalizeLines(IReadOnlyList<string>? lines, string parameterName)
+    {
+        if (lines is null || lines.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        if (lines.Count > MaxLineCount)
+        {
+            throw new ArgumentException($"{parameterName} exceeds the maximum item count of {MaxLineCount}.", parameterName);
+        }
+
+        List<string> normalized = new(lines.Count);
+        foreach (string line in lines)
+        {
+            string? normalizedLine = NormalizeOptional(line, parameterName, MaxLineLength);
+            if (normalizedLine is not null)
+            {
+                normalized.Add(normalizedLine);
+            }
+        }
+
+        return normalized;
+    }
 
     private static int OperatorRolePriority(string? role)
         => role?.Trim().ToLowerInvariant() switch
@@ -7129,9 +7174,8 @@ public sealed class CampaignSpineService
     private static string ResolveChangePacketIdentity(string? identity, string fallback)
         => AccountService.NormalizeOptional(identity) ?? fallback;
 
-    private static string ResolveRosterTransferRequestIdentity(string? identity, string fieldLabel)
-        => AccountService.NormalizeOptional(identity)
-            ?? throw new KeyNotFoundException($"Unknown {fieldLabel}: {identity}");
+    private static string ResolveRosterTransferRequestIdentity(string? identity, string parameterName)
+        => NormalizeRequired(identity, parameterName, MaxIdentifierLength);
 
     private static string ResolveRecapProjectionIdentity(PublicationSafeProjection recap)
         => ResolveChangePacketIdentity(

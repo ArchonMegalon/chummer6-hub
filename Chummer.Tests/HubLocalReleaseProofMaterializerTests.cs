@@ -166,7 +166,7 @@ public sealed class HubLocalReleaseProofMaterializerTests
             journeys);
     }
 
-    private static void RunMaterializer(string scriptPath, string proofPath)
+    private static void RunMaterializer(string scriptPath, string proofPath, IReadOnlyDictionary<string, string>? environment = null)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -176,6 +176,14 @@ public sealed class HubLocalReleaseProofMaterializerTests
             RedirectStandardOutput = true,
             UseShellExecute = false,
         };
+
+        if (environment is not null)
+        {
+            foreach ((string key, string value) in environment)
+            {
+                startInfo.Environment[key] = value;
+            }
+        }
 
         using Process process = Process.Start(startInfo)!;
         string stdout = process.StandardOutput.ReadToEnd();

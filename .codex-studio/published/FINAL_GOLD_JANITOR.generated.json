@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-23T13:14:17Z",
+  "generated_at_utc": "2026-06-28T14:41:52Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -17,7 +17,7 @@
       "generated_at_utc": "2026-06-23T13:12:20Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": true
+      "pass": false
     },
     "rule_authority_minimum_coverage": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
@@ -26,7 +26,7 @@
       "generated_at_utc": "2026-06-22T13:24:00Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": true,
+      "pass": false,
       "rulesets": {
         "sr4": {
           "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR4_RULEFACT_REGISTRY.generated.json",
@@ -439,7 +439,7 @@
       "generated_at_utc": "2026-06-22T13:24:01.049104Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": true,
+      "pass": false,
       "workflow_assumed_rulesets": [],
       "authority_approved_rulesets": [
         "sr4",
@@ -520,7 +520,7 @@
       "generated_at_utc": "2026-06-22T13:24:01Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": true
+      "pass": false
     },
     "black_ledger_live_media_proof": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
@@ -569,7 +569,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-22T13:59:07Z",
+      "generated_at_utc": "2026-06-28T09:51:52Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
       "pass": true
@@ -617,7 +617,25 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-23T08:52:24Z",
+      "generated_at_utc": "2026-06-27T18:07:57Z",
+      "fresh_within_hours": 24,
+      "structured_failures_count": 0,
+      "pass": true
+    },
+    "participate_billing_honesty": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PARTICIPATE_BILLING_HONESTY.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-27T18:16:40.946224Z",
+      "fresh_within_hours": 24,
+      "structured_failures_count": 0,
+      "pass": true
+    },
+    "account_handoff_runtime_config": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-28T14:40:08Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
       "pass": true
@@ -626,7 +644,7 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-23T08:52:01Z",
+      "generated_at_utc": "2026-06-27T18:08:14Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
       "pass": true
@@ -677,15 +695,15 @@
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-23T08:52:35Z",
+      "generated_at_utc": "2026-06-28T14:41:51Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
       "pass": true,
       "verdict": "OPERABLE_RELEASE_READY",
       "failures": [],
       "release": {
-        "version": "run-258",
-        "published_at": "2026-06-20T08:00:00Z",
+        "version": "run-20260627-005402",
+        "published_at": "2026-06-27T07:51:47Z",
         "channel": "public_stable",
         "rollout_state": "public_stable",
         "supportability_state": "gold_supported",
@@ -814,7 +832,11 @@
     }
   ],
   "failures": [
+    "live_public_web_recrawl stale",
+    "rule_authority_minimum_coverage stale",
+    "ruleset_readiness stale",
     "provider_proof_discoverability stale",
+    "desktop_native_model_depth stale",
     "black_ledger_live_media_proof stale",
     "table_pulse_scenario_replay stale",
     "public_route_proof stale",

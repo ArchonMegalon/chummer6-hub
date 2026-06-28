@@ -13,6 +13,8 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/ledger")]
 public sealed class LedgerController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
     private readonly LedgerService _ledger;
@@ -37,6 +39,7 @@ public sealed class LedgerController : ControllerBase
     }
 
     [HttpPost("receipts")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<ReceiptIngestResultDto>(StatusCodes.Status200OK)]
     public ActionResult<ReceiptIngestResultDto> Ingest([FromBody] JsonElement receipt)
     {
@@ -184,6 +187,7 @@ public sealed class LedgerController : ControllerBase
     }
 
     [HttpPost("/api/v1/account/ledger/allegiance/join")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [Produces("application/json")]
     public async Task<ActionResult<BlackLedgerFactionJoinReceiptDto>> JoinLedgerFaction(
         [FromBody] JoinFactionRequest? body,
@@ -208,6 +212,7 @@ public sealed class LedgerController : ControllerBase
     }
 
     [HttpPost("/api/v1/account/ledger/factions")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [Produces("application/json")]
     public async Task<ActionResult<BlackLedgerFactionCharterDto>> CreateLedgerFaction(
         [FromBody] BlackLedgerCreateFactionRequest? body,
@@ -239,6 +244,7 @@ public sealed class LedgerController : ControllerBase
     }
 
     [HttpPost("/api/v1/account/ledger/factions/{factionId}/actions")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [Produces("application/json")]
     public async Task<ActionResult<BlackLedgerFactionActionReceiptDto>> ExecuteLedgerFactionAction(
         [FromRoute] string factionId,
@@ -289,6 +295,7 @@ public sealed class LedgerController : ControllerBase
     }
 
     [HttpPost("/api/v1/account/ledger/factions/{factionId}/moderation/suppress")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [Produces("application/json")]
     public async Task<ActionResult<BlackLedgerFactionModerationReceiptDto>> SuppressLedgerFactionPublicProjection(
         [FromRoute] string factionId,
@@ -440,6 +447,7 @@ public sealed class LedgerController : ControllerBase
     }
 
     [HttpPost("dispatches")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [Produces("application/json")]
     public ActionResult<object> CreateBlackLedgerDispatch([FromBody] CreateLedgerDispatchApiRequest request)
     {
@@ -468,6 +476,7 @@ public sealed class LedgerController : ControllerBase
     }
 
     [HttpPost("dispatches/{dispatchId}/approve")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [Produces("application/json")]
     public ActionResult<object> ApproveBlackLedgerDispatch([FromRoute] string dispatchId, [FromBody] ApproveLedgerDispatchApiRequest request)
     {
@@ -493,6 +502,7 @@ public sealed class LedgerController : ControllerBase
     }
 
     [HttpPost("/api/v1/account/campaigns/{campaignId}/ledger/private-lore-overlay")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [Produces("application/json")]
     public async Task<ActionResult<object>> UpsertPrivateLoreOverlay([FromRoute] string campaignId, [FromBody] PrivateLoreOverlayRequest request, CancellationToken cancellationToken)
     {

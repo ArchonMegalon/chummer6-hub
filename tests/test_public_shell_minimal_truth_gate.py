@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,6 +27,7 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
     PRODUCTLIFT_LEAK = False
     UPSTREAM_ERROR = False
     PARTICIPATE_UNAVAILABLE = False
+    CONFIGURED_BILLING_HANDOFF = False
 
     def do_GET(self) -> None:  # noqa: N802
         path = self.path
@@ -59,15 +62,16 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                 """
                 <html>
                   <head>
-                    <base href="/participate/" />
-                    <title>Participate - Chummer.run</title>
                     <link rel="canonical" href="/participate" />
-                    <meta property="og:title" content="Public bugs and requests - Chummer.run" />
+                    <title>Participate - Chummer.run</title>
+                    <meta property="og:title" content="Participate - Chummer.run" />
                     <meta property="og:url" content="/participate" />
                     <meta name="twitter:url" content="/participate" />
                   </head>
                   <body>
-                    <style data-chummer-board-skin></style>
+                    <h1>What should Chummer do next?</h1>
+                    <p>Public requests, clear bugs, useful ideas.</p>
+                    <a href="/participate/board">Open board</a>
                   </body>
                 </html>
                 """,
@@ -99,8 +103,8 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                 body = body.replace("</body>", "<p>Something went wrong on our side. Could not load posts.</p></body>")
             self._send_html(200, body)
             return
-        if path == "/login?next=%2F":
-            og_value = "" if type(self).EMPTY_LOGIN_META else "/login?next=%2F"
+        if path.startswith("/login"):
+            og_value = "" if type(self).EMPTY_LOGIN_META else path
             self._send_html(
                 200,
                 f"""
@@ -110,13 +114,21 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                     <meta name="twitter:url" content="/login?next=%2F" />
                   </head>
                   <body>
+                    <h1>Open Chummer</h1>
+                    <p>Email first. Google if you prefer.</p>
                     <a href="/auth/email/start">Continue with email</a>
+                    <a href="/auth/google/start">Continue with Google</a>
                   </body>
                 </html>
                 """,
             )
             return
         if path == "/account/billing":
+            if type(self).CONFIGURED_BILLING_HANDOFF:
+                self.send_response(302)
+                self.send_header("Location", "/login?next=%2Faccount%2Fbilling")
+                self.end_headers()
+                return
             self._send_html(
                 200,
                 """
@@ -126,7 +138,8 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                     <meta name="twitter:url" content="/account/billing" />
                   </head>
                   <body>
-                    <p>Supporter checkout is unavailable right now.</p>
+                    <h1>Membership</h1>
+                    <p>Supporter checkout is not open right now.</p>
                   </body>
                 </html>
                 """,
@@ -187,6 +200,7 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         _PublicShellMinimalTruthHandler.PRODUCTLIFT_LEAK = False
         _PublicShellMinimalTruthHandler.UPSTREAM_ERROR = False
         _PublicShellMinimalTruthHandler.PARTICIPATE_UNAVAILABLE = False
+        _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = False
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _PublicShellMinimalTruthHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -202,6 +216,25 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
 
         self.assertEqual(payload["status"], "pass")
         self.assertEqual(payload["failure_count"], 0)
+
+    def test_gate_passes_when_live_billing_requires_first_party_sign_in_handoff(self) -> None:
+        _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = True
+
+        with mock.patch.dict(os.environ, {"CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT": "1"}, clear=False):
+            payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
+
+        self.assertEqual(payload["status"], "pass")
+        self.assertTrue(payload["require_brilliant_directories_checkout"])
+        billing = next(item for item in payload["routes"] if item["route"] == "/account/billing")
+        self.assertEqual("/login", billing["finalPath"])
+
+    def test_gate_fails_when_live_billing_stays_on_placeholder_surface(self) -> None:
+        with mock.patch.dict(os.environ, {"CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT": "1"}, clear=False):
+            payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
+
+        self.assertEqual(payload["status"], "fail")
+        self.assertTrue(any("/account/billing:" in failure for failure in payload["failures"]))
+        self.assertTrue(any("Membership" in failure or "Supporter is not open right now." in failure for failure in payload["failures"]))
 
     def test_gate_fails_when_contact_page_leaks_participate_detour(self) -> None:
         _PublicShellMinimalTruthHandler.BAD_CONTACT_COPY = True

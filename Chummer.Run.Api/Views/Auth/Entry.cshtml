@@ -3,14 +3,16 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = Model.CreateAccount ? "surface-auth surface-minimal" : "surface-auth surface-minimal surface-auth-login";
-    ViewData["HideAuthChrome"] = !Model.CreateAccount;
+    ViewData["HideAuthChrome"] = true;
 }
 
 <section class="auth-entry auth-entry--lean" aria-labelledby="auth-title">
     <div class="auth-panel auth-panel--entry">
         <div class="auth-panel__intro auth-panel__intro--masthead">
+            <p class="auth-panel__eyebrow">Next</p>
             <h1 id="auth-title">@Model.Heading</h1>
             <p class="auth-panel__hint">@Model.SupportLine</p>
+            <p class="auth-panel__meta">@Model.ReturnLine</p>
         </div>
 
         <form class="auth-form" method="post" action="/auth/email/start">

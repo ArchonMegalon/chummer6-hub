@@ -3,87 +3,158 @@
     ViewData["Title"] = "Participate";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-minimal surface-participate surface-partizipate";
-    var maxVisiblePosts = 8;
-    var displayPosts = Model.Posts
-        .Take(maxVisiblePosts)
-        .Select(post => new ParticipateItemViewModel(post.Score, post.Title, post.Summary, post.Status, post.Href))
-        .ToArray();
-    var hasMorePosts = Model.Posts.Count > maxVisiblePosts;
+
+    var boardSummary = string.IsNullOrWhiteSpace(Model.EntrySummary)
+        ? (Model.EmbeddedBoardEnabled ? "The board opens here." : "Board offline right now.")
+        : Model.EntrySummary;
+    var boardStateSummary = Model.EmbeddedBoardEnabled
+        ? "Board is live."
+        : Model.LoadedFromBoard
+            ? "Showing the last saved request snapshot."
+            : "Board offline right now.";
+    var requestCountLabel = Model.TotalRequestCount switch
+    {
+        > 1 => $"{Model.TotalRequestCount} requests live",
+        1 => "1 request live",
+        _ => string.Empty
+    };
+    var previewPosts = Model.Posts.Take(3).ToArray();
+    var previewFallbackItems = previewPosts.Length == 0 ? Model.FallbackItems.Take(3).ToArray() : System.Array.Empty<ParticipateItemViewModel>();
+    var hasPreviewItems = previewPosts.Length > 0 || previewFallbackItems.Length > 0;
+    var showPreview = hasPreviewItems && !Model.EmbeddedBoardEnabled;
+    static string PublicParticipateText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
-<style data-chummer-board-skin>
-</style>
-
-<section class="partizipate-board" aria-labelledby="partizipate-title">
-    <header class="partizipate-board__header">
-        <div>
-            <p class="partizipate-board__eyebrow">@Model.StatusLabel</p>
-            <h1 id="partizipate-title">@Model.Heading</h1>
-        </div>
-        <p>@Model.Summary</p>
-        @if (Model.LoadedFromBoard)
+<section class="minimal-page-hero participate-hero route-anchor-target" aria-labelledby="partizipate-title">
+    <div class="participate-hero__copy">
+        <p class="eyebrow">@Model.StatusLabel</p>
+        <h1 id="partizipate-title">@PublicParticipateText(Model.Heading)</h1>
+        <p>@PublicParticipateText(Model.Summary)</p>
+    </div>
+    <div class="participate-hero__status">
+        @if (!string.IsNullOrWhiteSpace(Model.EntryHref) && !string.IsNullOrWhiteSpace(Model.EntryLabel))
         {
-            <p class="partizipate-board__meta">@Model.TotalRequestCount items · @Model.SyncedLabel</p>
+            <a class="button-like button-like--ghost" href="@Model.EntryHref">@PublicParticipateText(Model.EntryLabel)</a>
         }
-    </header>
-
-    @if (Model.LoadedFromBoard)
-    {
-            <div class="partizipate-board__grid" aria-label="Public requests">
-            @foreach (var item in displayPosts)
-            {
-                <article class="partizipate-request">
-                    <div class="partizipate-request__score" aria-label="@item.Score votes">
-                        <strong>@item.Score</strong>
-                        <span>votes</span>
-                    </div>
-                    <div class="partizipate-request__body">
-                        <div class="partizipate-request__topline">
-                            <span>@item.Status</span>
-                        </div>
-                        <h2>
-                            @if (!string.IsNullOrWhiteSpace(item.Href))
-                            {
-                                <a href="@item.Href">@item.Title</a>
-                            }
-                            else
-                            {
-                                @item.Title
-                            }
-                        </h2>
-                        @if (!string.IsNullOrWhiteSpace(item.Summary))
-                        {
-                            <p>@item.Summary</p>
-                        }
-                    </div>
-                </article>
-            }
-            @if (hasMorePosts)
-            {
-                <p class="partizipate-board__meta">Showing the top 8 requests.</p>
-            }
-        </div>
-    }
-    else
-    {
-        <article class="partizipate-request partizipate-request--empty" role="status">
-            <div class="partizipate-request__body">
-                <div class="partizipate-request__topline">
-                    <span>Unavailable</span>
-                </div>
-                <h2>Participate is temporarily unavailable</h2>
-                <p>Try again later. Use Discord for normal questions or Contact for private details.</p>
-            </div>
-        </article>
-    }
-
-    <nav class="partizipate-board__actions" aria-label="Participate actions">
-        <a class="button-like button-like--primary" href="@Model.RetryHref">Reload</a>
-        <a class="button-like button-like--secondary" href="@Model.RoadmapHref">Roadmap</a>
-        <a class="button-like button-like--secondary" href="@Model.SupportHref">Private message</a>
         @if (!string.IsNullOrWhiteSpace(Model.SupporterHref))
         {
             <a class="button-like button-like--ghost" href="@Model.SupporterHref">Supporter</a>
         }
-    </nav>
+        @if (!string.IsNullOrWhiteSpace(Model.DirectBoardHref))
+        {
+            <a class="button-like button-like--secondary" href="@Model.DirectBoardHref">Open board</a>
+        }
+    </div>
+</section>
+
+<section class="participate-shell" aria-label="Participate board">
+    <div class="participate-hosted">
+        <div class="participate-hosted__header">
+            <div class="participate-hosted__lead">
+                <h2>Current requests</h2>
+                <p>@boardStateSummary</p>
+            </div>
+            <div class="participate-hosted__status">
+                @if (!string.IsNullOrWhiteSpace(requestCountLabel))
+                {
+                    <span class="participate-count">@requestCountLabel</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.SyncedLabel) && !string.Equals(Model.SyncedLabel, boardStateSummary, StringComparison.Ordinal))
+                {
+                    <span class="participate-chip">@PublicParticipateText(Model.SyncedLabel)</span>
+                }
+            </div>
+        </div>
+
+        @if (!Model.EmbeddedBoardEnabled && !string.IsNullOrWhiteSpace(boardSummary))
+        {
+            <div class="participate-toolbar">
+                <p class="participate-toolbar__note">@PublicParticipateText(boardSummary)</p>
+            </div>
+        }
+
+        @if (showPreview)
+        {
+            <div class="participate-preview-list" aria-label="Request preview list">
+                @foreach (var post in previewPosts)
+                {
+                    var scoreLabel = post.Score == 1 ? "1 request" : $"{post.Score} requests";
+                    <article class="participate-preview-card">
+                        <div class="participate-preview-card__facts" aria-label="Request facts">
+                            <span>@scoreLabel</span>
+                            @if (post.CommentCount > 0)
+                            {
+                                <span>@post.CommentCount comment@(post.CommentCount == 1 ? string.Empty : "s")</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(post.UpdatedLabel))
+                            {
+                                <span>@post.UpdatedLabel</span>
+                            }
+                            <span>@post.Status</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(post.Href))
+                        {
+                            <a class="participate-preview-card__title" href="@post.Href">@post.Title</a>
+                        }
+                        else
+                        {
+                            <h3>@post.Title</h3>
+                        }
+                        <p>@post.Summary</p>
+                        @if (!string.IsNullOrWhiteSpace(post.Href))
+                        {
+                            <a class="inline-link participate-preview-card__link" href="@post.Href">Open details</a>
+                        }
+                    </article>
+                }
+                @foreach (var item in previewFallbackItems)
+                {
+                    var scoreLabel = item.Score == 1 ? "1 request" : $"{item.Score} requests";
+                    <article class="participate-preview-card">
+                        <div class="participate-preview-card__facts" aria-label="Request facts">
+                            <span>@scoreLabel</span>
+                            <span>@item.Status</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(item.Href))
+                        {
+                            <a class="participate-preview-card__title" href="@item.Href">@item.Title</a>
+                        }
+                        else
+                        {
+                            <h3>@item.Title</h3>
+                        }
+                        <p>@item.Summary</p>
+                        @if (!string.IsNullOrWhiteSpace(item.Href))
+                        {
+                            <a class="inline-link participate-preview-card__link" href="@item.Href">Open details</a>
+                        }
+                    </article>
+                }
+            </div>
+        }
+
+        @if (Model.EmbeddedBoardEnabled && !string.IsNullOrWhiteSpace(Model.EmbeddedBoardHref))
+        {
+            <div class="participate-hosted__frame-shell" data-chummer-participate-frame-shell>
+                <iframe
+                    class="participate-hosted__frame"
+                    src="@Model.EmbeddedBoardHref"
+                    title="Participate board"
+                    loading="eager"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                    data-chummer-participate-frame></iframe>
+            </div>
+        }
+        else
+        {
+            <article class="participate-board-fallback" role="status" aria-live="polite">
+                <p>Board offline right now. Use private support only when it should stay private.</p>
+                <nav aria-label="Participate recovery actions">
+                    <a class="button-like button-like--primary" href="@Model.RetryHref">Retry</a>
+                    <a class="button-like button-like--secondary" href="@Model.RoadmapHref">Roadmap</a>
+                    <a class="button-like button-like--ghost" href="@Model.SupportHref">Private support</a>
+                </nav>
+            </article>
+        }
+    </div>
 </section>

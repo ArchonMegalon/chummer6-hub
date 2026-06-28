@@ -5,109 +5,46 @@
     ViewData["SurfaceClass"] = "surface-roadmap surface-minimal";
 }
 
-<section class="minimal-page-hero route-anchor-target roadmap-signal">
+<section class="minimal-page-hero route-anchor-target" aria-labelledby="roadmap-title">
     <div>
         <p class="eyebrow">Roadmap</p>
-        <h1>Now and next.</h1>
-        <p>Install reliability, cleaner screens, less noise.</p>
+        <h1 id="roadmap-title">Now and next.</h1>
+        <p>Planned work is here. Shipped work stays in Changelog.</p>
+        <div class="minimal-actions" aria-label="Roadmap actions">
+            <a class="button-like button-like--primary" href="/changelog">Changelog</a>
+            <a class="button-like button-like--ghost" href="/participate">Participate</a>
+        </div>
     </div>
 </section>
-
-<section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-active-work">
-    <div class="minimal-section__lead">
-        <p class="eyebrow">Now</p>
-        <h2 id="roadmap-active-work">Current focus</h2>
-        <p>Only the active work.</p>
-    </div>
-    <div class="minimal-lane-grid">
-            <article class="minimal-lane-card">
-                <span class="tag">Install</span>
-                <h3>Make setup boring</h3>
-                <p>Smaller installers, visible update progress, and cleaner recovery.</p>
-            </article>
-            <article class="minimal-lane-card">
-                <span class="tag">Desktop</span>
-                <h3>Clean the builder</h3>
-                <p>Readable controls, less duplicated UI, fewer surprises.</p>
-            </article>
-            <article class="minimal-lane-card">
-                <span class="tag">Web</span>
-                <h3>Keep the site quiet</h3>
-                <p>Downloads, help, billing, and feedback should stay short and clear.</p>
-            </article>
-        </div>
-</section>
-
-@if (Model.Milestones.Count > 0)
-{
-    <section class="minimal-section roadmap-milestones" aria-labelledby="roadmap-milestones-title">
-        <div class="minimal-section__lead">
-            <p class="eyebrow">Milestones</p>
-            <h2 id="roadmap-milestones-title">In progress</h2>
-            <p>Short milestone readouts.</p>
-        </div>
-        <div class="minimal-lane-grid">
-            @foreach (var milestone in Model.Milestones.Take(6))
-            {
-                <article class="minimal-lane-card">
-                    <span class="tag">@milestone.WaveLabel</span>
-                    <h3>@milestone.Title</h3>
-                    <p>@milestone.CasualSummary</p>
-                    <p class="muted-copy">@milestone.StatusLabel</p>
-                </article>
-            }
-        </div>
-    </section>
-}
 
 @if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))
 {
-    <div class="minimal-section minimal-section--tight roadmap-board" aria-labelledby="roadmap-board-title">
-        <div class="minimal-section__lead">
-            <p class="eyebrow">Board</p>
-            <h2 id="roadmap-board-title">Roadmap board</h2>
-            <p>Live board, same site.</p>
+    <section class="minimal-section minimal-section--tight roadmap-frame roadmap-frame--minimal" aria-labelledby="roadmap-board-title">
+        <div class="minimal-section__lead roadmap-frame__lead">
+            <p class="eyebrow">Live board</p>
+            <h2 id="roadmap-board-title">Current work</h2>
+            <p>Current work opens below.</p>
         </div>
-        <iframe id="roadmap-board"
-                title="Chummer roadmap board"
-                src="@Model.HostedBoardHref"
-                loading="lazy"></iframe>
-    </div>
+        <iframe
+            class="roadmap-frame__embed"
+            src="@Model.HostedBoardHref"
+            title="Roadmap board"
+            loading="eager"
+            referrerpolicy="strict-origin-when-cross-origin"
+            data-chummer-roadmap-frame></iframe>
+    </section>
 }
-
-@if (Model.PublicRequests.Count > 0)
+else
 {
-    <section class="minimal-section minimal-section--tight roadmap-public-requests" aria-labelledby="roadmap-public-requests">
+    <section class="minimal-section minimal-section--tight roadmap-fallback-state" aria-labelledby="roadmap-fallback-title">
         <div class="minimal-section__lead">
-            <p class="eyebrow">Requests</p>
-            <h2 id="roadmap-public-requests">Top requests</h2>
-            <p>@Model.PublicRequestCount public requests · @Model.PublicRequestSyncedLabel</p>
+            <p class="eyebrow">Roadmap</p>
+            <h2 id="roadmap-fallback-title">Board not loading right now</h2>
+            <p>Planned work is here. Shipped work stays in Changelog.</p>
         </div>
-        <div class="minimal-lane-grid">
-            @foreach (var item in Model.PublicRequests)
-            {
-                <article class="minimal-lane-card">
-                    <span class="tag">@item.Score votes</span>
-                    <h3>@item.Title</h3>
-                    @if (!string.IsNullOrWhiteSpace(item.Summary))
-                    {
-                        <p>@item.Summary</p>
-                    }
-                </article>
-            }
+        <div class="minimal-actions">
+            <a class="button-like button-like--primary" href="/changelog">Changelog</a>
+            <a class="button-like button-like--ghost" href="/participate">Participate</a>
         </div>
     </section>
 }
-
-<div class="minimal-section minimal-section--tight">
-    <div class="minimal-section__lead">
-        <p class="eyebrow">Elsewhere</p>
-        <h2>Other pages</h2>
-        <p>Participate, changelog, and help.</p>
-    </div>
-    <div class="minimal-actions">
-        <a class="button-like button-like--primary" href="/participate">Participate</a>
-        <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
-        <a class="button-like button-like--ghost" href="/help">Support</a>
-    </div>
-</div>

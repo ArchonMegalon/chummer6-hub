@@ -8,6 +8,22 @@ namespace Chummer.Run.Api.Services.Community;
 
 public sealed class BoostSessionService
 {
+    public const int MaxCreateRequestBodyBytes = 16 * 1024;
+
+    private const int MaxSubjectIdLength = 128;
+    private const int MaxProjectIdLength = 128;
+    private const int MaxGroupIdLength = 128;
+    private const int MaxSubjectLabelLength = 160;
+    private const int MaxParticipantCodexCodeInputLength = 64;
+    private const int MaxParticipantCodexCodeLength = 48;
+    private const int MaxBoostCodeLength = 128;
+    private const int MaxCampaignIdLength = 128;
+    private const int MaxVisibilityLength = 32;
+    private const int MaxLaneTypeLength = 64;
+    private const int MaxLaneRoleLength = 64;
+    private const int MaxAuthorizationTierLength = 64;
+    private const int MaxTierSourceLength = 64;
+
     private readonly CommunityStore _store;
     private readonly AccountService _accounts;
     private readonly GroupService _groups;
@@ -30,21 +46,22 @@ public sealed class BoostSessionService
 
     public SponsorSessionStatusDto Create(CreateSponsorSessionRequest request)
     {
-        var subjectId = AccountService.NormalizeRequired(request.SubjectId ?? string.Empty, nameof(request.SubjectId));
-        var user = _accounts.EnsureUser(subjectId, request.SubjectLabel ?? subjectId);
+        CreateSponsorSessionRequest normalizedRequest = NormalizeCreateRequest(request);
+        var subjectId = NormalizeRequired(normalizedRequest.SubjectId ?? string.Empty, nameof(request.SubjectId), MaxSubjectIdLength);
+        var user = _accounts.EnsureUser(subjectId, normalizedRequest.SubjectLabel ?? subjectId);
         var boostCodeId = default(string);
-        var campaignId = AccountService.NormalizeOptional(request.CampaignId);
+        var campaignId = normalizedRequest.CampaignId;
         BoostCodeDto? redeemedBoostCode = null;
-        if (!string.IsNullOrWhiteSpace(request.BoostCode))
+        if (!string.IsNullOrWhiteSpace(normalizedRequest.BoostCode))
         {
-            redeemedBoostCode = _groups.RedeemBoostCode(new RedeemBoostCodeRequest(subjectId, request.BoostCode!));
+            redeemedBoostCode = _groups.RedeemBoostCode(new RedeemBoostCodeRequest(subjectId, normalizedRequest.BoostCode!));
             boostCodeId = redeemedBoostCode.BoostCodeId;
             campaignId ??= redeemedBoostCode.CampaignId;
         }
-        var group = ResolveGroupForSession(user, request, redeemedBoostCode);
+        var group = ResolveGroupForSession(user, normalizedRequest, redeemedBoostCode);
         if (string.IsNullOrWhiteSpace(campaignId))
         {
-            campaignId = _groups.GetOrCreateCampaign(group.GroupId, request.ProjectId, $"{group.Name} sponsor campaign").CampaignId;
+            campaignId = _groups.GetOrCreateCampaign(group.GroupId, normalizedRequest.ProjectId, $"{group.Name} sponsor campaign").CampaignId;
         }
 
         var state = new SponsorSessionState
@@ -52,16 +69,16 @@ public sealed class BoostSessionService
             SponsorSessionId = AccountService.NewId("sps"),
             UserId = user.UserId,
             GroupId = group.GroupId,
-            ProjectId = AccountService.NormalizeRequired(request.ProjectId, nameof(request.ProjectId)),
-            ParticipantCodexCode = NormalizeParticipantCodexCode(request.ParticipantCodexCode),
-            RequestedLaneType = AccountService.NormalizeOptional(request.RequestedLaneType) ?? "participant_burst",
-            RequestedLaneRole = SponsorLaneRolePolicy.Normalize(request.RequestedLaneRole),
-            Visibility = AccountService.NormalizeOptional(request.Visibility) ?? "group",
+            ProjectId = normalizedRequest.ProjectId,
+            ParticipantCodexCode = NormalizeParticipantCodexCode(normalizedRequest.ParticipantCodexCode),
+            RequestedLaneType = normalizedRequest.RequestedLaneType ?? "participant_burst",
+            RequestedLaneRole = SponsorLaneRolePolicy.Normalize(normalizedRequest.RequestedLaneRole),
+            Visibility = normalizedRequest.Visibility ?? "group",
             Status = "intent_created",
             BoostCampaignId = campaignId,
             BoostCodeId = boostCodeId,
-            AuthorizationTier = SponsorStatusPolicy.NormalizeAuthorizationTier(request.AuthorizationTier),
-            TierSource = SponsorStatusPolicy.NormalizeTierSource(request.TierSource ?? (string.IsNullOrWhiteSpace(request.AuthorizationTier) ? null : "user_declared")),
+            AuthorizationTier = SponsorStatusPolicy.NormalizeAuthorizationTier(normalizedRequest.AuthorizationTier),
+            TierSource = SponsorStatusPolicy.NormalizeTierSource(normalizedRequest.TierSource ?? (string.IsNullOrWhiteSpace(normalizedRequest.AuthorizationTier) ? null : "user_declared")),
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
@@ -82,7 +99,8 @@ public sealed class BoostSessionService
         CreateSponsorSessionRequest request,
         CancellationToken cancellationToken)
     {
-        var reusable = FindReusableContributionForRequest(request);
+        CreateSponsorSessionRequest normalizedRequest = NormalizeCreateRequest(request);
+        var reusable = FindReusableContributionForRequest(normalizedRequest);
         if (reusable is not null)
         {
             if (!reusable.Consented)
@@ -109,7 +127,7 @@ public sealed class BoostSessionService
             }
         }
 
-        var created = Create(request);
+        var created = Create(normalizedRequest);
         RecordConsent(created.SponsorSessionId);
         return await StartDeviceAuthAsync(created.SponsorSessionId, cancellationToken);
     }
@@ -414,10 +432,11 @@ public sealed class BoostSessionService
 
     private SponsorSessionStatusDto? FindReusableContributionForRequest(CreateSponsorSessionRequest request)
     {
-        var subjectId = AccountService.NormalizeRequired(request.SubjectId ?? string.Empty, nameof(request.SubjectId));
-        var projectId = AccountService.NormalizeRequired(request.ProjectId, nameof(request.ProjectId));
-        var laneRole = SponsorLaneRolePolicy.Normalize(request.RequestedLaneRole);
-        var participantCodexCode = NormalizeParticipantCodexCode(request.ParticipantCodexCode);
+        CreateSponsorSessionRequest normalizedRequest = NormalizeCreateRequest(request);
+        var subjectId = normalizedRequest.SubjectId!;
+        var projectId = normalizedRequest.ProjectId;
+        var laneRole = SponsorLaneRolePolicy.Normalize(normalizedRequest.RequestedLaneRole);
+        var participantCodexCode = NormalizeParticipantCodexCode(normalizedRequest.ParticipantCodexCode);
         var user = _accounts.EnsureUser(subjectId, subjectId);
         lock (_store.Gate)
         {
@@ -757,19 +776,63 @@ public sealed class BoostSessionService
 
     private sealed record HubUserSubject(string SubjectId, string DisplayName);
 
+    private static CreateSponsorSessionRequest NormalizeCreateRequest(CreateSponsorSessionRequest request)
+        => request with
+        {
+            SubjectId = NormalizeOptional(request.SubjectId, nameof(request.SubjectId), MaxSubjectIdLength),
+            ProjectId = NormalizeRequired(request.ProjectId, nameof(request.ProjectId), MaxProjectIdLength),
+            GroupId = NormalizeOptional(request.GroupId, nameof(request.GroupId), MaxGroupIdLength),
+            SubjectLabel = NormalizeOptional(request.SubjectLabel, nameof(request.SubjectLabel), MaxSubjectLabelLength),
+            ParticipantCodexCode = NormalizeOptional(request.ParticipantCodexCode, nameof(request.ParticipantCodexCode), MaxParticipantCodexCodeInputLength),
+            BoostCode = NormalizeOptional(request.BoostCode, nameof(request.BoostCode), MaxBoostCodeLength),
+            CampaignId = NormalizeOptional(request.CampaignId, nameof(request.CampaignId), MaxCampaignIdLength),
+            Visibility = NormalizeOptional(request.Visibility, nameof(request.Visibility), MaxVisibilityLength) ?? "group",
+            RequestedLaneType = NormalizeOptional(request.RequestedLaneType, nameof(request.RequestedLaneType), MaxLaneTypeLength) ?? "participant_burst",
+            RequestedLaneRole = NormalizeOptional(request.RequestedLaneRole, nameof(request.RequestedLaneRole), MaxLaneRoleLength) ?? "coding",
+            AuthorizationTier = NormalizeOptional(request.AuthorizationTier, nameof(request.AuthorizationTier), MaxAuthorizationTierLength),
+            TierSource = NormalizeOptional(request.TierSource, nameof(request.TierSource), MaxTierSourceLength)
+        };
+
+    private static string NormalizeRequired(string value, string parameterName, int maxLength)
+    {
+        string? normalized = NormalizeOptional(value, parameterName, maxLength);
+        return normalized ?? throw new ArgumentException($"{parameterName} is required.", parameterName);
+    }
+
+    private static string? NormalizeOptional(string? value, string parameterName, int maxLength)
+    {
+        string? normalized = AccountService.NormalizeOptional(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException($"{parameterName} exceeds the maximum length of {maxLength} characters.", parameterName);
+        }
+
+        return normalized;
+    }
+
     private static string? NormalizeParticipantCodexCode(string? value)
     {
-        var raw = AccountService.NormalizeOptional(value);
+        var raw = NormalizeOptional(value, nameof(CreateSponsorSessionRequest.ParticipantCodexCode), MaxParticipantCodexCodeInputLength);
         if (raw is null)
         {
             return null;
         }
 
         var filtered = new string(raw
-            .Trim()
             .Where(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.')
-            .Take(48)
             .ToArray());
+        if (filtered.Length > MaxParticipantCodexCodeLength)
+        {
+            throw new ArgumentException(
+                $"{nameof(CreateSponsorSessionRequest.ParticipantCodexCode)} exceeds the maximum length of {MaxParticipantCodexCodeLength} characters after normalization.",
+                nameof(CreateSponsorSessionRequest.ParticipantCodexCode));
+        }
+
         return string.IsNullOrWhiteSpace(filtered) ? null : filtered;
     }
 }

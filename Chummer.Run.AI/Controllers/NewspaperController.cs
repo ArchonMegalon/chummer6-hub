@@ -8,6 +8,8 @@ namespace Chummer.Run.AI.Controllers;
 [Route("api/v1/ai/newspaper")]
 public sealed class NewspaperController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly INewspaperCompositionService _compositionService;
     private readonly INewspaperHtmlRenderer _htmlRenderer;
     private readonly INewspaperRenderService _renderService;
@@ -23,6 +25,7 @@ public sealed class NewspaperController : ControllerBase
     }
 
     [HttpPost("issue/compose")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<ComposeIssueResponse>(StatusCodes.Status200OK)]
     public ActionResult<ComposeIssueResponse> ComposeIssue([FromBody] ComposeIssueRequest? request)
     {
@@ -36,6 +39,7 @@ public sealed class NewspaperController : ControllerBase
     }
 
     [HttpPost("issue/render-html")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<RenderIssueHtmlResponse>(StatusCodes.Status200OK)]
     public ActionResult<RenderIssueHtmlResponse> RenderIssueHtml([FromBody] RenderIssueHtmlRequest? request)
     {
@@ -49,6 +53,7 @@ public sealed class NewspaperController : ControllerBase
     }
 
     [HttpPost("issue/render-pdf")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [Produces("application/pdf")]
     public async Task<IActionResult> RenderIssuePdf([FromBody] RenderIssueHtmlRequest? request, CancellationToken cancellationToken)

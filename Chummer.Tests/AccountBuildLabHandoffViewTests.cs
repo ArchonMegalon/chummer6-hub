@@ -32,13 +32,15 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("return Redirect($\"/account/access?localCoProcessor={Uri.EscapeDataString(normalizedProfile)}\")", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("/account/advanced?localCoProcessor=", controller, StringComparison.Ordinal);
         Assert.Contains("new SectionLinkViewModel(\"access\", \"Installs\"", controller, StringComparison.Ordinal);
-        Assert.Contains("new SectionLinkViewModel(\"work\", \"Campaigns\"", controller, StringComparison.Ordinal);
+        Assert.Contains("new SectionLinkViewModel(\"work\", \"Roster\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"profile\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"advanced\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"settings\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("claim ticket", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("group lane", controller, StringComparison.Ordinal);
 
         Assert.DoesNotContain("\"settings\" => \"Billing\"", view, StringComparison.Ordinal);
-        Assert.Contains("Installs, campaigns, support, billing, and participation.", view, StringComparison.Ordinal);
+        Assert.Contains("Downloads, runners, support, and membership.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between profile, installs, support, billing, participation, and campaigns.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Move between profile, access, support, and work", view, StringComparison.Ordinal);
@@ -60,10 +62,20 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("@Model.Eyebrow", sectionView, StringComparison.Ordinal);
         Assert.Contains("@Model.Heading", sectionView, StringComparison.Ordinal);
         Assert.Contains("@foreach (var card in Model.Cards)", sectionView, StringComparison.Ordinal);
-        Assert.Contains("Private support stays simple.", supportView, StringComparison.Ordinal);
+        Assert.Contains("<p class=\"eyebrow\">Support</p>", supportView, StringComparison.Ordinal);
+        Assert.Contains("<h1>Support</h1>", supportView, StringComparison.Ordinal);
+        Assert.Contains("Discord for normal questions. Private help for installs, crashes, and account issues.", supportView, StringComparison.Ordinal);
+        Assert.Contains("Use Discord for normal questions and quick feedback.", supportView, StringComparison.Ordinal);
+        Assert.Contains("Private cases stay attached to this account.", supportView, StringComparison.Ordinal);
         Assert.Contains("supportCaseForm", supportView, StringComparison.Ordinal);
+        Assert.Contains("<summary>Quick help</summary>", supportView, StringComparison.Ordinal);
         Assert.Contains("supportAssistantForm", supportView, StringComparison.Ordinal);
         Assert.Contains("ruleGhostForm", supportView, StringComparison.Ordinal);
+        Assert.DoesNotContain("account-linked follow-up", supportView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Account · @Model.Eyebrow", sectionView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Account · Support", supportView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Signed in as @Model.User.DisplayName", supportView, StringComparison.Ordinal);
+        Assert.DoesNotContain("@Model.User.DisplayName", supportView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -168,7 +180,7 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("Open next session note", view, StringComparison.Ordinal);
         Assert.Contains("Open build details for", view, StringComparison.Ordinal);
         Assert.Contains("Create recap or replay", view, StringComparison.Ordinal);
-        Assert.Contains("Recaps and replays become available once this campaign has a tracked run.", view, StringComparison.Ordinal);
+        Assert.Contains("Recaps and replays become available once this campaign has a live run.", view, StringComparison.Ordinal);
         Assert.Contains("Recent aftermath recap packages and replay outputs", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Runboard continuity", view, StringComparison.Ordinal);
         Assert.DoesNotContain("GM prep and travel", view, StringComparison.Ordinal);
@@ -209,5 +221,16 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("Table Pulse updates", view, StringComparison.Ordinal);
         Assert.Contains("Black Ledger involvement", view, StringComparison.Ordinal);
         Assert.Contains("whatsappNotificationsEnabled", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AccountSettingsRendersBlackLedgerStreamOptIn()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Settings.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("blackLedgerNewsEmail", view, StringComparison.Ordinal);
+        Assert.Contains("Black Ledger mobile stream", view, StringComparison.Ordinal);
+        Assert.Contains("blackLedgerNewsEmail: document.getElementById(\"blackLedgerNewsEmail\").checked", view, StringComparison.Ordinal);
     }
 }

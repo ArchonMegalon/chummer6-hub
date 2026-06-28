@@ -53,6 +53,7 @@ public static class HubApiGuardrailPolicy
     public static bool IsExtendedTimeoutPath(PathString path)
         => IsMultipartSupportPath(path)
            || IsFileTransferPath(path)
+           || IsBrowserSurfaceProxyPath(path)
            || path.StartsWithSegments("/api/internal/heyy/scam-chat", StringComparison.OrdinalIgnoreCase);
 
     public static bool IsReleaseBundleUploadPath(PathString path)
@@ -67,6 +68,11 @@ public static class HubApiGuardrailPolicy
         => path.StartsWithSegments("/downloads/file", StringComparison.OrdinalIgnoreCase)
            || path.StartsWithSegments("/downloads/files", StringComparison.OrdinalIgnoreCase)
            || path.StartsWithSegments("/downloads/get", StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsBrowserSurfaceProxyPath(PathString path)
+        => path.StartsWithSegments("/blazor", StringComparison.OrdinalIgnoreCase)
+           || path.StartsWithSegments("/app", StringComparison.OrdinalIgnoreCase)
+           || path.StartsWithSegments("/avalonia", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsBodylessMethod(string method)
         => HttpMethods.IsGet(method)

@@ -216,7 +216,7 @@ public sealed class RegistryTruthBindingService
                 Actions:
                 [
                     new RegistryTruthBindingActionProjection("open_support_continuation", "Open support continuation", "/api/v1/install-linking/continuation/support", "Keep recovery attached to this linked copy."),
-                    new RegistryTruthBindingActionProjection("open_tracked_support", "Open tracked support", detailRoute, "Inspect the support case that carries the same install and release status."),
+                    new RegistryTruthBindingActionProjection("open_tracked_support", "Open support case", detailRoute, "Inspect the support case that carries the same install and release status."),
                     new RegistryTruthBindingActionProjection("open_downloads", "Open downloads", string.IsNullOrWhiteSpace(artifact?.Id) ? "/downloads" : $"/downloads/install/{Uri.EscapeDataString(artifact!.Id)}", "Compare recovery with the current installer.")
                 ],
                 EmittedAtUtc: now,

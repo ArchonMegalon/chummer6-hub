@@ -38,6 +38,12 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
                 published / "DESIGN_QUALITY_GATE.generated.json": {"status": "pass", "verdict": "READY"},
                 published / "PUBLIC_COPY_LEAK_GATE.generated.json": {"status": "pass", "verdict": "READY"},
                 published / "PARTICIPATE_BILLING_HONESTY.generated.json": {"status": "pass", "verdict": "READY"},
+                published / "ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json": {
+                    "status": "pass",
+                    "verdict": "READY",
+                    "billing": {"mode": "external_handoff_configured"},
+                    "release_upload": {"mode": "default_single_operator"},
+                },
                 published / "RELEASE_READY.generated.json": {"status": "pass", "verdict": "RELEASE_READY"},
                 published / "FINAL_GOLD_JANITOR.generated.json": {"status": "pass", "verdict": "GOLD_READY"},
                 published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json": {"status": "pass"},
@@ -59,6 +65,9 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
 
         self.assertIn("participate_billing_honesty", payload["checks"])
         self.assertTrue(payload["checks"]["participate_billing_honesty"]["pass"])
+        self.assertIn("account_handoff_runtime_config", payload["checks"])
+        self.assertTrue(payload["checks"]["account_handoff_runtime_config"]["pass"])
+        self.assertEqual(payload["account_handoffs"]["billing_mode"], "external_handoff_configured")
 
 
 if __name__ == "__main__":

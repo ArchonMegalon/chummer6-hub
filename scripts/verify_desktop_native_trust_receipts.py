@@ -1240,10 +1240,9 @@ def _flagship_readiness_path() -> Path:
     if raw:
         configured = Path(raw)
         return configured if configured.is_absolute() else configured.resolve()
-    if DEFAULT_FLAGSHIP_READINESS_PATH.is_file():
-        return DEFAULT_FLAGSHIP_READINESS_PATH
-    if FALLBACK_FLAGSHIP_READINESS_PATH.is_file():
-        return FALLBACK_FLAGSHIP_READINESS_PATH
+    candidates = [path for path in (DEFAULT_FLAGSHIP_READINESS_PATH, FALLBACK_FLAGSHIP_READINESS_PATH) if path.is_file()]
+    if candidates:
+        return max(candidates, key=lambda path: path.stat().st_mtime)
     return FALLBACK_FLAGSHIP_READINESS_PATH
 
 

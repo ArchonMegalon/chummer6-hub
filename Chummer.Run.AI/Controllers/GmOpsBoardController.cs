@@ -9,6 +9,8 @@ namespace Chummer.Run.AI.Controllers;
 [Route("api/v1/ai/ops-board")]
 public sealed class GmOpsBoardController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly IGmOpsBoardService _opsBoard;
 
     public GmOpsBoardController(IGmOpsBoardService opsBoard)
@@ -32,6 +34,7 @@ public sealed class GmOpsBoardController : ControllerBase
     }
 
     [HttpPost("prep-assets")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<GmPrepAssetRecord>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<GmPrepAssetRecord> CreatePrepAsset([FromBody] GmPrepAssetCreateRequest? request)
@@ -49,6 +52,7 @@ public sealed class GmOpsBoardController : ControllerBase
     }
 
     [HttpPost("prep-assets/from-project")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<GmPrepAssetRecord>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<GmPrepAssetRecord> CreatePrepAssetFromProject([FromBody] GmPrepAssetCatalogImportRequest? request)
@@ -93,6 +97,7 @@ public sealed class GmOpsBoardController : ControllerBase
     }
 
     [HttpPost("prep-assets/{assetId}/checklist")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<GmPrepAssetRecord>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -113,6 +118,7 @@ public sealed class GmOpsBoardController : ControllerBase
     }
 
     [HttpPost("prep-assets/{assetId}/reveal")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<GmPrepAssetRevealResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

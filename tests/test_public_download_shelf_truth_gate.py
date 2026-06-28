@@ -110,6 +110,59 @@ def make_canonical_manifest() -> dict:
     }
 
 
+def add_windows_bootstrap_artifact(
+    *,
+    releases_payload: dict,
+    canonical_payload: dict,
+) -> tuple[dict, dict]:
+    releases_payload = json.loads(json.dumps(releases_payload))
+    canonical_payload = json.loads(json.dumps(canonical_payload))
+    releases_payload["downloads"].append(
+        {
+            "id": "avalonia-win-x64-installer",
+            "artifactId": "avalonia-win-x64-installer",
+            "fileName": "chummer-avalonia-win-x64-installer.exe",
+            "url": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe",
+            "sha256": "b" * 64,
+            "sizeBytes": 5678,
+            "head": "avalonia",
+            "platformId": "windows",
+            "arch": "x64",
+            "channel": "public_stable",
+            "channelId": "public_stable",
+            "installAccessClass": "open_public",
+            "installerMode": "bootstrap",
+            "kind": "installer",
+            "payloadFileName": "chummer-avalonia-win-x64-payload.zip",
+            "payloadDownloadUrl": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip",
+            "payloadSha256": "c" * 64,
+            "payloadSizeBytes": 87654,
+        }
+    )
+    canonical_payload["artifacts"].append(
+        {
+            "id": "avalonia-win-x64-installer",
+            "artifactId": "avalonia-win-x64-installer",
+            "fileName": "chummer-avalonia-win-x64-installer.exe",
+            "downloadUrl": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe",
+            "sha256": "b" * 64,
+            "sizeBytes": 5678,
+            "head": "avalonia",
+            "rid": "win-x64",
+            "channel": "public_stable",
+            "channelId": "public_stable",
+            "installAccessClass": "open_public",
+            "installerMode": "bootstrap",
+            "kind": "installer",
+            "payloadFileName": "chummer-avalonia-win-x64-payload.zip",
+            "payloadDownloadUrl": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip",
+            "payloadSha256": "c" * 64,
+            "payloadSizeBytes": 87654,
+        }
+    )
+    return releases_payload, canonical_payload
+
+
 class PublicDownloadShelfTruthGateTests(unittest.TestCase):
     def test_rid_from_row_derives_windows_and_linux_runtime_ids(self) -> None:
         self.assertEqual(
@@ -175,6 +228,72 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         self.assertEqual(receipt["status"], "pass")
         self.assertEqual(receipt["live"]["pageArtifactIds"], ["avalonia-linux-x64-installer"])
         self.assertEqual(len(receipt["live"]["artifactProbes"]), 1)
+
+    def test_matching_local_and_live_bundle_truth_passes_for_linux_and_windows_public_installers(self) -> None:
+        releases_payload, canonical_payload = add_windows_bootstrap_artifact(
+            releases_payload=make_releases_manifest(),
+            canonical_payload=make_canonical_manifest(),
+        )
+
+        with tempfile.TemporaryDirectory(prefix="download-shelf-truth-") as temp_root:
+            root = Path(temp_root)
+            local_manifest = root / "releases.json"
+            local_canonical = root / "RELEASE_CHANNEL.generated.json"
+            write_json(local_manifest, releases_payload)
+            write_json(local_canonical, canonical_payload)
+
+            def fake_get(url: str, *args, **kwargs) -> FakeResponse:
+                if url == "https://chummer.run/downloads":
+                    return FakeResponse(
+                        url=url,
+                        text=(
+                            '<a data-download-artifact="avalonia-win-x64-installer" href="/downloads/get/avalonia-win-x64-installer">Windows</a>'
+                            '<a data-download-artifact="avalonia-linux-x64-installer" href="/downloads/get/avalonia-linux-x64-installer">Linux</a>'
+                        ),
+                    )
+                if url == "https://chummer.run/downloads/releases.json":
+                    return FakeResponse(url=url, json_payload=releases_payload)
+                if url == "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json":
+                    return FakeResponse(url=url, json_payload=canonical_payload)
+                raise AssertionError(f"unexpected GET {url}")
+
+            def fake_head(url: str, *args, **kwargs) -> FakeResponse:
+                expected_sizes = {
+                    "https://chummer.run/downloads/files/chummer-avalonia-linux-x64-installer.deb": "1234",
+                    "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe": "5678",
+                    "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip": "87654",
+                }
+                self.assertIn(url, expected_sizes)
+                return FakeResponse(
+                    url=url,
+                    status_code=200,
+                    headers={"Content-Length": expected_sizes[url]},
+                )
+
+            with mock.patch.object(MODULE.requests, "get", side_effect=fake_get), mock.patch.object(
+                MODULE.requests,
+                "head",
+                side_effect=fake_head,
+            ):
+                receipt = MODULE.evaluate(
+                    base_url="https://chummer.run",
+                    local_manifest_path=local_manifest,
+                    local_canonical_manifest_path=local_canonical,
+                    timeout=5.0,
+                    artifact_probes_enabled=True,
+                )
+
+        self.assertEqual(receipt["status"], "pass")
+        self.assertEqual(
+            receipt["live"]["pageArtifactIds"],
+            ["avalonia-win-x64-installer", "avalonia-linux-x64-installer"],
+        )
+        self.assertEqual(
+            receipt["live"]["publicArtifactIds"],
+            ["avalonia-linux-x64-installer", "avalonia-win-x64-installer"],
+        )
+        self.assertEqual(len(receipt["live"]["artifactProbes"]), 3)
+        self.assertTrue(receipt["alignment"]["artifactProbesPassed"])
 
     def test_transient_downloads_502_retries_and_passes(self) -> None:
         releases_payload = make_releases_manifest()

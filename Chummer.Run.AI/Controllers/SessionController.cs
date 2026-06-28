@@ -8,6 +8,8 @@ namespace Chummer.Run.AI.Controllers;
 [Route("api/v1/ai/session")]
 public sealed class SessionController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly ISessionLedgerService _ledgerService;
     private readonly ISessionMemoryService _memoryService;
     private readonly ISessionMemoryIngestionService _memoryIngestionService;
@@ -29,6 +31,7 @@ public sealed class SessionController : ControllerBase
     }
 
     [HttpPost("events")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<SessionRelayMergeResponse>(StatusCodes.Status200OK)]
     public async Task<ActionResult<SessionRelayMergeResponse>> SubmitEvents([FromBody] IReadOnlyList<SessionEventEnvelope>? events, CancellationToken cancellationToken)
     {
@@ -54,6 +57,7 @@ public sealed class SessionController : ControllerBase
     }
 
     [HttpPost("memory/drafts")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<SessionMemoryDraftResult>(StatusCodes.Status200OK)]
     public ActionResult<SessionMemoryDraftResult> Draft([FromBody] SessionMemoryDraftRequest? request)
     {
@@ -66,6 +70,7 @@ public sealed class SessionController : ControllerBase
     }
 
     [HttpPost("memory/ingest-transcript")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<RunMemoryContracts.SessionMemoryIngestionResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<RunMemoryContracts.SessionMemoryIngestionResult>> IngestTranscript(
         [FromBody] RunMemoryContracts.SessionMemoryIngestionRequest? request,
@@ -101,6 +106,7 @@ public sealed class SessionController : ControllerBase
     }
 
     [HttpPost("offline/snapshot")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<OfflineSyncSnapshotPackage>(StatusCodes.Status200OK)]
     public ActionResult<OfflineSyncSnapshotPackage> CreateOfflineSnapshot([FromBody] OfflineSyncSnapshotRequest? request)
     {
@@ -117,6 +123,7 @@ public sealed class SessionController : ControllerBase
     }
 
     [HttpPost("offline/reconcile")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<OfflineSyncReconcileResult>(StatusCodes.Status200OK)]
     public async Task<ActionResult<OfflineSyncReconcileResult>> ReconcileOfflineSnapshot(
         [FromBody] OfflineSyncReconcileRequest? request,

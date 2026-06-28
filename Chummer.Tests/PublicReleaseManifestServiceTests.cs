@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.PublicSurface;
@@ -154,6 +156,140 @@ public sealed class PublicReleaseManifestServiceTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public void LoadManifestCachesRuntimeRegistryFetchAcrossRepeatedCalls()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifest(includeProof: false);
+        string runtimePayload = JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "public_stable",
+            ["version"] = "run-runtime-cache",
+            ["publishedAt"] = "2026-06-28T00:00:00Z",
+            ["status"] = "published",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Linux X64 Installer",
+                    ["fileName"] = "chummer-avalonia-linux-x64-installer.deb",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    ["sha256"] = new string('a', 64),
+                    ["sizeBytes"] = 1234L,
+                    ["installAccessClass"] = "open_public"
+                }
+            }
+        });
+
+        var handler = new CountingStaticJsonHandler(runtimePayload);
+        var service = fixture.CreateService(
+            httpClient: new HttpClient(handler),
+            includeRuntimeUrl: true);
+
+        PublicReleaseManifestDto first = service.LoadManifest();
+        PublicReleaseManifestDto second = service.LoadManifest();
+
+        Assert.Equal("run-runtime-cache", first.Version);
+        Assert.Equal("run-runtime-cache", second.Version);
+        Assert.Equal(1, handler.CallCount);
+    }
+
+    [Fact]
+    public void LoadManifestFailsFastWhenRuntimeRegistryUrlStallsAndFallsBackToLocalManifest()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "public_stable",
+            ["version"] = "run-local-fallback",
+            ["publishedAt"] = "2026-06-28T00:00:00Z",
+            ["status"] = "published",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Linux X64 Installer",
+                    ["fileName"] = "chummer-avalonia-linux-x64-installer.deb",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    ["sha256"] = new string('a', 64),
+                    ["sizeBytes"] = 1234L,
+                    ["installAccessClass"] = "open_public"
+                }
+            }
+        });
+
+        var service = fixture.CreateService(
+            httpClient: new HttpClient(new SlowJsonHandler(TimeSpan.FromSeconds(5))),
+            includeRuntimeUrl: true);
+        var stopwatch = Stopwatch.StartNew();
+
+        PublicReleaseManifestDto manifest = service.LoadManifest();
+
+        stopwatch.Stop();
+        Assert.Equal("run-local-fallback", manifest.Version);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"runtime registry fallback should fail fast, but took {stopwatch.Elapsed}.");
+    }
+
+    [Fact]
+    public void LoadManifestPrefersLocalRegistryManifestInDevelopmentWithoutCallingRuntimeUrl()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "public_stable",
+            ["version"] = "run-local-development",
+            ["publishedAt"] = "2026-06-28T00:00:00Z",
+            ["status"] = "published",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Linux X64 Installer",
+                    ["fileName"] = "chummer-avalonia-linux-x64-installer.deb",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    ["sha256"] = new string('a', 64),
+                    ["sizeBytes"] = 1234L,
+                    ["installAccessClass"] = "open_public"
+                }
+            }
+        });
+
+        var handler = new CountingStaticJsonHandler("{}");
+        var service = fixture.CreateService(
+            httpClient: new HttpClient(handler),
+            includeRuntimeUrl: true,
+            additionalSettings: new Dictionary<string, string?>
+            {
+                ["ASPNETCORE_ENVIRONMENT"] = "Development"
+            });
+
+        PublicReleaseManifestDto manifest = service.LoadManifest();
+
+        Assert.Equal("run-local-development", manifest.Version);
+        Assert.Equal(0, handler.CallCount);
     }
 
     [Fact]
@@ -1488,5 +1624,45 @@ public sealed class PublicReleaseManifestServiceTests
             {
                 Content = new StringContent(_payload)
             });
+    }
+
+    private sealed class CountingStaticJsonHandler : HttpMessageHandler
+    {
+        private readonly string _payload;
+
+        public CountingStaticJsonHandler(string payload)
+        {
+            _payload = payload;
+        }
+
+        public int CallCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            CallCount += 1;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(_payload)
+            });
+        }
+    }
+
+    private sealed class SlowJsonHandler : HttpMessageHandler
+    {
+        private readonly TimeSpan _delay;
+
+        public SlowJsonHandler(TimeSpan delay)
+        {
+            _delay = delay;
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(_delay, cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}")
+            };
+        }
     }
 }

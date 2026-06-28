@@ -7,6 +7,18 @@ namespace Chummer.Run.Api.Services.InstallLinking;
 
 public sealed class InstallLinkingService
 {
+    public const int MaxRequestBodyBytes = 16 * 1024;
+    private const int MaxInstallationIdLength = 64;
+    private const int MaxAccessTokenLength = 256;
+    private const int MaxClaimCodeLength = 128;
+    private const int MaxCallbackCodeLength = 256;
+    private const int MaxVersionLength = 64;
+    private const int MaxChannelIdLength = 64;
+    private const int MaxHeadIdLength = 128;
+    private const int MaxPlatformLength = 64;
+    private const int MaxArchLength = 32;
+    private const int MaxPublicKeyLength = 256;
+    private const int MaxHostLabelLength = 256;
     private static readonly TimeSpan DefaultClaimTicketLifetime = TimeSpan.FromDays(1);
     private static readonly TimeSpan DefaultBrowserCallbackLifetime = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan GrantLifetime = TimeSpan.FromDays(30);
@@ -125,8 +137,7 @@ public sealed class InstallLinkingService
 
         var normalizedClaimCode = NormalizeClaimCode(request.ClaimCode)
             ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "claim code is required.");
-        var installationId = NormalizeOptional(request.InstallationId)
-            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "installation id is required.");
+        var installationId = NormalizeRequired(request.InstallationId, nameof(request.InstallationId), MaxInstallationIdLength);
         var now = DateTimeOffset.UtcNow;
 
         lock (_store.Gate)
@@ -211,10 +222,8 @@ public sealed class InstallLinkingService
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var installationId = NormalizeOptional(request.InstallationId)
-            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "installation id is required.");
-        var accessToken = NormalizeOptional(request.AccessToken)
-            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "access token is required.");
+        var installationId = NormalizeRequired(request.InstallationId, nameof(request.InstallationId), MaxInstallationIdLength);
+        var accessToken = NormalizeRequired(request.AccessToken, nameof(request.AccessToken), MaxAccessTokenLength);
         var now = DateTimeOffset.UtcNow;
 
         lock (_store.Gate)
@@ -271,10 +280,8 @@ public sealed class InstallLinkingService
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var installationId = NormalizeOptional(request.InstallationId)
-            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "installation id is required.");
-        var accessToken = NormalizeOptional(request.AccessToken)
-            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "access token is required.");
+        var installationId = NormalizeRequired(request.InstallationId, nameof(request.InstallationId), MaxInstallationIdLength);
+        var accessToken = NormalizeRequired(request.AccessToken, nameof(request.AccessToken), MaxAccessTokenLength);
         var now = DateTimeOffset.UtcNow;
 
         lock (_store.Gate)
@@ -380,8 +387,7 @@ public sealed class InstallLinkingService
 
         string? normalizedCallbackCode = NormalizeBrowserCallbackCode(request.CallbackCode)
             ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "callback code is required.");
-        string? normalizedInstallationId = NormalizeOptional(request.InstallationId)
-            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "installation id is required.");
+        string normalizedInstallationId = NormalizeRequired(request.InstallationId, nameof(request.InstallationId), MaxInstallationIdLength);
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
         lock (_store.Gate)
@@ -456,8 +462,18 @@ public sealed class InstallLinkingService
 
     public ClaimedInstallationDto? ResolveInstallationForGrant(string? installationId, string? accessToken)
     {
-        string? normalizedInstallationId = NormalizeOptional(installationId);
-        string? normalizedAccessToken = NormalizeOptional(accessToken);
+        string? normalizedInstallationId;
+        string? normalizedAccessToken;
+        try
+        {
+            normalizedInstallationId = NormalizeOptional(installationId, nameof(installationId), MaxInstallationIdLength);
+            normalizedAccessToken = NormalizeOptional(accessToken, nameof(accessToken), MaxAccessTokenLength);
+        }
+        catch (InstallLinkingOperationException)
+        {
+            return null;
+        }
+
         if (normalizedInstallationId is null || normalizedAccessToken is null)
         {
             return null;
@@ -644,16 +660,16 @@ public sealed class InstallLinkingService
         RedeemInstallClaimRequestDto request,
         DateTimeOffset now)
     {
-        string version = NormalizeOptional(request.ApplicationVersion) ?? ticket.Version;
-        string channelId = NormalizeOptional(request.ChannelId) ?? ticket.Channel;
-        string headId = NormalizeOptional(request.HeadId) ?? existingInstallation?.HeadId ?? "desktop";
-        string platform = NormalizeOptional(request.Platform) ?? existingInstallation?.Platform ?? "unknown";
-        string arch = NormalizeOptional(request.Arch) ?? existingInstallation?.Arch ?? "unknown";
-        string? publicKey = NormalizeOptional(request.PublicKey) ?? existingInstallation?.PublicKey;
-        string? hostLabel = NormalizeOptional(request.HostLabel) ?? existingInstallation?.HostLabel;
+        string version = NormalizeOptional(request.ApplicationVersion, nameof(request.ApplicationVersion), MaxVersionLength) ?? ticket.Version;
+        string channelId = NormalizeOptional(request.ChannelId, nameof(request.ChannelId), MaxChannelIdLength) ?? ticket.Channel;
+        string headId = NormalizeOptional(request.HeadId, nameof(request.HeadId), MaxHeadIdLength) ?? existingInstallation?.HeadId ?? "desktop";
+        string platform = NormalizeOptional(request.Platform, nameof(request.Platform), MaxPlatformLength) ?? existingInstallation?.Platform ?? "unknown";
+        string arch = NormalizeOptional(request.Arch, nameof(request.Arch), MaxArchLength) ?? existingInstallation?.Arch ?? "unknown";
+        string? publicKey = NormalizeOptional(request.PublicKey, nameof(request.PublicKey), MaxPublicKeyLength) ?? existingInstallation?.PublicKey;
+        string? hostLabel = NormalizeOptional(request.HostLabel, nameof(request.HostLabel), MaxHostLabelLength) ?? existingInstallation?.HostLabel;
 
         return new ClaimedInstallationDto(
-            InstallationId: NormalizeOptional(request.InstallationId) ?? existingInstallation?.InstallationId ?? string.Empty,
+            InstallationId: NormalizeRequired(request.InstallationId, nameof(request.InstallationId), MaxInstallationIdLength),
             ArtifactId: ticket.ArtifactId,
             Channel: channelId,
             Version: version,
@@ -678,16 +694,17 @@ public sealed class InstallLinkingService
         ExchangeInstallBrowserCallbackRequestDto request,
         DateTimeOffset now)
     {
-        string version = NormalizeOptional(request.ApplicationVersion) ?? callback.Version;
-        string channelId = NormalizeOptional(request.ChannelId) ?? callback.Channel;
-        string headId = NormalizeOptional(request.HeadId) ?? callback.HeadId ?? existingInstallation?.HeadId ?? "desktop";
-        string platform = NormalizeOptional(request.Platform) ?? callback.Platform ?? existingInstallation?.Platform ?? "unknown";
-        string arch = NormalizeOptional(request.Arch) ?? callback.Arch ?? existingInstallation?.Arch ?? "unknown";
-        string? publicKey = NormalizeOptional(request.PublicKey) ?? callback.PublicKey ?? existingInstallation?.PublicKey;
-        string? hostLabel = NormalizeOptional(request.HostLabel) ?? callback.HostLabel ?? existingInstallation?.HostLabel;
+        string version = NormalizeOptional(request.ApplicationVersion, nameof(request.ApplicationVersion), MaxVersionLength) ?? callback.Version;
+        string channelId = NormalizeOptional(request.ChannelId, nameof(request.ChannelId), MaxChannelIdLength) ?? callback.Channel;
+        string headId = NormalizeOptional(request.HeadId, nameof(request.HeadId), MaxHeadIdLength) ?? callback.HeadId ?? existingInstallation?.HeadId ?? "desktop";
+        string platform = NormalizeOptional(request.Platform, nameof(request.Platform), MaxPlatformLength) ?? callback.Platform ?? existingInstallation?.Platform ?? "unknown";
+        string arch = NormalizeOptional(request.Arch, nameof(request.Arch), MaxArchLength) ?? callback.Arch ?? existingInstallation?.Arch ?? "unknown";
+        string? publicKey = NormalizeOptional(request.PublicKey, nameof(request.PublicKey), MaxPublicKeyLength) ?? callback.PublicKey ?? existingInstallation?.PublicKey;
+        string? hostLabel = NormalizeOptional(request.HostLabel, nameof(request.HostLabel), MaxHostLabelLength) ?? callback.HostLabel ?? existingInstallation?.HostLabel;
 
         return new ClaimedInstallationDto(
-            InstallationId: NormalizeOptional(request.InstallationId) ?? existingInstallation?.InstallationId ?? callback.InstallationId,
+            InstallationId: NormalizeOptional(request.InstallationId, nameof(request.InstallationId), MaxInstallationIdLength)
+                ?? existingInstallation?.InstallationId ?? callback.InstallationId,
             ArtifactId: callback.ArtifactId,
             Channel: channelId,
             Version: version,
@@ -713,13 +730,13 @@ public sealed class InstallLinkingService
         => installation with
         {
             UpdatedAtUtc = now,
-            HeadId = NormalizeOptional(request.HeadId) ?? installation.HeadId,
-            Version = NormalizeOptional(request.ApplicationVersion) ?? installation.Version,
-            Channel = NormalizeOptional(request.ChannelId) ?? installation.Channel,
-            Platform = NormalizeOptional(request.Platform) ?? installation.Platform,
-            Arch = NormalizeOptional(request.Arch) ?? installation.Arch,
-            PublicKey = NormalizeOptional(request.PublicKey) ?? installation.PublicKey,
-            HostLabel = NormalizeOptional(request.HostLabel) ?? installation.HostLabel
+            HeadId = NormalizeOptional(request.HeadId, nameof(request.HeadId), MaxHeadIdLength) ?? installation.HeadId,
+            Version = NormalizeOptional(request.ApplicationVersion, nameof(request.ApplicationVersion), MaxVersionLength) ?? installation.Version,
+            Channel = NormalizeOptional(request.ChannelId, nameof(request.ChannelId), MaxChannelIdLength) ?? installation.Channel,
+            Platform = NormalizeOptional(request.Platform, nameof(request.Platform), MaxPlatformLength) ?? installation.Platform,
+            Arch = NormalizeOptional(request.Arch, nameof(request.Arch), MaxArchLength) ?? installation.Arch,
+            PublicKey = NormalizeOptional(request.PublicKey, nameof(request.PublicKey), MaxPublicKeyLength) ?? installation.PublicKey,
+            HostLabel = NormalizeOptional(request.HostLabel, nameof(request.HostLabel), MaxHostLabelLength) ?? installation.HostLabel
         };
 
     private InstallationGrantDto? FindReusableGrantLocked(string installationId, DateTimeOffset now)
@@ -913,7 +930,7 @@ public sealed class InstallLinkingService
 
     private static string? NormalizeClaimCode(string? value)
     {
-        var normalized = NormalizeOptional(value);
+        var normalized = NormalizeOptional(value, "claim code", MaxClaimCodeLength);
         if (normalized is null)
         {
             return null;
@@ -923,10 +940,29 @@ public sealed class InstallLinkingService
     }
 
     private static string? NormalizeBrowserCallbackCode(string? value)
-        => NormalizeOptional(value);
+        => NormalizeOptional(value, "callback code", MaxCallbackCodeLength);
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizeOptional(string? value, string label, int maxLength)
+    {
+        string? normalized = NormalizeOptional(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        if (normalized.Length > maxLength)
+        {
+            throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, $"{label} exceeds the maximum length of {maxLength} characters.");
+        }
+
+        return normalized;
+    }
+
+    private static string NormalizeRequired(string value, string label, int maxLength)
+        => NormalizeOptional(value, label, maxLength) ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, $"{label} is required.");
 }
 
 public sealed record DownloadDispatchResult(

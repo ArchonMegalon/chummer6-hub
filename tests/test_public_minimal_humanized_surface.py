@@ -27,15 +27,14 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'surface-help surface-minimal' in trust_page
     assert 'minimal-help-grid' in trust_page
     assert 'minimal-help-card' in trust_page
-    assert 'Choose the right help path' in trust_page
-    assert 'Pick the closest one.' in trust_page
+    assert '@PublicText(Model.Intro)' in trust_page
+    assert 'Pick the next step.' in trust_page
     assert 'Start with the closest match.' not in trust_page
     assert 'if (helpPage || contactPage)' in trust_page
     assert 'return "/downloads";' in trust_page
     assert 'route-choice-grid--compact' in trust_page
-    assert 'Contact paths' in trust_page
-    assert 'Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.' in trust_page
-    assert 'Public requests belong on <a class="inline-link" href="/participate">Participate</a>.' in trust_page
+    assert 'Discord or private' in trust_page
+    assert 'Discord for normal questions. Private form for account or crash details.' in trust_page
     assert 'Public ideas go to Participate. Private problems stay here.' not in trust_page
     assert 'Send support request' in trust_page
     assert 'other routes below' not in trust_page
@@ -129,9 +128,9 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "Return to setup",
         "Go back to setup when you are ready",
         "use this claim code only if Chummer asks for it on that device",
-        "Contact Chummer",
-        "Discord for normal questions. Use the private form only for logs, crashes, install trouble, or account detail.",
-        "Public requests belong on <a class=\"inline-link\" href=\"/participate\">Participate</a>.",
+        "Contact",
+        "Discord for normal questions. Private form when needed.",
+        "Discord for normal questions. Private form for account or crash details.",
         "Open private form",
         "Private form",
     ):
@@ -427,51 +426,36 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "DefaultProductLiftFeedbackUrl" not in controller
     assert "https://chummer6.productlift.dev" not in controller
     assert "public async Task<IActionResult> ParticipatePage" in controller
+    assert "BuildFirstPartyParticipateBoardAsync" in controller
+    assert 'View("~/Views/PublicLanding/Partizipate.cshtml"' in controller
     assert '[HttpGet("/participate/board")]' in controller
     assert "ParticipateBoardProxy" in controller
     assert 'public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)' in controller
     assert 'BuildParticipateSignInHref(string targetPath = "/participate")' in controller
     assert '? _chrome.BuildPublicChrome(' in controller
     assert ': _chrome.BuildAuthenticatedChrome(' in controller
-    assert 'boardPath: string.Empty' in controller
-    assert '=> ResolveProductLiftHostedBoardUri() is null ? null : "/participate/board";' in controller
+    assert 'HostedBoardHref: boardShellHref,' in controller
+    assert 'EmbeddedBoardEnabled: hostedBoardAvailable,' in controller
+    assert 'EmbeddedBoardHref: embeddedBoardHref,' in controller
+    assert 'DirectBoardHref: boardShellHref,' in controller
     assert "ResolveParticipateSupporterHref()" in controller
     assert 'BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();' in controller
-    assert "data-chummer-home-link-patch" in controller
-    assert "data-chummer-board-skin" in controller
-    assert "data-chummer-board-failure-patch" in controller
-    assert "polishVisibleCopy" in controller
-    assert "quietHostedBoardChrome" in controller
-    assert "const pageTitle = __CHUMMER_PAGE_TITLE__;" in controller
-    assert 'pageTitle: "Participate - Chummer.run"' in controller
     assert "hostedHeadingReplacement: \"What should Chummer do next?\"" in controller
-    assert "hostedSummaryReplacement: \"Short requests, clear bugs, useful ideas.\"" in controller
+    assert "hostedSummaryReplacement: \"Public requests, clear bugs, useful ideas.\"" in controller
     assert "What should Chummer do next?" in controller
-    assert "Short requests, clear bugs, useful ideas." in controller
-    assert "Add a note" in controller
-    assert "attributeCandidates" in controller
-    assert "Choose a category" in controller
-    assert "data-chummer-hidden-status" in controller
-    assert r"\bAI-powered\b" in controller
-    assert "authCandidates" in controller
-    assert "node.remove()" in controller
-    assert "localOrigin: \"/participate\"" in controller
-    assert "localBaseHref: \"/participate/\"" in controller
-    assert "data-chummer-board-skin" in participate
-    assert "data-chummer-board-skin" in controller
-    assert "participate-hosted__frame" not in participate
+    assert "Public requests, clear bugs, useful ideas." in controller
+    assert 'public IActionResult ParticipateBoardFrame(string? boardPath)' in controller
+    assert "Current requests" in participate
+    assert "data-chummer-participate-frame" in participate
     assert "Model.SupporterHref" in participate
-    assert "Fallback form" not in participate
-    assert "Join beta waitlist" not in participate
-    assert "participate-quick-form" not in participate
-    assert "@foreach (var lane in Model.Lanes)" not in participate
-    assert "@lane.ActionLabel" not in participate
-    assert "Private issue" in participate
+    assert "@PublicParticipateText(Model.Heading)" in participate
+    assert "@PublicParticipateText(Model.Summary)" in participate
+    assert "Board offline right now" in participate
+    assert "Use private support only when it should stay private." in participate
+    assert "Private support" in participate
     assert "Supporter" in participate
     assert "Support Chummer" not in participate
-    assert "Support Chummer" not in participate
-    assert "Current themes" not in participate
-    assert "Open in a tab" not in participate
+    assert "Open board" in participate
     assert "BuildParticipatePageModel(" not in controller
     assert "ExternalBoardUrl" not in controller
     assert "ExternalBoardUrl" not in read("Chummer.Run.Api/ViewModels/SiteViewModels.cs")
@@ -483,8 +467,6 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     ):
         assert forbidden not in controller
         assert forbidden not in participate
-
-    assert '.Replace("AI-generated", string.Empty' in controller
 
 
 def test_character_helper_page_uses_account_helper_language() -> None:
@@ -551,7 +533,11 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
     assert '"/participate/board"' in controller
     assert '"/participate"' in controller
     assert "suppressHeaderActionsForPublicParticipate" in layout
-    assert 'normalizedCurrentPath is "/participate" or "/partizipate"' in layout
+    assert "var suppressHeaderActionsForPublicParticipate = false;" in layout
+    assert "@PublicParticipateText(Model.Heading)" in participate
+    assert "@PublicParticipateText(Model.Summary)" in participate
+    assert "Current requests" in participate
+    assert "data-chummer-participate-frame" in participate
 
     for forbidden in (
         "Account-only programs stay below the fold",
@@ -592,20 +578,19 @@ def test_billing_surface_uses_real_view_and_honest_supporter_copy() -> None:
     billing_view = read("Chummer.Run.Api/Views/Billing/Membership.cshtml")
 
     assert "ControllerBase" not in controller
-    assert 'return View("~/Views/Billing/Membership.cshtml"' in controller
+    assert '"~/Views/Billing/Membership.cshtml"' in controller
     assert 'return Redirect($"/login?next={Uri.EscapeDataString("/account/billing")}")' in controller
     assert "<!doctype html>" not in controller
     assert '/auth/google/start?next={Uri.EscapeDataString("/account/billing")}' not in controller
-    assert "Same app." in billing_view
-    assert "Origin books: 1/month free. 2/month supporter." in billing_view
-    assert "No extra app features right now." in billing_view
-    assert "Supporter checkout is unavailable right now." in billing_view
+    assert "1 book/month on Free. 2/month on Supporter." in billing_view
+    assert "No extra app features today." in billing_view
+    assert "@Model.Summary" in billing_view
     assert "Continue with email" in billing_view
-    assert "This month:" in billing_view
+    assert "used this month" in billing_view
     assert '__RequestVerificationToken' in billing_view
-    assert "Manage billing" in billing_view
+    assert "Manage supporter" in billing_view
     assert "Checkout stays attached to this account." in billing_view
-    assert "Chummer attaches supporter status after sign-in." in billing_view
+    assert "Email first. Supporter status attaches after sign-in." in billing_view
     assert "story-example" not in billing_view
     assert "Account attached: @Model.UserId" not in billing_view
     assert "temporarily unavailable" not in billing_view
@@ -848,9 +833,12 @@ def test_public_copy_cleanup_is_centralized_for_planning_and_package_pages() -> 
     ):
         source = read(view_path)
         if view_path == "Chummer.Run.Api/Views/PublicLanding/Roadmap.cshtml":
-            assert "Model.HostedBoardHref" in source
-            assert 'id="roadmap-board"' in source
-            assert "Maintenance first." in source
+            assert "Now and next." in source
+            assert "Board not loading right now" in source
+            assert "Planned work is here. Shipped work stays in Changelog." in source
+            assert "Current work opens below." in source
+            assert 'href="/participate"' in source
+            assert 'href="/changelog"' in source
         else:
             assert "PublicFacingCopyHumanizer.Clean" in source or "UndetectableHumanizerCopyAdapter.Humanize" in source
         for duplicated_rule in (
@@ -874,7 +862,10 @@ def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
 
     assert "@Model.Heading" in entry
     assert "@Model.SupportLine" in entry
-    assert "Use email first. Google is optional." in combined
+    assert "@Model.ReturnLine" in entry
+    assert "Email first. Google if you prefer." in combined
+    assert "Claim this copy when you want installs, support, and recovery together." in combined
+    assert "After this step, Chummer returns to" in combined
     assert "Continue with email" in entry
     assert "Continue with Google" in entry
 
@@ -945,8 +936,8 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Nightly" in downloads
     assert "Linux" in downloads
     assert "Build from source" in downloads
-    assert "Recommended from your browser. Other platforms stay out of the way." in downloads
-    assert "Recommended for this browser." in downloads
+    assert "Main build for this browser. Other downloads stay below." in downloads
+    assert "Main build for this browser." in downloads
     assert "<summary>Other downloads</summary>" in downloads
     assert "showLinuxSourcePrimary" in downloads
     assert "No sudo. Updates default to notify." in downloads
@@ -1047,35 +1038,36 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
     preview_detail = read("Chummer.Run.Api/Views/PublicLanding/_FeatureDetailPreviewConcept.cshtml")
 
     for required in (
-        "Maintenance first.",
-        "Make setup boring",
-        "Clean the builder",
-        "Keep the site quiet",
-        "Short list.",
+        "Roadmap",
+        "Now and next.",
+        "Board not loading right now",
+        "Planned work is here. Shipped work stays in Changelog.",
     ):
         assert required in roadmap
 
     for required in (
-        '@if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))',
-        'id="roadmap-board"',
-        'src="@Model.HostedBoardHref"',
-        'Current work',
-        'Shown here without leaving Chummer.',
+        'href="/changelog"',
+        'href="/participate"',
     ):
         assert required in roadmap
 
     assert "Use the right place" not in roadmap
+    assert "Model.Milestones" not in roadmap
+    assert 'id="roadmap-board"' not in roadmap
+    assert "Top requests" not in roadmap
 
     controller = read("Chummer.Run.Api/Controllers/PublicLandingController.cs")
     assert 'public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)' in controller
     assert 'canonicalHref: "/roadmap"' in controller
     assert 'assetProxyBasePath: "/roadmap/provider-assets"' in controller
     assert 'pageTitle: "Roadmap - Chummer.run"' in controller
+    assert 'return Redirect($"/roadmap{Request.QueryString}");' in controller
     for forbidden in (
         "Milestone-backed public direction",
         "current readiness",
         "next honest routes",
         "Loaded through Chummer so the page stays first-party.",
+        "Open live board",
     ):
         assert forbidden not in controller
         assert forbidden not in roadmap
@@ -1089,10 +1081,6 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
         assert required in roadmap_detail
 
     for forbidden in (
-        "static string RoadmapText(string? value)",
-        "@RoadmapText(milestone.StatusLabel)",
-        "@RoadmapText(milestone.Title)",
-        "@RoadmapText(milestone.CasualSummary)",
         "@RoadmapText(item.Card.Title)",
         "@RoadmapText(item.Card.Summary)",
         "@RoadmapText(item.Action.Label)",
@@ -1444,17 +1432,17 @@ def test_signed_in_account_copy_uses_files_status_and_plain_download_language() 
     account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
 
     assert "Installs, campaigns, support, billing, and participation." in account
-    assert "Tracked cases and the next step." in account
+    assert "Private cases and the next step." in account
     assert "Characters, groups, and campaigns." in account
-    assert "Supporter and billing." in account
+    assert "Membership and billing." in account
     assert "Start here" in account
     assert "Finish setup on that device" in account
-    assert "Use the linked install first" in account
+    assert "Use the linked app first" in account
     assert "Table Pulse is ready for the next reaction on this campaign." in account
-    assert "This run is ready for the next Table Pulse reaction." in account
+    assert "Ready for the next Table Pulse reaction." in account
     assert '? "Installs"' in account
     assert "See linked copies, setup codes, downloads, and install help. The app or installer still does the actual linking." in account
-    assert "keep setup and support tied to this account" in account
+    assert "setup, recovery, and support stay with this account" in account
     assert "Add an email recovery path if you want an easier way back later." in account
 
     for forbidden in (
@@ -1871,7 +1859,7 @@ def test_home_page_uses_account_language_for_return_surface_copy() -> None:
     home = read("Chummer.Run.Api/Views/PublicLanding/Home.cshtml")
 
     for expected in (
-        "Use the section links to move between access, work, and setup.",
+        "Use the section links to move between installs, roster, and setup.",
         "Home summary",
         "The account cockpit answers this first",
         "Account flagship coverage",
@@ -1895,8 +1883,8 @@ def test_home_page_uses_account_language_for_return_surface_copy() -> None:
     ):
         assert forbidden not in home
 
-    assert '@if (!showAccessSection)\n{\n    <section class="home-cockpit-strip" aria-label="Home summary">' in home
-    assert '@if (!showAccessSection)\n{\n    <section class="editorial-block">' in home
+    assert '<section class="home-cockpit-strip" aria-label="Home summary">' in home
+    assert '<section class="editorial-block">' in home
 
 
 def test_public_lookup_and_leaderboards_use_plain_history_language() -> None:
@@ -3175,11 +3163,13 @@ def test_login_view_is_minimal_auth_surface() -> None:
 
     for expected in (
         'ViewData["SurfaceClass"] = Model.CreateAccount ? "surface-auth surface-minimal" : "surface-auth surface-minimal surface-auth-login";',
-        'ViewData["HideAuthChrome"] = !Model.CreateAccount;',
+        'ViewData["HideAuthChrome"] = true;',
         "auth-entry--lean",
+        "auth-panel__eyebrow",
         'class="button-like button-like--secondary auth-panel__primary"',
         "Continue with Google",
         "@Model.SupportLine",
+        "@Model.ReturnLine",
     ):
         assert expected in auth_entry
 
@@ -3193,10 +3183,10 @@ def test_login_view_is_minimal_auth_surface() -> None:
 
     for expected in (
         ".route-login.surface-auth.surface-minimal",
-        "width: min(326px, calc(100vw - 32px));",
-        "font-size: 1.45rem;",
-        "min-height: 40px;",
-        "padding: 15px;",
+        "width: min(316px, calc(100vw - 24px));",
+        "font-size: 1.38rem;",
+        "min-height: 38px;",
+        "padding: 14px;",
         ".surface-auth.surface-minimal.surface-auth-message",
     ):
         assert expected in auth_compact
@@ -3247,18 +3237,28 @@ def test_minimal_landing_does_not_build_signed_in_or_campaign_surfaces_for_guest
 def test_account_page_does_not_expose_fake_advanced_settings_surface() -> None:
     account_view = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
     controller = read("Chummer.Run.Api/Controllers/AccountsController.cs")
+    billing_controller = read("Chummer.Run.Api/Controllers/BrilliantDirectoriesBillingController.cs")
+    settings_view = read("Chummer.Run.Api/Views/Accounts/Settings.cshtml")
 
-    assert '"settings" => "Billing"' in account_view
-    assert '"advanced" => "settings"' in controller
-    assert 'new SectionLinkViewModel("billing", "Billing", "/account/billing", false)' in controller
+    assert '"settings" => "Billing"' not in account_view
+    assert 'return Redirect("/account/settings");' in controller
+    assert '[HttpGet("/account/settings")]' not in billing_controller
+    assert '[HttpGet("/account/advanced")]' not in billing_controller
+    assert 'AccountSettingsAlias' not in billing_controller
+    assert 'Settings' in settings_view
+    assert 'Open membership' in settings_view
+    assert 'Save settings' in settings_view
+    assert 'Follow new updates' in settings_view
+    assert '"settings" => ("Account · Settings", "Update choices, sign-in, and privacy.")' in controller
+    assert '"advanced" => ("Account · Advanced account details", "Linked identities, channels, and recovery metadata.")' not in controller
+    assert not (REPO_ROOT / "Chummer.Run.Api/Views/Accounts/Advanced.cshtml").exists()
     assert "Open campaigns on the web" in account_view
     assert "<h2>Campaigns</h2>" in account_view
-    assert "deeper campaign continuity" in account_view
+    assert "Starter campaign is not ready yet. Open Home > Campaigns to continue." in account_view
     assert "Open Home > Campaigns to continue." in account_view
 
     for forbidden in (
         "showAdvancedSection",
-        "Advanced account details",
         '"advanced" => "Account · Billing"',
         '"advanced" => "Billing"',
         "SectionLinkViewModel(\"advanced\"",
@@ -3266,6 +3266,10 @@ def test_account_page_does_not_expose_fake_advanced_settings_surface() -> None:
         "<h2>Work</h2>",
         "deeper work continuity",
         "Open Home > Work to continue.",
+        "Hub account id",
+        "Provider-backed help",
+        "Help and policy",
     ):
         assert forbidden not in account_view
         assert forbidden not in controller
+        assert forbidden not in settings_view

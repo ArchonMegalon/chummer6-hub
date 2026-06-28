@@ -103,9 +103,7 @@ public sealed class ParticipationOperatorNotificationService
             return new ParticipationIntentResolution("roadmap", "/roadmap");
         }
 
-        if (normalized.StartsWith("/account/participation", StringComparison.OrdinalIgnoreCase)
-            || (normalized.StartsWith("/account/settings", StringComparison.OrdinalIgnoreCase)
-                && normalized.Contains("beta", StringComparison.OrdinalIgnoreCase)))
+        if (normalized.StartsWith("/account/participation", StringComparison.OrdinalIgnoreCase))
         {
             return new ParticipationIntentResolution("beta", "/account/participation");
         }

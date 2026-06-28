@@ -3,17 +3,15 @@
   "package_repo": "chummer6-hub",
   "status": "passed",
   "desktop_client_readiness": {
-    "status": "fail",
-    "scoped_status": "fail",
-    "generated_at": "2026-06-24T18:00:42Z",
-    "missing_coverage_keys": [
-      "horizons_and_public_surface"
-    ],
+    "status": "pass",
+    "scoped_status": "pass",
+    "generated_at": "2026-06-27T20:04:25Z",
+    "missing_coverage_keys": [],
     "desktop_client_missing": false,
-    "reason": "flagship product readiness proof is not green: fail; missing coverage: desktop_client; readiness plane gaps: flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready",
-    "completion_audit_status": "fail",
-    "completion_audit_reason": "Flagship product readiness planes are not green: flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready.",
-    "source_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
+    "reason": "Flagship product readiness checks are clear.",
+    "completion_audit_status": "pass",
+    "completion_audit_reason": "Flagship product readiness checks are clear.",
+    "source_path": "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
   },
   "publicTrustSurface": {
     "summary": "This governor-visible trust surface bundle keeps status, current release, downloads, proof shelf, and public pulse routes aligned on the same outward-facing release truth.",
@@ -1640,6 +1638,6 @@
       ]
     }
   ],
-  "generated_at": "2026-06-27T03:10:02Z",
-  "generatedAt": "2026-06-27T03:10:02Z"
+  "generated_at": "2026-06-27T20:05:02Z",
+  "generatedAt": "2026-06-27T20:05:02Z"
 }

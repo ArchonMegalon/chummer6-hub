@@ -13,10 +13,10 @@
         new
         {
             Badge = "Current app",
-            Title = "What works today",
+            Title = "Current release",
             Summary = "Use this when you want the current build, supported platforms, and known limits.",
-            Href = "/status",
-            Label = "Open status",
+            Href = "/now",
+            Label = "Open current release",
             Highlights = new[] { "Build", "Platforms", "Known limits" }
         },
         new
@@ -91,7 +91,7 @@
 
         if (combined.Contains("trust", StringComparison.Ordinal) || combined.Contains("use chummer right now", StringComparison.Ordinal))
         {
-            return new TrustPageActionViewModel("Open status", "/status", "secondary");
+            return new TrustPageActionViewModel("Open current release", "/now", "secondary");
         }
 
         return null;

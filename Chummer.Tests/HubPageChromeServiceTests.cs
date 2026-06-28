@@ -1,6 +1,7 @@
 using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Xunit;
 
@@ -213,6 +214,16 @@ public sealed class HubPageChromeServiceTests
     }
 
     [Fact]
+    public void PublicNavigationNoLongerPromotesStatusAsANormalShellLink()
+    {
+        string navigationPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_NAVIGATION.yaml");
+        string navigation = File.ReadAllText(navigationPath);
+
+        Assert.DoesNotContain("label: Status", navigation, StringComparison.Ordinal);
+        Assert.DoesNotContain("href: /status", navigation, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildPublicChromeUsesContextualDirectInstallRouteWhenGuestInstallIsAllowed()
     {
         string root = Path.Combine(Path.GetTempPath(), "hub-chrome-tests", Guid.NewGuid().ToString("N"));
@@ -297,7 +308,7 @@ public sealed class HubPageChromeServiceTests
 
         Assert.DoesNotContain(
             chrome.HeaderActions,
-            action => string.Equals(action.Href, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase));
+            action => string.Equals(action.Href, "/downloads/release-upload/bootstrap.command", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -321,7 +332,71 @@ public sealed class HubPageChromeServiceTests
 
         var buildAction = Assert.Single(
             chrome.HeaderActions,
-            action => string.Equals(action.Href, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase));
-        Assert.Equal("Build", buildAction.Label);
+            action => string.Equals(action.Href, "/downloads/release-upload/bootstrap.command", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("Build macOS", buildAction.Label);
+    }
+
+    [Fact]
+    public void BuildAuthenticatedChromeFallsBackToSignedInLabelWhenItCarriesOwnerEmail()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = CreateService(configuration);
+
+        var chrome = service.BuildAuthenticatedChrome(
+            "Home",
+            "Signed-in shell.",
+            "/home",
+            ReleaseUploadAccessPolicy.AllowedEmail,
+            null);
+
+        var buildAction = Assert.Single(
+            chrome.HeaderActions,
+            action => string.Equals(action.Href, "/downloads/release-upload/bootstrap.command", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("Build macOS", buildAction.Label);
+    }
+
+    [Fact]
+    public void BuildAuthenticatedChromeFallsBackToClaimsEmailWhenAccountEmailIsMissing()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var canon = new PublicCanonFileLoader(configuration);
+        var routes = new PublicRouteCatalogService(canon);
+        var context = new DefaultHttpContext
+        {
+            User = new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.Email, ReleaseUploadAccessPolicy.AllowedEmail)
+            ], "test"))
+        };
+        var service = new HubPageChromeService(
+            new PublicLandingService(canon, new PublicActionResolver()),
+            new PublicNavigationService(canon, routes),
+            new PublicReleaseManifestService(configuration),
+            new ReleaseSelectionService(canon),
+            new HttpContextAccessor { HttpContext = context });
+
+        var chrome = service.BuildAuthenticatedChrome(
+            "Home",
+            "Signed-in shell.",
+            "/home",
+            "Tibor",
+            null);
+
+        var buildAction = Assert.Single(
+            chrome.HeaderActions,
+            action => string.Equals(action.Href, "/downloads/release-upload/bootstrap.command", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("Build macOS", buildAction.Label);
     }
 }

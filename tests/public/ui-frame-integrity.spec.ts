@@ -512,7 +512,7 @@ test('login stays compact and does not reintroduce the old visual hero', async (
     const panel = page.locator('.auth-panel--entry').first();
     await expect(panel).toBeVisible();
     await expect(page.locator('body')).toContainText('Open Chummer');
-    await expect(page.locator('body')).toContainText('Use email first. Google is optional.');
+    await expect(page.locator('body')).toContainText('Email first. Google if you prefer.');
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Continue with email' })).toBeVisible();
 

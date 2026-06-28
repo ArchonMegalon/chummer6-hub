@@ -23,9 +23,13 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PublicPrivacyBoundaryService>();
         services.AddSingleton<PublicSignalProjectionService>();
         services.AddSingleton<PublicSignalOperationsService>();
+        services.AddSingleton<PublicParticipateSnapshotStore>();
+        services.AddSingleton<PublicParticipateSnapshotService>();
         services.AddSingleton<PublicConciergeStore>();
         services.AddSingleton<PublicConciergeService>();
+        services.AddHostedService<PublicParticipateSnapshotWorker>();
         services.AddHostedService<PublicSignalRetryExpiryWorker>();
+        services.AddHostedService<PublicSurfaceWarmupService>();
         services.AddSingleton<PublicNavigationService>();
         services.AddSingleton<HubPageChromeService>();
         services.AddSingleton<ReadyForTonightService>();
@@ -175,6 +179,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<ArtifactFactoryOrchestrationService>();
         services.AddSingleton<FleetReceiptVerifier>();
         services.AddSingleton<HubEmailLinkVerificationService>();
+        services.AddSingleton<HubIdentityHintCookieService>();
         services.AddSingleton<HubIdentitySubjectCache>();
         services.AddHttpClient<FleetBridgeService>();
         services.AddHttpClient<HubIdentityClient>();

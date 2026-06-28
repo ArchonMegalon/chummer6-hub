@@ -35,7 +35,11 @@ def build_payload(completion_dir: Path) -> dict:
         results["billing_available"] = available
         if available.get("status") != "pass":
             failures.append("available-state runtime receipt did not pass")
-        if not available.get("signed_in_participate_proxy_verified", False):
+        signed_in_first_party_verified = bool(
+            available.get("signed_in_participate_first_party_verified", False)
+            or available.get("signed_in_participate_proxy_verified", False)
+        )
+        if not signed_in_first_party_verified:
             failures.append("available-state runtime receipt did not verify signed-in participate proxy behavior")
         location = str(available.get("signed_in_supporter_checkout_location", ""))
         if "membership_plan=supporter" not in location:

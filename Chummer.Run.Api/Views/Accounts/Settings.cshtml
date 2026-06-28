@@ -1,0 +1,178 @@
+@using System.Globalization
+@model AccountPageViewModel
+@{
+    ViewData["Title"] = "Settings";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+
+    var laneInterests = Model.Experience.LaneInterests ?? Array.Empty<string>();
+    var followCount = (Model.Experience.FollowHorizons ? 1 : 0) + (Model.Experience.BetaInterest ? 1 : 0);
+    var packageFollowCount = Model.ParticipationPackageReceipts?.Count(item =>
+        string.Equals(item.ActionKind, "follow", StringComparison.OrdinalIgnoreCase)) ?? 0;
+    var packageVoteCount = Model.ParticipationPackageReceipts?.Count(item =>
+        string.Equals(item.ActionKind, "vote", StringComparison.OrdinalIgnoreCase)) ?? 0;
+    var linkedIdentityCount = Model.Links.LinkedIdentities.Count;
+    var linkedChannelCount = Model.Links.ChannelLinks.Count;
+    var primarySignIn = Humanize(Model.Links.RecommendedPrimaryAuth, "Email");
+    var publicRecognition = Model.Experience.PublicContributionProfileOptIn ? "On" : "Off";
+    var blackLedgerStatus = Model.Experience.BlackLedgerNewsEmail ? "On" : "Off";
+
+    static string Humanize(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
+    }
+}
+
+<section class="minimal-page-hero">
+    <div>
+        <p class="eyebrow">Account</p>
+        <h1>Settings</h1>
+        <p>Update choices, sign-in, and privacy in one place.</p>
+        <ul class="minimal-hero__points">
+            <li>@Humanize(Model.User.Visibility, "Private") visibility</li>
+            <li>@Humanize(Model.Links.RecoveryPosture, "Single method") recovery</li>
+            <li>@followCount update option@(followCount == 1 ? string.Empty : "s") turned on</li>
+        </ul>
+        <div class="minimal-actions">
+            <a class="button-like button-like--ghost" href="/account">Back to account</a>
+            <a class="button-like button-like--secondary" href="/account/billing">Open membership</a>
+        </div>
+    </div>
+</section>
+
+<section class="minimal-section minimal-section--tight">
+    <details class="details-drawer" open>
+        <summary>Updates</summary>
+        <article class="minimal-lane-card">
+            <p>Choose which updates matter and whether your public profile stays on.</p>
+            <div class="settings-summary-list">
+                <div class="settings-summary-row">
+                    <span>Followed items</span>
+                    <strong>@packageFollowCount follow@(packageFollowCount == 1 ? string.Empty : "s") · @packageVoteCount vote@(packageVoteCount == 1 ? string.Empty : "s")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Public profile</span>
+                    <strong>@(Model.Experience.PublicContributionProfileOptIn ? "On" : "Off")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Result updates</span>
+                    <strong>@(Model.Experience.ImpactCloseoutNotifications ? "On" : "Off")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Black Ledger mobile stream</span>
+                    <strong>@blackLedgerStatus</strong>
+                </div>
+            </div>
+            <form id="experienceForm" class="settings-form">
+                <div class="check-grid">
+                    <label class="check-row"><input type="checkbox" value="player" @(laneInterests.Contains("player") ? "checked" : null) /> <span>Player</span></label>
+                    <label class="check-row"><input type="checkbox" value="gm" @(laneInterests.Contains("gm") ? "checked" : null) /> <span>GM</span></label>
+                    <label class="check-row"><input type="checkbox" value="creator" @(laneInterests.Contains("creator") ? "checked" : null) /> <span>Creator</span></label>
+                    <label class="check-row"><input id="followHorizons" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow new updates</span></label>
+                    <label class="check-row"><input id="betaInterest" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Invite me when the right beta opens</span></label>
+                    <label class="check-row"><input id="impactCloseoutNotifications" type="checkbox" @(Model.Experience.ImpactCloseoutNotifications ? "checked" : null) /> <span>Send me result updates when something I followed actually changes</span></label>
+                    <label class="check-row"><input id="publicContributionProfileOptIn" type="checkbox" @(Model.Experience.PublicContributionProfileOptIn ? "checked" : null) /> <span>Allow public participation recognition if my account visibility is already public</span></label>
+                    <label class="check-row"><input id="blackLedgerNewsEmail" type="checkbox" @(Model.Experience.BlackLedgerNewsEmail ? "checked" : null) /> <span>Enable Black Ledger mobile stream during play sessions</span></label>
+                </div>
+                <button class="button-like button-like--primary" type="submit">Save settings</button>
+                <p id="experienceStatusNotice" class="muted-copy" hidden></p>
+            </form>
+        </article>
+    </details>
+
+    <details class="details-drawer" open>
+        <summary>Sign-in and privacy</summary>
+        <article class="minimal-lane-card">
+            <p>Keep sign-in, recovery, and visibility readable without turning this into an admin panel.</p>
+            <div class="settings-summary-list">
+                <div class="settings-summary-row">
+                    <span>Primary sign-in</span>
+                    <strong>@primarySignIn</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Recovery</span>
+                    <strong>@Humanize(Model.Links.RecoveryPosture, "Single method")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Linked sign-ins</span>
+                    <strong>@linkedIdentityCount</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Linked channels</span>
+                    <strong>@linkedChannelCount</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Public recognition</span>
+                    <strong>@publicRecognition</strong>
+                </div>
+            </div>
+            <div class="stacked-actions">
+                <a class="button-like button-like--secondary" href="/privacy">Read privacy</a>
+                <a class="button-like button-like--secondary" href="/help">Open help</a>
+            </div>
+        </article>
+    </details>
+
+    <details class="details-drawer">
+        <summary>Membership</summary>
+        <article class="minimal-lane-card">
+            <p>Supporter status and Origin Book limits live on the membership page.</p>
+            <div class="stacked-actions">
+                <a class="button-like button-like--secondary" href="/account/billing">Open membership</a>
+            </div>
+        </article>
+    </details>
+</section>
+
+@section Scripts {
+<script>
+(() => {
+  const ui = window.ChummerUi;
+  if (!ui) {
+    return;
+  }
+
+  const subjectId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.User.SubjectId));
+  const form = document.getElementById("experienceForm");
+  if (!form) {
+    return;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("experienceStatusNotice");
+    const button = form.querySelector("button[type='submit']");
+    const laneInterests = Array.from(document.querySelectorAll("#experienceForm input[type='checkbox'][value]:checked"))
+      .map((input) => input.value);
+
+    ui.clearNotice(notice);
+    ui.setButtonBusy(button, true, "Saving...");
+    try {
+      await ui.requestJson("/api/v1/accounts/me/preferences", {
+        method: "POST",
+        json: {
+          subjectId,
+          laneInterests,
+          followHorizons: document.getElementById("followHorizons").checked,
+          betaInterest: document.getElementById("betaInterest").checked,
+          impactCloseoutNotifications: document.getElementById("impactCloseoutNotifications").checked,
+          publicContributionProfileOptIn: document.getElementById("publicContributionProfileOptIn").checked,
+          blackLedgerNewsEmail: document.getElementById("blackLedgerNewsEmail").checked,
+          onboardingCompleted: true
+        }
+      });
+      ui.setNotice(notice, "Settings saved.");
+    } catch (error) {
+      ui.setNotice(notice, ui.describeError(error, "Settings could not be saved right now."), true);
+    } finally {
+      ui.setButtonBusy(button, false, "Saving...");
+    }
+  });
+})();
+</script>
+}

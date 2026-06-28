@@ -14,6 +14,10 @@ namespace Chummer.Run.Api.Services.Community;
 
 public sealed class CampaignWorkspaceServerPlaneService
 {
+    private const int MaxIdentifierLength = 128;
+    private const int MaxPackageKindLength = 64;
+    private const int MaxTitleLength = 128;
+    private const int MaxNoteLength = 256;
     private static readonly string[] CampaignRelationshipWordTokens =
     [
         "contact",
@@ -1971,10 +1975,14 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
-        GovernedPrepPacketSummary packet = ResolvePrepPacket(prepLibrary, request.PacketId);
+        string packetId = NormalizeRequired(request.PacketId, nameof(GovernedPrepLaunchRequest.PacketId), MaxIdentifierLength);
+        string? targetRunId = NormalizeOptional(request.TargetRunId, nameof(GovernedPrepLaunchRequest.TargetRunId), MaxIdentifierLength);
+        string? targetSceneId = NormalizeOptional(request.TargetSceneId, nameof(GovernedPrepLaunchRequest.TargetSceneId), MaxIdentifierLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(GovernedPrepLaunchRequest.Note), MaxNoteLength);
+        GovernedPrepPacketSummary packet = ResolvePrepPacket(prepLibrary, packetId);
 
-        RunProjection? targetRun = ResolvePrepLaunchRun(context.Workspace, context.LeadRun, request.TargetRunId);
-        SceneProjection? targetScene = ResolvePrepLaunchScene(targetRun, request.TargetSceneId);
+        RunProjection? targetRun = ResolvePrepLaunchRun(context.Workspace, context.LeadRun, targetRunId);
+        SceneProjection? targetScene = ResolvePrepLaunchScene(targetRun, targetSceneId);
         GovernedPrepLaunchProjection launch = _campaignSpine.RecordPrepLaunch(
             user,
             context.Workspace,
@@ -1984,7 +1992,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             packet.Summary,
             targetRun,
             targetScene,
-            request.Note);
+            normalizedNote);
         InvalidateCachedWorkspacePrepLibrary(user, workspaceId);
         return launch;
     }
@@ -2004,7 +2012,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        ClaimedDeviceRestoreProjection device = ResolveTravelPrefetchDevice(context.Restore, request.InstallationId);
+        string installationId = NormalizeRequired(request.InstallationId, nameof(TravelPrefetchStageRequest.InstallationId), MaxIdentifierLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(TravelPrefetchStageRequest.Note), MaxNoteLength);
+        ClaimedDeviceRestoreProjection device = ResolveTravelPrefetchDevice(context.Restore, installationId);
         CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
         IReadOnlyList<string> inventoryLines = BuildTravelPrefetchInventoryLines(context.Workspace, context.Restore, prepLibrary, device);
         string prefetchSummary = BuildTravelPrefetchSummary(context.Workspace, device, prepLibrary);
@@ -2018,7 +2028,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             [
                 "Install-local caches, secrets, and runtime state stay local even when travel packets are staged for bounded offline use."
             ]).ToArray(),
-            request.Note);
+            normalizedNote);
         InvalidateCachedWorkspacePrepLibrary(user, workspaceId);
         return receipt;
     }
@@ -2038,11 +2048,14 @@ public sealed class CampaignWorkspaceServerPlaneService
             return null;
         }
 
-        RunProjection? targetRun = ResolvePrepLaunchRun(context.Workspace, context.LeadRun, request.RunId);
-        string packageKind = NormalizeAftermathPackageKind(request.PackageKind);
-        string title = BuildAftermathPackageTitle(context.Workspace, targetRun, packageKind, request.Title);
+        string? runId = NormalizeOptional(request.RunId, nameof(AftermathRecapPackageRequest.RunId), MaxIdentifierLength);
+        string packageKind = NormalizeAftermathPackageKind(NormalizeRequired(request.PackageKind, nameof(AftermathRecapPackageRequest.PackageKind), MaxPackageKindLength));
+        string? requestedTitle = NormalizeOptional(request.Title, nameof(AftermathRecapPackageRequest.Title), MaxTitleLength);
+        string? normalizedNote = NormalizeOptional(request.Note, nameof(AftermathRecapPackageRequest.Note), MaxNoteLength);
+        RunProjection? targetRun = ResolvePrepLaunchRun(context.Workspace, context.LeadRun, runId);
+        string title = BuildAftermathPackageTitle(context.Workspace, targetRun, packageKind, requestedTitle);
         string summary = BuildAftermathPackageSummary(context.Workspace, targetRun, packageKind);
-        IReadOnlyList<string> evidenceLines = BuildAftermathPackageEvidenceLines(context.Workspace, context.Restore, targetRun, packageKind, request.Note);
+        IReadOnlyList<string> evidenceLines = BuildAftermathPackageEvidenceLines(context.Workspace, context.Restore, targetRun, packageKind, normalizedNote);
         AftermathRecapPackageProjection package = _campaignSpine.RecordAftermathRecapPackage(
             user,
             context.Workspace,
@@ -6939,6 +6952,26 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string NormalizeRequired(string? value, string parameterName, int maxLength)
+        => NormalizeOptional(value, parameterName, maxLength)
+            ?? throw new ArgumentException($"{parameterName} is required.", parameterName);
+
+    private static string? NormalizeOptional(string? value, string parameterName, int maxLength)
+    {
+        string? normalized = NormalizeOptional(value);
+        if (normalized is null)
+        {
+            return null;
+        }
+
+        if (normalized.Length > maxLength)
+        {
+            throw new ArgumentException($"{parameterName} exceeds the maximum length of {maxLength}.", parameterName);
+        }
+
+        return normalized;
+    }
 
     private static string NormalizeReceiptToken(string value)
     {

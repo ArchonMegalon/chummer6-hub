@@ -7,6 +7,8 @@ public sealed class FlagshipReadinessArtifactService
 {
     private const string DefaultReadinessRelativePath = ".codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json";
     private const string ReadinessFileKey = "CHUMMER_PUBLIC_FLAGSHIP_READINESS_FILE";
+    private const string ReadinessFallbackFileKey = "CHUMMER_PUBLIC_FLAGSHIP_READINESS_FALLBACK_FILE";
+    private const string DefaultFleetReadinessPath = "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json";
     private readonly IConfiguration _configuration;
 
     public FlagshipReadinessArtifactService(IConfiguration configuration)
@@ -59,13 +61,16 @@ public sealed class FlagshipReadinessArtifactService
 
         var relativePath = DefaultReadinessRelativePath.Replace('/', Path.DirectorySeparatorChar);
         string? canonRoot = _configuration["CHUMMER_PUBLIC_CANON_ROOT"]?.Trim();
+        string? configuredFallbackPath = _configuration[ReadinessFallbackFileKey]?.Trim();
         string[] candidates = new string?[]
             {
                 !string.IsNullOrWhiteSpace(canonRoot) ? Path.GetFullPath(Path.Combine(canonRoot, relativePath)) : null,
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),
-                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath))
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath)),
+                !string.IsNullOrWhiteSpace(configuredFallbackPath) ? Path.GetFullPath(configuredFallbackPath) : null,
+                DefaultFleetReadinessPath
             }
             .OfType<string>()
             .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))

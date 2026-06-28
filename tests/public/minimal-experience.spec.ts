@@ -34,6 +34,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   await expect(desktop.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
   await expect(desktop.locator('.minimal-inline-links')).toContainText('Help');
   await expect(desktop.locator('.minimal-inline-links')).not.toContainText('Participate');
+  await expect(desktop.locator('.minimal-inline-links')).not.toContainText('Status');
   await expect(desktop.locator('.site-nav')).toHaveCount(0);
   const homepageText = await desktop.locator('[data-homepage-section="hero"]').innerText();
   const homepageManifestResponse = await desktop.request.get(`${baseUrl}/downloads/RELEASE_CHANNEL.generated.json`);

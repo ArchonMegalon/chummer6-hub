@@ -10,22 +10,30 @@ public sealed class FeedbackOperatingLoopViewTests
     {
         string feedbackViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string participateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml");
         string controller = File.ReadAllText(controllerPath);
+        string participateView = File.ReadAllText(participateViewPath);
 
         Assert.False(File.Exists(feedbackViewPath));
-        Assert.Contains("ResolveProductLiftHostedBoardHref()", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/participate/board\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/participate/frame\")]", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult FeedbackPage()", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("BuildFirstPartyParticipateBoardAsync", controller, StringComparison.Ordinal);
-        Assert.Contains("ParticipateBoardProxyCore(", controller, StringComparison.Ordinal);
-        Assert.Contains("localOrigin: \"/participate\"", controller, StringComparison.Ordinal);
+        Assert.Contains("private static string BuildParticipateFrameHref(", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
+        Assert.Contains("\"~/Views/PublicLanding/Partizipate.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/participate{Request.QueryString}\");", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);
-        Assert.Contains("data-chummer-board-skin", controller, StringComparison.Ordinal);
-        Assert.Contains("RemoveHostedBoardAuthLinks", controller, StringComparison.Ordinal);
+        Assert.Contains("@PublicParticipateText(Model.Summary)", participateView, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
+        Assert.Contains("Open board", participateView, StringComparison.Ordinal);
+        Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
+        Assert.Contains("Board is live.", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Feedback and roadmap live here.", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-chummer-board-skin", participateView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -38,10 +46,10 @@ public sealed class FeedbackOperatingLoopViewTests
         string changelogView = File.ReadAllText(changelogViewPath);
 
         Assert.Contains("public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
-        Assert.Contains("RoadmapBoardProxyCore(", controller, StringComparison.Ordinal);
-        Assert.Contains("canonicalHref: \"/roadmap\"", controller, StringComparison.Ordinal);
-        Assert.Contains("assetProxyBasePath: \"/roadmap/provider-assets\"", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Roadmap.cshtml\", model);", controller, StringComparison.Ordinal);
+        Assert.Contains("\"~/Views/PublicLanding/Roadmap.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect($\"/roadmap{Request.QueryString}\");", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildRoadmapFallbackPageModelAsync", controller, StringComparison.Ordinal);
+        Assert.Contains("RoadmapBoardFallbackAsync", controller, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", changelogView, StringComparison.Ordinal);
         Assert.Contains("What changed, and what comes next.", changelogView, StringComparison.Ordinal);
         Assert.Contains("Open Participate", changelogView, StringComparison.Ordinal);

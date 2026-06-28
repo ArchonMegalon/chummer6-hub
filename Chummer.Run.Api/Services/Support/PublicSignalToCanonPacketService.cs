@@ -163,8 +163,8 @@ public sealed class PublicSignalToCanonPacketService
         string locale)
     {
         string summary = trackedSupportCase is null
-            ? "The public support surface routes bugs, account questions, and private feedback into first-party tracked case intake."
-            : $"Tracked support case {trackedSupportCase.CaseId} keeps the public contact path first-party instead of disappearing into email.";
+            ? "The public support surface routes bugs, account questions, and private feedback into first-party support intake."
+            : $"Support case {trackedSupportCase.CaseId} keeps the public contact path first-party instead of disappearing into email.";
         return new SignalToCanonPacketProjection(
             PacketId: StableId("signal-support", trackedSupportCase?.CaseId ?? manifest.Version),
             SurfaceId: "support",
@@ -180,15 +180,15 @@ public sealed class PublicSignalToCanonPacketService
             DecisionAuthority: "case_triage_and_release_followthrough",
             UpstreamPatchRequirement: "support_findings_must_patch_help_release_or_runtime_source_before_public_help_copy_changes",
             NoChangeRationalePolicy: "allowed_only_when_private_case_context_does_not_require_public_claim_changes",
-            CloseoutPosture: "Public support reports become tracked cases, and closeout stays attached to first-party account or reply-email follow-through.",
+            CloseoutPosture: "Public support reports become support cases, and closeout stays attached to first-party account or reply-email follow-through.",
             Summary: summary,
             EvidenceLines:
             [
                 "/contact is the first-party public support and private-feedback intake route.",
-                "Tracked support routes keep the case id, status, and release follow-through visible instead of redirecting to a private vendor queue.",
+                "Support routes keep the case id, status, and release follow-through visible instead of redirecting to a private vendor queue.",
                 trackedSupportCase is null
-                    ? "Guest support still stays first-party through tracked case intake."
-                    : $"Tracked case {trackedSupportCase.CaseId} is the support-side SignalToCanon packet anchor."
+                    ? "Guest support still stays first-party through support-case intake."
+                    : $"Support case {trackedSupportCase.CaseId} is the support-side SignalToCanon packet anchor."
             ],
             JourneyProofEventRefs:
             [

@@ -30,14 +30,13 @@ class MinimalExperienceGateTests(unittest.TestCase):
             """,
             "https://example.invalid/downloads": """
                 <span>Updated</span>
-                <article id="stable"><h2>Current build</h2></article>
-                <article id="nightly"><span>Nightly</span><h2>Newest build</h2></article>
+                <article id="stable"><span>Stable</span><p>Main build for this browser.</p></article>
+                <article id="nightly"><span>Nightly</span><h2>No newer build</h2></article>
             """,
             "https://example.invalid/status": """
                 <div class="minimal-page-hero minimal-status-pill"></div>
                 <a data-analytics-event="status_next_action">Downloads</a>
                 <a data-analytics-event="status_next_action">Support</a>
-                <a data-analytics-event="status_next_action">Release notes</a>
             """,
         }
 
@@ -67,8 +66,8 @@ class MinimalExperienceGateTests(unittest.TestCase):
             """,
             "https://example.invalid/downloads": """
                 <span>Updated</span><span>Updated</span>
-                <article id="stable"><h2>Current build</h2></article>
-                <article id="nightly"><h2>Newest build</h2></article>
+                <article id="stable"><span>Stable</span><p>Main build for this browser.</p></article>
+                <article id="nightly"><span>Nightly</span><h2>No newer build</h2></article>
                 <p>Released 2026-06-23</p>
             """,
             "https://example.invalid/status": """
@@ -78,7 +77,6 @@ class MinimalExperienceGateTests(unittest.TestCase):
                 <p>Checks passed</p>
                 <a data-analytics-event="status_next_action">Downloads</a>
                 <a data-analytics-event="status_next_action">Support</a>
-                <a data-analytics-event="status_next_action">Release notes</a>
             """,
         }
 

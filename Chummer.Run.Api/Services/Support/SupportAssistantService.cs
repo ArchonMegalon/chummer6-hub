@@ -272,17 +272,17 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
                 {
                 SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
                     when latest.FixReadyOnLinkedInstall
-                        => $"{latest.InstallReadinessSummary} Use the verification buttons on this same tracked case now to confirm whether the fix worked here or whether the issue is still broken.",
+                        => $"{latest.InstallReadinessSummary} Use the verification buttons on this same case now to confirm whether the fix worked here or whether the issue is still broken.",
                 SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
                     when latest.NeedsLinkedInstall
                         => $"{latest.InstallReadinessSummary} Once that copy is linked, come back to this same case to verify the fix.",
                 SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
                     => $"{latest.InstallReadinessSummary} After the linked install is current, come back to this same case to confirm whether the fix worked here.",
                 SupportCaseStatuses.AwaitingEvidence
-                    => "The tracked case is waiting for more evidence, so add the missing repro details or diagnostics instead of opening a duplicate report.",
+                    => "The case is waiting for more evidence, so add the missing repro details or diagnostics instead of opening a duplicate report.",
                 SupportCaseStatuses.Deferred or SupportCaseStatuses.Rejected
-                    => "The tracked case already has a terminal decision, so use the existing thread and ask for clarification only if the current state does not match reality.",
-                _ => "The tracked case is still live, so follow that case instead of creating a duplicate thread."
+                    => "The case already has a terminal decision, so use the existing thread and ask for clarification only if the current state does not match reality.",
+                _ => "The case is still live, so follow that case instead of creating a duplicate thread."
             };
 
             return $"I found {caseMatches.Count} matching support case(s). The latest is '{latest.Case.Title}' in {latest.StageLabel}. {guidance}";
@@ -318,7 +318,7 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
 
         if (caseMatches.Count > 0)
         {
-            Add("open_account_support", "Open support timeline", "/account/support", "Review the tracked case and its latest status.");
+            Add("open_account_support", "Open support timeline", "/account/support", "Review the case and its latest status.");
 
             if (caseMatches.FirstOrDefault(static item => item.CanVerifyFix) is { } readyToVerify)
             {
@@ -337,7 +337,7 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
         }
         else
         {
-            Add("open_support_case", "Open support case", "/account/support", "Create a tracked case if the docs do not resolve the issue.");
+            Add("open_support_case", "Open support case", "/account/support", "Create a support case if the docs do not resolve the issue.");
         }
 
         if (tokens.Contains("install") || tokens.Contains("download") || tokens.Contains("update") || tokens.Contains("claim") || tokens.Contains("restart"))

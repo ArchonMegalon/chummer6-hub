@@ -1190,6 +1190,7 @@ public sealed class CampaignSpineController : ControllerBase
     }
 
     [HttpPost("me/workspaces/{workspaceId}/prep-library/launches")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<GovernedPrepLaunchProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<GovernedPrepLaunchProjection>> LaunchMyCampaignWorkspacePrepPacket(
@@ -1218,13 +1219,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/workspaces/{workspaceId}/travel-prefetches")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<TravelPrefetchReceiptProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TravelPrefetchReceiptProjection>> StageMyCampaignWorkspaceTravelPrefetch(
@@ -1253,13 +1255,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/workspaces/{workspaceId}/aftermath-recap-packages")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<AftermathRecapPackageProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<AftermathRecapPackageProjection>> GenerateMyCampaignWorkspaceAftermathRecapPackage(
@@ -1288,13 +1291,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/workspaces/{workspaceId}/consequences")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<CampaignConsequenceProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CampaignConsequenceProjection>> UpsertMyCampaignWorkspaceConsequence(
@@ -1323,13 +1327,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/workspaces/{workspaceId}/runboard-continuity")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<RunboardContinuityProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RunboardContinuityProjection>> UpsertMyCampaignWorkspaceRunboardContinuity(
@@ -1358,13 +1363,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/workspaces/{workspaceId}/campaign-adoption")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<CampaignAdoptionProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CampaignAdoptionProjection>> UpsertMyCampaignWorkspaceCampaignAdoption(
@@ -1393,13 +1399,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentOutOfRangeException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/workspaces/{workspaceId}/runner-goals")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<RunnerGoalProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RunnerGoalProjection>> UpsertMyCampaignWorkspaceRunnerGoal(
@@ -1428,13 +1435,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentOutOfRangeException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/workspaces/{workspaceId}/resolution-report-approvals")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<ResolutionReportApprovalProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ResolutionReportApprovalProjection>> ApproveMyCampaignWorkspaceResolutionReport(
@@ -1463,13 +1471,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/workspaces/{workspaceId}/open-runs")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<OpenRunListingProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OpenRunListingProjection>> CreateMyCampaignWorkspaceOpenRun(
@@ -1497,13 +1506,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentOutOfRangeException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/open-runs/{openRunId}/join-requests")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<OpenRunJoinRequestProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OpenRunJoinRequestProjection>> SubmitMyOpenRunJoinRequest(
@@ -1538,6 +1548,7 @@ public sealed class CampaignSpineController : ControllerBase
     }
 
     [HttpPost("me/open-runs/{openRunId}/join-requests/{requestId}/reviews")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<OpenRunJoinRequestProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OpenRunJoinRequestProjection>> ReviewMyOpenRunJoinRequest(
@@ -1573,6 +1584,7 @@ public sealed class CampaignSpineController : ControllerBase
     }
 
     [HttpPost("me/open-runs/{openRunId}/schedule")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<OpenRunScheduleReceiptProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OpenRunScheduleReceiptProjection>> ScheduleMyOpenRun(
@@ -1600,13 +1612,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException or ArgumentOutOfRangeException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/open-runs/{openRunId}/meeting-handoff")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<OpenRunMeetingHandoffProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OpenRunMeetingHandoffProjection>> CreateMyOpenRunMeetingHandoff(
@@ -1634,13 +1647,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException or ArgumentOutOfRangeException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/open-runs/{openRunId}/closeout")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<OpenRunCloseoutProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OpenRunCloseoutProjection>> CloseOutMyOpenRun(
@@ -1675,6 +1689,7 @@ public sealed class CampaignSpineController : ControllerBase
     }
 
     [HttpPost("me/workspaces/{workspaceId}/federation-batches")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<CampaignFederationBatchProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CampaignFederationBatchProjection>> LaunchMyCampaignWorkspaceFederationBatch(
@@ -1720,13 +1735,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/dossier-movements")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<DossierMovementReceiptProjection>(StatusCodes.Status200OK)]
     public async Task<ActionResult<DossierMovementReceiptProjection>> MoveMyDossier([FromBody] DossierMovementRequest? request, CancellationToken cancellationToken)
     {
@@ -1749,13 +1765,14 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
     }
 
     [HttpPost("me/roster-transfers")]
+    [RequestSizeLimit(CampaignSpineService.MaxMutationRequestBodyBytes)]
     [ProducesResponseType<RosterTransferProjection>(StatusCodes.Status200OK)]
     public async Task<ActionResult<RosterTransferProjection>> TransferMyRoster([FromBody] RosterTransferRequest? request, CancellationToken cancellationToken)
     {
@@ -1778,7 +1795,7 @@ public sealed class CampaignSpineController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
-        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }

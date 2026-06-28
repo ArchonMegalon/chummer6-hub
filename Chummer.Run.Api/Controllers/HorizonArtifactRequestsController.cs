@@ -9,6 +9,8 @@ namespace Chummer.Run.Api.Controllers;
 [ApiController]
 public sealed class HorizonArtifactRequestsController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly HorizonArtifactRequestService _requests;
     private readonly AccountService? _accounts;
     private readonly HubIdentityClient? _identity;
@@ -54,6 +56,7 @@ public sealed class HorizonArtifactRequestsController : ControllerBase
     }
 
     [HttpPost("/api/v1/horizons/artifact-requests/me")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [IgnoreAntiforgeryToken]
     [ProducesResponseType<HorizonArtifactRequestReceipt>(StatusCodes.Status200OK)]
     [ProducesResponseType<HorizonArtifactRequestReceipt>(StatusCodes.Status400BadRequest)]

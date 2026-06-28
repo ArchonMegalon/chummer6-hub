@@ -1,0 +1,137 @@
+@using System.Globalization
+@model AccountPageViewModel
+@{
+    ViewData["Title"] = "Roster";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+
+    var answer = Model.SelectedRulesNavigatorAnswer;
+}
+
+@if (answer is null)
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">Roster</p>
+            <h1>Rules answer not found</h1>
+            <p>This answer is not attached to this account anymore.</p>
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" href="/account/work">Back to roster</a>
+            </div>
+        </div>
+    </section>
+}
+else
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">Roster</p>
+            <h1>@answer.Question</h1>
+            <p>@answer.ShortAnswer</p>
+            <ul class="minimal-hero__points">
+                <li>@answer.ProvenanceLabel</li>
+                <li>@answer.EntryId</li>
+            </ul>
+            <div class="minimal-actions">
+                <a class="button-like button-like--ghost" href="/account/work">Back to roster</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="minimal-section">
+        <div class="minimal-lane-grid minimal-platform-list">
+            <article class="minimal-lane-card">
+                <span class="tag">Before</span>
+                <h2>@answer.BeforeSummary</h2>
+                <p>Previous visible state for this answer.</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">After</span>
+                <h2>@answer.AfterSummary</h2>
+                <p>Current visible state after the applied explanation.</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Notes</span>
+                <h2>@answer.ProvenanceLabel</h2>
+                <p>Grounding stays visible here instead of being hidden behind the old account page.</p>
+            </article>
+        </div>
+    </section>
+
+    @if (answer.Studio is not null)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Stage</h2>
+                <p>Current lifecycle and next move.</p>
+            </div>
+            <article class="minimal-lane-card">
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Current stage</span>
+                        <strong>@answer.Studio.CurrentStageLabel</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Promote to</span>
+                        <strong>@answer.Studio.PromotionTargetLabel</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Rollback</span>
+                        <strong>@answer.Studio.RollbackSummary</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Lineage</span>
+                        <strong>@answer.Studio.LineageSummary</strong>
+                    </div>
+                </div>
+                <p><strong>Promotion:</strong> @answer.Studio.PromotionSummary</p>
+                <div class="stacked-copy">
+                    @foreach (var stage in answer.Studio.Stages)
+                    {
+                        <p><strong>@stage.Label:</strong> @CultureInfo.InvariantCulture.TextInfo.ToTitleCase(stage.Status.Replace('_', ' ')). @stage.Summary</p>
+                    }
+                </div>
+            </article>
+        </section>
+    }
+
+    @if (answer.Diffs is { Count: > 0 })
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Diffs</h2>
+                <p>Only the visible environment changes.</p>
+            </div>
+            <div class="minimal-lane-grid minimal-platform-list">
+                @foreach (var diff in answer.Diffs.Take(2))
+                {
+                    <article class="minimal-lane-card">
+                        <span class="tag">@diff.Label</span>
+                        <h3>@diff.AfterSummary</h3>
+                        <p><strong>Before:</strong> @diff.BeforeSummary</p>
+                        <p><strong>Why:</strong> @diff.ReasonSummary</p>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    @if (answer.EvidenceLines.Count > 0 || answer.SupportReuseHints.Count > 0)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <details class="details-drawer">
+                <summary>More context</summary>
+                <div class="stacked-copy">
+                    @if (answer.EvidenceLines.Count > 0)
+                    {
+                        <p><strong>Evidence:</strong> @string.Join(" ", answer.EvidenceLines.Take(3))</p>
+                    }
+                    @if (answer.SupportReuseHints.Count > 0)
+                    {
+                        <p><strong>Support reuse:</strong> @string.Join(" ", answer.SupportReuseHints.Take(3))</p>
+                    }
+                </div>
+            </details>
+        </section>
+    }
+}

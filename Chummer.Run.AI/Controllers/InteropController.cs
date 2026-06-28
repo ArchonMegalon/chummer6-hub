@@ -8,6 +8,8 @@ namespace Chummer.Run.AI.Controllers;
 [Route("api/v1/ai/interop")]
 public sealed class InteropController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly IInteropExportService _interop;
 
     public InteropController(IInteropExportService interop)
@@ -16,6 +18,7 @@ public sealed class InteropController : ControllerBase
     }
 
     [HttpPost("export")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<InteropContracts.InteropExportPackage>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<InteropContracts.InteropExportPackage> Export([FromBody] InteropContracts.InteropExportRequest? request)
@@ -29,6 +32,7 @@ public sealed class InteropController : ControllerBase
     }
 
     [HttpPost("import")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<InteropContracts.InteropImportResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<InteropContracts.InteropImportResult> Import([FromBody] InteropContracts.InteropImportRequest? request)
@@ -42,6 +46,7 @@ public sealed class InteropController : ControllerBase
     }
 
     [HttpPost("round-trip")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<InteropContracts.InteropRoundTripResult>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult<InteropContracts.InteropRoundTripResult> RoundTrip([FromBody] InteropContracts.InteropRoundTripRequest? request)

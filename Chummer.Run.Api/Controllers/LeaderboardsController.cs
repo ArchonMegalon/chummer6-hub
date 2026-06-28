@@ -75,9 +75,10 @@ public sealed class LeaderboardsController : Controller
         catch (HubRequestAuthException ex)
         {
             _logger.LogWarning(ex, "Preserving signed-in leaderboard chrome after identity failure.");
-            if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+            SiteChromeViewModel? fallbackChrome = TryBuildRetainedSignedInChrome(title, description, currentPath);
+            if (fallbackChrome is not null)
             {
-                return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+                return fallbackChrome;
             }
 
             return _chrome.BuildPublicChrome(title, description, currentPath);
@@ -88,12 +89,29 @@ public sealed class LeaderboardsController : Controller
             || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
         {
             _logger.LogWarning(ex, "Falling back while building leaderboard chrome.");
-            if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+            SiteChromeViewModel? fallbackChrome = TryBuildRetainedSignedInChrome(title, description, currentPath);
+            if (fallbackChrome is not null)
             {
-                return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+                return fallbackChrome;
             }
 
             return _chrome.BuildPublicChrome(title, description, currentPath);
         }
+    }
+
+    private SiteChromeViewModel? TryBuildRetainedSignedInChrome(string title, string description, string currentPath)
+    {
+        if (_identity.TryGetFallbackSubject(Request, out AuthenticatedHubSubject? subject) && subject is not null)
+        {
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName, user.Email);
+        }
+
+        if (Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName))
+        {
+            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, "Signed in");
+        }
+
+        return null;
     }
 }

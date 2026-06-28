@@ -63,7 +63,7 @@ public sealed class PrivacyBoundedSupportStatusService
             ? "/account/support"
             : concierge?.SupportCaseTruth.DetailHref ?? $"/account/support/{Uri.EscapeDataString(latestSupportCase.CaseId)}";
         string summary = latestSupportCase is null
-            ? "Support status stays first-party and install-aware; when no tracked case exists yet, the account support page remains the safe place to continue."
+            ? "Support status stays first-party and install-aware; when no support case exists yet, the account support page remains the safe place to continue."
             : $"{HumanizeStatus(latestSupportCase.Status)} support case {latestSupportCase.CaseId} keeps release and install follow-up visible on the account support page.";
 
         return new PrivacyBoundedSupportStatusProjection(
@@ -79,15 +79,15 @@ public sealed class PrivacyBoundedSupportStatusService
             EvidenceLines:
             [
                 latestSupportCase is null
-                    ? "No tracked support case is active yet, so the support intake page remains the safe place to start."
+                    ? "No support case is active yet, so the support intake page remains the safe place to start."
                     : $"Case {latestSupportCase.CaseId} is currently {HumanizeStatus(latestSupportCase.Status).ToLowerInvariant()}.",
                 concierge?.ReleaseExplainer.CorrectnessBasis ?? "Support status stays grounded in the same release status that powers downloads, install help, and fix availability.",
                 ResolveFixAvailabilitySummary(manifest)
             ],
             Actions:
             [
-                new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", route, "Review the tracked case or the account support page."),
-                new PrivacyBoundedSupportStatusActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Start first-party intake when no tracked case exists yet."),
+                new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", route, "Review the case or the account support page."),
+                new PrivacyBoundedSupportStatusActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Start first-party intake when no support case exists yet."),
                 new PrivacyBoundedSupportStatusActionProjection("open_current_release", "Open current release", "/now", "Compare support posture with the same current release status.")
             ],
             EmittedAtUtc: now,
@@ -128,7 +128,7 @@ public sealed class PrivacyBoundedSupportStatusService
             Actions:
             [
                 new PrivacyBoundedSupportStatusActionProjection("open_crash_work_items", "Open crash work items", "/api/v1/support/crashes/work-items", "Inspect bounded crash triage state."),
-                new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", "/account/support", "Compare crash routing with tracked support followthrough."),
+                new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", "/account/support", "Compare crash routing with support-case follow-up."),
                 new PrivacyBoundedSupportStatusActionProjection("open_privacy", "Open privacy", "/privacy", "Check the privacy boundary that keeps raw diagnostics off user surfaces.")
             ],
             EmittedAtUtc: now,
@@ -223,7 +223,7 @@ public sealed class PrivacyBoundedSupportStatusService
             [
                 new PrivacyBoundedSupportStatusActionProjection("open_progress", "Open progress", "/progress", "Review public program telemetry that stays customer-safe."),
                 new PrivacyBoundedSupportStatusActionProjection("open_privacy", "Open privacy", "/privacy", "Inspect the privacy boundary that explains what telemetry may and may not surface."),
-                new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", "/account/support", "Compare the rollup with tracked case followthrough when deeper status is needed.")
+                new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", "/account/support", "Compare the rollup with case follow-up when deeper status is needed.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -238,7 +238,7 @@ public sealed class PrivacyBoundedSupportStatusService
         string locale)
     {
         string supportClock = latestSupportCase is null
-            ? "No tracked support case clock is running yet."
+            ? "No support case clock is running yet."
             : $"Support case {latestSupportCase.CaseId} was updated {DescribeAge(now - latestSupportCase.UpdatedAtUtc)} ago.";
         string crashClock = latestCrashWorkItem is null
             ? "No crash work-item clock is running yet."
@@ -283,7 +283,7 @@ public sealed class PrivacyBoundedSupportStatusService
             : concierge?.SupportCaseTruth.DetailHref ?? $"/account/support/{Uri.EscapeDataString(latestSupportCase.CaseId)}";
         string comparisonRoute = "/api/v1/install-linking/continuation/support";
         string summary = latestSupportCase is null
-            ? "Case-status followthrough starts on the first-party support rail and only becomes install-aware once a tracked case exists."
+            ? "Case follow-up starts on the first-party support rail and only becomes install-aware once a support case exists."
             : concierge?.SupportClosure.Summary ?? $"Case {latestSupportCase.CaseId} keeps first-party followthrough attached to the same install and release status.";
 
         return new PrivacyBoundedSupportStatusProjection(
@@ -304,7 +304,7 @@ public sealed class PrivacyBoundedSupportStatusService
             ],
             Actions:
             [
-                new PrivacyBoundedSupportStatusActionProjection("open_case_followthrough", "Open tracked support", route, "Inspect the tracked case and next safe action."),
+                new PrivacyBoundedSupportStatusActionProjection("open_case_followthrough", "Open support case", route, "Inspect the support case and next safe action."),
                 new PrivacyBoundedSupportStatusActionProjection("open_support_continuation", "Open support continuation", comparisonRoute, "Keep install-aware followthrough on the same first-party support rail."),
                 new PrivacyBoundedSupportStatusActionProjection("open_downloads", "Open downloads", "/downloads", "Compare case followthrough with the current release and installer shelf.")
             ],

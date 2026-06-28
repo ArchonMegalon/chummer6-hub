@@ -19,7 +19,7 @@ public sealed class PublicLandingClaimRecoveryFlowTests
         string presenter = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Support", "SupportCasePresentationService.cs"));
 
         Assert.Contains("AccountLabel: \"Open installs\"", controller, StringComparison.Ordinal);
-        Assert.Contains("SupportLabel: \"Open tracked support\"", controller, StringComparison.Ordinal);
+        Assert.Contains("SupportLabel: \"Open support\"", controller, StringComparison.Ordinal);
         Assert.Contains("DesktopInstallRail.BuildSupportHref(", controller, StringComparison.Ordinal);
         Assert.Contains("/continue.json", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveSupportIntakeRailFromQuery()", controller, StringComparison.Ordinal);
@@ -46,7 +46,7 @@ public sealed class PublicLandingClaimRecoveryFlowTests
         Assert.Contains("Recovery codes stay below as a fallback, not the first instruction.", accountView, StringComparison.Ordinal);
         Assert.Contains("Open installs", presenter, StringComparison.Ordinal);
         Assert.Contains(
-            "Follow-up stays attached to the affected claimed install. Use Account > Support for tracked history and Installs only when you need to relink or reclaim that copy.",
+            "Follow-up stays attached to the affected claimed install. Use Account > Support for case history and Installs only when you need to relink or reclaim that copy.",
             presenter,
             StringComparison.Ordinal);
     }

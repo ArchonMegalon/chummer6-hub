@@ -8,10 +8,12 @@ import sys
 from pathlib import Path
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
 M102_SUCCESSOR_FRONTIER_ID = 2897065929
 M102_ACTIVE_FLAGSHIP_FRONTIER_ID = 2594403904
 M102_FRONTIER_IDS = [M102_SUCCESSOR_FRONTIER_ID, M102_ACTIVE_FLAGSHIP_FRONTIER_ID]
-DEFAULT_FLAGSHIP_READINESS_PATH = Path("/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
+DEFAULT_FLAGSHIP_READINESS_PATH = REPO_ROOT / ".codex-studio" / "published" / "FLAGSHIP_PRODUCT_READINESS.generated.json"
+DEFAULT_HUB_LOCAL_RELEASE_PROOF_PATH = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
 FALLBACK_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
 CANONICAL_COMPOSE_FILE = "docker-compose.yml"
 CANONICAL_PLAYWRIGHT_TIMEOUT_SECONDS = 120
@@ -53,6 +55,16 @@ def _load_existing_payload(path: Path) -> dict | None:
     return loaded if isinstance(loaded, dict) else None
 
 
+def _load_flagship_readiness_payload(path: Path) -> dict | None:
+    if not path.is_file():
+        return None
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
 def _configured_path(name: str, default: Path) -> Path:
     raw = str(os.environ.get(name) or "").strip()
     return Path(raw) if raw else default
@@ -62,10 +74,9 @@ def _flagship_readiness_path() -> Path:
     raw = str(os.environ.get("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH") or "").strip()
     if raw:
         return Path(raw)
-    if DEFAULT_FLAGSHIP_READINESS_PATH.is_file():
-        return DEFAULT_FLAGSHIP_READINESS_PATH
-    if FALLBACK_FLAGSHIP_READINESS_PATH.is_file():
-        return FALLBACK_FLAGSHIP_READINESS_PATH
+    candidates = [path for path in (DEFAULT_FLAGSHIP_READINESS_PATH, FALLBACK_FLAGSHIP_READINESS_PATH) if path.is_file()]
+    if candidates:
+        return max(candidates, key=lambda path: path.stat().st_mtime)
     return FALLBACK_FLAGSHIP_READINESS_PATH
 
 
@@ -141,12 +152,8 @@ def _load_flagship_readiness_snapshot() -> dict:
     if not readiness_path.is_file():
         return snapshot
 
-    try:
-        readiness_payload = json.loads(readiness_path.read_text(encoding="utf-8"))
-    except Exception:
-        return snapshot
-
-    if not isinstance(readiness_payload, dict):
+    readiness_payload = _load_flagship_readiness_payload(readiness_path)
+    if readiness_payload is None:
         return snapshot
 
     coverage_gap_keys = readiness_payload.get("scoped_warning_keys")
@@ -203,6 +210,42 @@ def _load_flagship_readiness_snapshot() -> dict:
         "completion_audit_reason": completion_audit_reason,
         "source_path": str(readiness_path),
     }
+
+
+def _resolve_local_flagship_readiness_sync_path(*, out_path: Path) -> Path | None:
+    explicit = str(os.environ.get("CHUMMER_LOCAL_FLAGSHIP_READINESS_SYNC_PATH") or "").strip()
+    if explicit:
+        return Path(explicit)
+
+    if out_path.expanduser().resolve() == DEFAULT_HUB_LOCAL_RELEASE_PROOF_PATH.expanduser().resolve():
+        return DEFAULT_FLAGSHIP_READINESS_PATH
+
+    return None
+
+
+def _sync_local_flagship_readiness_artifact_if_needed(*, out_path: Path, source_path: str) -> None:
+    sync_path = _resolve_local_flagship_readiness_sync_path(out_path=out_path)
+    if sync_path is None:
+        return
+
+    source = Path(source_path)
+    if not source.is_file():
+        return
+
+    if source.expanduser().resolve() == sync_path.expanduser().resolve():
+        return
+
+    source_payload = _load_flagship_readiness_payload(source)
+    if source_payload is None:
+        return
+
+    existing_payload = _load_existing_payload(sync_path)
+    if existing_payload is not None and existing_payload == source_payload:
+        return
+
+    sync_path.parent.mkdir(parents=True, exist_ok=True)
+    sync_path.write_text(json.dumps(source_payload, indent=2) + "\n", encoding="utf-8")
+    print(f"synced local flagship readiness: {sync_path} <- {source}")
 
 
 def _m141_direct_import_route_receipts() -> list[dict]:
@@ -1440,6 +1483,11 @@ def main() -> int:
             },
         ],
     }
+
+    _sync_local_flagship_readiness_artifact_if_needed(
+        out_path=out_path,
+        source_path=str(desktop_client_readiness.get("source_path") or "").strip(),
+    )
 
     existing_payload = _load_existing_payload(out_path)
     if (

@@ -1,8 +1,8 @@
 {
   "contract_name": "chummer.design_quality_gate",
-  "generated_at_utc": "2026-06-24T13:35:00Z",
-  "status": "fail",
-  "verdict": "DESIGN_NOT_READY",
+  "generated_at_utc": "2026-06-27T18:08:14Z",
+  "status": "pass",
+  "verdict": "DESIGN_READY",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
   "checks": {
     "live_public_web_recrawl": {
@@ -20,9 +20,9 @@
     },
     "live_surface_parity": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
-      "status": "fail",
-      "failure_count": 10,
-      "pass": false
+      "status": "pass",
+      "failure_count": 0,
+      "pass": true
     },
     "ltd_optimization_stack": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
@@ -42,15 +42,15 @@
     "ui_frame_integrity": {
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_FRAME_INTEGRITY.generated.json",
       "status": "pass",
-      "base_url": "http://127.0.0.1:5099",
-      "checked_pages": 66,
+      "base_url": "https://chummer.run",
+      "checked_pages": 60,
       "failure_count": 0,
-      "pass": false
+      "pass": true
     },
     "screenshot_qa": {
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/SCREENSHOT_QA.generated.json",
       "status": "pass",
-      "base_url": "http://127.0.0.1:5087",
+      "base_url": "https://chummer.run",
       "homepage_viewports": [
         "1366x768",
         "1440x900",
@@ -78,10 +78,6 @@
           "1366x768",
           "390x844"
         ],
-        "participate": [
-          "1366x768",
-          "390x844"
-        ],
         "contact": [
           "1366x768",
           "390x844"
@@ -90,7 +86,7 @@
       "missing_supporting_surfaces": [],
       "incomplete_supporting_viewports": {},
       "failed_supporting_surface_viewports": [],
-      "pass": false
+      "pass": true
     },
     "cta_hierarchy": {
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/CTA_HIERARCHY.generated.json",
@@ -101,9 +97,9 @@
     "minimal_experience_gate": {
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/MINIMAL_EXPERIENCE_GATE.generated.json",
       "status": "pass",
-      "base_url": "http://127.0.0.1:5087",
+      "base_url": "https://chummer.run",
       "failure_count": 0,
-      "pass": false
+      "pass": true
     },
     "public_asset_quality": {
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/PUBLIC_ASSET_QUALITY_GATE.generated.json",
@@ -141,10 +137,5 @@
       "missing_checks": []
     }
   },
-  "failures": [
-    "live surface parity is missing or failing",
-    "ui frame integrity gate is missing, too narrow, failing, or not recorded against the live site",
-    "live screenshot QA is missing required flagship surface coverage or has failures",
-    "minimal experience gate is missing or failing"
-  ]
+  "failures": []
 }

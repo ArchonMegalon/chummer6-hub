@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -17,183 +18,265 @@ PUBLISHED_ROOT = REPO_ROOT / ".codex-studio" / "published"
 OUTPUT_PATH = PUBLISHED_ROOT / "LIVE_SURFACE_PARITY.generated.json"
 DEFAULT_BASE_URL = "https://chummer.run"
 
-SURFACES = [
-    {
-        "path": "/",
+def truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def build_billing_surface(require_brilliant_directories_checkout: bool) -> dict[str, Any]:
+    if require_brilliant_directories_checkout:
+        return {
+            "path": "/account/billing",
+            "required_final_url_prefix": "/login",
+            "required_texts": [
+                "Open Chummer",
+                "Email first. Google if you prefer.",
+                "Continue with email",
+                "Continue with Google",
+            ],
+            "forbidden_texts": [
+                "Supporter is not open right now.",
+                "Account settings",
+                "Billing is unavailable",
+                "Membership",
+            ],
+        }
+
+    return {
+        "path": "/account/billing",
         "required_texts": [
-            "A Shadowrun character manager for clean sheets and faster tables.",
-            "Download Chummer",
-            "Current public installer",
-            "Help",
-            "Status",
-            "Watch 90 sec",
+            "Membership",
+            "Supporter is not open right now. Free stays the same.",
+            "Continue with email",
         ],
         "forbidden_texts": [
-            "Next move",
-            "Need help?",
-            "One compact rail for downloads, play, and public status.",
-            "Reel details",
-            "Keep it simple",
-            "Get started",
-            "Worlds",
-            "Flagship routes",
-            "Signals and horizons",
-            "Trust and support",
-            "Account and quick actions",
+            "Manage supporter",
+            "Account settings",
         ],
-    },
-    {
-        "path": "/downloads",
-        "required_texts": [
-            "Downloads",
-            "Nightly",
-            "Stable",
-            "Build from source",
-            "Download script",
-        ],
-        "forbidden_texts": [
-            "Advanced download options",
-            "Release notes",
-            "Build run",
-            "Need account return?",
-            "Current notes.",
-            "Install questions?",
-            "Account return later?",
-            "account-assisted install paths",
-            "Link this copy from the first launch",
-            "guided installer",
-            "Current stable build",
-            "Latest published build",
-            "Use this when you want the newest Windows or Linux release.",
-            "Get started",
-            "Flagship routes",
-            "Signals and horizons",
-            "Trust and support",
-            "Account and quick actions",
-        ],
-    },
-    {
-        "path": "/status",
-        "required_texts": [
-            "Chummer is available.",
-            "Updated",
-            "Downloads",
-            "Help",
-        ],
-        "forbidden_texts": [
-            "Current release",
-            "The build, platforms, and current state in one place.",
-            "Open downloads",
-            "Open help",
-            "Platforms",
-            "Release and next step.",
-            "Release, caution, next click.",
-            "Known issues and install help stay nearby.",
-            "provider",
-            "operator",
-            "fleet",
-            "proof",
-            "receipt",
-            "Build",
-            "Released",
-            "Current caution.",
-            "Preview posture on Public release",
-            "Review is still required before this release can be treated as supportable.",
-            "Fallback",
-            "Revoked",
-            "usage snapshot",
-            "At a glance",
-            "Signed-in return",
-            "Status poster",
-            "Get started",
-            "Flagship routes",
-            "Signals and horizons",
-            "Trust and support",
-            "Account and quick actions",
-        ],
-    },
-    {
-        "path": "/participate",
-        "required_texts": [],
-        "required_html_texts": [
-            "data-chummer-board-skin",
-        ],
-        "forbidden_texts": [
-            "ProductLift",
-            "Log in",
-            "Sign up",
-            "Sign in",
-            "Authorize Codex access.",
-            "OpenAI account in ChatGPT",
-            "Requests, votes, and shipped work.",
-            "Something went wrong",
-            "Could not load posts",
-            "Network error while loading tab configuration",
-        ],
-        "forbidden_html_texts": [
-            "chummer6.productlift.dev",
-        ],
-    },
-    {
-        "path": "/participate/board",
-        "required_texts": [
-            "Participate - Chummer.run",
-        ],
-        "required_html_texts": [
-            "<title>Participate - Chummer.run</title>",
-            "content=\"Short requests, clear bugs, useful ideas.\"",
-            "data-chummer-board-skin",
-        ],
-        "forbidden_texts": [
-            "ProductLift",
-            "productlift.dev",
-            "Log in",
-            "Sign up",
-            "Sign in",
-            "Search",
-            "Ctrl K",
-            "×",
-            "Something went wrong",
-            "Could not load posts",
-            "Network error while loading tab configuration",
-            "/auth/google/start?next=",
-            "accounts.google.com",
-        ],
-    },
-    {
-        "path": "/ledger",
-        "required_texts": [
-            "Black Ledger command map",
-            "Command map",
-        ],
-        "required_final_url_prefix": "/ledger/map",
-        "forbidden_texts": [
-            "Internal Error",
-            "Board signal:",
-            "Turn source:",
-            "Production notes",
-            "City note:",
-            "City pulse:",
-            "Built from",
-            "deterministic board",
-            "Linked through",
-            "Turn record:",
-            "Scene notes",
-            "<p class=\"editorial-copy\"></p>",
-        ],
-    },
-    {
-        "path": "/ledger/newsroom",
-        "required_texts": [
-            "Black Ledger Newsroom",
-            "Transcript",
-            "Published:",
-        ],
-        "forbidden_texts": [
-            "Internal Error",
-        ],
-    },
-]
+    }
+
+
+def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[str, Any]]:
+    return [
+        {
+            "path": "/",
+            "required_texts": [
+                "A Shadowrun character manager for clean sheets and faster tables.",
+                "Download Chummer",
+                "Current public installer",
+                "Help",
+                "Status",
+                "Watch 90 sec",
+            ],
+            "forbidden_texts": [
+                "Next move",
+                "Need help?",
+                "One compact rail for downloads, play, and public status.",
+                "Reel details",
+                "Keep it simple",
+                "Get started",
+                "Worlds",
+                "Flagship routes",
+                "Signals and horizons",
+                "Trust and support",
+                "Account and quick actions",
+            ],
+        },
+        {
+            "path": "/downloads",
+            "required_texts": [
+                "Downloads",
+                "Main build for this browser",
+                "Nightly",
+                "Stable",
+                "Build from source",
+                "Download script",
+            ],
+            "forbidden_texts": [
+                "Advanced download options",
+                "Release notes",
+                "Build run",
+                "Need account return?",
+                "Current notes.",
+                "Install questions?",
+                "Account return later?",
+                "account-assisted install paths",
+                "Link this copy from the first launch",
+                "guided installer",
+                "Current stable build",
+                "Latest published build",
+                "Use this when you want the newest Windows or Linux release.",
+                "Get started",
+                "Flagship routes",
+                "Signals and horizons",
+                "Trust and support",
+                "Account and quick actions",
+            ],
+        },
+        {
+            "path": "/status",
+            "required_texts": [
+                "Status",
+                "Updated",
+                "Downloads",
+                "Help",
+            ],
+            "forbidden_texts": [
+                "Current release",
+                "The build, platforms, and current state in one place.",
+                "Open downloads",
+                "Open help",
+                "Platforms",
+                "Release and next step.",
+                "Release, caution, next click.",
+                "Known issues and install help stay nearby.",
+                "provider",
+                "operator",
+                "fleet",
+                "proof",
+                "receipt",
+                "Build",
+                "Released",
+                "Current caution.",
+                "Preview posture on Public release",
+                "Review is still required before this release can be treated as supportable.",
+                "Fallback",
+                "Revoked",
+                "usage snapshot",
+                "At a glance",
+                "Signed-in return",
+                "Status poster",
+                "Get started",
+                "Flagship routes",
+                "Signals and horizons",
+                "Trust and support",
+                "Account and quick actions",
+            ],
+        },
+        build_billing_surface(require_brilliant_directories_checkout),
+        {
+            "path": "/participate",
+            "required_texts": [
+                "What should Chummer do next?",
+                "Public requests, clear bugs, useful ideas.",
+                "Current requests",
+                "Open board",
+            ],
+            "forbidden_texts": [
+                "ProductLift",
+                "Log in",
+                "Sign up",
+                "Authorize Codex access.",
+                "OpenAI account in ChatGPT",
+                "Requests, votes, and shipped work.",
+                "Something went wrong",
+                "Could not load posts",
+                "Network error while loading tab configuration",
+            ],
+            "forbidden_html_texts": [
+                "chummer6.productlift.dev",
+                "data-chummer-board-skin",
+            ],
+        },
+        {
+            "path": "/participate/board",
+            "required_texts": [
+                "What should Chummer do next?",
+                "Public requests, clear bugs, useful ideas.",
+                "Current requests",
+                "Open board",
+            ],
+            "required_final_url_prefix": "/participate",
+            "required_html_texts": [
+                "<title>Participate · Chummer</title>",
+            ],
+            "forbidden_texts": [
+                "ProductLift",
+                "productlift.dev",
+                "Log in",
+                "Sign up",
+                "Search",
+                "Ctrl K",
+                "×",
+                "Something went wrong",
+                "Could not load posts",
+                "Network error while loading tab configuration",
+                "/auth/google/start?next=",
+                "accounts.google.com",
+            ],
+            "forbidden_html_texts": [
+                "data-chummer-board-skin",
+            ],
+        },
+        {
+            "path": "/roadmap",
+            "required_texts": [
+                "Roadmap",
+                "Now and next.",
+                "Planned work is here. Shipped work stays in Changelog.",
+                "Current work opens below.",
+            ],
+            "forbidden_texts": [
+                "ProductLift",
+                "Open live board",
+                "Something went wrong",
+                "Could not load posts",
+                "Network error while loading tab configuration",
+            ],
+        },
+        {
+            "path": "/roadmap/board",
+            "required_texts": [
+                "Roadmap",
+                "Now and next.",
+                "Planned work is here. Shipped work stays in Changelog.",
+                "Current work opens below.",
+            ],
+            "required_final_url_prefix": "/roadmap",
+            "forbidden_texts": [
+                "ProductLift",
+                "Open live board",
+                "Something went wrong",
+                "Could not load posts",
+                "Network error while loading tab configuration",
+            ],
+        },
+        {
+            "path": "/ledger",
+            "required_texts": [
+                "Black Ledger command map",
+                "Command map",
+            ],
+            "required_final_url_prefix": "/ledger/map",
+            "forbidden_texts": [
+                "Internal Error",
+                "Board signal:",
+                "Turn source:",
+                "Production notes",
+                "City note:",
+                "City pulse:",
+                "Built from",
+                "deterministic board",
+                "Linked through",
+                "Turn record:",
+                "Scene notes",
+                "<p class=\"editorial-copy\"></p>",
+            ],
+        },
+        {
+            "path": "/ledger/newsroom",
+            "required_texts": [
+                "Black Ledger Newsroom",
+                "Transcript",
+                "Published:",
+            ],
+            "forbidden_texts": [
+                "Internal Error",
+            ],
+        },
+    ]
+
+
+SURFACES = build_surfaces(False)
 
 
 class TextExtractor(HTMLParser):
@@ -294,10 +377,12 @@ def flatten_text(html: str) -> str:
 def verify(base_url: str) -> dict[str, Any]:
     base = base_url.rstrip("/")
     base_origin = urllib.parse.urlparse(base)
+    require_brilliant_directories_checkout = truthy_env("CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT")
+    surfaces = build_surfaces(require_brilliant_directories_checkout)
     results: list[dict[str, Any]] = []
     failures: list[str] = []
 
-    for surface in SURFACES:
+    for surface in surfaces:
         path = str(surface["path"])
         url = urllib.parse.urljoin(f"{base}/", path.lstrip("/"))
         status_code, body, final_url, redirect_location, redirect_chain = fetch(url, base)
@@ -372,6 +457,7 @@ def verify(base_url: str) -> dict[str, Any]:
         "contract_name": "chummer.live_surface_parity",
         "generated_at_utc": now_iso(),
         "base_url": base,
+        "require_brilliant_directories_checkout": require_brilliant_directories_checkout,
         "status": "pass" if not failures else "fail",
         "verdict": "LIVE_SURFACE_PARITY_READY" if not failures else "LIVE_SURFACE_PARITY_NOT_READY",
         "results": results,

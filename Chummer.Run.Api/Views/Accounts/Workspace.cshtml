@@ -1,0 +1,261 @@
+@using System.Globalization
+@model AccountPageViewModel
+@{
+    ViewData["Title"] = "Roster";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-account surface-minimal";
+
+    var workspace = Model.SelectedWorkspace;
+    var plane = Model.SelectedWorkspaceServerPlane;
+    var firstPlayable = plane?.FirstPlayableSession ?? workspace?.FirstPlayableSession;
+    var carryForward = plane?.NextSessionCarryForward ?? workspace?.NextSessionCarryForward;
+    var campaignMemory = plane?.CampaignMemory ?? workspace?.CampaignMemory;
+    var aftermathPackages = plane?.AftermathPackages ?? workspace?.AftermathPackages ?? Array.Empty<Chummer.Campaign.Contracts.AftermathRecapPackageProjection>();
+    var consequences = plane?.Consequences ?? workspace?.Consequences ?? Array.Empty<Chummer.Campaign.Contracts.CampaignConsequenceProjection>();
+    var leadConsequence = consequences.FirstOrDefault();
+    var recapShelf = plane?.RecapShelf.Select(static item => (item.Label, item.Summary))
+        ?? workspace?.RecapShelf.Select(static item => (item.Label, item.Summary))
+        ?? Array.Empty<(string Label, string Summary)>();
+    var nextSafeLabel = !string.IsNullOrWhiteSpace(plane?.NextSafeAction.Label)
+        ? plane!.NextSafeAction.Label
+        : workspace?.NextSafeAction ?? "Open the next step.";
+    var nextSafeSummary = !string.IsNullOrWhiteSpace(plane?.NextSafeAction.Summary)
+        ? plane!.NextSafeAction.Summary
+        : workspace?.ReturnSummary ?? "This campaign is ready.";
+    var ruleSummary = workspace is null
+        ? string.Empty
+        : $"{workspace.RuleEnvironment.OwnerScope} scope · {workspace.RuleEnvironment.CompatibilityFingerprint} · {Humanize(workspace.RuleEnvironment.ApprovalState, "Current")}";
+    var deviceRoleSummary = plane?.Workspace.DeviceRoleSummary ?? "No device role is attached yet.";
+    var supportSummary = plane?.Workspace.SupportClosureSummary ?? "Install and release follow-up stay with this campaign.";
+    var continuitySummary = workspace?.LatestContinuity?.Summary ?? "No campaign note yet.";
+    var tablePulseSummary = plane is null
+        ? "No live cue is pinned yet."
+        : leadConsequence is not null
+            ? $"{consequences.Count} live cue(s) are already active for this campaign."
+            : "Ready for the next reaction.";
+    var livingNewsroomSummary = carryForward is not null
+        ? $"Living Newsroom follows the next session note: {carryForward.Summary}"
+        : campaignMemory is not null
+            ? $"Living Newsroom follows campaign memory: {campaignMemory.Summary}"
+            : "Nothing is pinned yet.";
+    var runnerPassportSummary = leadConsequence is not null
+        ? "Runner Passport will update from the current fallout."
+        : "Runner Passport will update on the next reaction.";
+    var aftermathHref = workspace is null
+        ? "/account/work"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#aftermath-packages";
+    var carryForwardHref = workspace is null
+        ? "/account/work"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#selected-next-session-carry-forward";
+    var memoryHref = workspace is null
+        ? "/account/work"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#selected-campaign-memory";
+
+    static string Humanize(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
+    }
+}
+
+@if (workspace is null)
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">Roster</p>
+            <h1>Campaign not found</h1>
+            <p>This campaign is not attached to this account anymore.</p>
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" href="/account/work">Back to roster</a>
+            </div>
+        </div>
+    </section>
+}
+else
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">Roster</p>
+            <h1>@workspace.CampaignName</h1>
+            <p>@(plane?.CampaignSummary.SessionReadinessSummary ?? workspace.ReturnSummary)</p>
+            <ul class="minimal-hero__points">
+                <li>@Humanize(workspace.Visibility, "Private")</li>
+                <li>@ruleSummary</li>
+                <li>@workspace.Runs.Count run@(workspace.Runs.Count == 1 ? string.Empty : "s")</li>
+            </ul>
+            <div class="minimal-actions">
+                <a class="button-like button-like--ghost" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--secondary" href="/account/access">Installs</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="minimal-section">
+        <div class="minimal-lane-grid minimal-platform-list">
+            <article class="minimal-lane-card">
+                <span class="tag">State</span>
+                <h2>@(plane?.WorkspaceState.Label ?? "Campaign")</h2>
+                <p>@(plane?.WorkspaceState.Summary ?? workspace.ReturnSummary)</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Next</span>
+                <h2>@nextSafeLabel</h2>
+                <p>@nextSafeSummary</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Continuity</span>
+                <h2>@(workspace.ActiveSceneSummary ?? "No active scene yet")</h2>
+                <p>@continuitySummary</p>
+            </article>
+        </div>
+    </section>
+
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Session</h2>
+                <p>Current state and next step.</p>
+            </div>
+        <article class="minimal-lane-card">
+            <div class="settings-summary-list">
+                <div class="settings-summary-row">
+                    <span>Visibility</span>
+                    <strong>@Humanize(workspace.Visibility, "Private")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Rules</span>
+                    <strong>@ruleSummary</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Device role</span>
+                    <strong>@deviceRoleSummary</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Support</span>
+                    <strong>@supportSummary</strong>
+                </div>
+                @if (firstPlayable is not null)
+                {
+                    <div class="settings-summary-row">
+                        <span>First playable</span>
+                        <strong>@firstPlayable.CampaignStartSummary</strong>
+                    </div>
+                }
+            </div>
+            @if (firstPlayable is not null)
+            {
+                <div class="stacked-copy">
+                    <p><strong>Legal runner:</strong> @firstPlayable.RuleReadySummary</p>
+                    <p><strong>Return lane:</strong> @firstPlayable.ReturnLaneSummary</p>
+                    <p><strong>Campaign readiness:</strong> @firstPlayable.CampaignReadySummary</p>
+                </div>
+            }
+        </article>
+    </section>
+
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Pulse</h2>
+                <p>What is moving through this campaign.</p>
+            </div>
+        <div class="minimal-lane-grid minimal-platform-list">
+            <article class="minimal-lane-card">
+                <span class="tag">Table Pulse</span>
+                <h3>@(leadConsequence is null ? "Armed" : $"{leadConsequence.Label} · {leadConsequence.State}")</h3>
+                <p>@tablePulseSummary</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Runner Passport</span>
+                <h3>Continuity</h3>
+                <p>@runnerPassportSummary</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Living Newsroom</span>
+                <h3>@(carryForward is not null ? carryForward.Label : campaignMemory?.Label ?? "Ready")</h3>
+                <p>@livingNewsroomSummary</p>
+            </article>
+            <article class="minimal-lane-card">
+                <span class="tag">Aftermath</span>
+                <h3>@(aftermathPackages.Count == 0 ? "Armed" : $"{aftermathPackages.Count} package(s)")</h3>
+                <p>Session note, memory, and recap stay together here.</p>
+                <div class="minimal-actions">
+                    <a class="button-like button-like--ghost" href="@carryForwardHref">Next session note</a>
+                    <a class="button-like button-like--ghost" href="@memoryHref">Campaign memory</a>
+                    <a class="button-like button-like--ghost" href="@aftermathHref">Aftermath</a>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    @if (plane is not null)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Prep</h2>
+                <p>Read-only overview. Search and launch stay on the full prep screen.</p>
+            </div>
+            <div class="minimal-lane-grid minimal-platform-list">
+                <article class="minimal-lane-card">
+                    <span class="tag">Prep library</span>
+                    <h3>@plane.PrepLibrary.SearchSummary</h3>
+                    <p>@plane.PrepLibrary.Summary</p>
+                </article>
+                <article class="minimal-lane-card">
+                    <span class="tag">Travel mode</span>
+                    <h3>@plane.TravelMode.CacheFreshnessSummary</h3>
+                    <p>@plane.TravelMode.OfflineActionabilitySummary</p>
+                </article>
+                <article class="minimal-lane-card">
+                    <span class="tag">Runboard</span>
+                    <h3>@(plane.Runboard?.ObjectiveSummary ?? "No active runboard yet")</h3>
+                    <p>@(plane.Runboard?.ReturnSummary ?? "When a runboard exists, it returns through this campaign path.")</p>
+                </article>
+            </div>
+        </section>
+    }
+
+    @if (workspace.Runs.Count > 0)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <div class="minimal-section__lead">
+                <h2>Runs</h2>
+                <p>Open the current run directly.</p>
+            </div>
+            <div class="minimal-lane-grid minimal-platform-list">
+                @foreach (var run in workspace.Runs.Take(3))
+                {
+                    <article class="minimal-lane-card">
+                        <span class="tag">@Humanize(run.Status, "Active")</span>
+                        <h3>@run.Title</h3>
+                        <p>@run.Summary</p>
+                        <div class="minimal-actions">
+                            <a class="button-like button-like--primary" href="/account/work/runs/@Uri.EscapeDataString(run.RunId)">Open run</a>
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    @if (recapShelf.Any() || aftermathPackages.Count > 0)
+    {
+        <section class="minimal-section minimal-section--tight">
+            <details class="details-drawer">
+                <summary>Recent returns</summary>
+                <div class="stacked-copy">
+                    @foreach (var item in recapShelf.Take(3))
+                    {
+                        <p><strong>@item.Label:</strong> @item.Summary</p>
+                    }
+                    @foreach (var package in aftermathPackages.Take(3))
+                    {
+                        <p><strong>@package.Title:</strong> @package.Summary</p>
+                    }
+                </div>
+            </details>
+        </section>
+    }
+}

@@ -5,9 +5,11 @@ import json
 import threading
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "verify_live_surface_parity.py"
@@ -22,6 +24,8 @@ def load_module():
 
 
 class _SurfaceHandler(BaseHTTPRequestHandler):
+    billing_mode = "unavailable"
+
     def do_GET(self):  # noqa: N802
         if self.path == "/":
             self.send_response(200)
@@ -41,7 +45,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Downloads Nightly Stable Build from source Download script"
+                b"Downloads Main build for this browser. Other downloads stay below. Nightly Stable Build from source Download script"
                 b"</body></html>"
             )
             return
@@ -52,10 +56,36 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Chummer is available. Available. Current public installers: Windows and Linux. "
-                b"Updated Downloads Help"
+                b"Status Updated Windows and Linux downloads are live. Downloads Help"
                 b"</body></html>"
             )
+            return
+
+        if self.path.startswith("/login"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(
+                b"<html><body>"
+                b"Open Chummer Email first. Google if you prefer. Continue with email Continue with Google"
+                b"</body></html>"
+            )
+            return
+
+        if self.path == "/account/billing":
+            if self.billing_mode == "configured":
+                self.send_response(302)
+                self.send_header("Location", "/login?next=%2Faccount%2Fbilling")
+                self.end_headers()
+            else:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(
+                    b"<html><body>"
+                    b"Membership Supporter is not open right now. Free stays the same. Continue with email"
+                    b"</body></html>"
+                )
             return
 
         if self.path == "/partizipate":
@@ -70,24 +100,42 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"<title>Participate - Chummer.run</title>"
-                b"<meta name=\"description\" content=\"Short requests, clear bugs, useful ideas.\">"
-                b"<style data-chummer-board-skin></style>"
+                b"<title>Participate \xc2\xb7 Chummer</title>"
+                b"<meta name=\"description\" content=\"Public requests, clear bugs, useful ideas.\">"
+                b"<h1>What should Chummer do next?</h1>"
+                b"<p>Public requests, clear bugs, useful ideas.</p>"
+                b"<h2>Current requests</h2>"
+                b"<a href=\"/participate/board\">Open board</a>"
+                b"<a href=\"/login?next=%2Fparticipate\">Sign in to Chummer</a>"
+                b"<a href=\"/participate/board/posts/mobile-companion\">Mobile companion app for dice rolling</a>"
                 b"</body></html>"
             )
             return
 
         if self.path == "/participate/board":
+            self.send_response(302)
+            self.send_header("Location", "/participate")
+            self.end_headers()
+            return
+
+        if self.path == "/roadmap":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"<title>Participate - Chummer.run</title>"
-                b"<meta name=\"description\" content=\"Short requests, clear bugs, useful ideas.\">"
-                b"<style data-chummer-board-skin></style>"
+                b"<title>Roadmap \xc2\xb7 Chummer</title>"
+                b"<h1>Now and next.</h1>"
+                b"<p>Planned work is here. Shipped work stays in Changelog.</p>"
+                b"<p>Current work opens below.</p>"
                 b"</body></html>"
             )
+            return
+
+        if self.path == "/roadmap/board":
+            self.send_response(302)
+            self.send_header("Location", "/roadmap")
+            self.end_headers()
             return
 
         if self.path == "/ledger":
@@ -131,6 +179,9 @@ class LiveSurfaceParityTests(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join(timeout=5)
 
+    def setUp(self) -> None:
+        _SurfaceHandler.billing_mode = "unavailable"
+
     def test_verify_requires_public_participate_surfaces(self) -> None:
         module = load_module()
 
@@ -166,15 +217,34 @@ class LiveSurfaceParityTests(unittest.TestCase):
         board = next(item for item in payload["results"] if item["path"] == "/participate/board")
         self.assertEqual(200, board["status_code"])
         self.assertFalse(board["cross_origin_redirect"])
+        self.assertEqual(f"{self.base_url}/participate", board["final_url"])
+        self.assertEqual([f"{self.base_url}/participate"], board["redirect_chain"])
         self.assertEqual([], board["missing_required_texts"])
         self.assertEqual([], board["forbidden_hits"])
+
+        roadmap = next(item for item in payload["results"] if item["path"] == "/roadmap")
+        self.assertEqual(200, roadmap["status_code"])
+        self.assertFalse(roadmap["cross_origin_redirect"])
+        self.assertEqual([], roadmap["missing_required_texts"])
+        self.assertEqual([], roadmap["forbidden_hits"])
+
+        roadmap_board = next(item for item in payload["results"] if item["path"] == "/roadmap/board")
+        self.assertEqual(200, roadmap_board["status_code"])
+        self.assertFalse(roadmap_board["cross_origin_redirect"])
+        self.assertEqual(f"{self.base_url}/roadmap", roadmap_board["final_url"])
+        self.assertEqual([f"{self.base_url}/roadmap"], roadmap_board["redirect_chain"])
+        self.assertEqual([], roadmap_board["missing_required_texts"])
+        self.assertEqual([], roadmap_board["forbidden_hits"])
 
     def test_verify_blocks_participate_iframe_wrapper(self) -> None:
         module = load_module()
         participate_surface = next(item for item in module.SURFACES if item["path"] == "/participate")
 
-        self.assertIn("data-chummer-board-skin", participate_surface["required_html_texts"])
-        self.assertIn("chummer6.productlift.dev", participate_surface["forbidden_html_texts"])
+        self.assertIn("What should Chummer do next?", participate_surface["required_texts"])
+        self.assertIn("Public requests, clear bugs, useful ideas.", participate_surface["required_texts"])
+        self.assertIn("Current requests", participate_surface["required_texts"])
+        self.assertIn("Open board", participate_surface["required_texts"])
+        self.assertIn("data-chummer-board-skin", participate_surface["forbidden_html_texts"])
 
     def test_verify_blocks_provider_chrome_on_participate_board(self) -> None:
         module = load_module()
@@ -187,9 +257,34 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("Ctrl K", board_surface["forbidden_texts"])
         self.assertIn("×", board_surface["forbidden_texts"])
         self.assertIn("Could not load posts", board_surface["forbidden_texts"])
-        self.assertIn("Participate - Chummer.run", board_surface["required_texts"])
-        self.assertIn("<title>Participate - Chummer.run</title>", board_surface["required_html_texts"])
-        self.assertIn("data-chummer-board-skin", board_surface["required_html_texts"])
+        self.assertIn("Open board", board_surface["required_texts"])
+        self.assertIn("Current requests", board_surface["required_texts"])
+        self.assertIn("<title>Participate · Chummer</title>", board_surface["required_html_texts"])
+        self.assertIn("data-chummer-board-skin", board_surface["forbidden_html_texts"])
+
+    def test_verify_supports_configured_billing_surface_when_live_checkout_is_required(self) -> None:
+        module = load_module()
+        _SurfaceHandler.billing_mode = "configured"
+        with mock.patch.dict("os.environ", {"CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT": "1"}, clear=False):
+            payload = module.verify(self.base_url)
+
+        self.assertEqual("pass", payload["status"])
+        self.assertTrue(payload["require_brilliant_directories_checkout"])
+        billing = next(item for item in payload["results"] if item["path"] == "/account/billing")
+        self.assertEqual("/login", urllib.parse.urlparse(billing["final_url"]).path)
+        self.assertEqual([], billing["missing_required_texts"])
+        self.assertEqual([], billing["forbidden_hits"])
+
+    def test_verify_rejects_placeholder_billing_surface_when_live_checkout_is_required(self) -> None:
+        module = load_module()
+        _SurfaceHandler.billing_mode = "unavailable"
+        with mock.patch.dict("os.environ", {"CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT": "1"}, clear=False):
+            payload = module.verify(self.base_url)
+
+        self.assertEqual("fail", payload["status"])
+        billing = next(item for item in payload["results"] if item["path"] == "/account/billing")
+        self.assertIn("Open Chummer", billing["missing_required_texts"])
+        self.assertIn("Supporter is not open right now.", billing["forbidden_hits"])
 
     def test_mainline_payload_remains_json_serializable(self) -> None:
         module = load_module()

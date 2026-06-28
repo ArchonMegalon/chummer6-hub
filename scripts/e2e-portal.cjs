@@ -4,6 +4,8 @@
 const baseUrl = (process.env.CHUMMER_PORTAL_BASE_URL || 'http://127.0.0.1:8091').replace(/\/$/, '');
 const publicHost = (process.env.CHUMMER_PORTAL_PUBLIC_HOST || '').trim();
 const forwardedProto = (process.env.CHUMMER_PORTAL_FORWARDED_PROTO || '').trim();
+const requireBlazor = /^(1|true|yes|on)$/i.test((process.env.CHUMMER_PORTAL_REQUIRE_BLAZOR || '').trim());
+const requireBrilliantDirectoriesCheckout = /^(1|true|yes|on)$/i.test((process.env.CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT || '').trim());
 const defaultHeaders = {};
 
 if (publicHost) {
@@ -24,6 +26,45 @@ function hasBlazorBaseHref(html) {
   return /<base href="[^"]*\/blazor\/"/i.test(html);
 }
 
+function isBlazorReady(text) {
+  return (
+    (text.includes('Published browser surface') || text.includes('Published browser client'))
+    && (text.includes('Launch browser workbench') || text.includes('Explore Chummer App'))
+    && hasBlazorBaseHref(text)
+  );
+}
+
+function isBlazorFallback(text) {
+  return (
+    text.includes('Browser preview is not ready right now.')
+    && text.includes('Download Chummer')
+    && text.includes('href="/downloads"')
+    && text.includes('href="/status"')
+  );
+}
+
+function isUnavailableBillingSurface(text) {
+  return (
+    text.includes('Membership')
+    && text.includes('Supporter is not open right now. Free stays the same.')
+    && text.includes('Continue with email')
+    && !text.includes('Manage supporter')
+    && !text.includes('Account settings')
+  );
+}
+
+function isConfiguredBillingSurface(text) {
+  return (
+    text.includes('Open Chummer')
+    && text.includes('Email first. Google if you prefer.')
+    && text.includes('Continue with email')
+    && text.includes('Continue with Google')
+    && !text.includes('Supporter is not open right now.')
+    && !text.includes('Account settings')
+    && !text.includes('Membership')
+  );
+}
+
 const checks = [
   {
     url: `${baseUrl}/`,
@@ -38,10 +79,32 @@ const checks = [
     url: `${baseUrl}/downloads/`,
     assert: text =>
       text.includes('Downloads')
+      && text.includes('Main build for this browser')
       && text.includes('Stable')
       && text.includes('Nightly')
       && text.includes('Build from source')
       && text.includes('Download script')
+  },
+  {
+    url: `${baseUrl}/help`,
+    assert: text =>
+      text.includes('What is wrong?')
+      && text.includes('Pick the next step.')
+      && text.includes('Install or update')
+      && text.includes('Account recovery')
+      && text.includes('Private support')
+      && text.includes('Read the FAQ')
+  },
+  {
+    url: `${baseUrl}/status`,
+    assert: text =>
+      text.includes('Updated')
+      && text.includes('Windows and Linux downloads are live.')
+      && text.includes('Downloads')
+      && text.includes('Help')
+      && !text.includes('Checks passed')
+      && !text.includes('Released')
+      && !text.includes('Build run-')
   },
   {
     url: `${baseUrl}/downloads/releases.json`,
@@ -56,9 +119,12 @@ const checks = [
   {
     url: `${baseUrl}/account`,
     assert: (text, response) =>
-      response.url.endsWith('/login?next=%2Faccount')
+      (
+        response.url.endsWith('/login?next=%2Faccount')
+        || response.url.endsWith('/login?next=%2Faccount%2Faccess')
+      )
       && text.includes('Open Chummer')
-      && text.includes('Keep this copy attached to your account. Use email first. Google is optional.')
+      && text.includes('Email first. Google if you prefer.')
       && text.includes('Continue with email')
       && text.includes('Continue with Google')
       && !text.includes('Account ID')
@@ -66,28 +132,59 @@ const checks = [
   {
     url: `${baseUrl}/contact`,
     assert: text =>
-      text.includes('Ask in Discord first. Use the form for private details.')
-      && text.includes('Bug report')
+      text.includes('Discord for normal questions. Private form when needed.')
+      && text.includes('Discord')
+      && text.includes('Private form for account or crash details')
+      && text.includes('Open private form')
+      && text.includes('Discord or private')
+      && text.includes('Send support request')
+  },
+  {
+    url: `${baseUrl}/account/billing`,
+    assert: text =>
+      requireBrilliantDirectoriesCheckout ? isConfiguredBillingSurface(text) : isUnavailableBillingSurface(text)
   },
   {
     url: `${baseUrl}/participate`,
     assert: text =>
-      text.includes('data-chummer-board-skin')
-      && text.includes('Short requests, clear bugs, useful ideas.')
-      && !text.includes('Requests, votes, and shipped work.')
+      text.includes('What should Chummer do next?')
+      && text.includes('Public requests, clear bugs, useful ideas.')
+      && text.includes('Current requests')
+      && text.includes('Open board')
+      && text.includes('data-chummer-participate-frame')
+      && !text.includes('data-chummer-board-skin')
       && !text.includes('ProductLift')
       && !text.includes('Something went wrong')
       && !text.includes('Could not load posts')
   },
   {
+    url: `${baseUrl}/roadmap`,
+    assert: text =>
+      text.includes('Roadmap')
+      && text.includes('Now and next.')
+      && text.includes('Planned work is here. Shipped work stays in Changelog.')
+      && text.includes('Current work opens below.')
+      && text.includes('data-chummer-roadmap-frame')
+      && !text.includes('ProductLift')
+  },
+  {
+    url: `${baseUrl}/roadmap/board`,
+    assert: (text, response) =>
+      /\/roadmap\/?$/.test(response.url)
+      && text.includes('Now and next.')
+      && text.includes('Planned work is here. Shipped work stays in Changelog.')
+      && text.includes('Current work opens below.')
+      && !text.includes('ProductLift')
+  },
+  {
     url: `${baseUrl}/partizipate`,
     assert: (text, response) =>
       /\/participate\/?$/.test(response.url)
-      && text.includes('Short requests, clear bugs, useful ideas.')
-      && text.includes('data-chummer-board-skin')
+      && text.includes('What should Chummer do next?')
+      && text.includes('Public requests, clear bugs, useful ideas.')
+      && !text.includes('data-chummer-board-skin')
       && !text.includes('cdn.productlift.dev')
       && !text.includes('media.productlift.dev')
-      && !text.includes('Requests, votes, and shipped work.')
       && !text.includes('Use the right place')
       && !text.includes('Chummer Participate')
       && !text.includes('What do you want to see next?')
@@ -112,7 +209,10 @@ const checks = [
   {
     url: `${baseUrl}/hub`,
     assert: (text, response) =>
-      response.url.endsWith('/login?next=%2Faccount')
+      (
+        response.url.endsWith('/login?next=%2Faccount')
+        || response.url.endsWith('/login?next=%2Faccount%2Faccess')
+      )
       && text.includes('Open Chummer')
       && text.includes('Continue with email')
       && text.includes('Continue with Google')
@@ -121,7 +221,10 @@ const checks = [
   {
     url: `${baseUrl}/hub/`,
     assert: (text, response) =>
-      response.url.endsWith('/login?next=%2Faccount')
+      (
+        response.url.endsWith('/login?next=%2Faccount')
+        || response.url.endsWith('/login?next=%2Faccount%2Faccess')
+      )
       && text.includes('Open Chummer')
       && text.includes('Continue with email')
       && text.includes('Continue with Google')
@@ -129,23 +232,11 @@ const checks = [
   },
   {
     url: `${baseUrl}/blazor/`,
-    label: 'delegated-blazor',
-    required: false,
+    label: requireBlazor ? 'blazor' : 'delegated-blazor',
+    required: requireBlazor,
     assert: (text, response) =>
       /\/blazor\/?$/.test(response.url)
-      && (
-        (
-          (text.includes('Published browser surface') || text.includes('Published browser client'))
-          && (text.includes('Launch browser workbench') || text.includes('Explore Chummer App'))
-          && hasBlazorBaseHref(text)
-        )
-        || (
-          text.includes('Browser preview is not ready right now.')
-          && text.includes('Download Chummer')
-          && text.includes('href="/downloads"')
-          && text.includes('href="/status"')
-        )
-      )
+      && (requireBlazor ? isBlazorReady(text) : (isBlazorReady(text) || isBlazorFallback(text)))
   },
   {
     url: `${baseUrl}/avalonia/`,
@@ -153,6 +244,7 @@ const checks = [
       /\/downloads\/?$/.test(response.url)
       && text.includes('Downloads')
       && text.includes('Stable')
+      && text.includes('Main build for this browser')
       && text.includes('Build from source')
   },
   {
@@ -165,8 +257,8 @@ const checks = [
     url: `${baseUrl}/coach/`,
     assert: (text, response) =>
       /\/status\/?$/.test(response.url)
-      && text.includes('Current release')
-      && text.includes('Updated. Linux is live.')
+      && text.includes('Status')
+      && text.includes('Updated')
       && text.includes('Downloads')
   }
 ];

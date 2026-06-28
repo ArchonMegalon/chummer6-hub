@@ -12,7 +12,7 @@ public sealed class FaqFlagshipViewTests
 
         Assert.Contains("Quick paths", faqView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", faqView, StringComparison.Ordinal);
-        Assert.Contains("What works today", faqView, StringComparison.Ordinal);
+        Assert.Contains("Current release", faqView, StringComparison.Ordinal);
         Assert.Contains("Use support for private problems", faqView, StringComparison.Ordinal);
         Assert.Contains("Discord first", faqView, StringComparison.Ordinal);
         Assert.DoesNotContain("Leave with the right next page", faqView, StringComparison.Ordinal);

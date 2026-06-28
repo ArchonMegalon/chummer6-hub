@@ -2802,7 +2802,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!accountSource.Contains("Save participation settings", StringComparison.Ordinal), "account should describe local opt-ins as preferences instead of fake account settings.");
     Assert(!accountSource.Contains("Participation settings saved.", StringComparison.Ordinal), "account save feedback should describe local opt-ins as preferences instead of fake account settings.");
     Assert(!accountsControllerSource.Contains("recognition settings", StringComparison.Ordinal), "account participation chrome should describe optional recognition as preferences.");
-    Assert(accountsControllerSource.Contains("Redirect(\"/account/billing\")", StringComparison.Ordinal), "account settings should hand off to the real Brilliant Directories billing surface.");
+    Assert(accountsControllerSource.Contains("Redirect(\"/account/settings\")", StringComparison.Ordinal), "the removed advanced account route should fold back into the single preferences surface.");
     Assert(accountSource.Contains("Model.PrivacyBoundary", StringComparison.Ordinal), "account privacy should render the shared privacy-boundary panel on the signed-in surface.");
     Assert(accountSource.Contains("<summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should keep primary sign-in inside a calmer drawer instead of a full stacked section.");
     Assert(!accountSource.Contains("<details class=\"details-drawer\" open>\n                <summary>Primary sign-in</summary>", StringComparison.Ordinal), "account profile should not expand the sign-in drawer by default.");
@@ -2842,10 +2842,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!trustCanonSource.Contains("signed-in shell", StringComparison.Ordinal), "public trust canon should not leak signed-in-shell language into customer copy.");
     Assert(!trustCanonSource.Contains("stays canonical", StringComparison.Ordinal), "public trust canon should not use canonical jargon on public trust surfaces.");
     Assert(trustCanonSource.Contains("The published package stays the same for everyone", StringComparison.Ordinal), "public trust canon should explain the package relationship in customer language.");
-    Assert(publicControllerSource.Contains("localOrigin: \"/participate\"", StringComparison.Ordinal), "participate should serve the hosted board through the first-party route.");
-    Assert(publicControllerSource.Contains("localBaseHref: \"/participate/\"", StringComparison.Ordinal), "participate should rewrite hosted board links under the first-party route.");
-    Assert(publicControllerSource.Contains("data-chummer-board-skin", StringComparison.Ordinal), "participate should skin the hosted board inside Chummer instead of copying a static list.");
-    Assert(publicControllerSource.Contains("RemoveHostedBoardAuthLinks", StringComparison.Ordinal), "participate should remove hosted auth chrome from the whitelabel board.");
+    Assert(publicControllerSource.Contains("BuildFirstPartyParticipateBoardAsync", StringComparison.Ordinal), "participate should render a first-party public summary instead of dropping users into a vendor shell.");
+    Assert(publicControllerSource.Contains("View(\"~/Views/PublicLanding/Partizipate.cshtml\"", StringComparison.Ordinal), "participate should render the dedicated first-party view.");
+    Assert(publicControllerSource.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", StringComparison.Ordinal), "participate should keep a deliberate board route for the full ProductLift queue.");
+    Assert(publicControllerSource.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", StringComparison.Ordinal), "participate should keep the live board behind a first-party wrapper and frame handoff.");
+    Assert(publicControllerSource.Contains("What should Chummer do next?", StringComparison.Ordinal), "participate should keep the public heading explicit and first-party.");
+    Assert(publicControllerSource.Contains("Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate should keep the public summary in restrained product language.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
@@ -2897,8 +2899,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!publicLandingControllerSource.Contains("/account/advanced?localCoProcessor=hosted_only", StringComparison.Ordinal), "public landing should not send optional local-acceleration users to the removed advanced account surface.");
     Assert(shelfSource.Contains("ArtifactViewHref", StringComparison.Ordinal) && shelfSource.Contains("new[] { \"all\", \"personal\", \"campaign\", \"creator\", \"public\" }", StringComparison.Ordinal), "artifacts shelf should expose first-class personal, campaign, creator, and public view filters instead of one blended signed-in overlay.");
     Assert(!publicLandingControllerSource.Contains("Redirect(\"/now\")", StringComparison.Ordinal), "status should be a first-class public surface instead of redirecting to the current-release page.");
-    Assert(statusSource.Contains("data-status-surface=\"decision-surface\"", StringComparison.Ordinal), "status should keep the top release decision in one calm surface.");
-    Assert(statusSource.Contains("Current release", StringComparison.Ordinal), "status should keep the current release posture inside the one public decision surface.");
+    Assert(statusSource.Contains("Status", StringComparison.Ordinal), "status should keep the compact status eyebrow inside the one public decision surface.");
+    Assert(statusSource.Contains("<h1>Updated</h1>", StringComparison.Ordinal), "status should keep the short updated headline inside the one public decision surface.");
     Assert(statusSource.Contains(">Downloads</a>", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");
     Assert(statusSource.Contains(">Help</a>", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");
     Assert(!statusSource.Contains("<h2>Platforms</h2>", StringComparison.Ordinal), "status should not carry a platform shelf after the minimal release decision.");

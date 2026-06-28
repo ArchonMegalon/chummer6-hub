@@ -21,6 +21,8 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/accounts")]
 public sealed class AccountsController : Controller
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
     private readonly IdentityLinkService _links;
@@ -131,8 +133,14 @@ public sealed class AccountsController : Controller
         [FromRoute] string? handoffId = null,
         [FromRoute] string? entryId = null,
         [FromRoute] string? publicationId = null,
-        [FromQuery] string? prepQuery = null)
+        [FromQuery] string? prepQuery = null,
+        [FromQuery] string? accessNotice = null)
     {
+        if (string.Equals(section?.Trim(), "advanced", StringComparison.OrdinalIgnoreCase))
+        {
+            return Redirect("/account/settings");
+        }
+
         bool showHub = string.IsNullOrWhiteSpace(section)
                        && string.IsNullOrWhiteSpace(caseId)
                        && !HasWorkSelection(workspaceId, runId, handoffId, entryId, publicationId);
@@ -221,9 +229,9 @@ public sealed class AccountsController : Controller
                         supportCases,
                         campaignSpine,
                         _originAuthoringAllowance.TryGetAllowance(user.UserId, user.Email),
-                        _leaderboards.UserRecognitionSummary(user.UserId),
                         _packageCatalog.ListReceiptsForSubject(subject.SubjectId, 8),
-                        _participationNotifications.ListReceiptsForUser(user.UserId, 6)));
+                        _participationNotifications.ListReceiptsForUser(user.UserId, 6),
+                        accessNotice));
             }
 
             var model = new AccountPageViewModel(
@@ -270,10 +278,49 @@ public sealed class AccountsController : Controller
                 return View("~/Views/Accounts/Support.cshtml", model);
             }
 
+            if (ShouldShowMinimalSupportCaseDetail(selectedSection, caseId, selectedSupportCaseSummary))
+            {
+                return View("~/Views/Accounts/SupportCase.cshtml", model);
+            }
+
+            if (ShouldShowMinimalWorkspaceDetail(selectedSection, workspaceId, prepQuery, selectedWorkspace))
+            {
+                return View("~/Views/Accounts/Workspace.cshtml", model);
+            }
+
+            if (ShouldShowMinimalRunDetail(selectedSection, runId, selectedRun))
+            {
+                return View("~/Views/Accounts/Run.cshtml", model);
+            }
+
+            if (ShouldShowMinimalBuildHandoffDetail(selectedSection, handoffId, selectedBuildLabHandoff))
+            {
+                return View("~/Views/Accounts/BuildHandoff.cshtml", model);
+            }
+
+            if (ShouldShowMinimalRulesAnswerDetail(selectedSection, entryId, selectedRulesNavigatorAnswer))
+            {
+                return View("~/Views/Accounts/RulesAnswer.cshtml", model);
+            }
+
+            if (ShouldShowMinimalCreatorPublicationDetail(selectedSection, publicationId, selectedCreatorPublication))
+            {
+                return View("~/Views/Accounts/Publication.cshtml", model);
+            }
+
+            if (string.Equals(selectedSection, "settings", StringComparison.OrdinalIgnoreCase))
+            {
+                return View("~/Views/Accounts/Settings.cshtml", model);
+            }
             return View("~/Views/Accounts/Account.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
+            if (showHub)
+            {
+                return Redirect("/account/access");
+            }
+
             return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
         }
         catch (HubRequestAuthException ex)
@@ -291,13 +338,70 @@ public sealed class AccountsController : Controller
         }
     }
 
+    [HttpPost("/account/access/unlink")]
+    [Consumes("application/x-www-form-urlencoded")]
+    public async Task<IActionResult> UnlinkInstall(
+        [FromForm] string? installationId,
+        CancellationToken cancellationToken)
+    {
+        const string returnPath = "/account/access";
+        if (string.IsNullOrWhiteSpace(installationId))
+        {
+            return Redirect($"{returnPath}?accessNotice=unlink_failed");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            InstallLinkingSummaryDto summary = _installLinking.GetSummary(user.UserId, subject.SubjectId, maxItems: 32);
+            ClaimedInstallationDto? installation = (summary.ClaimedInstallations ?? Array.Empty<ClaimedInstallationDto>())
+                .FirstOrDefault(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase));
+            if (installation is null
+                || string.Equals(installation.Status, ClaimedInstallationStates.Revoked, StringComparison.OrdinalIgnoreCase))
+            {
+                return Redirect($"{returnPath}?accessNotice=unlinked");
+            }
+
+            InstallationGrantDto? activeGrant = (summary.ActiveGrants ?? Array.Empty<InstallationGrantDto>())
+                .Where(item => string.Equals(item.InstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase))
+                .Where(item => string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.IssuedAtUtc)
+                .FirstOrDefault();
+            if (activeGrant is null)
+            {
+                return Redirect($"{returnPath}?accessNotice=unlink_refresh");
+            }
+
+            _installLinking.RevokeGrant(new RevokeInstallationGrantRequestDto(
+                InstallationId: installation.InstallationId,
+                AccessToken: activeGrant.AccessToken));
+            return Redirect($"{returnPath}?accessNotice=unlinked");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(returnPath)}");
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            _logger.LogWarning(ex, "Account access unlink failed for installation {InstallationId}.", installationId);
+            return Redirect($"{returnPath}?accessNotice=unlink_failed");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Account access unlink could not confirm the signed-in identity.");
+            return Redirect($"{returnPath}?accessNotice=unlink_failed");
+        }
+    }
+
     private AccountHubPageViewModel BuildAccountHubModel(
         HubUserDto user,
         InstallLinkingSummaryDto installLinking,
         IReadOnlyList<SupportCaseProjection> supportCases,
         AccountCampaignSummary campaignSpine)
     {
-        int linkedInstallCount = installLinking.ClaimedInstallations?.Count ?? 0;
+        int linkedInstallCount = (installLinking.ClaimedInstallations ?? Array.Empty<ClaimedInstallationDto>())
+            .Count(item => string.Equals(item.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase));
         int pendingClaimCount = installLinking.PendingClaimTickets.Count;
         bool hasLinkedInstall = linkedInstallCount > 0;
         HorizonArtifactAllowanceViewModel? allowance = _originAuthoringAllowance.TryGetAllowance(user.UserId, user.Email);
@@ -310,9 +414,9 @@ public sealed class AccountsController : Controller
             ?? "Free";
         string membershipSummary = allowance is not null
             ? allowance.SupporterActive
-                ? "Supporter adds one extra Origin Book each month."
-                : "Same app. Supporter only changes the monthly Origin Book limit."
-            : "Supporter checkout is unavailable right now.";
+                ? "2 books each month. Same app."
+                : "1 book each month. Same app."
+            : "Supporter checkout is not open right now.";
         string bookQuotaSummary = allowance is not null
             ? $"{allowance.WindowRemaining} of {allowance.WindowLimit} Origin Book{(allowance.WindowLimit == 1 ? string.Empty : "s")} left this {DescribeAllowanceWindowPeriod(allowance.WindowKind)}."
             : "Book limit is unavailable right now.";
@@ -322,56 +426,78 @@ public sealed class AccountsController : Controller
             : "No linked install yet.";
         if (pendingClaimCount > 0)
         {
-            installSummary += $" {pendingClaimCount} claim ticket{(pendingClaimCount == 1 ? string.Empty : "s")} waiting.";
+            installSummary += $" {pendingClaimCount} setup code{(pendingClaimCount == 1 ? string.Empty : "s")} waiting.";
         }
 
         string supportSummary = supportCases.Count == 0
-            ? "No tracked support cases."
-            : $"{supportCases.Count} tracked support case{(supportCases.Count == 1 ? string.Empty : "s")}.";
+            ? "No support case yet."
+            : $"{supportCases.Count} support case{(supportCases.Count == 1 ? string.Empty : "s")}.";
         string campaignSummary = $"{campaignSpine.Dossiers.Count} runner{(campaignSpine.Dossiers.Count == 1 ? string.Empty : "s")}, {campaignSpine.Campaigns.Count} campaign{(campaignSpine.Campaigns.Count == 1 ? string.Empty : "s")}.";
+        bool supporterActive = allowance?.SupporterActive ?? false;
+        string supporterPrimaryLabel = supporterActive ? "Manage supporter" : "Become supporter";
+        string supporterPrimaryHref = "/account/billing";
+        string supporterSecondaryLabel = "Details";
+        string supporterSecondaryHref = "/account/billing";
+        bool canBuildMacOs = ReleaseUploadAccessPolicy.CanAccess(user.Email) || ReleaseUploadAccessPolicy.CanAccess(user.DisplayName);
+
+        var cards = new List<AccountHubCardViewModel>
+        {
+            new(
+                "Installs",
+                "Installs",
+                installSummary,
+                hasLinkedInstall ? "Open installs" : "Open downloads",
+                hasLinkedInstall ? "/account/access" : "/downloads",
+                hasLinkedInstall ? "Downloads" : "Installs",
+                hasLinkedInstall ? "/downloads" : "/account/access"),
+            new(
+                "Runners",
+                "Runners",
+                campaignSummary,
+                "Open Chummer",
+                "/account/work"),
+            new(
+                "Help",
+                "Help",
+                supportSummary,
+                "Open help",
+                "/account/support"),
+            new(
+                "Membership",
+                "Membership",
+                membershipSummary,
+                supporterPrimaryLabel,
+                supporterPrimaryHref,
+                supporterSecondaryLabel,
+                supporterSecondaryHref)
+        };
+
+        if (canBuildMacOs)
+        {
+            cards.Add(new AccountHubCardViewModel(
+                "macOS",
+                "Build macOS",
+                "Download the current local build script for your Mac.",
+                "Build macOS",
+                "/downloads/release-upload/bootstrap.command",
+                "How it works",
+                "/downloads/release-upload"));
+        }
 
         return new AccountHubPageViewModel(
             Chrome: _chrome.BuildAuthenticatedChrome(
                 "Account",
-                "Installs, support, membership, and campaign return paths.",
+                "Installs, runners, membership, and private help.",
                 "/account",
                 user.DisplayName,
                 user.Email),
             User: user,
-            Heading: "Use this page for installs, membership, and support.",
-            Summary: "Open Chummer for actual character work. Stay here for recovery, billing, and help.",
+            Heading: "Account",
+            Summary: "Installs, runners, help, and membership live here.",
             MembershipLabel: membershipLabel,
             MembershipSummary: membershipSummary,
             BookQuotaSummary: bookQuotaSummary,
-            Cards:
-            [
-                new AccountHubCardViewModel(
-                    "Installs",
-                    "Downloads and linked copies",
-                    installSummary,
-                    hasLinkedInstall ? "Open installs" : "Open downloads",
-                    hasLinkedInstall ? "/account/access" : "/downloads",
-                    hasLinkedInstall ? "Downloads" : "Installs",
-                    hasLinkedInstall ? "/downloads" : "/account/access"),
-                new AccountHubCardViewModel(
-                    "Membership",
-                    "Membership",
-                    membershipSummary,
-                    "Open billing",
-                    "/account/billing"),
-                new AccountHubCardViewModel(
-                    "Support",
-                    "Private help",
-                    supportSummary,
-                    "Open support",
-                    "/account/support"),
-                new AccountHubCardViewModel(
-                    "Campaigns",
-                    "Runners and groups",
-                    campaignSummary,
-                    "Open campaigns",
-                    "/account/work")
-            ]);
+            Cards: cards);
     }
 
     private AccountSectionPageViewModel BuildAccountSectionModel(
@@ -381,39 +507,60 @@ public sealed class AccountsController : Controller
         IReadOnlyList<SupportCaseProjection> supportCases,
         AccountCampaignSummary campaignSpine,
         HorizonArtifactAllowanceViewModel? allowance,
-        Chummer.Run.Contracts.Leaderboards.UserRecognitionSummaryDto? participationRecognition,
         IReadOnlyList<PublicPackageReceipt> participationPackageReceipts,
-        IReadOnlyList<ParticipationOperatorNotificationReceipt> participationActivityReceipts)
+        IReadOnlyList<ParticipationOperatorNotificationReceipt> participationActivityReceipts,
+        string? accessNotice)
         => section switch
         {
-            "access" => BuildAccountAccessSectionModel(user, installLinking, supportCases),
+            "access" => BuildAccountAccessSectionModel(user, installLinking, supportCases, accessNotice),
             "work" => BuildAccountWorkSectionModel(user, installLinking, campaignSpine),
-            "participation" => BuildAccountParticipationSectionModel(user, allowance, participationRecognition, participationPackageReceipts, participationActivityReceipts),
+            "participation" => BuildAccountParticipationSectionModel(user, allowance, participationPackageReceipts, participationActivityReceipts),
             _ => throw new InvalidOperationException($"Unsupported account section '{section}'.")
         };
 
     private AccountSectionPageViewModel BuildAccountAccessSectionModel(
         HubUserDto user,
         InstallLinkingSummaryDto installLinking,
-        IReadOnlyList<SupportCaseProjection> supportCases)
+        IReadOnlyList<SupportCaseProjection> supportCases,
+        string? accessNotice)
     {
-        int linkedInstallCount = installLinking.ClaimedInstallations?.Count ?? 0;
+        List<string> highlights = [];
         int pendingClaimCount = installLinking.PendingClaimTickets.Count;
         int installSupportCount = supportCases.Count(item =>
             string.Equals(item.Kind, "install_help", StringComparison.OrdinalIgnoreCase)
             || !string.IsNullOrWhiteSpace(item.InstallationId)
             || !string.IsNullOrWhiteSpace(item.ReleaseChannel)
             || !string.IsNullOrWhiteSpace(item.Platform));
-        ClaimedInstallationDto? leadInstall = installLinking.ClaimedInstallations?
+        var activeInstallations = (installLinking.ClaimedInstallations ?? Array.Empty<ClaimedInstallationDto>())
+            .Where(item => string.Equals(item.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(static item => item.UpdatedAtUtc)
-            .FirstOrDefault();
+            .ToArray();
+        int linkedInstallCount = activeInstallations.Length;
+        HashSet<string> activeGrantInstallationIds = (installLinking.ActiveGrants ?? Array.Empty<InstallationGrantDto>())
+            .Where(item => string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
+            .Select(static item => item.InstallationId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        ClaimedInstallationDto? leadInstall = activeInstallations.FirstOrDefault();
+
+        switch ((accessNotice ?? string.Empty).Trim().ToLowerInvariant())
+        {
+            case "unlinked":
+                highlights.Add("Copy unlinked.");
+                break;
+            case "unlink_refresh":
+                highlights.Add("Open that copy once, then try unlinking it here again.");
+                break;
+            case "unlink_failed":
+                highlights.Add("Chummer could not unlink that copy right now.");
+                break;
+        }
 
         string linkedInstallSummary = leadInstall is null
             ? "No copy is linked yet. Downloads claimed while signed in come back here."
             : $"{CountLabel(linkedInstallCount, "linked copy", "linked copies")}. Latest: {DescribeInstallation(leadInstall)}.";
         string claimSummary = pendingClaimCount > 0
-            ? $"{CountLabel(pendingClaimCount, "claim ticket", "claim tickets")} waiting to be redeemed."
-            : "If a copy stops opening, recovery and relink start from the same account path.";
+            ? $"{CountLabel(pendingClaimCount, "setup code", "setup codes")} waiting."
+            : "If a copy stops opening, recovery and relink start here.";
         string supportSummary = installSupportCount > 0
             ? $"{CountLabel(installSupportCount, "install case", "install cases")} already tracked on this account."
             : "No install-specific support case is open right now.";
@@ -426,21 +573,14 @@ public sealed class AccountsController : Controller
                 user.DisplayName,
                 user.Email),
             Eyebrow: "Installs",
-            Heading: "Downloads, installs, and recovery.",
-            Summary: "Keep setup tied to this account. Real character work still belongs in the desktop app.",
-            Highlights:
-            [
-                $"Signed in as {user.DisplayName}",
-                $"{CountLabel(linkedInstallCount, "linked copy", "linked copies")}.",
-                pendingClaimCount > 0
-                    ? $"{CountLabel(pendingClaimCount, "claim ticket", "claim tickets")} waiting."
-                    : "No pending claim ticket."
-            ],
+            Heading: "Installs",
+            Summary: "Downloads, linked copies, and recovery.",
+            Highlights: BuildAccessHighlights(),
             Cards:
             [
                 new AccountHubCardViewModel(
                     "Downloads",
-                    "Current downloads",
+                    "Downloads",
                     "Stable and nightly stay on the public shelf. Signed-in downloads claim themselves back to this account.",
                     "Open downloads",
                     "/downloads",
@@ -456,7 +596,7 @@ public sealed class AccountsController : Controller
                     "/account"),
                 new AccountHubCardViewModel(
                     "Recovery",
-                    "Recovery and relink",
+                    "Recovery",
                     $"{claimSummary} {supportSummary}",
                     "Open support",
                     "/account/support",
@@ -464,7 +604,24 @@ public sealed class AccountsController : Controller
                     "/downloads")
             ],
             BackLabel: "Back to account",
-            BackHref: "/account");
+            BackHref: "/account",
+            AccessInstallations: activeInstallations
+                .Select(item => new AccountAccessInstallationViewModel(
+                    item.InstallationId,
+                    item.HostLabel ?? item.InstallationId,
+                    BuildAccessInstallationSummary(item),
+                    activeGrantInstallationIds.Contains(item.InstallationId)))
+                .ToArray());
+
+        IReadOnlyList<string> BuildAccessHighlights()
+        {
+            highlights.Add(user.DisplayName);
+            highlights.Add($"{CountLabel(linkedInstallCount, "linked copy", "linked copies")}.");
+            highlights.Add(pendingClaimCount > 0
+                ? $"{CountLabel(pendingClaimCount, "setup code", "setup codes")} waiting."
+                : "No pending setup code.");
+            return highlights;
+        }
     }
 
     private AccountSectionPageViewModel BuildAccountWorkSectionModel(
@@ -493,7 +650,7 @@ public sealed class AccountsController : Controller
             ? new AccountHubCardViewModel(
                 "Starter",
                 "Start from an example runner",
-                "No runner is attached to this account yet. Open a clear archetype and turn it into your own sheet in Chummer.",
+                "Start with a clear archetype and make it your own in Chummer.",
                 "Open street samurai",
                 "/account/open/example/street-samurai",
                 "Open decker",
@@ -502,8 +659,8 @@ public sealed class AccountsController : Controller
                 "Runner",
                 latestDossier.DisplayName,
                 string.IsNullOrWhiteSpace(latestDossier.CurrentRunId)
-                    ? "Most recently updated runner on this account."
-                    : "This runner already has an active campaign return waiting.",
+                    ? "Most recently updated runner."
+                    : "This runner already has an active campaign.",
                 "Open in Chummer",
                 $"/account/open/character/{Uri.EscapeDataString(latestDossier.DossierId)}",
                 hasLinkedDesktop ? "Installs" : "Finish setup",
@@ -516,7 +673,7 @@ public sealed class AccountsController : Controller
                 latestWorkspace.ReturnSummary,
                 "Open in Chummer",
                 $"/account/open/campaign/{Uri.EscapeDataString(latestWorkspace.CampaignId)}",
-                "Open browser return",
+                "Open in browser",
                 $"/account/work/workspaces/{Uri.EscapeDataString(latestWorkspace.WorkspaceId)}")
             : latestGroup is not null
                 ? new AccountHubCardViewModel(
@@ -529,8 +686,8 @@ public sealed class AccountsController : Controller
                     "/account")
                 : new AccountHubCardViewModel(
                     "Campaign",
-                    "No campaign return yet",
-                    "When a runner joins a group or campaign, the next return path shows up here.",
+                    "No campaign yet",
+                    "Campaigns appear here when one of your runners joins them.",
                     hasLinkedDesktop ? "Open examples" : "Finish setup",
                     hasLinkedDesktop ? "/account/open/example/face" : "/account/access",
                     "Account home",
@@ -538,21 +695,21 @@ public sealed class AccountsController : Controller
 
         AccountHubCardViewModel browserCard = latestRun is not null
             ? new AccountHubCardViewModel(
-                "Browser return",
+                "Browser",
                 latestRun.Title,
                 latestRun.Summary,
-                "Open browser return",
+                "Open in browser",
                 $"/account/work/runs/{Uri.EscapeDataString(latestRun.RunId)}",
                 latestWorkspace is null
                     ? "Account home"
-                    : "Campaign return",
+                    : "Campaign",
                 latestWorkspace is null
                     ? "/account"
                     : $"/account/work/workspaces/{Uri.EscapeDataString(latestWorkspace.WorkspaceId)}")
             : new AccountHubCardViewModel(
-                "Browser return",
-                "Nothing is waiting in the browser",
-                "The browser side stays small. Once a campaign return exists, it lands here without replacing the desktop flow.",
+                "Browser",
+                "No campaign page is open yet",
+                "When you open a campaign on the web, it appears here.",
                 "Open account",
                 "/account",
                 hasLinkedDesktop ? "Open examples" : "Finish setup",
@@ -560,19 +717,19 @@ public sealed class AccountsController : Controller
 
         return new AccountSectionPageViewModel(
             Chrome: _chrome.BuildAuthenticatedChrome(
-                "Account · Campaigns",
-                "Runners, groups, and browser return paths.",
+                "Account · Roster",
+                "Open runners, groups, and campaigns.",
                 "/account/work",
                 user.DisplayName,
                 user.Email),
-            Eyebrow: "Campaigns",
-            Heading: "Runners and groups.",
-            Summary: "Pick what to reopen. Real edits stay in Chummer, while the browser keeps only the return paths.",
+            Eyebrow: "Roster",
+            Heading: "Roster",
+            Summary: "Open runners, groups, and campaigns.",
             Highlights:
             [
                 $"{CountLabel(campaignSpine.Dossiers.Count, "runner", "runners")}.",
-                $"{CountLabel(campaignSpine.Workspaces.Count, "campaign return", "campaign returns")}.",
-                $"{CountLabel(campaignSpine.CommunityOperations.Count, "group lane", "group lanes")}."
+                $"{CountLabel(campaignSpine.Workspaces.Count, "campaign", "campaigns")}.",
+                $"{CountLabel(campaignSpine.CommunityOperations.Count, "group", "groups")}."
             ],
             Cards:
             [
@@ -587,59 +744,61 @@ public sealed class AccountsController : Controller
     private AccountSectionPageViewModel BuildAccountParticipationSectionModel(
         HubUserDto user,
         HorizonArtifactAllowanceViewModel? allowance,
-        Chummer.Run.Contracts.Leaderboards.UserRecognitionSummaryDto? participationRecognition,
         IReadOnlyList<PublicPackageReceipt> participationPackageReceipts,
         IReadOnlyList<ParticipationOperatorNotificationReceipt> participationActivityReceipts)
     {
         int followAndVoteCount = participationPackageReceipts.Count(item =>
             string.Equals(item.ActionKind, "follow", StringComparison.OrdinalIgnoreCase)
             || string.Equals(item.ActionKind, "vote", StringComparison.OrdinalIgnoreCase));
-        int badgeCount = (participationRecognition?.CurrentStatusBadges?.Count ?? 0)
-            + (participationRecognition?.PersistentBadges?.Count ?? 0);
         string supporterSummary = allowance?.SupporterActive ?? false
-            ? "Supporter is active. It only increases the monthly Origin Book allowance right now."
-            : "Free and Supporter run the same app. Supporter only changes the monthly Origin Book allowance right now.";
+            ? "2 books each month. Same app."
+            : "1 book each month. Same app.";
+        bool supporterActive = allowance?.SupporterActive ?? false;
+        string participateSummary = followAndVoteCount > 0
+            ? $"{CountLabel(followAndVoteCount, "public follow or vote", "public follows or votes")} already attached to this account."
+            : "Public feedback stays on Participate.";
+        string privateHelpSummary = participationActivityReceipts.Count > 0
+            ? $"{CountLabel(participationActivityReceipts.Count, "private follow-up", "private follow-ups")} already tied to this account."
+            : "Use private help when the issue should not live on the public board.";
 
         return new AccountSectionPageViewModel(
             Chrome: _chrome.BuildAuthenticatedChrome(
-                "Account · Participation",
-                "Public feedback, private standing, and supporter membership.",
+                "Account · Participate",
+                "Public requests and membership.",
                 "/account/participation",
                 user.DisplayName,
                 user.Email),
-            Eyebrow: "Participation",
-            Heading: "Feedback and roadmap.",
-            Summary: "Public requests live in Participate. Private account standing and supporter checkout stay separate.",
+            Eyebrow: "Participate",
+            Heading: "Participate",
+            Summary: "Public requests and membership.",
             Highlights:
             [
-                $"{(participationRecognition?.LifetimePoints ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture)} lifetime points.",
-                $"{CountLabel(followAndVoteCount, "public follow or vote", "public follows or votes")}.",
-                $"{CountLabel(participationActivityReceipts.Count, "private activity receipt", "private activity receipts")}."
+                supporterSummary
             ],
             Cards:
             [
                 new AccountHubCardViewModel(
                     "Participate",
-                    "Feedback and roadmap",
-                    "Public requests, votes, and shipped notes live on the Participate surface instead of inside the account shell.",
+                    "Participate",
+                    participateSummary,
                     "Open participate",
                     "/participate",
                     "Changelog",
                     "/changelog"),
                 new AccountHubCardViewModel(
-                    "Supporter",
+                    "Membership",
                     "Membership",
                     supporterSummary,
-                    "Open billing",
+                    supporterActive ? "Manage supporter" : "Become supporter",
+                    "/account/billing",
+                    "Details",
                     "/account/billing"),
                 new AccountHubCardViewModel(
-                    "Recognition",
-                    "Community standing",
-                    badgeCount > 0
-                        ? $"{CountLabel(badgeCount, "badge", "badges")} attached to this account."
-                        : "Recognition stays optional and quiet unless you choose to look at it.",
-                    "Open leaderboards",
-                    "/leaderboards",
+                    "Help",
+                    "Private help",
+                    privateHelpSummary,
+                    "Open help",
+                    "/account/support",
                     "Back to account",
                     "/account")
             ],
@@ -679,6 +838,56 @@ public sealed class AccountsController : Controller
         => string.Equals(selectedSection, "support", StringComparison.OrdinalIgnoreCase)
            && string.IsNullOrWhiteSpace(caseId);
 
+    private static bool ShouldShowMinimalSupportCaseDetail(
+        string selectedSection,
+        string? caseId,
+        SupportCasePresentationViewModel? selectedSupportCaseSummary)
+        => string.Equals(selectedSection, "support", StringComparison.OrdinalIgnoreCase)
+           && !string.IsNullOrWhiteSpace(caseId)
+           && selectedSupportCaseSummary is not null;
+
+    private static bool ShouldShowMinimalWorkspaceDetail(
+        string selectedSection,
+        string? workspaceId,
+        string? prepQuery,
+        CampaignWorkspaceProjection? selectedWorkspace)
+        => string.Equals(selectedSection, "work", StringComparison.OrdinalIgnoreCase)
+           && !string.IsNullOrWhiteSpace(workspaceId)
+           && string.IsNullOrWhiteSpace(prepQuery)
+           && selectedWorkspace is not null;
+
+    private static bool ShouldShowMinimalRunDetail(
+        string selectedSection,
+        string? runId,
+        RunProjection? selectedRun)
+        => string.Equals(selectedSection, "work", StringComparison.OrdinalIgnoreCase)
+           && !string.IsNullOrWhiteSpace(runId)
+           && selectedRun is not null;
+
+    private static bool ShouldShowMinimalBuildHandoffDetail(
+        string selectedSection,
+        string? handoffId,
+        BuildLabHandoffProjection? selectedBuildLabHandoff)
+        => string.Equals(selectedSection, "work", StringComparison.OrdinalIgnoreCase)
+           && !string.IsNullOrWhiteSpace(handoffId)
+           && selectedBuildLabHandoff is not null;
+
+    private static bool ShouldShowMinimalRulesAnswerDetail(
+        string selectedSection,
+        string? entryId,
+        RulesNavigatorAnswerProjection? selectedRulesNavigatorAnswer)
+        => string.Equals(selectedSection, "work", StringComparison.OrdinalIgnoreCase)
+           && !string.IsNullOrWhiteSpace(entryId)
+           && selectedRulesNavigatorAnswer is not null;
+
+    private static bool ShouldShowMinimalCreatorPublicationDetail(
+        string selectedSection,
+        string? publicationId,
+        CreatorPublicationProjection? selectedCreatorPublication)
+        => string.Equals(selectedSection, "work", StringComparison.OrdinalIgnoreCase)
+           && !string.IsNullOrWhiteSpace(publicationId)
+           && selectedCreatorPublication is not null;
+
     private static string DescribeInstallation(ClaimedInstallationDto installation)
     {
         List<string> parts = [];
@@ -703,6 +912,29 @@ public sealed class AccountsController : Controller
         }
 
         return string.Join(" · ", parts);
+    }
+
+    private static string BuildAccessInstallationSummary(ClaimedInstallationDto installation)
+    {
+        List<string> parts = [];
+        if (!string.IsNullOrWhiteSpace(installation.Platform))
+        {
+            parts.Add(string.IsNullOrWhiteSpace(installation.Arch)
+                ? installation.Platform
+                : $"{installation.Platform} {installation.Arch}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(installation.Version))
+        {
+            parts.Add(installation.Version);
+        }
+
+        if (!string.IsNullOrWhiteSpace(installation.Channel))
+        {
+            parts.Add(installation.Channel);
+        }
+
+        return string.Join(" · ", parts.Where(static item => !string.IsNullOrWhiteSpace(item)));
     }
 
     private static string CountLabel(int count, string singular, string plural)
@@ -1809,6 +2041,7 @@ public sealed class AccountsController : Controller
     }
 
     [HttpPost("/account/work/publications/{publicationId}/submit")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ValidateAntiForgeryToken]
     [Produces("text/html")]
     public Task<IActionResult> SubmitCreatorPublication(
@@ -1822,6 +2055,7 @@ public sealed class AccountsController : Controller
             static (bridge, user, publication, workspace, mutationNotes) => bridge.SubmitForReview(user, publication, workspace, mutationNotes));
 
     [HttpPost("/account/work/publications/{publicationId}/approve")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ValidateAntiForgeryToken]
     [Produces("text/html")]
     public Task<IActionResult> ApproveCreatorPublication(
@@ -1835,6 +2069,7 @@ public sealed class AccountsController : Controller
             static (bridge, user, publication, workspace, mutationNotes) => bridge.ApproveReview(user, publication, workspace, mutationNotes));
 
     [HttpPost("/account/work/publications/{publicationId}/publish")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ValidateAntiForgeryToken]
     [Produces("text/html")]
     public Task<IActionResult> PublishCreatorPublication(
@@ -1848,6 +2083,7 @@ public sealed class AccountsController : Controller
             static (bridge, user, publication, workspace, mutationNotes) => bridge.Publish(user, publication, workspace, mutationNotes));
 
     [HttpPost("/account/work/publications/{publicationId}/reject")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ValidateAntiForgeryToken]
     [Produces("text/html")]
     public Task<IActionResult> RejectCreatorPublication(
@@ -2076,6 +2312,7 @@ public sealed class AccountsController : Controller
                 "access" => "access",
                 "work" => "work",
                 "participation" => "participation",
+                "settings" => "settings",
                 _ => "profile"
             };
 
@@ -2083,9 +2320,9 @@ public sealed class AccountsController : Controller
         => new[]
         {
             new SectionLinkViewModel("access", "Installs", "/account/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("work", "Campaigns", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("work", "Roster", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("support", "Support", "/account/support", string.Equals(currentSection, "support", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("participation", "Participation", "/account/participation", string.Equals(currentSection, "participation", StringComparison.OrdinalIgnoreCase))
+            new SectionLinkViewModel("participation", "Participate", "/account/participation", string.Equals(currentSection, "participation", StringComparison.OrdinalIgnoreCase))
         };
 
     private static IReadOnlyList<SectionLinkViewModel> BuildAccountSecondarySections(string currentSection)
@@ -2097,11 +2334,12 @@ public sealed class AccountsController : Controller
     private static (string Title, string Description) DescribeAccountSection(string currentSection)
         => currentSection switch
         {
-            "participation" => ("Account · Participation", "Public feedback and recognition."),
-            "support" => ("Account · Support", "Tracked cases and the next step."),
-            "access" => ("Account · Installs", "Linked installs, downloads, and recovery."),
-            "work" => ("Account · Campaigns", "Characters, groups, and campaigns."),
-            _ => ("Account", "Installs, campaigns, support, and billing.")
+            "participation" => ("Account · Participate", "Membership and public requests."),
+            "support" => ("Account · Support", "Private cases and next steps."),
+            "access" => ("Account · Installs", "Downloads, installs, and recovery."),
+            "work" => ("Account · Roster", "Open runners, groups, and campaigns."),
+            "settings" => ("Account · Settings", "Update choices, sign-in, and privacy."),
+            _ => ("Account", "Downloads, runners, support, and membership.")
         };
 
     private MediaArtifactDocument GetPropertyquarryPropertyOrThrow(string propertyId)
@@ -2143,6 +2381,7 @@ public sealed class AccountsController : Controller
     [HttpPost("me/origin-dossiers/publications")]
     [ValidateAntiForgeryToken]
     [ProducesResponseType<OriginDossierPublicationImportResultDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<OriginDossierPublicationImportResultDto>> UpsertOriginDossierPublication(
         [FromBody] OriginDossierPublicationImportRequest? request,
         CancellationToken cancellationToken)
@@ -2172,6 +2411,7 @@ public sealed class AccountsController : Controller
     [HttpPost("me/profile")]
     [ValidateAntiForgeryToken]
     [ProducesResponseType<HubUserDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<HubUserDto>> UpsertProfile([FromBody] UpsertHubUserProfileRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
@@ -2210,6 +2450,7 @@ public sealed class AccountsController : Controller
     [HttpPost("me/preferences")]
     [ValidateAntiForgeryToken]
     [ProducesResponseType<HubUserExperienceDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<HubUserExperienceDto>> UpsertPreferences([FromBody] UpsertHubUserExperienceRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)

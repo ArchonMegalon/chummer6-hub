@@ -3,19 +3,15 @@
 @{
     var pageTitle = Model.CurrentSection switch
     {
-        "access" => "Home · Access",
-        "work" => "Home · Campaigns",
+        "work" => "Home · Roster",
         "setup" => "Home · Setup",
         _ => "Home"
     };
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
-    var isAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
-    ViewData["SurfaceClass"] = isAccessSection
-        ? "surface-home surface-minimal surface-home-access"
-        : "surface-home surface-minimal";
+    ViewData["SurfaceClass"] = "surface-home surface-minimal";
     ViewData["ContextSidebarHeading"] = "Home";
-    ViewData["ContextSidebarSummary"] = "Jump between installs, campaigns, and setup.";
+    ViewData["ContextSidebarSummary"] = "Use the section links to move between installs, roster, and setup.";
     ViewData["ContextSidebarLinks"] = Model.Sections
         .Select(static item => new PublicNavigationLink(item.Label, item.Href))
         .ToArray();
@@ -24,7 +20,6 @@
     var followCount = (Model.Experience.FollowHorizons ? 1 : 0) + (Model.Experience.BetaInterest ? 1 : 0);
     var recoveryLinked = Model.Links.LinkedIdentities.Any(link => string.Equals(link.Provider, "email", StringComparison.OrdinalIgnoreCase));
     var claimedInstallations = Model.InstallLinking.ClaimedInstallations?.Count ?? 0;
-    var activeAccessRights = Model.InstallLinking.ActiveGrants?.Count ?? 0;
     var pendingClaims = Model.InstallLinking.PendingClaimTickets.Count;
     var primaryActionTargetsSetup = string.Equals(Model.PrimaryAction.Href, "/home/setup", StringComparison.OrdinalIgnoreCase);
     var dossiers = Model.CampaignSpine.Dossiers.Take(2).ToArray();
@@ -143,12 +138,6 @@
         .Take(2)
         .ToArray();
     var recentReceipts = Model.InstallLinking.RecentReceipts.Take(2).ToArray();
-    var accessSurfaceReady = claimedInstallations > 0
-        || activeAccessRights > 0
-        || pendingClaims > 0
-        || recentReceipts.Length > 0
-        || restoreConflicts > 0
-        || releasedOrNotifiedCases.Length > 0;
     var hasSeedableStarterWork = (claimedInstallations > 0 || pendingClaims > 0)
         && dossiers.Length == 0
         && campaigns.Length == 0
@@ -164,32 +153,23 @@
             || restoreDevices.Length > 0);
     var effectiveWorkSurfaceReady = workSurfaceReady || hasSeedableStarterWork;
     var showOverviewSection = string.Equals(Model.CurrentSection, "overview", StringComparison.OrdinalIgnoreCase);
-    var showAccessSection = isAccessSection;
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
     var showSetupSection = string.Equals(Model.CurrentSection, "setup", StringComparison.OrdinalIgnoreCase);
-    var showInlineStatus = showAccessSection;
-    var showStatusDrawer = Model.SignedInStatus is not null && !showInlineStatus;
+    var showStatusDrawer = Model.SignedInStatus is not null;
     var contextualDownloadsHref = string.IsNullOrWhiteSpace(Model.ReleaseExperience.Recommended?.DispatchHref)
         ? "/downloads"
         : Model.ReleaseExperience.Recommended.DispatchHref;
-    var accessReleaseLabel = string.IsNullOrWhiteSpace(Model.ReleaseExperience.Display.BuildLabel)
-        ? "Current public release"
-        : Model.ReleaseExperience.Display.BuildLabel;
-    var accessSupportCases = releasedOrNotifiedCases.Take(2).ToArray();
-    var accessRecentReceipts = recentReceipts.Take(1).ToArray();
-    var hasAccessActivity = accessSupportCases.Length > 0 || accessRecentReceipts.Length > 0 || restoreConflicts > 0;
     var openSetupDialog = showOnboarding || showSetupSection;
     var heading = Model.CurrentSection switch
     {
         "access" => "Installs",
-        "work" => "Campaigns",
+        "work" => "Open",
         "setup" => "Finish setup",
         _ => $"Welcome back, {Model.User.DisplayName}"
     };
     var summary = Model.CurrentSection switch
     {
-        "access" => "One place for linking, recovery, and install help.",
-        "work" => "Return to runners, campaigns, and the next useful page.",
+        "work" => "Return to runners, campaigns, and the next useful thing to open.",
         "setup" => "Finish the short setup flow first, then come back to installs and campaigns with a steadier account.",
         _ => "Pick up where you left off: finish the basics, install the current release, and keep track of what is planned next."
     };
@@ -306,90 +286,92 @@
     @Html.AntiForgeryToken()
 </div>
 
-@if (!showAccessSection)
-{
-    <section class="home-cockpit-strip" aria-label="Home summary">
-        <div class="home-cockpit-strip__lead">
-            <p class="eyebrow">Home</p>
-            <h2>@homeContinuityHeadline</h2>
-            <p>@homeContinuitySummary</p>
-            <div class="stacked-actions">
-                @if (primaryActionTargetsSetup && showSetupSection)
-                {
-                    <button class="button-like button-like--primary" type="button" data-open-onboarding>@PublicText(Model.PrimaryAction.Label)</button>
-                }
-                else
-                {
-                    <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)">@PublicText(Model.PrimaryAction.Label)</a>
-                }
-                <a class="button-like button-like--secondary" href="/account/access">Open installs</a>
-                <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
-            </div>
-        </div>
-        <div class="home-cockpit-strip__panel">
-            <article class="home-cockpit-strip__fact">
-                <span>Install</span>
-                <strong>@homeRoleSummary</strong>
-                <p>The same download still works for everyone. Use as guest or link this copy later.</p>
-            </article>
-            <article class="home-cockpit-strip__fact">
-                <span>Recent change</span>
-                <strong>@homeWhatChangedSummary</strong>
-                <p>The account cockpit answers this first so you know whether to continue, recover, or wait.</p>
-            </article>
-            <article class="home-cockpit-strip__fact">
-                <span>Support</span>
-                <strong>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].StageLabel : "Calm return path")</strong>
-                <p>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].ClosureSummary : "No support issue is blocking the next install, return, or recovery step right now.")</p>
-            </article>
-            <article class="home-cockpit-strip__fact">
-                <span>Current release</span>
-                <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open current release for the latest availability.")</strong>
-                <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open current release for the latest notes.")</p>
-            </article>
-        </div>
-    </section>
-}
-
-@if (!showAccessSection)
-{
-    <section class="editorial-block">
-        <details class="details-drawer">
-            <summary>Release and access</summary>
-            @if (showStatusDrawer)
+<section class="home-cockpit-strip" aria-label="Home summary">
+    <div class="home-cockpit-strip__lead">
+        <p class="eyebrow">Home</p>
+        <h2>@homeContinuityHeadline</h2>
+        <p>@homeContinuitySummary</p>
+        <div class="stacked-actions">
+            @if (primaryActionTargetsSetup && showSetupSection)
             {
-                @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+                <button class="button-like button-like--primary" type="button" data-open-onboarding>@PublicText(Model.PrimaryAction.Label)</button>
             }
-            <div class="flagship-coverage flagship-coverage--home" aria-label="Account flagship coverage">
-                <div class="flagship-coverage__lead">
-                    <p class="eyebrow">@PublicText(Model.FlagshipCoverage.Eyebrow)</p>
-                    <h2 class="editorial-title">What matters right now.</h2>
-                    <p class="editorial-copy">Downloads, access, and support stay together.</p>
-                </div>
-                <div class="flagship-coverage__grid">
-                    @foreach (var card in Model.FlagshipCoverage.Cards)
-                    {
-                        <article class="flagship-coverage__card" id="home-@card.Id.Replace('_', '-')">
-                            <span class="tag">@PublicText(card.Label)</span>
-                            <h3>@PublicText(card.CurrentTitle)</h3>
-                            <p>@PublicText(card.CurrentBody)</p>
-                            <p class="flagship-coverage__phase"><strong>Target:</strong> @PublicText(card.TargetBody)</p>
-                            <a class="inline-link" href="@card.Href">@PublicText(card.ActionLabel)</a>
-                        </article>
-                    }
-                </div>
-            </div>
-        </details>
-    </section>
-}
+            else
+            {
+                <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)">@PublicText(Model.PrimaryAction.Label)</a>
+            }
+            <a class="button-like button-like--secondary" href="/account/access">Open installs</a>
+            <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
+        </div>
+    </div>
+    <div class="home-cockpit-strip__panel">
+        <article class="home-cockpit-strip__fact">
+            <span>Install</span>
+            <strong>@homeRoleSummary</strong>
+            <p>The same download still works for everyone. Use as guest or link this copy later.</p>
+        </article>
+        <article class="home-cockpit-strip__fact">
+            <span>Recent change</span>
+            <strong>@homeWhatChangedSummary</strong>
+            <p>The account cockpit answers this first so you know whether to continue, recover, or wait.</p>
+        </article>
+        <article class="home-cockpit-strip__fact">
+            <span>Support</span>
+            @if (releasedOrNotifiedCases.Length > 0)
+            {
+                var supportCase = releasedOrNotifiedCases[0];
+                <strong>@supportCase.StageLabel</strong>
+                <p>@supportCase.ClosureSummary</p>
+                @if (!string.IsNullOrWhiteSpace(supportCase.PrimaryActionHref))
+                {
+                    <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@supportCase.PrimaryActionLabel</a>
+                }
+            }
+            else
+            {
+                <strong>Calm return path</strong>
+                <p>No support issue is blocking the next install, return, or recovery step right now.</p>
+            }
+        </article>
+        <article class="home-cockpit-strip__fact">
+            <span>Current release</span>
+            <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open current release for the latest availability.")</strong>
+            <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open current release for the latest notes.")</p>
+        </article>
+    </div>
+</section>
 
-<section class="home-dashboard home-dashboard--focus">
-    <div class="home-dashboard__main">
-        @if (showInlineStatus && Model.SignedInStatus is not null)
+<section class="editorial-block">
+    <details class="details-drawer">
+        <summary>Release and access</summary>
+        @if (showStatusDrawer)
         {
             @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
         }
+        <div class="flagship-coverage flagship-coverage--home" aria-label="Account flagship coverage">
+            <div class="flagship-coverage__lead">
+                <p class="eyebrow">@PublicText(Model.FlagshipCoverage.Eyebrow)</p>
+                <h2 class="editorial-title">What matters right now.</h2>
+                <p class="editorial-copy">Downloads, access, and support stay together.</p>
+            </div>
+            <div class="flagship-coverage__grid">
+                @foreach (var card in Model.FlagshipCoverage.Cards)
+                {
+                    <article class="flagship-coverage__card" id="home-@card.Id.Replace('_', '-')">
+                        <span class="tag">@PublicText(card.Label)</span>
+                        <h3>@PublicText(card.CurrentTitle)</h3>
+                        <p>@PublicText(card.CurrentBody)</p>
+                        <p class="flagship-coverage__phase"><strong>Target:</strong> @PublicText(card.TargetBody)</p>
+                        <a class="inline-link" href="@card.Href">@PublicText(card.ActionLabel)</a>
+                    </article>
+                }
+            </div>
+        </div>
+    </details>
+</section>
 
+<section class="home-dashboard home-dashboard--focus">
+    <div class="home-dashboard__main">
         @if (showOverviewSection)
         {
             <div class="home-action-grid">
@@ -416,83 +398,9 @@
                     <span class="tag">Installs</span>
                     <h2>Link or recover this copy</h2>
                     <p>Open one quiet place for linking, recovery, and install help.</p>
-                    <a class="button-like button-like--ghost" href="/home/access">Open installs</a>
+                    <a class="button-like button-like--ghost" href="/account/access">Open installs</a>
                 </article>
             </div>
-        }
-
-        @if (showAccessSection && (!showOnboarding || accessSurfaceReady))
-        {
-            <section class="release-shelf release-shelf--manual release-shelf--compact">
-                <div class="home-stream__lead">
-                    <p class="eyebrow">Access</p>
-                    <h2 class="home-stream__title">Installs</h2>
-                    <p class="home-stream__summary">Linking, recovery, and install help in one place.</p>
-                </div>
-                <div class="app-rail app-rail--compact">
-                    <article class="app-rail__item">
-                        <span class="tag">Build</span>
-                        <div class="app-rail__copy">
-                            <h3>@HomeText(accessReleaseLabel)</h3>
-                            <p>Use the release page when your desktop client should stay aligned.</p>
-                        </div>
-                        <a class="inline-link" href="/now">Open release</a>
-                    </article>
-                    <article class="app-rail__item">
-                        <span class="tag">Installs</span>
-                        <div class="app-rail__copy">
-                            <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} linked copy access" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install")</h3>
-                            <p>Open installs to reconnect, replace, or recover this copy.</p>
-                        </div>
-                        <a class="inline-link" href="/account/access">Open installs</a>
-                    </article>
-                    <article class="app-rail__item">
-                        <span class="tag">Support</span>
-                        <div class="app-rail__copy">
-                            @if (hasAccessActivity)
-                            {
-                                @if (accessSupportCases.Length > 0)
-                                {
-                                    var supportCase = accessSupportCases[0];
-                                    <h3>@PublicText(accessSupportCases[0].Case.Title)</h3>
-                                    <p>@PublicText(accessSupportCases[0].ClosureSummary)</p>
-                                    @if (!string.IsNullOrWhiteSpace(supportCase.PrimaryActionHref))
-                                    {
-                                        <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@PublicText(supportCase.PrimaryActionLabel)</a>
-                                    }
-                                }
-                                else if (restoreConflicts > 0)
-                                {
-                                    <h3>Return confirmation pending</h3>
-                                    <p>@PublicText(Model.CampaignSpine.Restore.ConflictSummaries[0])</p>
-                                }
-                                else if (accessRecentReceipts.Length > 0)
-                                {
-                                    <h3>@HomeText(accessRecentReceipts[0].ArtifactLabel)</h3>
-                                    <p>@HomeText(accessRecentReceipts[0].Version) on @HomeText(accessRecentReceipts[0].Channel)</p>
-                                }
-                            }
-                            else
-                            {
-                                <h3>No urgent follow-up</h3>
-                                <p>Nothing blocking: finish builds and installs at your pace.</p>
-                            }
-                        </div>
-                        <a class="inline-link" href="/account/support">Open support</a>
-                    </article>
-                </div>
-            </section>
-        }
-        else if (showAccessSection)
-        {
-            <section class="release-footnote">
-                <p class="eyebrow">Access</p>
-                <h2 class="editorial-title">Finish setup before you worry about installs and follow-up</h2>
-                <p class="editorial-copy">The access surface becomes more useful once the account basics and recovery path are in place.</p>
-                <div class="stacked-actions">
-                    <a class="button-like button-like--primary" href="/home/setup">Open setup</a>
-                </div>
-            </section>
         }
 
         @if (showWorkSection && (!showOnboarding || effectiveWorkSurfaceReady))
@@ -1391,7 +1299,7 @@
                     <a class="button-like button-like--secondary" href="/auth/google/link?next=/home">Link Google</a>
                 }
                 <div class="check-grid">
-                    <label class="check-row"><input id="onboardingFollow" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow upcoming updates</span></label>
+                    <label class="check-row"><input id="onboardingFollow" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow new updates</span></label>
                     <label class="check-row"><input id="onboardingBeta" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Invite me to the right beta when it opens</span></label>
                 </div>
             </section>

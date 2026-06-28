@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.Services;
 
@@ -12,10 +13,10 @@ public sealed record CampaignFederationRouteReceiptProjection(
     ReceiptEnvelope? Envelope = null);
 
 public sealed record CampaignFederationBatchRequest(
-    IReadOnlyList<string>? SourceIds = null,
-    IReadOnlyList<string>? RequestedFormats = null,
-    string? Audience = null,
-    string? Locale = null);
+    [property: MaxLength(8)] IReadOnlyList<string>? SourceIds = null,
+    [property: MaxLength(8)] IReadOnlyList<string>? RequestedFormats = null,
+    [property: StringLength(64)] string? Audience = null,
+    [property: StringLength(32)] string? Locale = null);
 
 public sealed record CampaignFederationSourcePackProjection(
     string SourcePackId,

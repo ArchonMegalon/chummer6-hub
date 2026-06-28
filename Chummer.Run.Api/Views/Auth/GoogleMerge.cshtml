@@ -11,7 +11,7 @@
         <div class="auth-panel__intro auth-panel__intro--masthead">
             <p class="auth-panel__eyebrow">Confirm account link</p>
             <h1 id="auth-merge-title">Use the existing account</h1>
-            <p class="auth-panel__hint">Chummer found <strong>@Model.VerifiedEmail</strong> on the account for <strong>@Model.ExistingDisplayName</strong>.</p>
+            <p class="auth-panel__hint"><strong>@Model.VerifiedEmail</strong> already belongs to <strong>@Model.ExistingDisplayName</strong>.</p>
         </div>
         <form method="post" action="/auth/google/merge" class="auth-form">
             @Html.AntiForgeryToken()

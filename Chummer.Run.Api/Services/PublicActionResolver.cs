@@ -134,7 +134,7 @@ public sealed class PublicActionResolver
             "whats_real_now" => "See current release",
             "choose_your_lane" => "Choose your path",
             "participate" when href.Contains("/participate/codex", StringComparison.OrdinalIgnoreCase) => "Authorize contribution access",
-            "participate" when href.Contains("/account/participation", StringComparison.OrdinalIgnoreCase) || href.Contains("/account/settings", StringComparison.OrdinalIgnoreCase) || href.Contains("#beta-interest", StringComparison.OrdinalIgnoreCase) => "Join beta waitlist",
+            "participate" when href.Contains("/account/participation", StringComparison.OrdinalIgnoreCase) || href.Contains("#beta-interest", StringComparison.OrdinalIgnoreCase) => "Join beta waitlist",
             "participate" when href.Contains("/signup", StringComparison.OrdinalIgnoreCase) => "Claim your copy",
             "participate" when href.Contains("/login", StringComparison.OrdinalIgnoreCase) => "Sign in to continue",
             "participate" => "Open the participation path",

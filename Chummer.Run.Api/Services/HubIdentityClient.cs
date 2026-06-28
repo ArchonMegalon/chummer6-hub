@@ -73,18 +73,21 @@ public sealed class HubIdentityClient
     private readonly IConfiguration _configuration;
     private readonly ILogger<HubIdentityClient> _logger;
     private readonly HubIdentitySubjectCache _subjectCache;
+    private readonly HubIdentityHintCookieService? _identityHintCookie;
     private const string IdentityUnavailableMessage = "Identity is unavailable right now. Try again later.";
 
     public HubIdentityClient(
         HttpClient httpClient,
         IConfiguration configuration,
         ILogger<HubIdentityClient>? logger = null,
-        HubIdentitySubjectCache? subjectCache = null)
+        HubIdentitySubjectCache? subjectCache = null,
+        HubIdentityHintCookieService? identityHintCookie = null)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _logger = logger ?? NullLogger<HubIdentityClient>.Instance;
         _subjectCache = subjectCache ?? new HubIdentitySubjectCache();
+        _identityHintCookie = identityHintCookie;
     }
 
     private string BaseUrl =>
@@ -147,6 +150,33 @@ public sealed class HubIdentityClient
         }
 
         return subject;
+    }
+
+    public bool TryGetFallbackSubject(HttpRequest request, out AuthenticatedHubSubject? subject)
+    {
+        subject = null;
+        if (!TryExtractBearerToken(request, out string? accessToken) || string.IsNullOrWhiteSpace(accessToken))
+        {
+            return false;
+        }
+
+        if (TryResolveLocalSeededSubject(request, accessToken, out subject))
+        {
+            return true;
+        }
+
+        if (_subjectCache.TryGet(BaseUrl, accessToken, out subject))
+        {
+            return true;
+        }
+
+        if (_identityHintCookie?.TryRead(request, out subject) == true)
+        {
+            return true;
+        }
+
+        subject = null;
+        return false;
     }
 
     private async Task<IdentityIntrospectionResponse> IntrospectAsync(string accessToken, CancellationToken cancellationToken)
@@ -260,9 +290,20 @@ public sealed class HubIdentityClient
 
     private static string ExtractBearerToken(HttpRequest request)
     {
-        if (request is null)
+        if (!TryExtractBearerToken(request, out string? accessToken) || string.IsNullOrWhiteSpace(accessToken))
         {
             throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "bearer access token required.");
+        }
+
+        return accessToken;
+    }
+
+    private static bool TryExtractBearerToken(HttpRequest? request, out string? accessToken)
+    {
+        accessToken = null;
+        if (request is null)
+        {
+            return false;
         }
 
         var header = request.Headers.Authorization.ToString();
@@ -272,17 +313,19 @@ public sealed class HubIdentityClient
             var token = header["Bearer ".Length..].Trim();
             if (!string.IsNullOrWhiteSpace(token))
             {
-                return token;
+                accessToken = token;
+                return true;
             }
         }
 
         if (request.Cookies.TryGetValue(HubBrowserAuthConstants.AccessTokenCookieName, out var cookieToken)
             && !string.IsNullOrWhiteSpace(cookieToken))
         {
-            return cookieToken.Trim();
+            accessToken = cookieToken.Trim();
+            return true;
         }
 
-        throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "bearer access token required.");
+        return false;
     }
 
     private bool TryResolveLocalSeededSubject(HttpRequest request, string accessToken, out AuthenticatedHubSubject? subject)

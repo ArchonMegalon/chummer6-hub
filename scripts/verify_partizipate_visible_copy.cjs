@@ -24,7 +24,6 @@ const forbidden = [
   /chummer6\.productlift\.dev/i,
   /\bLog in\b/i,
   /\bSign up\b/i,
-  /\bSign in\b/i,
   /\bGathering votes\b/i,
   /\bAdd Feature or Bug\b/i,
   /\bShort title of your feedback/i,
@@ -35,12 +34,11 @@ const forbidden = [
 ];
 
 const requiredHtml = [
-  '<title>Participate - Chummer.run</title>',
-  'data-chummer-board-skin',
+  '<title>Participate · Chummer</title>',
 ];
 
 const forbiddenHtml = [
-  'partizipate-board__grid',
+  'data-chummer-board-skin',
   'Requests, votes, and shipped work.',
 ];
 
@@ -74,6 +72,25 @@ function extractVisibleText(html) {
       failures.push(`missing-html:${needle}`);
     }
   });
+
+  if (!text.includes('What should Chummer do next?')) {
+    failures.push('missing-text:What should Chummer do next?');
+  }
+  if (!text.includes('Public requests, clear bugs, useful ideas.')) {
+    failures.push('missing-text:Public requests, clear bugs, useful ideas.');
+  }
+  if (!text.includes('Sign in')) {
+    failures.push('missing-text:Sign in');
+  }
+  if (!text.includes('Open board') && !text.includes('Retry')) {
+    failures.push('missing-text:Open board or Retry');
+  }
+
+  const hasEmbeddedBoard = html.includes('data-chummer-participate-frame') && html.includes('data-frame-src=');
+  const hasOfflineFallback = text.includes('Board offline right now');
+  if (!hasEmbeddedBoard && !hasOfflineFallback) {
+    failures.push('missing-participate-state:embedded-board-or-offline-fallback');
+  }
 
   forbiddenHtml.forEach((needle) => {
     if (html.includes(needle)) {

@@ -1,7 +1,7 @@
 @model BillingMembershipPageViewModel
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
-    ViewData["Title"] = "Billing";
+    ViewData["Title"] = "Membership";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-billing surface-minimal";
     var free = Model.FreePlan;
@@ -10,12 +10,14 @@
     var usingSignedInAccount = Model.UsingSignedInAccount && hasUserId;
     var quota = Model.CurrentOriginAuthoringAllowance;
     var hasManageMembershipHref = !string.IsNullOrWhiteSpace(Model.ManageMembershipHref);
+    var supporterActive = quota?.SupporterActive == true;
+    var showManageSupporterAction = usingSignedInAccount && supporterActive && hasManageMembershipHref;
     var antiForgery = Antiforgery.GetAndStoreTokens(Context);
     var signedInLabel = string.IsNullOrWhiteSpace(Model.SignedInLabel) ? Model.Email ?? Model.UserId : Model.SignedInLabel;
 }
 <section class="minimal-page-hero">
     <div>
-        <p class="eyebrow">Membership</p>
+        <p class="eyebrow">Supporter</p>
         <h1>@Model.Heading</h1>
         <p>@Model.Summary</p>
         @if (Model.Unavailable)
@@ -25,44 +27,32 @@
                 {
                     <a class="button-like button-like--secondary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
                 }
-                <a class="button-like button-like--primary" href="/downloads">Downloads</a>
             </div>
         }
         else
         {
             <ul class="minimal-hero__points">
-                <li>Same app.</li>
-                <li>Origin Books: 1/month on Free. 2/month on Supporter.</li>
+                <li>1 book/month on Free. 2/month on Supporter.</li>
                 @if (usingSignedInAccount)
                 {
-                    <li>Signed in as @signedInLabel</li>
+                    <li>@signedInLabel</li>
                 }
                 @if (quota is not null)
                 {
-                    <li>This month: @quota.WindowUsed / @quota.WindowLimit books</li>
+                    <li>@quota.WindowUsed / @quota.WindowLimit used this month</li>
                 }
             </ul>
         }
     </div>
 </section>
 
-@if (Model.Unavailable)
-{
-    <section class="minimal-section minimal-section--tight">
-        <div class="minimal-section__lead">
-            <p class="eyebrow">Unavailable</p>
-            <h2>Free access stays the same</h2>
-            <p>Supporter checkout is unavailable right now.</p>
-        </div>
-    </section>
-}
-else
+@if (!Model.Unavailable)
 {
     <section class="minimal-section">
         <div class="minimal-section__lead">
             <p class="eyebrow">Plans</p>
-            <h2>Only the book allowance changes</h2>
-            <p>No extra app features right now.</p>
+            <h2>Only the book limit changes</h2>
+            <p>No extra app features today.</p>
         </div>
         <div class="minimal-lane-grid minimal-platform-list">
             @if (free is not null)
@@ -70,11 +60,11 @@ else
                 <article class="minimal-lane-card billing-plan-card">
                     <span class="tag">Free</span>
                     <h2>@free.Name</h2>
-                    <p>Default plan. Same app. 1 Origin Book each month.</p>
+                    <p>1 Origin Book each month.</p>
                     <div class="route-choice-card__details">
                         <span>Default</span>
                         <span>1 book/month</span>
-                        <span>Everything else stays the same</span>
+                        <span>Same app</span>
                     </div>
                 </article>
             }
@@ -83,7 +73,7 @@ else
                 <article class="minimal-lane-card billing-plan-card">
                     <span class="tag">Supporter</span>
                     <h2>@supporter.Name</h2>
-                    <p>Same app. 2 Origin Books each month. Supporter helps pay for Chummer.</p>
+                    <p>2 Origin Books each month. Helps pay for Chummer.</p>
                     <div class="route-choice-card__details">
                         <span>2 books/month</span>
                         <span>Same app</span>
@@ -97,27 +87,33 @@ else
                             {
                                 <input type="hidden" name="email" value="@Model.Email">
                             }
-                            <p class="muted-copy">Checkout stays attached to this account.</p>
+                            <p class="muted-copy">@(supporterActive ? "Supporter is already attached to this account." : "Checkout stays attached to this account.")</p>
                         }
                         else
                         {
-                            <p class="muted-copy">Continue with email first. Chummer attaches supporter status after sign-in.</p>
+                            <p class="muted-copy">Email first. Supporter status attaches after sign-in.</p>
                         }
-                        <p class="muted-copy">Supporter only changes the monthly Origin Book limit.</p>
-                        <div class="minimal-actions">
-                            @if (hasUserId)
-                            {
-                                <button class="button-like button-like--primary" type="submit">Support Chummer</button>
-                            }
-                            else
-                            {
-                                <a class="button-like button-like--primary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
-                            }
-                            @if (hasManageMembershipHref)
-                            {
-                                <a class="button-like button-like--ghost" href="@Model.ManageMembershipHref">Manage billing</a>
-                            }
-                        </div>
+                        <p class="muted-copy">No extra app features today.</p>
+                        @if (!hasUserId || !supporterActive || showManageSupporterAction)
+                        {
+                            <div class="minimal-actions">
+                                @if (hasUserId)
+                                {
+                                    @if (!supporterActive)
+                                    {
+                                        <button class="button-like button-like--primary" type="submit">Become supporter</button>
+                                    }
+                                    @if (showManageSupporterAction)
+                                    {
+                                        <a class="button-like button-like--ghost" href="@Model.ManageMembershipHref">Manage supporter</a>
+                                    }
+                                }
+                                else
+                                {
+                                    <a class="button-like button-like--primary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
+                                }
+                            </div>
+                        }
                     </form>
                 </article>
             }

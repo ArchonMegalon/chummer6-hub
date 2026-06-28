@@ -6,6 +6,8 @@ using Chummer.Run.Contracts.Billing;
 using Microsoft.AspNetCore.Mvc;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Chummer.Run.Contracts.PublicSurface;
 
@@ -14,6 +16,8 @@ namespace Chummer.Run.Api.Controllers;
 [ApiController]
 public sealed class BrilliantDirectoriesBillingController : Controller
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly BrilliantDirectoriesBillingService _billing;
     private readonly HubIdentityClient? _identity;
     private readonly AccountService? _accounts;
@@ -44,7 +48,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
     [HttpGet("/account/billing")]
     [Produces("text/html")]
-    public async Task<IActionResult> BillingPage([FromQuery] string? userId = null, [FromQuery] string? email = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> BillingPage([FromQuery] string? userId = null, [FromQuery] string? email = null, [FromQuery] bool preview = false, CancellationToken cancellationToken = default)
     {
         _ = userId;
         _ = email;
@@ -58,21 +62,81 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             var quota = string.IsNullOrWhiteSpace(resolvedUserId)
                 ? null
                 : _originAuthoringAllowance.GetAllowance(resolvedUserId, resolvedEmail);
+            if (!preview)
+            {
+                if (currentUser is null)
+                {
+                    return Redirect(BuildBillingLoginRedirect());
+                }
+
+                string? handoffHref = ResolveBillingHandoffHref(page, quota, currentUser, resolvedUserId, resolvedEmail);
+                if (!string.IsNullOrWhiteSpace(handoffHref))
+                {
+                    return Redirect(handoffHref);
+                }
+            }
+
             return View(
                 "~/Views/Billing/Membership.cshtml",
                 BuildViewModel(page, quota, resolvedUserId, resolvedEmail, currentUser, BuildChrome(currentUser)));
         }
         catch (BrilliantDirectoriesBillingUnavailableException)
         {
+            if (!preview)
+            {
+                string? fallbackHandoff = ResolveUnavailableBillingHandoff(currentUser, resolvedUserId, resolvedEmail);
+                if (!string.IsNullOrWhiteSpace(fallbackHandoff))
+                {
+                    return Redirect(fallbackHandoff);
+                }
+            }
+
             return View(
                 "~/Views/Billing/Membership.cshtml",
                 BuildUnavailableViewModel(resolvedUserId, resolvedEmail, currentUser, BuildChrome(currentUser)));
         }
     }
 
+    private string? ResolveBillingHandoffHref(
+        BrilliantDirectoriesBillingPageDto page,
+        HorizonArtifactAllowanceViewModel? quota,
+        HubUserDto? currentUser,
+        string? userId,
+        string? email)
+    {
+        if (currentUser is null || string.IsNullOrWhiteSpace(userId))
+        {
+            return null;
+        }
+
+        if (quota?.SupporterActive == true)
+        {
+            return string.IsNullOrWhiteSpace(page.ManageMembershipHref)
+                ? null
+                : page.ManageMembershipHref;
+        }
+
+        try
+        {
+            BrilliantDirectoriesCheckoutResponseDto checkout = _billing.CreateSupporterCheckout(
+                new BrilliantDirectoriesCheckoutRequest(
+                    userId,
+                    email));
+            return checkout.CheckoutUrl;
+        }
+        catch (BrilliantDirectoriesBillingUnavailableException ex)
+        {
+            _logger.LogInformation(ex, "Billing page could not create a supporter checkout handoff for signed-in account {UserId}.", userId);
+            return null;
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogInformation(ex, "Billing page could not create a supporter checkout handoff for signed-in account {UserId}.", userId);
+            return null;
+        }
+    }
+
     [HttpGet("/billing")]
-    [HttpGet("/account/settings")]
-    [HttpGet("/account/advanced")]
     [Produces("text/html")]
     public IActionResult BillingAlias()
         => Redirect("/account/billing");
@@ -183,6 +247,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     }
 
     [HttpPost("/account/billing/supporter")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [Consumes("application/x-www-form-urlencoded")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> StartSupporterCheckout([FromForm] BrilliantDirectoriesCheckoutRequest request, CancellationToken cancellationToken = default)
@@ -236,7 +301,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         HubUserDto? currentUser = await TryGetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
         if (currentUser is null)
         {
-            return Redirect("/account/billing");
+            return Redirect(BuildBillingLoginRedirect());
         }
 
         try
@@ -259,6 +324,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
     [HttpPost("/api/billing/brilliant-directories/supporter")]
     [ProducesResponseType<BrilliantDirectoriesCheckoutResponseDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public ActionResult<BrilliantDirectoriesCheckoutResponseDto> StartSupporterCheckoutApi([FromBody] BrilliantDirectoriesCheckoutRequest request)
     {
         try
@@ -282,6 +348,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
     [HttpPost("/api/billing/brilliant-directories/sync")]
     [ProducesResponseType<BrilliantDirectoriesSyncResultDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public ActionResult<BrilliantDirectoriesSyncResultDto> SyncMember([FromBody] BrilliantDirectoriesMemberSyncRequest request)
     {
         try
@@ -363,13 +430,48 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             UsingSignedInAccount: currentUser is not null,
             Unavailable: true,
             Heading: "Membership",
-            Summary: "Supporter checkout is unavailable right now. Free access stays the same.",
-            ManageMembershipHref: "/downloads");
+            Summary: "Supporter is not open right now. Free stays the same.",
+            ManageMembershipHref: string.Empty);
+
+    private static string BuildBillingLoginRedirect()
+        => $"/login?next={Uri.EscapeDataString("/account/billing")}";
+
+    private string? ResolveUnavailableBillingHandoff(HubUserDto? currentUser, string? userId, string? email)
+    {
+        if (currentUser is null || string.IsNullOrWhiteSpace(userId))
+        {
+            return null;
+        }
+
+        string? memberPortalUrl = ReadOptionalExternalUrl("BRILLIANT_DIRECTORIES_MEMBER_PORTAL_URL", "BrilliantDirectories:MemberPortalUrl");
+        if (!string.IsNullOrWhiteSpace(memberPortalUrl))
+        {
+            return memberPortalUrl;
+        }
+
+        string? supporterPlanUrl = ReadOptionalExternalUrl("BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL", "BrilliantDirectories:SupporterPlanUrl");
+        if (string.IsNullOrWhiteSpace(supporterPlanUrl))
+        {
+            return null;
+        }
+
+        string userIdParameter = ReadOptionalValue("BRILLIANT_DIRECTORIES_CHECKOUT_USER_ID_PARAMETER", "BrilliantDirectories:CheckoutUserIdParameter") ?? "chummer_user_id";
+        string emailParameter = ReadOptionalValue("BRILLIANT_DIRECTORIES_CHECKOUT_EMAIL_PARAMETER", "BrilliantDirectories:CheckoutEmailParameter") ?? "email";
+        string planParameter = ReadOptionalValue("BRILLIANT_DIRECTORIES_CHECKOUT_PLAN_PARAMETER", "BrilliantDirectories:CheckoutPlanParameter") ?? "plan";
+
+        string checkoutUrl = AppendQueryParameter(supporterPlanUrl, userIdParameter, userId);
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            checkoutUrl = AppendQueryParameter(checkoutUrl, emailParameter, email);
+        }
+
+        return AppendQueryParameter(checkoutUrl, planParameter, BrilliantDirectoriesBillingConstants.SupporterPlanKey);
+    }
 
     private SiteChromeViewModel BuildChrome(HubUserDto? currentUser)
     {
-        const string title = "Billing";
-        const string description = "Same app. Supporter only changes the monthly Origin Book limit.";
+        const string title = "Membership";
+        const string description = "Same app. 1 book each month on Free. 2 on Supporter.";
         const string currentPath = "/account/billing";
 
         if (currentUser is not null)
@@ -420,8 +522,8 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             : new SiteChromeActionViewModel("Claim your copy", "/signup?next=%2Faccount%2Fbilling", "primary");
 
         return new SiteChromeViewModel(
-            Title: "Billing",
-            Description: "Same app. Supporter only changes the monthly Origin Book limit.",
+            Title: "Membership",
+            Description: "Same app. 1 book each month on Free. 2 on Supporter.",
             CurrentPath: "/account/billing",
             PrimaryNavigation: primaryNavigation,
             SecondaryNavigation: secondaryNavigation,
@@ -460,6 +562,59 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
     private static string? TrimToNull(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private string? ReadOptionalValue(string environmentKey, string configurationKey)
+    {
+        string? environmentValue = TrimToNull(Environment.GetEnvironmentVariable(environmentKey));
+        if (!string.IsNullOrWhiteSpace(environmentValue))
+        {
+            return environmentValue;
+        }
+
+        IServiceProvider? services = HttpContext?.RequestServices;
+        if (services is null)
+        {
+            return null;
+        }
+
+        IConfiguration? configuration = services.GetService<IConfiguration>();
+        return configuration is null ? null : TrimToNull(configuration[configurationKey]);
+    }
+
+    private string? ReadOptionalExternalUrl(string environmentKey, string configurationKey)
+    {
+        string? value = ReadOptionalValue(environmentKey, configurationKey);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
+            || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+        {
+            return null;
+        }
+
+        if (uri.Scheme == Uri.UriSchemeHttp && !uri.IsLoopback)
+        {
+            return null;
+        }
+
+        return uri.ToString();
+    }
+
+    private static string AppendQueryParameter(string url, string name, string value)
+    {
+        char separator = url.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        if (url.EndsWith("?", StringComparison.Ordinal) || url.EndsWith("&", StringComparison.Ordinal))
+        {
+            separator = '\0';
+        }
+
+        return separator == '\0'
+            ? $"{url}{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}"
+            : $"{url}{separator}{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}";
+    }
 
     private string? BillingSecretHeader()
         => HttpContext?.Request.Headers["X-Chummer-Billing-Secret"].ToString();

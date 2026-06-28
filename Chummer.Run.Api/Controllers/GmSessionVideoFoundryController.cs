@@ -9,6 +9,8 @@ namespace Chummer.Run.Api.Controllers;
 [AutoValidateAntiforgeryToken]
 public sealed class GmSessionVideoFoundryController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly HubIdentityClient _identity;
     private readonly AccountService _accounts;
     private readonly GmSessionVideoFoundryService _foundry;
@@ -34,6 +36,7 @@ public sealed class GmSessionVideoFoundryController : ControllerBase
         => await WithUser(cancellationToken, userId => Ok(_foundry.ListFaces(userId, campaignId, q)));
 
     [HttpPost("/gm/campaigns/{campaignId}/video-foundry/cast")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<FaceAssetProjection>(StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateCastFace(
         [FromRoute] string campaignId,
@@ -59,6 +62,7 @@ public sealed class GmSessionVideoFoundryController : ControllerBase
         });
 
     [HttpPost("/gm/campaigns/{campaignId}/video-foundry/new")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PromptDraftProjection>(StatusCodes.Status200OK)]
     public async Task<IActionResult> CreatePrompt(
         [FromRoute] string campaignId,
@@ -83,6 +87,7 @@ public sealed class GmSessionVideoFoundryController : ControllerBase
         });
 
     [HttpPost("/gm/campaigns/{campaignId}/video-foundry/prompts/{promptDraftId}")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PromptDraftProjection>(StatusCodes.Status200OK)]
     public async Task<IActionResult> EditPrompt(
         [FromRoute] string campaignId,
@@ -102,6 +107,7 @@ public sealed class GmSessionVideoFoundryController : ControllerBase
         => await WithUser(cancellationToken, userId => Ok(_foundry.RegeneratePromptOnly(userId, campaignId, promptDraftId)));
 
     [HttpPost("/gm/campaigns/{campaignId}/video-foundry/prompts/{promptDraftId}/approve")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<SessionVideoRenderJobProjection>(StatusCodes.Status200OK)]
     public async Task<IActionResult> ApprovePrompt(
         [FromRoute] string campaignId,
@@ -143,6 +149,7 @@ public sealed class GmSessionVideoFoundryController : ControllerBase
         => await WithUser(cancellationToken, userId => Ok(_foundry.ListSessionVideos(userId, campaignId, sessionId)));
 
     [HttpPost("/gm/campaigns/{campaignId}/sessions/{sessionId}/videos")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<PromptDraftProjection>(StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateSessionPrompt(
         [FromRoute] string campaignId,
@@ -164,6 +171,7 @@ public sealed class GmSessionVideoFoundryController : ControllerBase
             .ToArray()));
 
     [HttpPost("/gm/campaigns/{campaignId}/sessions/{sessionId}/table-pulse/videos")]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     [ProducesResponseType<TablePulseMediaPacketProjection>(StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateTablePulsePacket(
         [FromRoute] string campaignId,

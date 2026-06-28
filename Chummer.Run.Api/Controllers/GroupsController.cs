@@ -10,6 +10,8 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/groups")]
 public sealed class GroupsController : ControllerBase
 {
+    private const int MaxRequestBodyBytes = 16 * 1024;
+
     private readonly GroupService _groups;
     private readonly HubIdentityClient _identity;
 
@@ -74,6 +76,7 @@ public sealed class GroupsController : ControllerBase
 
     [HttpPost]
     [ProducesResponseType<GroupDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<GroupDto>> Create([FromBody] CreateGroupRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
@@ -94,6 +97,7 @@ public sealed class GroupsController : ControllerBase
 
     [HttpPost("{groupId}/join-codes")]
     [ProducesResponseType<JoinCodeDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<JoinCodeDto>> CreateJoinCode([FromRoute] string groupId, [FromBody] CreateJoinCodeRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
@@ -122,6 +126,7 @@ public sealed class GroupsController : ControllerBase
 
     [HttpPost("join")]
     [ProducesResponseType<GroupDto>(StatusCodes.Status200OK)]
+    [RequestSizeLimit(MaxRequestBodyBytes)]
     public async Task<ActionResult<GroupDto>> Join([FromBody] JoinGroupByCodeRequest? request, CancellationToken cancellationToken)
     {
         if (request is null)
