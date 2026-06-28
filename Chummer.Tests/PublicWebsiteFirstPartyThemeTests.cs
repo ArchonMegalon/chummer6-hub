@@ -40,12 +40,15 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("!(minimalSurface && normalizeHeaderActionPath(action.Href).StartsWith(\"/downloads\"", layout, StringComparison.Ordinal);
         Assert.Contains("var showPrimaryNavInHeader = !minimalSurface && routeKey is not \"landing\";", layout, StringComparison.Ordinal);
         Assert.Contains("accountMenuBuildAction = chrome.Authenticated ? buildAction : null", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("launcherDesktopLabel", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("launcherWebLabel", layout, StringComparison.Ordinal);
         Assert.Contains("href: /participate", appNavigation, StringComparison.Ordinal);
+        Assert.DoesNotContain("href: /mobile", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Get Chummer", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev", appNavigation, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
         Assert.Contains("@PublicParticipateText(Model.Summary)", participateView, StringComparison.Ordinal);
-        Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
+        Assert.Contains("Requests", participateView, StringComparison.Ordinal);
         Assert.Contains("Board is live.", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Feedback and roadmap live here.", participateView, StringComparison.Ordinal);
         Assert.Contains("Model.EmbeddedBoardHref", participateView, StringComparison.Ordinal);

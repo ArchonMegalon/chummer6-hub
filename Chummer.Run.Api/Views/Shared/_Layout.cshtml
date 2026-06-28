@@ -100,8 +100,18 @@
             .Concat(buildAction is null ? Array.Empty<SiteChromeActionViewModel>() : new[] { buildAction })
             .ToArray();
     var showPrimaryNavInHeader = !minimalSurface && routeKey is not "landing";
-    const string launcherDesktopLabel = "Desktop";
-    const string launcherWebLabel = "Web";
+    string renderActionLabel(SiteChromeActionViewModel action)
+    {
+        if (string.Equals(action.Label, "Open Chummer", StringComparison.OrdinalIgnoreCase))
+        {
+            return chrome.Authenticated ? "Open" : "Sign in";
+        }
+
+        return routeKey is "landing"
+            && normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
+            ? "Download"
+            : action.Label;
+    }
     var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass}".Trim();
     var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "artifacts" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "privacy" or "terms" or "contact"
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
@@ -128,12 +138,6 @@
         footerLinks = footerLinks
             .Where(link => link.Href is "/help" or "/contact")
             .ToArray();
-        if (routeKey is "landing" && !footerLinks.Any(link => string.Equals(link.Href, "/status", StringComparison.OrdinalIgnoreCase)))
-        {
-            footerLinks = footerLinks
-                .Concat(new[] { new PublicNavigationLink("Status", "/status") })
-                .ToArray();
-        }
     }
     var utilityLink = chrome.UtilityNavigation.FirstOrDefault();
     var contextSidebarHeading = ViewData["ContextSidebarHeading"] as string;
@@ -427,29 +431,17 @@
                                         }
                                         @foreach (var action in accountMenuActions)
                                         {
-                                            if (string.Equals(action.Label, "Open Chummer", StringComparison.OrdinalIgnoreCase))
+                                            var renderedActionLabel = renderActionLabel(action);
+                                            if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
                                             {
-                                                <details class="site-account-menu site-open-chummer-menu">
-                                                    <summary class="site-account-menu__summary">
-                                                        <span class="site-account-menu__label">@action.Label</span>
-                                                    </summary>
-                                                    <div class="site-account-menu__panel">
-                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">@launcherDesktopLabel</a>
-                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">@launcherWebLabel</a>
-                                                    </div>
-                                                </details>
+                                                <form method="post" action="/logout" class="site-account-menu__form">
+                                                    @Html.AntiForgeryToken()
+                                                    <button class="site-account-menu__button" type="submit">@renderedActionLabel</button>
+                                                </form>
                                             }
                                             else
                                             {
-                                                var renderedActionLabel = action.Label;
-                                                if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
-                                                {
-                                                    <form method="post" action="/logout" class="site-account-menu__form">
-                                                        @Html.AntiForgeryToken()
-                                                        <button class="site-account-menu__button" type="submit">@renderedActionLabel</button>
-                                                    </form>
-                                                }
-                                                else if (action.Current)
+                                                if (action.Current)
                                                 {
                                                     <span class="site-account-menu__current">@renderedActionLabel</span>
                                                 }
@@ -466,39 +458,24 @@
                             {
                                 @foreach (var action in visibleHeaderActions)
                                 {
-                                    if (string.Equals(action.Label, "Open Chummer", StringComparison.OrdinalIgnoreCase))
+                                    var renderedActionLabel = renderActionLabel(action);
+                                    if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        <details class="site-account-menu site-open-chummer-menu">
-                                            <summary class="site-account-menu__summary">
-                                                <span class="site-account-menu__label">@action.Label</span>
-                                            </summary>
-                                            <div class="site-account-menu__panel">
-                                                <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">@launcherDesktopLabel</a>
-                                                <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">@launcherWebLabel</a>
-                                            </div>
-                                        </details>
+                                        <form method="post" action="/logout" class="action-form">
+                                            @Html.AntiForgeryToken()
+                                            <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
+                                        </form>
+                                    }
+                                    else if (action.Current)
+                                    {
+                                        <span class="action-pill action-pill--current">@renderedActionLabel</span>
                                     }
                                     else
                                     {
-                                        var renderedActionLabel = action.Label;
-                                        if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
-                                        {
-                                            <form method="post" action="/logout" class="action-form">
-                                                @Html.AntiForgeryToken()
-                                                <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
-                                            </form>
-                                        }
-                                        else if (action.Current)
-                                        {
-                                            <span class="action-pill action-pill--current">@renderedActionLabel</span>
-                                        }
-                                        else
-                                        {
-                                            var actionClass = string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase)
-                                                ? "site-actions__link"
-                                                : $"action-pill action-pill--{action.Tone}";
-                                            <a class="@actionClass" href="@action.Href">@renderedActionLabel</a>
-                                        }
+                                        var actionClass = string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase)
+                                            ? "site-actions__link"
+                                            : $"action-pill action-pill--{action.Tone}";
+                                        <a class="@actionClass" href="@action.Href">@renderedActionLabel</a>
                                     }
                                 }
                             }
@@ -551,29 +528,17 @@
                                         }
                                         @foreach (var action in accountMenuActions)
                                         {
-                                            if (string.Equals(action.Label, "Open Chummer", StringComparison.OrdinalIgnoreCase))
+                                            var renderedActionLabel = renderActionLabel(action);
+                                            if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
                                             {
-                                                <details class="site-account-menu site-open-chummer-menu">
-                                                    <summary class="site-account-menu__summary">
-                                                        <span class="site-account-menu__label">@action.Label</span>
-                                                    </summary>
-                                                    <div class="site-account-menu__panel">
-                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">@launcherDesktopLabel</a>
-                                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">@launcherWebLabel</a>
-                                                    </div>
-                                                </details>
+                                                <form method="post" action="/logout" class="site-account-menu__form">
+                                                    @Html.AntiForgeryToken()
+                                                    <button class="site-account-menu__button" type="submit">@renderedActionLabel</button>
+                                                </form>
                                             }
                                             else
                                             {
-                                                var renderedActionLabel = action.Label;
-                                                if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
-                                                {
-                                                    <form method="post" action="/logout" class="site-account-menu__form">
-                                                        @Html.AntiForgeryToken()
-                                                        <button class="site-account-menu__button" type="submit">@renderedActionLabel</button>
-                                                    </form>
-                                                }
-                                                else if (action.Current)
+                                                if (action.Current)
                                                 {
                                                     <span class="site-account-menu__current">@renderedActionLabel</span>
                                                 }
@@ -590,32 +555,17 @@
                     {
                         @foreach (var action in visibleHeaderActions)
                         {
-                            if (string.Equals(action.Label, "Open Chummer", StringComparison.OrdinalIgnoreCase))
+                            var renderedActionLabel = renderActionLabel(action);
+                            if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
                             {
-                                <details class="site-account-menu site-open-chummer-menu">
-                                    <summary class="site-account-menu__summary">
-                                        <span class="site-account-menu__label">@action.Label</span>
-                                    </summary>
-                                    <div class="site-account-menu__panel">
-                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="@action.Href">@launcherDesktopLabel</a>
-                                        <a class="site-open-chummer-menu__button site-account-menu__button" href="/mobile">@launcherWebLabel</a>
-                                    </div>
-                                </details>
+                                <form method="post" action="/logout" class="action-form">
+                                    @Html.AntiForgeryToken()
+                                    <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
+                                </form>
                             }
                             else
                             {
-                                var renderedActionLabel = routeKey is "landing"
-                                    && normalizeHeaderActionPath(action.Href).StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
-                                    ? "Download"
-                                    : action.Label;
-                                if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    <form method="post" action="/logout" class="action-form">
-                                        @Html.AntiForgeryToken()
-                                        <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
-                                    </form>
-                                }
-                                else if (action.Current)
+                                if (action.Current)
                                 {
                                     <span class="action-pill action-pill--current">@renderedActionLabel</span>
                                 }

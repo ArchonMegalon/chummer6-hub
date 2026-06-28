@@ -154,9 +154,9 @@ public sealed class ParticipateController : Controller
         string? entryHref = subject is null
             ? BuildParticipateSignInHref("/participate")
             : "/account";
-        string entryLabel = subject is null ? "Sign in to Chummer" : "Account";
+        string entryLabel = subject is null ? "Sign in" : "Account";
         string entrySummary = subject is null
-            ? "Browse without signing in. If you later sign in on the board, use the same email."
+            ? "Browse now. Sign in later if you want your votes attached."
             : $"{(string.IsNullOrWhiteSpace(subject.DisplayName) ? "This account" : subject.DisplayName)} is already signed in here.";
         string? supporterHref = subject is null ? null : ResolveParticipateSupporterHref();
 

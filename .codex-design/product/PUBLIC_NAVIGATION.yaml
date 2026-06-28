@@ -6,8 +6,6 @@ primary_nav:
     href: /
   - label: Participate
     href: /participate
-  - label: Play
-    href: /mobile
   - label: Help
     href: /help
 public_signal_nav:
