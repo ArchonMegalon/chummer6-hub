@@ -11959,7 +11959,6 @@ def main() -> int:
                 "Download Chummer",
                 "Current public installer",
                 "Help",
-                "Status",
                 "Watch 90 sec"),
             forbidden_texts=(
                 "The city is moving.",
@@ -12034,9 +12033,9 @@ def main() -> int:
         AuditRoute(
             "/participate",
             "Participate",
-            required_texts=("What should Chummer do next?", "Short requests, clear bugs, useful ideas.", "Add a note"),
+            required_texts=("What should Chummer do next?", "Public requests, clear bugs, useful ideas.", "Requests", "Board is live."),
             forbidden_texts=("productlift.dev",),
-            expects_header_count=0),
+            expects_header_count=1),
         AuditRoute(
             "/help",
             "What is wrong?",
