@@ -213,7 +213,10 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
                 "Roadmap",
                 "Now and next.",
                 "Planned work is here. Shipped work stays in Changelog.",
+            ],
+            "required_any_texts": [
                 "Current work opens below.",
+                "Board not loading right now",
             ],
             "forbidden_texts": [
                 "ProductLift",
@@ -229,7 +232,10 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
                 "Roadmap",
                 "Now and next.",
                 "Planned work is here. Shipped work stays in Changelog.",
+            ],
+            "required_any_texts": [
                 "Current work opens below.",
+                "Board not loading right now",
             ],
             "required_final_url_prefix": "/roadmap",
             "forbidden_texts": [
@@ -388,6 +394,8 @@ def verify(base_url: str) -> dict[str, Any]:
         status_code, body, final_url, redirect_location, redirect_chain = fetch(url, base)
         flattened = flatten_text(body) if status_code == 200 else body
         missing = [token for token in surface.get("required_texts", []) if token not in flattened]
+        required_any = list(surface.get("required_any_texts", []))
+        missing_any = required_any if required_any and not any(token in flattened for token in required_any) else []
         missing_html = [token for token in surface.get("required_html_texts", []) if token not in body]
         forbidden = [token for token in surface.get("forbidden_texts", []) if token in flattened]
         forbidden_html = [token for token in surface.get("forbidden_html_texts", []) if token in body]
@@ -422,6 +430,8 @@ def verify(base_url: str) -> dict[str, Any]:
             failures.append(f"{path}: redirected off-origin to {redirect_target_url}")
         if missing:
             failures.append(f"{path}: missing required text: {', '.join(missing)}")
+        if missing_any:
+            failures.append(f"{path}: missing any-of required text: {', '.join(missing_any)}")
         if missing_html:
             failures.append(f"{path}: missing required html text: {', '.join(missing_html)}")
         if forbidden:
@@ -440,8 +450,10 @@ def verify(base_url: str) -> dict[str, Any]:
                 "status_code": status_code,
                 "redirect_chain": redirect_chain,
                 "required_texts": surface.get("required_texts", []),
+                "required_any_texts": required_any,
                 "required_html_texts": surface.get("required_html_texts", []),
                 "missing_required_texts": missing,
+                "missing_required_any_texts": missing_any,
                 "missing_required_html_texts": missing_html,
                 "forbidden_texts": surface.get("forbidden_texts", []),
                 "forbidden_html_texts": surface.get("forbidden_html_texts", []),
@@ -449,7 +461,7 @@ def verify(base_url: str) -> dict[str, Any]:
                 "forbidden_html_hits": forbidden_html,
                 "required_final_url_prefix": final_url_prefix or None,
                 "final_url_matches": final_url_matches,
-                "status": "pass" if status_code == 200 and not missing and not missing_html and not forbidden and not forbidden_html and final_url_matches else "fail",
+                "status": "pass" if status_code == 200 and not missing and not missing_any and not missing_html and not forbidden and not forbidden_html and final_url_matches else "fail",
             }
         )
 

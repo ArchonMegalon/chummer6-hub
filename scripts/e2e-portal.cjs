@@ -163,8 +163,8 @@ const checks = [
       text.includes('Roadmap')
       && text.includes('Now and next.')
       && text.includes('Planned work is here. Shipped work stays in Changelog.')
-      && text.includes('Current work opens below.')
-      && text.includes('data-chummer-roadmap-frame')
+      && (text.includes('Current work opens below.') || text.includes('Board not loading right now'))
+      && (text.includes('data-chummer-roadmap-frame') || text.includes('Board not loading right now'))
       && !text.includes('ProductLift')
   },
   {
@@ -173,7 +173,7 @@ const checks = [
       /\/roadmap\/?$/.test(response.url)
       && text.includes('Now and next.')
       && text.includes('Planned work is here. Shipped work stays in Changelog.')
-      && text.includes('Current work opens below.')
+      && (text.includes('Current work opens below.') || text.includes('Board not loading right now'))
       && !text.includes('ProductLift')
   },
   {

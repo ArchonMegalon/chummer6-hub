@@ -126,6 +126,12 @@
         footerLinks = footerLinks
             .Where(link => link.Href is "/help" or "/contact")
             .ToArray();
+        if (routeKey is "landing" && !footerLinks.Any(link => string.Equals(link.Href, "/status", StringComparison.OrdinalIgnoreCase)))
+        {
+            footerLinks = footerLinks
+                .Concat(new[] { new PublicNavigationLink("Status", "/status") })
+                .ToArray();
+        }
     }
     var utilityLink = chrome.UtilityNavigation.FirstOrDefault();
     var contextSidebarHeading = ViewData["ContextSidebarHeading"] as string;

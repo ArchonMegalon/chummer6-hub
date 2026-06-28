@@ -25,6 +25,7 @@ def load_module():
 
 class _SurfaceHandler(BaseHTTPRequestHandler):
     billing_mode = "unavailable"
+    roadmap_mode = "board"
 
     def do_GET(self):  # noqa: N802
         if self.path == "/":
@@ -122,14 +123,24 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            self.wfile.write(
-                b"<html><body>"
-                b"<title>Roadmap \xc2\xb7 Chummer</title>"
-                b"<h1>Now and next.</h1>"
-                b"<p>Planned work is here. Shipped work stays in Changelog.</p>"
-                b"<p>Current work opens below.</p>"
-                b"</body></html>"
-            )
+            if self.roadmap_mode == "fallback":
+                self.wfile.write(
+                    b"<html><body>"
+                    b"<title>Roadmap \xc2\xb7 Chummer</title>"
+                    b"<h1>Now and next.</h1>"
+                    b"<p>Planned work is here. Shipped work stays in Changelog.</p>"
+                    b"<h2>Board not loading right now</h2>"
+                    b"</body></html>"
+                )
+            else:
+                self.wfile.write(
+                    b"<html><body>"
+                    b"<title>Roadmap \xc2\xb7 Chummer</title>"
+                    b"<h1>Now and next.</h1>"
+                    b"<p>Planned work is here. Shipped work stays in Changelog.</p>"
+                    b"<p>Current work opens below.</p>"
+                    b"</body></html>"
+                )
             return
 
         if self.path == "/roadmap/board":
@@ -181,6 +192,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
 
     def setUp(self) -> None:
         _SurfaceHandler.billing_mode = "unavailable"
+        _SurfaceHandler.roadmap_mode = "board"
 
     def test_verify_requires_public_participate_surfaces(self) -> None:
         module = load_module()
@@ -221,6 +233,17 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertEqual([f"{self.base_url}/participate"], board["redirect_chain"])
         self.assertEqual([], board["missing_required_texts"])
         self.assertEqual([], board["forbidden_hits"])
+
+    def test_verify_accepts_roadmap_fallback_when_hosted_board_is_unavailable(self) -> None:
+        module = load_module()
+        _SurfaceHandler.roadmap_mode = "fallback"
+
+        payload = module.verify(self.base_url)
+
+        self.assertEqual("pass", payload["status"])
+        roadmap = next(item for item in payload["results"] if item["path"] == "/roadmap")
+        self.assertEqual([], roadmap["missing_required_texts"])
+        self.assertEqual([], roadmap["missing_required_any_texts"])
 
         roadmap = next(item for item in payload["results"] if item["path"] == "/roadmap")
         self.assertEqual(200, roadmap["status_code"])
