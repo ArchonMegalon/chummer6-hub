@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -277,6 +278,61 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
+    public async Task ParticipateBoardProxyReusesFreshHostedBoardHtmlCache()
+    {
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var factory = new CountingHostedBoardChromeHttpClientFactory();
+        var firstController = CreatePublicLandingController(factory, hostedBoardHtmlCache: cache);
+        firstController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
+        firstController.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        firstController.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        firstController.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult firstResult = await firstController.ParticipateBoardProxy(null, CancellationToken.None);
+
+        ContentResult firstContent = Assert.IsType<ContentResult>(firstResult);
+        Assert.Equal("miss", firstController.Response.Headers["X-Chummer-Hosted-Board-Cache"].ToString());
+        Assert.Equal(1, factory.RequestCount);
+
+        var secondController = CreatePublicLandingController(factory, hostedBoardHtmlCache: cache);
+        secondController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
+        secondController.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        secondController.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        secondController.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult secondResult = await secondController.ParticipateBoardProxy(null, CancellationToken.None);
+
+        ContentResult secondContent = Assert.IsType<ContentResult>(secondResult);
+        Assert.Equal("hit", secondController.Response.Headers["X-Chummer-Hosted-Board-Cache"].ToString());
+        Assert.Equal(1, factory.RequestCount);
+        Assert.Equal(firstContent.Content, secondContent.Content);
+    }
+
+    [Fact]
+    public async Task ParticipateBoardProxyKeepsServingWarmCacheWhenUpstreamFails()
+    {
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var seedingController = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), hostedBoardHtmlCache: cache);
+        seedingController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
+        seedingController.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        seedingController.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        seedingController.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+        _ = await seedingController.ParticipateBoardProxy(null, CancellationToken.None);
+
+        var staleController = CreatePublicLandingController(new ThrowingHttpClientFactory(), hostedBoardHtmlCache: cache);
+        staleController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
+        staleController.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        staleController.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        staleController.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await staleController.ParticipateBoardProxy(null, CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("hit", staleController.Response.Headers["X-Chummer-Hosted-Board-Cache"].ToString());
+        Assert.Contains("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RoadmapBoardProxyServesEmbeddedShellForIframeRequests()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory());
@@ -289,6 +345,30 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("Now and next", content.Content ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RoadmapBoardProxyKeepsServingWarmCacheWhenUpstreamFails()
+    {
+        using var cache = new MemoryCache(new MemoryCacheOptions());
+        var seedingController = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), hostedBoardHtmlCache: cache);
+        seedingController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
+        seedingController.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        seedingController.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        seedingController.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+        _ = await seedingController.RoadmapBoardProxy(null, CancellationToken.None);
+
+        var staleController = CreatePublicLandingController(new ThrowingHttpClientFactory(), hostedBoardHtmlCache: cache);
+        staleController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
+        staleController.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        staleController.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        staleController.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await staleController.RoadmapBoardProxy(null, CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("hit", staleController.Response.Headers["X-Chummer-Hosted-Board-Cache"].ToString());
         Assert.Contains("Now and next", content.Content ?? string.Empty, StringComparison.Ordinal);
     }
 
@@ -419,7 +499,8 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         string? roadmapUrl = "https://ideas.example.test/roadmap",
         string feedbackUrl = "https://ideas.example.test/feedback",
         IWebHostEnvironment? webHostEnvironment = null,
-        bool seedParticipateSnapshot = false)
+        bool seedParticipateSnapshot = false,
+        IMemoryCache? hostedBoardHtmlCache = null)
     {
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -509,7 +590,8 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
             participateSnapshots: participateSnapshots,
             httpClientFactory: httpClientFactory,
             webHostEnvironment: environment,
-            logger: NullLogger<PublicLandingController>.Instance)
+            logger: NullLogger<PublicLandingController>.Instance,
+            hostedBoardHtmlCache: hostedBoardHtmlCache)
         {
             ControllerContext = new ControllerContext
             {
@@ -696,6 +778,38 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
                     Content = new StringContent(html, Encoding.UTF8, "text/html")
                 };
                 return Task.FromResult(response);
+            }
+        }
+    }
+
+    private sealed class CountingHostedBoardChromeHttpClientFactory : IHttpClientFactory
+    {
+        public int RequestCount { get; private set; }
+
+        public HttpClient CreateClient(string name)
+            => new(new CountingHostedBoardChromeHandler(this));
+
+        private sealed class CountingHostedBoardChromeHandler(CountingHostedBoardChromeHttpClientFactory owner) : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                owner.RequestCount += 1;
+                const string html = """
+<!doctype html>
+<html lang="en">
+<head>
+  <title>What do you want to see next?</title>
+  <script src="https://cdn.productlift.dev/js/all.js?id=370f0b336fe725b13230"></script>
+</head>
+<body>
+<main><h1>What do you want to see next?</h1></main>
+</body>
+</html>
+""";
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(html, Encoding.UTF8, "text/html")
+                });
             }
         }
     }

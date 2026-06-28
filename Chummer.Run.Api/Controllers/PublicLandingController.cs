@@ -27,6 +27,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Chummer.Run.Api.Controllers;
@@ -42,6 +43,8 @@ public sealed class PublicLandingController : Controller
     private const string DefaultBlackLedgerViewerFlyThroughHref = "/media/ledger/tours/black-ledger-3dvista-flythrough.mp4";
     private const int MaxRequestBodyBytes = 16 * 1024;
     private static readonly TimeSpan HostedBoardPageTimeout = TimeSpan.FromMilliseconds(1250);
+    private static readonly TimeSpan HostedBoardHtmlFreshFor = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan HostedBoardHtmlRetainFor = TimeSpan.FromMinutes(10);
     private static readonly JsonSerializerOptions PublicJsonContentOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     private readonly PublicLandingService _landing;
@@ -103,6 +106,7 @@ public sealed class PublicLandingController : Controller
     private readonly AurPackageCatalogService _aurPackages;
     private readonly PublicParticipateSnapshotService _participateSnapshots;
     private readonly IHttpClientFactory? _httpClientFactory;
+    private readonly IMemoryCache _hostedBoardHtmlCache;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly ILogger<PublicLandingController> _logger;
 
@@ -164,7 +168,8 @@ public sealed class PublicLandingController : Controller
         ILogger<PublicLandingController> logger,
         HorizonArtifactRequestService? artifactRequests = null,
         HorizonCapabilityService? horizonCapabilities = null,
-        HorizonArtifactAccessTokenService? artifactAccessTokens = null)
+        HorizonArtifactAccessTokenService? artifactAccessTokens = null,
+        IMemoryCache? hostedBoardHtmlCache = null)
     {
         _landing = landing;
         _flipLinkDocumentPortal = flipLinkDocumentPortal;
@@ -225,6 +230,7 @@ public sealed class PublicLandingController : Controller
         _aurPackages = aurPackages;
         _participateSnapshots = participateSnapshots;
         _httpClientFactory = httpClientFactory;
+        _hostedBoardHtmlCache = hostedBoardHtmlCache ?? new MemoryCache(new MemoryCacheOptions());
         _webHostEnvironment = webHostEnvironment;
         _logger = logger;
     }
@@ -2499,6 +2505,21 @@ public sealed class PublicLandingController : Controller
 
         string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
         string relativePath = string.IsNullOrWhiteSpace(normalizedBoardPath) ? string.Empty : normalizedBoardPath.TrimStart('/');
+        string currentPath = string.IsNullOrWhiteSpace(normalizedBoardPath)
+            ? "/participate/board"
+            : $"/participate/board/{normalizedBoardPath}";
+        string cacheKey = BuildHostedBoardHtmlCacheKey(
+            surfaceId: "participate",
+            localOrigin,
+            localBaseHref,
+            canonicalHref ?? currentPath,
+            relativePath,
+            embedded);
+        if (TryServeHostedBoardHtmlCache(cacheKey, allowStale: false, out ContentResult? cachedHtml) && cachedHtml is not null)
+        {
+            return cachedHtml;
+        }
+
         Uri target = string.IsNullOrWhiteSpace(relativePath)
             ? AppendQueryString(upstream, Request.QueryString.Value)
             : AppendQueryString(ResolveHostedBoardContentUri(upstream, relativePath), Request.QueryString.Value);
@@ -2522,15 +2543,17 @@ public sealed class PublicLandingController : Controller
                 return Redirect(redirected);
             }
 
-            string currentPath = string.IsNullOrWhiteSpace(normalizedBoardPath)
-                ? "/participate/board"
-                : $"/participate/board/{normalizedBoardPath}";
             string mediaType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
             if (mediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
             {
                 string html = await response.Content.ReadAsStringAsync(timeoutCts.Token);
                 if (!response.IsSuccessStatusCode || HostedBoardHtmlLooksUnavailable(html))
                 {
+                    if (TryServeHostedBoardHtmlCache(cacheKey, allowStale: true, out cachedHtml) && cachedHtml is not null)
+                    {
+                        return cachedHtml;
+                    }
+
                     return embedded
                         ? BuildHostedBoardEmbedFallbackResult(
                             "Participate",
@@ -2572,9 +2595,8 @@ public sealed class PublicLandingController : Controller
                     failureSecondaryLabel: "Private support",
                     failureReturnHref: fallbackPath,
                     failureReturnLabel: "Retry");
-                Response.Headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=120";
-                Response.Headers["Vary"] = "Accept-Encoding";
-                return Content(rewritten, "text/html; charset=utf-8");
+                StoreHostedBoardHtmlCache(cacheKey, rewritten);
+                return BuildHostedBoardHtmlContent(rewritten, "miss");
             }
 
             byte[] bytes = await response.Content.ReadAsByteArrayAsync(timeoutCts.Token);
@@ -2584,6 +2606,14 @@ public sealed class PublicLandingController : Controller
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "Participate board proxy could not reach upstream board.");
+            string normalizedCachePath = NormalizeParticipateBoardPath(boardPath);
+            string cachePath = string.IsNullOrWhiteSpace(normalizedCachePath) ? "/participate/board" : $"/participate/board/{normalizedCachePath}";
+            string staleCacheKey = BuildHostedBoardHtmlCacheKey("participate", localOrigin, localBaseHref, canonicalHref ?? cachePath, normalizedCachePath, embedded);
+            if (TryServeHostedBoardHtmlCache(staleCacheKey, allowStale: true, out ContentResult? staleHtml) && staleHtml is not null)
+            {
+                return staleHtml;
+            }
+
             return embedded
                 ? BuildHostedBoardEmbedFallbackResult(
                     "Participate",
@@ -2598,6 +2628,14 @@ public sealed class PublicLandingController : Controller
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(ex, "Participate board proxy timed out.");
+            string normalizedCachePath = NormalizeParticipateBoardPath(boardPath);
+            string cachePath = string.IsNullOrWhiteSpace(normalizedCachePath) ? "/participate/board" : $"/participate/board/{normalizedCachePath}";
+            string staleCacheKey = BuildHostedBoardHtmlCacheKey("participate", localOrigin, localBaseHref, canonicalHref ?? cachePath, normalizedCachePath, embedded);
+            if (TryServeHostedBoardHtmlCache(staleCacheKey, allowStale: true, out ContentResult? staleHtml) && staleHtml is not null)
+            {
+                return staleHtml;
+            }
+
             return embedded
                 ? BuildHostedBoardEmbedFallbackResult(
                     "Participate",
@@ -2810,6 +2848,58 @@ public sealed class PublicLandingController : Controller
         return $"{route}?embed=1";
     }
 
+    private ContentResult BuildHostedBoardHtmlContent(string html, string cacheStatus)
+    {
+        Response.Headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=120";
+        Response.Headers["Vary"] = "Accept-Encoding";
+        Response.Headers["X-Chummer-Hosted-Board-Cache"] = cacheStatus;
+        return Content(html, "text/html; charset=utf-8");
+    }
+
+    private bool TryServeHostedBoardHtmlCache(string cacheKey, bool allowStale, out ContentResult? cachedResult)
+    {
+        cachedResult = null;
+        if (!_hostedBoardHtmlCache.TryGetValue<HostedBoardHtmlCacheEntry>(cacheKey, out HostedBoardHtmlCacheEntry? entry)
+            || entry is null)
+        {
+            return false;
+        }
+
+        bool fresh = DateTimeOffset.UtcNow - entry.CachedAtUtc <= HostedBoardHtmlFreshFor;
+        if (!fresh && !allowStale)
+        {
+            return false;
+        }
+
+        cachedResult = BuildHostedBoardHtmlContent(entry.Html, fresh ? "hit" : "stale");
+        return true;
+    }
+
+    private void StoreHostedBoardHtmlCache(string cacheKey, string html)
+        => _hostedBoardHtmlCache.Set(
+            cacheKey,
+            new HostedBoardHtmlCacheEntry(html, DateTimeOffset.UtcNow),
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = HostedBoardHtmlRetainFor
+            });
+
+    private static string BuildHostedBoardHtmlCacheKey(
+        string surfaceId,
+        string localOrigin,
+        string localBaseHref,
+        string canonicalHref,
+        string relativePath,
+        bool embedded)
+        => string.Join(
+            '|',
+            surfaceId,
+            localOrigin,
+            localBaseHref,
+            canonicalHref,
+            relativePath,
+            embedded ? "embed" : "page");
+
     private bool IsEmbeddedHostedBoardRequest()
     {
         if (Request.Query.TryGetValue("embed", out var values))
@@ -2826,6 +2916,10 @@ public sealed class PublicLandingController : Controller
 
         return string.Equals(Request.Headers["Sec-Fetch-Dest"].ToString(), "iframe", StringComparison.OrdinalIgnoreCase);
     }
+
+    private sealed record HostedBoardHtmlCacheEntry(
+        string Html,
+        DateTimeOffset CachedAtUtc);
 
     private ContentResult BuildHostedBoardEmbedFallbackResult(
         string eyebrow,
@@ -7082,6 +7176,18 @@ document.addEventListener('DOMContentLoaded', function () {
         Uri target = string.IsNullOrWhiteSpace(relativePath)
             ? AppendQueryString(upstream, Request.QueryString.Value)
             : AppendQueryString(ResolveHostedBoardContentUri(upstream, relativePath), Request.QueryString.Value);
+        string resolvedCanonicalHref = canonicalHref ?? "/roadmap";
+        string cacheKey = BuildHostedBoardHtmlCacheKey(
+            surfaceId: "roadmap",
+            localOrigin,
+            localBaseHref,
+            resolvedCanonicalHref,
+            relativePath,
+            embedded);
+        if (TryServeHostedBoardHtmlCache(cacheKey, allowStale: false, out ContentResult? cachedHtml) && cachedHtml is not null)
+        {
+            return cachedHtml;
+        }
 
         try
         {
@@ -7108,6 +7214,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 string html = await response.Content.ReadAsStringAsync(timeoutCts.Token);
                 if (!response.IsSuccessStatusCode || HostedBoardHtmlLooksUnavailable(html))
                 {
+                    if (TryServeHostedBoardHtmlCache(cacheKey, allowStale: true, out cachedHtml) && cachedHtml is not null)
+                    {
+                        return cachedHtml;
+                    }
+
                     return embedded
                         ? BuildHostedBoardEmbedFallbackResult(
                             "Roadmap",
@@ -7150,7 +7261,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     failureSecondaryLabel: "Participate",
                     failureReturnHref: fallbackPath,
                     failureReturnLabel: "Retry");
-                return Content(rewritten, "text/html; charset=utf-8");
+                StoreHostedBoardHtmlCache(cacheKey, rewritten);
+                return BuildHostedBoardHtmlContent(rewritten, "miss");
             }
 
             byte[] bytes = await response.Content.ReadAsByteArrayAsync(timeoutCts.Token);
@@ -7160,6 +7272,13 @@ document.addEventListener('DOMContentLoaded', function () {
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "Roadmap board proxy could not reach upstream roadmap.");
+            string normalizedCachePath = NormalizeParticipateBoardPath(boardPath);
+            string staleCacheKey = BuildHostedBoardHtmlCacheKey("roadmap", localOrigin, localBaseHref, resolvedCanonicalHref, normalizedCachePath, embedded);
+            if (TryServeHostedBoardHtmlCache(staleCacheKey, allowStale: true, out ContentResult? staleHtml) && staleHtml is not null)
+            {
+                return staleHtml;
+            }
+
             return embedded
                 ? BuildHostedBoardEmbedFallbackResult(
                     "Roadmap",
@@ -7174,6 +7293,13 @@ document.addEventListener('DOMContentLoaded', function () {
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(ex, "Roadmap board proxy timed out.");
+            string normalizedCachePath = NormalizeParticipateBoardPath(boardPath);
+            string staleCacheKey = BuildHostedBoardHtmlCacheKey("roadmap", localOrigin, localBaseHref, resolvedCanonicalHref, normalizedCachePath, embedded);
+            if (TryServeHostedBoardHtmlCache(staleCacheKey, allowStale: true, out ContentResult? staleHtml) && staleHtml is not null)
+            {
+                return staleHtml;
+            }
+
             return embedded
                 ? BuildHostedBoardEmbedFallbackResult(
                     "Roadmap",
