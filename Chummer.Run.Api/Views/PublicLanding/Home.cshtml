@@ -320,11 +320,11 @@
             @if (releasedOrNotifiedCases.Length > 0)
             {
                 var supportCase = releasedOrNotifiedCases[0];
-                <strong>@supportCase.StageLabel</strong>
-                <p>@supportCase.ClosureSummary</p>
+                <strong>@PublicText(supportCase.StageLabel)</strong>
+                <p>@PublicText(supportCase.ClosureSummary)</p>
                 @if (!string.IsNullOrWhiteSpace(supportCase.PrimaryActionHref))
                 {
-                    <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@supportCase.PrimaryActionLabel</a>
+                    <a class="inline-link" href="@ContextualPreviewHref(supportCase.PrimaryActionHref)">@PublicText(supportCase.PrimaryActionLabel)</a>
                 }
             }
             else

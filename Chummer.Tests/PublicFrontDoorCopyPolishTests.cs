@@ -850,7 +850,9 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "static string PublicText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
             "static string HomeText(string? value)",
             "=> UndetectableHumanizerCopyAdapter.HumanizeHome(value);",
-            "@PublicText(accessSupportCases[0].Case.Title)",
+            "@PublicText(supportCase.StageLabel)",
+            "@PublicText(supportCase.ClosureSummary)",
+            "@PublicText(supportCase.PrimaryActionLabel)",
             "@PublicText(workspace.ChangePackets[0].Summary)",
             "PublicText(leadWorkspaceServerPlane!.Workspace.DeviceRoleSummary)",
             "HomeText(recentReceipts[0].ArtifactLabel)",
@@ -871,7 +873,9 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         foreach (string forbidden in new[]
         {
-            "@supportCase.Case.Title",
+            "@supportCase.StageLabel",
+            "@supportCase.ClosureSummary",
+            "@supportCase.PrimaryActionLabel",
             "@receipt.ArtifactLabel",
             "@workspace.ChangePackets[0].Summary",
             "@leadWorkspaceServerPlane.ChangePackets[0].Summary",
@@ -1415,8 +1419,8 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         Assert.DoesNotContain("handoff", visibleText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("callback", visibleText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("manual open", visibleText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Claiming only connects this copy to your account.", controller, StringComparison.Ordinal);
-        Assert.Contains("Keep this copy attached to your account.", controller, StringComparison.Ordinal);
+        Assert.Contains("Claim this copy when you want installs, support, and recovery together.", controller, StringComparison.Ordinal);
+        Assert.Contains("Email first. Google if you prefer.", controller, StringComparison.Ordinal);
     }
 
     private static readonly string[] ForbiddenVisibleMarkers =
