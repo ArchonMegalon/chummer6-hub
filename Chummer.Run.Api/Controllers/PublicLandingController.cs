@@ -8315,8 +8315,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 safety_note = world.SafetyNote,
                 map_note = world.MapNote
             };
-        object summaryModel = followsCurrentWorld
-            ? new
+        object summaryModel;
+        if (followsCurrentWorld)
+        {
+            summaryModel = new
             {
                 hot_district = hottestDistrict is null
                     ? "No district snapshot is available yet."
@@ -8325,13 +8327,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     ? "No district movement snapshot is available yet."
                     : $"{mostMovedDistrict.Name} moved this turn by {(mostMovedDistrict.DeltaSinceLastTick >= 0 ? "+" : string.Empty)}{mostMovedDistrict.DeltaSinceLastTick}.",
                 follow_hint = (string?)null
-            }
-            : new
+            };
+        }
+        else
+        {
+            summaryModel = new
             {
                 hot_district = "Follow this world to reveal live heat tracking.",
                 hot_shift = "Follow this world to reveal live movement changes.",
                 follow_hint = "Enable or select this world in Black Ledger preferences."
             };
+        }
         object trackerModel = followsCurrentWorld
             ? new
             {
