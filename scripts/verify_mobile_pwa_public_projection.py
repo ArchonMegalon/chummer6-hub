@@ -57,7 +57,24 @@ def run(base_url: str) -> int:
     mobile_json_response.raise_for_status()
     ledger_stream_response = session.get(f"{base_url}/mobile/pwa/ledger.json", timeout=30)
     ledger_stream_response.raise_for_status()
-    receipt_index_response = session.get(f"{base_url}/play/continuity/receipts", timeout=30)
+    continuity_receipt_paths = (
+        "/play/continuity/history",
+        "/play/continuity/receipts",
+    )
+    receipt_index_response = None
+    receipt_index_route = None
+    for candidate_path in continuity_receipt_paths:
+        response = session.get(f"{base_url}{candidate_path}", timeout=30)
+        if response.status_code == 200:
+            receipt_index_response = response
+            receipt_index_route = candidate_path
+            break
+
+    if receipt_index_response is None:
+        raise RuntimeError(
+            f"continuity receipt route not available on {base_url}; expected one of "
+            f"{', '.join(continuity_receipt_paths)}"
+        )
     receipt_index_response.raise_for_status()
     manifest_response = session.get(f"{base_url}/manifest.json", timeout=30)
     manifest_response.raise_for_status()
@@ -88,7 +105,7 @@ def run(base_url: str) -> int:
     mobile_json_has_routes = (
         mobile_json.get("install_route") == "/downloads"
         and mobile_json.get("continuity_route") == "/play/continuity"
-        and mobile_json.get("receipt_index_route") == "/play/continuity/receipts"
+        and mobile_json.get("receipt_index_route") in continuity_receipt_paths
     )
     ledger_stream_mode = ledger_stream.get("mode")
     ledger_stream_status = ledger_stream.get("status")
@@ -162,10 +179,11 @@ def run(base_url: str) -> int:
             "role_routes_hold": role_routes_hold,
             "continuity_page_status_code": continuity_html.status_code,
         },
-        "continuity": {
+                "continuity": {
             "receipt_count": continuity_receipt_count,
             "has_boundary": continuity_boundary_present,
             "mobile_json_has_routes": mobile_json_has_routes,
+            "receipt_index_route": receipt_index_route,
         },
         "ledger_stream": {
             "status": ledger_stream_status,

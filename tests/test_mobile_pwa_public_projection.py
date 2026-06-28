@@ -67,7 +67,7 @@ class _FakeSession:
                 json_data={
                     "install_route": "/downloads",
                     "continuity_route": "/play/continuity",
-                    "receipt_index_route": "/play/continuity/receipts",
+                    "receipt_index_route": "/play/continuity/history",
                 },
             )
         if url.endswith("/mobile/pwa/ledger.json"):
@@ -83,7 +83,7 @@ class _FakeSession:
                     "updates_route": "/mobile/pwa/ledger.json",
                 },
             )
-        if url.endswith("/play/continuity/receipts"):
+        if url.endswith("/play/continuity/receipts") or url.endswith("/play/continuity/history"):
             return _FakeResponse(
                 url,
                 json_data={
