@@ -37,8 +37,17 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   expect(shortcutUrls.has('/play')).toBeTruthy();
   expect(shortcutUrls.has('/play/continuity')).toBeTruthy();
 
+  const pwaLedgerResponse = await request.get(`${baseUrl}/mobile/pwa/ledger.json`);
+  expect(pwaLedgerResponse.ok()).toBeTruthy();
+  const ledgerPayload = await pwaLedgerResponse.json();
+  expect(ledgerPayload.mode).toBe("mobile_pwa_living_world");
+  expect(["opt_in_required", "no_world_data", "live", "world_not_followed"]).toContain(ledgerPayload.status);
+
   await page.goto(`${baseUrl}/mobile`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Mobile and PWA entry' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Black Ledger live tracker' })).toBeVisible();
+  await expect(page.locator('[data-pwa-ledger-status]')).toBeVisible();
+  await expect(page.locator('[data-pwa-ledger-summary]')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Install this app' })).toBeVisible();
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', /manifest\.(json|webmanifest)/);
 

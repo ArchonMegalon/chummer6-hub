@@ -70,6 +70,69 @@
 
 <section class="workflow-band workflow-band--compact">
     <div class="workflow-band__lead">
+        <p class="eyebrow">Living world</p>
+        <h2 class="editorial-title">Black Ledger live tracker</h2>
+        <p class="editorial-copy">Enable updates in account preferences to keep heat, movement, and turn status visible in the same mobile shell.</p>
+    </div>
+    <div class="flagship-gateway-grid flagship-gateway-grid--compact" id="pwa-ledger-stream">
+        <article class="gateway-card">
+            <div class="gateway-card__header">
+                <span class="tag" data-pwa-ledger-status>Checking</span>
+                <h3>Board snapshot</h3>
+            </div>
+            <p data-pwa-ledger-summary>Waiting for live board stream data.</p>
+            <p class="muted-copy">
+                <span>World:</span>
+                <span data-pwa-ledger-world>Not yet available</span>
+            </p>
+            <p class="muted-copy">
+                <span>Turn:</span>
+                <span data-pwa-ledger-turn>—</span>
+            </p>
+            <p class="muted-copy">
+                <span>Hot district:</span>
+                <span data-pwa-ledger-hot-district>—</span>
+            </p>
+            <p class="muted-copy">
+                <span>Top movement:</span>
+                <span data-pwa-ledger-top-movement>—</span>
+            </p>
+            <div class="stacked-actions">
+                <a class="editorial-strip__action" data-pwa-ledger-map-route href="/ledger/map">Open ledger map</a>
+                <a class="editorial-strip__action" data-pwa-ledger-opt-in-route href="/account">Enable updates</a>
+            </div>
+            <div class="muted-copy" data-pwa-ledger-follow-hint></div>
+        </article>
+        <article class="gateway-card">
+            <div class="gateway-card__header">
+                <span class="tag">Top districts</span>
+                <h3>Current heat snapshot</h3>
+            </div>
+            <ul class="gateway-card__list" data-pwa-ledger-top-districts>
+                <li>No live district data yet.</li>
+            </ul>
+            <p class="muted-copy">This list updates from the living world stream when you allow table-safe updates.</p>
+        </article>
+        <article class="gateway-card">
+            <div class="gateway-card__header">
+                <span class="tag">Update stream</span>
+                <h3>Polling state</h3>
+            </div>
+            <p>
+                <span>Route:</span>
+                <span>/mobile/pwa/ledger.json</span>
+            </p>
+            <p class="muted-copy">Updates refresh every 30 seconds while the page is open.</p>
+            <p class="muted-copy">
+                <span>Last update:</span>
+                <span data-pwa-ledger-updated>never</span>
+            </p>
+        </article>
+    </div>
+</section>
+
+<section class="workflow-band workflow-band--compact">
+    <div class="workflow-band__lead">
         <p class="eyebrow">Capabilities</p>
         <h2 class="editorial-title">One mobile view, five clear promises.</h2>
     </div>
@@ -128,6 +191,17 @@
             var installState = document.querySelector("[data-pwa-install-state]");
             var onlineState = document.querySelector("[data-pwa-online-state]");
             var deferredPrompt = null;
+            var ledgerStatus = document.querySelector("[data-pwa-ledger-status]");
+            var ledgerSummary = document.querySelector("[data-pwa-ledger-summary]");
+            var ledgerWorld = document.querySelector("[data-pwa-ledger-world]");
+            var ledgerTurn = document.querySelector("[data-pwa-ledger-turn]");
+            var ledgerHotDistrict = document.querySelector("[data-pwa-ledger-hot-district]");
+            var ledgerTopMovement = document.querySelector("[data-pwa-ledger-top-movement]");
+            var ledgerTopDistricts = document.querySelector("[data-pwa-ledger-top-districts]");
+            var ledgerFollowHint = document.querySelector("[data-pwa-ledger-follow-hint]");
+            var ledgerMapRoute = document.querySelector("[data-pwa-ledger-map-route]");
+            var ledgerOptInRoute = document.querySelector("[data-pwa-ledger-opt-in-route]");
+            var ledgerUpdated = document.querySelector("[data-pwa-ledger-updated]");
 
             function setOnlineState() {
                 if (!onlineState) {
@@ -186,6 +260,134 @@
                 }
                 setInstallAvailability(false);
             });
+
+            function safeText(node, value) {
+                if (node) {
+                    node.textContent = value;
+                }
+            }
+
+            function updateLedgerStatus(status, label) {
+                safeText(ledgerStatus, label || status || "Unknown");
+            }
+
+            function updateLedgerTopDistricts(items) {
+                if (!ledgerTopDistricts) {
+                    return;
+                }
+
+                if (!items || items.length === 0) {
+                    ledgerTopDistricts.innerHTML = "<li>No live district data yet.</li>";
+                    return;
+                }
+
+                ledgerTopDistricts.innerHTML = "";
+                for (var i = 0; i < items.length; i += 1) {
+                    var district = items[i];
+                    var delta = typeof district.delta === "number" ? district.delta : 0;
+                    var formattedDelta = delta >= 0 ? "+" + delta : String(delta);
+                    var trend = district.trend || "";
+                    var listItem = document.createElement("li");
+                    listItem.textContent = district.name + " — heat " + district.heat + ", Δ " + formattedDelta + (trend ? " (" + trend + ")" : "");
+                    ledgerTopDistricts.appendChild(listItem);
+                }
+            }
+
+            function renderLedgerPayload(payload) {
+                if (!payload || typeof payload !== "object") {
+                    updateLedgerStatus("error", "Stream unavailable");
+                    safeText(ledgerSummary, "The board stream did not return a valid payload.");
+                    safeText(ledgerWorld, "Unavailable");
+                    safeText(ledgerTurn, "—");
+                    safeText(ledgerHotDistrict, "Unavailable");
+                    safeText(ledgerTopMovement, "Unavailable");
+                    safeText(ledgerUpdated, "Unavailable");
+                    safeText(ledgerFollowHint, "");
+                    return;
+                }
+
+                updateLedgerStatus(payload.status, payload.status_label);
+                var summaryText = typeof payload.summary === "string"
+                    ? payload.summary
+                    : (payload.summary && payload.summary.hot_district)
+                        ? payload.summary.hot_district
+                        : "No summary available.";
+                safeText(ledgerSummary, summaryText);
+                safeText(ledgerUpdated, payload.generated_at_utc ? new Date(payload.generated_at_utc).toLocaleString() : "not yet");
+
+                if (payload.world) {
+                    safeText(ledgerWorld, payload.world.world_name || payload.world.world_id || "No world loaded");
+                    safeText(ledgerTurn, "Turn " + (payload.world.world_turn || 0));
+                }
+                else {
+                    safeText(ledgerWorld, "No world loaded");
+                    safeText(ledgerTurn, "—");
+                }
+
+                if (payload.hot_district) {
+                    safeText(
+                        ledgerHotDistrict,
+                        payload.hot_district.name
+                            ? payload.hot_district.name + " (" + payload.hot_district.heat + ")"
+                            : String(payload.hot_district.heat || 0));
+                }
+                else if (payload.summary && payload.summary.hot_district) {
+                    safeText(ledgerHotDistrict, payload.summary.hot_district);
+                }
+                else {
+                    safeText(ledgerHotDistrict, "No hot district yet");
+                }
+
+                if (payload.move_district) {
+                    var moveDelta = typeof payload.move_district.delta === "number" ? payload.move_district.delta : 0;
+                    safeText(
+                        ledgerTopMovement,
+                        payload.move_district.name
+                            ? payload.move_district.name + " (" + (moveDelta >= 0 ? "+" + moveDelta : moveDelta) + ")"
+                            : "No movement data");
+                }
+                else if (payload.summary && payload.summary.hot_shift) {
+                    safeText(ledgerTopMovement, payload.summary.hot_shift);
+                }
+                else {
+                    safeText(ledgerTopMovement, "No movement data yet");
+                }
+
+                if (ledgerMapRoute && payload.tracker && payload.tracker.turn_map_route) {
+                    ledgerMapRoute.setAttribute("href", payload.tracker.turn_map_route);
+                }
+
+                if (ledgerOptInRoute && payload.opt_in_route) {
+                    ledgerOptInRoute.href = payload.opt_in_route;
+                }
+
+                safeText(ledgerFollowHint, payload.summary && payload.summary.follow_hint ? payload.summary.follow_hint : "");
+                updateLedgerTopDistricts(payload.top_districts || []);
+            }
+
+            async function refreshLedgerPayload() {
+                if (!ledgerStatus || !ledgerSummary) {
+                    return;
+                }
+
+                try {
+                    var response = await fetch("/mobile/pwa/ledger.json", { cache: "no-store", method: "GET" });
+                    if (!response.ok) {
+                        updateLedgerStatus("error", "Stream offline");
+                        safeText(ledgerSummary, "The stream endpoint returned " + response.status + ".");
+                        return;
+                    }
+
+                    renderLedgerPayload(await response.json());
+                } catch (error) {
+                    updateLedgerStatus("error", "Stream offline");
+                    safeText(ledgerSummary, "Could not reach /mobile/pwa/ledger.json while checking for updates.");
+                }
+            }
+
+            safeText(ledgerSummary, "Loading live board stream...");
+            refreshLedgerPayload();
+            window.setInterval(refreshLedgerPayload, 30000);
         })();
     </script>
 }

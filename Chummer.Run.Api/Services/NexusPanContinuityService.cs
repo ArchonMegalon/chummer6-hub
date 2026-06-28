@@ -160,11 +160,19 @@ public sealed class NexusPanContinuityService
             install_route = "/downloads",
             continuity_route = "/play/continuity",
             receipt_index_route = "/play/continuity/history",
+            living_world_updates_route = "/mobile/pwa/ledger.json",
             claimed_installations = summary.ActiveInstallationCount,
             active_grants = summary.ActiveGrantCount,
             pending_claims = summary.PendingClaimCount,
             pending_browser_callbacks = summary.PendingBrowserCallbackCount,
             platform_labels = summary.PlatformLabels,
+            living_world_data = new
+            {
+                mode = "public",
+                enabled_message = "Enable Black Ledger living world updates in your account for live heat tracking in the PWA.",
+                legal_note = "Public PWA world tracking remains an aggregate layer and does not expose private table state.",
+                update_route = "/mobile/pwa/ledger.json"
+            },
             boundaries = new[]
             {
                 "No private device history on the public route.",
