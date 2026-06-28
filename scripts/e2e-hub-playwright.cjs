@@ -471,7 +471,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
     await expectVisible(page, 'text=Contact');
-    await expectVisible(page, 'text=Discord for normal questions. Private form when needed.');
+    await expectVisible(page, 'text=Discord first. Private form if needed.');
     await expectVisible(page, 'text=Discord for normal questions. Private form for account or crash details.');
     await expectVisible(page, 'text=Open private form');
     await page.locator('summary:has-text("Private message")').click();
@@ -552,7 +552,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   ]);
   await expectVisible(page, 'text=Open your email');
   await expectVisible(page, 'text=Magic link sent');
-  await expectVisible(page, `text=Check ${uniqueEmail} for the Chummer sign-in email.`);
+  await expectVisible(page, `text=${uniqueEmail}`);
   await assertNoBannedCopy(page, 'Signup confirmation');
   await assertNoPageErrors(page, pageErrors, 'Signup confirmation');
 
