@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-28T22:03:41Z",
+  "generated_at_utc": "2026-06-28T23:48:02Z",
   "base_url": "https://chummer.run",
   "require_brilliant_directories_checkout": false,
   "status": "pass",
@@ -201,7 +201,7 @@
       "required_texts": [
         "What should Chummer do next?",
         "Public requests, clear bugs, useful ideas.",
-        "Requests",
+        "Current requests",
         "Board is live."
       ],
       "required_any_texts": [],
@@ -244,7 +244,7 @@
       "required_texts": [
         "What should Chummer do next?",
         "Public requests, clear bugs, useful ideas.",
-        "Requests",
+        "Current requests",
         "Board is live."
       ],
       "required_any_texts": [],
