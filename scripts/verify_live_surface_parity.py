@@ -23,34 +23,20 @@ def truthy_env(name: str) -> bool:
 
 
 def build_billing_surface(require_brilliant_directories_checkout: bool) -> dict[str, Any]:
-    if require_brilliant_directories_checkout:
-        return {
-            "path": "/account/billing",
-            "required_final_url_prefix": "/login",
-            "required_texts": [
-                "Open Chummer",
-                "Email first. Google if you prefer.",
-                "Continue with email",
-                "Continue with Google",
-            ],
-            "forbidden_texts": [
-                "Supporter is not open right now.",
-                "Account settings",
-                "Billing is unavailable",
-                "Membership",
-            ],
-        }
-
     return {
         "path": "/account/billing",
+        "required_final_url_prefix": "/login",
         "required_texts": [
-            "Membership",
-            "Supporter is not open right now. Free stays the same.",
+            "Open Chummer",
+            "Email first. Google if you prefer.",
             "Continue with email",
+            "Continue with Google",
         ],
         "forbidden_texts": [
-            "Manage supporter",
             "Account settings",
+            "Supporter is not open right now.",
+            "Billing is unavailable",
+            "Membership",
         ],
     }
 

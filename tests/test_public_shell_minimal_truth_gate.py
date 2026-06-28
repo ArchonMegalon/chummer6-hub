@@ -214,6 +214,8 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         self.thread.join(timeout=5)
 
     def test_gate_passes_when_routes_stay_minimal_and_first_party(self) -> None:
+        _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = True
+
         payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
 
         self.assertEqual(payload["status"], "pass")
@@ -283,6 +285,7 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
 
     def test_gate_can_allow_local_participate_unavailable_fallback_explicitly(self) -> None:
         _PublicShellMinimalTruthHandler.PARTICIPATE_UNAVAILABLE = True
+        _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = True
 
         failed_payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
         passing_payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0, allow_participate_unavailable=True)

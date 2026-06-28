@@ -674,9 +674,34 @@ public sealed class BrilliantDirectoriesBillingTests
     }
 
     [Fact]
-    public async Task BillingPageWithoutAttachedUserRedirectsToEmailWhenConfigured()
+    public async Task BillingPageWithoutAttachedUserRedirectsToEmailBeforeRenderingBillingState()
     {
         BrilliantDirectoriesBillingService service = CreateService();
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+
+        IActionResult result = await controller.BillingPage();
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login?next=%2Faccount%2Fbilling", redirect.Url);
+    }
+
+    [Fact]
+    public async Task BillingPageWithoutAttachedUserRedirectsToEmailWhenProviderConfigurationIsMissing()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-bd-tests", Guid.NewGuid().ToString("N"));
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(root, "bd.json")
+            })
+            .Build();
+        BrilliantDirectoriesBillingService service = new(new BrilliantDirectoriesBillingStore(configuration), new MyFirstBookUsageStore(configuration), configuration);
         BrilliantDirectoriesBillingController controller = new(service)
         {
             ControllerContext = new ControllerContext

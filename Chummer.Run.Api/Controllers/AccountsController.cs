@@ -416,7 +416,7 @@ public sealed class AccountsController : Controller
             ? allowance.SupporterActive
                 ? "2 books each month. Same app."
                 : "1 book each month. Same app."
-            : "Supporter checkout is not open right now.";
+            : "Membership details unavailable right now.";
         string bookQuotaSummary = allowance is not null
             ? $"{allowance.WindowRemaining} of {allowance.WindowLimit} Origin Book{(allowance.WindowLimit == 1 ? string.Empty : "s")} left this {DescribeAllowanceWindowPeriod(allowance.WindowKind)}."
             : "Book limit is unavailable right now.";

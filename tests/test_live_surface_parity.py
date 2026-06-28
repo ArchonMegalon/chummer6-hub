@@ -24,7 +24,7 @@ def load_module():
 
 
 class _SurfaceHandler(BaseHTTPRequestHandler):
-    billing_mode = "unavailable"
+    billing_mode = "configured"
     roadmap_mode = "board"
 
     def do_GET(self):  # noqa: N802
@@ -74,11 +74,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/account/billing":
-            if self.billing_mode == "configured":
-                self.send_response(302)
-                self.send_header("Location", "/login?next=%2Faccount%2Fbilling")
-                self.end_headers()
-            else:
+            if self.billing_mode == "placeholder":
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.end_headers()
@@ -87,6 +83,10 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                     b"Membership Supporter is not open right now. Free stays the same. Continue with email"
                     b"</body></html>"
                 )
+            else:
+                self.send_response(302)
+                self.send_header("Location", "/login?next=%2Faccount%2Fbilling")
+                self.end_headers()
             return
 
         if self.path == "/partizipate":
@@ -191,7 +191,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         cls.thread.join(timeout=5)
 
     def setUp(self) -> None:
-        _SurfaceHandler.billing_mode = "unavailable"
+        _SurfaceHandler.billing_mode = "configured"
         _SurfaceHandler.roadmap_mode = "board"
 
     def test_verify_requires_public_participate_surfaces(self) -> None:
@@ -285,7 +285,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("<title>Participate · Chummer</title>", board_surface["required_html_texts"])
         self.assertIn("data-chummer-board-skin", board_surface["forbidden_html_texts"])
 
-    def test_verify_supports_configured_billing_surface_when_live_checkout_is_required(self) -> None:
+    def test_verify_supports_guest_billing_sign_in_handoff_when_live_checkout_is_required(self) -> None:
         module = load_module()
         _SurfaceHandler.billing_mode = "configured"
         with mock.patch.dict("os.environ", {"CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT": "1"}, clear=False):
@@ -300,7 +300,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
 
     def test_verify_rejects_placeholder_billing_surface_when_live_checkout_is_required(self) -> None:
         module = load_module()
-        _SurfaceHandler.billing_mode = "unavailable"
+        _SurfaceHandler.billing_mode = "placeholder"
         with mock.patch.dict("os.environ", {"CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT": "1"}, clear=False):
             payload = module.verify(self.base_url)
 

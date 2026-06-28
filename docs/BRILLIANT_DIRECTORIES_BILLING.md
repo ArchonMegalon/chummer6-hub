@@ -45,11 +45,14 @@ The sync secret is a Hub webhook secret, not a Brilliant Directories tenant cred
 
 ## Release gate
 
-The public page may stay online without provider configuration, but that state is only a placeholder handoff:
+The public route stays login-first whether the provider is configured or not:
 
 ```text
-Supporter checkout is not open yet.
+/account/billing
+-> /login?next=%2Faccount%2Fbilling
 ```
+
+The membership page remains available through `preview=true` and as a signed-in fallback when the provider is still unconfigured.
 
 A publish that claims live Brilliant Directories billing must run the public billing E2E with:
 
@@ -57,7 +60,7 @@ A publish that claims live Brilliant Directories billing must run the public bil
 CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT=1
 ```
 
-That gate fails if `/account/billing` still shows the placeholder copy. `verify_account_handoff_runtime_config.py`, `verify_live_surface_parity.py`, and `scripts/e2e-portal.cjs` all honor the same flag. Do not describe billing as live until `BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL`, `BRILLIANT_DIRECTORIES_MEMBER_PORTAL_URL` when available, and `BRILLIANT_DIRECTORIES_SYNC_SECRET` are configured in the public deployment environment.
+That gate fails if `/account/billing` leaks the placeholder copy to guests or if the signed-in handoff is still unavailable. `verify_account_handoff_runtime_config.py`, `verify_live_surface_parity.py`, and `scripts/e2e-portal.cjs` all honor the same posture. Do not describe billing as live until `BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL`, `BRILLIANT_DIRECTORIES_MEMBER_PORTAL_URL` when available, and `BRILLIANT_DIRECTORIES_SYNC_SECRET` are configured in the public deployment environment.
 
 ## Production boundary
 

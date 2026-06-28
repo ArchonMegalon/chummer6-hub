@@ -39,21 +39,13 @@ def truthy_env(name: str) -> bool:
 
 
 def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tuple[RouteContract, ...]:
-    billing_contract = (
-        RouteContract(
-            route="/account/billing",
-            expected_final_path="/login",
-            required_all=("Open Chummer", "Email first. Google if you prefer.", "Continue with email", "Continue with Google"),
-            forbidden=("Membership", "Supporter is not open right now."),
-            require_public_meta_urls=True,
-        )
-        if require_brilliant_directories_checkout
-        else RouteContract(
-            route="/account/billing",
-            required_all=("Membership",),
-            required_any=("1 book/month on Free. 2/month on Supporter.", "Supporter checkout is not open right now."),
-            require_public_meta_urls=True,
-        )
+    _ = require_brilliant_directories_checkout
+    billing_contract = RouteContract(
+        route="/account/billing",
+        expected_final_path="/login",
+        required_all=("Open Chummer", "Email first. Google if you prefer.", "Continue with email", "Continue with Google"),
+        forbidden=("Membership", "Supporter is not open right now."),
+        require_public_meta_urls=True,
     )
 
     return (

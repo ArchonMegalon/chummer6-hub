@@ -41,12 +41,8 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(payfunnelsProjection.status()).toBe(200);
   expect(payfunnelsCheckout.status()).toBe(302);
   expect(payfunnelsCheckout.headers()['location'] || '').toContain('payfunnels');
-  if (requireBrilliantDirectoriesCheckout) {
-    expect([302, 303, 307, 308]).toContain(brilliantDirectoriesPage.status());
-    expect(brilliantDirectoriesPage.headers()['location'] || '').toBe('/login?next=%2Faccount%2Fbilling');
-  } else {
-    expect(brilliantDirectoriesPage.status()).toBe(200);
-  }
+  expect([302, 303, 307, 308]).toContain(brilliantDirectoriesPage.status());
+  expect(brilliantDirectoriesPage.headers()['location'] || '').toBe('/login?next=%2Faccount%2Fbilling');
   expect(brilliantDirectoriesPreviewPage.status()).toBe(200);
   expect(brilliantDirectoriesPreviewPage.status()).not.toBe(500);
 

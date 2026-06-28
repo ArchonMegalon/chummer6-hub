@@ -5,7 +5,6 @@ const baseUrl = (process.env.CHUMMER_PORTAL_BASE_URL || 'http://127.0.0.1:8091')
 const publicHost = (process.env.CHUMMER_PORTAL_PUBLIC_HOST || '').trim();
 const forwardedProto = (process.env.CHUMMER_PORTAL_FORWARDED_PROTO || '').trim();
 const requireBlazor = /^(1|true|yes|on)$/i.test((process.env.CHUMMER_PORTAL_REQUIRE_BLAZOR || '').trim());
-const requireBrilliantDirectoriesCheckout = /^(1|true|yes|on)$/i.test((process.env.CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT || '').trim());
 const defaultHeaders = {};
 
 if (publicHost) {
@@ -43,17 +42,7 @@ function isBlazorFallback(text) {
   );
 }
 
-function isUnavailableBillingSurface(text) {
-  return (
-    text.includes('Membership')
-    && text.includes('Supporter is not open right now. Free stays the same.')
-    && text.includes('Continue with email')
-    && !text.includes('Manage supporter')
-    && !text.includes('Account settings')
-  );
-}
-
-function isConfiguredBillingSurface(text) {
+function isGuestBillingSurface(text) {
   return (
     text.includes('Open Chummer')
     && text.includes('Email first. Google if you prefer.')
@@ -141,8 +130,7 @@ const checks = [
   },
   {
     url: `${baseUrl}/account/billing`,
-    assert: text =>
-      requireBrilliantDirectoriesCheckout ? isConfiguredBillingSurface(text) : isUnavailableBillingSurface(text)
+    assert: text => isGuestBillingSurface(text)
   },
   {
     url: `${baseUrl}/participate`,

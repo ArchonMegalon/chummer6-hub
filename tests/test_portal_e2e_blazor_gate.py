@@ -14,7 +14,7 @@ SCRIPT = REPO_ROOT / "scripts" / "e2e-portal.cjs"
 
 class _PortalFixtureHandler(BaseHTTPRequestHandler):
     blazor_mode = "fallback"
-    billing_mode = "unavailable"
+    billing_mode = "configured"
 
     def do_GET(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
@@ -293,7 +293,7 @@ class PortalE2EBlazorGateTests(unittest.TestCase):
         self.server.server_close()
         self.thread.join(timeout=5)
 
-    def run_script(self, *, require_blazor: bool, blazor_mode: str, require_billing_checkout: bool = False, billing_mode: str = "unavailable") -> subprocess.CompletedProcess[str]:
+    def run_script(self, *, require_blazor: bool, blazor_mode: str, require_billing_checkout: bool = False, billing_mode: str = "configured") -> subprocess.CompletedProcess[str]:
         _PortalFixtureHandler.blazor_mode = blazor_mode
         _PortalFixtureHandler.billing_mode = billing_mode
         env = os.environ.copy()

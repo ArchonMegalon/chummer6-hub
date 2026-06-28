@@ -81,11 +81,8 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("text.includes('Discord')", text)
         self.assertIn("text.includes('Send support request')", text)
         self.assertIn("url: `${baseUrl}/account/billing`", text)
-        self.assertIn("const requireBrilliantDirectoriesCheckout =", text)
-        self.assertIn("process.env.CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT", text)
-        self.assertIn("function isUnavailableBillingSurface(text)", text)
-        self.assertIn("function isConfiguredBillingSurface(text)", text)
-        self.assertIn("requireBrilliantDirectoriesCheckout ? isConfiguredBillingSurface(text) : isUnavailableBillingSurface(text)", text)
+        self.assertIn("function isGuestBillingSurface(text)", text)
+        self.assertIn("assert: text => isGuestBillingSurface(text)", text)
 
     def test_portal_e2e_reports_delegated_blazor_without_blocking_required_routes(self) -> None:
         text = PORTAL_E2E_SCRIPT.read_text(encoding="utf-8")

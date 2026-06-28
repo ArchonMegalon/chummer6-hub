@@ -56,6 +56,11 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         string? resolvedUserId = TrimToNull(currentUser?.UserId);
         string? resolvedEmail = TrimToNull(currentUser?.Email);
 
+        if (!preview && currentUser is null)
+        {
+            return Redirect(BuildBillingLoginRedirect());
+        }
+
         try
         {
             var page = _billing.GetPage();
@@ -64,11 +69,6 @@ public sealed class BrilliantDirectoriesBillingController : Controller
                 : _originAuthoringAllowance.GetAllowance(resolvedUserId, resolvedEmail);
             if (!preview)
             {
-                if (currentUser is null)
-                {
-                    return Redirect(BuildBillingLoginRedirect());
-                }
-
                 string? handoffHref = ResolveBillingHandoffHref(page, quota, currentUser, resolvedUserId, resolvedEmail);
                 if (!string.IsNullOrWhiteSpace(handoffHref))
                 {
