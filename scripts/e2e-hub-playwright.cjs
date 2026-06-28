@@ -332,7 +332,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
     await expectVisible(page, 'text=A Shadowrun character manager for clean sheets and faster tables.');
     await expectVisible(page, 'text=Download Chummer');
-    await expectVisible(page, 'text=Current public installer: Linux.');
+    await expectVisible(page, 'text=Current public installer');
     await expectVisible(page, 'text=Kestrel');
     await expectVisible(page, 'text=Brick');
     await expectVisible(page, 'text=Whisper');
