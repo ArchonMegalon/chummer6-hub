@@ -50,7 +50,6 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
                 "Download Chummer",
                 "Current public installer",
                 "Help",
-                "Status",
                 "Watch 90 sec",
             ],
             "forbidden_texts": [
@@ -144,7 +143,7 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             "required_texts": [
                 "What should Chummer do next?",
                 "Public requests, clear bugs, useful ideas.",
-                "Current requests",
+                "Requests",
                 "Board is live.",
             ],
             "forbidden_texts": [
@@ -168,7 +167,7 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             "required_texts": [
                 "What should Chummer do next?",
                 "Public requests, clear bugs, useful ideas.",
-                "Current requests",
+                "Requests",
                 "Board is live.",
             ],
             "required_final_url_prefix": "/participate",

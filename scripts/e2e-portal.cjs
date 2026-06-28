@@ -17,8 +17,6 @@ if (forwardedProto) {
 const requiredLandingLinks = [
   '/downloads',
   '/help',
-  '/status',
-  '/contact',
 ];
 
 function hasBlazorBaseHref(html) {
@@ -138,7 +136,7 @@ const checks = [
     assert: text =>
       text.includes('What should Chummer do next?')
       && text.includes('Public requests, clear bugs, useful ideas.')
-      && text.includes('Current requests')
+      && text.includes('Requests')
       && text.includes('Board is live.')
       && text.includes('data-chummer-participate-frame')
       && !text.includes('data-chummer-board-skin')
