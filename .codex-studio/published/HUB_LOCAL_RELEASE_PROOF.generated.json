@@ -8,9 +8,9 @@
     "generated_at": "2026-06-27T20:04:25Z",
     "missing_coverage_keys": [],
     "desktop_client_missing": false,
-    "reason": "Flagship product readiness checks are clear.",
+    "reason": "Flagship product readiness proof is green.",
     "completion_audit_status": "pass",
-    "completion_audit_reason": "Flagship product readiness checks are clear.",
+    "completion_audit_reason": "Flagship product readiness proof is green.",
     "source_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
   },
   "publicTrustSurface": {
@@ -1638,6 +1638,6 @@
       ]
     }
   ],
-  "generated_at": "2026-06-28T22:35:56Z",
-  "generatedAt": "2026-06-28T22:35:56Z"
+  "generated_at": "2026-06-28T22:45:29Z",
+  "generatedAt": "2026-06-28T22:45:29Z"
 }

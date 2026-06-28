@@ -126,7 +126,6 @@ def _payload_is_fresh(payload: dict, *, max_age_seconds: int, max_future_skew_se
 def _release_readiness_reason(value: str) -> str:
     text = value.strip()
     replacements = {
-        "Flagship product readiness proof is green.": "Flagship product readiness checks are clear.",
         "flagship product readiness proof did not publish a desktop-client reason.": (
             "flagship product readiness checks did not publish a desktop-client reason."
         ),

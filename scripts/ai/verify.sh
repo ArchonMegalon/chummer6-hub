@@ -482,7 +482,6 @@ if not isinstance(block, dict):
 def release_readiness_reason(value):
     text = str(value or "").strip()
     replacements = {
-        "Flagship product readiness proof is green.": "Flagship product readiness checks are clear.",
         "flagship product readiness proof did not publish a desktop-client reason.": (
             "flagship product readiness checks did not publish a desktop-client reason."
         ),
