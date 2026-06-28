@@ -8255,10 +8255,9 @@ document.addEventListener('DOMContentLoaded', function () {
             .FirstOrDefault();
         bool followsCurrentWorld = followedWorlds is null
             || followedWorlds.Count == 0
-            || followedWorlds.Contains(world.WorldId, StringComparer.OrdinalIgnoreCase)
-            || followedWorlds.Contains(world.WorldId.Replace("-", "_"), StringComparer.OrdinalIgnoreCase)
-            || followedWorlds.Contains(world.WorldId.Replace("_", "-"), StringComparer.OrdinalIgnoreCase);
-        var topDistricts = world.Districts
+            || followedWorlds.Any(item => string.Equals(NormalizeMobilePwaWorldKey(item), NormalizeMobilePwaWorldKey(world.WorldId), StringComparison.OrdinalIgnoreCase));
+        var topDistricts = followsCurrentWorld
+            ? world.Districts
             .OrderByDescending(static district => district.Heat)
             .ThenByDescending(static district => district.DeltaSinceLastTick)
             .Take(3)
@@ -8270,8 +8269,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 influence = district.Influence,
                 trend = district.Trend
             })
-            .ToArray();
-        var continuityEvents = world.LastTick is null
+            .ToArray()
+            : Array.Empty<object>();
+        var continuityEvents = !followsCurrentWorld || world.LastTick is null
             ? Array.Empty<object>()
             : world.LastTick.Effects
                 .Select(effect => new
@@ -8296,13 +8296,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 generated_at_utc = world.LastTick.CreatedAtUtc,
                 effects_count = world.LastTick.Effects.Count
             };
-
-        return JsonSerializer.Serialize(new
-        {
-            mode = "mobile_pwa_living_world",
-            status = followsCurrentWorld ? "live" : "world_not_followed",
-            status_label = followsCurrentWorld ? "Live board snapshot" : "Followed world not active",
-            world = new
+        object worldModel = followsCurrentWorld
+            ? new
             {
                 world_id = world.WorldId,
                 world_name = world.PublicName,
@@ -8310,8 +8305,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 turn_headline = world.TurnHeadline,
                 safety_note = world.SafetyNote,
                 map_note = world.MapNote
-            },
-            summary = new
+            }
+            : new
+            {
+                world_id = world.WorldId,
+                world_name = world.PublicName,
+                world_turn = world.CurrentTurn,
+                turn_headline = "Follow this world to reveal the live turn headline.",
+                safety_note = world.SafetyNote,
+                map_note = world.MapNote
+            };
+        object summaryModel = followsCurrentWorld
+            ? new
             {
                 hot_district = hottestDistrict is null
                     ? "No district snapshot is available yet."
@@ -8319,13 +8324,44 @@ document.addEventListener('DOMContentLoaded', function () {
                 hot_shift = mostMovedDistrict is null
                     ? "No district movement snapshot is available yet."
                     : $"{mostMovedDistrict.Name} moved this turn by {(mostMovedDistrict.DeltaSinceLastTick >= 0 ? "+" : string.Empty)}{mostMovedDistrict.DeltaSinceLastTick}.",
-                follow_hint = followsCurrentWorld ? null : "Enable or select this world in Black Ledger preferences."
-            },
+                follow_hint = (string?)null
+            }
+            : new
+            {
+                hot_district = "Follow this world to reveal live heat tracking.",
+                hot_shift = "Follow this world to reveal live movement changes.",
+                follow_hint = "Enable or select this world in Black Ledger preferences."
+            };
+        object trackerModel = followsCurrentWorld
+            ? new
+            {
+                update_interval_seconds = 30,
+                turn_map_route = "/ledger/map",
+                turn_route = (string?)$"/ledger/turns/{world.CurrentTurn}",
+                newsreel_route = (string?)$"/ledger/turns/{world.CurrentTurn}/newsreel.json",
+                world_status = world.Status
+            }
+            : new
+            {
+                update_interval_seconds = 30,
+                turn_map_route = "/ledger/map",
+                turn_route = (string?)null,
+                newsreel_route = (string?)null,
+                world_status = world.Status
+            };
+
+        return JsonSerializer.Serialize(new
+        {
+            mode = "mobile_pwa_living_world",
+            status = followsCurrentWorld ? "live" : "world_not_followed",
+            status_label = followsCurrentWorld ? "Live board snapshot" : "Followed world not active",
+            world = worldModel,
+            summary = summaryModel,
             followed_worlds = followedWorlds is null
                 ? Array.Empty<string>()
                 : followedWorlds.ToArray(),
             top_districts = topDistricts,
-            hot_district = hottestDistrict is null
+            hot_district = !followsCurrentWorld || hottestDistrict is null
                 ? null
                 : new
                 {
@@ -8333,26 +8369,24 @@ document.addEventListener('DOMContentLoaded', function () {
                     heat = hottestDistrict.Heat,
                     delta = hottestDistrict.DeltaSinceLastTick
                 },
-            move_district = mostMovedDistrict is null
+            move_district = !followsCurrentWorld || mostMovedDistrict is null
                 ? null
                 : new
                 {
                     name = mostMovedDistrict.Name,
                     delta = mostMovedDistrict.DeltaSinceLastTick
                 },
-            tracker = new
-            {
-                update_interval_seconds = 30,
-                turn_map_route = "/ledger/map",
-                turn_route = $"/ledger/turns/{world.CurrentTurn}",
-                newsreel_route = $"/ledger/turns/{world.CurrentTurn}/newsreel.json",
-                world_status = world.Status
-            },
-            continuity,
+            tracker = trackerModel,
+            continuity = followsCurrentWorld ? continuity : null,
             updates_route = "/mobile/pwa/ledger.json",
             generated_at_utc = DateTimeOffset.UtcNow
         }, PublicJsonContentOptions);
     }
+
+    private static string NormalizeMobilePwaWorldKey(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Trim().Replace("_", "-", StringComparison.Ordinal).ToLowerInvariant();
 
     private async Task<NexusPanContinuityPageViewModel> BuildNexusPanContinuityPageModel(CancellationToken cancellationToken)
     {

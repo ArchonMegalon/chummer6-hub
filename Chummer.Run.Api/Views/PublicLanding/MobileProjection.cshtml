@@ -1,11 +1,15 @@
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @model MobileProjectionPageViewModel
 @{
     static string PublicMobileText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
+    var antiForgery = Antiforgery.GetAndStoreTokens(Context);
     ViewData["Title"] = PublicMobileText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-mobile-projection";
 }
+
+<input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken" />
 
 <section class="trust-page-hero trust-page-hero--compact">
     <div class="trust-page-hero__copy">
@@ -94,13 +98,20 @@
                 <span data-pwa-ledger-hot-district>—</span>
             </p>
             <p class="muted-copy">
+                <span>Heat meter:</span>
+                <span data-pwa-ledger-heat-score>—</span>
+            </p>
+            <meter min="0" max="100" low="35" high="70" optimum="0" value="0" data-pwa-ledger-heat-meter aria-label="Current hottest district heat"></meter>
+            <p class="muted-copy">
                 <span>Top movement:</span>
                 <span data-pwa-ledger-top-movement>—</span>
             </p>
             <div class="stacked-actions">
                 <a class="editorial-strip__action" data-pwa-ledger-map-route href="/ledger/map">Open ledger map</a>
                 <a class="editorial-strip__action" data-pwa-ledger-opt-in-route href="/account">Enable updates</a>
+                <button class="button-like button-like--secondary" type="button" data-pwa-ledger-follow-button hidden></button>
             </div>
+            <div class="muted-copy" data-pwa-ledger-follow-state>Sign in to opt in and follow a living world.</div>
             <div class="muted-copy" data-pwa-ledger-follow-hint></div>
         </article>
         <article class="gateway-card">
@@ -208,14 +219,19 @@
             var installState = document.querySelector("[data-pwa-install-state]");
             var onlineState = document.querySelector("[data-pwa-online-state]");
             var deferredPrompt = null;
+            var ui = window.ChummerUi;
             var ledgerStatus = document.querySelector("[data-pwa-ledger-status]");
             var ledgerSummary = document.querySelector("[data-pwa-ledger-summary]");
             var ledgerWorld = document.querySelector("[data-pwa-ledger-world]");
             var ledgerTurn = document.querySelector("[data-pwa-ledger-turn]");
             var ledgerHotDistrict = document.querySelector("[data-pwa-ledger-hot-district]");
+            var ledgerHeatScore = document.querySelector("[data-pwa-ledger-heat-score]");
+            var ledgerHeatMeter = document.querySelector("[data-pwa-ledger-heat-meter]");
             var ledgerTopMovement = document.querySelector("[data-pwa-ledger-top-movement]");
             var ledgerTopDistricts = document.querySelector("[data-pwa-ledger-top-districts]");
             var ledgerFollowHint = document.querySelector("[data-pwa-ledger-follow-hint]");
+            var ledgerFollowState = document.querySelector("[data-pwa-ledger-follow-state]");
+            var ledgerFollowButton = document.querySelector("[data-pwa-ledger-follow-button]");
             var ledgerMapRoute = document.querySelector("[data-pwa-ledger-map-route]");
             var ledgerOptInRoute = document.querySelector("[data-pwa-ledger-opt-in-route]");
             var ledgerUpdated = document.querySelector("[data-pwa-ledger-updated]");
@@ -224,6 +240,13 @@
             var ledgerContinuityTurn = document.querySelector("[data-pwa-continuity-turn]");
             var ledgerContinuitySummary = document.querySelector("[data-pwa-continuity-summary]");
             var ledgerContinuityEvents = document.querySelector("[data-pwa-continuity-events]");
+            var currentLedgerPayload = null;
+            var preferenceState = {
+                loaded: false,
+                authenticated: false,
+                optedIn: false,
+                followedWorlds: []
+            };
 
             function setOnlineState() {
                 if (!onlineState) {
@@ -293,6 +316,163 @@
                 safeText(ledgerStatus, label || status || "Unknown");
             }
 
+            function normalizeWorldId(value) {
+                return typeof value === "string"
+                    ? value.trim().toLowerCase().replace(/_/g, "-")
+                    : "";
+            }
+
+            function getCurrentWorldId(payload) {
+                return payload && payload.world
+                    ? normalizeWorldId(payload.world.world_id)
+                    : "";
+            }
+
+            function getCurrentWorldName(payload) {
+                return payload && payload.world && payload.world.world_name
+                    ? payload.world.world_name
+                    : "this world";
+            }
+
+            function isCurrentWorldFollowed(payload, followedWorlds) {
+                var worldId = getCurrentWorldId(payload);
+                if (!worldId) {
+                    return false;
+                }
+
+                if (!followedWorlds || followedWorlds.length === 0) {
+                    return true;
+                }
+
+                for (var i = 0; i < followedWorlds.length; i += 1) {
+                    if (normalizeWorldId(followedWorlds[i]) === worldId) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            function setFollowButton(label, action, tone) {
+                if (!ledgerFollowButton) {
+                    return;
+                }
+
+                ledgerFollowButton.hidden = false;
+                ledgerFollowButton.dataset.action = action || "";
+                ledgerFollowButton.className = "button-like button-like--" + (tone || "secondary");
+                ledgerFollowButton.textContent = label;
+                ledgerFollowButton.disabled = false;
+            }
+
+            function hideFollowButton() {
+                if (!ledgerFollowButton) {
+                    return;
+                }
+
+                ledgerFollowButton.hidden = true;
+                ledgerFollowButton.dataset.action = "";
+                ledgerFollowButton.disabled = false;
+            }
+
+            async function loadPreferenceState() {
+                if (!ui || preferenceState.loaded) {
+                    return preferenceState;
+                }
+
+                try {
+                    var payload = await ui.requestJson("/api/v1/accounts/me/preferences");
+                    preferenceState = {
+                        loaded: true,
+                        authenticated: true,
+                        optedIn: !!payload.blackLedgerNewsEmail,
+                        followedWorlds: Array.isArray(payload.blackLedgerWorldsFollowed) ? payload.blackLedgerWorldsFollowed : []
+                    };
+                } catch (error) {
+                    var statusCode = error && error.payload && typeof error.payload.status === "number"
+                        ? error.payload.status
+                        : 0;
+                    if (statusCode === 401 || statusCode === 403) {
+                        preferenceState = {
+                            loaded: true,
+                            authenticated: false,
+                            optedIn: false,
+                            followedWorlds: []
+                        };
+                    } else {
+                        preferenceState = {
+                            loaded: true,
+                            authenticated: false,
+                            optedIn: false,
+                            followedWorlds: []
+                        };
+                    }
+                }
+
+                return preferenceState;
+            }
+
+            function renderFollowState(payload) {
+                if (!ledgerFollowState) {
+                    return;
+                }
+
+                if (!payload || !payload.world) {
+                    safeText(ledgerFollowState, "No active living world is available yet.");
+                    hideFollowButton();
+                    return;
+                }
+
+                var worldName = getCurrentWorldName(payload);
+                var followedWorlds = Array.isArray(preferenceState.followedWorlds) ? preferenceState.followedWorlds : [];
+                var currentWorldFollowed = isCurrentWorldFollowed(payload, followedWorlds);
+
+                if (!preferenceState.authenticated) {
+                    safeText(ledgerFollowState, "Sign in to opt in and decide whether " + worldName + " can send mobile heat updates.");
+                    hideFollowButton();
+                    return;
+                }
+
+                if (!preferenceState.optedIn) {
+                    safeText(ledgerFollowState, "Enable the stream to receive live heat and continuity for " + worldName + ".");
+                    setFollowButton("Enable stream and follow this world", "enable_and_follow", "primary");
+                    return;
+                }
+
+                if (followedWorlds.length === 0) {
+                    safeText(ledgerFollowState, worldName + " is live because this account currently accepts available Black Ledger worlds.");
+                    setFollowButton("Limit stream to this world", "pin_current_world", "secondary");
+                    return;
+                }
+
+                if (!currentWorldFollowed || payload.status === "world_not_followed") {
+                    safeText(ledgerFollowState, "This account is opted in, but " + worldName + " is not on the followed-world list yet.");
+                    setFollowButton("Follow current world", "follow_current_world", "primary");
+                    return;
+                }
+
+                safeText(ledgerFollowState, "Following " + worldName + " for live heat and continuity updates.");
+                hideFollowButton();
+            }
+
+            function updateHeatMeter(district, status) {
+                if (ledgerHeatMeter) {
+                    ledgerHeatMeter.value = 0;
+                }
+
+                if (!district || typeof district.heat !== "number") {
+                    safeText(ledgerHeatScore, status === "world_not_followed" ? "Follow required" : "—");
+                    return;
+                }
+
+                var heatValue = Math.max(0, Math.min(100, district.heat));
+                if (ledgerHeatMeter) {
+                    ledgerHeatMeter.value = heatValue;
+                }
+
+                safeText(ledgerHeatScore, heatValue + " / 100");
+            }
+
             function updateLedgerTopDistricts(items) {
                 if (!ledgerTopDistricts) {
                     return;
@@ -341,20 +521,25 @@
 
             function renderLedgerPayload(payload) {
                 if (!payload || typeof payload !== "object") {
+                    currentLedgerPayload = null;
                     updateLedgerStatus("error", "Stream unavailable");
                     safeText(ledgerSummary, "The board stream did not return a valid payload.");
                     safeText(ledgerWorld, "Unavailable");
                     safeText(ledgerTurn, "—");
                     safeText(ledgerHotDistrict, "Unavailable");
+                    safeText(ledgerHeatScore, "Unavailable");
                     safeText(ledgerTopMovement, "Unavailable");
                     safeText(ledgerUpdated, "Unavailable");
                     safeText(ledgerFollowHint, "");
                     safeText(ledgerContinuityTurn, "Unavailable");
                     safeText(ledgerContinuitySummary, "Continuity snapshot is not available in this lane.");
+                    updateHeatMeter(null, "error");
                     updateContinuityEvents([]);
+                    renderFollowState(null);
                     return;
                 }
 
+                currentLedgerPayload = payload;
                 updateLedgerStatus(payload.status, payload.status_label);
                 var summaryText = typeof payload.summary === "string"
                     ? payload.summary
@@ -379,12 +564,15 @@
                         payload.hot_district.name
                             ? payload.hot_district.name + " (" + payload.hot_district.heat + ")"
                             : String(payload.hot_district.heat || 0));
+                    updateHeatMeter(payload.hot_district, payload.status);
                 }
                 else if (payload.summary && payload.summary.hot_district) {
                     safeText(ledgerHotDistrict, payload.summary.hot_district);
+                    updateHeatMeter(null, payload.status);
                 }
                 else {
-                    safeText(ledgerHotDistrict, "No hot district yet");
+                    safeText(ledgerHotDistrict, payload.status === "world_not_followed" ? "Follow required" : "No hot district yet");
+                    updateHeatMeter(null, payload.status);
                 }
 
                 if (payload.move_district) {
@@ -399,7 +587,7 @@
                     safeText(ledgerTopMovement, payload.summary.hot_shift);
                 }
                 else {
-                    safeText(ledgerTopMovement, "No movement data yet");
+                    safeText(ledgerTopMovement, payload.status === "world_not_followed" ? "Follow required" : "No movement data yet");
                 }
 
                 if (ledgerMapRoute && payload.tracker && payload.tracker.turn_map_route) {
@@ -441,13 +629,18 @@
                     }
                 }
                 else {
-                    safeText(ledgerContinuityTurn, "Unavailable");
-                    safeText(ledgerContinuitySummary, "Continuity snapshot is not available in this lane.");
+                    safeText(ledgerContinuityTurn, payload.status === "world_not_followed" ? "Follow required" : "Unavailable");
+                    safeText(
+                        ledgerContinuitySummary,
+                        payload.status === "world_not_followed"
+                            ? ((payload.summary && payload.summary.follow_hint) || "Follow this world to unlock live continuity.")
+                            : "Continuity snapshot is not available in this lane.");
                     updateContinuityEvents([]);
                 }
 
                 safeText(ledgerFollowHint, payload.summary && payload.summary.follow_hint ? payload.summary.follow_hint : "");
                 updateLedgerTopDistricts(payload.top_districts || []);
+                renderFollowState(payload);
             }
 
             async function refreshLedgerPayload() {
@@ -470,7 +663,89 @@
                 }
             }
 
+            async function saveFollowPreference(action) {
+                if (!ui || !currentLedgerPayload || !currentLedgerPayload.world) {
+                    return;
+                }
+
+                var worldId = currentLedgerPayload.world.world_id;
+                if (!worldId) {
+                    return;
+                }
+
+                var followedWorlds = Array.isArray(preferenceState.followedWorlds)
+                    ? preferenceState.followedWorlds.slice()
+                    : [];
+                var normalizedWorldId = normalizeWorldId(worldId);
+                var nextOptIn = preferenceState.optedIn;
+                var nextFollowedWorlds;
+
+                if (action === "enable_and_follow") {
+                    nextOptIn = true;
+                    nextFollowedWorlds = followedWorlds.filter(function (value) { return normalizeWorldId(value) !== normalizedWorldId; });
+                    nextFollowedWorlds.push(worldId);
+                } else if (action === "pin_current_world") {
+                    nextOptIn = true;
+                    nextFollowedWorlds = [worldId];
+                } else if (action === "follow_current_world") {
+                    nextOptIn = true;
+                    nextFollowedWorlds = followedWorlds.slice();
+                    if (!nextFollowedWorlds.some(function (value) { return normalizeWorldId(value) === normalizedWorldId; })) {
+                        nextFollowedWorlds.push(worldId);
+                    }
+                } else {
+                    return;
+                }
+
+                if (!ledgerFollowButton) {
+                    return;
+                }
+
+                try {
+                    if (ledgerFollowState) {
+                        safeText(ledgerFollowState, "Updating Black Ledger mobile preferences...");
+                    }
+
+                    if (typeof ui.setButtonBusy === "function") {
+                        ui.setButtonBusy(ledgerFollowButton, true, "Saving...");
+                    }
+
+                    var updated = await ui.requestJson("/api/v1/accounts/me/preferences", {
+                        method: "POST",
+                        json: {
+                            blackLedgerNewsEmail: nextOptIn,
+                            blackLedgerWorldsFollowed: nextFollowedWorlds
+                        }
+                    });
+
+                    preferenceState = {
+                        loaded: true,
+                        authenticated: true,
+                        optedIn: !!updated.blackLedgerNewsEmail,
+                        followedWorlds: Array.isArray(updated.blackLedgerWorldsFollowed) ? updated.blackLedgerWorldsFollowed : []
+                    };
+                    renderFollowState(currentLedgerPayload);
+                    await refreshLedgerPayload();
+                } catch (error) {
+                    safeText(
+                        ledgerFollowState,
+                        ui.describeError(error, "Black Ledger preferences could not be updated right now."));
+                } finally {
+                    if (typeof ui.setButtonBusy === "function") {
+                        ui.setButtonBusy(ledgerFollowButton, false, "Saving...");
+                    }
+                }
+            }
+
             safeText(ledgerSummary, "Loading live board stream...");
+            loadPreferenceState().then(function () {
+                renderFollowState(currentLedgerPayload);
+            });
+            if (ledgerFollowButton) {
+                ledgerFollowButton.addEventListener("click", function () {
+                    saveFollowPreference(ledgerFollowButton.dataset.action || "");
+                });
+            }
             refreshLedgerPayload();
             window.setInterval(refreshLedgerPayload, 30000);
         })();

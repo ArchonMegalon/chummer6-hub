@@ -45,13 +45,23 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   expect(ledgerPayload.updates_route).toBe("/mobile/pwa/ledger.json");
   if (ledgerPayload.status === "opt_in_required") {
     expect(ledgerPayload.opt_in_route).toBe("/account");
-  } else if (ledgerPayload.status === "live" || ledgerPayload.status === "world_not_followed") {
+  } else if (ledgerPayload.status === "live") {
     expect(ledgerPayload.world).toBeTruthy();
     expect(Array.isArray(ledgerPayload.top_districts)).toBeTruthy();
     expect(typeof ledgerPayload.continuity).toBe("object");
     expect(typeof ledgerPayload.continuity?.turn).toBe("number");
     expect(Array.isArray(ledgerPayload.continuity?.events)).toBeTruthy();
     expect(ledgerPayload.tracker).toEqual(expect.objectContaining({ turn_route: expect.any(String), newsreel_route: expect.any(String) }));
+  } else if (ledgerPayload.status === "world_not_followed") {
+    expect(ledgerPayload.world).toBeTruthy();
+    expect(ledgerPayload.world?.turn_headline).toBe("Follow this world to reveal the live turn headline.");
+    expect(Array.isArray(ledgerPayload.top_districts)).toBeTruthy();
+    expect(ledgerPayload.top_districts).toHaveLength(0);
+    expect(ledgerPayload.hot_district).toBeNull();
+    expect(ledgerPayload.move_district).toBeNull();
+    expect(ledgerPayload.continuity).toBeNull();
+    expect(ledgerPayload.summary?.follow_hint).toContain("preferences");
+    expect(ledgerPayload.tracker).toEqual(expect.objectContaining({ turn_route: null, newsreel_route: null }));
   } else {
     expect(ledgerPayload.status).toBe("no_world_data");
   }
@@ -61,6 +71,7 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   await expect(page.getByRole('heading', { name: 'Black Ledger live tracker' })).toBeVisible();
   await expect(page.locator('[data-pwa-ledger-status]')).toBeVisible();
   await expect(page.locator('[data-pwa-ledger-summary]')).toBeVisible();
+  await expect(page.locator('[data-pwa-ledger-follow-state]')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Install this app' })).toBeVisible();
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', /manifest\.(json|webmanifest)/);
 

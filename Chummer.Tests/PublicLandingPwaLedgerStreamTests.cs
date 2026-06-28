@@ -65,6 +65,14 @@ public sealed class PublicLandingPwaLedgerStreamTests
         Assert.Equal("world_not_followed", payload.GetProperty("status").GetString());
         Assert.Contains("select this world", payload.GetProperty("summary").GetProperty("follow_hint").GetString() ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.True(payload.GetProperty("followed_worlds").GetArrayLength() > 0);
+        Assert.Equal(0, payload.GetProperty("top_districts").GetArrayLength());
+        Assert.Equal(JsonValueKind.Null, payload.GetProperty("hot_district").ValueKind);
+        Assert.Equal(JsonValueKind.Null, payload.GetProperty("move_district").ValueKind);
+        Assert.Equal(JsonValueKind.Null, payload.GetProperty("continuity").ValueKind);
+        Assert.Equal("Follow this world to reveal the live turn headline.", payload.GetProperty("world").GetProperty("turn_headline").GetString());
+        JsonElement tracker = payload.GetProperty("tracker");
+        Assert.Equal(JsonValueKind.Null, tracker.GetProperty("turn_route").ValueKind);
+        Assert.Equal(JsonValueKind.Null, tracker.GetProperty("newsreel_route").ValueKind);
     }
 
     private sealed class Fixture : IDisposable
