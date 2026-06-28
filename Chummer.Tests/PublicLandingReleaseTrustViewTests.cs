@@ -813,7 +813,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("source of truth", controller, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("generated and owned", controller, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Download PDF", controller, StringComparison.Ordinal);
-        Assert.Contains("heading: \"Quickstart reader view\"", controller, StringComparison.Ordinal);
+        Assert.Contains("title: $\"{document.Title} reader view\"", controller, StringComparison.Ordinal);
+        Assert.Contains("heading: $\"{document.Title} reader view\"", controller, StringComparison.Ordinal);
+        Assert.Contains("new TrustPageActionViewModel($\"Back to {document.Title}\"", controller, StringComparison.Ordinal);
     }
 
     [Fact]

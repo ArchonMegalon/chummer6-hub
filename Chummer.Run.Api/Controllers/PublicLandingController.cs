@@ -12539,38 +12539,40 @@ Boundary:
     private async Task<TrustPageViewModel> BuildDocumentPortalEmbedBoundaryPageModel(ChummerDocument document, CancellationToken cancellationToken)
         => await BuildHorizonPreviewPageModel(
             pageId: "document-portal-embed-boundary",
-            title: "Quickstart reader view",
-            description: "Viewer fallback for the Chummer6 Quickstart Guide.",
+            title: $"{document.Title} reader view",
+            description: $"Viewer fallback for {document.Title}.",
             currentPath: $"/docs/embed/{document.Slug}",
             eyebrow: "Reader view",
-            heading: "Quickstart reader view",
-            intro: "Open the quickstart in the embedded reader. The Chummer page and PDF fallback stay available even when the reader is unavailable.",
+            heading: $"{document.Title} reader view",
+            intro: string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
+                ? "Open the approved story packet in the embedded reader. The Chummer page and PDF fallback stay available even when the reader is unavailable."
+                : "Open the quickstart in the embedded reader. The Chummer page and PDF fallback stay available even when the reader is unavailable.",
             sections:
             [
                 new TrustPageSectionViewModel(
                     "embed_boundary_contract",
                     "Contract",
                     "What the reader may do",
-                    "The reader may present the guide, but the Chummer page and PDF remain the reliable fallback.",
-                    [
-                        "Presentation only",
-                        "Analytics are engagement-only",
-                        "Chummer page remains primary"
-                    ]),
+                    string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
+                        ? "The reader may present the approved story packet, but the Chummer page and PDF remain the reliable fallback."
+                        : "The reader may present the guide, but the Chummer page and PDF remain the reliable fallback.",
+                    string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
+                        ? ["Presentation only", "Approved story packet only", "Chummer page remains primary"]
+                        : ["Presentation only", "Analytics are engagement-only", "Chummer page remains primary"]),
                 new TrustPageSectionViewModel(
                     "embed_boundary_current_state",
                     "Fallback",
                     "Why the fallback stays visible",
-                    "The reader remains optional. Chummer keeps the page and PDF available even when the embedded view is unavailable.",
-                    [
-                        "Chummer route remains current",
-                        "Fallback PDF remains current",
-                        "Reader view remains optional"
-                    ])
+                    string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
+                        ? "The reader remains optional. Chummer keeps the story page and PDF available even when the embedded view is unavailable."
+                        : "The reader remains optional. Chummer keeps the page and PDF available even when the embedded view is unavailable.",
+                    string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
+                        ? ["Story page remains current", "Fallback PDF remains current", "Reader view remains optional"]
+                        : ["Chummer route remains current", "Fallback PDF remains current", "Reader view remains optional"])
             ],
             actions:
             [
-                new TrustPageActionViewModel("Back to Quickstart Guide", $"/docs/{document.Slug}", "primary"),
+                new TrustPageActionViewModel($"Back to {document.Title}", $"/docs/{document.Slug}", "primary"),
                 new TrustPageActionViewModel("Back to Document Portal", "/docs", "secondary"),
                 new TrustPageActionViewModel("Download PDF", $"/docs/{document.Slug}/download.pdf", "ghost")
             ],

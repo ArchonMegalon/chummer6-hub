@@ -29,6 +29,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
 
   const originPage = await request.get(`${baseUrl}/origin-dossier`);
   const originStoryPage = await request.get(`${baseUrl}/docs/origin-dossier-the-name-she-chose`);
+  const originStoryEmbedPage = await request.get(`${baseUrl}/docs/embed/origin-dossier-the-name-she-chose`);
   const originReceipt = await request.get(`${baseUrl}/docs/origin-dossier-the-name-she-chose/receipts/publication.json`);
   const originPdf = await request.get(`${baseUrl}/docs/origin-dossier-the-name-she-chose/download.pdf`);
   const originBookStudioPage = await request.get(`${baseUrl}/docs/origin-book-studio`);
@@ -48,6 +49,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
 
   expect(originPage.status()).toBe(200);
   expect(originStoryPage.status()).toBe(200);
+  expect(originStoryEmbedPage.status()).toBe(200);
   expect(originReceipt.status()).toBe(200);
   expect(originPdf.status()).toBe(200);
   expect(originPdf.headers()['content-type']).toContain('application/pdf');
@@ -113,6 +115,18 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   await expect(storyPage.getByRole('link', { name: 'Download PDF' })).toBeVisible();
   await storyPage.close();
 
+  const storyEmbedPage = await openPublicPage(browser, '/docs/embed/origin-dossier-the-name-she-chose');
+  await expect(storyEmbedPage.getByRole('heading', { name: 'Origin Dossier: The Name She Chose reader view' })).toBeVisible();
+  await expect(storyEmbedPage.locator('body')).toContainText('approved story packet');
+  await expect(storyEmbedPage.getByRole('link', { name: 'Back to Origin Dossier: The Name She Chose' })).toBeVisible();
+  const embedSections = storyEmbedPage.locator('.trust-page-section');
+  await expect(embedSections).toHaveCount(2);
+  const firstSectionBox = await embedSections.nth(0).boundingBox();
+  const secondSectionBox = await embedSections.nth(1).boundingBox();
+  expect(firstSectionBox?.width ?? 0).toBeGreaterThan(320);
+  expect(secondSectionBox?.width ?? 0).toBeGreaterThan(320);
+  await storyEmbedPage.close();
+
   const bookStudioPage = await openPublicPage(browser, '/docs/origin-book-studio');
   await expect(bookStudioPage.getByRole('heading', { name: 'Origin Book Studio' })).toBeVisible();
   await expect(bookStudioPage.locator('body')).toContainText('Chummer route published');
@@ -132,6 +146,7 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
     brilliant_directories_preview_status: brilliantDirectoriesPreviewPage.status(),
     origin_page_status: originPage.status(),
     origin_story_page_status: originStoryPage.status(),
+    origin_story_embed_page_status: originStoryEmbedPage.status(),
     origin_receipt_status: originReceipt.status(),
     origin_pdf_status: originPdf.status(),
     origin_book_studio_page_status: originBookStudioPage.status(),

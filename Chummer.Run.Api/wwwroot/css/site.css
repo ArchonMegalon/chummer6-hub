@@ -2467,16 +2467,13 @@ td {
 .trust-page-sections {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(18rem, 1fr));
 }
 
 .trust-page-layout {
   width: min(var(--site-max), calc(100% - 2rem));
   margin-inline: auto;
   margin-top: 1.25rem;
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: 220px minmax(0, 1fr);
 }
 
 .trust-page-section__list {
