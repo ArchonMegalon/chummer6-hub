@@ -441,7 +441,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await page.goto(`${baseUrl}/home/access`, { waitUntil: 'domcontentloaded' });
-  assertLoginRedirect(page, '/home/access', 'Signed-out /home/access');
+  assertLoginRedirect(page, '/account/access', 'Signed-out /home/access');
   await assertNoPageErrors(page, pageErrors, 'Signed-out /home/access redirect');
 
   await page.goto(`${baseUrl}/account/support`, { waitUntil: 'domcontentloaded' });
