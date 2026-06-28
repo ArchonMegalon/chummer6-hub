@@ -1,6 +1,6 @@
 @model NowPageViewModel
 @{
-    ViewData["Title"] = "What Works Today";
+    ViewData["Title"] = "Current release";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-now surface-minimal";
     var sourceAlias = Context?.Request?.Query["source"].ToString() ?? string.Empty;
@@ -32,7 +32,7 @@
         .ToArray();
     var signedInBenefits = Model.SignedInPreview.ToArray();
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
-    var verifiedLabel = Model.ReleaseTruth.VerifiedDateLabel;
+    var currentReleaseLabel = Model.ReleaseTruth.VerifiedDateLabel;
 
     static string PublicNowText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
@@ -53,8 +53,8 @@
 
 <section class="minimal-page-hero route-anchor-target" id="public-shipped-closeout">
     <div>
-        <p class="eyebrow">What works today</p>
-        <h1>What works today</h1>
+        <p class="eyebrow">Current release</p>
+        <h1>Current release</h1>
         <p>Use this page when you want the short answer before you install.</p>
         @if (fromChangelogAlias)
         {
@@ -70,8 +70,8 @@
         }
     </div>
     <div class="minimal-status-pill">
-        <span>Updated</span>
-        <strong>@verifiedLabel</strong>
+        <span>Current app</span>
+        <strong>@currentReleaseLabel</strong>
     </div>
 </section>
 
