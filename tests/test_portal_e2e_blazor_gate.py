@@ -109,7 +109,7 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 """
                 <html><body>
                 <h1>Contact</h1>
-                <p>Discord for normal questions. Private form when needed.</p>
+                <p>Discord first. Private form if needed.</p>
                 <p>Discord for normal questions. Private form for account or crash details.</p>
                 <a href="https://discord.gg/chummer">Open Discord</a>
                 <a href="/contact#support-intake">Open private form</a>
@@ -138,10 +138,10 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                     """
                     <html><body>
                     <h1>Membership</h1>
-                    <p>Supporter is not open right now. Free stays the same.</p>
+                    <p>Supporter is not open right now.</p>
                     <button>Continue with email</button>
-                    </body></html>
-                    """
+                </body></html>
+                """
                 )
             return
 

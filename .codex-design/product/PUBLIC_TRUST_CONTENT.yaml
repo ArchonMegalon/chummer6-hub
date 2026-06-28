@@ -26,7 +26,7 @@ trust_pages:
       - id: install-update
         eyebrow: "Install or update"
         heading: "Downloads"
-        body: "Get the current build or the Linux source script first."
+        body: "Get the current build or the Linux source script."
         bullets:
           - "Stable for normal use."
           - "Source build for Linux users who want to compile it themselves."
@@ -39,7 +39,7 @@ trust_pages:
           - "Claim only when you want recovery."
       - id: product-bug
         eyebrow: "Bug report"
-        heading: "Contact"
+        heading: "Private support"
         body: "Use Contact for crashes, install trouble, or account details."
         bullets:
           - "One issue per message."
@@ -123,7 +123,7 @@ trust_pages:
   - id: contact
     eyebrow: "Contact"
     heading: "Contact"
-    intro: "Discord for normal questions. Private form when needed."
+    intro: "Discord first. Private form if needed."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
@@ -134,7 +134,7 @@ trust_pages:
       - label: "Open Discord"
         href: "https://discord.gg/chummer"
         tone: primary
-      - label: "Open private form"
+      - label: "Private support"
         href: "/contact#support-intake"
         tone: secondary
       - label: "Read help first"
@@ -143,17 +143,17 @@ trust_pages:
     sections:
       - id: discord
         eyebrow: "Discord"
-        heading: "Use Discord for normal questions"
-        body: "Questions, quick feedback, and normal discussion are quicker there."
+        heading: "Use the Chummer5 server for normal contact"
+        body: "Questions, quick feedback, and normal discussion belong in Discord where the Chummer community already is."
       - id: tracked-support
         eyebrow: "Private"
         heading: "Use the form only when Discord is the wrong place"
-        body: "Account details, install trouble, and crashes should stay private. The form is for those cases."
+        body: "Install failures, crashes, screenshots, logs, or account details should stay private. The form is for those cases."
 faq_pages:
   - id: faq
     eyebrow: "FAQ"
     heading: "Plain answers before you spend more time"
-    intro: "Short answers about installs, accounts, and help."
+    intro: "The public front door should answer the normal questions directly: what to install, what an account is for, and how to get help."
     actions:
       - label: "Open downloads"
         href: "/downloads"

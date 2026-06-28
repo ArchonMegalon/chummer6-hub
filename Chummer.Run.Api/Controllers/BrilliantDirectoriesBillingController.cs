@@ -430,7 +430,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             UsingSignedInAccount: currentUser is not null,
             Unavailable: true,
             Heading: "Membership",
-            Summary: "Supporter is not open right now. Free stays the same.",
+            Summary: "Supporter is not open right now.",
             ManageMembershipHref: string.Empty);
 
     private static string BuildBillingLoginRedirect()

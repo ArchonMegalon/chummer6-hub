@@ -80,7 +80,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(
                     b"<html><body>"
-                    b"Membership Supporter is not open right now. Free stays the same. Continue with email"
+                    b"Membership Supporter is not open right now. Continue with email"
                     b"</body></html>"
                 )
             else:

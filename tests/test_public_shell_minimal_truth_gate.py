@@ -141,7 +141,7 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                   </head>
                   <body>
                     <h1>Membership</h1>
-                    <p>Supporter checkout is not open right now.</p>
+                    <p>Supporter is not open right now.</p>
                   </body>
                 </html>
                 """,

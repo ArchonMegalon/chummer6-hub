@@ -7646,7 +7646,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("text/html")]
     public async Task<IActionResult> ContactPage(CancellationToken cancellationToken)
     {
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Discord for normal questions. Private form when needed.", "/contact", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Discord first. Private form if needed.", "/contact", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildContactPageModelAsync(chrome, manifest, releaseExperience, cancellationToken));

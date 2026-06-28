@@ -121,7 +121,8 @@ const checks = [
   {
     url: `${baseUrl}/contact`,
     assert: text =>
-      text.includes('Discord for normal questions. Private form when needed.')
+      (text.includes('Discord for normal questions. Private form when needed.')
+        || text.includes('Discord first. Private form if needed.'))
       && text.includes('Discord')
       && text.includes('Private form for account or crash details')
       && text.includes('Open private form')

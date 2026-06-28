@@ -1273,7 +1273,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Href: \"https://discord.gg/chummer\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Label: \"Open Discord\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Private form when needed.", controller, StringComparison.Ordinal);
+        Assert.Contains("Private form if needed.", controller, StringComparison.Ordinal);
         Assert.Contains("Discord for normal questions. Private form for account or crash details.", trustView, StringComparison.Ordinal);
         Assert.Contains("Title: \"Private form\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Label: \"Open private form\"", trustView, StringComparison.Ordinal);

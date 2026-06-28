@@ -129,7 +129,7 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "Go back to setup when you are ready",
         "use this claim code only if Chummer asks for it on that device",
         "Contact",
-        "Discord for normal questions. Private form when needed.",
+        "Discord first. Private form if needed.",
         "Discord for normal questions. Private form for account or crash details.",
         "Open private form",
         "Private form",
@@ -592,6 +592,9 @@ def test_billing_surface_uses_real_view_and_honest_supporter_copy() -> None:
     assert "Manage supporter" in billing_view
     assert "Checkout stays attached to this account." in billing_view
     assert "Email first. Supporter status attaches after sign-in." in billing_view
+    assert "Back to account" in billing_view
+    assert "Free · 1 book/month" in billing_view
+    assert "Supporter · 2 books/month" in billing_view
     assert "story-example" not in billing_view
     assert "Account attached: @Model.UserId" not in billing_view
     assert "temporarily unavailable" not in billing_view

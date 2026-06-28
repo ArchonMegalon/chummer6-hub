@@ -69,12 +69,13 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Contains("Checkout stays attached to this account.", view, StringComparison.Ordinal);
         Assert.Contains("Supporter is already attached to this account.", view, StringComparison.Ordinal);
         Assert.Contains("Become supporter", view, StringComparison.Ordinal);
-        Assert.Contains("1 Origin Book each month.", view, StringComparison.Ordinal);
-        Assert.Contains("2 Origin Books each month. Helps pay for Chummer.", view, StringComparison.Ordinal);
+        Assert.Contains("Free · 1 book/month", view, StringComparison.Ordinal);
+        Assert.Contains("Supporter · 2 books/month", view, StringComparison.Ordinal);
         Assert.Contains("No extra app features today.", view, StringComparison.Ordinal);
         Assert.Contains("Manage supporter", view, StringComparison.Ordinal);
+        Assert.Contains("Back to account", view, StringComparison.Ordinal);
         Assert.Contains("minimal-page-hero", view, StringComparison.Ordinal);
-        Assert.Contains("minimal-lane-grid minimal-platform-list", view, StringComparison.Ordinal);
+        Assert.Contains("minimal-section minimal-section--tight", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Layout = null;", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<!doctype html>", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<style>", view, StringComparison.OrdinalIgnoreCase);
@@ -110,7 +111,7 @@ public sealed class BrilliantDirectoriesBillingTests
 
         Assert.Equal(string.Empty, page.ManageMembershipHref);
         Assert.Contains("showManageSupporterAction", view, StringComparison.Ordinal);
-        Assert.Contains("@if (showManageSupporterAction)", view, StringComparison.Ordinal);
+        Assert.Contains("primaryActionLabel", view, StringComparison.Ordinal);
         Assert.DoesNotContain("ManageMembershipHref: options.MemberPortalUrl ?? \"/account\"", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Community", "BrilliantDirectoriesBillingService.cs")), StringComparison.Ordinal);
     }
 
@@ -156,7 +157,7 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.DoesNotContain("href=\"/downloads\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<p class=\"eyebrow\">Unavailable</p>", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<h2>Free stays the same</h2>", view, StringComparison.Ordinal);
-        Assert.Contains("if (!Model.Unavailable)", view, StringComparison.Ordinal);
+        Assert.Contains("Supporter is not open right now.", view, StringComparison.Ordinal);
     }
 
     [Fact]

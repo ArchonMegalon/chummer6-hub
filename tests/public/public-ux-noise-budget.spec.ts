@@ -64,7 +64,7 @@ test('contact page keeps routing and private intake clear without extra ceremony
 
   await expect(page.locator('h1')).toContainText('Contact');
   expect(bodyText).toContain('Discord or private');
-  expect(bodyText).toContain('Discord for normal questions. Private form when needed.');
+  expect(bodyText).toContain('Discord first. Private form if needed.');
   expect(bodyText).toContain('Discord for normal questions. Private form for account or crash details.');
   expect(bodyText).not.toContain('Discord for normal contact. Private form for logs or account details.');
   expect(bodyText).not.toContain('Public ideas go to Participate. Private problems stay here.');

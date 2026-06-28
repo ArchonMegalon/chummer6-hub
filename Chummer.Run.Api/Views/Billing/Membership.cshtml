@@ -4,8 +4,6 @@
     ViewData["Title"] = "Membership";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-billing surface-minimal";
-    var free = Model.FreePlan;
-    var supporter = Model.SupporterPlan;
     var hasUserId = !string.IsNullOrWhiteSpace(Model.UserId);
     var usingSignedInAccount = Model.UsingSignedInAccount && hasUserId;
     var quota = Model.CurrentOriginAuthoringAllowance;
@@ -14,109 +12,81 @@
     var showManageSupporterAction = usingSignedInAccount && supporterActive && hasManageMembershipHref;
     var antiForgery = Antiforgery.GetAndStoreTokens(Context);
     var signedInLabel = string.IsNullOrWhiteSpace(Model.SignedInLabel) ? Model.Email ?? Model.UserId : Model.SignedInLabel;
+    var primaryActionLabel = !hasUserId
+        ? "Continue with email"
+        : supporterActive
+            ? showManageSupporterAction
+                ? "Manage supporter"
+                : null
+            : "Become supporter";
+    var primaryActionHref = !hasUserId
+        ? "/login?next=%2Faccount%2Fbilling"
+        : showManageSupporterAction
+            ? Model.ManageMembershipHref
+            : null;
 }
 <section class="minimal-page-hero">
     <div>
         <p class="eyebrow">Supporter</p>
         <h1>@Model.Heading</h1>
         <p>@Model.Summary</p>
-        @if (Model.Unavailable)
-        {
-            <div class="minimal-actions">
-                @if (!hasUserId)
+        <ul class="minimal-hero__points">
+            <li>1 book/month on Free. 2/month on Supporter.</li>
+            @if (usingSignedInAccount)
+            {
+                <li>@signedInLabel</li>
+            }
+            @if (quota is not null)
+            {
+                <li>@quota.WindowUsed / @quota.WindowLimit used this month</li>
+            }
+        </ul>
+        <div class="minimal-actions">
+            @if (!string.IsNullOrWhiteSpace(primaryActionLabel))
+            {
+                if (hasUserId && !supporterActive && !Model.Unavailable)
                 {
-                    <a class="button-like button-like--secondary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
+                    <form class="billing-plan-form" method="post" action="/account/billing/supporter">
+                        <input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken">
+                        <input type="hidden" name="userId" value="@Model.UserId">
+                        @if (!string.IsNullOrWhiteSpace(Model.Email))
+                        {
+                            <input type="hidden" name="email" value="@Model.Email">
+                        }
+                        <button class="button-like button-like--primary" type="submit">@primaryActionLabel</button>
+                    </form>
                 }
-            </div>
-        }
-        else
-        {
-            <ul class="minimal-hero__points">
-                <li>1 book/month on Free. 2/month on Supporter.</li>
-                @if (usingSignedInAccount)
+                else if (!string.IsNullOrWhiteSpace(primaryActionHref))
                 {
-                    <li>@signedInLabel</li>
+                    <a class="button-like button-like--primary" href="@primaryActionHref">@primaryActionLabel</a>
                 }
-                @if (quota is not null)
-                {
-                    <li>@quota.WindowUsed / @quota.WindowLimit used this month</li>
-                }
-            </ul>
-        }
+            }
+            <a class="button-like button-like--ghost" href="/account">Back to account</a>
+        </div>
     </div>
 </section>
 
-@if (!Model.Unavailable)
-{
-    <section class="minimal-section">
-        <div class="minimal-section__lead">
-            <p class="eyebrow">Plans</p>
-            <h2>Only the book limit changes</h2>
-            <p>No extra app features today.</p>
+<section class="minimal-section minimal-section--tight">
+    <article class="minimal-lane-card billing-plan-card">
+        <span class="tag">Membership</span>
+        <h2>Only the book limit changes</h2>
+        <p>No extra app features today.</p>
+        <div class="route-choice-card__details">
+            <span>Free · 1 book/month</span>
+            <span>Supporter · 2 books/month</span>
+            <span>Same app</span>
         </div>
-        <div class="minimal-lane-grid minimal-platform-list">
-            @if (free is not null)
-            {
-                <article class="minimal-lane-card billing-plan-card">
-                    <span class="tag">Free</span>
-                    <h2>@free.Name</h2>
-                    <p>1 Origin Book each month.</p>
-                    <div class="route-choice-card__details">
-                        <span>Default</span>
-                        <span>1 book/month</span>
-                        <span>Same app</span>
-                    </div>
-                </article>
-            }
-            @if (supporter is not null)
-            {
-                <article class="minimal-lane-card billing-plan-card">
-                    <span class="tag">Supporter</span>
-                    <h2>@supporter.Name</h2>
-                    <p>2 Origin Books each month. Helps pay for Chummer.</p>
-                    <div class="route-choice-card__details">
-                        <span>2 books/month</span>
-                        <span>Same app</span>
-                    </div>
-                    <form class="billing-plan-form" method="post" action="/account/billing/supporter">
-                        <input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken">
-                        @if (hasUserId)
-                        {
-                            <input type="hidden" name="userId" value="@Model.UserId">
-                            @if (!string.IsNullOrWhiteSpace(Model.Email))
-                            {
-                                <input type="hidden" name="email" value="@Model.Email">
-                            }
-                            <p class="muted-copy">@(supporterActive ? "Supporter is already attached to this account." : "Checkout stays attached to this account.")</p>
-                        }
-                        else
-                        {
-                            <p class="muted-copy">Email first. Supporter status attaches after sign-in.</p>
-                        }
-                        <p class="muted-copy">No extra app features today.</p>
-                        @if (!hasUserId || !supporterActive || showManageSupporterAction)
-                        {
-                            <div class="minimal-actions">
-                                @if (hasUserId)
-                                {
-                                    @if (!supporterActive)
-                                    {
-                                        <button class="button-like button-like--primary" type="submit">Become supporter</button>
-                                    }
-                                    @if (showManageSupporterAction)
-                                    {
-                                        <a class="button-like button-like--ghost" href="@Model.ManageMembershipHref">Manage supporter</a>
-                                    }
-                                }
-                                else
-                                {
-                                    <a class="button-like button-like--primary" href="/login?next=%2Faccount%2Fbilling">Continue with email</a>
-                                }
-                            </div>
-                        }
-                    </form>
-                </article>
-            }
-        </div>
-    </section>
-}
+        @if (Model.Unavailable)
+        {
+            <p class="muted-copy">Supporter is not open right now.</p>
+        }
+        else if (hasUserId)
+        {
+            <p class="muted-copy">@(supporterActive ? "Supporter is already attached to this account." : "Checkout stays attached to this account.")</p>
+        }
+        else
+        {
+            <p class="muted-copy">Email first. Supporter status attaches after sign-in.</p>
+        }
+    </article>
+</section>
