@@ -3538,7 +3538,15 @@ document.addEventListener('DOMContentLoaded', function () {
   const localOrigin = __CHUMMER_LOCAL_ORIGIN__;
   const canonicalHref = __CHUMMER_CANONICAL_HREF__;
   const hiddenStatusTerms = __CHUMMER_HIDDEN_STATUS_TERMS__;
+  let chromePassScheduled = false;
+  let copyPolishRuns = 0;
   const polishVisibleCopy = function () {
+    if (copyPolishRuns >= 2) {
+      return;
+    }
+
+    copyPolishRuns += 1;
+
     const replacements = [
       [/\bAI-powered\b/gi, ''],
       [/\bAI powered\b/gi, ''],
@@ -3644,13 +3652,34 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   };
 
-  polishVisibleCopy();
-  quietHostedBoardChrome();
-  removeHostedAuth();
-  const authObserver = new MutationObserver(function () {
-    polishVisibleCopy();
+  const runChromePass = function (includeCopyPolish) {
+    if (includeCopyPolish) {
+      polishVisibleCopy();
+    }
+
     quietHostedBoardChrome();
     removeHostedAuth();
+  };
+
+  const scheduleChromePass = function () {
+    if (chromePassScheduled) {
+      return;
+    }
+
+    chromePassScheduled = true;
+    window.requestAnimationFrame(function () {
+      chromePassScheduled = false;
+      runChromePass(false);
+    });
+  };
+
+  runChromePass(true);
+  window.setTimeout(function () {
+    runChromePass(true);
+  }, 1200);
+
+  const authObserver = new MutationObserver(function () {
+    scheduleChromePass();
   });
   authObserver.observe(document.documentElement, { childList: true, subtree: true });
 
@@ -3753,25 +3782,15 @@ document.addEventListener('DOMContentLoaded', function () {
     return panel;
   };
 
+  let failurePassScheduled = false;
   const suppressHostedError = function () {
-    const nodes = Array.from(document.querySelectorAll('main, section, article, div, p, span, h1, h2, h3'));
-    let found = false;
+    const text = ((document.body && document.body.innerText) || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!text) {
+      return;
+    }
 
-    nodes.forEach(function (node) {
-      const text = (node.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-      if (!text) {
-        return;
-      }
-
-      const matches = errorPhrases.some(function (phrase) {
-        return text.includes(phrase);
-      });
-
-      if (!matches) {
-        return;
-      }
-
-      found = true;
+    const found = errorPhrases.some(function (phrase) {
+      return text.includes(phrase);
     });
 
     if (found) {
@@ -3779,9 +3798,22 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   };
 
+  const scheduleFailurePass = function () {
+    if (failurePassScheduled) {
+      return;
+    }
+
+    failurePassScheduled = true;
+    window.setTimeout(function () {
+      failurePassScheduled = false;
+      suppressHostedError();
+    }, 120);
+  };
+
   suppressHostedError();
+  window.setTimeout(suppressHostedError, 1500);
   const observer = new MutationObserver(function () {
-    suppressHostedError();
+    scheduleFailurePass();
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 });

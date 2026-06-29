@@ -10,6 +10,7 @@ VERIFY_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "ai" / "verify.sh"
 RELEASE_READY_SCRIPT = Path("/docker/chummercomplete/scripts/release/verify_chummer6_release_ready.sh")
 PORTAL_E2E_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "e2e-portal.cjs"
 PARTIZIPATE_RUNTIME_FALLBACK_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "verify_partizipate_runtime_fallback.cjs"
+PUBLIC_LANDING_CONTROLLER = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs"
 
 
 class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
@@ -114,6 +115,19 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("provider menubar must stay hidden in the proxied request detail", text)
         self.assertIn("provider search mount must stay hidden in the proxied request detail", text)
         self.assertIn("vendor error copy must not be visible in the proxied request detail", text)
+
+    def test_hosted_board_wrapper_uses_throttled_dom_scrub_passes(self) -> None:
+        text = PUBLIC_LANDING_CONTROLLER.read_text(encoding="utf-8")
+
+        self.assertIn("let chromePassScheduled = false;", text)
+        self.assertIn("const scheduleChromePass = function () {", text)
+        self.assertIn("window.requestAnimationFrame(function () {", text)
+        self.assertIn("window.setTimeout(function () {", text)
+        self.assertIn("runChromePass(true);", text)
+        self.assertIn("let failurePassScheduled = false;", text)
+        self.assertIn("const scheduleFailurePass = function () {", text)
+        self.assertIn("document.body.innerText", text)
+        self.assertIn("window.setTimeout(suppressHostedError, 1500);", text)
 
 
 if __name__ == "__main__":
