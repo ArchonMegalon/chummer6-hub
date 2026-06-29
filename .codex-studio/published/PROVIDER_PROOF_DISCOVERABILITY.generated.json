@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.provider_proof_discoverability",
-  "generated_at_utc": "2026-06-29T12:21:30Z",
+  "generated_at_utc": "2026-06-29T12:22:14Z",
   "status": "pass",
   "providers": {
     "payfunnels": {
@@ -11,7 +11,14 @@
       ],
       "mirrored_paths": [
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/FINAL_PAYFUNNELS_TEST_BILLING_ADAPTER_VERDICT.md",
-        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_PROVIDER_VERIFICATION.generated.json"
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_COPY_HONESTY_REVIEW.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_ENTITLEMENT_NOOP_PROOF.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_PROVIDER_VERIFICATION.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_REFUND_PATH_PROOF.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_SECURITY_REVIEW.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_TEST_CHECKOUT_RECEIPT.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_WEBHOOK_IDEMPOTENCY.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_WEBHOOK_RECEIPT.generated.json"
       ],
       "mirror_fallback_paths": [
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/FINAL_PAYFUNNELS_TEST_BILLING_ADAPTER_VERDICT.md",
@@ -27,7 +34,14 @@
       ],
       "mirrored_paths": [
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/FINAL_PROMPT_ARCHITECTS_INTEGRATION_VERDICT.md",
-        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_PROVIDER_VERIFICATION.generated.json"
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_GM_VIDEO_PROMPT_FLOW.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_HUMAN_REVIEW.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_MAGICFIT_BRIDGE_PROOF.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_PRIVACY_BOUNDARY.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_PROVIDER_VERIFICATION.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_RULES_SAFE_HUMANIZER.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_TEMPLATE_SYNC.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_USAGE_METERING.generated.json"
       ],
       "mirror_fallback_paths": [
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/FINAL_PROMPT_ARCHITECTS_INTEGRATION_VERDICT.md",
@@ -79,7 +93,15 @@
         "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/GM_VIDEO_USAGE_METERING.generated.json"
       ],
       "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/FACE_VAULT_TENANT_ISOLATION.generated.json",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/FINAL_GM_SESSION_VIDEO_FOUNDRY_VERDICT.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_SESSION_VIDEO_HUMAN_REVIEW.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_SESSION_VIDEO_PUBLIC_SAFETY.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_SESSION_VIDEO_SAMPLE_CONTACT_SHEET.jpg",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_SESSION_VIDEO_SAMPLE_RENDER_MANIFEST.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_SESSION_VIDEO_SAMPLE_RENDER_RECEIPT.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_VIDEO_QUOTA_POLICY.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_VIDEO_USAGE_LEDGER_INTEGRITY.generated.json",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_VIDEO_USAGE_METERING.generated.json",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/MAGICFIT_SESSION_PROVIDER_VERIFICATION.generated.json",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/PROMPT_PREVIEW_APPROVAL_PROOF.generated.json"

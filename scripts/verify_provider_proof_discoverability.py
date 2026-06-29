@@ -179,6 +179,9 @@ def main() -> int:
                     target = provider_root / source.name
                     shutil.copyfile(source, target)
                     mirrored_paths.append(str(target))
+        for existing_mirror in sorted(provider_root.glob("*")):
+            if existing_mirror.is_file():
+                mirrored_paths.append(str(existing_mirror))
         status = "pass" if not missing else "fail"
         if missing:
             failures.append(f"{provider} missing discoverable proof artifacts")
