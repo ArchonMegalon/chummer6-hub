@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_public_windows_installer",
-  "generated_at_utc": "2026-06-29T00:38:18Z",
+  "generated_at_utc": "2026-06-29T00:40:37Z",
   "base_url": "https://chummer.run",
   "manifest_url": "https://chummer.run/downloads/releases.json",
   "verify_script_path": "/docker/chummercomplete/chummer-presentation/scripts/verify-windows-installer-payloads.py",
