@@ -170,6 +170,28 @@ app.Use(async (context, next) =>
 });
 app.Use(async (context, next) =>
 {
+    if (!HttpMethods.IsHead(context.Request.Method) || !ShouldServeHeadFromGet(context.Request.Path))
+    {
+        await next();
+        return;
+    }
+
+    string originalMethod = context.Request.Method;
+    Stream originalBody = context.Response.Body;
+    context.Request.Method = HttpMethods.Get;
+    context.Response.Body = Stream.Null;
+    try
+    {
+        await next();
+    }
+    finally
+    {
+        context.Response.Body = originalBody;
+        context.Request.Method = originalMethod;
+    }
+});
+app.Use(async (context, next) =>
+{
     if (IsLegacyMacReleaseBootstrapArtifactPath(context.Request.Path))
     {
         context.Response.Redirect("/downloads/release-upload/bootstrap.sh", permanent: false);
@@ -347,6 +369,16 @@ static bool IsIndexablePublicPath(PathString path)
         || path.Equals("/robots.txt", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/sitemap.xml", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/llms.txt", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool ShouldServeHeadFromGet(PathString path)
+{
+    if (path.Equals("/api/health", StringComparison.OrdinalIgnoreCase))
+    {
+        return true;
+    }
+
+    return !path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase);
 }
 
 static bool IsLegacyMacReleaseBootstrapArtifactPath(PathString path)
