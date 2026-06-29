@@ -29,5 +29,7 @@ def test_windows_bootstrap_uses_resolved_temp_root_instead_of_raw_temp() -> None
     assert '"$BootstrapTempRoot\\chummer-verify-payload.cmd"' in text
     assert '"$BootstrapTempRoot\\chummer-extract-payload.cmd"' in text
     assert 'SetOutPath "$BootstrapTempRoot"' in text
+    assert 'Push "Payload download failed; legacy NSIS downloader is disabled for bootstrap installs"' in text
+    assert "NSISdl::download" not in text
     assert 'StrCpy $EffectivePayloadPath "$TEMP\\${CHUMMER_PAYLOAD_FILE_NAME}"' not in text
     assert 'SetOutPath "$TEMP"' not in text
