@@ -21,11 +21,13 @@ class _FakeResponse:
         status_code: int = 200,
         text: str = "",
         json_data: object | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self.url = url
         self.status_code = status_code
         self.text = text
         self._json_data = json_data
+        self.headers = headers or {}
 
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
@@ -82,6 +84,10 @@ class _FakeSession:
                     "opt_in_route": "/account",
                     "updates_route": "/mobile/pwa/ledger.json",
                 },
+                headers={
+                    "Cache-Control": "private, no-store, no-cache, max-age=0",
+                    "Vary": "Cookie, Authorization",
+                },
             )
         if url.endswith("/play/continuity/receipts") or url.endswith("/play/continuity/history"):
             return _FakeResponse(
@@ -118,7 +124,8 @@ class _FakeSession:
                     'self.addEventListener("notificationclose", () => {});\n'
                     "navigationPreload\n"
                     "RUNTIME_CACHE\n"
-                    "/mobile\n/play\n/play/continuity\n/mobile/pwa.json\n/ready/handoff/mobile.json\n"
+                    'const PRECACHE_URLS = ["/mobile", "/play", "/play/continuity", "/mobile/pwa.json", "/ready/handoff/mobile.json"];\n'
+                    'const NON_CACHEABLE_PATHS = new Set(["/mobile/pwa/ledger.json"]);\n'
                 ),
             )
         raise AssertionError(f"unexpected url {url}")
@@ -237,8 +244,59 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
                 if url.endswith("/service-worker.js"):
                     return _FakeResponse(
                         response.url,
-                        text=response.text.replace("/play/continuity\n", "", 1),
+                        text=response.text.replace('"/play/continuity", ', "", 1),
                     )
+                return response
+
+        module = _load_module()
+        stdout = io.StringIO()
+
+        with (
+            patch.object(module.requests, "Session", return_value=DriftedSession()),
+            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
+            patch.object(module, "write_json"),
+            patch.object(module, "write_text"),
+            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
+            redirect_stdout(stdout),
+        ):
+            result = module.run("http://example.test")
+
+        self.assertEqual(result, 1)
+        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+
+    def test_verifier_fails_when_service_worker_allows_personalized_ledger_stream_cache(self) -> None:
+        class DriftedSession(_FakeSession):
+            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
+                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
+                if url.endswith("/service-worker.js"):
+                    return _FakeResponse(
+                        response.url,
+                        text=response.text.replace('"/mobile/pwa/ledger.json"', "", 1),
+                    )
+                return response
+
+        module = _load_module()
+        stdout = io.StringIO()
+
+        with (
+            patch.object(module.requests, "Session", return_value=DriftedSession()),
+            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
+            patch.object(module, "write_json"),
+            patch.object(module, "write_text"),
+            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
+            redirect_stdout(stdout),
+        ):
+            result = module.run("http://example.test")
+
+        self.assertEqual(result, 1)
+        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+
+    def test_verifier_fails_when_personalized_ledger_stream_drops_no_store_headers(self) -> None:
+        class DriftedSession(_FakeSession):
+            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
+                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
+                if url.endswith("/mobile/pwa/ledger.json"):
+                    return _FakeResponse(response.url, json_data=response.json(), headers={"Cache-Control": "public, max-age=60"})
                 return response
 
         module = _load_module()

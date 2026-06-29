@@ -35,6 +35,26 @@ public sealed class PublicLandingPwaLedgerStreamTests
     }
 
     [Fact]
+    public async Task MobilePwaLedgerStreamReturnsPrivateNoStoreHeaders()
+    {
+        using var fixture = new Fixture();
+        fixture.SeedSignedUserExperience(blackLedgerNewsEmail: true, followedWorlds: []);
+        fixture.Controller.ControllerContext.HttpContext = fixture.CreateHttpContext(includeAuth: true);
+
+        JsonElement payload = await fixture.ReadLedgerPayloadAsync();
+
+        Assert.Equal("mobile_pwa_living_world", payload.GetProperty("mode").GetString());
+        Assert.True(payload.TryGetProperty("generated_at_utc", out JsonElement generatedAt));
+        Assert.False(string.IsNullOrWhiteSpace(generatedAt.GetString()));
+        IHeaderDictionary headers = fixture.Controller.Response.Headers;
+        Assert.Equal("private, no-store, no-cache, max-age=0", headers.CacheControl.ToString());
+        Assert.Equal("no-cache", headers.Pragma.ToString());
+        Assert.Equal("0", headers.Expires.ToString());
+        Assert.Contains("Cookie", headers.Vary.ToString(), StringComparison.Ordinal);
+        Assert.Contains("Authorization", headers.Vary.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task MobilePwaLedgerStreamReturnsLiveWorldAndContinuity_WhenUserIsOptedIn()
     {
         using var fixture = new Fixture();

@@ -137,3 +137,106 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   });
   expect(controlledWorkerUrl).toContain('/service-worker.js');
 });
+
+test('mobile ledger stream clears stale live detail links on followed-world fallback', async ({ page }) => {
+  let ledgerCalls = 0;
+  await page.route('**/api/v1/accounts/me/preferences', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        blackLedgerNewsEmail: true,
+        blackLedgerWorldsFollowed: ['other-world']
+      })
+    });
+  });
+  await page.route('**/mobile/pwa/ledger.json', async (route) => {
+    ledgerCalls += 1;
+    const livePayload = {
+      mode: 'mobile_pwa_living_world',
+      status: 'live',
+      status_label: 'Live board snapshot',
+      world: {
+        world_id: 'seattle-live',
+        world_name: 'Seattle Live',
+        world_turn: 42,
+        turn_headline: 'Heat rises in Redmond'
+      },
+      summary: {
+        hot_district: 'Redmond is currently the hottest district with heat 82.',
+        hot_shift: 'Downtown moved this turn by +7.',
+        follow_hint: null
+      },
+      followed_worlds: [],
+      top_districts: [{ name: 'Redmond', heat: 82, delta: 7, influence: 3, trend: 'rising' }],
+      hot_district: { name: 'Redmond', heat: 82, delta: 7 },
+      move_district: { name: 'Downtown', delta: 7 },
+      tracker: {
+        update_interval_seconds: 30,
+        turn_map_route: '/ledger/map',
+        turn_route: '/ledger/turns/42',
+        newsreel_route: '/ledger/turns/42/newsreel.json',
+        world_status: 'live'
+      },
+      continuity: {
+        turn: 42,
+        turn_summary: 'The board moved.',
+        turn_route: '/ledger/turns/42',
+        events: []
+      },
+      updates_route: '/mobile/pwa/ledger.json',
+      generated_at_utc: '2026-06-29T12:00:00Z'
+    };
+    const gatedPayload = {
+      mode: 'mobile_pwa_living_world',
+      status: 'world_not_followed',
+      status_label: 'Followed world not active',
+      world: {
+        world_id: 'seattle-live',
+        world_name: 'Seattle Live',
+        world_turn: 42,
+        turn_headline: 'Follow this world to reveal the live turn headline.'
+      },
+      summary: {
+        hot_district: 'Follow this world to reveal live heat tracking.',
+        hot_shift: 'Follow this world to reveal live movement changes.',
+        follow_hint: 'Enable or select this world in Black Ledger preferences.'
+      },
+      followed_worlds: ['other-world'],
+      top_districts: [],
+      hot_district: null,
+      move_district: null,
+      tracker: {
+        update_interval_seconds: 30,
+        turn_map_route: '/ledger/map',
+        turn_route: null,
+        newsreel_route: null,
+        world_status: 'live'
+      },
+      continuity: null,
+      updates_route: '/mobile/pwa/ledger.json',
+      generated_at_utc: '2026-06-29T12:00:30Z'
+    };
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(ledgerCalls === 1 ? livePayload : gatedPayload)
+    });
+  });
+
+  await page.goto(`${baseUrl}/mobile`, { waitUntil: 'domcontentloaded' });
+
+  const turnRoute = page.locator('[data-pwa-ledger-turn-route]');
+  const newsreelRoute = page.locator('[data-pwa-ledger-newsreel-route]');
+  await expect(turnRoute).toHaveAttribute('href', '/ledger/turns/42');
+  await expect(newsreelRoute).toHaveAttribute('href', '/ledger/turns/42/newsreel.json');
+
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+
+  await expect.poll(async () => await turnRoute.getAttribute('href')).toBeNull();
+  await expect.poll(async () => await newsreelRoute.getAttribute('href')).toBeNull();
+  await expect(turnRoute).toHaveText('Follow this world to open live turn detail');
+  await expect(newsreelRoute).toHaveText('Follow this world to open live newsreel');
+  await expect(page.locator('[data-pwa-ledger-heat-score]')).toHaveText('Follow required');
+});

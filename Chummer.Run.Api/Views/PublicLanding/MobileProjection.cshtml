@@ -347,9 +347,9 @@
                 node.setAttribute("tabindex", "-1");
             }
 
-            function clearLedgerDetailRoutes(reason) {
-                setActionLink(ledgerTurnRoute, null, ledgerTurnRouteLabel, reason || "Turn detail unavailable");
-                setActionLink(ledgerNewsreelRoute, null, ledgerNewsreelRouteLabel, reason || "Newsreel unavailable");
+            function clearLedgerDetailRoutes(turnReason, newsreelReason) {
+                setActionLink(ledgerTurnRoute, null, ledgerTurnRouteLabel, turnReason || "Turn detail unavailable");
+                setActionLink(ledgerNewsreelRoute, null, ledgerNewsreelRouteLabel, newsreelReason || "Newsreel unavailable");
             }
 
             function resolveLedgerRefreshIntervalMs(payload) {
@@ -603,7 +603,7 @@
                 updateHeatMeter(null, "error");
                 updateLedgerTopDistricts([]);
                 updateContinuityEvents([]);
-                clearLedgerDetailRoutes("Unavailable in this lane");
+                clearLedgerDetailRoutes("Turn detail unavailable in this lane", "Newsreel unavailable in this lane");
                 renderFollowState(null);
             }
 
@@ -625,7 +625,10 @@
                 clearLedgerDetailRoutes(
                     payload.status === "world_not_followed"
                         ? "Follow this world to open live turn detail"
-                        : "Turn detail unavailable right now");
+                        : "Turn detail unavailable right now",
+                    payload.status === "world_not_followed"
+                        ? "Follow this world to open live newsreel"
+                        : "Newsreel unavailable right now");
 
                 if (payload.world) {
                     safeText(ledgerWorld, payload.world.world_name || payload.world.world_id || "No world loaded");

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from urllib.parse import urlparse
 
 import requests
@@ -22,6 +23,15 @@ EXPECTED_FINAL_ROUTES = {
 EXPECTED_SHORTCUTS = {"/mobile", "/play", "/play/continuity"}
 EXPECTED_SHELL_CACHE_PATHS = {"/mobile", "/play", "/play/continuity", "/mobile/pwa.json", "/ready/handoff/mobile.json"}
 EXPECTED_PWA_LEDGER_STATUSES = {"opt_in_required", "no_world_data", "live", "world_not_followed"}
+PERSONALIZED_LEDGER_STREAM_ROUTE = "/mobile/pwa/ledger.json"
+
+
+def extract_js_string_array(source: str, name: str) -> set[str]:
+    match = re.search(rf"const\s+{re.escape(name)}\s*=\s*(?:new\s+Set\()?\[(.*?)\]\)?;", source, re.DOTALL)
+    if not match:
+        return set()
+
+    return set(re.findall(r'"([^"]+)"', match.group(1)))
 
 
 def parse_args() -> argparse.Namespace:
@@ -85,6 +95,11 @@ def run(base_url: str) -> int:
     mobile_json = mobile_json_response.json()
     ledger_stream = ledger_stream_response.json()
     receipt_index = receipt_index_response.json()
+    service_worker_text = service_worker_response.text
+    precache_urls = extract_js_string_array(service_worker_text, "PRECACHE_URLS")
+    non_cacheable_paths = extract_js_string_array(service_worker_text, "NON_CACHEABLE_PATHS")
+    ledger_stream_cache_control = ledger_stream_response.headers.get("Cache-Control", "")
+    ledger_stream_vary = ledger_stream_response.headers.get("Vary", "")
     has_manifest_link = 'rel="manifest"' in mobile_html.text and "/manifest.json" in mobile_html.text
     has_sw_registration = "serviceWorker.register(\"/service-worker.js\"" in mobile_html.text
     has_install_button = "Install this app" in mobile_html.text
@@ -94,12 +109,16 @@ def run(base_url: str) -> int:
     has_manifest_id = manifest.get("id") == "/mobile"
     has_display_override = bool(manifest.get("display_override"))
     has_expected_shortcuts = EXPECTED_SHORTCUTS.issubset(shortcut_urls)
-    has_expected_shell_cache_paths = all(path in service_worker_response.text for path in EXPECTED_SHELL_CACHE_PATHS)
-    has_navigation_preload = "navigationPreload" in service_worker_response.text
-    has_runtime_cache = "RUNTIME_CACHE" in service_worker_response.text
-    has_push_handler = 'self.addEventListener("push"' in service_worker_response.text
-    has_notification_click_handler = 'self.addEventListener("notificationclick"' in service_worker_response.text
-    has_notification_close_handler = 'self.addEventListener("notificationclose"' in service_worker_response.text
+    has_expected_shell_cache_paths = EXPECTED_SHELL_CACHE_PATHS.issubset(precache_urls)
+    ledger_stream_not_precached = PERSONALIZED_LEDGER_STREAM_ROUTE not in precache_urls
+    ledger_stream_denied_by_service_worker = PERSONALIZED_LEDGER_STREAM_ROUTE in non_cacheable_paths
+    ledger_stream_has_no_store_header = "no-store" in ledger_stream_cache_control.lower()
+    ledger_stream_has_personalized_vary = "Cookie" in ledger_stream_vary and "Authorization" in ledger_stream_vary
+    has_navigation_preload = "navigationPreload" in service_worker_text
+    has_runtime_cache = "RUNTIME_CACHE" in service_worker_text
+    has_push_handler = 'self.addEventListener("push"' in service_worker_text
+    has_notification_click_handler = 'self.addEventListener("notificationclick"' in service_worker_text
+    has_notification_close_handler = 'self.addEventListener("notificationclose"' in service_worker_text
     continuity_receipt_count = len(receipt_index.get("receipts") or [])
     continuity_boundary_present = bool(receipt_index.get("boundary"))
     mobile_json_has_routes = (
@@ -132,6 +151,10 @@ def run(base_url: str) -> int:
         has_expected_shortcuts,
         screenshot_count >= 2,
         has_expected_shell_cache_paths,
+        ledger_stream_not_precached,
+        ledger_stream_denied_by_service_worker,
+        ledger_stream_has_no_store_header,
+        ledger_stream_has_personalized_vary,
         has_navigation_preload,
         has_runtime_cache,
         has_push_handler,
@@ -163,10 +186,12 @@ def run(base_url: str) -> int:
         "service_worker": {
             "path": "/service-worker.js",
             "status_code": service_worker_response.status_code,
-            "has_fetch_handler": "self.addEventListener(\"fetch\"" in service_worker_response.text,
+            "has_fetch_handler": "self.addEventListener(\"fetch\"" in service_worker_text,
             "has_navigation_preload": has_navigation_preload,
             "has_runtime_cache": has_runtime_cache,
             "has_expected_shell_cache_paths": has_expected_shell_cache_paths,
+            "ledger_stream_not_precached": ledger_stream_not_precached,
+            "ledger_stream_denied_by_service_worker": ledger_stream_denied_by_service_worker,
             "has_push_handler": has_push_handler,
             "has_notification_click_handler": has_notification_click_handler,
             "has_notification_close_handler": has_notification_close_handler,
@@ -189,6 +214,10 @@ def run(base_url: str) -> int:
             "status": ledger_stream_status,
             "mode": ledger_stream_mode,
             "has_contract": ledger_stream_contract_holds,
+            "cache_control": ledger_stream_cache_control,
+            "vary": ledger_stream_vary,
+            "has_no_store_header": ledger_stream_has_no_store_header,
+            "has_personalized_vary": ledger_stream_has_personalized_vary,
         },
     }
     write_json(completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"), payload)
@@ -210,6 +239,10 @@ def run(base_url: str) -> int:
                 f"- Service worker fetch handler present: `{payload['service_worker']['has_fetch_handler']}`",
                 f"- Service worker navigation preload present: `{has_navigation_preload}`",
                 f"- Service worker continuity cache paths present: `{has_expected_shell_cache_paths}`",
+                f"- Personalized ledger stream excluded from precache: `{ledger_stream_not_precached}`",
+                f"- Personalized ledger stream denied by service worker: `{ledger_stream_denied_by_service_worker}`",
+                f"- Personalized ledger stream has no-store header: `{ledger_stream_has_no_store_header}`",
+                f"- Personalized ledger stream varies by Cookie and Authorization: `{ledger_stream_has_personalized_vary}`",
                 f"- Service worker push handler present: `{has_push_handler}`",
                 f"- Service worker notification click handler present: `{has_notification_click_handler}`",
                 f"- Service worker notification close handler present: `{has_notification_close_handler}`",

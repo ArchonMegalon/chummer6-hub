@@ -66,6 +66,9 @@ const PUBLIC_RUNTIME_CACHE_SUFFIXES = [
   ".json",
   ".txt"
 ];
+const NON_CACHEABLE_PATHS = new Set([
+  "/mobile/pwa/ledger.json"
+]);
 const NON_CACHEABLE_PATH_PREFIXES = [
   "/account",
   "/api",
@@ -208,6 +211,10 @@ function isPublicRuntimeCacheableRequest(request) {
       return false;
     }
 
+    if (NON_CACHEABLE_PATHS.has(url.pathname)) {
+      return false;
+    }
+
     if (NON_CACHEABLE_PATH_PREFIXES.some((prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) {
       return false;
     }
@@ -229,6 +236,11 @@ function isPublicRuntimeCacheableRequest(request) {
 
 function shouldCacheResponse(request, response) {
   if (!response || !response.ok || response.status !== 200) {
+    return false;
+  }
+
+  const cacheControl = response.headers.get("Cache-Control") || "";
+  if (cacheControl.toLowerCase().includes("no-store") || cacheControl.toLowerCase().includes("private")) {
     return false;
   }
 
