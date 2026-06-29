@@ -2,49 +2,33 @@
 @{
     ViewData["Title"] = "Roadmap";
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-roadmap surface-minimal";
+    ViewData["SurfaceClass"] = "surface-roadmap surface-roadmap-board surface-minimal";
 }
-
-<section class="minimal-page-hero route-anchor-target" aria-labelledby="roadmap-title">
-    <div>
-        <p class="eyebrow">Roadmap</p>
-        <h1 id="roadmap-title">Roadmap.</h1>
-        <p>Current requests and planned work.</p>
-        <div class="minimal-actions" aria-label="Roadmap actions">
-            <a class="button-like button-like--primary" href="/changelog">Changelog</a>
-            <a class="button-like button-like--ghost" href="/participate">Participate</a>
-        </div>
-    </div>
-</section>
 
 @if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))
 {
-    <section class="minimal-section minimal-section--tight roadmap-frame roadmap-frame--minimal" aria-labelledby="roadmap-board-title">
-        <div class="minimal-section__lead roadmap-frame__lead">
-            <p class="eyebrow">Live board</p>
-            <h2 id="roadmap-board-title">Board</h2>
-            <p>Open requests below.</p>
-        </div>
+    <section class="roadmap-board-frame route-anchor-target" aria-labelledby="roadmap-title">
+        <h1 id="roadmap-title" class="sr-only">Roadmap</h1>
         <iframe
-            class="roadmap-frame__embed"
+            class="roadmap-board-frame__embed"
             src="@Model.HostedBoardHref"
-            title="Roadmap board"
+            title="Chummer roadmap board"
             loading="eager"
-            referrerpolicy="strict-origin-when-cross-origin"
+            referrerpolicy="same-origin"
             data-chummer-roadmap-frame></iframe>
     </section>
 }
 else
 {
-    <section class="minimal-section minimal-section--tight roadmap-fallback-state" aria-labelledby="roadmap-fallback-title">
+    <section class="minimal-section minimal-section--tight roadmap-fallback-state route-anchor-target" aria-labelledby="roadmap-fallback-title">
         <div class="minimal-section__lead">
             <p class="eyebrow">Roadmap</p>
-            <h2 id="roadmap-fallback-title">Requests stay in Participate.</h2>
-            <p>Shipped work moves to Changelog.</p>
+            <h1 id="roadmap-fallback-title">Board offline right now.</h1>
+            <p>Use Participate for requests and Changelog for shipped work.</p>
         </div>
         <div class="minimal-actions">
-            <a class="button-like button-like--primary" href="/changelog">Changelog</a>
-            <a class="button-like button-like--ghost" href="/participate">Participate</a>
+            <a class="button-like button-like--primary" href="/participate">Participate</a>
+            <a class="button-like button-like--ghost" href="/changelog">Changelog</a>
         </div>
     </section>
 }

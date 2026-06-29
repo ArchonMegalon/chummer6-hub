@@ -7225,21 +7225,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpHead("/roadmap")]
     [Produces("text/html")]
     public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)
-    {
-        Uri? upstream = ResolveProductLiftHostedRoadmapUri();
-        if (upstream is null || ShouldShortCircuitHostedBoardUpstream(upstream))
-        {
-            return await RoadmapBoardFallbackAsync(cancellationToken, "/roadmap", disableHostedBoard: true).ConfigureAwait(false);
-        }
-
-        return await RoadmapBoardProxyCore(
-            null,
-            cancellationToken,
-            localOrigin: "/roadmap",
-            localBaseHref: "/roadmap/",
-            canonicalHref: "/roadmap",
-            fallbackPath: "/roadmap").ConfigureAwait(false);
-    }
+        => await RoadmapBoardFallbackAsync(cancellationToken, "/roadmap").ConfigureAwait(false);
 
     [HttpGet("/roadmap/board")]
     [HttpGet("/roadmap/board/{**boardPath}")]
@@ -7247,26 +7233,11 @@ document.addEventListener('DOMContentLoaded', function () {
     {
         string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
         bool embedded = IsEmbeddedHostedBoardRequest();
-        if (string.IsNullOrWhiteSpace(normalizedBoardPath))
-        {
-            if (!embedded)
-            {
-                await Task.CompletedTask.ConfigureAwait(false);
-                return Redirect($"/roadmap{Request.QueryString}");
-            }
-
-            return await RoadmapBoardProxyCore(
-                null,
-                cancellationToken,
-                canonicalHref: "/roadmap",
-                fallbackPath: "/roadmap",
-                embedded: true).ConfigureAwait(false);
-        }
-
-        return await RoadmapBoardProxyCore(
-            normalizedBoardPath,
-            cancellationToken,
-            embedded: embedded).ConfigureAwait(false);
+        await Task.CompletedTask.ConfigureAwait(false);
+        string target = embedded
+            ? BuildParticipateFrameHref(normalizedBoardPath)
+            : BuildParticipateBoardRouteHref(normalizedBoardPath);
+        return Redirect(target);
     }
 
     private async Task<IActionResult> RoadmapBoardFallbackAsync(
@@ -12974,8 +12945,8 @@ Boundary:
         var syncedLabel = publicRequests.Posts.Count == 0
             ? "Fallback list"
             : FormatParticipateSyncedLabel(publicRequests.SyncedAtUtc);
-        string? hostedRoadmapHref = ResolveProductLiftHostedRoadmapUri() is not null
-            ? BuildRoadmapBoardEmbedHref()
+        string? hostedRoadmapHref = ResolveProductLiftHostedBoardUri() is not null
+            ? BuildParticipateFrameHref()
             : null;
         SiteChromeViewModel chrome = (_releases is null || _releaseSelection is null)
             ? _chrome.BuildPublicChrome("Roadmap", "Planned work and current requests.", currentPath)

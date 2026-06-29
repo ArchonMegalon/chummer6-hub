@@ -79,19 +79,24 @@ public sealed class PublicWebsiteFirstPartyThemeTests
     {
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         string roadmapView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml"));
+        string siteCss = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "css", "site.css"));
 
         Assert.Contains("public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/roadmap/board\")]", controller, StringComparison.Ordinal);
         Assert.Contains("\"~/Views/PublicLanding/Roadmap.cshtml\"", controller, StringComparison.Ordinal);
-        Assert.Contains("return Redirect($\"/roadmap{Request.QueryString}\");", controller, StringComparison.Ordinal);
-        Assert.Contains("pageTitle: \"Roadmap - Chummer.run\"", controller, StringComparison.Ordinal);
-        Assert.Contains("hostedHeadingReplacement: \"Roadmap.\"", controller, StringComparison.Ordinal);
+        Assert.Contains("? BuildParticipateFrameHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
+        Assert.Contains(": BuildParticipateBoardRouteHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
+        Assert.Contains("=> await RoadmapBoardFallbackAsync(cancellationToken, \"/roadmap\")", controller, StringComparison.Ordinal);
+        Assert.Contains("? BuildParticipateFrameHref()", controller, StringComparison.Ordinal);
         Assert.Contains("HostedBoardHtmlLooksUnavailable(html)", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("BuildRoadmapFallbackPageModelAsync", controller, StringComparison.Ordinal);
         Assert.Contains("RoadmapBoardFallbackAsync", controller, StringComparison.Ordinal);
         Assert.Contains("data-chummer-roadmap-frame", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Open requests below.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("surface-roadmap-board", roadmapView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Current requests and planned work.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains(".route-roadmap.surface-roadmap-board .site-header", siteCss, StringComparison.Ordinal);
+        Assert.Contains(".roadmap-board-frame__embed", siteCss, StringComparison.Ordinal);
     }
 
     [Fact]

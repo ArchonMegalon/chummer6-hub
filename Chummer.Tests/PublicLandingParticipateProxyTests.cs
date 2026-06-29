@@ -170,7 +170,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task RoadmapPageProxiesHostedBoardIntoCanonicalRoadmapSurface()
+    public async Task RoadmapPageRendersTheSameHostedProductLiftBoardFrame()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), seedParticipateSnapshot: true);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -179,27 +179,25 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         IActionResult result = await controller.RoadmapPage(CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("<base href=\"/roadmap/\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("<link rel=\"canonical\" href=\"/roadmap\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("Roadmap.", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("Current requests and planned work.", content.Content ?? string.Empty, StringComparison.Ordinal);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/PublicLanding/Roadmap.cshtml", view.ViewName);
+        RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
+        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
     }
 
     [Fact]
-    public async Task RoadmapBoardProxyRedirectsRootBoardRouteToCanonicalRoadmapSurface()
+    public async Task RoadmapBoardProxyRedirectsRootBoardRouteToParticipateBoard()
     {
         var controller = CreatePublicLandingController(new HostedBoardPostsHttpClientFactory());
 
         IActionResult result = await controller.RoadmapBoardProxy(null, CancellationToken.None);
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/roadmap", redirect.Url);
+        Assert.Equal("/participate/board", redirect.Url);
     }
 
     [Fact]
-    public async Task RoadmapPageReturnsFirstPartyFallbackWhenUpstreamIsUnavailable()
+    public async Task RoadmapPageDoesNotPreflightTheHostedBoardBeforeRenderingFrame()
     {
         var controller = CreatePublicLandingController(new ThrowingHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -211,7 +209,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.Equal("~/Views/PublicLanding/Roadmap.cshtml", view.ViewName);
         RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Null(model.HostedBoardHref);
+        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
         Assert.True(model.Milestones.Count >= 0);
         Assert.False(string.IsNullOrWhiteSpace(model.PublicRequestSyncedLabel));
     }
@@ -226,11 +224,9 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         IActionResult result = await controller.RoadmapPage(CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("<base href=\"/roadmap/\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("<link rel=\"canonical\" href=\"/roadmap\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.DoesNotContain("ProductLift", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
+        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
     }
 
     [Fact]
@@ -243,10 +239,9 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         IActionResult result = await controller.RoadmapPage(CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("<base href=\"/roadmap/\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("<link rel=\"canonical\" href=\"/roadmap\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
+        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
     }
 
     [Fact]
@@ -323,7 +318,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task RoadmapBoardProxyServesEmbeddedShellForIframeRequests()
+    public async Task RoadmapBoardProxyRedirectsEmbeddedRequestsToParticipateBoard()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
@@ -333,33 +328,20 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         IActionResult result = await controller.RoadmapBoardProxy(null, CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("Roadmap.", content.Content ?? string.Empty, StringComparison.Ordinal);
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/participate/board?embed=1", redirect.Url);
     }
 
     [Fact]
-    public async Task RoadmapBoardProxyKeepsServingWarmCacheWhenUpstreamFails()
+    public async Task RoadmapBoardProxyRedirectsNestedEmbeddedRequestsToParticipateBoard()
     {
-        using var cache = new MemoryCache(new MemoryCacheOptions());
-        var seedingController = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), hostedBoardHtmlCache: cache);
-        seedingController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
-        seedingController.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
-        seedingController.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
-        seedingController.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
-        _ = await seedingController.RoadmapBoardProxy(null, CancellationToken.None);
+        var controller = CreatePublicLandingController(new ThrowingHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
 
-        var staleController = CreatePublicLandingController(new ThrowingHttpClientFactory(), hostedBoardHtmlCache: cache);
-        staleController.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
-        staleController.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
-        staleController.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
-        staleController.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+        IActionResult result = await controller.RoadmapBoardProxy("posts/mobile-companion", CancellationToken.None);
 
-        IActionResult result = await staleController.RoadmapBoardProxy(null, CancellationToken.None);
-
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        Assert.Equal("hit", staleController.Response.Headers["X-Chummer-Hosted-Board-Cache"].ToString());
-        Assert.Contains("Roadmap.", content.Content ?? string.Empty, StringComparison.Ordinal);
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/participate/board/posts/mobile-companion?embed=1", redirect.Url);
     }
 
     [Fact]

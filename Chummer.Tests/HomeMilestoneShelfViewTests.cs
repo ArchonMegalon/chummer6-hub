@@ -10,15 +10,17 @@ public sealed class RoadmapMilestoneProjectionViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Roadmap.cshtml");
         string source = File.ReadAllText(viewPath);
 
-        Assert.Contains("Roadmap.", source, StringComparison.Ordinal);
-        Assert.Contains("Requests stay in Participate.", source, StringComparison.Ordinal);
-        Assert.Contains("Current requests and planned work.", source, StringComparison.Ordinal);
-        Assert.Contains("Open requests below.", source, StringComparison.Ordinal);
+        Assert.Contains("surface-roadmap-board", source, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-roadmap-frame", source, StringComparison.Ordinal);
+        Assert.Contains("Board offline right now.", source, StringComparison.Ordinal);
+        Assert.Contains("Use Participate for requests and Changelog for shipped work.", source, StringComparison.Ordinal);
         Assert.Contains("Changelog", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Model.Milestones", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Top requests", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ProductLift owns the roadmap.", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Private issue", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Current requests and planned work.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open requests below.", source, StringComparison.Ordinal);
     }
 
     [Fact]
