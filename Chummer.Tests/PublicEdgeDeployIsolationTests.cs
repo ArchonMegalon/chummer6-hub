@@ -35,4 +35,21 @@ public sealed class PublicEdgeDeployIsolationTests
         Assert.Contains("docker compose \"${compose_args[@]}\" up -d --build --remove-orphans \"${public_edge_services[@]}\"", script, StringComparison.Ordinal);
         Assert.DoesNotContain("up -d --build --remove-orphans chummer-run-identity chummer-portal", script, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void PublicEdgeDoesNotOwnHomeAssistant()
+    {
+        string composePath = RepoPaths.FromRoot("docker-compose.public-edge.yml");
+        string envExamplePath = RepoPaths.FromRoot(".env.example");
+
+        string compose = File.ReadAllText(composePath);
+        string envExample = File.ReadAllText(envExamplePath);
+
+        Assert.DoesNotContain("home-girschele-hass", compose, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("homeassistant", compose, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("HOME_GIRSCHELE", compose, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("HOME_GIRSCHELE", envExample, StringComparison.OrdinalIgnoreCase);
+        Assert.False(File.Exists(RepoPaths.FromRoot("scripts", "home_girschele_hass_ops.sh")));
+        Assert.False(File.Exists(RepoPaths.FromRoot("docs", "HOME_GIRSCHELE_HOME_ASSISTANT_RUNBOOK.md")));
+    }
 }

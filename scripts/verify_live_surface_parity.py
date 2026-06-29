@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import html as html_lib
 import json
 import os
 import urllib.error
@@ -379,13 +380,18 @@ def verify(base_url: str) -> dict[str, Any]:
         path = str(surface["path"])
         url = urllib.parse.urljoin(f"{base}/", path.lstrip("/"))
         status_code, body, final_url, redirect_location, redirect_chain = fetch(url, base)
-        flattened = flatten_text(body) if status_code == 200 else body
+        decoded_body = html_lib.unescape(body)
+        flattened = flatten_text(decoded_body) if status_code == 200 else decoded_body
         missing = [token for token in surface.get("required_texts", []) if token not in flattened]
         required_any = list(surface.get("required_any_texts", []))
         missing_any = required_any if required_any and not any(token in flattened for token in required_any) else []
-        missing_html = [token for token in surface.get("required_html_texts", []) if token not in body]
+        missing_html = [token for token in surface.get("required_html_texts", []) if token not in decoded_body]
         forbidden = [token for token in surface.get("forbidden_texts", []) if token in flattened]
-        forbidden_html = [token for token in surface.get("forbidden_html_texts", []) if token in body]
+        forbidden_html = [
+            token
+            for token in surface.get("forbidden_html_texts", [])
+            if token in body or token in decoded_body
+        ]
         final_url_prefix = str(surface.get("required_final_url_prefix") or "")
         final_url_matches = True
         cross_origin_redirect = False
