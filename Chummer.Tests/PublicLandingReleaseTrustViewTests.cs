@@ -11,6 +11,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("<h1>Downloads</h1>", view, StringComparison.Ordinal);
+        Assert.Contains("Download Chummer from the current public shelf.", view, StringComparison.Ordinal);
+        Assert.Contains("Current public installer is selected for this browser when available.", view, StringComparison.Ordinal);
+        Assert.Contains("attach this installed copy to your account", view, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
         Assert.Contains("<summary>Other downloads</summary>", view, StringComparison.Ordinal);
@@ -19,7 +22,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.True(
             view.IndexOf("id=\"linux-source\"", StringComparison.Ordinal) >
             view.IndexOf("<summary>Other downloads</summary>", StringComparison.Ordinal));
-        Assert.Contains("Main build for this browser. Other downloads stay below.", view, StringComparison.Ordinal);
+        Assert.Contains("Current public installer is selected for this browser when available. Other downloads stay below.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Pick one.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer picks the right installer for this browser.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
