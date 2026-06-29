@@ -1,11 +1,11 @@
 {
   "contract_name": "chummer.table_pulse_scenario_replay",
-  "generated_at_utc": "2026-06-19T23:39:00Z",
+  "generated_at_utc": "2026-06-29T11:59:56Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "scenario_receipt_path": "/docker/chummercomplete/.integrated/fleet/_completion/table_pulse/TABLE_PULSE_SCENARIO_REPLAY.generated.json",
   "scenario_receipt_exists": true,
-  "scenario_receipt_generated_at_utc": "2026-06-19T23:39:00Z",
+  "scenario_receipt_generated_at_utc": "2026-06-29T11:59:56Z",
   "live_lane": {
     "command": "python3 scripts/verify_table_pulse_connected_lane_surface.py --base-url https://chummer.run",
     "returncode": 0,

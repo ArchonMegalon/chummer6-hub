@@ -125,8 +125,11 @@ def build_payload() -> dict[str, Any]:
         and "RYBBIT_CHUMMER_RUN_SITE_ID" in layout_source
         and "ChummerUi.trackPublicEvent" in site_js
         and "window.ChummerAnalyticsQueue" in site_js
-        and 'data-analytics-event="homepage_open_stable"' in landing
-        and 'data-analytics-event="homepage_open_nightly"' in landing
+        and 'data-analytics-event="homepage_open_downloads"' in landing
+        and 'data-analytics-event="homepage_open_build"' in landing
+        and 'data-analytics-event="homepage_open_play"' in landing
+        and 'homepage_open_stable' not in landing
+        and 'homepage_open_nightly' not in landing
         and 'data-analytics-event="downloads_stable_install"' in downloads
         and 'data-analytics-event="downloads_nightly_install"' in downloads
         and 'data-analytics-event="status_next_action"' in status
