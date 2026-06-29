@@ -937,8 +937,8 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Nightly" in downloads
     assert "Linux" in downloads
     assert "Build from source" in downloads
-    assert "Download Chummer from the current public shelf." in downloads
-    assert "Current public installer is selected for this browser when available. Other downloads stay below." in downloads
+    assert "Download Chummer from the current release page." in downloads
+    assert "The current installer is selected for this browser when available. Other downloads stay below." in downloads
     assert "attach this installed copy to your account" in downloads
     assert "Main build for this browser." in downloads
     assert "<summary>Other downloads</summary>" in downloads
@@ -969,6 +969,7 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
         "proof",
         "receipt",
         "Checked",
+        "public shelf",
     ):
         assert forbidden not in downloads
 
