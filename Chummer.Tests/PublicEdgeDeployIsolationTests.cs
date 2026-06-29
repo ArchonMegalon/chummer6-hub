@@ -37,7 +37,7 @@ public sealed class PublicEdgeDeployIsolationTests
     }
 
     [Fact]
-    public void PublicEdgeDoesNotOwnHomeAssistant()
+    public void PublicEdgeDoesNotOwnPrivateOpsServices()
     {
         string composePath = RepoPaths.FromRoot("docker-compose.public-edge.yml");
         string envExamplePath = RepoPaths.FromRoot(".env.example");
@@ -45,11 +45,26 @@ public sealed class PublicEdgeDeployIsolationTests
         string compose = File.ReadAllText(composePath);
         string envExample = File.ReadAllText(envExamplePath);
 
-        Assert.DoesNotContain("home-girschele-hass", compose, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("homeassistant", compose, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("HOME_GIRSCHELE", compose, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("HOME_GIRSCHELE", envExample, StringComparison.OrdinalIgnoreCase);
-        Assert.False(File.Exists(RepoPaths.FromRoot("scripts", "home_girschele_hass_ops.sh")));
-        Assert.False(File.Exists(RepoPaths.FromRoot("docs", "HOME_GIRSCHELE_HOME_ASSISTANT_RUNBOOK.md")));
+        string[] forbiddenPublicEdgeMarkers =
+        [
+            "home-girschele-hass",
+            "homeassistant",
+            "HOME_GIRSCHELE",
+        ];
+        foreach (string marker in forbiddenPublicEdgeMarkers)
+        {
+            Assert.DoesNotContain(marker, compose, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(marker, envExample, StringComparison.OrdinalIgnoreCase);
+        }
+
+        string[] privateOpsFiles =
+        [
+            RepoPaths.FromRoot("scripts", "home_girschele_hass_ops.sh"),
+            RepoPaths.FromRoot("docs", "HOME_GIRSCHELE_HOME_ASSISTANT_RUNBOOK.md"),
+        ];
+        foreach (string path in privateOpsFiles)
+        {
+            Assert.False(File.Exists(path));
+        }
     }
 }
