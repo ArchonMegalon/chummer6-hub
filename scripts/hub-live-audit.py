@@ -12033,8 +12033,8 @@ def main() -> int:
         AuditRoute(
             "/participate",
             "Participate",
-            required_texts=("What should Chummer do next?", "Public requests, clear bugs, useful ideas.", "Current requests", "Board is live."),
-            forbidden_texts=("productlift.dev",),
+            required_texts=("What should Chummer do next?", "Public requests, clear bugs, useful ideas."),
+            forbidden_texts=("productlift.dev", "data-chummer-participate-frame"),
             expects_header_count=1),
         AuditRoute(
             "/help",

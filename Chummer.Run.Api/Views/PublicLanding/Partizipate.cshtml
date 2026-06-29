@@ -4,9 +4,12 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-minimal surface-participate surface-partizipate";
 
-    var boardStateSummary = Model.EmbeddedBoardEnabled
-        ? "Board is live."
-        : "Board offline right now.";
+    var hasPosts = Model.Posts.Count > 0;
+    var boardStateSummary = hasPosts
+        ? Model.SyncedLabel
+        : Model.EmbeddedBoardEnabled
+            ? "Requests open here."
+            : "Board offline right now.";
     static string PublicParticipateText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
@@ -37,24 +40,42 @@
             </div>
         </div>
 
-        @if (Model.EmbeddedBoardEnabled && !string.IsNullOrWhiteSpace(Model.EmbeddedBoardHref))
+        @if (hasPosts)
         {
-            <div class="participate-hosted__frame-shell" data-chummer-participate-frame-shell>
-                <iframe
-                    class="participate-hosted__frame"
-                    src="@Model.EmbeddedBoardHref"
-                    title="Participate board"
-                    loading="eager"
-                    referrerpolicy="strict-origin-when-cross-origin"
-                    data-chummer-participate-frame></iframe>
+            <div class="participate-preview-list" aria-label="Current requests">
+                @foreach (var post in Model.Posts)
+                {
+                    <article class="participate-preview-card">
+                        <div class="participate-preview-card__facts">
+                            <span>@PublicParticipateText(post.Status)</span>
+                            <span>@post.Score votes</span>
+                            <span>@post.CommentCount comments</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(post.Href))
+                        {
+                            <a class="participate-preview-card__title" href="@post.Href">@PublicParticipateText(post.Title)</a>
+                        }
+                        else
+                        {
+                            <h3>@PublicParticipateText(post.Title)</h3>
+                        }
+                        <p>@PublicParticipateText(post.Summary)</p>
+                    </article>
+                }
             </div>
         }
         else
         {
             <article class="participate-board-fallback" role="status" aria-live="polite">
-                <p>Board offline right now. Use Contact for the Chummer5 Discord server.</p>
+                <p>
+                    @(Model.EmbeddedBoardEnabled
+                        ? "Requests open on the board route. If it stalls, use Contact for the Chummer5 Discord server."
+                        : "Board offline right now. Use Contact for the Chummer5 Discord server.")
+                </p>
                 <nav aria-label="Participate recovery actions">
-                    <a class="button-like button-like--primary" href="@Model.RetryHref">Retry</a>
+                    <a class="button-like button-like--primary" href="@Model.RetryHref">
+                        @(Model.EmbeddedBoardEnabled ? "Open requests" : "Retry")
+                    </a>
                     <a class="button-like button-like--secondary" href="@Model.RoadmapHref">Roadmap</a>
                     <a class="button-like button-like--ghost" href="@Model.SupportHref">Contact</a>
                 </nav>

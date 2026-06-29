@@ -42,8 +42,8 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
         self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', controller)
         participate = PARTICIPATE_VIEW.read_text(encoding="utf-8")
         self.assertIn("Current requests", participate)
-        self.assertIn("data-chummer-participate-frame", participate)
-        self.assertIn("Board is live.", participate)
+        self.assertIn("participate-preview-card", participate)
+        self.assertNotIn("data-chummer-participate-frame", participate)
 
     def test_public_participate_controller_targets_board_proxy_instead_of_recursive_wrapper(self) -> None:
         controller = (REPO_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs").read_text(encoding="utf-8")

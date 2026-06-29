@@ -32,7 +32,8 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     assert 'BuildParticipateBoardRouteHref(normalizedBoardPath)' in controller
     assert 'ResolveParticipateSupporterHref()' in controller
     assert "Current requests" in participate
-    assert 'data-chummer-participate-frame' in participate
+    assert 'participate-preview-card' in participate
+    assert 'data-chummer-participate-frame' not in participate
     assert "Requests, votes, and shipped work." not in controller
     assert 'id="participate-board"' not in controller
     assert "Tell us what slows the table down." not in controller
@@ -62,7 +63,9 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     assert "public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)" in gate_module.REQUIRED_SOURCE_PHRASES
     assert "return Redirect($\"/participate{Request.QueryString}\");" in gate_module.REQUIRED_SOURCE_PHRASES
     assert "Current requests" in gate_module.REQUIRED_SOURCE_PHRASES
+    assert "participate-preview-card" in gate_module.REQUIRED_SOURCE_PHRASES
     assert "data-chummer-board-skin" in gate_module.FORBIDDEN_HTML_PHRASES
+    assert "data-chummer-participate-frame" in gate_module.FORBIDDEN_SOURCE_PHRASES
     assert "release-backed closeout" in gate_module.FORBIDDEN_HTML_PHRASES
     assert "proof-bound" in gate_module.FORBIDDEN_HTML_PHRASES
 

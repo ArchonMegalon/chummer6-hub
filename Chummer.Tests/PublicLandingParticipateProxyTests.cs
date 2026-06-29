@@ -54,20 +54,22 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task ParticipatePageRendersFirstPartyBoardWithoutWaitingForHostedBoardSnapshot()
+    public async Task ParticipatePageProxiesFirstPartyBoardWithoutIframeWrapper()
     {
-        var controller = CreatePublicLandingController(new SlowHostedBoardPostsHttpClientFactory());
-        var stopwatch = Stopwatch.StartNew();
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.ParticipatePage(CancellationToken.None);
 
-        stopwatch.Stop();
-        ViewResult view = Assert.IsType<ViewResult>(result);
-        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Equal("Live", model.StatusLabel);
-        Assert.Equal("Board is live.", model.SyncedLabel);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(3), $"participate page should render first-party chrome quickly without waiting for the hosted board snapshot, but took {stopwatch.Elapsed}.");
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("<base href=\"/participate/board/\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("<link rel=\"canonical\" href=\"/participate\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-chummer-participate-frame", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("productlift.dev", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -90,35 +92,20 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task ParticipatePageServesDurableSnapshotWithoutCallingUpstream()
+    public async Task ParticipatePageFallsBackToFirstPartyOfflineViewWhenUpstreamIsUnavailable()
     {
-        const string cachedFeedbackUrl = "https://ideas.chummer-preview.test/feedback";
-        var seedingController = CreatePublicLandingController(
-            new HostedBoardPostsHttpClientFactory(),
-            feedbackUrl: cachedFeedbackUrl,
-            seedParticipateSnapshot: true);
-        _ = await seedingController.ParticipatePage(CancellationToken.None);
+        var controller = CreatePublicLandingController(new ThrowingHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
-        var staleController = CreatePublicLandingController(
-            new ThrowingHttpClientFactory(),
-            feedbackUrl: cachedFeedbackUrl,
-            seedParticipateSnapshot: false);
-        staleController.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
-        staleController.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
-        staleController.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
-
-        var stopwatch = Stopwatch.StartNew();
-        IActionResult result = await staleController.ParticipatePage(CancellationToken.None);
-        stopwatch.Stop();
+        IActionResult result = await controller.ParticipatePage(CancellationToken.None);
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.True(model.LoadedFromBoard);
-        Assert.Equal("Live", model.StatusLabel);
-        Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Single(model.Posts);
-        Assert.StartsWith("Synced ", model.SyncedLabel, StringComparison.Ordinal);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"durable participate snapshot should return immediately, but took {stopwatch.Elapsed}.");
+        Assert.False(model.EmbeddedBoardEnabled);
+        Assert.Equal("Offline", model.StatusLabel);
+        Assert.Equal("Board offline right now", model.SyncedLabel);
     }
 
     [Fact]
@@ -162,7 +149,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task ParticipatePageRendersFirstPartyBoardEvenWhenHostedBoardChromeIsAvailable()
+    public async Task ParticipatePageUsesCanonicalProxyWhenHostedBoardChromeIsAvailable()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), seedParticipateSnapshot: false);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -171,13 +158,11 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         IActionResult result = await controller.ParticipatePage(CancellationToken.None);
 
-        ViewResult view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
-        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.Equal("What should Chummer do next?", model.Heading);
-        Assert.Equal("Public requests, clear bugs, useful ideas.", model.Summary);
-        Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Equal("Live", model.StatusLabel);
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("Public requests, clear bugs, useful ideas.", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-chummer-participate-frame", content.Content ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]

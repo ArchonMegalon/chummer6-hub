@@ -51,14 +51,12 @@ test('help, contact, and participate keep public and private paths clear', async
   expect(contactRobots).toContain('index');
   expect(participateText).toContain('What should Chummer do next?');
   expect(participateText).toContain('Public requests, clear bugs, useful ideas.');
-  expect(participateText).toContain('data-chummer-participate-frame');
-  expect(participateText).toContain('/participate/board?embed=1');
+  expect(participateText).not.toContain('data-chummer-participate-frame');
   expect(participateText).not.toContain('ProductLift');
   expect(new URL(participateBoardResponse.url()).pathname).toBe('/participate');
   expect(participateBoardText).toContain('What should Chummer do next?');
   expect(participateBoardText).toContain('Public requests, clear bugs, useful ideas.');
-  expect(participateBoardText).toContain('data-chummer-participate-frame');
-  expect(participateBoardText).toContain('/participate/board?embed=1');
+  expect(participateBoardText).not.toContain('data-chummer-participate-frame');
   expect(participateBoardText).not.toContain('ProductLift');
   expect(new URL(participateFrameResponse.url()).pathname).toBe('/participate/board');
   expect(new URL(participateFrameResponse.url()).search).toContain('embed=1');
@@ -88,8 +86,7 @@ test('help, contact, and participate keep public and private paths clear', async
   await expect(participatePage.getByRole('heading', { name: 'What should Chummer do next?' })).toBeVisible();
   await expect(participatePage.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
   await expect(participatePage.locator('body')).not.toContainText('Board offline right now');
-  await expect(participatePage.locator('[data-chummer-participate-frame]')).toHaveCount(1);
-  await expect(participatePage.locator('[data-chummer-participate-frame]')).toHaveAttribute('src', '/participate/board?embed=1');
+  await expect(participatePage.locator('[data-chummer-participate-frame]')).toHaveCount(0);
   await expect(participatePage.locator('body')).not.toContainText('ProductLift');
   await participatePage.close();
 
@@ -103,6 +100,6 @@ test('help, contact, and participate keep public and private paths clear', async
     help_robots: helpRobots,
     contact_robots: contactRobots,
     participate_robots: participateRobots,
-    participate_mode: 'first_party_embedded_board',
+    participate_mode: 'first_party_productlift_proxy',
   });
 });

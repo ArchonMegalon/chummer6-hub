@@ -30,12 +30,11 @@ public sealed class PublicSignalOperationsViewTests
         Assert.DoesNotContain("CommunityCreatorHorizonsService", routeController, StringComparison.Ordinal);
         Assert.DoesNotContain("SignedInTrustStatusService", routeController, StringComparison.Ordinal);
         Assert.Contains("@PublicParticipateText(Model.Summary)", participateView, StringComparison.Ordinal);
-        Assert.Contains("participate-hosted__frame", participateView, StringComparison.Ordinal);
-        Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("participate-hosted__frame", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
         Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
-        Assert.Contains("Board is live.", participateView, StringComparison.Ordinal);
-        Assert.DoesNotContain("participate-preview-list", participateView, StringComparison.Ordinal);
-        Assert.DoesNotContain("participate-preview-card", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-preview-list", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-preview-card", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("participate-toolbar", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Preview current requests", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Feedback and roadmap live here.", participateView, StringComparison.Ordinal);

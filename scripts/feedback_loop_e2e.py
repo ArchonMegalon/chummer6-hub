@@ -26,8 +26,8 @@ def main() -> int:
 
     if 'aria-label="Participate board"' not in feedback_view:
         failures.append("participate view lost first-party board landmark")
-    if "data-chummer-participate-frame" not in feedback_view:
-        failures.append("participate view lost embedded board frame hook")
+    if "data-chummer-participate-frame" in feedback_view:
+        failures.append("participate view reintroduced embedded board frame hook")
     if "Board offline right now. Use Contact for the Chummer5 Discord server." not in feedback_view:
         failures.append("participate view lost first-party fallback wording")
     if args.stub_delivery and not DRY_RUN_RECEIPT.is_file():

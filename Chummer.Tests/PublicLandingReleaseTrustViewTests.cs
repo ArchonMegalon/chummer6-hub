@@ -599,8 +599,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/participate{Request.QueryString}\");", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", controller, StringComparison.Ordinal);
-        Assert.Contains("participate-hosted__frame", feedback, StringComparison.Ordinal);
-        Assert.Contains("data-chummer-participate-frame", feedback, StringComparison.Ordinal);
+        Assert.DoesNotContain("participate-hosted__frame", feedback, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-chummer-participate-frame", feedback, StringComparison.Ordinal);
+        Assert.Contains("participate-preview-card", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("Need private help?", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("Use <a class=\"inline-link\" href=\"/contact#support-intake\">Support</a>", feedback, StringComparison.Ordinal);
         Assert.DoesNotContain("shipped follow-through", feedback, StringComparison.OrdinalIgnoreCase);

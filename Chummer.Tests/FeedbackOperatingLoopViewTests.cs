@@ -28,9 +28,9 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Feedback.cshtml\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.Ordinal);
         Assert.Contains("@PublicParticipateText(Model.Summary)", participateView, StringComparison.Ordinal);
-        Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
         Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
-        Assert.Contains("Board is live.", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-preview-card", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Feedback and roadmap live here.", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("data-chummer-board-skin", participateView, StringComparison.Ordinal);
     }
