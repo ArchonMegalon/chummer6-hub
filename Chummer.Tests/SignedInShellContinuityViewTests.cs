@@ -174,17 +174,23 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("data-dossier-video-verified", detailView, StringComparison.Ordinal);
         Assert.Contains("data-telegram-share-delivered", detailView, StringComparison.Ordinal);
         Assert.Contains("data-origin-edition-tabs", detailView, StringComparison.Ordinal);
-        Assert.Contains("Readiness", detailView, StringComparison.Ordinal);
+        Assert.Contains("Edition status", detailView, StringComparison.Ordinal);
         Assert.Contains("Story draft", detailView, StringComparison.Ordinal);
         Assert.Contains("Story polish", detailView, StringComparison.Ordinal);
         Assert.Contains("Read in Audiobookshelf", detailView, StringComparison.Ordinal);
         Assert.Contains("Listen in Audiobookshelf", detailView, StringComparison.Ordinal);
         Assert.Contains("Watch scene movie", detailView, StringComparison.Ordinal);
-        Assert.Contains("Canon Audit", detailView, StringComparison.Ordinal);
+        Assert.Contains("Canon notes", detailView, StringComparison.Ordinal);
         Assert.Contains("Access notes", detailView, StringComparison.Ordinal);
         Assert.Contains("Dossier ebook share locked", detailView, StringComparison.Ordinal);
         Assert.Contains("Archived book locked", detailView, StringComparison.Ordinal);
         Assert.Contains("Dossier film locked", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Gold ready", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("face verification", detailView, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(">Readiness<", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Edition readiness", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Verified<", detailView, StringComparison.Ordinal);
+        Assert.DoesNotContain(">Gated<", detailView, StringComparison.Ordinal);
     }
 
     [Fact]

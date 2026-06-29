@@ -41,7 +41,7 @@
                  data-book-artifact-verified="@publication.BookArtifactVerified.ToString().ToLowerInvariant()"
                  data-dossier-video-verified="@publication.DossierVideoVerified.ToString().ToLowerInvariant()"
                  data-telegram-share-delivered="@publication.TelegramShareDelivered.ToString().ToLowerInvariant()">
-            <span class="tag">@(publication.GoldReady ? "Gold ready" : "In progress")</span>
+            <span class="tag">@(publication.GoldReady ? "Ready" : "Building")</span>
             <h2>Cover</h2>
             @if (canShowCover)
             {
@@ -54,40 +54,40 @@
             }
             else
             {
-                <p class="muted-copy">Cover unlocks after face verification.</p>
+                <p class="muted-copy">Cover unlocks after the portrait is ready.</p>
             }
         </article>
         <article class="app-action-card">
-            <span class="tag">Readiness</span>
-            <h2>Edition readiness</h2>
+            <span class="tag">Edition</span>
+            <h2>Edition status</h2>
             <div class="settings-summary-list">
                 <div class="settings-summary-row">
                     <span>Story draft</span>
-                    <strong>@(publication.ProviderAuthoredManuscriptImported ? "Imported" : "Pending")</strong>
+                    <strong>@(publication.ProviderAuthoredManuscriptImported ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
                     <span>Story polish</span>
-                    <strong>@(publication.UndetectableHumanizerApplied ? "Applied" : "Pending")</strong>
+                    <strong>@(publication.UndetectableHumanizerApplied ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
                     <span>Book</span>
-                    <strong>@(publication.BookArtifactVerified ? "Verified" : "Pending")</strong>
+                    <strong>@(publication.BookArtifactVerified ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
                     <span>Cover</span>
-                    <strong>@(publication.StorySceneCoverUsesSelectedCharacterFace ? "Verified" : "Pending")</strong>
+                    <strong>@(publication.StorySceneCoverUsesSelectedCharacterFace ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
                     <span>Audio</span>
-                    <strong>@(publication.AudiobookshelfPlaybackVerified ? "Verified" : "Pending")</strong>
+                    <strong>@(publication.AudiobookshelfPlaybackVerified ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
                     <span>Video</span>
-                    <strong>@(publication.DossierVideoVerified ? "Verified" : "Pending")</strong>
+                    <strong>@(publication.DossierVideoVerified ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
                     <span>Share</span>
-                    <strong>@(publication.TelegramShareDelivered ? "Delivered" : "Pending")</strong>
+                    <strong>@(publication.TelegramShareDelivered ? "Delivered" : "Waiting")</strong>
                 </div>
                 @if (publication.ArtifactCapability is not null)
                 {
@@ -126,7 +126,7 @@
             <a class="button-like button-like--ghost" href="#origin-edition-read">Read</a>
             <a class="button-like button-like--ghost" href="#origin-edition-listen">Listen</a>
             <a class="button-like button-like--ghost" href="#origin-edition-watch">Watch</a>
-            <a class="button-like button-like--ghost" href="#origin-edition-canon-audit">Canon Audit</a>
+            <a class="button-like button-like--ghost" href="#origin-edition-canon-audit">Canon notes</a>
         </nav>
     </article>
 </section>
@@ -201,7 +201,7 @@
          data-canon-privacy-receipts-present="@((publication.ProviderAuthoredManuscriptImported && publication.UndetectableHumanizerApplied).ToString().ToLowerInvariant())"
          data-no-fallback-media-verified="@publication.GoldReady.ToString().ToLowerInvariant()">
     <article class="app-action-card">
-        <span class="tag">Canon Audit</span>
+        <span class="tag">Canon notes</span>
         <h2 class="heading-with-help">
             <span>Access notes</span>
             <span class="inline-help-dot" tabindex="0" role="note" title="@rightsTooltip" aria-label="@rightsTooltip">?</span>
@@ -214,11 +214,11 @@
             </div>
             <div class="settings-summary-row">
                 <span>Canon and privacy</span>
-                <strong>@(publication.ProviderAuthoredManuscriptImported && publication.UndetectableHumanizerApplied ? "Ready" : "Pending")</strong>
+                <strong>@(publication.ProviderAuthoredManuscriptImported && publication.UndetectableHumanizerApplied ? "Ready" : "Waiting")</strong>
             </div>
             <div class="settings-summary-row">
-                <span>No fallback media</span>
-                <strong>@(publication.GoldReady ? "Verified" : "Gated")</strong>
+                <span>Media links</span>
+                <strong>@(publication.GoldReady ? "Ready" : "Waiting")</strong>
             </div>
         </div>
         <div class="minimal-actions">
