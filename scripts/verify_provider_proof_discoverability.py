@@ -158,14 +158,19 @@ def main() -> int:
 
     for provider, required_paths in required_artifacts().items():
         mirrored_paths: list[str] = []
+        mirror_fallback_paths: list[str] = []
         missing: list[str] = []
         provider_root = MIRROR_ROOT / provider
         provider_root.mkdir(parents=True, exist_ok=True)
         for source in required_paths:
+            target = provider_root / source.name
             if not source.is_file():
+                if target.is_file():
+                    mirrored_paths.append(str(target))
+                    mirror_fallback_paths.append(str(target))
+                    continue
                 missing.append(str(source))
                 continue
-            target = provider_root / source.name
             shutil.copyfile(source, target)
             mirrored_paths.append(str(target))
         if required_paths:
@@ -181,6 +186,7 @@ def main() -> int:
             "status": status,
             "required_paths": [str(path) for path in required_paths],
             "mirrored_paths": sorted(set(mirrored_paths)),
+            "mirror_fallback_paths": sorted(set(mirror_fallback_paths)),
             "missing_paths": missing,
         }
 

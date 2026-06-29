@@ -57,6 +57,27 @@ class ProviderProofDiscoverabilityGateTests(unittest.TestCase):
             self.assertEqual(icanpreneur_payload["license_tier"], "Tier 3")
             self.assertIn("Discovery interviews", icanpreneur_payload["claim_boundary"])
 
+    def test_gate_accepts_existing_mirrors_when_transient_fleet_cache_is_missing(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="provider-proof-mirror-fallback-") as temp_dir:
+            root = Path(temp_dir)
+            mirror = root / "mirror"
+            for provider, paths in module.required_artifacts().items():
+                provider_root = mirror / provider
+                provider_root.mkdir(parents=True, exist_ok=True)
+                for path in paths:
+                    (provider_root / path.name).write_text("{}", encoding="utf-8")
+            output = root / "PROVIDER_PROOF_DISCOVERABILITY.generated.json"
+
+            with mock.patch.object(module, "FLEET_COMPLETION_ROOT", root / "missing-fleet"), mock.patch.object(module, "OUTPUT_PATH", output), mock.patch.object(module, "MIRROR_ROOT", mirror):
+                self.assertEqual(module.main(), 0)
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "pass")
+            self.assertEqual(payload["providers"]["payfunnels"]["status"], "pass")
+            self.assertTrue(payload["providers"]["payfunnels"]["mirror_fallback_paths"])
+            self.assertEqual(payload["providers"]["payfunnels"]["missing_paths"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
