@@ -155,12 +155,7 @@ app.Use(async (context, next) =>
         context.Response.Headers["X-Robots-Tag"] = robotsPolicy;
         if (requiresNoStore)
         {
-            context.Response.Headers["Cache-Control"] = "private, no-store, max-age=0";
-            context.Response.Headers["CDN-Cache-Control"] = "no-store, max-age=0";
-            context.Response.Headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
-            context.Response.Headers["Surrogate-Control"] = "no-store";
-            context.Response.Headers["Pragma"] = "no-cache";
-            context.Response.Headers["Expires"] = "0";
+            ApplyNoStoreHeaders(context.Response.Headers);
         }
 
         return Task.CompletedTask;
@@ -199,7 +194,12 @@ app.UseStaticFiles(new StaticFileOptions
     ContentTypeProvider = contentTypeProvider,
     OnPrepareResponse = fileContext =>
     {
-        fileContext.Context.Response.Headers["X-Robots-Tag"] = ResolveRobotsPolicy(fileContext.Context.Request.Path);
+        PathString requestPath = fileContext.Context.Request.Path;
+        fileContext.Context.Response.Headers["X-Robots-Tag"] = ResolveRobotsPolicy(requestPath);
+        if (RequiresNoStoreHeaders(requestPath))
+        {
+            ApplyNoStoreHeaders(fileContext.Context.Response.Headers);
+        }
     }
 });
 
@@ -273,6 +273,8 @@ static bool RequiresNoStoreHeaders(PathString path)
     return path.StartsWithSegments("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
         || IsLegacyMacReleaseBootstrapArtifactPath(path)
         || IsPublicVideoMediaPath(path)
+        || path.Equals("/service-worker.js", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/manifest.json", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/proof/windows", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/aur-packages.json", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/ledger/newsroom", StringComparison.OrdinalIgnoreCase)
@@ -285,6 +287,16 @@ static bool RequiresNoStoreHeaders(PathString path)
         || path.Equals("/llms.txt", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/ai.txt", StringComparison.OrdinalIgnoreCase)
         || path.Value?.StartsWith("/install-", StringComparison.OrdinalIgnoreCase) == true;
+}
+
+static void ApplyNoStoreHeaders(IHeaderDictionary headers)
+{
+    headers["Cache-Control"] = "private, no-store, max-age=0";
+    headers["CDN-Cache-Control"] = "no-store, max-age=0";
+    headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
+    headers["Surrogate-Control"] = "no-store";
+    headers["Pragma"] = "no-cache";
+    headers["Expires"] = "0";
 }
 
 static bool IsPublicVideoMediaPath(PathString path)

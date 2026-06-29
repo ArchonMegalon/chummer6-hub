@@ -3419,6 +3419,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("/downloads/proof/windows", program, StringComparison.Ordinal);
         Assert.Contains("/downloads/install", program, StringComparison.Ordinal);
         Assert.Contains("/install-", program, StringComparison.Ordinal);
+        Assert.Contains("/service-worker.js", program, StringComparison.Ordinal);
+        Assert.Contains("/manifest.json", program, StringComparison.Ordinal);
+        Assert.Contains("OnPrepareResponse", program, StringComparison.Ordinal);
+        Assert.Contains("ApplyNoStoreHeaders(fileContext.Context.Response.Headers)", program, StringComparison.Ordinal);
         Assert.Contains("context.Response.Redirect(\"/downloads/release-upload/bootstrap.sh\", permanent: false)", program, StringComparison.Ordinal);
         Assert.Contains("Cache-Control", program, StringComparison.Ordinal);
         Assert.Contains("CDN-Cache-Control", program, StringComparison.Ordinal);
