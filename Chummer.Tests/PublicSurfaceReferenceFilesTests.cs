@@ -336,7 +336,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         (string id, string href, string badge)[] shippedCards =
         {
             ("lane_creator", "/creator", "Shipped MVP"),
-            ("real_mobile_projection", "/mobile", "Live now"),
+            ("real_app_entry", "/build", "Live now"),
             ("feature_nexus_pan", "/play/continuity", "Shipped MVP"),
             ("horizon_knowledge_fabric", "/rules", "Shipped MVP"),
             ("horizon_karma_forge", "/participate/karma-forge", "Shipped MVP"),

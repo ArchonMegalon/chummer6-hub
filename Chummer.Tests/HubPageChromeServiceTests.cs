@@ -66,7 +66,7 @@ public sealed class HubPageChromeServiceTests
     }
 
     [Fact]
-    public void BuildPublicChromeShowsPwaButHidesParticipateFromGuestPrimaryNavigation()
+    public void BuildPublicChromeShowsBuildButHidesParticipateFromGuestPrimaryNavigation()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -80,12 +80,14 @@ public sealed class HubPageChromeServiceTests
         var chrome = service.BuildPublicChrome("Home", "Flagship shell.", "/");
 
         Assert.Equal(
-            ["Home", "PWA", "Help"],
+            ["Home", "Build", "Help"],
             chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
         Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
-        Assert.Equal("/mobile", chrome.PrimaryNavigation[1].Href);
+        Assert.Equal("/build", chrome.PrimaryNavigation[1].Href);
         Assert.Equal("/help", chrome.PrimaryNavigation[2].Href);
-        Assert.Contains(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/mobile", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/build", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(chrome.PrimaryNavigation, link => string.Equals(link.Label, "PWA", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/mobile", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/participate", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/partizipate", StringComparison.OrdinalIgnoreCase));
     }

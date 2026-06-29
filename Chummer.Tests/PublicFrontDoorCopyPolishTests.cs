@@ -408,8 +408,10 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         Assert.Contains("label: Home", navigation, StringComparison.Ordinal);
         Assert.Contains("href: /", navigation, StringComparison.Ordinal);
-        Assert.Contains("label: PWA", navigation, StringComparison.Ordinal);
-        Assert.Contains("href: /mobile", navigation, StringComparison.Ordinal);
+        Assert.Contains("label: Build", navigation, StringComparison.Ordinal);
+        Assert.Contains("href: /build", navigation, StringComparison.Ordinal);
+        Assert.DoesNotContain("label: PWA", navigation, StringComparison.Ordinal);
+        Assert.DoesNotContain("href: /mobile", navigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Get Chummer", firstVisitSource, StringComparison.Ordinal);
         Assert.DoesNotContain("href: /downloads", firstVisitSource, StringComparison.Ordinal);
         Assert.Contains("label: Participate", navigation, StringComparison.Ordinal);
@@ -572,7 +574,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ReadyForTonight.cshtml"));
         string combined = string.Join(Environment.NewLine, controller, service);
 
-        Assert.Contains("role status, starter loadouts, session files, and mobile setup", combined, StringComparison.Ordinal);
+        Assert.Contains("role status, starter loadouts, and session files", combined, StringComparison.Ordinal);
         Assert.Contains("table role", combined, StringComparison.Ordinal);
         Assert.Contains("export path", combined, StringComparison.Ordinal);
         Assert.Contains("Download starter file", view, StringComparison.Ordinal);
@@ -1115,7 +1117,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         string[] publicFeatureMethodMarkers =
         [
-            "public async Task<IActionResult> MobileProjectionPage",
+            "public IActionResult MobileProjectionPage",
             "public async Task<IActionResult> ParticipatePage",
             "public async Task<IActionResult> AlicePage",
             "public async Task<IActionResult> TablePulsePage",

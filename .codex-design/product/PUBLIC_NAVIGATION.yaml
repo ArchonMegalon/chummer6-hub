@@ -4,8 +4,8 @@ version: 1
 primary_nav:
   - label: Home
     href: /
-  - label: PWA
-    href: /mobile
+  - label: Build
+    href: /build
   - label: Participate
     href: /participate
   - label: Help

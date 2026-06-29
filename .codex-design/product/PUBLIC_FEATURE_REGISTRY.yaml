@@ -159,15 +159,15 @@ cards:
     audience: public
     image_family: streetfront
     action_label: See continuity in preview
-  - id: real_mobile_projection
+  - id: real_app_entry
     bucket: whats_real_now
-    title: Mobile projection
-    summary: Inspect the mobile and PWA preview without treating it as a replacement for desktop rules math.
-    href: /mobile
+    title: Build in Chummer
+    summary: Open the browser app. Mobile-specific surfaces return when they have real product content.
+    href: /build
     badge: Live now
     audience: public
     image_family: streetfront
-    action_label: Open mobile projection
+    action_label: Open Chummer
   - id: real_package_browser
     bucket: whats_real_now
     title: Package browser

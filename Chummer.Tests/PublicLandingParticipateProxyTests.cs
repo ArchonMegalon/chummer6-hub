@@ -66,8 +66,8 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.Equal("What should Chummer do next?", model.Heading);
-        Assert.Equal("Public requests, clear bugs, useful ideas.", model.Summary);
+        Assert.Equal("Participate", model.Heading);
+        Assert.Equal("Feedback and roadmap live on the board.", model.Summary);
         Assert.True(model.EmbeddedBoardEnabled);
         Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
         Assert.Equal("/participate/board", model.DirectBoardHref);
@@ -106,7 +106,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         ViewResult view = Assert.IsType<ViewResult>(result);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
         Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Equal("Live", model.StatusLabel);
+        Assert.Equal("Open", model.StatusLabel);
         Assert.Equal("Board is live.", model.SyncedLabel);
         Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
     }
@@ -163,8 +163,8 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.Equal("What should Chummer do next?", model.Heading);
-        Assert.Equal("Public requests, clear bugs, useful ideas.", model.Summary);
+        Assert.Equal("Participate", model.Heading);
+        Assert.Equal("Feedback and roadmap live on the board.", model.Summary);
         Assert.True(model.EmbeddedBoardEnabled);
         Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
     }
@@ -261,7 +261,8 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("What do you want to see next?", content.Content ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -316,7 +317,8 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ContentResult content = Assert.IsType<ContentResult>(result);
         Assert.Equal("hit", staleController.Response.Headers["X-Chummer-Hosted-Board-Cache"].ToString());
-        Assert.Contains("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("What do you want to see next?", content.Content ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]

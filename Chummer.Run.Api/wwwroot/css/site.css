@@ -9842,8 +9842,9 @@ body {
 }
 
 .surface-participate .site-main {
-  width: min(1120px, calc(100% - 1rem));
-  padding-top: 0.35rem;
+  width: min(1520px, calc(100% - 0.75rem));
+  min-height: calc(100svh - 4.25rem);
+  padding-top: 0.25rem;
 }
 
 .route-participate.surface-participate .site-footer {
@@ -9880,6 +9881,7 @@ body {
 .participate-shell {
   display: grid;
   min-height: 0;
+  height: calc(100svh - 4.75rem);
   border: 0;
   border-radius: 0;
   padding: 0;
@@ -10000,9 +10002,9 @@ body {
 
 .participate-hosted {
   display: grid;
-  gap: 0.65rem;
-  --participate-frame-visible-height: clamp(24rem, 62svh, 42rem);
-  --participate-frame-crop: 4.5rem;
+  min-height: 0;
+  --participate-frame-visible-height: calc(100svh - 4.75rem);
+  --participate-frame-crop: 0rem;
 }
 
 .participate-hosted__loading {
@@ -10145,8 +10147,8 @@ body {
   width: 100%;
   height: var(--participate-frame-visible-height);
   overflow: hidden;
-  border: 1px solid var(--minimal-line);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
   background: var(--minimal-page);
 }
 

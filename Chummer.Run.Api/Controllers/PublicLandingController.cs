@@ -1272,26 +1272,13 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/mobile")]
     [HttpHead("/mobile")]
     [Produces("text/html")]
-    public async Task<IActionResult> MobileProjectionPage(CancellationToken cancellationToken)
-    {
-        var model = await BuildMobileProjectionPageModel(
-            currentPath: "/mobile",
-            chromeTitle: "Mobile and PWA",
-            chromeDescription: "Phone, tablet, and installable play entry with reconnect behavior and role-aware routes.",
-            eyebrow: "Mobile",
-            heading: "Mobile and PWA entry",
-            intro: "Installability, reconnect behavior, and player, GM, or observer entry stay on Chummer routes instead of fallback docs or legacy aliases.",
-            currentRoleKey: "player",
-            primaryAction: new TrustPageActionViewModel("Open play shell", "/play", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
-            cancellationToken: cancellationToken);
-        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
-    }
+    public IActionResult MobileProjectionPage()
+        => Redirect("/app?command=character_roster");
 
     [HttpGet("/pwa")]
     [HttpHead("/pwa")]
     public IActionResult PwaProjectionAlias()
-        => Redirect("/mobile");
+        => Redirect("/app?command=character_roster");
 
     [HttpGet("/play")]
     [HttpHead("/play")]
@@ -1306,12 +1293,12 @@ public sealed class PublicLandingController : Controller
         var model = await BuildMobileProjectionPageModel(
             currentPath: currentPath,
             chromeTitle: $"{currentRoleLabel} play shell",
-            chromeDescription: "Role-aware mobile and tablet entry with reconnect and continuity inside Chummer.",
+            chromeDescription: "Role-aware play entry with reconnect and continuity inside Chummer.",
             eyebrow: "Play shell",
             heading: $"{currentRoleLabel} entry",
-            intro: "The play shell keeps role entry, reconnect expectations, and current continuity visible without pretending the mobile route replaces installs, support, or deeper campaign work.",
+            intro: "The play shell keeps role entry, reconnect expectations, and current continuity visible without pretending a preview route is the product.",
             currentRoleKey: currentRoleKey,
-            primaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "primary"),
+            primaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
             cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
@@ -1359,7 +1346,7 @@ public sealed class PublicLandingController : Controller
             eyebrow: "Rules-light play shell",
             heading: "Anarchy play shell",
             intro: "This page keeps a one-page runner sheet, continuity cues, and explainable export together without pretending to be full dense-builder parity.",
-            primaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "primary"),
+            primaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "primary"),
             secondaryAction: new TrustPageActionViewModel("View dispatches through the Anarchy lens", "/ledger/dispatches?ruleset=anarchy", "secondary"),
             cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/Anarchy.cshtml", model);
@@ -2267,9 +2254,9 @@ public sealed class PublicLandingController : Controller
                     currentPath,
                     string.IsNullOrWhiteSpace(subject.DisplayName) ? "Signed in" : subject.DisplayName,
                     subject.Email),
-            Heading: "What should Chummer do next?",
-            Summary: "Public requests, clear bugs, useful ideas.",
-            StatusLabel: hostedBoardAvailable ? "Live" : loadedFromBoard ? "Cached" : "Offline",
+            Heading: "Participate",
+            Summary: "Feedback and roadmap live on the board.",
+            StatusLabel: hostedBoardAvailable ? "Open" : loadedFromBoard ? "Cached" : "Offline",
             Posts: visiblePosts,
             FallbackItems: fallbackItems,
             TotalRequestCount: loadedFromBoard ? publicRequests.TotalCount : 0,
@@ -2577,10 +2564,10 @@ public sealed class PublicLandingController : Controller
                     canonicalHref: canonicalHref ?? currentPath,
                     assetProxyBasePath: "/participate/provider-assets",
                     pageTitle: "Participate · Chummer",
-                    hostedHeadingReplacement: "What should Chummer do next?",
-                    hostedSummaryReplacement: "Public requests, clear bugs, useful ideas.",
+                    hostedHeadingReplacement: null,
+                    hostedSummaryReplacement: null,
                     hostedPrimaryActionReplacement: "Add note",
-                    hostedLeadReplacement: "Public requests, clear bugs, useful ideas.",
+                    hostedLeadReplacement: null,
                     applyFeedbackPolish: true,
                     failureTitle: "Board offline right now",
                     failureSummary: "Try again shortly. Use Contact for the Chummer5 Discord server.",
@@ -4108,14 +4095,8 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/build")]
     [HttpHead("/build")]
     [Produces("text/html")]
-    public async Task<IActionResult> BuildPage(CancellationToken cancellationToken)
-        => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(
-            cancellationToken,
-            currentPath: "/build",
-            title: "Build",
-            eyebrow: "Build",
-            heading: "Build a runner",
-            intro: "Use Build when you want a guided runner plan, tradeoff notes, legality explanations, or a clean way to discard and apply suggested changes."));
+    public IActionResult BuildPage()
+        => Redirect("/app?command=character_roster");
 
     [HttpGet("/alice")]
     [HttpHead("/alice")]
@@ -8519,7 +8500,7 @@ document.addEventListener('DOMContentLoaded', function () {
             Heading: heading,
             Intro: intro,
             CurrentRoleLabel: ResolvePlayRoleLabel(currentRoleKey),
-            InstallabilitySummary: $"The public mobile page explains installability, reconnect behavior, and role entry without pretending the mobile shell replaces downloads, support, or deeper campaign work. Claimed installs currently tracked: {continuitySummary.ActiveInstallationCount}; pending recovery items: {continuitySummary.PendingClaimCount + continuitySummary.PendingBrowserCallbackCount}.",
+            InstallabilitySummary: $"This play entry explains reconnect behavior and role entry without pretending a preview shell replaces the app. Claimed installs currently tracked: {continuitySummary.ActiveInstallationCount}; pending recovery items: {continuitySummary.PendingClaimCount + continuitySummary.PendingBrowserCallbackCount}.",
             Roles:
             [
                 new MobileRoleCardViewModel("Player", "Resume the session, keep the dossier visible, and re-enter with reconnect behavior already named.", "/player", string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)),
@@ -8528,11 +8509,11 @@ document.addEventListener('DOMContentLoaded', function () {
             ],
             Capabilities:
             [
-                new MobileCapabilityCardViewModel("Installable PWA", "The public page keeps the installable shell, entry point, and fallback behavior inside Chummer."),
+                new MobileCapabilityCardViewModel("Play entry", "The public page keeps role entry and fallback behavior inside Chummer."),
                 new MobileCapabilityCardViewModel("Offline and reconnect", "Continuity, reconnect, and next safe action remain visible before the network starts wobbling."),
                 new MobileCapabilityCardViewModel("Role-aware entry", "Player, GM, and observer aliases all converge on the same play shell instead of splitting the product into separate stories."),
                 new MobileCapabilityCardViewModel("Claimed install truth", $"Active claimed installs: {continuitySummary.ActiveInstallationCount}; active grants: {continuitySummary.ActiveGrantCount}; observed platforms: {string.Join(", ", continuitySummary.PlatformLabels.DefaultIfEmpty("none yet"))}."),
-                new MobileCapabilityCardViewModel("Downloads stay separate", "Mobile entry explains play behavior; Downloads still owns platform choice, build integrity, and guided acquisition.")
+                new MobileCapabilityCardViewModel("Downloads stay separate", "Play entry explains table behavior; Downloads still owns platform choice and guided acquisition.")
             ],
             PrimaryAction: primaryAction,
             SecondaryAction: secondaryAction,
@@ -8547,7 +8528,7 @@ document.addEventListener('DOMContentLoaded', function () {
             mode = "mobile_pwa_living_world",
             status = "opt_in_required",
             status_label = "Opt in required",
-            summary = "Black Ledger live updates are available in the PWA when you opt in via account preferences.",
+            summary = "Black Ledger live updates are available when you opt in via account preferences.",
             legal_posture = "Public lane stays aggregate only. No private run table state is published.",
             opt_in_route = "/account",
             updates_route = "/mobile/pwa/ledger.json",
@@ -8764,8 +8745,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 .Select(receipt => new NexusPanReceiptViewModel(receipt.ReceiptId, receipt.Topic, receipt.Summary, receipt.Route, receipt.Status))
                 .ToArray(),
             PrimaryAction: new TrustPageActionViewModel("Open continuity history", "/play/continuity/history", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "secondary"),
-            TertiaryAction: new TrustPageActionViewModel("Open mobile app data", "/mobile/pwa.json", "ghost"),
+            SecondaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "secondary"),
+            TertiaryAction: new TrustPageActionViewModel("Open account", "/account", "ghost"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
     }
@@ -11138,18 +11119,18 @@ Boundary:
             Eyebrow: "Session-start mode",
             Heading: "Ready for Tonight",
             Intro: "This page answers the only urgent question before a game starts: are you ready, what still blocks you, and which packet should you carry into the session right now.",
-            VerdictSummary: "Chummer now keeps role status, starter loadouts, session files, and mobile setup in one place.",
+            VerdictSummary: "Chummer now keeps role status, starter loadouts, and session files in one place.",
             SummaryPoints:
             [
                 "Role-aware readiness verdicts",
                 "Starter loadouts with downloadable JSON",
-                "Printable packets and mobile setup"
+                "Printable packets"
             ],
             Verdicts: verdicts,
             RoleKits: kits,
             Packets: packets,
             PrimaryAction: new TrustPageActionViewModel("Download player notes", "/ready/packet/player.md", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "secondary"),
+            SecondaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "secondary"),
             TertiaryAction: new TrustPageActionViewModel("Open help", "/help", "ghost"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));

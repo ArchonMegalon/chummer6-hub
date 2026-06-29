@@ -5,35 +5,11 @@
     ViewData["SurfaceClass"] = "surface-minimal surface-participate surface-partizipate";
 
     var hasHostedBoard = Model.EmbeddedBoardEnabled && !string.IsNullOrWhiteSpace(Model.EmbeddedBoardHref);
-    var boardStateSummary = hasHostedBoard
-        ? "Board opens here."
-        : "Board offline right now.";
-    static string PublicParticipateText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
-<section class="minimal-page-hero participate-hero route-anchor-target" aria-labelledby="partizipate-title">
-    <div class="participate-hero__copy">
-        <p class="eyebrow">@Model.StatusLabel</p>
-        <h1 id="partizipate-title">@PublicParticipateText(Model.Heading)</h1>
-        <p>@PublicParticipateText(Model.Summary)</p>
-    </div>
-    <div class="participate-hero__status">
-        @if (!string.IsNullOrWhiteSpace(Model.SupporterHref))
-        {
-            <a class="button-like button-like--ghost" href="@Model.SupporterHref">Supporter</a>
-        }
-    </div>
-</section>
-
-<section class="participate-shell" aria-label="Participate board">
+<section class="participate-shell route-anchor-target" aria-labelledby="partizipate-title">
+    <h1 id="partizipate-title" class="sr-only">Participate</h1>
     <div class="participate-hosted">
-        <div class="participate-hosted__header">
-            <div class="participate-hosted__lead">
-                <h2>Current requests</h2>
-                <p>@boardStateSummary</p>
-            </div>
-        </div>
-
         @if (hasHostedBoard)
         {
             <div class="participate-hosted__frame-shell">
@@ -45,12 +21,6 @@
                     referrerpolicy="same-origin"
                     data-chummer-participate-frame></iframe>
             </div>
-            @if (!string.IsNullOrWhiteSpace(Model.DirectBoardHref))
-            {
-                <div class="participate-board-links">
-                    <a class="button-like button-like--ghost" href="@Model.DirectBoardHref">Open full board</a>
-                </div>
-            }
         }
         else
         {
