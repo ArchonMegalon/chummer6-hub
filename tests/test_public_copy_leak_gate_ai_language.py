@@ -44,6 +44,18 @@ def test_public_copy_leak_gate_blocks_visible_ai_generated_language():
     assert any("prompt engineered" in hit for hit in hits)
 
 
+def test_public_copy_leak_gate_blocks_internal_decision_and_status_terms():
+    module = load_module()
+
+    text = "Product Governor release-backed proof-bound package truth should never be visible copy."
+    hits = module.forbidden_hits(text)
+
+    assert any("Product Governor" in hit for hit in hits)
+    assert any("release-backed" in hit for hit in hits)
+    assert any("proof-bound" in hit for hit in hits)
+    assert any("package truth" in hit for hit in hits)
+
+
 def test_public_copy_leak_gate_allows_minimal_human_product_copy():
     module = load_module()
 

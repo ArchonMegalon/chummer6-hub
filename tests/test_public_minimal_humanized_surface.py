@@ -810,6 +810,13 @@ def test_public_humanizer_cleans_plural_internal_terms() -> None:
         '("proofs", "details")',
         '("operators", "maintainers")',
         '("assistants", "help")',
+        '("proof-bound", "status-based")',
+        '("receipt-bound", "record-based")',
+        '("release-backed", "release-based")',
+        '("registry-backed", "record-based")',
+        '("Product Governor", "product decision")',
+        '("package truth", "package status")',
+        '("governor", "guide")',
     ):
         assert phrase in humanizer
 
@@ -3117,6 +3124,8 @@ def test_feedback_and_account_views_trim_remaining_operator_noise() -> None:
     humanizer = read("Chummer.Run.Api/Services/PublicFacingCopyHumanizer.cs")
 
     assert "Reconnect note:" in account
+    assert "Social specialist focused on negotiation, cover, and team access." in account
+    assert "Social operator focused on negotiation, cover, and team access." not in account
     assert "Restore update:" not in account
     assert "Notes: @PublicFacingCopyHumanizer.Clean(receipt.Proof)" in account
     assert "Observed: @receipt.ObservedAtUtc" not in account
@@ -3140,6 +3149,16 @@ def test_feedback_and_account_views_trim_remaining_operator_noise() -> None:
         '("authority", "source")',
     ):
         assert expected in humanizer
+
+
+def test_public_views_avoid_visible_receipt_and_verification_labels() -> None:
+    ledger = read("Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml")
+    leaderboards = read("Chummer.Run.Api/Views/Leaderboards/Index.cshtml")
+
+    assert "Viewer details" in ledger
+    assert "Viewer receipt" not in ledger
+    assert '<th scope="col">Confirmed</th>' in leaderboards
+    assert '<th scope="col">Verified</th>' not in leaderboards
 
 
 def test_email_preview_fallback_does_not_expose_live_ticket_by_default() -> None:
