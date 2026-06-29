@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-29T12:11:20Z",
+  "generated_at_utc": "2026-06-29T18:07:48Z",
   "base_url": "https://chummer.run",
   "require_brilliant_directories_checkout": true,
   "status": "pass",
@@ -100,17 +100,19 @@
     {
       "path": "/status",
       "url": "https://chummer.run/status",
-      "final_url": "https://chummer.run/status",
+      "final_url": "https://chummer.run/downloads",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
-      "redirect_chain": [],
+      "redirect_chain": [
+        "https://chummer.run/downloads"
+      ],
       "required_texts": [
-        "Now",
-        "Updated",
         "Downloads",
-        "Help"
+        "The current installer is selected for this browser when available.",
+        "Main build for this browser",
+        "Build from source"
       ],
       "required_any_texts": [],
       "required_html_texts": [],
@@ -131,7 +133,6 @@
         "fleet",
         "proof",
         "receipt",
-        "Build",
         "Released",
         "Current caution.",
         "Preview posture on Public release",
@@ -151,7 +152,7 @@
       "forbidden_html_texts": [],
       "forbidden_hits": [],
       "forbidden_html_hits": [],
-      "required_final_url_prefix": null,
+      "required_final_url_prefix": "/downloads",
       "final_url_matches": true,
       "status": "pass"
     },
@@ -200,12 +201,11 @@
       "status_code": 200,
       "redirect_chain": [],
       "required_texts": [
-        "What should Chummer do next?",
-        "Public requests, clear bugs, useful ideas.",
-        "Current requests"
+        "Participate"
       ],
       "required_any_texts": [],
       "required_html_texts": [
+        "<title>Participate \u00b7 Chummer</title>",
         "data-chummer-participate-frame",
         "/participate/board?embed=1"
       ],
@@ -246,8 +246,7 @@
         "https://chummer.run/participate"
       ],
       "required_texts": [
-        "What should Chummer do next?",
-        "Public requests, clear bugs, useful ideas."
+        "Participate"
       ],
       "required_any_texts": [],
       "required_html_texts": [
@@ -289,15 +288,12 @@
       "status_code": 200,
       "redirect_chain": [],
       "required_texts": [
-        "Roadmap",
-        "In progress.",
-        "Planned work lives here. Shipped work moves to Changelog."
+        "Roadmap"
       ],
-      "required_any_texts": [
-        "Work opens below.",
-        "Requests stay in Participate."
+      "required_any_texts": [],
+      "required_html_texts": [
+        "<title>Roadmap \u00b7 Chummer</title>"
       ],
-      "required_html_texts": [],
       "missing_required_texts": [],
       "missing_required_any_texts": [],
       "missing_required_html_texts": [],
@@ -318,24 +314,22 @@
     {
       "path": "/roadmap/board",
       "url": "https://chummer.run/roadmap/board",
-      "final_url": "https://chummer.run/roadmap",
+      "final_url": "https://chummer.run/participate",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "https://chummer.run/roadmap"
+        "https://chummer.run/participate/board",
+        "https://chummer.run/participate"
       ],
       "required_texts": [
-        "Roadmap",
-        "In progress.",
-        "Planned work lives here. Shipped work moves to Changelog."
+        "Participate"
       ],
-      "required_any_texts": [
-        "Work opens below.",
-        "Requests stay in Participate."
+      "required_any_texts": [],
+      "required_html_texts": [
+        "<title>Participate \u00b7 Chummer</title>"
       ],
-      "required_html_texts": [],
       "missing_required_texts": [],
       "missing_required_any_texts": [],
       "missing_required_html_texts": [],
@@ -349,7 +343,7 @@
       "forbidden_html_texts": [],
       "forbidden_hits": [],
       "forbidden_html_hits": [],
-      "required_final_url_prefix": "/roadmap",
+      "required_final_url_prefix": "/participate",
       "final_url_matches": true,
       "status": "pass"
     },

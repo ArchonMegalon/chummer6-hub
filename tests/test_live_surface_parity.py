@@ -25,7 +25,6 @@ def load_module():
 
 class _SurfaceHandler(BaseHTTPRequestHandler):
     billing_mode = "configured"
-    roadmap_mode = "board"
 
     def do_GET(self):  # noqa: N802
         if self.path == "/":
@@ -52,14 +51,9 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/status":
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_response(302)
+            self.send_header("Location", "/downloads")
             self.end_headers()
-            self.wfile.write(
-                b"<html><body>"
-                b"Now Updated Windows and Linux downloads are live. Downloads Help"
-                b"</body></html>"
-            )
             return
 
         if self.path.startswith("/login"):
@@ -110,9 +104,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 b"<html><body>"
                 b"<title>Participate \xc2\xb7 Chummer</title>"
                 b"<meta name=\"description\" content=\"Public requests, clear bugs, useful ideas.\">"
-                b"<h1>What should Chummer do next?</h1>"
-                b"<p>Public requests, clear bugs, useful ideas.</p>"
-                b"<h2>Current requests</h2>"
+                b"<h1>Participate</h1>"
                 b"<iframe src=\"/participate/board?embed=1\" data-chummer-participate-frame></iframe>"
                 b"</body></html>"
             )
@@ -128,29 +120,17 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
-            if self.roadmap_mode == "fallback":
-                self.wfile.write(
-                    b"<html><body>"
-                    b"<title>Roadmap \xc2\xb7 Chummer</title>"
-                    b"<h1>In progress.</h1>"
-                    b"<p>Planned work lives here. Shipped work moves to Changelog.</p>"
-                    b"<h2>Requests stay in Participate.</h2>"
-                    b"</body></html>"
-                )
-            else:
-                self.wfile.write(
-                    b"<html><body>"
-                    b"<title>Roadmap \xc2\xb7 Chummer</title>"
-                    b"<h1>In progress.</h1>"
-                    b"<p>Planned work lives here. Shipped work moves to Changelog.</p>"
-                    b"<p>Work opens below.</p>"
-                    b"</body></html>"
-                )
+            self.wfile.write(
+                b"<html><body>"
+                b"<title>Roadmap \xc2\xb7 Chummer</title>"
+                b"<h1>Roadmap</h1>"
+                b"</body></html>"
+            )
             return
 
         if self.path == "/roadmap/board":
             self.send_response(302)
-            self.send_header("Location", "/roadmap")
+            self.send_header("Location", "/participate")
             self.end_headers()
             return
 
@@ -197,7 +177,6 @@ class LiveSurfaceParityTests(unittest.TestCase):
 
     def setUp(self) -> None:
         _SurfaceHandler.billing_mode = "configured"
-        _SurfaceHandler.roadmap_mode = "board"
 
     def test_verify_requires_public_participate_surfaces(self) -> None:
         module = load_module()
@@ -239,9 +218,8 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertEqual([], board["missing_required_texts"])
         self.assertEqual([], board["forbidden_hits"])
 
-    def test_verify_accepts_roadmap_fallback_when_hosted_board_is_unavailable(self) -> None:
+    def test_verify_accepts_minimal_roadmap_and_redirects_board_to_participate(self) -> None:
         module = load_module()
-        _SurfaceHandler.roadmap_mode = "fallback"
 
         payload = module.verify(self.base_url)
 
@@ -259,8 +237,8 @@ class LiveSurfaceParityTests(unittest.TestCase):
         roadmap_board = next(item for item in payload["results"] if item["path"] == "/roadmap/board")
         self.assertEqual(200, roadmap_board["status_code"])
         self.assertFalse(roadmap_board["cross_origin_redirect"])
-        self.assertEqual(f"{self.base_url}/roadmap", roadmap_board["final_url"])
-        self.assertEqual([f"{self.base_url}/roadmap"], roadmap_board["redirect_chain"])
+        self.assertEqual(f"{self.base_url}/participate", roadmap_board["final_url"])
+        self.assertEqual([f"{self.base_url}/participate"], roadmap_board["redirect_chain"])
         self.assertEqual([], roadmap_board["missing_required_texts"])
         self.assertEqual([], roadmap_board["forbidden_hits"])
 
@@ -268,9 +246,10 @@ class LiveSurfaceParityTests(unittest.TestCase):
         module = load_module()
         participate_surface = next(item for item in module.SURFACES if item["path"] == "/participate")
 
-        self.assertIn("What should Chummer do next?", participate_surface["required_texts"])
-        self.assertIn("Public requests, clear bugs, useful ideas.", participate_surface["required_texts"])
-        self.assertIn("Current requests", participate_surface["required_texts"])
+        self.assertIn("Participate", participate_surface["required_texts"])
+        self.assertNotIn("What should Chummer do next?", participate_surface["required_texts"])
+        self.assertNotIn("Current requests", participate_surface["required_texts"])
+        self.assertIn("<title>Participate · Chummer</title>", participate_surface["required_html_texts"])
         self.assertIn("data-chummer-participate-frame", participate_surface["required_html_texts"])
         self.assertIn("/participate/board?embed=1", participate_surface["required_html_texts"])
         self.assertNotIn("Board is live.", participate_surface["required_texts"])
@@ -290,6 +269,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("Could not load posts", board_surface["forbidden_texts"])
         self.assertNotIn("Board is live.", board_surface["required_texts"])
         self.assertNotIn("Current requests", board_surface["required_texts"])
+        self.assertIn("Participate", board_surface["required_texts"])
         self.assertIn("<title>Participate · Chummer</title>", board_surface["required_html_texts"])
         self.assertIn("data-chummer-board-skin", board_surface["forbidden_html_texts"])
 

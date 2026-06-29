@@ -106,11 +106,12 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
         },
         {
             "path": "/status",
+            "required_final_url_prefix": "/downloads",
             "required_texts": [
-                "Now",
-                "Updated",
                 "Downloads",
-                "Help",
+                "The current installer is selected for this browser when available.",
+                "Main build for this browser",
+                "Build from source",
             ],
             "forbidden_texts": [
                 "Current release",
@@ -126,7 +127,6 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
                 "fleet",
                 "proof",
                 "receipt",
-                "Build",
                 "Released",
                 "Current caution.",
                 "Preview posture on Public release",
@@ -148,11 +148,10 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
         {
             "path": "/participate",
             "required_texts": [
-                "What should Chummer do next?",
-                "Public requests, clear bugs, useful ideas.",
-                "Current requests",
+                "Participate",
             ],
             "required_html_texts": [
+                "<title>Participate · Chummer</title>",
                 "data-chummer-participate-frame",
                 "/participate/board?embed=1",
             ],
@@ -176,8 +175,7 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
         {
             "path": "/participate/board",
             "required_texts": [
-                "What should Chummer do next?",
-                "Public requests, clear bugs, useful ideas.",
+                "Participate",
             ],
             "required_final_url_prefix": "/participate",
             "required_html_texts": [
@@ -205,12 +203,9 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             "path": "/roadmap",
             "required_texts": [
                 "Roadmap",
-                "In progress.",
-                "Planned work lives here. Shipped work moves to Changelog.",
             ],
-            "required_any_texts": [
-                "Work opens below.",
-                "Requests stay in Participate.",
+            "required_html_texts": [
+                "<title>Roadmap · Chummer</title>",
             ],
             "forbidden_texts": [
                 "ProductLift",
@@ -223,15 +218,12 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
         {
             "path": "/roadmap/board",
             "required_texts": [
-                "Roadmap",
-                "In progress.",
-                "Planned work lives here. Shipped work moves to Changelog.",
+                "Participate",
             ],
-            "required_any_texts": [
-                "Work opens below.",
-                "Requests stay in Participate.",
+            "required_final_url_prefix": "/participate",
+            "required_html_texts": [
+                "<title>Participate · Chummer</title>",
             ],
-            "required_final_url_prefix": "/roadmap",
             "forbidden_texts": [
                 "ProductLift",
                 "Open live board",
