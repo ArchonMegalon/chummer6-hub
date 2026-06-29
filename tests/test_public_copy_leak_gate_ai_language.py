@@ -87,6 +87,7 @@ def test_minimal_route_detection_keeps_special_routes_out_of_first_visit_tier():
 
     assert module.is_minimal_public_route("/")
     assert module.is_minimal_public_route("/downloads")
+    assert module.is_minimal_public_route("/contact")
     assert module.is_minimal_public_route("/login?next=%2Faccount%2Faccess")
     assert not module.is_minimal_public_route("/feedback")
     assert not module.is_minimal_public_route("/ledger")
@@ -147,6 +148,7 @@ def test_public_copy_leak_gate_scans_participate_board_route():
     assert "/participate" in module.DEFAULT_ROUTES
     assert "/partizipate" in module.DEFAULT_ROUTES
     assert "/participate/board" in module.DEFAULT_ROUTES
+    assert "/contact" in module.DEFAULT_ROUTES
     assert module.forbidden_hits("ProductLift Log in Sign up Could not load posts")
 
 

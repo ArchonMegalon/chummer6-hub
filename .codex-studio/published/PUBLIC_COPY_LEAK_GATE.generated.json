@@ -1,10 +1,10 @@
 {
   "contract_name": "chummer.public_copy_leak_gate",
-  "generated_at_utc": "2026-06-29T11:44:34Z",
+  "generated_at_utc": "2026-06-29T12:16:30Z",
   "base_url": "https://chummer.run",
   "status": "pass",
   "summary": {
-    "route_count": 18,
+    "route_count": 19,
     "failed_route_count": 0,
     "forbidden_pattern_count": 67,
     "minimal_route_forbidden_pattern_count": 26,
@@ -147,6 +147,18 @@
     {
       "route": "/help",
       "url": "https://chummer.run/help",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "minimal_route": true,
+      "minimal_forbidden_hits": [],
+      "detail": null,
+      "redirect_url": null,
+      "redirect_external": false
+    },
+    {
+      "route": "/contact",
+      "url": "https://chummer.run/contact",
       "status_code": 200,
       "success": true,
       "forbidden_hits": [],
