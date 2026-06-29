@@ -149,7 +149,8 @@ public sealed record OriginDossierProviderCreditReservationRequest(
     bool OutlineApproved,
     bool VoiceSampleApproved,
     bool CanonPreflightPassed,
-    bool HumanReviewAssigned);
+    bool HumanReviewAssigned,
+    bool AuditOnly = false);
 
 public sealed record OriginDossierProviderCreditReservationResult(
     string Status,
@@ -161,7 +162,9 @@ public sealed record OriginDossierProviderCreditReservationResult(
     string? ProviderAccountAlias,
     int CreditsReserved,
     IReadOnlyList<string> BlockedRequirements,
-    DateTimeOffset CheckedAtUtc);
+    DateTimeOffset CheckedAtUtc,
+    bool AuditOnly = false,
+    bool ProviderBurnWouldBeAllowed = false);
 
 public sealed record SubscribrWebhookRequest(
     string? EventId,

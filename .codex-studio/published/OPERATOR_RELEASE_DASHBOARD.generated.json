@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.operator_release_dashboard",
-  "generated_at_utc": "2026-06-28T14:41:51Z",
+  "generated_at_utc": "2026-06-29T17:40:00Z",
   "status": "pass",
   "verdict": "OPERABLE_RELEASE_READY",
   "release": {
@@ -43,7 +43,7 @@
   },
   "ui": {
     "frame_base_url": "https://chummer.run",
-    "frame_checked_pages": 60,
+    "frame_checked_pages": 66,
     "frame_failure_count": 0,
     "design_verdict": "DESIGN_READY"
   },
@@ -65,7 +65,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-19T23:39:07Z",
+      "generated_at_utc": "2026-06-29T12:23:35Z",
       "pass": true
     },
     "ruleset_readiness": {
@@ -73,7 +73,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-22T13:24:01.049104Z",
+      "generated_at_utc": "2026-06-29T11:55:31.144794Z",
       "pass": true
     },
     "ui_frame_integrity": {
@@ -81,7 +81,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "READY",
-      "generated_at_utc": "2026-06-27T18:07:54.055Z",
+      "generated_at_utc": "2026-06-29T12:07:56.541Z",
       "pass": true
     },
     "design_quality_gate": {
@@ -89,7 +89,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "DESIGN_READY",
-      "generated_at_utc": "2026-06-27T18:08:14Z",
+      "generated_at_utc": "2026-06-29T12:23:26Z",
       "pass": true
     },
     "public_copy_leak_gate": {
@@ -97,7 +97,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-27T18:07:57Z",
+      "generated_at_utc": "2026-06-29T12:16:30Z",
       "pass": true
     },
     "participate_billing_honesty": {
@@ -105,7 +105,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "READY",
-      "generated_at_utc": "2026-06-27T18:16:40.946224Z",
+      "generated_at_utc": "2026-06-29T11:56:26.206863Z",
       "pass": true
     },
     "account_handoff_runtime_config": {
@@ -113,7 +113,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "READY",
-      "generated_at_utc": "2026-06-28T14:40:08Z",
+      "generated_at_utc": "2026-06-29T17:39:53Z",
       "pass": true
     },
     "release_ready": {
@@ -130,7 +130,7 @@
       "exists": true,
       "status": "fail",
       "verdict": "NOT_GOLD",
-      "generated_at_utc": "2026-06-23T13:14:17Z",
+      "generated_at_utc": "2026-06-28T14:41:52Z",
       "pass": false,
       "release_blocking": false
     },

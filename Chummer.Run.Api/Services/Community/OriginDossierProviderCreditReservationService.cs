@@ -42,7 +42,7 @@ public sealed class OriginDossierProviderCreditReservationService
 
         if (blocked.Count > 0)
         {
-            return BuildResult("blocked", false, null, userId, projectId, provider, accountAlias, 0, blocked, checkedAt);
+            return BuildResult("blocked", false, null, userId, projectId, provider, accountAlias, 0, blocked, checkedAt, request.AuditOnly, providerBurnWouldBeAllowed: false);
         }
 
         string reservationId = BuildReservationId(userId, projectId, provider, accountAlias);
@@ -53,7 +53,9 @@ public sealed class OriginDossierProviderCreditReservationService
                 && string.Equals(item.Status, "reserved", StringComparison.OrdinalIgnoreCase));
             if (existing is not null)
             {
-                return BuildResult("reserved", true, existing.ReservationId, userId, projectId, provider, accountAlias, existing.CreditsReserved, [], checkedAt);
+                return request.AuditOnly
+                    ? BuildResult("audit_passed", false, existing.ReservationId, userId, projectId, provider, accountAlias, existing.CreditsReserved, [], checkedAt, auditOnly: true, providerBurnWouldBeAllowed: true)
+                    : BuildResult("reserved", true, existing.ReservationId, userId, projectId, provider, accountAlias, existing.CreditsReserved, [], checkedAt);
             }
 
             int activeReservations = _store.Entries.Count(item =>
@@ -61,7 +63,12 @@ public sealed class OriginDossierProviderCreditReservationService
                 && string.Equals(item.Status, "reserved", StringComparison.OrdinalIgnoreCase));
             if (activeReservations >= ResolveMaxActiveReservationsPerUser())
             {
-                return BuildResult("blocked", false, null, userId, projectId, provider, accountAlias, 0, ["active provider credit reservation limit"], checkedAt);
+                return BuildResult("blocked", false, null, userId, projectId, provider, accountAlias, 0, ["active provider credit reservation limit"], checkedAt, request.AuditOnly, providerBurnWouldBeAllowed: false);
+            }
+
+            if (request.AuditOnly)
+            {
+                return BuildResult("audit_passed", false, null, userId, projectId, provider, accountAlias, 0, [], checkedAt, auditOnly: true, providerBurnWouldBeAllowed: true);
             }
 
             _store.Entries.Add(new OriginDossierProviderCreditReservationLedgerEntry(
@@ -188,7 +195,9 @@ public sealed class OriginDossierProviderCreditReservationService
         string accountAlias,
         int creditsReserved,
         IReadOnlyList<string> blocked,
-        DateTimeOffset checkedAt)
+        DateTimeOffset checkedAt,
+        bool auditOnly = false,
+        bool providerBurnWouldBeAllowed = false)
         => new(
             status,
             providerBurnAllowed,
@@ -199,7 +208,9 @@ public sealed class OriginDossierProviderCreditReservationService
             string.IsNullOrWhiteSpace(accountAlias) ? null : accountAlias,
             creditsReserved,
             blocked,
-            checkedAt);
+            checkedAt,
+            auditOnly,
+            providerBurnWouldBeAllowed || providerBurnAllowed);
 
     private static string BuildReservationId(string userId, string projectId, string provider, string accountAlias)
     {

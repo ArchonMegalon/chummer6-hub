@@ -51,6 +51,90 @@ public sealed class OriginDossierProviderCreditReservationServiceTests
     }
 
     [Fact]
+    public void AuditOnlyChecksProviderReadinessWithoutWritingReservation()
+    {
+        using Fixture fixture = new();
+
+        OriginDossierProviderCreditReservationResult result = fixture.Service.Reserve(
+            ValidRequest() with { AuditOnly = true },
+            Fixture.Now);
+        var quota = fixture.Billing.GetMyFirstBookQuota("user-origin", Fixture.Now);
+
+        Assert.Equal("audit_passed", result.Status);
+        Assert.True(result.AuditOnly);
+        Assert.False(result.ProviderBurnAllowed);
+        Assert.True(result.ProviderBurnWouldBeAllowed);
+        Assert.Null(result.ReservationId);
+        Assert.Equal(0, result.CreditsReserved);
+        Assert.Empty(result.BlockedRequirements);
+        Assert.Empty(fixture.Store.Entries);
+        Assert.Equal(0, quota.MonthlyUsed);
+        Assert.Equal(1, quota.MonthlyRemaining);
+    }
+
+    [Fact]
+    public void AuditOnlyReportsBlockedRequirementsWithoutWritingReservation()
+    {
+        using Fixture fixture = new();
+
+        OriginDossierProviderCreditReservationResult result = fixture.Service.Reserve(
+            ValidRequest() with
+            {
+                AuditOnly = true,
+                SourcePacketApproved = false,
+                ProviderAccountAlias = "FIRSTBOOK_OTHER"
+            },
+            Fixture.Now);
+
+        Assert.Equal("blocked", result.Status);
+        Assert.True(result.AuditOnly);
+        Assert.False(result.ProviderBurnAllowed);
+        Assert.False(result.ProviderBurnWouldBeAllowed);
+        Assert.Contains("approved source packet", result.BlockedRequirements);
+        Assert.Contains("configured provider account alias", result.BlockedRequirements);
+        Assert.Empty(fixture.Store.Entries);
+    }
+
+    [Fact]
+    public void AuditOnlyReturnsExistingReservationAsRestartableReadOnlyProof()
+    {
+        using Fixture fixture = new();
+        OriginDossierProviderCreditReservationResult reserved = fixture.Service.Reserve(ValidRequest(), Fixture.Now);
+
+        OriginDossierProviderCreditReservationResult audit = fixture.Service.Reserve(
+            ValidRequest() with { AuditOnly = true },
+            Fixture.Now.AddMinutes(5));
+
+        Assert.Equal("reserved", reserved.Status);
+        Assert.Equal("audit_passed", audit.Status);
+        Assert.True(audit.AuditOnly);
+        Assert.False(audit.ProviderBurnAllowed);
+        Assert.True(audit.ProviderBurnWouldBeAllowed);
+        Assert.Equal(reserved.ReservationId, audit.ReservationId);
+        Assert.Equal(1, audit.CreditsReserved);
+        Assert.Single(fixture.Store.Entries);
+    }
+
+    [Fact]
+    public void AuditOnlyDoesNotBypassActiveReservationLimit()
+    {
+        using Fixture fixture = new(maxActiveReservations: 1);
+        OriginDossierProviderCreditReservationResult first = fixture.Service.Reserve(ValidRequest(projectId: "origin-one"), Fixture.Now);
+
+        OriginDossierProviderCreditReservationResult audit = fixture.Service.Reserve(
+            ValidRequest(projectId: "origin-two") with { AuditOnly = true },
+            Fixture.Now);
+
+        Assert.Equal("reserved", first.Status);
+        Assert.Equal("blocked", audit.Status);
+        Assert.True(audit.AuditOnly);
+        Assert.False(audit.ProviderBurnAllowed);
+        Assert.False(audit.ProviderBurnWouldBeAllowed);
+        Assert.Contains("active provider credit reservation limit", audit.BlockedRequirements);
+        Assert.Single(fixture.Store.Entries);
+    }
+
+    [Fact]
     public void ReserveAcceptsProviderAccountAliasFromRegistryWithoutDirectAliasEnv()
     {
         using Fixture fixture = new(useDirectAliases: false);
