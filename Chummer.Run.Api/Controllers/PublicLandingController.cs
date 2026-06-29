@@ -3854,7 +3854,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (!string.IsNullOrWhiteSpace(hostedHeadingReplacement)
-            && !rewritten.Contains("chummer-board-intro", StringComparison.OrdinalIgnoreCase))
+            && !rewritten.Contains("<section class=\"chummer-board-intro\"", StringComparison.OrdinalIgnoreCase))
         {
             string intro = $"""
 <section class="chummer-board-intro" aria-label="Chummer board intro">
@@ -3868,7 +3868,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 $"$1{intro}",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline,
                 TimeSpan.FromMilliseconds(250));
-            if (!rewritten.Contains("chummer-board-intro", StringComparison.OrdinalIgnoreCase))
+            if (!rewritten.Contains("<section class=\"chummer-board-intro\"", StringComparison.OrdinalIgnoreCase))
             {
                 rewritten = intro + rewritten;
             }

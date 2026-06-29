@@ -240,6 +240,7 @@ public sealed class PublicSignalOperationsViewTests
   <title>Board</title>
   <meta property="og:url" content="">
   <meta name="twitter:url" content="https://chummer6.productlift.dev/feedback">
+  <style>.chummer-board-intro { color: red; }</style>
 </head>
 <link rel="preload" href="https://media.productlift.dev/branding-stylesheets/theme.css" as="style">
 <script src="https://cdn.productlift.dev/js/all.js"></script>
@@ -304,6 +305,9 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("data-chummer-home-link-patch", rewritten, StringComparison.Ordinal);
         Assert.Contains("data-chummer-board-failure-patch", rewritten, StringComparison.Ordinal);
         Assert.Contains("polishVisibleCopy", rewritten, StringComparison.Ordinal);
+        Assert.Contains("<section class=\"chummer-board-intro\" aria-label=\"Chummer board intro\">", rewritten, StringComparison.Ordinal);
+        Assert.Contains("<h1>What should Chummer do next?</h1>", rewritten, StringComparison.Ordinal);
+        Assert.Contains("<p>Public requests, clear bugs, useful ideas.</p>", rewritten, StringComparison.Ordinal);
         Assert.Contains("something went wrong on our side", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("could not load posts", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("network error while loading tab configuration", rewritten, StringComparison.OrdinalIgnoreCase);
