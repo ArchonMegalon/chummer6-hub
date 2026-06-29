@@ -166,10 +166,9 @@ const checks = [
   {
     url: `${baseUrl}/roadmap/board`,
     assert: (text, response) =>
-      /\/roadmap\/?$/.test(response.url)
-      && text.includes('Roadmap')
-      && text.includes('Planned work and current requests.')
-      && text.includes('data-chummer-roadmap-frame')
+      /\/participate\/?$/.test(response.url)
+      && text.includes('Participate')
+      && text.includes('Public requests, clear bugs, useful ideas.')
       && !text.includes('ProductLift')
   },
   {
