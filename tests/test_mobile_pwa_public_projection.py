@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_mobile_pwa_public_projection.py"
+DESIGN_SPEC_PATH = REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "MOBILE_PWA_PRODUCT_SPEC.md"
 
 
 class _FakeResponse:
@@ -144,6 +145,34 @@ def _load_module():
 
 
 class MobilePwaPublicProjectionTests(unittest.TestCase):
+    def test_design_spec_tracks_live_pwa_projection_contract(self) -> None:
+        text = DESIGN_SPEC_PATH.read_text(encoding="utf-8")
+
+        for required in (
+            "during-play companion surface",
+            "`/mobile` is the canonical PWA start URL",
+            "`/pwa` redirects to",
+            "`/play` is the shared play shell",
+            "`/player`, `/gm`, `/observer`, and",
+            "`/mobile/pwa/ledger.json`",
+            "`mode: mobile_pwa_living_world`",
+            "`updates_route: /mobile/pwa/ledger.json`",
+            "`opt_in_required`, `no_world_data`,",
+            "`live`, and `world_not_followed`",
+            "no-store caching and vary by",
+            "`Cookie` and `Authorization`",
+            "must never be pre-cached",
+            "`/play/continuity/history` or `/play/continuity/receipts`",
+            "scripts/verify_mobile_pwa_public_projection.py --base-url https://chummer.run",
+            "tests/public/mobile-pwa-public.spec.ts",
+            "tests/public/pwa-installability.spec.ts",
+            "not be described as a complete mobile character builder",
+        ):
+            self.assertIn(required, text)
+
+        self.assertNotIn("preview shell", text)
+        self.assertNotIn("Gate `gate-mobile-pwa` includes", text)
+
     def test_verifier_prints_explicit_ok_line_on_pass(self) -> None:
         module = _load_module()
         stdout = io.StringIO()
