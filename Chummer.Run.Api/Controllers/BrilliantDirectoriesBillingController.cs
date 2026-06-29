@@ -47,6 +47,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     }
 
     [HttpGet("/account/billing")]
+    [HttpHead("/account/billing")]
     [Produces("text/html")]
     public async Task<IActionResult> BillingPage([FromQuery] string? userId = null, [FromQuery] string? email = null, [FromQuery] bool preview = false, CancellationToken cancellationToken = default)
     {

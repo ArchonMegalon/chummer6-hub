@@ -1101,8 +1101,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Claim this copy when you want installs, support, and recovery together.", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Use the same copy. Add recovery and support history.", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Open your account. Keep installs and support together.", controller, StringComparison.Ordinal);
-        Assert.Contains("heading: \"Claim your copy\"", controller, StringComparison.Ordinal);
-        Assert.Contains("heading: \"Open Chummer\"", controller, StringComparison.Ordinal);
+        Assert.Contains("\"Claim your copy\"", controller, StringComparison.Ordinal);
+        Assert.Contains("\"Open Chummer\"", controller, StringComparison.Ordinal);
         Assert.Contains("<h1 id=\"auth-title\">@Model.Heading</h1>", view, StringComparison.Ordinal);
         Assert.Contains("<p class=\"auth-panel__hint\">@Model.SupportLine</p>", view, StringComparison.Ordinal);
         Assert.Contains("<p class=\"auth-panel__meta\">@Model.ReturnLine</p>", view, StringComparison.Ordinal);

@@ -354,6 +354,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/")]
+    [HttpHead("/")]
     [Produces("text/html")]
     public async Task<IActionResult> LandingPage(CancellationToken cancellationToken)
     {
@@ -2176,6 +2177,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/partizipate")]
+    [HttpHead("/partizipate")]
     public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)
     {
         await Task.CompletedTask.ConfigureAwait(false);
@@ -2185,6 +2187,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/participate")]
+    [HttpHead("/participate")]
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
@@ -2437,7 +2440,9 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/participate/board")]
+    [HttpHead("/participate/board")]
     [HttpGet("/participate/board/{**boardPath}")]
+    [HttpHead("/participate/board/{**boardPath}")]
     public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)
     {
         string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
@@ -7240,6 +7245,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     [HttpGet("/roadmap")]
+    [HttpHead("/roadmap")]
     [Produces("text/html")]
     public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)
     {
@@ -7470,6 +7476,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     [HttpGet("/changelog")]
+    [HttpHead("/changelog")]
     [Produces("text/html")]
     public async Task<IActionResult> ChangelogPage(CancellationToken cancellationToken)
     {
@@ -7857,6 +7864,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     [HttpGet("/help")]
+    [HttpHead("/help")]
     [Produces("text/html")]
     public async Task<IActionResult> HelpPage(CancellationToken cancellationToken)
     {
@@ -7874,6 +7882,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     [HttpGet("/faq")]
+    [HttpHead("/faq")]
     [Produces("text/html")]
     public async Task<IActionResult> FaqPage(CancellationToken cancellationToken)
     {
@@ -7892,6 +7901,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     [HttpGet("/privacy")]
+    [HttpHead("/privacy")]
     [Produces("text/html")]
     public async Task<IActionResult> PrivacyPage(CancellationToken cancellationToken)
     {
@@ -7909,6 +7919,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     [HttpGet("/terms")]
+    [HttpHead("/terms")]
     [Produces("text/html")]
     public async Task<IActionResult> TermsPage(CancellationToken cancellationToken)
     {
@@ -7925,6 +7936,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     [HttpGet("/contact")]
+    [HttpHead("/contact")]
     [Produces("text/html")]
     public async Task<IActionResult> ContactPage(CancellationToken cancellationToken)
     {

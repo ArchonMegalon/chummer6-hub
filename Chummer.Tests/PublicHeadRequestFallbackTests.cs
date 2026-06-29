@@ -5,25 +5,43 @@ namespace Chummer.Tests;
 public sealed class PublicHeadRequestFallbackTests
 {
     [Fact]
-    public void PublicEdgeServesHeadFromGetWithoutWritingResponseBodies()
+    public void PublicEdgeDeclaresHeadRoutesOnUserFacingPages()
     {
-        string program = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs"));
+        string publicLandingController = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string billingController = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "BrilliantDirectoriesBillingController.cs"));
 
-        Assert.Contains("HttpMethods.IsHead(context.Request.Method)", program, StringComparison.Ordinal);
-        Assert.Contains("ShouldServeHeadFromGet(context.Request.Path)", program, StringComparison.Ordinal);
-        Assert.Contains("context.Request.Method = HttpMethods.Get;", program, StringComparison.Ordinal);
-        Assert.Contains("context.Response.Body = Stream.Null;", program, StringComparison.Ordinal);
-        Assert.Contains("context.Response.Body = originalBody;", program, StringComparison.Ordinal);
-        Assert.Contains("context.Request.Method = originalMethod;", program, StringComparison.Ordinal);
+        string[] publicPageRoutes =
+        [
+            "/",
+            "/downloads",
+            "/status",
+            "/help",
+            "/faq",
+            "/privacy",
+            "/terms",
+            "/contact",
+            "/participate",
+            "/participate/board",
+            "/roadmap",
+            "/changelog",
+            "/partizipate"
+        ];
+
+        foreach (string route in publicPageRoutes)
+        {
+            Assert.Contains($"[HttpHead(\"{route}\")]", publicLandingController, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("[HttpHead(\"/account/billing\")]", billingController, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void PublicEdgeHeadFallbackIsLimitedToPublicRoutesAndHealth()
+    public void PublicEdgeHealthEndpointAcceptsHeadExplicitly()
     {
         string program = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs"));
 
-        Assert.Contains("static bool ShouldServeHeadFromGet(PathString path)", program, StringComparison.Ordinal);
-        Assert.Contains("path.Equals(\"/api/health\", StringComparison.OrdinalIgnoreCase)", program, StringComparison.Ordinal);
-        Assert.Contains("!path.StartsWithSegments(\"/api\", StringComparison.OrdinalIgnoreCase)", program, StringComparison.Ordinal);
+        Assert.Contains("app.MapMethods(\"/api/health\", new[] { HttpMethods.Get, HttpMethods.Head }", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("context.Request.Method = HttpMethods.Get;", program, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShouldServeHeadFromGet", program, StringComparison.Ordinal);
     }
 }
