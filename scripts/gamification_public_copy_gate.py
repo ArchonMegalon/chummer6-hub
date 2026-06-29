@@ -36,7 +36,7 @@ ROUTES = [
     "/feedback",
     "/participate",
 ]
-PARTICIPATE_CONTROLLER = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Controllers" / "ParticipateController.cs"
+PARTICIPATE_CONTROLLER = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs"
 
 
 def parse_args() -> argparse.Namespace:

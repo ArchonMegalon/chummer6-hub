@@ -45,7 +45,7 @@ ACCOUNT_SOURCE_FORBIDDEN = (
     "Top voters decide roadmap",
 )
 ACCOUNT_SOURCE = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
-PARTICIPATE_CONTROLLER = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Controllers" / "ParticipateController.cs"
+PARTICIPATE_CONTROLLER = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs"
 
 
 def parse_args() -> argparse.Namespace:
