@@ -67,8 +67,10 @@ services:
     image: chummer-run-identity:local
     restart: unless-stopped
     build:
-      context: /docker
-      dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Identity/Dockerfile
+      context: /docker/chummercomplete
+      dockerfile: chummer.run-services/Chummer.Run.Identity/Dockerfile
+      additional_contexts:
+        fleet-media-factory: /docker/fleet/repos/chummer-media-factory
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
     environment:
@@ -106,8 +108,10 @@ services:
     image: chummer-run-api:local
     restart: unless-stopped
     build:
-      context: /docker
-      dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Api/Dockerfile
+      context: /docker/chummercomplete
+      dockerfile: chummer.run-services/Chummer.Run.Api/Dockerfile
+      additional_contexts:
+        fleet-media-factory: /docker/fleet/repos/chummer-media-factory
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
     env_file:
