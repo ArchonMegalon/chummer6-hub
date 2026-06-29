@@ -1,0 +1,31 @@
+{
+  "contract_name": "chummer.live_public_windows_installer",
+  "generated_at_utc": "2026-06-29T00:18:58Z",
+  "base_url": "https://chummer.run",
+  "manifest_url": "https://chummer.run/downloads/releases.json",
+  "verify_script_path": "/docker/chummercomplete/chummer-presentation/scripts/verify-windows-installer-payloads.py",
+  "status": "pass",
+  "verdict": "LIVE_PUBLIC_WINDOWS_INSTALLER_READY",
+  "checked_artifacts": [
+    {
+      "artifact_id": "avalonia-win-x64-installer",
+      "installer_file_name": "chummer-avalonia-win-x64-installer.exe",
+      "installer_url": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe",
+      "installer_sha256": "d9d25b2c93dbd4887590b52b03431c4aba3c5614dbc4b18ec2f282222067466c",
+      "expected_installer_sha256": "d9d25b2c93dbd4887590b52b03431c4aba3c5614dbc4b18ec2f282222067466c",
+      "installer_size_bytes": 2794320,
+      "expected_installer_size_bytes": 2794320,
+      "payload_file_name": "chummer-avalonia-win-x64-payload.zip",
+      "payload_url": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip",
+      "payload_sha256": "0d35a21cea0434d74056bc4437e44479ccf9835fd2fec4d1e36568c44dd040a3",
+      "expected_payload_sha256": "0d35a21cea0434d74056bc4437e44479ccf9835fd2fec4d1e36568c44dd040a3",
+      "payload_size_bytes": 50967126,
+      "expected_payload_size_bytes": 50967126,
+      "sidecar_url": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip.json",
+      "release_version": "run-20260627-005402",
+      "status": "pass",
+      "failures": []
+    }
+  ],
+  "failures": []
+}

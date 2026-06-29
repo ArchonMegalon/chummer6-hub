@@ -99,6 +99,7 @@ if [[ "$HUB_CLOSEOUT_LIVE_AUDIT" == "1" || "$HUB_CLOSEOUT_LIVE_AUDIT" == "true" 
   echo
   echo "== live route audit =="
   python3 scripts/hub-live-audit.py --base-url "$HUB_LIVE_BASE_URL"
+  python3 scripts/verify_live_public_windows_installer.py --base-url "$HUB_LIVE_BASE_URL"
 fi
 
 echo
