@@ -272,10 +272,10 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
                 {
                 SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
                     when latest.FixReadyOnLinkedInstall
-                        => $"{latest.InstallReadinessSummary} Use the verification buttons on this same case now to confirm whether the fix worked here or whether the issue is still broken.",
+                        => $"{latest.InstallReadinessSummary} Use the case buttons now to confirm whether the fix worked here or whether the issue is still broken.",
                 SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
                     when latest.NeedsLinkedInstall
-                        => $"{latest.InstallReadinessSummary} Once that copy is linked, come back to this same case to verify the fix.",
+                        => $"{latest.InstallReadinessSummary} Once that copy is linked, come back to this same case to try the fix.",
                 SupportCaseStatuses.ReleasedToReporterChannel or SupportCaseStatuses.Fixed or SupportCaseStatuses.UserNotified
                     => $"{latest.InstallReadinessSummary} After the linked install is current, come back to this same case to confirm whether the fix worked here.",
                 SupportCaseStatuses.AwaitingEvidence
@@ -322,12 +322,12 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
 
             if (caseMatches.FirstOrDefault(static item => item.CanVerifyFix) is { } readyToVerify)
             {
-                Add("verify_fix_on_case", "Verify fix now", readyToVerify.DetailHref, "The linked install is already on the reporter-ready fix, so confirm whether the fix worked here.");
+                Add("verify_fix_on_case", "Try fix now", readyToVerify.DetailHref, "The linked install is already on the reporter-ready fix, so confirm whether the fix worked here.");
             }
 
             if (caseMatches.Any(static item => item.NeedsLinkedInstall))
             {
-                Add("open_account_access", "Open installs", "/account/access", "Link or reclaim the affected install before you verify the fix.");
+                Add("open_account_access", "Open installs", "/account/access", "Link or reclaim the affected install before you try the fix.");
             }
 
             if (caseMatches.Any(static item => item.NeedsInstallUpdate))
@@ -342,7 +342,7 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
 
         if (tokens.Contains("install") || tokens.Contains("download") || tokens.Contains("update") || tokens.Contains("claim") || tokens.Contains("restart"))
         {
-            Add("open_downloads", "Open downloads", "/downloads", "Check the current installer and release status.");
+            Add("open_downloads", "Open downloads", "/downloads", "Open the current installer and release notes.");
         }
 
         if (ShouldUseRulesTruth(tokens))

@@ -407,7 +407,7 @@ public sealed class SupportCasePresentationService
                 SupportCaseStatuses.ReleasedToReporterChannel => string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "Relink or reclaim the affected copy in Installs, then return to that claimed install before you pick up the reporter-ready fix there."
                     : $"Relink or reclaim the affected copy in Installs, then return to that claimed install before you pick up {fixedReleaseLabel} there.",
-                SupportCaseStatuses.UserNotified => "Relink or reclaim the affected copy in Installs, then return to that claimed install before you verify whether the reported fix held there.",
+                SupportCaseStatuses.UserNotified => "Relink or reclaim the affected copy in Installs, then return to that claimed install before you confirm whether the reported fix held there.",
                 _ => fallbackAction
             };
         }
@@ -420,8 +420,8 @@ public sealed class SupportCasePresentationService
                     ? "Update the affected claimed install, then continue the fix on that same copy."
                     : $"Update the affected claimed install to {fixedReleaseLabel}, then continue the fix on that same copy.",
                 SupportCaseStatuses.ReleasedToReporterChannel => string.IsNullOrWhiteSpace(fixedReleaseLabel)
-                    ? "Update the affected claimed install to the reporter-ready build, then verify the fix on that same copy."
-                    : $"Update the affected claimed install to {fixedReleaseLabel}, then verify the fix on that same copy.",
+                    ? "Update the affected claimed install to the reporter-ready build, then try the fix on that same copy."
+                    : $"Update the affected claimed install to {fixedReleaseLabel}, then try the fix on that same copy.",
                 SupportCaseStatuses.UserNotified => string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "Update or reinstall the affected claimed install before you reopen this case."
                     : $"Update or reinstall the affected claimed install to {fixedReleaseLabel} before you reopen this case.",
@@ -434,9 +434,9 @@ public sealed class SupportCasePresentationService
             return normalizedStatus switch
             {
                 SupportCaseStatuses.ReleasedToReporterChannel => string.IsNullOrWhiteSpace(fixedReleaseLabel)
-                    ? "Verify the reporter-ready fix on the affected claimed install."
-                    : $"Verify {fixedReleaseLabel} on the affected claimed install.",
-                SupportCaseStatuses.UserNotified => "Verify the affected claimed install before you decide whether to reopen support.",
+                    ? "Try the reporter-ready fix on the affected claimed install."
+                    : $"Try {fixedReleaseLabel} on the affected claimed install.",
+                SupportCaseStatuses.UserNotified => "Try the affected claimed install before you decide whether to reopen support.",
                 _ => fallbackAction
             };
         }
@@ -463,7 +463,7 @@ public sealed class SupportCasePresentationService
         {
             return verificationAvailable
                 ? new InstallVerificationReadiness(
-                    Summary: "No linked install is attached yet. Link or reclaim the affected copy in Installs before you verify the fix here.",
+                    Summary: "No linked install is attached yet. Link or reclaim the affected copy in Installs before you try the fix here.",
                     FixReadyOnLinkedInstall: false,
                     NeedsInstallUpdate: false,
                     NeedsLinkedInstall: true)
@@ -479,7 +479,7 @@ public sealed class SupportCasePresentationService
         {
             return verificationAvailable
                 ? new InstallVerificationReadiness(
-                    Summary: "The affected install is not linked to this account right now. Reclaim that copy in Installs before you verify the fix.",
+                    Summary: "The affected install is not linked to this account right now. Reclaim that copy in Installs before you try the fix.",
                     FixReadyOnLinkedInstall: false,
                     NeedsInstallUpdate: false,
                     NeedsLinkedInstall: true)

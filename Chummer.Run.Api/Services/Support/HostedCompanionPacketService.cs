@@ -300,7 +300,7 @@ public sealed class HostedCompanionPacketService
             AllowedActions:
             [
                 new HostedCompanionActionProjection("open_support_case", "Open support case", detailRoute, "Inspect the support case, next-safe action, and closure timeline."),
-                new HostedCompanionActionProjection("show_fix_receipt", "Show fix record", concierge.ReleaseExplainer.FirstPartyRoutes.FirstOrDefault(static route => route.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)) ?? "/downloads", "Check the same Chummer release path that support says fixes the issue."),
+                new HostedCompanionActionProjection("show_fix_receipt", "Show fix record", concierge.ReleaseExplainer.FirstPartyRoutes.FirstOrDefault(static route => route.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)) ?? "/downloads", "Open the same Chummer release path that support says fixes the issue."),
                 new HostedCompanionActionProjection("open_install_support", "Open install support", "/api/v1/install-linking/continuation/support", "Keep support and install follow-up on the same linked copy.")
             ],
             Suppression: BuildSuppression("trigger_class_per_support_case", reporterCanClose ? 28800 : 14400, 1, true),
@@ -618,7 +618,7 @@ public sealed class HostedCompanionPacketService
             FactSummary: summary,
             AllowedActions:
             [
-                new HostedCompanionActionProjection("open_downloads", "Open downloads", "/downloads", "See the current installers and release status."),
+                new HostedCompanionActionProjection("open_downloads", "Open downloads", "/downloads", "See the current installers and release notes."),
                 new HostedCompanionActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Use Chummer support when the public page still needs help."),
                 new HostedCompanionActionProjection("open_account_access", "Create account for guided install", "/account/access", "Move from the public page into a linked install and restore path.")
             ],
