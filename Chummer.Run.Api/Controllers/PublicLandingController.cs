@@ -1272,13 +1272,26 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/mobile")]
     [HttpHead("/mobile")]
     [Produces("text/html")]
-    public IActionResult MobileProjectionPage()
-        => Redirect("/app?command=character_roster");
+    public async Task<IActionResult> MobileProjectionPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildMobileProjectionPageModel(
+            currentPath: "/mobile",
+            chromeTitle: "Mobile and PWA entry",
+            chromeDescription: "Installable mobile play shell with reconnect, role entry, and opt-in living-world updates.",
+            eyebrow: "Mobile shell",
+            heading: "Mobile and PWA entry",
+            intro: "Track the essentials during play, install the shell when the browser allows it, and keep living-world updates behind explicit opt-in.",
+            currentRoleKey: "player",
+            primaryAction: new TrustPageActionViewModel("Open play", "/play", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Desktop downloads", "/downloads", "secondary"),
+            cancellationToken: cancellationToken);
+        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
+    }
 
     [HttpGet("/pwa")]
     [HttpHead("/pwa")]
     public IActionResult PwaProjectionAlias()
-        => Redirect("/app?command=character_roster");
+        => Redirect("/mobile");
 
     [HttpGet("/play")]
     [HttpHead("/play")]

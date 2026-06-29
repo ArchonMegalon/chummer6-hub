@@ -749,7 +749,7 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void BuildAndPwaRoutesOpenTheUsableAppInsteadOfExplainerPages()
+    public void BuildRouteOpensTheAppAndPwaRoutesRenderTheInstallableViewer()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string navigationPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_NAVIGATION.yaml");
@@ -758,11 +758,13 @@ public sealed class PublicLandingReleaseTrustViewTests
         string navigation = File.ReadAllText(navigationPath);
 
         Assert.Contains("public IActionResult BuildPage()", controller, StringComparison.Ordinal);
-        Assert.Contains("public IActionResult MobileProjectionPage()", controller, StringComparison.Ordinal);
+        Assert.Contains("public async Task<IActionResult> MobileProjectionPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult PwaProjectionAlias()", controller, StringComparison.Ordinal);
         Assert.Contains("=> Redirect(\"/app?command=character_roster\");", controller, StringComparison.Ordinal);
+        Assert.Contains("return View(\"~/Views/PublicLanding/MobileProjection.cshtml\", model);", controller, StringComparison.Ordinal);
+        Assert.Contains("=> Redirect(\"/mobile\");", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("currentPath: \"/build\"", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("chromeTitle: \"Mobile and PWA\"", controller, StringComparison.Ordinal);
+        Assert.Contains("chromeTitle: \"Mobile and PWA entry\"", controller, StringComparison.Ordinal);
         Assert.Contains("label: Build", navigation, StringComparison.Ordinal);
         Assert.Contains("href: /build", navigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: PWA", navigation, StringComparison.Ordinal);
