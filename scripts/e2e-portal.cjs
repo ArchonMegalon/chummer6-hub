@@ -145,7 +145,7 @@ const checks = [
       && !text.includes('Could not load posts')
   },
   {
-    url: `${baseUrl}/participate/frame`,
+    url: `${baseUrl}/participate/board?embed=1`,
     assert: (text, response) =>
       /\/participate\/board\/?\?embed=1$/.test(response.url)
       && text.includes('<base href="/participate/board/"')

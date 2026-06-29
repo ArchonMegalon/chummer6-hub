@@ -429,9 +429,10 @@ public sealed class ParticipateController : Controller
     private static string BuildParticipateFrameHref(string? boardPath = null)
     {
         string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
-        return string.IsNullOrWhiteSpace(normalizedBoardPath)
-            ? "/participate/frame"
-            : $"/participate/frame/{normalizedBoardPath}";
+        string route = string.IsNullOrWhiteSpace(normalizedBoardPath)
+            ? "/participate/board"
+            : $"/participate/board/{normalizedBoardPath}";
+        return $"{route}?embed=1";
     }
 
     private static Uri ResolveHostedBoardContentUri(Uri upstream, string relativePath)

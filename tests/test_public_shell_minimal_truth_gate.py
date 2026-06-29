@@ -73,7 +73,7 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                     <p>Public requests, clear bugs, useful ideas.</p>
                     <h2>Current requests</h2>
                     <p>Board is live.</p>
-                    <iframe data-chummer-participate-frame src="/participate/frame"></iframe>
+                    <iframe data-chummer-participate-frame src="/participate/board?embed=1"></iframe>
                   </body>
                 </html>
                 """,

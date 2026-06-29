@@ -67,7 +67,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("text.includes('Current requests')", text)
         self.assertIn("text.includes('Board is live.')", text)
         self.assertIn("text.includes('data-chummer-participate-frame')", text)
-        self.assertIn("url: `${baseUrl}/participate/frame`", text)
+        self.assertIn("url: `${baseUrl}/participate/board?embed=1`", text)
         self.assertIn("text.includes('<base href=\"/participate/board/\"')", text)
         self.assertIn("!text.includes('productlift.dev')", text)
         self.assertIn("!text.includes('data-chummer-board-skin')", text)

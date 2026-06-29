@@ -175,7 +175,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
         Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Equal("/participate/frame", model.EmbeddedBoardHref);
+        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
         Assert.Equal("/participate/board", model.DirectBoardHref);
         Assert.Equal("What should Chummer do next?", model.Heading);
         Assert.Equal("Public requests, clear bugs, useful ideas.", model.Summary);

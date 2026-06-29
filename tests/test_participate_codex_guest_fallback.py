@@ -21,6 +21,7 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
         controller = PUBLIC_CONTROLLER.read_text(encoding="utf-8")
         self.assertIn('private static string BuildParticipateFrameHref(', controller)
         self.assertIn('embeddedBoardHref = hostedBoardAvailable ? BuildParticipateFrameHref(normalizedBoardPath) : null;', controller)
+        self.assertIn('return $"{route}?embed=1";', controller)
         self.assertIn('BuildParticipateBoardRouteHref(normalizedBoardPath)', controller)
         self.assertIn('ResolveParticipateSupporterHref()', controller)
         self.assertIn('return "/account/billing";', controller)

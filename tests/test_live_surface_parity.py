@@ -115,7 +115,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 b"<h2>Current requests</h2>"
                 b"<p>Board is live.</p>"
                 b"<a href=\"/login?next=%2Fparticipate\">Sign in to Chummer</a>"
-                b"<iframe data-chummer-participate-frame src=\"/participate/frame\"></iframe>"
+                b"<iframe data-chummer-participate-frame src=\"/participate/board?embed=1\"></iframe>"
                 b"</body></html>"
             )
             return
