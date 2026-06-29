@@ -22,6 +22,11 @@ def truthy_env(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def is_public_chummer_run_base(parsed_base_url: urllib.parse.ParseResult) -> bool:
+    host = (parsed_base_url.hostname or "").lower()
+    return parsed_base_url.scheme.lower() == "https" and (host == "chummer.run" or host.endswith(".chummer.run"))
+
+
 def build_billing_surface(require_brilliant_directories_checkout: bool) -> dict[str, Any]:
     return {
         "path": "/account/billing",
@@ -364,7 +369,7 @@ def flatten_text(html: str) -> str:
 def verify(base_url: str) -> dict[str, Any]:
     base = base_url.rstrip("/")
     base_origin = urllib.parse.urlparse(base)
-    require_brilliant_directories_checkout = truthy_env("CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT")
+    require_brilliant_directories_checkout = truthy_env("CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT") or is_public_chummer_run_base(base_origin)
     surfaces = build_surfaces(require_brilliant_directories_checkout)
     results: list[dict[str, Any]] = []
     failures: list[str] = []

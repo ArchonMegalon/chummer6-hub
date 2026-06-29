@@ -11,6 +11,7 @@ RELEASE_READY_SCRIPT = Path("/docker/chummercomplete/scripts/release/verify_chum
 PORTAL_E2E_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "e2e-portal.cjs"
 PARTIZIPATE_RUNTIME_FALLBACK_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "verify_partizipate_runtime_fallback.cjs"
 PUBLIC_LANDING_CONTROLLER = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingController.cs"
+PUBLIC_EDGE_COMPOSE = RUN_SERVICES_ROOT / "docker-compose.public-edge.yml"
 
 
 class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
@@ -43,6 +44,16 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("python3 scripts/verify_participate_billing_honesty.py --completion-dir .codex-studio/published", text)
         self.assertIn("verify_account_handoff_runtime_config", text)
         self.assertIn("python3 scripts/verify_account_handoff_runtime_config.py", text)
+
+    def test_public_edge_requires_brilliant_directories_checkout_by_default(self) -> None:
+        text = PUBLIC_EDGE_COMPOSE.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT: ${CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT:-true}",
+            text,
+        )
+        self.assertIn("BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL: ${BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL:-}", text)
+        self.assertIn("BRILLIANT_DIRECTORIES_MEMBER_PORTAL_URL: ${BRILLIANT_DIRECTORIES_MEMBER_PORTAL_URL:-}", text)
 
     def test_final_gold_janitor_requires_and_materializes_participate_billing_honesty(self) -> None:
         text = FINAL_GOLD_JANITOR.read_text(encoding="utf-8")

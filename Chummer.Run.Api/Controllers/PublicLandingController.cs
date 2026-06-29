@@ -3227,7 +3227,7 @@ public sealed class PublicLandingController : Controller
                 ? "['gathering votes', 'planned', 'in progress']"
                 : "[]";
             const string boardSkin = """
-<style data-chummer-board-skin>
+<style>
 :root {
   color-scheme: dark;
   --chummer-board-bg: #0d0e10;
@@ -3521,6 +3521,26 @@ body > nav,
 main,
 [role="main"] {
   padding-top: 0 !important;
+}
+
+.chummer-board-intro {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0.9rem 1rem 0.2rem;
+  color: var(--chummer-board-text);
+}
+
+.chummer-board-intro h1 {
+  margin: 0 0 0.25rem;
+  color: var(--chummer-board-text);
+  font-size: clamp(1.35rem, 2.2vw, 2rem);
+  line-height: 1.1;
+}
+
+.chummer-board-intro p {
+  margin: 0;
+  color: var(--chummer-board-muted);
+  max-width: 42rem;
 }
 </style>
 """;
@@ -3826,6 +3846,27 @@ document.addEventListener('DOMContentLoaded', function () {
             else
             {
                 rewritten = boardSkin + homeLinkPatch + boardFailurePatch + rewritten;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(hostedHeadingReplacement)
+            && !rewritten.Contains("chummer-board-intro", StringComparison.OrdinalIgnoreCase))
+        {
+            string intro = $"""
+<section class="chummer-board-intro" aria-label="Chummer board intro">
+  <h1>{HtmlEncoder.Default.Encode(hostedHeadingReplacement)}</h1>
+  <p>{HtmlEncoder.Default.Encode(hostedSummaryReplacement ?? string.Empty)}</p>
+</section>
+""";
+            rewritten = Regex.Replace(
+                rewritten,
+                @"(<body\b[^>]*>)",
+                $"$1{intro}",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline,
+                TimeSpan.FromMilliseconds(250));
+            if (!rewritten.Contains("chummer-board-intro", StringComparison.OrdinalIgnoreCase))
+            {
+                rewritten = intro + rewritten;
             }
         }
 

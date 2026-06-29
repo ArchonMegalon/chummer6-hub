@@ -591,7 +591,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("support follow-through", status, StringComparison.Ordinal);
         Assert.DoesNotContain("At a glance", status, StringComparison.Ordinal);
 
-        Assert.Contains("data-chummer-board-skin", controller, StringComparison.Ordinal);
+        Assert.Contains("chummer-board-intro", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-chummer-board-skin", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/participate{Request.QueryString}\");", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", controller, StringComparison.Ordinal);

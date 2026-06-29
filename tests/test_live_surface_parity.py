@@ -314,6 +314,14 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertIn("Email first. Billing stays attached after this step.", billing["missing_required_texts"])
         self.assertIn("Supporter is not open right now.", billing["forbidden_hits"])
 
+    def test_public_chummer_run_base_requires_billing_checkout_without_env_flag(self) -> None:
+        module = load_module()
+
+        self.assertTrue(module.is_public_chummer_run_base(urllib.parse.urlparse("https://chummer.run")))
+        self.assertTrue(module.is_public_chummer_run_base(urllib.parse.urlparse("https://www.chummer.run")))
+        self.assertFalse(module.is_public_chummer_run_base(urllib.parse.urlparse(self.base_url)))
+        self.assertFalse(module.is_public_chummer_run_base(urllib.parse.urlparse("http://chummer.run")))
+
     def test_mainline_payload_remains_json_serializable(self) -> None:
         module = load_module()
 
