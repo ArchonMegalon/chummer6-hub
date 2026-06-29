@@ -145,6 +145,14 @@ const checks = [
       && !text.includes('Could not load posts')
   },
   {
+    url: `${baseUrl}/participate/frame`,
+    assert: (text, response) =>
+      /\/participate\/board\/?\?embed=1$/.test(response.url)
+      && text.includes('<base href="/participate/board/"')
+      && !text.includes('productlift.dev')
+      && !text.includes('support@productlift.dev')
+  },
+  {
     url: `${baseUrl}/roadmap`,
     assert: text =>
       text.includes('Roadmap')

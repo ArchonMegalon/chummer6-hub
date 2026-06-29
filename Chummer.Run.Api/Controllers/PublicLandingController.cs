@@ -3248,6 +3248,10 @@ public sealed class PublicLandingController : Controller
   --chummer-board-accent-ink: #181612;
 }
 
+html {
+  background: var(--chummer-board-bg) !important;
+}
+
 body {
   background: var(--chummer-board-bg) !important;
   color: var(--chummer-board-text) !important;
@@ -3318,6 +3322,13 @@ main small,
 
 article,
 form,
+[class*="modal"],
+[class*="dialog"],
+[class*="drawer"],
+[class*="dropdown"],
+[class*="menu"],
+[class*="popover"],
+[class*="tooltip"],
 [class*="card"],
 [class*="panel"],
 [class*="box"],
@@ -3403,6 +3414,92 @@ textarea::placeholder {
   background: rgba(255, 255, 255, 0.03) !important;
   border: 1px solid var(--chummer-board-line) !important;
   color: var(--chummer-board-muted) !important;
+}
+
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-outline-primary,
+.btn-outline-secondary,
+[class*="btn-primary"],
+[class*="btn-secondary"],
+[class*="btn-outline-primary"],
+[class*="btn-outline-secondary"],
+[class*="bg-primary"],
+[class*="bg-secondary"],
+[class*="bg-info"],
+[class*="bg-light"],
+[class*="bg-white"] {
+  background-image: none !important;
+  background-color: var(--chummer-board-panel-soft) !important;
+  border-color: rgba(241, 233, 219, 0.14) !important;
+  color: var(--chummer-board-text) !important;
+}
+
+.btn-primary,
+[class*="btn-primary"],
+[aria-current="page"],
+.active > .nav-link,
+.nav-link.active {
+  background: var(--chummer-board-accent-soft) !important;
+  border-color: rgba(212, 179, 107, 0.45) !important;
+  color: var(--chummer-board-text) !important;
+}
+
+.text-primary,
+.text-info,
+.text-blue,
+.link-primary,
+.link-info,
+[class*="text-primary"],
+[class*="text-info"],
+[class*="text-blue"],
+[class*="link-primary"],
+[class*="link-info"] {
+  color: var(--chummer-board-text) !important;
+}
+
+.text-muted,
+[class*="text-muted"],
+[class*="muted"] {
+  color: var(--chummer-board-muted) !important;
+}
+
+.form-control,
+.form-select,
+.dropdown-menu,
+.dropdown-item,
+.modal-content,
+.offcanvas,
+.popover,
+.tooltip-inner,
+[role="listbox"],
+[role="menu"],
+[role="dialog"] {
+  background: var(--chummer-board-panel) !important;
+  border-color: var(--chummer-board-line) !important;
+  color: var(--chummer-board-text) !important;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus,
+[role="option"]:hover,
+[role="option"]:focus,
+[role="menuitem"]:hover,
+[role="menuitem"]:focus {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--chummer-board-text) !important;
+}
+
+table tr,
+table td,
+table th,
+.table,
+.table td,
+.table th {
+  background: transparent !important;
+  border-color: var(--chummer-board-line) !important;
+  color: var(--chummer-board-text) !important;
 }
 
 svg,

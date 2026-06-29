@@ -445,6 +445,9 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "What should Chummer do next?" in controller
     assert "Public requests, clear bugs, useful ideas." in controller
     assert 'public IActionResult ParticipateBoardFrame(string? boardPath)' in controller
+    assert ".text-primary," in controller
+    assert ".dropdown-menu," in controller
+    assert "var(--chummer-board-text)" in controller
     assert "Current requests" in participate
     assert "data-chummer-participate-frame" in participate
     assert "Model.SupporterHref" in participate

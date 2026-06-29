@@ -32,17 +32,20 @@ test('help, contact, and participate keep public and private paths clear', async
   const contactResponse = await request.get(`${baseUrl}/contact`);
   const participateResponse = await request.get(`${baseUrl}/participate`);
   const participateBoardResponse = await request.get(`${baseUrl}/participate/board`);
+  const participateFrameResponse = await request.get(`${baseUrl}/participate/frame`);
 
   expect(helpResponse.status()).toBe(200);
   expect(contactResponse.status()).toBe(200);
   expect(participateResponse.status()).toBe(200);
   expect(participateBoardResponse.status()).toBe(200);
+  expect(participateFrameResponse.status()).toBe(200);
 
   const helpRobots = helpResponse.headers()['x-robots-tag'] || '';
   const contactRobots = contactResponse.headers()['x-robots-tag'] || '';
   const participateRobots = participateResponse.headers()['x-robots-tag'] || '';
   const participateText = await participateResponse.text();
   const participateBoardText = await participateBoardResponse.text();
+  const participateFrameText = await participateFrameResponse.text();
 
   expect(helpRobots).toContain('index');
   expect(contactRobots).toContain('index');
@@ -53,6 +56,11 @@ test('help, contact, and participate keep public and private paths clear', async
   expect(participateText).toContain('Sign in to Chummer');
   expect(participateText).toContain('data-chummer-participate-frame');
   expect(participateText).not.toContain('ProductLift');
+  expect(new URL(participateFrameResponse.url()).pathname).toBe('/participate/board');
+  expect(new URL(participateFrameResponse.url()).search).toContain('embed=1');
+  expect(participateFrameText).toContain('<base href="/participate/board/"');
+  expect(participateFrameText).not.toContain('productlift.dev');
+  expect(participateFrameText).not.toContain('support@productlift.dev');
   expect(new URL(participateBoardResponse.url()).pathname).toBe('/participate');
   expect(participateBoardText).toContain('Current requests');
   expect(participateBoardText).toContain('Board is live.');
