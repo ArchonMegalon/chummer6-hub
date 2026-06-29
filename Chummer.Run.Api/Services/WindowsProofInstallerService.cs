@@ -99,7 +99,7 @@ public sealed class WindowsProofInstallerService
             Sha256: ComputeSha256(proofFilePath),
             SizeBytes: info.Length,
             UpdatedAtUtc: info.LastWriteTimeUtc,
-            DownloadUrl: $"/downloads/proof/windows/{Uri.EscapeDataString(allowedFileName)}",
+            DownloadUrl: $"/downloads/supplemental/windows/{Uri.EscapeDataString(allowedFileName)}",
             ArtifactId: ResolveArtifactId(allowedFileName));
     }
 

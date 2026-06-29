@@ -1867,7 +1867,7 @@ public sealed class PublicLandingController : Controller
             DispatchNote: "Use this page when you need this exact installer.",
             ArtifactTitle: $"{headLabel} Windows x64 installer",
             ArtifactSupportLine: "Direct Windows installer.",
-            DownloadHref: $"/downloads/install/{Uri.EscapeDataString(artifactId)}/proof",
+            DownloadHref: $"/downloads/install/{Uri.EscapeDataString(artifactId)}/supplemental",
             DownloadLabel: "Download installer",
             TerminalInstallCommand: null,
             BootstrapCommandLabel: null,

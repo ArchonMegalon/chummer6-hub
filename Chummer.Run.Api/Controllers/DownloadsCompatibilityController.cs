@@ -69,6 +69,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     public IActionResult AurPackagesManifest()
         => Ok(_aurPackages.LoadCatalog());
 
+    [HttpGet("/downloads/supplemental/windows")]
     [HttpGet("/downloads/proof/windows")]
     public IActionResult WindowsProofInstallers()
     {
@@ -99,6 +100,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         });
     }
 
+    [HttpGet("/downloads/supplemental/windows/{fileName}")]
+    [HttpHead("/downloads/supplemental/windows/{fileName}")]
     [HttpGet("/downloads/proof/windows/{fileName}")]
     [HttpHead("/downloads/proof/windows/{fileName}")]
     public IActionResult DownloadWindowsProofInstaller([FromRoute] string fileName)
@@ -113,6 +116,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         ApplyRouteProofHeaders(
             Response.Headers,
             "No current release status record is attached to the Windows installer output route.",
+            "/downloads/supplemental/windows/{fileName}",
+            "/downloads/install/{artifactId}/supplemental",
             "/downloads/proof/windows/{fileName}",
             "/downloads/install/{artifactId}/proof",
             $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}");
@@ -123,6 +128,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             enableRangeProcessing: true);
     }
 
+    [HttpGet("/downloads/install/{artifactId}/supplemental")]
+    [HttpHead("/downloads/install/{artifactId}/supplemental")]
     [HttpGet("/downloads/install/{artifactId}/proof")]
     [HttpHead("/downloads/install/{artifactId}/proof")]
     public IActionResult DownloadWindowsProofInstallerByArtifactId([FromRoute] string artifactId)
@@ -137,6 +144,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         ApplyRouteProofHeaders(
             Response.Headers,
             "No current release status record is attached to the Windows installer artifact route.",
+            $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}/supplemental",
+            "/downloads/install/{artifactId}/supplemental",
             $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}/proof",
             "/downloads/install/{artifactId}/proof",
             $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}");
@@ -152,7 +161,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         headers["Cache-Control"] = "private, no-store, max-age=0";
         headers["Pragma"] = "no-cache";
         headers["Expires"] = "0";
-        headers["X-Chummer-Install-Tier"] = "proof-only";
+        headers["X-Chummer-Install-Tier"] = "supplemental";
     }
 
     [HttpGet("/downloads/get/{artifactId}")]

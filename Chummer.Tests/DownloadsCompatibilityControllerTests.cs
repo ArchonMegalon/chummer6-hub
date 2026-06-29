@@ -33,17 +33,23 @@ public sealed class DownloadsCompatibilityControllerTests
             .ToArray();
 
         Assert.Contains(byFileRoutes, route =>
-            string.Equals(route.Template, "/downloads/proof/windows/{fileName}", StringComparison.Ordinal)
+            string.Equals(route.Template, "/downloads/supplemental/windows/{fileName}", StringComparison.Ordinal)
             && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
         Assert.Contains(byFileRoutes, route =>
+            string.Equals(route.Template, "/downloads/supplemental/windows/{fileName}", StringComparison.Ordinal)
+            && route.HttpMethods.Contains("HEAD", StringComparer.OrdinalIgnoreCase));
+        Assert.Contains(byFileRoutes, route =>
             string.Equals(route.Template, "/downloads/proof/windows/{fileName}", StringComparison.Ordinal)
+            && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
+        Assert.Contains(byArtifactRoutes, route =>
+            string.Equals(route.Template, "/downloads/install/{artifactId}/supplemental", StringComparison.Ordinal)
+            && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
+        Assert.Contains(byArtifactRoutes, route =>
+            string.Equals(route.Template, "/downloads/install/{artifactId}/supplemental", StringComparison.Ordinal)
             && route.HttpMethods.Contains("HEAD", StringComparer.OrdinalIgnoreCase));
         Assert.Contains(byArtifactRoutes, route =>
             string.Equals(route.Template, "/downloads/install/{artifactId}/proof", StringComparison.Ordinal)
             && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
-        Assert.Contains(byArtifactRoutes, route =>
-            string.Equals(route.Template, "/downloads/install/{artifactId}/proof", StringComparison.Ordinal)
-            && route.HttpMethods.Contains("HEAD", StringComparer.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -304,6 +310,8 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.DoesNotContain("verification and support rail", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-blazor-desktop-win-x64-installer.exe", payload, StringComparison.Ordinal);
+        Assert.Contains("/downloads/supplemental/windows/chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -339,7 +347,7 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.Equal("private, no-store, max-age=0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
         Assert.Equal("no-cache", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Pragma.ToString());
         Assert.Equal("0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Expires.ToString());
-        Assert.Equal("proof-only", fixture.Controller.ControllerContext.HttpContext.Response.Headers["X-Chummer-Install-Tier"].ToString());
+        Assert.Equal("supplemental", fixture.Controller.ControllerContext.HttpContext.Response.Headers["X-Chummer-Install-Tier"].ToString());
     }
 
     [Fact]
@@ -359,7 +367,7 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.Equal("private, no-store, max-age=0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
         Assert.Equal("no-cache", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Pragma.ToString());
         Assert.Equal("0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Expires.ToString());
-        Assert.Equal("proof-only", fixture.Controller.ControllerContext.HttpContext.Response.Headers["X-Chummer-Install-Tier"].ToString());
+        Assert.Equal("supplemental", fixture.Controller.ControllerContext.HttpContext.Response.Headers["X-Chummer-Install-Tier"].ToString());
     }
 
     [Fact]
