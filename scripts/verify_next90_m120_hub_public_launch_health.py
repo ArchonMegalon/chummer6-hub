@@ -154,10 +154,10 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
 }
 SOURCE_MARKERS = {
     "Chummer.Run.Api/Controllers/PublicLandingController.cs": [
-        'Chrome: await BuildPublicOrAuthenticatedChromeAsync("Updated", "Current Chummer downloads and setup help.", "/status", cancellationToken),',
-        "ReleaseSummary: releaseSummary,",
-        "CautionSummary: cautionSummary);",
+        '[HttpGet("/status")]',
+        '[HttpHead("/status")]',
         "ApplyNoStoreHeaders(Response.Headers);",
+        'return Redirect("/downloads");',
     ],
     "Chummer.Run.Api/Controllers/PublicProgressController.cs": [
         '[HttpGet("progress-poster.svg")]',

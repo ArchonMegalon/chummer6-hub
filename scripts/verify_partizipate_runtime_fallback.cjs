@@ -73,13 +73,13 @@ async function assertBoardShell(page, path) {
   await page.waitForFunction(
     () => {
       const text = (document.body && document.body.innerText) || '';
-      return /What should Chummer do next\?|Board offline right now/i.test(text);
+      return /Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(text);
     },
     { timeout: 15000 },
   );
 
   const text = await page.locator('body').innerText();
-  assert.equal(/What should Chummer do next\?/i.test(text), true, `${path} should render the first-party heading.`);
+  assert.equal(/Participate/i.test(text), true, `${path} should render the first-party heading.`);
   assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), true, `${path} should render the first-party summary.`);
   assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(text), false, `${path} must not show provider failure copy.`);
   assert.equal(/productlift\.dev/i.test(text), false, `${path} must not leak provider domains.`);

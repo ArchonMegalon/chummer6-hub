@@ -208,21 +208,21 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("receipt id launch_health:public must appear exactly once in proof_receipts", result.stderr)
 
-    def test_verifier_fails_when_controller_loses_compact_status_summary(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m120-status-summary-") as temp_dir:
+    def test_verifier_fails_when_controller_loses_minimal_status_redirect(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="next90-m120-status-redirect-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             controller_path = temp_root / "Chummer.Run.Api/Controllers/PublicLandingController.cs"
             controller_text = controller_path.read_text(encoding="utf-8")
             controller_path.write_text(
-                controller_text.replace("ReleaseSummary: releaseSummary,", "ReleaseSummary: string.Empty,", 1),
+                controller_text.replace('return Redirect("/downloads");', 'return Redirect("/now");', 1),
                 encoding="utf-8",
             )
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("ReleaseSummary: releaseSummary,", result.stderr)
+        self.assertIn('return Redirect("/downloads");', result.stderr)
 
     def test_verifier_fails_when_smoke_drops_status_decision_surface_assertion(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-status-surface-") as temp_dir:

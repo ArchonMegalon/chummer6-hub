@@ -86,10 +86,12 @@ const checks = [
   },
   {
     url: `${baseUrl}/status`,
-    assert: text =>
-      text.includes('Updated')
-      && text.includes('Windows and Linux downloads are live.')
+    assert: (text, response) =>
+      /\/downloads\/?$/.test(response.url)
       && text.includes('Downloads')
+      && text.includes('Stable release')
+      && text.includes('Nightly')
+      && text.includes('Build from source')
       && text.includes('Help')
       && !text.includes('Checks passed')
       && !text.includes('Released')
@@ -254,10 +256,9 @@ const checks = [
   {
     url: `${baseUrl}/coach/`,
     assert: (text, response) =>
-      /\/status\/?$/.test(response.url)
-      && text.includes('Status')
-      && text.includes('Updated')
+      /\/downloads\/?$/.test(response.url)
       && text.includes('Downloads')
+      && text.includes('Stable release')
   }
 ];
 
@@ -281,7 +282,7 @@ async function runRenderedCheck(browser, check) {
     await page.waitForFunction(
       () => {
         const text = (document.body && document.body.innerText) || '';
-        return /What should Chummer do next\?|Board offline right now/i.test(text);
+        return /Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(text);
       },
       { timeout: 15000 },
     );
