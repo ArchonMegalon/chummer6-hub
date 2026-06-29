@@ -281,7 +281,10 @@ def test_homepage_has_minimal_promo_entry_surface() -> None:
     assert "Kestrel" in landing
     assert "Brick" in landing
     assert "Whisper" in landing
-    assert 'href="/login?next=%2Fhome%2Faccess"' in landing
+    assert '/account/open/example/decker' in landing
+    assert '/account/open/example/street-samurai' in landing
+    assert '/account/open/example/face' in landing
+    assert 'href="/login?next=%2Fhome%2Faccess"' not in landing
     assert "/media/promo/every-wonder-horizon-promo.webm" not in landing
     assert "/media/promo/every-wonder-horizon-promo.vtt" not in landing
     assert 'data-homepage-section="downloads"' not in landing
@@ -427,7 +430,7 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "https://chummer6.productlift.dev" not in controller
     assert "public async Task<IActionResult> ParticipatePage" in controller
     assert "BuildFirstPartyParticipateBoardAsync" in controller
-    assert 'View("~/Views/PublicLanding/Partizipate.cshtml"' in controller
+    assert 'return await ParticipateBoardProxyCore(' in controller
     assert '[HttpGet("/participate/board")]' in controller
     assert "ParticipateBoardProxy" in controller
     assert 'public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)' in controller

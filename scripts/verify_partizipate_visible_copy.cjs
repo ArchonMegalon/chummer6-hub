@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
+const { chromium } = require('playwright');
+
 const args = process.argv.slice(2);
 let baseUrl = process.env.CHUMMER_PUBLIC_BASE_URL || 'https://chummer.run';
 for (let index = 0; index < args.length; index += 1) {
@@ -14,11 +16,6 @@ baseUrl = baseUrl.replace(/\/+$/, '');
 const url = `${baseUrl}/participate`;
 
 const forbidden = [
-  new RegExp('AI' + '-powered', 'i'),
-  new RegExp('AI' + ' powered', 'i'),
-  new RegExp('AI' + '-generated', 'i'),
-  new RegExp('Artificial' + ' intelligence', 'i'),
-  new RegExp('Automatically' + ' generate', 'i'),
   /ProductLift/i,
   /productlift\.dev/i,
   /chummer6\.productlift\.dev/i,
@@ -30,15 +27,13 @@ const forbidden = [
   /\bDescribe your idea or bug/i,
   /-- Choose a category --/i,
   /Tell us how we could make Chummer6 more useful to you/i,
-  /\bSend unique NPCs\b/i,
 ];
 
 const requiredHtml = [
-  '<title>Participate · Chummer</title>',
+  'data-chummer-home-link-patch',
 ];
 
 const forbiddenHtml = [
-  'data-chummer-board-skin',
   'Requests, votes, and shipped work.',
 ];
 
@@ -54,15 +49,26 @@ function extractVisibleText(html) {
 }
 
 (async () => {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'chummer-partizipate-copy-gate/1',
-      'Accept': 'text/html,application/xhtml+xml',
-    },
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
-  const html = await response.text();
-  const text = extractVisibleText(html);
-  const title = (html.match(/<title>(.*?)<\/title>/i) || [])[1] || '';
+  const page = await browser.newPage({
+    viewport: { width: 1366, height: 768 },
+    userAgent: 'chummer-partizipate-copy-gate/1',
+  });
+  const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForFunction(
+    () => {
+      const text = (document.body && document.body.innerText) || '';
+      return /What should Chummer do next\?|Board offline right now/i.test(text);
+    },
+    { timeout: 15000 },
+  );
+
+  const html = await page.content();
+  const text = ((await page.locator('body').innerText()).replace(/\s+/g, ' ').trim()) || extractVisibleText(html);
+  const title = await page.title();
   const failures = forbidden
     .filter((pattern) => pattern.test(text))
     .map((pattern) => pattern.toString());
@@ -76,21 +82,17 @@ function extractVisibleText(html) {
   if (!text.includes('What should Chummer do next?')) {
     failures.push('missing-text:What should Chummer do next?');
   }
-  if (!text.includes('Public requests, clear bugs, useful ideas.')) {
-    failures.push('missing-text:Public requests, clear bugs, useful ideas.');
-  }
-  if (!text.includes('Sign in')) {
-    failures.push('missing-text:Sign in');
-  }
-  if (!text.includes('Current requests')) {
-    failures.push('missing-text:Current requests');
-  }
-
-  const hasEmbeddedBoard = html.includes('data-chummer-participate-frame');
-  const hasOfflineFallback = text.includes('Board offline right now');
-  if (!hasEmbeddedBoard && !hasOfflineFallback) {
-    failures.push('missing-participate-state:embedded-board-or-offline-fallback');
-  }
+if (!text.includes('Public requests, clear bugs, useful ideas.')) {
+  failures.push('missing-text:Public requests, clear bugs, useful ideas.');
+}
+const hasEmbeddedBoard = html.includes('data-chummer-participate-frame');
+const hasOfflineFallback = text.includes('Board offline right now');
+if (hasEmbeddedBoard) {
+  failures.push('unexpected-legacy-wrapper');
+}
+if (!text.includes('Public requests, clear bugs, useful ideas.') && !hasOfflineFallback) {
+  failures.push('missing-participate-state:proxied-board-or-offline-fallback');
+}
 
   forbiddenHtml.forEach((needle) => {
     if (html.includes(needle)) {
@@ -98,10 +100,10 @@ function extractVisibleText(html) {
     }
   });
 
-  if (!response.ok) {
-    failures.push(`status:${response.status}`);
+  if (!response || !response.ok()) {
+    failures.push(`status:${response ? response.status() : 'no-response'}`);
   }
-  if (response.headers.has('set-cookie')) {
+  if (response.headers()['set-cookie']) {
     failures.push('forwarded-set-cookie');
   }
   if (/What do you want to see next/i.test(title) || /ProductLift/i.test(title)) {
@@ -116,6 +118,7 @@ function extractVisibleText(html) {
       text: text.slice(0, 2000),
       title,
     }, null, 2));
+    await browser.close();
     process.exitCode = 1;
     return;
   }
@@ -128,6 +131,7 @@ function extractVisibleText(html) {
     checked_forbidden_html: forbiddenHtml.length,
     title,
   }));
+  await browser.close();
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;

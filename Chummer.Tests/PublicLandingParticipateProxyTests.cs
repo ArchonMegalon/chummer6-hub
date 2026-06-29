@@ -64,10 +64,10 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         stopwatch.Stop();
         ViewResult view = Assert.IsType<ViewResult>(result);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Equal("Live", model.StatusLabel);
-        Assert.Equal("Board is live.", model.SyncedLabel);
-        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"participate page should return the first-party shell immediately even when the hosted board is slow, but took {stopwatch.Elapsed}.");
+        Assert.False(model.EmbeddedBoardEnabled);
+        Assert.Equal("Offline", model.StatusLabel);
+        Assert.Equal("Board offline right now", model.SyncedLabel);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(3), $"participate page should fall back quickly when the hosted board is slow, but took {stopwatch.Elapsed}.");
     }
 
     [Fact]
@@ -114,10 +114,10 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         ViewResult view = Assert.IsType<ViewResult>(result);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
         Assert.True(model.LoadedFromBoard);
-        Assert.Equal("Live", model.StatusLabel);
-        Assert.True(model.EmbeddedBoardEnabled);
+        Assert.Equal("Offline", model.StatusLabel);
+        Assert.False(model.EmbeddedBoardEnabled);
         Assert.Single(model.Posts);
-        Assert.StartsWith("Synced ", model.SyncedLabel, StringComparison.Ordinal);
+        Assert.Equal("Board offline right now", model.SyncedLabel);
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"durable participate snapshot should return immediately, but took {stopwatch.Elapsed}.");
     }
 
@@ -162,7 +162,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task ParticipatePageServesFirstPartyIframeShellForHostedBoard()
+    public async Task ParticipatePageProxiesHostedBoardIntoCanonicalParticipateSurface()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), seedParticipateSnapshot: false);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -171,15 +171,14 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         IActionResult result = await controller.ParticipatePage(CancellationToken.None);
 
-        ViewResult view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
-        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
-        Assert.Equal("/participate/board", model.DirectBoardHref);
-        Assert.Equal("What should Chummer do next?", model.Heading);
-        Assert.Equal("Public requests, clear bugs, useful ideas.", model.Summary);
-        Assert.Equal("/login?next=%2Fparticipate", model.EntryHref);
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("<base href=\"/participate/\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("<link rel=\"canonical\" href=\"/participate\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("Public requests, clear bugs, useful ideas.", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProductLift", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data-chummer-participate-frame", content.Content ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -53,7 +53,8 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
 
     def test_authenticated_participate_e2e_spec_rejects_sign_in_chrome(self) -> None:
         spec = (REPO_ROOT / "tests" / "public" / "participate-billing-auth.spec.ts").read_text(encoding="utf-8")
-        self.assertIn("getByRole('link', { name: 'Account' })", spec)
+        self.assertIn("not.toContainText('Log in')", spec)
+        self.assertIn("not.toContainText('Sign up')", spec)
 
 
 if __name__ == "__main__":

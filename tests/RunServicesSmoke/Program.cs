@@ -2845,7 +2845,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!trustCanonSource.Contains("stays canonical", StringComparison.Ordinal), "public trust canon should not use canonical jargon on public trust surfaces.");
     Assert(trustCanonSource.Contains("The published package stays the same for everyone", StringComparison.Ordinal), "public trust canon should explain the package relationship in customer language.");
     Assert(publicControllerSource.Contains("BuildFirstPartyParticipateBoardAsync", StringComparison.Ordinal), "participate should render a first-party public summary instead of dropping users into a vendor shell.");
-    Assert(publicControllerSource.Contains("View(\"~/Views/PublicLanding/Partizipate.cshtml\"", StringComparison.Ordinal), "participate should render the dedicated first-party view.");
+    Assert(publicControllerSource.Contains("return await ParticipateBoardProxyCore(", StringComparison.Ordinal), "participate should resolve the canonical route straight into the first-party ProductLift proxy.");
     Assert(publicControllerSource.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", StringComparison.Ordinal), "participate should keep a deliberate board route for the full ProductLift queue.");
     Assert(publicControllerSource.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", StringComparison.Ordinal), "participate should keep the live board behind a first-party wrapper and frame handoff.");
     Assert(publicControllerSource.Contains("What should Chummer do next?", StringComparison.Ordinal), "participate should keep the public heading explicit and first-party.");

@@ -241,6 +241,11 @@
             var ledgerContinuitySummary = document.querySelector("[data-pwa-continuity-summary]");
             var ledgerContinuityEvents = document.querySelector("[data-pwa-continuity-events]");
             var currentLedgerPayload = null;
+            var ledgerRefreshTimer = 0;
+            var ledgerRefreshInFlight = false;
+            var defaultLedgerRefreshIntervalMs = 30000;
+            var ledgerTurnRouteLabel = ledgerTurnRoute ? ledgerTurnRoute.textContent : "Open live turn";
+            var ledgerNewsreelRouteLabel = ledgerNewsreelRoute ? ledgerNewsreelRoute.textContent : "Open live newsreel";
             var preferenceState = {
                 loaded: false,
                 authenticated: false,
@@ -310,6 +315,69 @@
                 if (node) {
                     node.textContent = value;
                 }
+            }
+
+            function formatTimestamp(value, fallback) {
+                if (!value) {
+                    return fallback || "not yet";
+                }
+
+                var timestamp = new Date(value);
+                return Number.isNaN(timestamp.getTime())
+                    ? String(value)
+                    : timestamp.toLocaleString();
+            }
+
+            function setActionLink(node, href, enabledLabel, disabledLabel) {
+                if (!node) {
+                    return;
+                }
+
+                safeText(node, href ? enabledLabel : disabledLabel);
+
+                if (href) {
+                    node.setAttribute("href", href);
+                    node.removeAttribute("aria-disabled");
+                    node.removeAttribute("tabindex");
+                    return;
+                }
+
+                node.removeAttribute("href");
+                node.setAttribute("aria-disabled", "true");
+                node.setAttribute("tabindex", "-1");
+            }
+
+            function clearLedgerDetailRoutes(reason) {
+                setActionLink(ledgerTurnRoute, null, ledgerTurnRouteLabel, reason || "Turn detail unavailable");
+                setActionLink(ledgerNewsreelRoute, null, ledgerNewsreelRouteLabel, reason || "Newsreel unavailable");
+            }
+
+            function resolveLedgerRefreshIntervalMs(payload) {
+                var seconds = payload
+                    && payload.tracker
+                    && typeof payload.tracker.update_interval_seconds === "number"
+                    ? payload.tracker.update_interval_seconds
+                    : 30;
+                return Math.max(15000, Math.min(120000, seconds * 1000));
+            }
+
+            function clearLedgerRefreshTimer() {
+                if (ledgerRefreshTimer) {
+                    window.clearTimeout(ledgerRefreshTimer);
+                    ledgerRefreshTimer = 0;
+                }
+            }
+
+            function scheduleLedgerRefresh(delayMs) {
+                clearLedgerRefreshTimer();
+                ledgerRefreshTimer = window.setTimeout(function () {
+                    if (document.hidden) {
+                        scheduleLedgerRefresh(delayMs);
+                        return;
+                    }
+
+                    refreshLedgerPayload();
+                }, Math.max(15000, delayMs || defaultLedgerRefreshIntervalMs));
             }
 
             function updateLedgerStatus(status, label) {
@@ -519,23 +587,29 @@
                 }
             }
 
+            function renderLedgerUnavailable(statusLabel, summaryText) {
+                currentLedgerPayload = null;
+                updateLedgerStatus("error", statusLabel || "Stream unavailable");
+                safeText(ledgerSummary, summaryText || "The board stream did not return a valid payload.");
+                safeText(ledgerWorld, "Unavailable");
+                safeText(ledgerTurn, "—");
+                safeText(ledgerHotDistrict, "Unavailable");
+                safeText(ledgerHeatScore, "Unavailable");
+                safeText(ledgerTopMovement, "Unavailable");
+                safeText(ledgerUpdated, "Unavailable");
+                safeText(ledgerFollowHint, "");
+                safeText(ledgerContinuityTurn, "Unavailable");
+                safeText(ledgerContinuitySummary, "Continuity snapshot is not available in this lane.");
+                updateHeatMeter(null, "error");
+                updateLedgerTopDistricts([]);
+                updateContinuityEvents([]);
+                clearLedgerDetailRoutes("Unavailable in this lane");
+                renderFollowState(null);
+            }
+
             function renderLedgerPayload(payload) {
                 if (!payload || typeof payload !== "object") {
-                    currentLedgerPayload = null;
-                    updateLedgerStatus("error", "Stream unavailable");
-                    safeText(ledgerSummary, "The board stream did not return a valid payload.");
-                    safeText(ledgerWorld, "Unavailable");
-                    safeText(ledgerTurn, "—");
-                    safeText(ledgerHotDistrict, "Unavailable");
-                    safeText(ledgerHeatScore, "Unavailable");
-                    safeText(ledgerTopMovement, "Unavailable");
-                    safeText(ledgerUpdated, "Unavailable");
-                    safeText(ledgerFollowHint, "");
-                    safeText(ledgerContinuityTurn, "Unavailable");
-                    safeText(ledgerContinuitySummary, "Continuity snapshot is not available in this lane.");
-                    updateHeatMeter(null, "error");
-                    updateContinuityEvents([]);
-                    renderFollowState(null);
+                    renderLedgerUnavailable("Stream unavailable", "The board stream did not return a valid payload.");
                     return;
                 }
 
@@ -547,7 +621,11 @@
                         ? payload.summary.hot_district
                         : "No summary available.";
                 safeText(ledgerSummary, summaryText);
-                safeText(ledgerUpdated, payload.generated_at_utc ? new Date(payload.generated_at_utc).toLocaleString() : "not yet");
+                safeText(ledgerUpdated, formatTimestamp(payload.generated_at_utc, "not yet"));
+                clearLedgerDetailRoutes(
+                    payload.status === "world_not_followed"
+                        ? "Follow this world to open live turn detail"
+                        : "Turn detail unavailable right now");
 
                 if (payload.world) {
                     safeText(ledgerWorld, payload.world.world_name || payload.world.world_id || "No world loaded");
@@ -599,11 +677,11 @@
                 }
 
                 if (ledgerTurnRoute && payload.tracker && payload.tracker.turn_route) {
-                    ledgerTurnRoute.setAttribute("href", payload.tracker.turn_route);
+                    setActionLink(ledgerTurnRoute, payload.tracker.turn_route, ledgerTurnRouteLabel, "Turn detail unavailable");
                 }
 
                 if (ledgerNewsreelRoute && payload.tracker && payload.tracker.newsreel_route) {
-                    ledgerNewsreelRoute.setAttribute("href", payload.tracker.newsreel_route);
+                    setActionLink(ledgerNewsreelRoute, payload.tracker.newsreel_route, ledgerNewsreelRouteLabel, "Newsreel unavailable");
                 }
 
                 if (payload.continuity) {
@@ -617,14 +695,14 @@
                         payload.continuity.turn_summary || "No continuity summary available.");
                     updateContinuityEvents(payload.continuity.events);
                     if (ledgerTurnRoute && payload.continuity.turn_route) {
-                        ledgerTurnRoute.setAttribute("href", payload.continuity.turn_route);
+                        setActionLink(ledgerTurnRoute, payload.continuity.turn_route, ledgerTurnRouteLabel, "Turn detail unavailable");
                     }
                     if (ledgerNewsreelRoute && payload.continuity.turn_route) {
                         var newsreelRoute = (payload.tracker && payload.tracker.newsreel_route) || (typeof payload.continuity.turn === "number"
                             ? "/ledger/turns/" + payload.continuity.turn + "/newsreel.json"
                             : null);
                         if (newsreelRoute) {
-                            ledgerNewsreelRoute.setAttribute("href", newsreelRoute);
+                            setActionLink(ledgerNewsreelRoute, newsreelRoute, ledgerNewsreelRouteLabel, "Newsreel unavailable");
                         }
                     }
                 }
@@ -648,18 +726,32 @@
                     return;
                 }
 
+                if (ledgerRefreshInFlight) {
+                    return;
+                }
+
+                if (document.hidden) {
+                    scheduleLedgerRefresh(defaultLedgerRefreshIntervalMs);
+                    return;
+                }
+
+                ledgerRefreshInFlight = true;
+                var nextRefreshDelay = defaultLedgerRefreshIntervalMs;
                 try {
                     var response = await fetch("/mobile/pwa/ledger.json", { cache: "no-store", method: "GET" });
                     if (!response.ok) {
-                        updateLedgerStatus("error", "Stream offline");
-                        safeText(ledgerSummary, "The stream endpoint returned " + response.status + ".");
+                        renderLedgerUnavailable("Stream offline", "The stream endpoint returned " + response.status + ".");
                         return;
                     }
 
-                    renderLedgerPayload(await response.json());
+                    var payload = await response.json();
+                    renderLedgerPayload(payload);
+                    nextRefreshDelay = resolveLedgerRefreshIntervalMs(payload);
                 } catch (error) {
-                    updateLedgerStatus("error", "Stream offline");
-                    safeText(ledgerSummary, "Could not reach /mobile/pwa/ledger.json while checking for updates.");
+                    renderLedgerUnavailable("Stream offline", "Could not reach /mobile/pwa/ledger.json while checking for updates.");
+                } finally {
+                    ledgerRefreshInFlight = false;
+                    scheduleLedgerRefresh(nextRefreshDelay);
                 }
             }
 
@@ -747,7 +839,12 @@
                 });
             }
             refreshLedgerPayload();
-            window.setInterval(refreshLedgerPayload, 30000);
+            document.addEventListener("visibilitychange", function () {
+                if (!document.hidden) {
+                    refreshLedgerPayload();
+                }
+            });
+            window.addEventListener("pagehide", clearLedgerRefreshTimer);
         })();
     </script>
 }

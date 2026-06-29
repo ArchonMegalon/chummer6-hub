@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 
+const { chromium } = require('playwright');
+
 const baseUrl = (process.env.CHUMMER_PORTAL_BASE_URL || 'http://127.0.0.1:8091').replace(/\/$/, '');
 const publicHost = (process.env.CHUMMER_PORTAL_PUBLIC_HOST || '').trim();
 const forwardedProto = (process.env.CHUMMER_PORTAL_FORWARDED_PROTO || '').trim();
@@ -133,12 +135,11 @@ const checks = [
   },
   {
     url: `${baseUrl}/participate`,
+    rendered: true,
     assert: text =>
       text.includes('What should Chummer do next?')
       && text.includes('Public requests, clear bugs, useful ideas.')
-      && text.includes('Current requests')
-      && text.includes('Board is live.')
-      && text.includes('data-chummer-participate-frame')
+      && !text.includes('data-chummer-participate-frame')
       && !text.includes('data-chummer-board-skin')
       && !text.includes('ProductLift')
       && !text.includes('Something went wrong')
@@ -173,6 +174,7 @@ const checks = [
   },
   {
     url: `${baseUrl}/partizipate`,
+    rendered: true,
     assert: (text, response) =>
       /\/participate\/?$/.test(response.url)
       && text.includes('What should Chummer do next?')
@@ -258,63 +260,131 @@ const checks = [
   }
 ];
 
+async function runRenderedCheck(browser, check) {
+  const context = await browser.newContext({
+    viewport: { width: 1366, height: 768 },
+    extraHTTPHeaders: defaultHeaders,
+  });
+  const page = await context.newPage();
+  try {
+    const response = await page.goto(check.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    if (!response || !response.ok()) {
+      return {
+        ok: false,
+        status: response ? response.status() : 'no-response',
+        text: '',
+        response: { url: page.url() },
+      };
+    }
+
+    await page.waitForFunction(
+      () => {
+        const text = (document.body && document.body.innerText) || '';
+        return /What should Chummer do next\?|Board offline right now/i.test(text);
+      },
+      { timeout: 15000 },
+    );
+
+    return {
+      ok: true,
+      status: response.status(),
+      text: (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim(),
+      response: { url: page.url() },
+    };
+  } finally {
+    await context.close();
+  }
+}
+
 (async () => {
   const delegatedWarnings = [];
+  let browser = null;
 
-  for (const check of checks) {
-    const response = await fetch(check.url, {
-      method: check.method ?? 'GET',
-      headers: {
-        ...defaultHeaders,
-        ...(check.headers ?? {})
-      },
-      body: check.body
-    });
-    const body = await response.text();
-    if (!response.ok) {
-      if (check.required === false) {
-        const message = `delegated-not-ready: ${check.label ?? check.url} -> HTTP ${response.status}`;
-        delegatedWarnings.push(message);
-        console.warn(message);
-        continue;
+  try {
+    for (const check of checks) {
+      let body;
+      let response;
+      if (check.rendered) {
+        if (!browser) {
+          browser = await chromium.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-dev-shm-usage'],
+          });
+        }
+
+        const rendered = await runRenderedCheck(browser, check);
+        body = rendered.text;
+        response = rendered.response;
+        if (!rendered.ok) {
+          if (check.required === false) {
+            const message = `delegated-not-ready: ${check.label ?? check.url} -> HTTP ${rendered.status}`;
+            delegatedWarnings.push(message);
+            console.warn(message);
+            continue;
+          }
+
+          throw new Error(`Portal check failed: ${check.url} -> HTTP ${rendered.status}`);
+        }
+      } else {
+        response = await fetch(check.url, {
+          method: check.method ?? 'GET',
+          headers: {
+            ...defaultHeaders,
+            ...(check.headers ?? {})
+          },
+          body: check.body
+        });
+        body = await response.text();
+        if (!response.ok) {
+          if (check.required === false) {
+            const message = `delegated-not-ready: ${check.label ?? check.url} -> HTTP ${response.status}`;
+            delegatedWarnings.push(message);
+            console.warn(message);
+            continue;
+          }
+
+          throw new Error(`Portal check failed: ${check.url} -> HTTP ${response.status}`);
+        }
       }
 
-      throw new Error(`Portal check failed: ${check.url} -> HTTP ${response.status}`);
-    }
+      let passed = false;
+      try {
+        passed = Boolean(check.assert(body, response));
+      } catch (error) {
+        if (check.required === false) {
+          const message = `delegated-not-ready: ${check.label ?? check.url} -> assertion threw: ${error.message}`;
+          delegatedWarnings.push(message);
+          console.warn(message);
+          continue;
+        }
 
-    let passed = false;
-    try {
-      passed = Boolean(check.assert(body, response));
-    } catch (error) {
-      if (check.required === false) {
-        const message = `delegated-not-ready: ${check.label ?? check.url} -> assertion threw: ${error.message}`;
-        delegatedWarnings.push(message);
-        console.warn(message);
-        continue;
+        throw new Error(`Portal check failed: ${check.url} -> assertion threw: ${error.message}`);
       }
 
-      throw new Error(`Portal check failed: ${check.url} -> assertion threw: ${error.message}`);
-    }
+      if (!passed) {
+        if (check.required === false) {
+          const message = `delegated-not-ready: ${check.label ?? check.url} -> assertion returned false`;
+          delegatedWarnings.push(message);
+          console.warn(message);
+          continue;
+        }
 
-    if (!passed) {
-      if (check.required === false) {
-        const message = `delegated-not-ready: ${check.label ?? check.url} -> assertion returned false`;
-        delegatedWarnings.push(message);
-        console.warn(message);
-        continue;
+        throw new Error(`Portal check failed: ${check.url} -> assertion returned false`);
       }
 
-      throw new Error(`Portal check failed: ${check.url} -> assertion returned false`);
+      console.log(`ok: ${check.url}`);
     }
 
-    console.log(`ok: ${check.url}`);
+    if (delegatedWarnings.length > 0) {
+      console.warn(`portal E2E completed with delegated warnings: ${delegatedWarnings.length}`);
+    }
+
+    console.log('portal E2E completed');
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
   }
-
-  if (delegatedWarnings.length > 0) {
-    console.warn(`portal E2E completed with delegated warnings: ${delegatedWarnings.length}`);
-  }
-
-  console.log('portal E2E completed');
 })().catch(error => {
   console.error(error.message);
   process.exit(1);

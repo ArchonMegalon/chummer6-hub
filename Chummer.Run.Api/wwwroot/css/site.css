@@ -9003,7 +9003,7 @@ body {
   margin-top: 0.2rem;
 }
 
-.minimal-runner-rail a {
+.minimal-runner-rail > * {
   display: grid;
   gap: 0.14rem;
   padding: 0.62rem 0.72rem;
@@ -9011,6 +9011,9 @@ body {
   border-radius: 8px;
   background: color-mix(in srgb, var(--minimal-surface) 72%, transparent);
   color: var(--minimal-ink);
+}
+
+.minimal-runner-rail a {
   text-decoration: none;
 }
 
@@ -10571,7 +10574,7 @@ body {
     margin-top: 0.7rem;
   }
 
-  .minimal-runner-rail a {
+  .minimal-runner-rail > * {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     padding: 0.52rem 0.62rem;

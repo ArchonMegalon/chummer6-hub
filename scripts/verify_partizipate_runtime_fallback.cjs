@@ -70,18 +70,24 @@ async function assertBoardShell(page, path) {
   const response = await navigateLenient(page, `${baseUrl}${path}`, 'domcontentloaded');
   assert(response, `${path} should return a response.`);
   assert.equal(response.status(), 200, `${path} should return 200.`);
+  await page.waitForFunction(
+    () => {
+      const text = (document.body && document.body.innerText) || '';
+      return /What should Chummer do next\?|Board offline right now/i.test(text);
+    },
+    { timeout: 15000 },
+  );
 
   const text = await page.locator('body').innerText();
   assert.equal(/What should Chummer do next\?/i.test(text), true, `${path} should render the first-party heading.`);
   assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), true, `${path} should render the first-party summary.`);
   assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(text), false, `${path} must not show provider failure copy.`);
   assert.equal(/productlift\.dev/i.test(text), false, `${path} must not leak provider domains.`);
-  assert.equal(await page.locator('iframe[data-chummer-participate-frame]').count(), 1, `${path} should keep the hosted board inside the first-party shell.`);
+  assert.equal(await page.locator('iframe[data-chummer-participate-frame]').count(), 0, `${path} should resolve to the first-party proxied board instead of the old wrapper.`);
 
   const offline = /Board offline right now/i.test(text);
   if (!offline) {
-    assert.equal(/Board is live\./i.test(text), true, `${path} should explain that the board is live.`);
-    assert.equal(/Current requests/i.test(text), true, `${path} should keep the request entry point visible.`);
+    assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), true, `${path} should keep the public summary visible when the hosted board is live.`);
   }
 
   const detailLink = page.locator('a[href^="/participate/board/"]').first();
@@ -125,8 +131,8 @@ async function main() {
     };
 
     let mode = wrapper.offline
-      ? 'first_party_wrapper_offline_fallback'
-      : 'first_party_wrapper_embedded_hosted_board';
+      ? 'first_party_proxy_offline_fallback'
+      : 'first_party_productlift_proxy';
 
     const detailHref = wrapper.detailHref || board.detailHref;
     if (detailHref) {
@@ -147,6 +153,21 @@ async function main() {
       timings.detailFetchMs = detailResponse.durationMs;
       mode = `${mode}_with_first_party_detail`;
     }
+
+    const framePage = await context.newPage();
+    await navigateLenient(framePage, `${baseUrl}/participate/frame`, 'domcontentloaded');
+    await framePage.waitForFunction(
+      () => {
+        const text = (document.body && document.body.innerText) || '';
+        return /What should Chummer do next\?|Board offline right now/i.test(text);
+      },
+      { timeout: 15000 },
+    );
+    assert.equal(/\/participate\/board\/?\?embed=1$/.test(framePage.url()), true, '/participate/frame should resolve to the embedded first-party board document.');
+    assert.equal(await framePage.locator('iframe[data-chummer-participate-frame]').count(), 0, '/participate/frame should resolve directly to the embedded board document instead of nesting another iframe wrapper.');
+    const frameText = await framePage.locator('body').innerText();
+    assert.equal(/What should Chummer do next\?|Board offline right now/i.test(frameText), true, '/participate/frame should keep the request entry point visible.');
+    await framePage.close();
 
     console.log(JSON.stringify({
       status: 'pass',

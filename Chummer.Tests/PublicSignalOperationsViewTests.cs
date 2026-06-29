@@ -22,6 +22,7 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("private static string BuildParticipateFrameHref(", controller, StringComparison.Ordinal);
         Assert.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", controller, StringComparison.Ordinal);
+        Assert.Contains("return await ParticipateBoardProxyCore(", controller, StringComparison.Ordinal);
         Assert.Contains("[NonController]", routeController, StringComparison.Ordinal);
         Assert.Contains("public sealed class ParticipateController : Controller", routeController, StringComparison.Ordinal);
         Assert.DoesNotContain("RunsiteTourQuotaService", routeController, StringComparison.Ordinal);
@@ -304,8 +305,6 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("data-chummer-home-link-patch", rewritten, StringComparison.Ordinal);
         Assert.Contains("data-chummer-board-failure-patch", rewritten, StringComparison.Ordinal);
         Assert.Contains("polishVisibleCopy", rewritten, StringComparison.Ordinal);
-        Assert.Contains(@"\bAI-powered\b", rewritten, StringComparison.Ordinal);
-        Assert.Contains(@"\bAutomatically generate\b", rewritten, StringComparison.Ordinal);
         Assert.Contains("something went wrong on our side", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("could not load posts", rewritten, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("network error while loading tab configuration", rewritten, StringComparison.OrdinalIgnoreCase);

@@ -50,7 +50,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Kestrel", view, StringComparison.Ordinal);
         Assert.Contains("Brick", view, StringComparison.Ordinal);
         Assert.Contains("Whisper", view, StringComparison.Ordinal);
-        Assert.Contains("href=\"/login?next=%2Fhome%2Faccess\"", view, StringComparison.Ordinal);
+        Assert.Contains("/account/open/example/decker", view, StringComparison.Ordinal);
+        Assert.Contains("/account/open/example/street-samurai", view, StringComparison.Ordinal);
+        Assert.Contains("/account/open/example/face", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("href=\"/login?next=%2Fhome%2Faccess\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"workflow\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"downloads\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"help\"", view, StringComparison.Ordinal);
@@ -176,7 +179,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)", publicController, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/participate{Request.QueryString}\");", publicController, StringComparison.Ordinal);
         Assert.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", publicController, StringComparison.Ordinal);
-        Assert.Contains("\"~/Views/PublicLanding/Partizipate.cshtml\"", publicController, StringComparison.Ordinal);
+        Assert.Contains("return await ParticipateBoardProxyCore(", publicController, StringComparison.Ordinal);
+        Assert.Contains("fallbackPath: \"/participate\"", publicController, StringComparison.Ordinal);
         Assert.Contains("ResolveParticipateSupporterHref()", publicController, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", controller, StringComparison.Ordinal);
@@ -1420,7 +1424,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("return Redirect($\"/participate{Request.QueryString}\");", controller, StringComparison.Ordinal);
         Assert.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
-        Assert.Contains("\"~/Views/PublicLanding/Partizipate.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.Contains("return await ParticipateBoardProxyCore(", controller, StringComparison.Ordinal);
         Assert.Contains("Not the front door", horizonsView, StringComparison.Ordinal);
         Assert.Contains("Future work stays behind the main app.", horizonsView, StringComparison.Ordinal);
         Assert.DoesNotContain("/participate?source=feedback#public-feedback", horizonsView, StringComparison.Ordinal);

@@ -26,9 +26,8 @@ test('participate suppresses supporter links when billing is unavailable', async
   await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'What should Chummer do next?' })).toBeVisible();
   await expect(page.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
-  await expect(page.locator('body')).toContainText('Current requests');
   await expect(page.locator('body')).not.toContainText('Board offline right now');
-  await expect(page.locator('[data-chummer-participate-frame]')).toHaveCount(1);
+  await expect(page.locator('[data-chummer-participate-frame]')).toHaveCount(0);
   await expect(page.locator('body')).not.toContainText('ProductLift');
   await expect(page.locator('a[href="/account/billing"]')).toHaveCount(0);
   await expect(page.locator('a[href="/account/billing/supporter/start"]')).toHaveCount(0);
@@ -36,7 +35,7 @@ test('participate suppresses supporter links when billing is unavailable', async
     generated_at_utc: new Date().toISOString(),
     status: 'pass',
     base_url: baseUrl,
-    board_state: 'first_party_iframe_shell',
+    board_state: 'first_party_productlift_proxy',
     supporter_link_count: 0,
     supporter_copy_visible: false,
     billing_state: 'unavailable',

@@ -17,6 +17,12 @@
     };
     var entryHref = Model.Chrome.Authenticated ? "/account" : "/login?next=%2Faccount%2Faccess";
     var entryLabel = Model.Chrome.Authenticated ? "Account" : "Sign in";
+    var exampleRunners = new[]
+    {
+        new { Name = "Kestrel", Archetype = "decker", Href = "/account/open/example/decker" },
+        new { Name = "Brick", Archetype = "street samurai", Href = "/account/open/example/street-samurai" },
+        new { Name = "Whisper", Archetype = "face", Href = "/account/open/example/face" }
+    };
 }
 
 <section class="minimal-hero" data-homepage-section="hero">
@@ -41,17 +47,25 @@
         <span class="minimal-hero__visual-badge">Watch 90 sec</span>
     </a>
     <div class="minimal-runner-rail" aria-label="Example runners">
-        <a href="/login?next=%2Fhome%2Faccess" aria-label="Open example runner Kestrel after signing in">
-            <span>Kestrel</span>
-            <small>infiltration</small>
-        </a>
-        <a href="/login?next=%2Fhome%2Faccess" aria-label="Open example runner Brick after signing in">
-            <span>Brick</span>
-            <small>street samurai</small>
-        </a>
-        <a href="/login?next=%2Fhome%2Faccess" aria-label="Open example runner Whisper after signing in">
-            <span>Whisper</span>
-            <small>face</small>
-        </a>
+        @if (Model.Chrome.Authenticated)
+        {
+            @foreach (var runner in exampleRunners)
+            {
+                <a href="@runner.Href" aria-label="Open runner @runner.Name">
+                    <span>@runner.Name</span>
+                    <small>@runner.Archetype</small>
+                </a>
+            }
+        }
+        else
+        {
+            @foreach (var runner in exampleRunners)
+            {
+                <article class="minimal-runner-card" aria-label="Example runner @runner.Name">
+                    <span>@runner.Name</span>
+                    <small>@runner.Archetype</small>
+                </article>
+            }
+        }
     </div>
 </section>

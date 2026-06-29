@@ -361,7 +361,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     const participateHtml = await participateResponse.text();
     const participateHasEmbeddedBoard = participateHtml.includes('data-chummer-participate-frame');
     const participateHasOfflineFallback = participateHtml.includes('Board offline right now');
-    assert.equal(participateHasEmbeddedBoard || participateHasOfflineFallback, true, '/participate should render either the embedded board wrapper or the first-party offline fallback.');
+    assert.equal(!participateHasEmbeddedBoard || participateHasOfflineFallback, true, '/participate should no longer use the old embedded board wrapper on the canonical route.');
     assert.equal(participateHtml.includes('Requests, votes, and shipped work.'), false, '/participate should not show wrapper marketing copy.');
     assert.equal(participateHtml.includes('participate-quick-form'), false, '/participate should not show the old quick form.');
     assert.equal(participateHtml.includes('id="participate-board"'), false, '/participate should not expose the legacy hosted board wrapper id.');

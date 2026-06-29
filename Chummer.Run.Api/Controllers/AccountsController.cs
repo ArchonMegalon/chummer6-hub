@@ -1284,7 +1284,7 @@ public sealed class AccountsController : Controller
                 || installLinking.PendingClaimTickets.Count > 0;
             if (!hasLinkedDesktop)
             {
-                return Redirect("/downloads");
+                return Redirect(BuildBrowserOpenFallbackHref(dossierId, campaignId, groupId, exampleId));
             }
 
             string launchKind;
@@ -1345,6 +1345,36 @@ public sealed class AccountsController : Controller
         {
             return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
         }
+    }
+
+    private static string BuildBrowserOpenFallbackHref(
+        string? dossierId,
+        string? campaignId,
+        string? groupId,
+        string? exampleId)
+    {
+        if (!string.IsNullOrWhiteSpace(exampleId))
+        {
+            string normalizedExampleId = exampleId.Trim().ToLowerInvariant();
+            string tab = normalizedExampleId switch
+            {
+                "street-samurai" => "tab-combat",
+                "combat-mage" => "tab-magician",
+                "face" => "tab-contacts",
+                _ => "tab-technomancer"
+            };
+
+            return $"/app?fixture=blue&tab={Uri.EscapeDataString(tab)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(dossierId)
+            || !string.IsNullOrWhiteSpace(campaignId)
+            || !string.IsNullOrWhiteSpace(groupId))
+        {
+            return "/app?command=character_roster";
+        }
+
+        return "/downloads";
     }
 
     [HttpGet("/account/creator")]

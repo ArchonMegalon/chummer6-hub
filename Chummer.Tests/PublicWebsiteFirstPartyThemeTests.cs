@@ -31,7 +31,7 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/participate{Request.QueryString}\");", controller, StringComparison.Ordinal);
         Assert.Contains("BuildFirstPartyParticipateBoardAsync", controller, StringComparison.Ordinal);
-        Assert.Contains("\"~/Views/PublicLanding/Partizipate.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.Contains("return await ParticipateBoardProxyCore(", controller, StringComparison.Ordinal);
         Assert.Contains("private static string BuildParticipateFrameHref(", controller, StringComparison.Ordinal);
         Assert.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", controller, StringComparison.Ordinal);

@@ -2188,24 +2188,19 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
-        FirstPartyParticipateBoardViewModel model =
-            await BuildFirstPartyParticipateBoardAsync(cancellationToken, "/participate").ConfigureAwait(false);
-
-        if (!model.EmbeddedBoardEnabled)
+        Uri? upstream = ResolveProductLiftHostedBoardUri();
+        if (upstream is null || ShouldShortCircuitHostedBoardUpstream(upstream))
         {
-            model = model with
-            {
-                HostedBoardHref = null,
-                EmbeddedBoardHref = null,
-                DirectBoardHref = null,
-                StatusLabel = "Offline",
-                SyncedLabel = model.LoadedFromBoard
-                    ? FormatParticipateSyncedLabel(_participateSnapshots.GetSnapshot().SyncedAtUtc)
-                    : "Board offline right now"
-            };
+            return await ParticipateBoardFallbackAsync(cancellationToken, "/participate", disableHostedBoard: true).ConfigureAwait(false);
         }
 
-        return View("~/Views/PublicLanding/Partizipate.cshtml", model);
+        return await ParticipateBoardProxyCore(
+            null,
+            cancellationToken,
+            localOrigin: "/participate",
+            localBaseHref: "/participate/",
+            canonicalHref: "/participate",
+            fallbackPath: "/participate").ConfigureAwait(false);
     }
 
     private async Task<IActionResult> ParticipateBoardFallbackAsync(
@@ -3226,9 +3221,6 @@ public sealed class PublicLandingController : Controller
       [/\bShort title of your feedback\.\.\./g, 'Short title'],
       [/\bDescribe your idea or bug\.\.\./g, 'What happened? What should exist?'],
       [/-- Choose a category --/g, 'Choose a category'],
-      [/\bGathering votes\b/g, ''],
-      [/\bFeature\b/g, 'Idea'],
-      [/\bvotes\b/gi, 'requests'],
 """
                 : string.Empty;
             string hiddenStatusTermsJs = applyFeedbackPolish
@@ -3542,20 +3534,13 @@ document.addEventListener('DOMContentLoaded', function () {
   let chromePassScheduled = false;
   let copyPolishRuns = 0;
   const polishVisibleCopy = function () {
-    if (copyPolishRuns >= 2) {
+    if (copyPolishRuns >= 12) {
       return;
     }
 
     copyPolishRuns += 1;
 
     const replacements = [
-      [/\bAI-powered\b/gi, ''],
-      [/\bAI powered\b/gi, ''],
-      [new RegExp('\\bAI' + '-generated\\b', 'gi'), ''],
-      [new RegExp('\\bAI' + ' generated\\b', 'gi'), ''],
-      [/\bArtificial intelligence\b/gi, ''],
-      [/\bAutomatically generate\b/gi, 'Create'],
-      [/\bautomatically generate\b/g, 'create'],
       __CHUMMER_HEADING_REPLACEMENT__
       __CHUMMER_SUMMARY_REPLACEMENT__
       __CHUMMER_PRIMARY_ACTION_REPLACEMENT__
@@ -3670,7 +3655,7 @@ document.addEventListener('DOMContentLoaded', function () {
     chromePassScheduled = true;
     window.requestAnimationFrame(function () {
       chromePassScheduled = false;
-      runChromePass(false);
+      runChromePass(true);
     });
   };
 
@@ -4530,16 +4515,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (experience is null || !experience.BlackLedgerNewsEmail)
         {
-            return Content(BuildMobilePwaLedgerStreamNotOptedInPayload(), "application/json");
+            return BuildMobilePwaLedgerJsonResponse(BuildMobilePwaLedgerStreamNotOptedInPayload());
         }
 
         BlackLedgerWorldPreviewViewModel? world = _blackLedgerStats.LoadWorldPreview();
         if (world is null)
         {
-            return Content(BuildMobilePwaLedgerStreamUnavailablePayload(), "application/json");
+            return BuildMobilePwaLedgerJsonResponse(BuildMobilePwaLedgerStreamUnavailablePayload());
         }
 
-        return Content(BuildMobilePwaLedgerStreamPayload(world, experience.BlackLedgerWorldsFollowed), "application/json");
+        return BuildMobilePwaLedgerJsonResponse(BuildMobilePwaLedgerStreamPayload(world, experience.BlackLedgerWorldsFollowed));
     }
 
     [HttpGet("/jackpoint")]
@@ -8504,7 +8489,8 @@ document.addEventListener('DOMContentLoaded', function () {
             summary = "Black Ledger live updates are available in the PWA when you opt in via account preferences.",
             legal_posture = "Public lane stays aggregate only. No private run table state is published.",
             opt_in_route = "/account",
-            updates_route = "/mobile/pwa/ledger.json"
+            updates_route = "/mobile/pwa/ledger.json",
+            generated_at_utc = DateTimeOffset.UtcNow
         }, PublicJsonContentOptions);
     }
 
@@ -8516,8 +8502,18 @@ document.addEventListener('DOMContentLoaded', function () {
             status = "no_world_data",
             status_label = "Waiting for board data",
             summary = "Living world board data is currently unavailable. The stream will update automatically once board previews are available.",
-            updates_route = "/mobile/pwa/ledger.json"
+            updates_route = "/mobile/pwa/ledger.json",
+            generated_at_utc = DateTimeOffset.UtcNow
         }, PublicJsonContentOptions);
+    }
+
+    private ContentResult BuildMobilePwaLedgerJsonResponse(string payload)
+    {
+        Response.Headers.CacheControl = "private, no-store, no-cache, max-age=0";
+        Response.Headers.Pragma = "no-cache";
+        Response.Headers.Expires = "0";
+        Response.Headers["Vary"] = "Cookie, Authorization";
+        return Content(payload, "application/json");
     }
 
     private static string BuildMobilePwaLedgerStreamPayload(
