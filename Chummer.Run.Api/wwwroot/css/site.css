@@ -9841,14 +9841,22 @@ body {
   grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr));
 }
 
-.surface-participate .site-main {
+.route-participate.surface-participate .site-header,
+.route-participate.surface-participate .site-footer {
+  display: none;
+}
+
+.route-participate.surface-participate .site-main {
+  width: 100%;
+  max-width: none;
+  min-height: 100svh;
+  padding: 0;
+}
+
+.surface-participate:not(.route-participate) .site-main {
   width: min(1520px, calc(100% - 0.75rem));
   min-height: calc(100svh - 4.25rem);
   padding-top: 0.25rem;
-}
-
-.route-participate.surface-participate .site-footer {
-  display: none;
 }
 
 .participate-hero {
@@ -9881,7 +9889,7 @@ body {
 .participate-shell {
   display: grid;
   min-height: 0;
-  height: calc(100svh - 4.75rem);
+  height: 100svh;
   border: 0;
   border-radius: 0;
   padding: 0;
@@ -10003,7 +10011,7 @@ body {
 .participate-hosted {
   display: grid;
   min-height: 0;
-  --participate-frame-visible-height: calc(100svh - 4.75rem);
+  --participate-frame-visible-height: 100svh;
   --participate-frame-crop: 0rem;
 }
 
@@ -10189,7 +10197,7 @@ body {
   background: var(--minimal-page);
 }
 
-.surface-partizipate .site-main {
+.surface-partizipate:not(.route-participate) .site-main {
   width: min(1040px, calc(100% - 1.5rem));
   padding-top: 1rem;
 }
@@ -10632,6 +10640,11 @@ body {
   .participate-hosted {
     --participate-frame-visible-height: calc(100svh - 5.5rem);
     --participate-frame-crop: 3.75rem;
+  }
+
+  .route-participate.surface-participate .participate-hosted {
+    --participate-frame-visible-height: 100svh;
+    --participate-frame-crop: 0rem;
   }
 
   .minimal-hero {

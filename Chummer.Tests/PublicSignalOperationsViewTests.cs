@@ -13,11 +13,13 @@ public sealed class PublicSignalOperationsViewTests
         string participateViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml");
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string routeControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "ParticipateController.cs");
+        string siteCssPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "css", "site.css");
 
         Assert.False(File.Exists(feedbackViewPath));
         string participateView = File.ReadAllText(participateViewPath);
         string controller = File.ReadAllText(controllerPath);
         string routeController = File.ReadAllText(routeControllerPath);
+        string siteCss = File.ReadAllText(siteCssPath);
 
         Assert.Contains("private static string BuildParticipateFrameHref(", controller, StringComparison.Ordinal);
         Assert.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
@@ -44,6 +46,10 @@ public sealed class PublicSignalOperationsViewTests
         Assert.DoesNotContain("First-party page", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("var signalOperations = Model.SignalOperations;", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("_PublicSignalOperationsPacket", participateView, StringComparison.Ordinal);
+        Assert.Contains(".route-participate.surface-participate .site-header", siteCss, StringComparison.Ordinal);
+        Assert.Contains(".route-participate.surface-participate .site-main", siteCss, StringComparison.Ordinal);
+        Assert.Contains("--participate-frame-visible-height: 100svh;", siteCss, StringComparison.Ordinal);
+        Assert.Contains(".surface-partizipate:not(.route-participate) .site-main", siteCss, StringComparison.Ordinal);
     }
 
     [Fact]
