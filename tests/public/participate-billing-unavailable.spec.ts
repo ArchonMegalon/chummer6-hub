@@ -27,7 +27,7 @@ test('participate suppresses supporter links when billing is unavailable', async
   await expect(page.getByRole('heading', { name: 'What should Chummer do next?' })).toBeVisible();
   await expect(page.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
   await expect(page.locator('body')).not.toContainText('Board offline right now');
-  await expect(page.locator('[data-chummer-participate-frame]')).toHaveCount(0);
+  await expect(page.locator('[data-chummer-participate-frame]')).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText('ProductLift');
   await expect(page.locator('a[href="/account/billing"]')).toHaveCount(0);
   await expect(page.locator('a[href="/account/billing/supporter/start"]')).toHaveCount(0);

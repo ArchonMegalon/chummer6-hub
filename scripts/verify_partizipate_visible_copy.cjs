@@ -87,11 +87,8 @@ if (!text.includes('Public requests, clear bugs, useful ideas.')) {
 }
 const hasEmbeddedBoard = html.includes('data-chummer-participate-frame');
 const hasOfflineFallback = text.includes('Board offline right now');
-if (hasEmbeddedBoard) {
-  failures.push('unexpected-legacy-wrapper');
-}
-if (!text.includes('Public requests, clear bugs, useful ideas.') && !hasOfflineFallback) {
-  failures.push('missing-participate-state:proxied-board-or-offline-fallback');
+if (!hasEmbeddedBoard && !hasOfflineFallback) {
+  failures.push('missing-participate-state:embedded-board-or-offline-fallback');
 }
 
   forbiddenHtml.forEach((needle) => {

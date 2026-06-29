@@ -156,8 +156,8 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 <html><body>
                 <h1>What should Chummer do next?</h1>
                 <p>Public requests, clear bugs, useful ideas.</p>
-                <base href="/participate/board/" />
-                <a href="/participate/board/p/better-roster-ux-ab12">Better roster UX</a>
+                <h2>Current requests</h2>
+                <iframe src="/participate/board?embed=1" data-chummer-participate-frame></iframe>
                 </body></html>
                 """
             )

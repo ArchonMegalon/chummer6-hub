@@ -83,7 +83,7 @@ async function assertBoardShell(page, path) {
   assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), true, `${path} should render the first-party summary.`);
   assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(text), false, `${path} must not show provider failure copy.`);
   assert.equal(/productlift\.dev/i.test(text), false, `${path} must not leak provider domains.`);
-  assert.equal(await page.locator('iframe[data-chummer-participate-frame]').count(), 0, `${path} should resolve to the first-party proxied board instead of the old wrapper.`);
+  assert.equal(await page.locator('iframe[data-chummer-participate-frame]').count(), 1, `${path} should host the same-origin ProductLift board frame.`);
 
   const offline = /Board offline right now/i.test(text);
   if (!offline) {
@@ -164,7 +164,7 @@ async function main() {
       { timeout: 15000 },
     );
     assert.equal(/\/participate\/board\/?\?embed=1$/.test(framePage.url()), true, '/participate/frame should resolve to the embedded first-party board document.');
-    assert.equal(await framePage.locator('iframe[data-chummer-participate-frame]').count(), 0, '/participate/frame should resolve directly to the embedded board document instead of nesting another iframe wrapper.');
+    assert.equal(await framePage.locator('iframe[data-chummer-participate-frame]').count(), 0, '/participate/frame should resolve directly to the embedded board document instead of nesting another frame.');
     const frameText = await framePage.locator('body').innerText();
     assert.equal(/What should Chummer do next\?|Board offline right now/i.test(frameText), true, '/participate/frame should keep the request entry point visible.');
     await framePage.close();

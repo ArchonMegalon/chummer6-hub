@@ -22,7 +22,7 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("private static string BuildParticipateFrameHref(", controller, StringComparison.Ordinal);
         Assert.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", controller, StringComparison.Ordinal);
-        Assert.Contains("return await ParticipateBoardProxyCore(", controller, StringComparison.Ordinal);
+        Assert.Contains("return await ParticipateBoardFallbackAsync(cancellationToken, \"/participate\")", controller, StringComparison.Ordinal);
         Assert.Contains("[NonController]", routeController, StringComparison.Ordinal);
         Assert.Contains("public sealed class ParticipateController : Controller", routeController, StringComparison.Ordinal);
         Assert.DoesNotContain("RunsiteTourQuotaService", routeController, StringComparison.Ordinal);
@@ -30,11 +30,11 @@ public sealed class PublicSignalOperationsViewTests
         Assert.DoesNotContain("CommunityCreatorHorizonsService", routeController, StringComparison.Ordinal);
         Assert.DoesNotContain("SignedInTrustStatusService", routeController, StringComparison.Ordinal);
         Assert.Contains("@PublicParticipateText(Model.Summary)", participateView, StringComparison.Ordinal);
-        Assert.DoesNotContain("participate-hosted__frame", participateView, StringComparison.Ordinal);
-        Assert.DoesNotContain("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
+        Assert.Contains("participate-hosted__frame", participateView, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
         Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
-        Assert.Contains("participate-preview-list", participateView, StringComparison.Ordinal);
-        Assert.Contains("participate-preview-card", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("participate-preview-list", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("participate-preview-card", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("participate-toolbar", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Preview current requests", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Feedback and roadmap live here.", participateView, StringComparison.Ordinal);

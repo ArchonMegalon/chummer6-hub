@@ -2198,11 +2198,7 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
-        return await ParticipateBoardProxyCore(
-            null,
-            cancellationToken,
-            canonicalHref: "/participate",
-            fallbackPath: "/participate").ConfigureAwait(false);
+        return await ParticipateBoardFallbackAsync(cancellationToken, "/participate").ConfigureAwait(false);
     }
 
     private async Task<IActionResult> ParticipateBoardFallbackAsync(

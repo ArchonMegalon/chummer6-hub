@@ -419,7 +419,7 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "https://chummer6.productlift.dev" not in controller
     assert "public async Task<IActionResult> ParticipatePage" in controller
     assert "BuildFirstPartyParticipateBoardAsync" in controller
-    assert 'return await ParticipateBoardProxyCore(' in controller
+    assert 'return await ParticipateBoardFallbackAsync(cancellationToken, "/participate")' in controller
     assert '[HttpGet("/participate/board")]' in controller
     assert "ParticipateBoardProxy" in controller
     assert 'public async Task<IActionResult> ParticipateAliasPage(CancellationToken cancellationToken)' in controller
@@ -440,8 +440,8 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert ".dropdown-menu," in controller
     assert "var(--chummer-board-text)" in controller
     assert "Current requests" in participate
-    assert "participate-preview-card" in participate
-    assert "data-chummer-participate-frame" not in participate
+    assert "participate-preview-card" not in participate
+    assert "data-chummer-participate-frame" in participate
     assert "Model.SupporterHref" in participate
     assert "@PublicParticipateText(Model.Heading)" in participate
     assert "@PublicParticipateText(Model.Summary)" in participate
@@ -450,8 +450,8 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "Private support" not in participate
     assert "Supporter" in participate
     assert "Support Chummer" not in participate
-    assert "participate-preview-list" in participate
-    assert "participate-preview-card" in participate
+    assert "participate-preview-list" not in participate
+    assert "participate-preview-card" not in participate
     assert "BuildParticipatePageModel(" not in controller
     assert "ExternalBoardUrl" not in controller
     assert "ExternalBoardUrl" not in read("Chummer.Run.Api/ViewModels/SiteViewModels.cs")
@@ -533,8 +533,8 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
     assert "@PublicParticipateText(Model.Heading)" in participate
     assert "@PublicParticipateText(Model.Summary)" in participate
     assert "Current requests" in participate
-    assert "participate-preview-card" in participate
-    assert "data-chummer-participate-frame" not in participate
+    assert "participate-preview-card" not in participate
+    assert "data-chummer-participate-frame" in participate
 
     for forbidden in (
         "Account-only programs stay below the fold",

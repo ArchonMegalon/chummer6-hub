@@ -54,7 +54,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task ParticipatePageProxiesFirstPartyBoardWithoutIframeWrapper()
+    public async Task ParticipatePageRendersChummerShellWithEmbeddedBoardHref()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -63,13 +63,15 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         IActionResult result = await controller.ParticipatePage(CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("<base href=\"/participate/board/\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("<link rel=\"canonical\" href=\"/participate\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.DoesNotContain("data-chummer-participate-frame", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.DoesNotContain("productlift.dev", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.Equal("What should Chummer do next?", model.Heading);
+        Assert.Equal("Public requests, clear bugs, useful ideas.", model.Summary);
+        Assert.True(model.EmbeddedBoardEnabled);
+        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
+        Assert.Equal("/participate/board", model.DirectBoardHref);
+        Assert.DoesNotContain("productlift.dev", model.EmbeddedBoardHref ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -92,7 +94,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task ParticipatePageFallsBackToFirstPartyOfflineViewWhenUpstreamIsUnavailable()
+    public async Task ParticipatePageDoesNotPreflightHostedBoardBeforeRenderingShell()
     {
         var controller = CreatePublicLandingController(new ThrowingHttpClientFactory());
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -103,9 +105,10 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
-        Assert.False(model.EmbeddedBoardEnabled);
-        Assert.Equal("Offline", model.StatusLabel);
-        Assert.Equal("Board offline right now", model.SyncedLabel);
+        Assert.True(model.EmbeddedBoardEnabled);
+        Assert.Equal("Live", model.StatusLabel);
+        Assert.Equal("Board is live.", model.SyncedLabel);
+        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
     }
 
     [Fact]
@@ -149,7 +152,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task ParticipatePageUsesCanonicalProxyWhenHostedBoardChromeIsAvailable()
+    public async Task ParticipatePageUsesCanonicalShellWhenHostedBoardChromeIsAvailable()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), seedParticipateSnapshot: false);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -158,11 +161,12 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         IActionResult result = await controller.ParticipatePage(CancellationToken.None);
 
-        ContentResult content = Assert.IsType<ContentResult>(result);
-        Assert.Equal("text/html; charset=utf-8", content.ContentType);
-        Assert.Contains("What should Chummer do next?", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.Contains("Public requests, clear bugs, useful ideas.", content.Content ?? string.Empty, StringComparison.Ordinal);
-        Assert.DoesNotContain("data-chummer-participate-frame", content.Content ?? string.Empty, StringComparison.Ordinal);
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
+        Assert.Equal("What should Chummer do next?", model.Heading);
+        Assert.Equal("Public requests, clear bugs, useful ideas.", model.Summary);
+        Assert.True(model.EmbeddedBoardEnabled);
+        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
     }
 
     [Fact]

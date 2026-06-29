@@ -31,7 +31,7 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/participate{Request.QueryString}\");", controller, StringComparison.Ordinal);
         Assert.Contains("BuildFirstPartyParticipateBoardAsync", controller, StringComparison.Ordinal);
-        Assert.Contains("return await ParticipateBoardProxyCore(", controller, StringComparison.Ordinal);
+        Assert.Contains("return await ParticipateBoardFallbackAsync(cancellationToken, \"/participate\")", controller, StringComparison.Ordinal);
         Assert.Contains("private static string BuildParticipateFrameHref(", controller, StringComparison.Ordinal);
         Assert.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller, StringComparison.Ordinal);
         Assert.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", controller, StringComparison.Ordinal);
@@ -47,12 +47,12 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("href: /mobile", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Get Chummer", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev", appNavigation, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);
         Assert.Contains("@PublicParticipateText(Model.Summary)", participateView, StringComparison.Ordinal);
         Assert.Contains("Current requests", participateView, StringComparison.Ordinal);
-        Assert.Contains("participate-preview-card", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("participate-preview-card", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("Feedback and roadmap live here.", participateView, StringComparison.Ordinal);
-        Assert.DoesNotContain("Model.EmbeddedBoardHref", participateView, StringComparison.Ordinal);
+        Assert.Contains("Model.EmbeddedBoardHref", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("data-chummer-board-skin", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("#2e7bff", controller, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("#39c6ff", controller, StringComparison.OrdinalIgnoreCase);

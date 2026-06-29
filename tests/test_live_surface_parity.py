@@ -113,7 +113,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 b"<h1>What should Chummer do next?</h1>"
                 b"<p>Public requests, clear bugs, useful ideas.</p>"
                 b"<h2>Current requests</h2>"
-                b"<a href=\"/participate/p/better-roster-ux-ab12\">Better roster UX</a>"
+                b"<iframe src=\"/participate/board?embed=1\" data-chummer-participate-frame></iframe>"
                 b"</body></html>"
             )
             return
@@ -264,14 +264,17 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertEqual([], roadmap_board["missing_required_texts"])
         self.assertEqual([], roadmap_board["forbidden_hits"])
 
-    def test_verify_blocks_participate_iframe_wrapper(self) -> None:
+    def test_verify_requires_participate_embedded_board_shell(self) -> None:
         module = load_module()
         participate_surface = next(item for item in module.SURFACES if item["path"] == "/participate")
 
         self.assertIn("What should Chummer do next?", participate_surface["required_texts"])
         self.assertIn("Public requests, clear bugs, useful ideas.", participate_surface["required_texts"])
-        self.assertNotIn("Current requests", participate_surface["required_texts"])
+        self.assertIn("Current requests", participate_surface["required_texts"])
+        self.assertIn("data-chummer-participate-frame", participate_surface["required_html_texts"])
+        self.assertIn("/participate/board?embed=1", participate_surface["required_html_texts"])
         self.assertNotIn("Board is live.", participate_surface["required_texts"])
+        self.assertIn("participate-preview-card", participate_surface["forbidden_html_texts"])
         self.assertIn("data-chummer-board-skin", participate_surface["forbidden_html_texts"])
 
     def test_verify_blocks_provider_chrome_on_participate_board(self) -> None:

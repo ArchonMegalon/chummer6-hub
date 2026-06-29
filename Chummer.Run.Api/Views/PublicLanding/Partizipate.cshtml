@@ -4,12 +4,10 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-minimal surface-participate surface-partizipate";
 
-    var hasPosts = Model.Posts.Count > 0;
-    var boardStateSummary = hasPosts
-        ? Model.SyncedLabel
-        : Model.EmbeddedBoardEnabled
-            ? "Requests open here."
-            : "Board offline right now.";
+    var hasHostedBoard = Model.EmbeddedBoardEnabled && !string.IsNullOrWhiteSpace(Model.EmbeddedBoardHref);
+    var boardStateSummary = hasHostedBoard
+        ? "Board opens here."
+        : "Board offline right now.";
     static string PublicParticipateText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
 
@@ -20,10 +18,6 @@
         <p>@PublicParticipateText(Model.Summary)</p>
     </div>
     <div class="participate-hero__status">
-        @if (!string.IsNullOrWhiteSpace(Model.EntryHref) && !string.IsNullOrWhiteSpace(Model.EntryLabel))
-        {
-            <a class="button-like button-like--ghost" href="@Model.EntryHref">@PublicParticipateText(Model.EntryLabel)</a>
-        }
         @if (!string.IsNullOrWhiteSpace(Model.SupporterHref))
         {
             <a class="button-like button-like--ghost" href="@Model.SupporterHref">Supporter</a>
@@ -40,43 +34,34 @@
             </div>
         </div>
 
-        @if (hasPosts)
+        @if (hasHostedBoard)
         {
-            <div class="participate-preview-list" aria-label="Current requests">
-                @foreach (var post in Model.Posts)
-                {
-                    <article class="participate-preview-card">
-                        <div class="participate-preview-card__facts">
-                            <span>@PublicParticipateText(post.Status)</span>
-                            <span>@post.Score votes</span>
-                            <span>@post.CommentCount comments</span>
-                        </div>
-                        @if (!string.IsNullOrWhiteSpace(post.Href))
-                        {
-                            <a class="participate-preview-card__title" href="@post.Href">@PublicParticipateText(post.Title)</a>
-                        }
-                        else
-                        {
-                            <h3>@PublicParticipateText(post.Title)</h3>
-                        }
-                        <p>@PublicParticipateText(post.Summary)</p>
-                    </article>
-                }
+            <div class="participate-hosted__frame-shell">
+                <iframe
+                    class="participate-hosted__frame"
+                    src="@Model.EmbeddedBoardHref"
+                    title="Chummer participation board"
+                    loading="lazy"
+                    referrerpolicy="same-origin"
+                    data-chummer-participate-frame></iframe>
             </div>
+            @if (!string.IsNullOrWhiteSpace(Model.DirectBoardHref))
+            {
+                <div class="participate-board-links">
+                    <a class="button-like button-like--ghost" href="@Model.DirectBoardHref">Open full board</a>
+                </div>
+            }
         }
         else
         {
             <article class="participate-board-fallback" role="status" aria-live="polite">
                 <p>
-                    @(Model.EmbeddedBoardEnabled
-                        ? "Requests open on the board route. If it stalls, use Contact for the Chummer5 Discord server."
-                        : "Board offline right now. Use Contact for the Chummer5 Discord server.")
+                    Board offline right now. Use Contact for the Chummer5 Discord server.
                 </p>
                 <nav aria-label="Participate recovery actions">
                     <a class="button-like button-like--primary" href="@Model.RetryHref">
-                        @(Model.EmbeddedBoardEnabled ? "Open requests" : "Retry")
+                        Retry
                     </a>
-                    <a class="button-like button-like--secondary" href="@Model.RoadmapHref">Roadmap</a>
                     <a class="button-like button-like--ghost" href="@Model.SupportHref">Contact</a>
                 </nav>
             </article>

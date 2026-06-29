@@ -46,7 +46,7 @@ test('billing and participate stay first-party for guests and signed-in users', 
   const guestParticipateText = await guestParticipate.text();
   expect(guestParticipateText).toContain('What should Chummer do next?');
   expect(guestParticipateText).toContain('Public requests, clear bugs, useful ideas.');
-  expect(guestParticipateText).not.toContain('data-chummer-participate-frame');
+  expect(guestParticipateText).toContain('data-chummer-participate-frame');
   expect(guestParticipateText).not.toContain('ProductLift');
 
   const guestSupporterStart = await request.get(`${baseUrl}/account/billing/supporter/start`, { maxRedirects: 0 });
@@ -145,7 +145,7 @@ test('billing and participate stay first-party for guests and signed-in users', 
   await expect(page.getByRole('heading', { name: 'What should Chummer do next?' })).toBeVisible();
   await expect(page.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
   await expect(page.locator('body')).not.toContainText('Board offline right now');
-  await expect(page.locator('[data-chummer-participate-frame]')).toHaveCount(0);
+  await expect(page.locator('[data-chummer-participate-frame]')).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText('ProductLift');
   await expect(page.locator('body')).not.toContainText('Log in');
   await expect(page.locator('body')).not.toContainText('Sign up');

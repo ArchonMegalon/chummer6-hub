@@ -37,12 +37,11 @@ REQUIRED_SOURCE_PHRASES = (
     "return Redirect($\"/participate{Request.QueryString}\");",
     "BuildParticipateBoardRouteHref(normalizedBoardPath)",
     "Current requests",
-    "participate-preview-card",
+    "data-chummer-participate-frame",
     "Chummer follow-up is not visible here yet.",
     "account follow-up waits until the shipped path is available on this host",
 )
 FORBIDDEN_SOURCE_PHRASES = (
-    "data-chummer-participate-frame",
     "pending/zero closeout",
     "webhook verification",
     "recipient projection",
