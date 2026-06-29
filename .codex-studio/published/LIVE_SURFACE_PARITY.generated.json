@@ -1,15 +1,15 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-29T07:32:01Z",
-  "base_url": "http://127.0.0.1:35403",
+  "generated_at_utc": "2026-06-29T07:41:54Z",
+  "base_url": "https://chummer.run",
   "require_brilliant_directories_checkout": true,
   "status": "pass",
   "verdict": "LIVE_SURFACE_PARITY_READY",
   "results": [
     {
       "path": "/",
-      "url": "http://127.0.0.1:35403/",
-      "final_url": "http://127.0.0.1:35403/",
+      "url": "https://chummer.run/",
+      "final_url": "https://chummer.run/",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -49,8 +49,8 @@
     },
     {
       "path": "/downloads",
-      "url": "http://127.0.0.1:35403/downloads",
-      "final_url": "http://127.0.0.1:35403/downloads",
+      "url": "https://chummer.run/downloads",
+      "final_url": "https://chummer.run/downloads",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -99,8 +99,8 @@
     },
     {
       "path": "/status",
-      "url": "http://127.0.0.1:35403/status",
-      "final_url": "http://127.0.0.1:35403/status",
+      "url": "https://chummer.run/status",
+      "final_url": "https://chummer.run/status",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -157,14 +157,14 @@
     },
     {
       "path": "/account/billing",
-      "url": "http://127.0.0.1:35403/account/billing",
-      "final_url": "http://127.0.0.1:35403/login?next=%2Faccount%2Fbilling",
+      "url": "https://chummer.run/account/billing",
+      "final_url": "https://chummer.run/login?next=%2Faccount%2Fbilling",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:35403/login?next=%2Faccount%2Fbilling"
+        "https://chummer.run/login?next=%2Faccount%2Fbilling"
       ],
       "required_texts": [
         "Supporter",
@@ -192,8 +192,8 @@
     },
     {
       "path": "/participate",
-      "url": "http://127.0.0.1:35403/participate",
-      "final_url": "http://127.0.0.1:35403/participate",
+      "url": "https://chummer.run/participate",
+      "final_url": "https://chummer.run/participate",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -231,14 +231,14 @@
     },
     {
       "path": "/participate/board",
-      "url": "http://127.0.0.1:35403/participate/board",
-      "final_url": "http://127.0.0.1:35403/participate",
+      "url": "https://chummer.run/participate/board",
+      "final_url": "https://chummer.run/participate",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:35403/participate"
+        "https://chummer.run/participate"
       ],
       "required_texts": [
         "What should Chummer do next?",
@@ -276,8 +276,8 @@
     },
     {
       "path": "/roadmap",
-      "url": "http://127.0.0.1:35403/roadmap",
-      "final_url": "http://127.0.0.1:35403/roadmap",
+      "url": "https://chummer.run/roadmap",
+      "final_url": "https://chummer.run/roadmap",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
@@ -312,14 +312,14 @@
     },
     {
       "path": "/roadmap/board",
-      "url": "http://127.0.0.1:35403/roadmap/board",
-      "final_url": "http://127.0.0.1:35403/roadmap",
+      "url": "https://chummer.run/roadmap/board",
+      "final_url": "https://chummer.run/roadmap",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:35403/roadmap"
+        "https://chummer.run/roadmap"
       ],
       "required_texts": [
         "Roadmap",
@@ -350,14 +350,14 @@
     },
     {
       "path": "/ledger",
-      "url": "http://127.0.0.1:35403/ledger",
-      "final_url": "http://127.0.0.1:35403/ledger/map",
+      "url": "https://chummer.run/ledger",
+      "final_url": "https://chummer.run/ledger/map",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
       "redirect_chain": [
-        "http://127.0.0.1:35403/ledger/map"
+        "https://chummer.run/ledger/map"
       ],
       "required_texts": [
         "Black Ledger command map",
@@ -391,13 +391,15 @@
     },
     {
       "path": "/ledger/newsroom",
-      "url": "http://127.0.0.1:35403/ledger/newsroom",
-      "final_url": "http://127.0.0.1:35403/ledger/newsroom",
+      "url": "https://chummer.run/ledger/newsroom",
+      "final_url": "https://chummer.run/ledger/newsroom/turn-2-newsreel",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
-      "redirect_chain": [],
+      "redirect_chain": [
+        "https://chummer.run/ledger/newsroom/turn-2-newsreel"
+      ],
       "required_texts": [
         "Black Ledger Newsroom",
         "Transcript",
