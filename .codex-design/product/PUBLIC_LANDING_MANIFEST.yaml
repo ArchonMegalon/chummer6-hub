@@ -475,6 +475,7 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: markdown packet for known starter or recovery lane IDs only
+  verification_path: /onramp/packets/starter_lane.md
 - path: /onramp/packets/{packetId}.json
   title: ONRAMP packet JSON
   audience: public
@@ -484,6 +485,7 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: JSON packet for known starter or recovery lane IDs only
+  verification_path: /onramp/packets/starter_lane.json
 - path: /edition-studio
   title: EDITION STUDIO
   audience: public
@@ -520,6 +522,7 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: markdown packet for known edition-head IDs only
+  verification_path: /edition-studio/packets/sr5_head.md
 - path: /edition-studio/packets/{packetId}.json
   title: EDITION STUDIO packet JSON
   audience: public
@@ -529,6 +532,7 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: JSON packet for known edition-head IDs only
+  verification_path: /edition-studio/packets/sr5_head.json
 - path: /quicksilver
   title: Quicksilver
   audience: public
@@ -565,6 +569,7 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: markdown packet for known command-deck or jump-target IDs only
+  verification_path: /quicksilver/packets/command_deck.md
 - path: /quicksilver/packets/{packetId}.json
   title: Quicksilver packet JSON
   audience: public
@@ -574,6 +579,7 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: JSON packet for known command-deck or jump-target IDs only
+  verification_path: /quicksilver/packets/command_deck.json
 - path: /passport
   title: Runner Passport
   audience: public
@@ -807,15 +813,6 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: static markdown instructions only
-- path: /artifacts/explanation-receipt-trail
-  title: Explanation receipt trail detail
-  audience: public
-  purpose: artifact_detail
-  requires_auth: false
-  guest_fallback: /artifacts/explanation-receipt-trail
-  must_exist: true
-  placeholder_allowed: false
-  placeholder_requirements: artifact detail only
 - path: /artifacts/runsite-pack
   title: Runsite pack detail
   audience: public
@@ -1328,7 +1325,7 @@ registered_routes:
   audience: registered
   purpose: signed_in_dashboard
   requires_auth: true
-  guest_fallback: /login?next=/home/access
+  guest_fallback: /account/access
   must_exist: true
   placeholder_allowed: true
   placeholder_requirements: signed-in access focus
@@ -1337,7 +1334,7 @@ registered_routes:
   audience: registered
   purpose: signed_in_dashboard
   requires_auth: true
-  guest_fallback: /login?next=/home/work
+  guest_fallback: /account/work
   must_exist: true
   placeholder_allowed: true
   placeholder_requirements: signed-in work focus
@@ -1355,7 +1352,7 @@ registered_routes:
   audience: registered
   purpose: profile_and_preferences
   requires_auth: true
-  guest_fallback: /login?next=/account
+  guest_fallback: /account/access
   must_exist: true
   placeholder_allowed: true
   placeholder_requirements: profile and linked-identity shell
@@ -1689,7 +1686,7 @@ registered_routes:
   audience: registered
   purpose: profile_and_preferences
   requires_auth: true
-  guest_fallback: /login?next=/account/advanced
+  guest_fallback: /account/settings
   must_exist: true
   placeholder_allowed: true
   placeholder_requirements: advanced account diagnostics route

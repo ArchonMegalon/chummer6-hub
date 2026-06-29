@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.public_route_proof",
   "status": "pass",
-  "generated_at_utc": "2026-06-22T12:57:26.387543Z",
+  "generated_at_utc": "2026-06-29T00:27:55.899276Z",
   "base_url": "https://chummer.run",
   "public_host": null,
   "forwarded_proto": null,
@@ -11,13 +11,13 @@
   "manifest_surface": "chummer.run",
   "manifest_version": 1,
   "summary": {
-    "route_count": 165,
-    "passed_count": 165,
+    "route_count": 183,
+    "passed_count": 183,
     "failed_count": 0,
-    "positive_proof_count": 165,
-    "public_route_count": 115,
+    "positive_proof_count": 183,
+    "public_route_count": 130,
     "auth_operation_count": 4,
-    "registered_route_count": 44,
+    "registered_route_count": 47,
     "controller_contract_count": 2,
     "controller_contract_only_count": 0,
     "negative_path_count": 2,
@@ -43,7 +43,14 @@
       "final_url": "https://chummer.run/",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "8ab48073d5b411978aeb5d434461df915b3fd7e2280a41cc758af4074c680692",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Chummer &#x2014; Shadowrun character manager \u00b7 Chummer</title> <meta name=\"description\" content=\"Desktop char",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/what-is-chummer",
@@ -61,7 +68,14 @@
       "final_url": "https://chummer.run/what-is-chummer",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "6f43ec7d2c1773a05e9a6801c58de72153d96d0ed40e21b9127f7f33aead0c91",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>What Is Chummer? \u00b7 Chummer</title> <meta name=\"description\" content=\"Character tools for Shadowrun.\" /> <meta",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/now",
@@ -79,7 +93,14 @@
       "final_url": "https://chummer.run/now",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "874f6c6d7c894b145b9a78644f119c6b81a53a29496990d208031ac656501a71",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Current release \u00b7 Chummer</title> <meta name=\"description\" content=\"Readiness labels and direct status for wh",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/status",
@@ -97,7 +118,14 @@
       "final_url": "https://chummer.run/status",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "1ecb91656daeeaa9204947bd05b286ef1e19f16e7cbe0d43e59e58ab4764836a",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Status \u00b7 Chummer</title> <meta name=\"description\" content=\"Current Chummer downloads and setup help.\" /> <met",
+      "critical_excerpt": null,
+      "cache_control": "private, no-store, max-age=0",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/horizons",
@@ -115,7 +143,14 @@
       "final_url": "https://chummer.run/horizons",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "0daa80785f218d0ecbce5b81ef1bf0bf3fa83351d96a4ff941a361cf4c7c023e",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Maintenance \u00b7 Chummer</title> <meta name=\"description\" content=\"Future work stays behind the main app.\" /> <m",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/roadmap",
@@ -133,7 +168,14 @@
       "final_url": "https://chummer.run/roadmap",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "a42cd11dbcc154f0ad0cded22bd0d08b013f861d7319f416b79e65fafa06f0fe",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Roadmap \u00b7 Chummer</title> <meta name=\"description\" content=\"Planned work and current requests.\" /> <meta name",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/changelog",
@@ -151,7 +193,14 @@
       "final_url": "https://chummer.run/changelog",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "1387bbc3498a6a150058a76bd6b3b5182c599261b225da2a129c1e4edc53c92e",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Changelog \u00b7 Chummer</title> <meta name=\"description\" content=\"Shipped closeout, user-visible status, and curr",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/downloads",
@@ -169,7 +218,14 @@
       "final_url": "https://chummer.run/downloads",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "1db00609ac9812b20bbee4e01b897ff38df65280af4aa92f09c30b3c445438f1",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Downloads \u00b7 Chummer</title> <meta name=\"description\" content=\"Current Chummer installers and platform availab",
+      "critical_excerpt": null,
+      "cache_control": "private, no-store, max-age=0",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/docs",
@@ -187,7 +243,14 @@
       "final_url": "https://chummer.run/docs",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "99363c06a1b88a1be5023c88a1aa872cc39b2b2b74ec1e6c8c70b8d61fccd1cd",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Document Portal \u00b7 Chummer</title> <meta name=\"description\" content=\"Chummer-owned guides, primers, and player",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/docs/chummer6-quickstart",
@@ -205,7 +268,14 @@
       "final_url": "https://chummer.run/docs/chummer6-quickstart",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "5682c005e2682be36516088b30fb1fea36acdf1236de96239fb5d1d08c82b5f3",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Chummer6 Quickstart Guide \u00b7 Chummer</title> <meta name=\"description\" content=\"Original Chummer document with ",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/docs/{slug}/receipts/publication.json",
@@ -223,7 +293,14 @@
       "final_url": "https://chummer.run/docs/chummer6-quickstart/receipts/publication.json",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "36848557131138d2b90c9fa6f384a5e3515d0bd5b97bf04b4d7bfd87e6b93379",
+      "text_excerpt": "{\"document\":{\"id\":\"chummer6_quickstart_guide\",\"slug\":\"chummer6-quickstart\",\"title\":\"Chummer6 Quickstart Guide\",\"category\":\"quickstart\",\"sourceRepo\":\"chummer6-design\",\"sourcePath\":\"products/chummer/public-guides/chummer6-quickstart.md\",\"sourceHash\":\"bc3e035086f81107b27644fbbbc6385",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/docs/{slug}/download.pdf",
@@ -241,7 +318,14 @@
       "final_url": "https://chummer.run/docs/chummer6-quickstart/download.pdf",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "23c867ea8840f9abc45f337b190abec693346ef1a3fa77a921c940790fa049b3",
+      "text_excerpt": "%PDF-1.4 1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj 2 0 obj << /Type /Pages /Count 1 /Kids [3 0 R] >> endobj 3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj 4 0 obj << /Type /Font /Subtype /Type1 ",
+      "critical_excerpt": null,
+      "cache_control": "max-age=14400",
+      "etag": null,
+      "last_modified": "Mon, 29 Jun 2026 00:21:44 GMT",
+      "detection_hits": []
     },
     {
       "path": "/docs/embed/{slug}",
@@ -259,7 +343,14 @@
       "final_url": "https://chummer.run/docs/embed/chummer6-quickstart",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "d3d11c6820e79aa8bd12074e13e8e5ff67ccb10d05855a093dbf1fa2095567cf",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Chummer6 Quickstart Guide reader view \u00b7 Chummer</title> <meta name=\"description\" content=\"Viewer fallback for",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/docs/category/{category}",
@@ -277,7 +368,14 @@
       "final_url": "https://chummer.run/docs/category/quickstart",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "e140c91c3b7cb0fbcfab85e822b512ee23a52303e896d5d9b3fc8ca685a1f48a",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>quickstart documents \u00b7 Chummer</title> <meta name=\"description\" content=\"Chummer-owned documents on named pub",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/help",
@@ -295,7 +393,14 @@
       "final_url": "https://chummer.run/help",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "64c1bc7fcb3e65964efab06ebd17c30515ba8c2495792fbc4ea0610c8f803f27",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>What is wrong? \u00b7 Chummer</title> <meta name=\"description\" content=\"Help for installs, accounts, and bugs.\" />",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/help/feedback",
@@ -313,7 +418,14 @@
       "final_url": "https://chummer.run/participate",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "3a8092a243e0b61745ac8e042c26938e6664fae665f7843106d61b73d3294e33",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Participate \u00b7 Chummer</title> <meta name=\"description\" content=\"Public requests, clear bugs, useful ideas.\" /",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/faq",
@@ -331,7 +443,14 @@
       "final_url": "https://chummer.run/faq",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "7189142a79aba5ebf68fe73e09ca449c1013ec62f02c68c410c70c87c238137d",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Plain answers before you spend more time \u00b7 Chummer</title> <meta name=\"description\" content=\"Short answers ab",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/privacy",
@@ -349,7 +468,14 @@
       "final_url": "https://chummer.run/privacy",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "48c3c7e60b3fd4f5135e1f751499a7a6f6229cf96b9ed2f4fd4357af9b4b0783",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>What Chummer stores, and what it does not \u00b7 Chummer</title> <meta name=\"description\" content=\"What the accoun",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/terms",
@@ -367,7 +493,14 @@
       "final_url": "https://chummer.run/terms",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "47d8b4e764a14aa588d14a16b1c7e0229e81044faaa97f0c3f3b6575674e2d91",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Terms in plain language \u00b7 Chummer</title> <meta name=\"description\" content=\"Preview-use expectations, support",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/contact",
@@ -385,7 +518,14 @@
       "final_url": "https://chummer.run/contact",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "24ee53c75dbe9c0dd69793b5e35fc1ba89d07aad15f0e8f96b823cf83a1310d1",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Contact \u00b7 Chummer</title> <meta name=\"description\" content=\"Discord first. Private form if needed.\" /> <meta ",
+      "critical_excerpt": null,
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/progress",
@@ -403,12 +543,19 @@
       "final_url": "https://chummer.run/progress",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "a3390ccce62b5a3485e8dc3a094019627eafcdd2cb2227a2a2dbace12456a5dd",
+      "text_excerpt": "<!doctype html> <html lang=\"en\"> <head> <meta charset=\"utf-8\"> <title>Chummer6 Progress Report</title> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> <style> :root { --bg: #09121b; --bg-2: #101b28; --bg-3: #162435; --paper: #edf3f7; --muted: #98a7b6; --text:",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/participate",
       "audience": "public",
-      "purpose": "help_and_booster_entry",
+      "purpose": "first_party_public_board",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/participate",
@@ -421,7 +568,14 @@
       "final_url": "https://chummer.run/participate",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "3a8092a243e0b61745ac8e042c26938e6664fae665f7843106d61b73d3294e33",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Participate \u00b7 Chummer</title> <meta name=\"description\" content=\"Public requests, clear bugs, useful ideas.\" /",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/feedback",
@@ -439,7 +593,14 @@
       "final_url": "https://chummer.run/participate",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "3a8092a243e0b61745ac8e042c26938e6664fae665f7843106d61b73d3294e33",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Participate \u00b7 Chummer</title> <meta name=\"description\" content=\"Public requests, clear bugs, useful ideas.\" /",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/feedback/operations",
@@ -457,7 +618,14 @@
       "final_url": "https://chummer.run/feedback/operations",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "2755f99ab4fbfa2476a141cf8712fbb6f093c055499525f50a58e50d6134ea66",
+      "text_excerpt": "{ \"contractName\": \"chummer.public_signal_operations\", \"generatedAtUtc\": \"2026-06-29T00:27:49.3198069+00:00\", \"eyebrow\": \"Public board status\", \"heading\": \"Public requests and roadmap status.\", \"summary\": \"Chummer keeps public requests, roadmap movement, shipped updates, and priva",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/feedback/operations/lookup",
@@ -475,7 +643,14 @@
       "final_url": "https://chummer.run/feedback/operations/lookup",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "ea521d2667481c3bd697fd9d0d168251707ee71a853ee6d913fc64d5fa1e9c26",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Feedback Activity \u00b7 Chummer</title> <meta name=\"description\" content=\"Limited public lookup across Chummer-ow",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ready",
@@ -493,7 +668,16 @@
       "final_url": "https://chummer.run/ready",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "e6dc6e72a78f7fe89b296742b521c99b2856651b362363f4cec612d22b68b15b",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Ready for Tonight \u00b7 Chummer</title> <meta name=\"description\" content=\"Role verdicts, starter loadouts, and pa",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/play/continuity",
@@ -511,7 +695,16 @@
       "final_url": "https://chummer.run/play/continuity",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "60b631bede44c176d671ded5abccdf76f1c24e7014cdbed7544d2b1e22aba4f6",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>NEXUS-PAN continuity \u00b7 Chummer</title> <meta name=\"description\" content=\"Claimed installs, reconnect behavior",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/rules",
@@ -529,7 +722,41 @@
       "final_url": "https://chummer.run/rules",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "04668d3be8ac77819d9a9db1403c2336380e821502ff255e9de8750cd503cc0a",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Knowledge Fabric \u00b7 Chummer</title> <meta name=\"description\" content=\"Source-aware explanations and readable h",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
+    },
+    {
+      "path": "/rules/explanations",
+      "audience": "public",
+      "purpose": "product_surface_detail",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/rules/explanations",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/rules/explanations",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "209e45f38e766415a2de3a0e0817192b5e97de5566e31fdcc4f306de588171a8",
+      "text_excerpt": "{ \"receipts\": [ { \"receiptId\": \"kf_explain_initiative_sr5\", \"topic\": \"SR5 initiative explain\", \"summary\": \"Shows the bounded modifier trail for initiative posture without copying official sourcebook text.\", \"provenance\": \"Chummer rules runtime \\u002B public-safe explain summary\",",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/jackpoint",
@@ -547,12 +774,21 @@
       "final_url": "https://chummer.run/jackpoint",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "9eac210fb36eb9a2d9ee9aa534d2e36bbef1ad123b193204499753048b7a235c",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>JACKPOINT \u00b7 Chummer</title> <meta name=\"description\" content=\"Player-safe dossier cards, mission briefs, and ",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
-      "path": "/jackpoint/receipts/briefing-network.json",
+      "path": "/jackpoint/briefing-network",
       "audience": "public",
-      "purpose": "proof_receipt",
+      "purpose": "product_surface_detail",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/jackpoint",
@@ -562,10 +798,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/jackpoint/receipts/briefing-network.json",
+      "final_url": "https://chummer.run/jackpoint/briefing-network",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "7e5664ab83af77b5dea66332dd1a43d7f11a415460d3f673d5a50310c49952dc",
+      "text_excerpt": "{\"horizon\":\"jackpoint\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"firstBriefingMarkdownHref\":\"/jackpoint/briefings/emerald-sprawl-briefing.md\",\"firstBriefingJsonHref\":\"/jackpoint/briefings/emerald-sprawl-briefing.json\",\"briefingCount\":2,\"summary\":\"Public JACKPOINT keeps player-safe b",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/runsites",
@@ -583,12 +826,21 @@
       "final_url": "https://chummer.run/runsites",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "ed59389dfd8f35abfe7de65e0ae8626ee94be858e1a292d232afe9a17d89a15a",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>RUNSITE \u00b7 Chummer</title> <meta name=\"description\" content=\"Site cards, threat clocks, prep paths, and Chumme",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
-      "path": "/runsites/receipts/prep-network.json",
+      "path": "/runsites/prep-network",
       "audience": "public",
-      "purpose": "proof_receipt",
+      "purpose": "product_surface_detail",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/runsites",
@@ -598,10 +850,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/runsites/receipts/prep-network.json",
+      "final_url": "https://chummer.run/runsites/prep-network",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "8bd791acc080091aded6ce3b2d5414aac4acbe2c7c70a840ac3eacd63dce438b",
+      "text_excerpt": "{\"horizon\":\"runsite\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"firstPackMarkdownHref\":\"/runsites/packs/redmond-dockyard-pack.md\",\"firstPackJsonHref\":\"/runsites/packs/redmond-dockyard-pack.json\",\"packCount\":2,\"summary\":\"Public RUNSITE keeps inspectable packs, routes, and threat clock",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/runbook",
@@ -619,7 +878,41 @@
       "final_url": "https://chummer.run/runbook",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "a00e141d889d9e53f3e15420ff634cbd5b8e554ac0d914deff9e45348bfe3c61",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>RUNBOOK PRESS \u00b7 Chummer</title> <meta name=\"description\" content=\"Printable primers and first-session onboard",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
+    },
+    {
+      "path": "/runbook/primer-network",
+      "audience": "public",
+      "purpose": "product_surface_detail",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/runbook",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/runbook/primer-network",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "1dbf965c50e4dba90f5e4261d90a966947f8cabdcb6fee71176936fd6376196d",
+      "text_excerpt": "{\"horizon\":\"runbook-press\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"firstPrimerMarkdownHref\":\"/runbook/primers/new-runner-primer.md\",\"firstPrimerJsonHref\":\"/runbook/primers/new-runner-primer.json\",\"primerCount\":2,\"exportDispatchHrefTemplate\":\"/runbook/primers/{primerId}/export\",\"su",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/community",
@@ -637,12 +930,21 @@
       "final_url": "https://chummer.run/community",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "d1ee2a5e6f5eabb9351e9f75fa13b367afc4d6bea675d12be4df79b925797093",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Community Hub \u00b7 Chummer</title> <meta name=\"description\" content=\"Find open runs, understand the ground rules",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
-      "path": "/community/receipts/open-run-network.json",
+      "path": "/community/open-run-network",
       "audience": "public",
-      "purpose": "product_surface_receipt",
+      "purpose": "product_surface_detail",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/community",
@@ -652,10 +954,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/community/receipts/open-run-network.json",
+      "final_url": "https://chummer.run/community/open-run-network",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "3df1c2ed76cd562304a1dc835e1bfcf243695868e795cee9ce2ff1823fea5185",
+      "text_excerpt": "{\"horizon\":\"community_hub\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"boardMarkdownHref\":\"/community/open-runs/open_run_board.md\",\"boardJsonHref\":\"/community/open-runs/open_run_board.json\",\"openRunCount\":0,\"pendingJoinCount\":0,\"scheduledCount\":0,\"closeoutCount\":0},\"signedInBench\":{\"a",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/creator",
@@ -673,12 +982,21 @@
       "final_url": "https://chummer.run/creator",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "a0626db4f600a04406355331f877b838d2b5df2901587585326457717abd2346",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Creator OS \u00b7 Chummer</title> <meta name=\"description\" content=\"Publication discovery, status, and campaign re",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
-      "path": "/creator/receipts/publication-network.json",
+      "path": "/creator/publication-network",
       "audience": "public",
-      "purpose": "product_surface_receipt",
+      "purpose": "product_surface_detail",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/creator",
@@ -688,10 +1006,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/creator/receipts/publication-network.json",
+      "final_url": "https://chummer.run/creator/publication-network",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "b5840f9c427433bf3b8eb0385bd7f37c8f27126aac91a13cb7286262ad24d108",
+      "text_excerpt": "{\"horizon\":\"creator_os\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"boardMarkdownHref\":\"/creator/packets/publication_board.md\",\"boardJsonHref\":\"/creator/packets/publication_board.json\",\"publicationCount\":0,\"curatedLiveCount\":0,\"approvalBackedCount\":0,\"returnLoopCount\":0},\"signedInBenc",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ghostwire",
@@ -709,12 +1034,21 @@
       "final_url": "https://chummer.run/ghostwire",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "75acbdc48e3667e718fe4eae4afb209583c44f3c35a1f68863b82eac65b140b8",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>GHOSTWIRE \u00b7 Chummer</title> <meta name=\"description\" content=\"Replay timelines, after-action reports, and con",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
-      "path": "/ghostwire/receipts/replay-network.json",
+      "path": "/ghostwire/replay-network",
       "audience": "public",
-      "purpose": "product_surface_receipt",
+      "purpose": "product_surface_detail",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/ghostwire",
@@ -724,10 +1058,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/ghostwire/receipts/replay-network.json",
+      "final_url": "https://chummer.run/ghostwire/replay-network",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "314b978ec4cd12886f07a1b2a12f200e10c65b2f619bbc9fe38a3e4985b40d5a",
+      "text_excerpt": "{\"horizon\":\"ghostwire\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"replayTimelineMarkdownHref\":\"/ghostwire/after-action/replay_timeline.md\",\"replayTimelineJsonHref\":\"/ghostwire/after-action/replay_timeline.json\",\"afterActionReportMarkdownHref\":\"/ghostwire/after-action/after_action_rep",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/run-control",
@@ -745,12 +1086,21 @@
       "final_url": "https://chummer.run/run-control",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "e922ecbb84aabc306b7dca6a14c846c28a274e9c1c80c5071cdd47797faf0998",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>RUN CONTROL \u00b7 Chummer</title> <meta name=\"description\" content=\"Session board, active-scene continuity, recon",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
-      "path": "/run-control/receipts/control-network.json",
+      "path": "/run-control/control-network",
       "audience": "public",
-      "purpose": "product_surface_receipt",
+      "purpose": "product_surface_detail",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/run-control",
@@ -760,10 +1110,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/run-control/receipts/control-network.json",
+      "final_url": "https://chummer.run/run-control/control-network",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "b22d4c1e3a15cf3ec3c0369d951d6b48af2477d1c391828e2112c4050e7f70c8",
+      "text_excerpt": "{\"horizon\":\"run_control\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"sessionBoardMarkdownHref\":\"/run-control/packets/session_board.md\",\"sessionBoardJsonHref\":\"/run-control/packets/session_board.json\",\"continuityBoardMarkdownHref\":\"/run-control/packets/continuity_board.md\",\"continuityB",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/onramp",
@@ -781,7 +1138,41 @@
       "final_url": "https://chummer.run/onramp",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "b203ef9cf9d35ffdd5868adf17dc17fbd6e35189ab1dcc4e1af7cb49efd27e58",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>ONRAMP \u00b7 Chummer</title> <meta name=\"description\" content=\"Guided first session, recovery status, and continu",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
+    },
+    {
+      "path": "/onramp/guided-starter",
+      "audience": "public",
+      "purpose": "product_surface_detail",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/onramp",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/onramp/guided-starter",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "19775bb617166c57e0f0c7c474bdd7795e870d40ac31d4c766ff171aebcce717",
+      "text_excerpt": "{\"horizon\":\"onramp\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"starterLaneMarkdownHref\":\"/onramp/packets/starter_lane.md\",\"starterLaneJsonHref\":\"/onramp/packets/starter_lane.json\",\"recoveryLaneMarkdownHref\":\"/onramp/packets/recovery_lane.md\",\"recoveryLaneJsonHref\":\"/onramp/packets/re",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/onramp/receipts/guided-starter.json",
@@ -799,7 +1190,64 @@
       "final_url": "https://chummer.run/onramp/receipts/guided-starter.json",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "19775bb617166c57e0f0c7c474bdd7795e870d40ac31d4c766ff171aebcce717",
+      "text_excerpt": "{\"horizon\":\"onramp\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"starterLaneMarkdownHref\":\"/onramp/packets/starter_lane.md\",\"starterLaneJsonHref\":\"/onramp/packets/starter_lane.json\",\"recoveryLaneMarkdownHref\":\"/onramp/packets/recovery_lane.md\",\"recoveryLaneJsonHref\":\"/onramp/packets/re",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/onramp/packets/{packetId}.md",
+      "audience": "public",
+      "purpose": "product_surface_packet",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/onramp",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/onramp/packets/starter_lane.md",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "f476988ffdde0c059d7964108f0578be5f639412b02ad0a3d762cca51104a8db",
+      "text_excerpt": "# ONRAMP starter packet ONRAMP now ships a guided starter packet. ## Public board * Starter packet: `/onramp/packets/starter_lane.json` * Recovery packet: `/onramp/packets/recovery_lane.json` ## Account workspace * Account workspace: `/account/onramp` * Open page: `/account/onram",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/onramp/packets/{packetId}.json",
+      "audience": "public",
+      "purpose": "product_surface_packet",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/onramp",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/onramp/packets/starter_lane.json",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "f1837371f14f4904b0a57693db1c2ea521fdd9298dcc28f1b12c13e155f626db",
+      "text_excerpt": "{ \"horizon\": \"onramp\", \"status\": \"shipped_mvp\", \"packet\": \"starter_lane\", \"publicBoard\": { \"starterLaneMarkdownHref\": \"/onramp/packets/starter_lane.md\", \"starterLaneJsonHref\": \"/onramp/packets/starter_lane.json\", \"recoveryLaneMarkdownHref\": \"/onramp/packets/recovery_lane.md\", \"re",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/edition-studio",
@@ -817,7 +1265,41 @@
       "final_url": "https://chummer.run/edition-studio",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "00c7cf0a5b8c9fc9da4243bcca9ecb8dba1e2aafb4fea773416f7c9e3bdc5825",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>EDITION STUDIO \u00b7 Chummer</title> <meta name=\"description\" content=\"Distinct SR4, SR5, and SR6 ruleset heads w",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
+    },
+    {
+      "path": "/edition-studio/ruleset-heads",
+      "audience": "public",
+      "purpose": "product_surface_detail",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/edition-studio",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/edition-studio/ruleset-heads",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "01416d825c3f3dd8a279c49235cae5d9e9b78613ac188072516b4f3157bb2ae5",
+      "text_excerpt": "{\"horizon\":\"edition_studio\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"sr4HeadMarkdownHref\":\"/edition-studio/packets/sr4_head.md\",\"sr4HeadJsonHref\":\"/edition-studio/packets/sr4_head.json\",\"sr5HeadMarkdownHref\":\"/edition-studio/packets/sr5_head.md\",\"sr5HeadJsonHref\":\"/edition-studio/p",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/edition-studio/receipts/ruleset-heads.json",
@@ -835,7 +1317,64 @@
       "final_url": "https://chummer.run/edition-studio/receipts/ruleset-heads.json",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "01416d825c3f3dd8a279c49235cae5d9e9b78613ac188072516b4f3157bb2ae5",
+      "text_excerpt": "{\"horizon\":\"edition_studio\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"sr4HeadMarkdownHref\":\"/edition-studio/packets/sr4_head.md\",\"sr4HeadJsonHref\":\"/edition-studio/packets/sr4_head.json\",\"sr5HeadMarkdownHref\":\"/edition-studio/packets/sr5_head.md\",\"sr5HeadJsonHref\":\"/edition-studio/p",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/edition-studio/packets/{packetId}.md",
+      "audience": "public",
+      "purpose": "product_surface_packet",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/edition-studio",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/edition-studio/packets/sr5_head.md",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "99aa7bbb008f40841a38ca6a8cac42ee42820d6d2bb704614447c37942431793",
+      "text_excerpt": "# EDITION STUDIO SR5 focus EDITION STUDIO keeps SR5 authored as a distinct ruleset focus in Chummer. ## Public board * SR4 head packet: `/edition-studio/packets/sr4_head.json` * SR5 head packet: `/edition-studio/packets/sr5_head.json` * SR6 head packet: `/edition-studio/packets/s",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/edition-studio/packets/{packetId}.json",
+      "audience": "public",
+      "purpose": "product_surface_packet",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/edition-studio",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/edition-studio/packets/sr5_head.json",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "cb3bd89ffe273c622907699970386a52ee59e530d2ba71fd7e99c33789cf59b5",
+      "text_excerpt": "{ \"horizon\": \"edition_studio\", \"status\": \"shipped_mvp\", \"packet\": \"sr5_head\", \"publicBoard\": { \"sr4HeadMarkdownHref\": \"/edition-studio/packets/sr4_head.md\", \"sr4HeadJsonHref\": \"/edition-studio/packets/sr4_head.json\", \"sr5HeadMarkdownHref\": \"/edition-studio/packets/sr5_head.md\", \"",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/quicksilver",
@@ -853,7 +1392,41 @@
       "final_url": "https://chummer.run/quicksilver",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "3650f5caccf298ab7b6c161f4886ba89f7c5f917e886ba0afa077648d0467325",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Quicksilver \u00b7 Chummer</title> <meta name=\"description\" content=\"Expert-speed jump view, jump targets, and foc",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
+    },
+    {
+      "path": "/quicksilver/command-network",
+      "audience": "public",
+      "purpose": "product_surface_detail",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/quicksilver",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/quicksilver/command-network",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "7d3054c7cc0d0def7f818cae9a88b7d90b70a2d4e7603714a99727587b51d75d",
+      "text_excerpt": "{\"horizon\":\"quicksilver\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"commandDeckMarkdownHref\":\"/quicksilver/packets/command_deck.md\",\"commandDeckJsonHref\":\"/quicksilver/packets/command_deck.json\",\"jumpTargetsMarkdownHref\":\"/quicksilver/packets/jump_targets.md\",\"jumpTargetsJsonHref\":\"/",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/quicksilver/receipts/command-network.json",
@@ -871,7 +1444,64 @@
       "final_url": "https://chummer.run/quicksilver/receipts/command-network.json",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "7d3054c7cc0d0def7f818cae9a88b7d90b70a2d4e7603714a99727587b51d75d",
+      "text_excerpt": "{\"horizon\":\"quicksilver\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"commandDeckMarkdownHref\":\"/quicksilver/packets/command_deck.md\",\"commandDeckJsonHref\":\"/quicksilver/packets/command_deck.json\",\"jumpTargetsMarkdownHref\":\"/quicksilver/packets/jump_targets.md\",\"jumpTargetsJsonHref\":\"/",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/quicksilver/packets/{packetId}.md",
+      "audience": "public",
+      "purpose": "product_surface_packet",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/quicksilver",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/quicksilver/packets/command_deck.md",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "5e33c04afc47f6443665a04e209fc930cf9e6b25742a42dfa9b8ad2cac9fe4fc",
+      "text_excerpt": "# Quicksilver jump guide Quicksilver keeps expert-speed jumps inside Chummer. - Build handoffs: /account/quicksilver/builds - Rules answers: /account/quicksilver/rules - Prep benches: /account/quicksilver/runsites - Creator desk: /account/quicksilver/creator - JACKPOINT desk: /ac",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/quicksilver/packets/{packetId}.json",
+      "audience": "public",
+      "purpose": "product_surface_packet",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/quicksilver",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/quicksilver/packets/command_deck.json",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "65a6aa304dad83ddf909c08e945b2e11268abcdc2739bec4d726ee306fe0fa89",
+      "text_excerpt": "{ \"packetId\": \"command_deck\", \"horizon\": \"quicksilver\", \"status\": \"shipped_mvp\", \"publicBoard\": { \"commandDeckMarkdownHref\": \"/quicksilver/packets/command_deck.md\", \"commandDeckJsonHref\": \"/quicksilver/packets/command_deck.json\", \"jumpTargetsMarkdownHref\": \"/quicksilver/packets/j",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/passport",
@@ -889,12 +1519,21 @@
       "final_url": "https://chummer.run/passport",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "5521d050ec99edfced20f030aa26ce8f8f564fdb32846c82bd636d1259160ade",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Runner Passport \u00b7 Chummer</title> <meta name=\"description\" content=\"Runner return status, participation histo",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
-      "path": "/passport/receipts/identity-network.json",
+      "path": "/passport/identity-network",
       "audience": "public",
-      "purpose": "product_surface_receipt",
+      "purpose": "product_surface_detail",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/passport",
@@ -904,10 +1543,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/passport/receipts/identity-network.json",
+      "final_url": "https://chummer.run/passport/identity-network",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "d88337f10a0d396c18e474d73705cf734cf15fa4733303ae4fe0cc53e1df3881",
+      "text_excerpt": "{\"horizon\":\"runner_passport\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"runnerReturnMarkdownHref\":\"/passport/runner_return_posture.md\",\"runnerReturnJsonHref\":\"/passport/runner_return_posture.json\",\"crossTableBoundaryMarkdownHref\":\"/passport/cross_table_identity_boundary.md\",\"crossTab",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/anarchy",
@@ -925,7 +1571,14 @@
       "final_url": "https://chummer.run/anarchy",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "21fad9ada8152f38d5df3566403b49faba670ea285e0ad87a84286abd045d4ae",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Shadowrun Anarchy \u00b7 Chummer</title> <meta name=\"description\" content=\"Rules-light play, campaign city consequ",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/play/anarchy",
@@ -943,7 +1596,14 @@
       "final_url": "https://chummer.run/play/anarchy",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "74149913581e47531e3ab35740f1bdca3a13a594dde889c11b6ccddd1a0ee037",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Anarchy play shell \u00b7 Chummer</title> <meta name=\"description\" content=\"Rules-light play, campaign city conseq",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger/anarchy",
@@ -961,7 +1621,14 @@
       "final_url": "https://chummer.run/ledger/anarchy",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "397543fca230d077c699c93a5de52effc0268ae226c4789c9aef64c8e1ef1a26",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Anarchy consequence view \u00b7 Chummer</title> <meta name=\"description\" content=\"Rules-light play, campaign city ",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/anarchy/export/runner.json",
@@ -979,12 +1646,19 @@
       "final_url": "https://chummer.run/anarchy/export/runner.json",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "09842f19aa6ed3807a91e01a8eeebb597f22ad1ec555970901f5d426379742ab",
+      "text_excerpt": "{ \"ruleset_id\": \"shadowrun_anarchy\", \"verdict_label\": \"Playable preview\", \"runner_id\": \"anarchy_runner_emerald_sprawl_switchback\", \"handle\": \"Switchback\", \"concept\": \"Dockside courier who turned faction heat, route memory, and too many favors into a survivable day job.\", \"metatyp",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
-      "path": "/anarchy/receipts/explain.json",
+      "path": "/anarchy/explain",
       "audience": "public",
-      "purpose": "product_surface_receipt",
+      "purpose": "product_surface_detail",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/anarchy",
@@ -994,15 +1668,22 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/anarchy/receipts/explain.json",
+      "final_url": "https://chummer.run/anarchy/explain",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "8e641a83bb41b4837389e63704c98682fd0a395481dde2d62ca1b183bf8ec192",
+      "text_excerpt": "{ \"receiptId\": \"anarchy_preview_receipt_turn1\", \"sourceReceiptId\": \"ledger_tick_0001_preseeded\", \"rulesetId\": \"shadowrun_anarchy\", \"status\": \"preview_receipt_backed\", \"provenanceNotes\": [ \"Facts come from the public-safe World Tick receipt and published Black Ledger dispatches.\",",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
-      "path": "/anarchy/receipts/runtime.json",
+      "path": "/anarchy/runtime",
       "audience": "public",
-      "purpose": "product_surface_receipt",
+      "purpose": "product_surface_detail",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/anarchy",
@@ -1012,10 +1693,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/anarchy/receipts/runtime.json",
+      "final_url": "https://chummer.run/anarchy/runtime",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "f11b6668aad8b3fbe938c06b89d55bc8d27416b0d2996fc9b77758fb01c5dfcf",
+      "text_excerpt": "{\"horizon\":\"anarchy\",\"status\":\"shipped_mvp\",\"rulesetId\":\"shadowrun_anarchy\",\"playShell\":{\"overviewHref\":\"/anarchy\",\"playHref\":\"/play/anarchy\",\"ledgerHref\":\"/ledger/anarchy\"},\"exportLane\":{\"exportJsonHref\":\"/anarchy/export/runner.json\",\"explainReceiptHref\":\"/anarchy/explain\",\"expl",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/participate/karma-forge",
@@ -1033,7 +1721,39 @@
       "final_url": "https://chummer.run/participate/karma-forge",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "b874decaeecce4d98bf78e73c2a6e06551b161d71c57ac5d2dda5f9b20c99f48",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>KARMA FORGE \u00b7 Chummer</title> <meta name=\"description\" content=\"Chummer-owned intake for house-rule, campaign",
+      "critical_excerpt": null,
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/participate/karma-forge/discovery-network",
+      "audience": "public",
+      "purpose": "governed_future_signal_detail",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/participate/karma-forge",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/participate/karma-forge/discovery-network",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "2bdb73cb6231e11fc9f2c7fd69a376c45fb15b6a7bc81068a746f628ea2e61fd",
+      "text_excerpt": "{\"horizon\":\"karma-forge\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"intakeHref\":\"/participate/karma-forge\",\"discoveryDispatchHref\":\"/participate/karma-forge/discovery\",\"submittedReceiptHrefTemplate\":\"/participate/karma-forge/submitted/{submissionId}\",\"summary\":\"KARMA FORGE keeps hous",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/alice",
@@ -1051,7 +1771,14 @@
       "final_url": "https://chummer.run/alice",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "2d3c9abe43366fd1132869ed700d257e3a8ba98b9f9f9e665ae78597bb373b89",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Character help \u00b7 Chummer</title> <meta name=\"description\" content=\"Public intake and explanation for characte",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/alice/receipts/build-ghost.json",
@@ -1069,7 +1796,14 @@
       "final_url": "https://chummer.run/alice/receipts/build-ghost.json",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "c5e60464af6317fdee3460286ac856867e13ad58655efdcb1b9cf4e53ea4d067",
+      "text_excerpt": "{\"facePopEntryHref\":\"/participate\",\"facePopStatus\":\"Public concierge only\",\"answerlyStatus\":\"Fallback explainer only\",\"engineStatus\":\"First-party compare/apply only\",\"humanizedSummary\":\"A short intake can greet the builder, the explainer can clarify the preview, and Chummer still",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/table-pulse",
@@ -1087,7 +1821,14 @@
       "final_url": "https://chummer.run/table-pulse",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "f30f28975ccfad5c972643637e03eb4d38bd224b6ffa6cc6ec412c3ee5afe0b3",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>TABLE PULSE \u00b7 Chummer</title> <meta name=\"description\" content=\"Live heat and GM-private aftermath stay separ",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/table-pulse/receipts/live-and-aftermath.json",
@@ -1105,7 +1846,116 @@
       "final_url": "https://chummer.run/table-pulse/receipts/live-and-aftermath.json",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "da820ad0483d956935303aa39c21c20e96c1138da8868c22cd96e2c3fdc0ad93",
+      "text_excerpt": "{\"horizon\":\"table_pulse\",\"status\":\"shipped_mvp\",\"separationStatus\":\"pass\",\"liveRail\":{\"status\":\"live\",\"notificationsHref\":\"/account/ledger/notifications\",\"reactionPostHref\":\"/account/ledger/notifications/table-pulse/react\",\"summary\":\"GM-controlled heat updates, remote reactions, ",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/propertyquarry",
+      "audience": "public",
+      "purpose": "product_surface",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/propertyquarry",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/propertyquarry",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "613033f7643c7eb08728c3f0b828374e2c831ae59232543fb0563bd126ce5d16",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>PROPERTYQUARRY \u00b7 Chummer</title> <meta name=\"description\" content=\"Spatially anchored property packets with 3",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
+    },
+    {
+      "path": "/propertyquarry/property-network",
+      "audience": "public",
+      "purpose": "product_surface_detail",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/propertyquarry",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/propertyquarry/property-network",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "f266831bf27009d5ff7cc1bf87a7be4161a2ad0ca05e7e6f1cf630b8e60199d7",
+      "text_excerpt": "{\"horizon\":\"propertyquarry\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"firstPropertyMarkdownHref\":\"/propertyquarry/properties/northbound-research-lab.md\",\"firstPropertyJsonHref\":\"/propertyquarry/properties/northbound-research-lab.json\",\"propertyCount\":3,\"summary\":\"Public PROPERTYQUAR",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/origin-dossier",
+      "audience": "public",
+      "purpose": "product_surface",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/origin-dossier",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/origin-dossier",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "de9139035c036cc234e2a215bb4fe0ee4644a650556c18ae382647fe35252938",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Origin Dossier \u00b7 Chummer</title> <meta name=\"description\" content=\"Story-first runner source, limited media, ",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/origin-dossier/story-network",
+      "audience": "public",
+      "purpose": "product_surface_detail",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/origin-dossier",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/origin-dossier/story-network",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "0a7223d39c708ef8310cb9715b5c5e98e3608e723fc57929c225c308943260df",
+      "text_excerpt": "{\"horizon\":\"origin-dossier\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"storyBookletHref\":\"/docs/origin-dossier-the-name-she-chose\",\"storyBookletPdfHref\":\"/docs/origin-dossier-the-name-she-chose/download.pdf\",\"mediaDispatchHref\":\"/origin-dossier/media\",\"bookStudioHref\":\"/docs/origin-b",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/participate/karma-forge/submitted/{submissionId}",
@@ -1123,7 +1973,14 @@
       "final_url": "https://chummer.run/participate/karma-forge",
       "redirect_location": null,
       "expectation": "controller contract contains [HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")] and resolves /participate/karma-forge",
-      "detail": "expected [HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs and /participate/karma-forge to resolve one of [200, 301, 302, 303, 307, 308], got 200"
+      "detail": "expected [HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs and /participate/karma-forge to resolve one of [200, 301, 302, 303, 307, 308], got 200",
+      "response_sha256": "c101d5c65e6460f53d0dbe74b0f771f6b2571ff78dc57858847f555c0f0bd6e3",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>KARMA FORGE \u00b7 Chummer</title> <meta name=\"description\" content=\"Chummer-owned intake for house-rule, campaign",
+      "critical_excerpt": null,
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/contact/submitted/{caseId}",
@@ -1141,7 +1998,14 @@
       "final_url": "https://chummer.run/contact",
       "redirect_location": null,
       "expectation": "controller contract contains [HttpGet(\"/contact/submitted/{caseId}\")] and resolves /contact",
-      "detail": "expected [HttpGet(\"/contact/submitted/{caseId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs and /contact to resolve one of [200, 301, 302, 303, 307, 308], got 200"
+      "detail": "expected [HttpGet(\"/contact/submitted/{caseId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs and /contact to resolve one of [200, 301, 302, 303, 307, 308], got 200",
+      "response_sha256": "2f9d3e9c4c1d37baa104cd1b5bc67352502d2dd6227d109b4e32ef17c53d1a40",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Contact \u00b7 Chummer</title> <meta name=\"description\" content=\"Discord first. Private form if needed.\" /> <meta ",
+      "critical_excerpt": null,
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/artifacts",
@@ -1159,7 +2023,14 @@
       "final_url": "https://chummer.run/artifacts",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "a0084cd039201c72f60b5ca5f54b90db86ab7af8d983b2769b6854ed00dade98",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Detail gallery \u00b7 Chummer</title> <meta name=\"description\" content=\"Detail surfaces, briefs, and clear outputs",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/artifacts/current-preview-build",
@@ -1177,7 +2048,14 @@
       "final_url": "https://chummer.run/artifacts/current-preview-build",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "df9ed9cf05a188e6569b0298bc02849479b2fa973f9174c28cd04f0164384973",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Current release build \u00b7 Chummer</title> <meta name=\"description\" content=\"A clear file detail page with curre",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/artifacts/mac-release-pipeline",
@@ -1195,7 +2073,14 @@
       "final_url": "https://chummer.run/artifacts/mac-release-pipeline",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "b416f3198d339139b2081cbe5907f02a7c300c47c5b94d4e7db67734994d216f",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Mac release pipeline \u00b7 Chummer</title> <meta name=\"description\" content=\"A clear file detail page with curren",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/downloads/release-upload/bootstrap.sh",
@@ -1213,7 +2098,14 @@
       "final_url": "https://chummer.run/downloads/release-upload/bootstrap.sh",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "769abd3b47be190cc9478633e18538822d4500de6dc01442ad7a301e7dbb038b",
+      "text_excerpt": "#!/usr/bin/env bash # Release-upload bootstrap defaults to GitHub main for the active repos; callers can still override refs or pin explicit commits via env. export CHUMMER_UI_REF='main' export CHUMMER_CORE_REF='main' export CHUMMER_HUB_REF='main' export CHUMMER_UI_KIT_REF='main'",
+      "critical_excerpt": null,
+      "cache_control": "private, no-store, max-age=0",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/artifacts/mac-codex-release-pipeline/readme.md",
@@ -1231,25 +2123,14 @@
       "final_url": "https://chummer.run/artifacts/mac-codex-release-pipeline/readme.md",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
-    },
-    {
-      "path": "/artifacts/explanation-receipt-trail",
-      "audience": "public",
-      "purpose": "artifact_detail",
-      "requires_auth": false,
-      "must_exist": true,
-      "guest_fallback": "/artifacts/explanation-receipt-trail",
-      "mode": "public_route",
-      "proof_class": "public_route",
-      "positive_proof": true,
-      "seeded_receipt": false,
-      "success": true,
-      "status_code": 200,
-      "final_url": "https://chummer.run/artifacts/explanation-receipt-trail",
-      "redirect_location": null,
-      "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "392eada972822bccead451203f455abf7337b230c207e0b0d6c389dadefc422b",
+      "text_excerpt": "# Mac Codex Release To chummer.run Purpose: let a Codex session running on a Mac build a public-ready desktop artifact, prove it, and promote it onto the live `chummer.run` downloads shelf through the new authenticated HTTP upload endpoint instead of manual server file copies. ##",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": "\"1dcf1045acff052\"",
+      "last_modified": "Sun, 31 May 2026 13:49:52 GMT",
+      "detection_hits": []
     },
     {
       "path": "/artifacts/runsite-pack",
@@ -1267,7 +2148,14 @@
       "final_url": "https://chummer.run/artifacts/runsite-pack",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "d86f036f6fe9eb38a8ea380ecc47c925d83c06e997aacdb137e5e788fadb0e2f",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Runsite pack \u00b7 Chummer</title> <meta name=\"description\" content=\"A clear file detail page with current status",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/artifacts/dossier-brief",
@@ -1285,7 +2173,14 @@
       "final_url": "https://chummer.run/artifacts/dossier-brief",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "b702133ba583fe4953e62a97040c3aa5ff009437aa3ce24cd71ac7219d15fdba",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Dossier brief \u00b7 Chummer</title> <meta name=\"description\" content=\"A clear file detail page with current statu",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/artifacts/campaign-primer",
@@ -1303,7 +2198,14 @@
       "final_url": "https://chummer.run/artifacts/campaign-primer",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "53d8146c14ca21f1cfd47f773e7e6bcb4d3d904090738a52e27bf2d64479d1df",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Campaign primer \u00b7 Chummer</title> <meta name=\"description\" content=\"A clear file detail page with current sta",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/artifacts/campaign-primer-video",
@@ -1321,7 +2223,14 @@
       "final_url": "https://chummer.run/artifacts/campaign-primer-video",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "1ee3a2040759adf39e818c1678eebea08731b4206098206c597a4c744d4ec046",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Campaign primer video \u00b7 Chummer</title> <meta name=\"description\" content=\"A clear file detail page with curre",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/artifacts/mission-brief-video",
@@ -1339,7 +2248,14 @@
       "final_url": "https://chummer.run/artifacts/mission-brief-video",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "d2bd4cd499c2c1bead997db50c6019d451cdf1dcb4c36541a563e4787ac49fdf",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Mission briefing video \u00b7 Chummer</title> <meta name=\"description\" content=\"A clear file detail page with curr",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/artifacts/replay-after-action",
@@ -1357,7 +2273,14 @@
       "final_url": "https://chummer.run/artifacts/replay-after-action",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "8afe974bf39396db27f08ae14417426250df07a1909e01696ec4f51f09ee7a0e",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Replay and after-action \u00b7 Chummer</title> <meta name=\"description\" content=\"A clear file detail page with cur",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger",
@@ -1375,7 +2298,14 @@
       "final_url": "https://chummer.run/ledger/map",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "60ead9d8abb14c781be08652eca1b4911ab3bae186c8be561d6d93ddefe849ea",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Black Ledger command map \u00b7 Chummer</title> <meta name=\"description\" content=\"Fictional campaign pressure, pac",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger/map",
@@ -1393,7 +2323,14 @@
       "final_url": "https://chummer.run/ledger/map",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "b7c3c6128ef85ed53486cdf08d35f9d5e826a9289176085c307a785347c898d5",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Black Ledger command map \u00b7 Chummer</title> <meta name=\"description\" content=\"Fictional campaign pressure, pac",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger/factions",
@@ -1411,7 +2348,14 @@
       "final_url": "https://chummer.run/ledger/factions",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "a91551b00d380ffb5fbc005c115144fedbaca38128c22cb70d6e2372ca54ba04",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Black Ledger factions &#xB7; Emerald Sprawl: First Pressure \u00b7 Chummer</title> <meta name=\"description\" conten",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger/factions/{factionId}",
@@ -1429,7 +2373,14 @@
       "final_url": "https://chummer.run/ledger/factions/ashline-circle",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "3f2fc4a882a1e9d543db6fe13fb70ed1bfc77702b3886a223a4fecb1100846f3",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Ashline Circle faction file \u00b7 Chummer</title> <meta name=\"description\" content=\"Fictional campaign pressure, ",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger/factions/{factionId}/promo",
@@ -1447,7 +2398,14 @@
       "final_url": "https://chummer.run/ledger/factions/ashline-circle/promo",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "23a4bd13b70dce8017e1d356227b0099d6aeae8fd66db5ad495bdfa3e5a7dffb",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Ashline Circle promo \u00b7 Chummer</title> <meta name=\"description\" content=\"Public-safe faction bulletin media w",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger/factions/{factionId}/promo.json",
@@ -1465,7 +2423,14 @@
       "final_url": "https://chummer.run/ledger/factions/ashline-circle/promo.json",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "ccfd3a1d95e10c462cce5b21c4a75545b6ff075f288d9cf2e2d4828dc875ca09",
+      "text_excerpt": "{\"factionId\":\"ashline-circle\",\"publicName\":\"Ashline Circle\",\"provider_status\":\"VERIFIED_PROVIDER\",\"render_mode\":\"verified_cinematic_faction_bulletin\",\"fallback_render_mode\":\"storyboard_fallback\",\"storyline_summary\":\"Ashline Circle now runs as a five-scene cinematic faction reel: ",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger/factions/{factionId}/promo.vtt",
@@ -1483,7 +2448,14 @@
       "final_url": "https://chummer.run/ledger/factions/ashline-circle/promo.vtt",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "98359bba14868090f1b8ce0ca77228b319f5cc77b2a19ff8317d441883322433",
+      "text_excerpt": "WEBVTT 1 00:00:00.000 --> 00:00:06.000 The nightly anchor warns that Ashline ritual authority is moving from rumor into visible force. 2 00:00:06.000 --> 00:00:12.000 An orkish correspondent stands at the edge of the ward ring as heat lifts and the crowd recoils. 3 00:00:12.000 -",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger/newsroom",
@@ -1501,7 +2473,14 @@
       "final_url": "https://chummer.run/ledger/newsroom/turn-2-newsreel",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "322b9bd4527487e80cf2015daefba8731c6e698b3d44e5fc3336f95c17b20c5e",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Black Ledger newsroom &#xB7; Turn 2 anchor package \u00b7 Chummer</title> <meta name=\"description\" content=\"Fictio",
+      "critical_excerpt": null,
+      "cache_control": "private, no-store, max-age=0",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger/newsroom/turn-1-newsreel",
@@ -1519,7 +2498,14 @@
       "final_url": "https://chummer.run/ledger/newsroom/turn-1-newsreel",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "1057f37924443470b20205c565fff7c4864076214f4f320a5d4e585a38725bdf",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Black Ledger newsroom &#xB7; Turn 1 anchor package \u00b7 Chummer</title> <meta name=\"description\" content=\"Fictio",
+      "critical_excerpt": null,
+      "cache_control": "private, no-store, max-age=0",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/ledger/newsroom/turn-1-newsreel/transcript",
@@ -1534,10 +2520,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/media/ledger/newsreels/turn-1-newsreel.vtt?v=1782107654",
+      "final_url": "https://chummer.run/media/ledger/newsreels/turn-1-newsreel.vtt?artifactAccess=Q2ZESjhCMmpSWm9CcmdCTGp0YVlmR0RsdDBUS0RlUHVybVdrcFBWWDdkRnRjQ3VDRC1EUWpCMXhfbFU1aHhhb1o5anJqSkdUTm4td0U4cUFWY3dPVHpIVTNQOXJDM3o4bXIycGxvRTB6ekQ3T1JsVFhwM2xmaDBWaTFLZlppU1dfTjBrVzlWWjhuczFJeWNLMlZ1RDdTdFVGLTFsc3R3ak8xaktmVW54R3ZUZW5hN2pXQURPaWNFR0ZQSklTWnA5eHBiUHZGbVUxLTBkTmFzQmtMSmdvZU5MREY0RUQzSHpUNUN5NEhOeC0wR0Fla1F4aFA4LUxiNEhURmYxMS1PcGhFYXhqdw",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "f0ab70ff2699a4789bfac6b02571a41831dbf9be0066a2ec059b73e659cde69c",
+      "text_excerpt": "WEBVTT 1 00:00:00.000 --> 00:00:06.744 Emerald Sprawl opens in Rust Bazaar. Debt heat is visible, Ashline is watching, and the board is no longer abstract. 2 00:00:06.744 --> 00:00:13.489 The city remembers who moved first, and where tomorrow's trouble begins. This is the first p",
+      "critical_excerpt": null,
+      "cache_control": "private, no-store, max-age=0",
+      "etag": "\"1dd020b8ded06a8\"",
+      "last_modified": "Mon, 22 Jun 2026 05:54:14 GMT",
+      "detection_hits": []
     },
     {
       "path": "/ledger/newsroom/turn-1-newsreel/receipts",
@@ -1555,7 +2548,14 @@
       "final_url": "https://chummer.run/ledger/newsroom/turn-1-newsreel/receipts",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "75d30c52d1f4f906c30bc112d1de21c0a238121cddfeffb2808929cb7f91431d",
+      "text_excerpt": "{\"worldId\":\"emerald-sprawl-prelude\",\"worldName\":\"Emerald Sprawl: First Pressure\",\"toTurn\":1,\"summary\":\"Turn 0 -> Turn 1 current turn details for the inbox/newsreel path.\",\"checks\":[\"Transition: Turn 0 -> Turn 1\",\"Turn record: ledger_tick_0001_preseeded\",\"Public-safe effects carri",
+      "critical_excerpt": null,
+      "cache_control": "private, no-store, max-age=0",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/now/concierge",
@@ -1573,7 +2573,14 @@
       "final_url": "https://chummer.run/now/concierge",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "a5cff78f01e9f44a05047d203bf0bf75897e3c99c0247df39c2aee8e52d3960c",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Detail what changed or get update help. \u00b7 Chummer</title> <meta name=\"description\" content=\"Short answers abo",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/downloads/concierge",
@@ -1591,7 +2598,14 @@
       "final_url": "https://chummer.run/downloads/concierge",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "c0b2c68a679881d317f94979835ab118bf7201c9800a8ab957975bfe380d2d4b",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Get Chummer installed. \u00b7 Chummer</title> <meta name=\"description\" content=\"Guided setup without extra noise.\"",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/packages",
@@ -1609,7 +2623,14 @@
       "final_url": "https://chummer.run/packages",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "2589a3ba9e6d5c4ec4fa9fba697ff5eda0942d4b1b12e0e7f1a0cde4aaa39e45",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Packages \u00b7 Chummer</title> <meta name=\"description\" content=\"Browse current Chummer downloads, rules data, ad",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/packages/{packageId}",
@@ -1627,7 +2648,14 @@
       "final_url": "https://chummer.run/packages/desktop-preview",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "32628059850bd10c9b0d2b251f0ab133efd98a6bff6b53aa97a6b750e98f6643",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Current desktop installer \u00b7 Chummer</title> <meta name=\"description\" content=\"The current desktop install pat",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/packages/{packageId}/vote",
@@ -1645,7 +2673,14 @@
       "final_url": "https://chummer.run/packages/desktop-preview#community-actions",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "32628059850bd10c9b0d2b251f0ab133efd98a6bff6b53aa97a6b750e98f6643",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Current desktop installer \u00b7 Chummer</title> <meta name=\"description\" content=\"The current desktop install pat",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/packages/{packageId}/follow",
@@ -1663,7 +2698,14 @@
       "final_url": "https://chummer.run/packages/desktop-preview#community-actions",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "32628059850bd10c9b0d2b251f0ab133efd98a6bff6b53aa97a6b750e98f6643",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Current desktop installer \u00b7 Chummer</title> <meta name=\"description\" content=\"The current desktop install pat",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/mobile",
@@ -1681,7 +2723,16 @@
       "final_url": "https://chummer.run/mobile",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "25f87ac7d5c1808ec30fa6315a80537e663f5563109aabea116da168dd9b6454",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Mobile and PWA entry \u00b7 Chummer</title> <meta name=\"description\" content=\"Phone, tablet, and installable play ",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/pwa",
@@ -1699,7 +2750,16 @@
       "final_url": "https://chummer.run/mobile",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "913f9ffa747336e15462a60b27e447b8f2cc76a2d396f79cff9a2337bbb66e2c",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Mobile and PWA entry \u00b7 Chummer</title> <meta name=\"description\" content=\"Phone, tablet, and installable play ",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/play",
@@ -1717,7 +2777,16 @@
       "final_url": "https://chummer.run/play",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "1eb2f1b64f0ae03650390edd5c6c22221da922e3120fe1253e63dd628e49a861",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Player entry \u00b7 Chummer</title> <meta name=\"description\" content=\"Role-aware mobile and tablet entry with reco",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/player",
@@ -1735,7 +2804,16 @@
       "final_url": "https://chummer.run/play?role=player",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "274797aabad43cde45e350eb8e85a6b262ec6fe3dad8103faa5f482941fd1cc6",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Player entry \u00b7 Chummer</title> <meta name=\"description\" content=\"Role-aware mobile and tablet entry with reco",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/gm",
@@ -1753,7 +2831,16 @@
       "final_url": "https://chummer.run/play?role=gm",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "c052fc5fef8e773f91fa313a301118bd87f51c71d0fa0d57d1c722b6b4a9f546",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>GM entry \u00b7 Chummer</title> <meta name=\"description\" content=\"Role-aware mobile and tablet entry with reconnec",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/observer",
@@ -1771,7 +2858,16 @@
       "final_url": "https://chummer.run/play?role=observer",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "74a853628d7d635e727a816137dc5c651e02f484cbeb8b3ad5c024f235e0f581",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Observer entry \u00b7 Chummer</title> <meta name=\"description\" content=\"Role-aware mobile and tablet entry with re",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/session",
@@ -1789,7 +2885,16 @@
       "final_url": "https://chummer.run/play",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "219dca7ea0c7a333cc7a02cdeb818a184ceabe8202f0cd6232b16fcf5c600925",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Player entry \u00b7 Chummer</title> <meta name=\"description\" content=\"Role-aware mobile and tablet entry with reco",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/contact/concierge",
@@ -1807,7 +2912,14 @@
       "final_url": "https://chummer.run/contact/concierge",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "f0602757fc27b8e5079c73867f6dd92b049226b981f527584217e572ba5c3a3a",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Pick the next step. \u00b7 Chummer</title> <meta name=\"description\" content=\"Choose the right support path before ",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/join/concierge",
@@ -1825,7 +2937,14 @@
       "final_url": "https://chummer.run/join/concierge",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "b12991a229c29b8d38a6fb00c6c6c38735fa9c8073f5a9c0a32f627c6cb6d66e",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Continue the invite, review the primer, or ask for session-zero help. \u00b7 Chummer</title> <meta name=\"descripti",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/join/primer",
@@ -1843,7 +2962,14 @@
       "final_url": "https://chummer.run/join/primer",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "92d3446782c7fda2bdaa810d7710cf0f66dce7ff109f55070e927d362b3e3cae",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Campaign primer \u00b7 Chummer</title> <meta name=\"description\" content=\"First-session orientation, expectations, ",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/roadmap/nexus-pan",
@@ -1861,7 +2987,16 @@
       "final_url": "https://chummer.run/play/continuity",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "60b631bede44c176d671ded5abccdf76f1c24e7014cdbed7544d2b1e22aba4f6",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>NEXUS-PAN continuity \u00b7 Chummer</title> <meta name=\"description\" content=\"Claimed installs, reconnect behavior",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/roadmap/knowledge-fabric",
@@ -1879,7 +3014,16 @@
       "final_url": "https://chummer.run/rules",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "04668d3be8ac77819d9a9db1403c2336380e821502ff255e9de8750cd503cc0a",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Knowledge Fabric \u00b7 Chummer</title> <meta name=\"description\" content=\"Source-aware explanations and readable h",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/roadmap/karma-forge",
@@ -1897,7 +3041,14 @@
       "final_url": "https://chummer.run/participate/karma-forge",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "2299bcbd62f09472fa69270a6b6ce38951a52b32d60132c28618b4b91def1d62",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>KARMA FORGE \u00b7 Chummer</title> <meta name=\"description\" content=\"Chummer-owned intake for house-rule, campaign",
+      "critical_excerpt": null,
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/roadmap/jackpoint",
@@ -1915,7 +3066,16 @@
       "final_url": "https://chummer.run/jackpoint",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "9eac210fb36eb9a2d9ee9aa534d2e36bbef1ad123b193204499753048b7a235c",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>JACKPOINT \u00b7 Chummer</title> <meta name=\"description\" content=\"Player-safe dossier cards, mission briefs, and ",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/roadmap/runsite",
@@ -1933,7 +3093,16 @@
       "final_url": "https://chummer.run/runsites",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "ed59389dfd8f35abfe7de65e0ae8626ee94be858e1a292d232afe9a17d89a15a",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>RUNSITE \u00b7 Chummer</title> <meta name=\"description\" content=\"Site cards, threat clocks, prep paths, and Chumme",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/roadmap/runbook-press",
@@ -1951,7 +3120,16 @@
       "final_url": "https://chummer.run/runbook",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "a00e141d889d9e53f3e15420ff634cbd5b8e554ac0d914deff9e45348bfe3c61",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>RUNBOOK PRESS \u00b7 Chummer</title> <meta name=\"description\" content=\"Printable primers and first-session onboard",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/roadmap/onramp",
@@ -1969,7 +3147,16 @@
       "final_url": "https://chummer.run/onramp",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "b203ef9cf9d35ffdd5868adf17dc17fbd6e35189ab1dcc4e1af7cb49efd27e58",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>ONRAMP \u00b7 Chummer</title> <meta name=\"description\" content=\"Guided first session, recovery status, and continu",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/roadmap/edition-studio",
@@ -1987,7 +3174,16 @@
       "final_url": "https://chummer.run/edition-studio",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "00c7cf0a5b8c9fc9da4243bcca9ecb8dba1e2aafb4fea773416f7c9e3bdc5825",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>EDITION STUDIO \u00b7 Chummer</title> <meta name=\"description\" content=\"Distinct SR4, SR5, and SR6 ruleset heads w",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/roadmap/community-hub",
@@ -2005,7 +3201,16 @@
       "final_url": "https://chummer.run/community",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "d1ee2a5e6f5eabb9351e9f75fa13b367afc4d6bea675d12be4df79b925797093",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Community Hub \u00b7 Chummer</title> <meta name=\"description\" content=\"Find open runs, understand the ground rules",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/roadmap/black-ledger",
@@ -2020,10 +3225,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/ledger/map",
+      "final_url": "https://chummer.run/horizons",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "0daa80785f218d0ecbce5b81ef1bf0bf3fa83351d96a4ff941a361cf4c7c023e",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Maintenance \u00b7 Chummer</title> <meta name=\"description\" content=\"Future work stays behind the main app.\" /> <m",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/roadmap/ghostwire",
@@ -2041,7 +3253,16 @@
       "final_url": "https://chummer.run/ghostwire",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "75acbdc48e3667e718fe4eae4afb209583c44f3c35a1f68863b82eac65b140b8",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>GHOSTWIRE \u00b7 Chummer</title> <meta name=\"description\" content=\"Replay timelines, after-action reports, and con",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/roadmap/local-co-processor",
@@ -2059,7 +3280,16 @@
       "final_url": "https://chummer.run/local-co-processor",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "945919544e5eb1b94448c3fd74a76a0749e77f3792daf069fc31a9c684200f3c",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>LOCAL CO-PROCESSOR \u00b7 Chummer</title> <meta name=\"description\" content=\"Optional local acceleration, explicit ",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
       "path": "/local-co-processor",
@@ -2077,12 +3307,21 @@
       "final_url": "https://chummer.run/local-co-processor",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "945919544e5eb1b94448c3fd74a76a0749e77f3792daf069fc31a9c684200f3c",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>LOCAL CO-PROCESSOR \u00b7 Chummer</title> <meta name=\"description\" content=\"Optional local acceleration, explicit ",
+      "critical_excerpt": "ss=\"settings-summary-row\"> <span>Release status</span> <strong>Passed &#xB7; Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable.</strong> </div> <div class=\"setti",
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": [
+        "missing or stale"
+      ]
     },
     {
-      "path": "/local-co-processor/receipts/optional-acceleration.json",
+      "path": "/local-co-processor/optional-acceleration",
       "audience": "public",
-      "purpose": "horizon_receipt",
+      "purpose": "horizon_detail",
       "requires_auth": false,
       "must_exist": true,
       "guest_fallback": "/local-co-processor",
@@ -2092,10 +3331,17 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "https://chummer.run/local-co-processor/receipts/optional-acceleration.json",
+      "final_url": "https://chummer.run/local-co-processor/optional-acceleration",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "3b269af4b745ab59be8fa9b24ae12ec4b50fe239f1cf01ba2758c2a0783836af",
+      "text_excerpt": "{\"horizon\":\"local_co_processor\",\"status\":\"shipped_mvp\",\"publicBoard\":{\"capabilityMatrixMarkdownHref\":\"/local-co-processor/packets/capability_matrix.md\",\"capabilityMatrixJsonHref\":\"/local-co-processor/packets/capability_matrix.json\",\"policyBoundaryMarkdownHref\":\"/local-co-processo",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/login",
@@ -2113,7 +3359,14 @@
       "final_url": "https://chummer.run/login",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "dedeba558933a965c2749eae2038ce984ed764d934e94fbed43c9c96699cc539",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Open Chummer \u00b7 Chummer</title> <meta name=\"description\" content=\"Email first. Google if you prefer.\" /> <meta",
+      "critical_excerpt": null,
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/signup",
@@ -2131,7 +3384,14 @@
       "final_url": "https://chummer.run/signup",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
-      "detail": "expected 200 from public route, got 200"
+      "detail": "expected 200 from public route, got 200",
+      "response_sha256": "77394f922d3f13362094a83e5e92f1c520a38c041de0be04dd185f5497fec58f",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Claim your copy \u00b7 Chummer</title> <meta name=\"description\" content=\"Claim this copy when you want installs, s",
+      "critical_excerpt": null,
+      "cache_control": "no-cache, no-store",
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/logout",
@@ -2149,7 +3409,14 @@
       "final_url": "https://chummer.run/logout",
       "redirect_location": "/",
       "expectation": "anonymous request redirects to /",
-      "detail": "expected anonymous redirect to /, got / (status 302)"
+      "detail": "expected anonymous redirect to /, got / (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/auth/email/start",
@@ -2167,7 +3434,14 @@
       "final_url": "https://chummer.run/auth/email/start",
       "redirect_location": null,
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
-      "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 405"
+      "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 405",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/auth/email/callback",
@@ -2185,7 +3459,14 @@
       "final_url": "https://chummer.run/auth/email/callback",
       "redirect_location": null,
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
-      "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 400"
+      "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 400",
+      "response_sha256": "668600b8d4e72e974958a2f98ce4f6ba670a0b86d25c97a05580633e8993dfc6",
+      "text_excerpt": "ticket is required.",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/auth/google/start",
@@ -2201,9 +3482,16 @@
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/auth/google/start",
-      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=b3Fdxs60MO4wqhogiFCN0gy9LExX2cFU&nonce=BK4o9Gn51_AtdGuPtY4nIGmL78n9-IH1&code_challenge=n41P6aV1wDNTm43sxAyGtU1vEQ58kPkNw2isSOeCBK4&code_challenge_method=S256&prompt=select_account",
+      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=NnQxUmZFHXm9XnuI2oU4G9ktJs6wkb45&nonce=esV-zHBDMbh_MUeCigdouLhA_PeRoGS7&code_challenge=rzZiM4gmuPkz8XTlNu1cQ3b_yUeaA31ekCVH4tFGIsc&code_challenge_method=S256&prompt=select_account",
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
-      "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 302"
+      "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 302",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/auth/google/callback",
@@ -2221,7 +3509,14 @@
       "final_url": "https://chummer.run/auth/google/callback",
       "redirect_location": null,
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
-      "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 200"
+      "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 200",
+      "response_sha256": "ca2f0af8326598d670606ba6acd935da54e59a7d91e39c89104d57f09029b503",
+      "text_excerpt": "<!doctype html> <html lang=\"en\" data-theme=\"hub-front-door\"> <head> <meta charset=\"utf-8\" /> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" /> <title>Google sign-in state was missing \u00b7 Chummer</title> <meta name=\"description\" content=\"Start the Google sign-in",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/home",
@@ -2239,7 +3534,14 @@
       "final_url": "https://chummer.run/home",
       "redirect_location": "/login?next=%2Fhome",
       "expectation": "anonymous request redirects to /login?next=/home",
-      "detail": "expected anonymous redirect to /login?next=/home, got /login?next=%2Fhome (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/home, got /login?next=%2Fhome (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/home/access",
@@ -2247,7 +3549,7 @@
       "purpose": "signed_in_dashboard",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/home/access",
+      "guest_fallback": "/account/access",
       "mode": "registered_fallback",
       "proof_class": "registered_fallback",
       "positive_proof": true,
@@ -2255,9 +3557,16 @@
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/home/access",
-      "redirect_location": "/login?next=%2Fhome%2Faccess",
-      "expectation": "anonymous request redirects to /login?next=/home/access",
-      "detail": "expected anonymous redirect to /login?next=/home/access, got /login?next=%2Fhome%2Faccess (status 302)"
+      "redirect_location": "/account/access",
+      "expectation": "anonymous request redirects to /account/access",
+      "detail": "expected anonymous redirect to /account/access, got /account/access (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/home/work",
@@ -2265,7 +3574,7 @@
       "purpose": "signed_in_dashboard",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/home/work",
+      "guest_fallback": "/account/work",
       "mode": "registered_fallback",
       "proof_class": "registered_fallback",
       "positive_proof": true,
@@ -2273,9 +3582,16 @@
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/home/work",
-      "redirect_location": "/login?next=%2Fhome%2Fwork",
-      "expectation": "anonymous request redirects to /login?next=/home/work",
-      "detail": "expected anonymous redirect to /login?next=/home/work, got /login?next=%2Fhome%2Fwork (status 302)"
+      "redirect_location": "/account/work",
+      "expectation": "anonymous request redirects to /account/work",
+      "detail": "expected anonymous redirect to /account/work, got /account/work (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/home/setup",
@@ -2293,7 +3609,14 @@
       "final_url": "https://chummer.run/home/setup",
       "redirect_location": "/login?next=%2Fhome%2Fsetup",
       "expectation": "anonymous request redirects to /login?next=/home/setup",
-      "detail": "expected anonymous redirect to /login?next=/home/setup, got /login?next=%2Fhome%2Fsetup (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/home/setup, got /login?next=%2Fhome%2Fsetup (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account",
@@ -2301,7 +3624,7 @@
       "purpose": "profile_and_preferences",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/account",
+      "guest_fallback": "/account/access",
       "mode": "registered_fallback",
       "proof_class": "registered_fallback",
       "positive_proof": true,
@@ -2309,9 +3632,16 @@
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/account",
-      "redirect_location": "/login?next=%2Faccount",
-      "expectation": "anonymous request redirects to /login?next=/account",
-      "detail": "expected anonymous redirect to /login?next=/account, got /login?next=%2Faccount (status 302)"
+      "redirect_location": "/account/access",
+      "expectation": "anonymous request redirects to /account/access",
+      "detail": "expected anonymous redirect to /account/access, got /account/access (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/support",
@@ -2329,7 +3659,14 @@
       "final_url": "https://chummer.run/account/support",
       "redirect_location": "/login?next=%2Faccount%2Fsupport",
       "expectation": "anonymous request redirects to /login?next=/account/support",
-      "detail": "expected anonymous redirect to /login?next=/account/support, got /login?next=%2Faccount%2Fsupport (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/support, got /login?next=%2Faccount%2Fsupport (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/access",
@@ -2347,7 +3684,14 @@
       "final_url": "https://chummer.run/account/access",
       "redirect_location": "/login?next=%2Faccount%2Faccess",
       "expectation": "anonymous request redirects to /login?next=/account/access",
-      "detail": "expected anonymous redirect to /login?next=/account/access, got /login?next=%2Faccount%2Faccess (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/access, got /login?next=%2Faccount%2Faccess (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/work",
@@ -2365,7 +3709,14 @@
       "final_url": "https://chummer.run/account/work",
       "redirect_location": "/login?next=%2Faccount%2Fwork",
       "expectation": "anonymous request redirects to /login?next=/account/work",
-      "detail": "expected anonymous redirect to /login?next=/account/work, got /login?next=%2Faccount%2Fwork (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/work, got /login?next=%2Faccount%2Fwork (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/alice",
@@ -2383,7 +3734,14 @@
       "final_url": "https://chummer.run/account/alice",
       "redirect_location": "/login?next=%2Faccount%2Falice",
       "expectation": "anonymous request redirects to /login?next=/account/alice",
-      "detail": "expected anonymous redirect to /login?next=/account/alice, got /login?next=%2Faccount%2Falice (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/alice, got /login?next=%2Faccount%2Falice (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/alice/{handoffId}",
@@ -2401,7 +3759,89 @@
       "final_url": "https://chummer.run/account/alice/sample-handoffid",
       "redirect_location": "/login?next=%2Faccount%2Falice%2Fsample-handoffid",
       "expectation": "anonymous request redirects to /login?next=/account/alice/sample-handoffid",
-      "detail": "expected anonymous redirect to /login?next=/account/alice/sample-handoffid, got /login?next=%2Faccount%2Falice%2Fsample-handoffid (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/alice/sample-handoffid, got /login?next=%2Faccount%2Falice%2Fsample-handoffid (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/account/propertyquarry",
+      "audience": "registered",
+      "purpose": "signed_in_horizon",
+      "requires_auth": true,
+      "must_exist": true,
+      "guest_fallback": "/login?next=/account/propertyquarry",
+      "mode": "registered_fallback",
+      "proof_class": "registered_fallback",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 302,
+      "final_url": "https://chummer.run/account/propertyquarry",
+      "redirect_location": "/login?next=%2Faccount%2Fpropertyquarry",
+      "expectation": "anonymous request redirects to /login?next=/account/propertyquarry",
+      "detail": "expected anonymous redirect to /login?next=/account/propertyquarry, got /login?next=%2Faccount%2Fpropertyquarry (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/account/propertyquarry/open",
+      "audience": "registered",
+      "purpose": "signed_in_horizon",
+      "requires_auth": true,
+      "must_exist": true,
+      "guest_fallback": "/login?next=/account/propertyquarry/open",
+      "mode": "registered_fallback",
+      "proof_class": "registered_fallback",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 302,
+      "final_url": "https://chummer.run/account/propertyquarry/open",
+      "redirect_location": "/login?next=%2Faccount%2Fpropertyquarry%2Fopen",
+      "expectation": "anonymous request redirects to /login?next=/account/propertyquarry/open",
+      "detail": "expected anonymous redirect to /login?next=/account/propertyquarry/open, got /login?next=%2Faccount%2Fpropertyquarry%2Fopen (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
+    },
+    {
+      "path": "/account/propertyquarry/{propertyId}",
+      "audience": "registered",
+      "purpose": "signed_in_horizon",
+      "requires_auth": true,
+      "must_exist": true,
+      "guest_fallback": "/login?next=/account/propertyquarry/{propertyId}",
+      "mode": "registered_fallback",
+      "proof_class": "registered_fallback",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 302,
+      "final_url": "https://chummer.run/account/propertyquarry/sample-propertyid",
+      "redirect_location": "/login?next=%2Faccount%2Fpropertyquarry%2Fsample-propertyid",
+      "expectation": "anonymous request redirects to /login?next=/account/propertyquarry/sample-propertyid",
+      "detail": "expected anonymous redirect to /login?next=/account/propertyquarry/sample-propertyid, got /login?next=%2Faccount%2Fpropertyquarry%2Fsample-propertyid (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/community",
@@ -2419,7 +3859,14 @@
       "final_url": "https://chummer.run/account/community",
       "redirect_location": "/login?next=%2Faccount%2Fcommunity",
       "expectation": "anonymous request redirects to /login?next=/account/community",
-      "detail": "expected anonymous redirect to /login?next=/account/community, got /login?next=%2Faccount%2Fcommunity (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/community, got /login?next=%2Faccount%2Fcommunity (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/creator",
@@ -2437,7 +3884,14 @@
       "final_url": "https://chummer.run/account/creator",
       "redirect_location": "/login?next=%2Faccount%2Fcreator",
       "expectation": "anonymous request redirects to /login?next=/account/creator",
-      "detail": "expected anonymous redirect to /login?next=/account/creator, got /login?next=%2Faccount%2Fcreator (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/creator, got /login?next=%2Faccount%2Fcreator (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/creator/{publicationId}",
@@ -2455,7 +3909,14 @@
       "final_url": "https://chummer.run/account/creator/sample-publicationid",
       "redirect_location": "/login?next=%2Faccount%2Fcreator%2Fsample-publicationid",
       "expectation": "anonymous request redirects to /login?next=/account/creator/sample-publicationid",
-      "detail": "expected anonymous redirect to /login?next=/account/creator/sample-publicationid, got /login?next=%2Faccount%2Fcreator%2Fsample-publicationid (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/creator/sample-publicationid, got /login?next=%2Faccount%2Fcreator%2Fsample-publicationid (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/jackpoint",
@@ -2473,7 +3934,14 @@
       "final_url": "https://chummer.run/account/jackpoint",
       "redirect_location": "/login?next=%2Faccount%2Fjackpoint",
       "expectation": "anonymous request redirects to /login?next=/account/jackpoint",
-      "detail": "expected anonymous redirect to /login?next=/account/jackpoint, got /login?next=%2Faccount%2Fjackpoint (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/jackpoint, got /login?next=%2Faccount%2Fjackpoint (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/jackpoint/open",
@@ -2491,7 +3959,14 @@
       "final_url": "https://chummer.run/account/jackpoint/open",
       "redirect_location": "/login?next=%2Faccount%2Fjackpoint%2Fopen",
       "expectation": "anonymous request redirects to /login?next=/account/jackpoint/open",
-      "detail": "expected anonymous redirect to /login?next=/account/jackpoint/open, got /login?next=%2Faccount%2Fjackpoint%2Fopen (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/jackpoint/open, got /login?next=%2Faccount%2Fjackpoint%2Fopen (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/jackpoint/{publicationId}",
@@ -2509,7 +3984,14 @@
       "final_url": "https://chummer.run/account/jackpoint/sample-publicationid",
       "redirect_location": "/login?next=%2Faccount%2Fjackpoint%2Fsample-publicationid",
       "expectation": "anonymous request redirects to /login?next=/account/jackpoint/sample-publicationid",
-      "detail": "expected anonymous redirect to /login?next=/account/jackpoint/sample-publicationid, got /login?next=%2Faccount%2Fjackpoint%2Fsample-publicationid (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/jackpoint/sample-publicationid, got /login?next=%2Faccount%2Fjackpoint%2Fsample-publicationid (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/runsites",
@@ -2527,7 +4009,14 @@
       "final_url": "https://chummer.run/account/runsites",
       "redirect_location": "/login?next=%2Faccount%2Frunsites",
       "expectation": "anonymous request redirects to /login?next=/account/runsites",
-      "detail": "expected anonymous redirect to /login?next=/account/runsites, got /login?next=%2Faccount%2Frunsites (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/runsites, got /login?next=%2Faccount%2Frunsites (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/runsites/open",
@@ -2545,7 +4034,14 @@
       "final_url": "https://chummer.run/account/runsites/open",
       "redirect_location": "/login?next=%2Faccount%2Frunsites%2Fopen",
       "expectation": "anonymous request redirects to /login?next=/account/runsites/open",
-      "detail": "expected anonymous redirect to /login?next=/account/runsites/open, got /login?next=%2Faccount%2Frunsites%2Fopen (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/runsites/open, got /login?next=%2Faccount%2Frunsites%2Fopen (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/runsites/{workspaceId}",
@@ -2563,7 +4059,14 @@
       "final_url": "https://chummer.run/account/runsites/sample-workspaceid",
       "redirect_location": "/login?next=%2Faccount%2Frunsites%2Fsample-workspaceid",
       "expectation": "anonymous request redirects to /login?next=/account/runsites/sample-workspaceid",
-      "detail": "expected anonymous redirect to /login?next=/account/runsites/sample-workspaceid, got /login?next=%2Faccount%2Frunsites%2Fsample-workspaceid (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/runsites/sample-workspaceid, got /login?next=%2Faccount%2Frunsites%2Fsample-workspaceid (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/run-control",
@@ -2581,7 +4084,14 @@
       "final_url": "https://chummer.run/account/run-control",
       "redirect_location": "/login?next=%2Faccount%2Frun-control",
       "expectation": "anonymous request redirects to /login?next=/account/run-control",
-      "detail": "expected anonymous redirect to /login?next=/account/run-control, got /login?next=%2Faccount%2Frun-control (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/run-control, got /login?next=%2Faccount%2Frun-control (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/run-control/open",
@@ -2599,7 +4109,14 @@
       "final_url": "https://chummer.run/account/run-control/open",
       "redirect_location": "/login?next=%2Faccount%2Frun-control%2Fopen",
       "expectation": "anonymous request redirects to /login?next=/account/run-control/open",
-      "detail": "expected anonymous redirect to /login?next=/account/run-control/open, got /login?next=%2Faccount%2Frun-control%2Fopen (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/run-control/open, got /login?next=%2Faccount%2Frun-control%2Fopen (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/run-control/{runId}",
@@ -2617,7 +4134,14 @@
       "final_url": "https://chummer.run/account/run-control/sample-runid",
       "redirect_location": "/login?next=%2Faccount%2Frun-control%2Fsample-runid",
       "expectation": "anonymous request redirects to /login?next=/account/run-control/sample-runid",
-      "detail": "expected anonymous redirect to /login?next=/account/run-control/sample-runid, got /login?next=%2Faccount%2Frun-control%2Fsample-runid (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/run-control/sample-runid, got /login?next=%2Faccount%2Frun-control%2Fsample-runid (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/onramp",
@@ -2635,7 +4159,14 @@
       "final_url": "https://chummer.run/account/onramp",
       "redirect_location": "/login?next=%2Faccount%2Fonramp",
       "expectation": "anonymous request redirects to /login?next=/account/onramp",
-      "detail": "expected anonymous redirect to /login?next=/account/onramp, got /login?next=%2Faccount%2Fonramp (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/onramp, got /login?next=%2Faccount%2Fonramp (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/onramp/open",
@@ -2653,7 +4184,14 @@
       "final_url": "https://chummer.run/account/onramp/open",
       "redirect_location": "/login?next=%2Faccount%2Fonramp%2Fopen",
       "expectation": "anonymous request redirects to /login?next=/account/onramp/open",
-      "detail": "expected anonymous redirect to /login?next=/account/onramp/open, got /login?next=%2Faccount%2Fonramp%2Fopen (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/onramp/open, got /login?next=%2Faccount%2Fonramp%2Fopen (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/onramp/starter",
@@ -2671,7 +4209,14 @@
       "final_url": "https://chummer.run/account/onramp/starter",
       "redirect_location": "/login?next=%2Faccount%2Fonramp%2Fstarter",
       "expectation": "anonymous request redirects to /login?next=/account/onramp/starter",
-      "detail": "expected anonymous redirect to /login?next=/account/onramp/starter, got /login?next=%2Faccount%2Fonramp%2Fstarter (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/onramp/starter, got /login?next=%2Faccount%2Fonramp%2Fstarter (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/edition-studio",
@@ -2689,7 +4234,14 @@
       "final_url": "https://chummer.run/account/edition-studio",
       "redirect_location": "/login?next=%2Faccount%2Fedition-studio",
       "expectation": "anonymous request redirects to /login?next=/account/edition-studio",
-      "detail": "expected anonymous redirect to /login?next=/account/edition-studio, got /login?next=%2Faccount%2Fedition-studio (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/edition-studio, got /login?next=%2Faccount%2Fedition-studio (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/edition-studio/open",
@@ -2707,7 +4259,14 @@
       "final_url": "https://chummer.run/account/edition-studio/open",
       "redirect_location": "/login?next=%2Faccount%2Fedition-studio%2Fopen",
       "expectation": "anonymous request redirects to /login?next=/account/edition-studio/open",
-      "detail": "expected anonymous redirect to /login?next=/account/edition-studio/open, got /login?next=%2Faccount%2Fedition-studio%2Fopen (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/edition-studio/open, got /login?next=%2Faccount%2Fedition-studio%2Fopen (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/edition-studio/{edition}",
@@ -2725,7 +4284,14 @@
       "final_url": "https://chummer.run/account/edition-studio/sample-edition",
       "redirect_location": "/login?next=%2Faccount%2Fedition-studio%2Fsample-edition",
       "expectation": "anonymous request redirects to /login?next=/account/edition-studio/sample-edition",
-      "detail": "expected anonymous redirect to /login?next=/account/edition-studio/sample-edition, got /login?next=%2Faccount%2Fedition-studio%2Fsample-edition (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/edition-studio/sample-edition, got /login?next=%2Faccount%2Fedition-studio%2Fsample-edition (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/passport",
@@ -2743,7 +4309,14 @@
       "final_url": "https://chummer.run/account/passport",
       "redirect_location": "/login?next=%2Faccount%2Fpassport",
       "expectation": "anonymous request redirects to /login?next=/account/passport",
-      "detail": "expected anonymous redirect to /login?next=/account/passport, got /login?next=%2Faccount%2Fpassport (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/passport, got /login?next=%2Faccount%2Fpassport (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/passport/open",
@@ -2761,7 +4334,14 @@
       "final_url": "https://chummer.run/account/passport/open",
       "redirect_location": "/login?next=%2Faccount%2Fpassport%2Fopen",
       "expectation": "anonymous request redirects to /login?next=/account/passport/open",
-      "detail": "expected anonymous redirect to /login?next=/account/passport/open, got /login?next=%2Faccount%2Fpassport%2Fopen (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/passport/open, got /login?next=%2Faccount%2Fpassport%2Fopen (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/quicksilver",
@@ -2779,7 +4359,14 @@
       "final_url": "https://chummer.run/account/quicksilver",
       "redirect_location": "/login?next=%2Faccount%2Fquicksilver",
       "expectation": "anonymous request redirects to /login?next=/account/quicksilver",
-      "detail": "expected anonymous redirect to /login?next=/account/quicksilver, got /login?next=%2Faccount%2Fquicksilver (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/quicksilver, got /login?next=%2Faccount%2Fquicksilver (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/quicksilver/open",
@@ -2797,7 +4384,14 @@
       "final_url": "https://chummer.run/account/quicksilver/open",
       "redirect_location": "/login?next=%2Faccount%2Fquicksilver%2Fopen",
       "expectation": "anonymous request redirects to /login?next=/account/quicksilver/open",
-      "detail": "expected anonymous redirect to /login?next=/account/quicksilver/open, got /login?next=%2Faccount%2Fquicksilver%2Fopen (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/quicksilver/open, got /login?next=%2Faccount%2Fquicksilver%2Fopen (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/quicksilver/{focus}",
@@ -2815,7 +4409,14 @@
       "final_url": "https://chummer.run/account/quicksilver/sample-focus",
       "redirect_location": "/login?next=%2Faccount%2Fquicksilver%2Fsample-focus",
       "expectation": "anonymous request redirects to /login?next=/account/quicksilver/sample-focus",
-      "detail": "expected anonymous redirect to /login?next=/account/quicksilver/sample-focus, got /login?next=%2Faccount%2Fquicksilver%2Fsample-focus (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/quicksilver/sample-focus, got /login?next=%2Faccount%2Fquicksilver%2Fsample-focus (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/local-co-processor",
@@ -2833,7 +4434,14 @@
       "final_url": "https://chummer.run/account/local-co-processor",
       "redirect_location": "/login?next=%2Faccount%2Flocal-co-processor",
       "expectation": "anonymous request redirects to /login?next=/account/local-co-processor",
-      "detail": "expected anonymous redirect to /login?next=/account/local-co-processor, got /login?next=%2Faccount%2Flocal-co-processor (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/local-co-processor, got /login?next=%2Faccount%2Flocal-co-processor (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/local-co-processor/open",
@@ -2851,7 +4459,14 @@
       "final_url": "https://chummer.run/account/local-co-processor/open",
       "redirect_location": "/login?next=%2Faccount%2Flocal-co-processor%2Fopen",
       "expectation": "anonymous request redirects to /login?next=/account/local-co-processor/open",
-      "detail": "expected anonymous redirect to /login?next=/account/local-co-processor/open, got /login?next=%2Faccount%2Flocal-co-processor%2Fopen (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/local-co-processor/open, got /login?next=%2Faccount%2Flocal-co-processor%2Fopen (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/local-co-processor/{profile}",
@@ -2869,7 +4484,14 @@
       "final_url": "https://chummer.run/account/local-co-processor/sample-profile",
       "redirect_location": "/login?next=%2Faccount%2Flocal-co-processor%2Fsample-profile",
       "expectation": "anonymous request redirects to /login?next=/account/local-co-processor/sample-profile",
-      "detail": "expected anonymous redirect to /login?next=/account/local-co-processor/sample-profile, got /login?next=%2Faccount%2Flocal-co-processor%2Fsample-profile (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/local-co-processor/sample-profile, got /login?next=%2Faccount%2Flocal-co-processor%2Fsample-profile (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/settings",
@@ -2887,7 +4509,14 @@
       "final_url": "https://chummer.run/account/settings",
       "redirect_location": "/login?next=%2Faccount%2Fsettings",
       "expectation": "anonymous request redirects to /login?next=/account/settings",
-      "detail": "expected anonymous redirect to /login?next=/account/settings, got /login?next=%2Faccount%2Fsettings (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/settings, got /login?next=%2Faccount%2Fsettings (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/participation",
@@ -2905,7 +4534,14 @@
       "final_url": "https://chummer.run/account/participation",
       "redirect_location": "/login?next=%2Faccount%2Fparticipation",
       "expectation": "anonymous request redirects to /login?next=/account/participation",
-      "detail": "expected anonymous redirect to /login?next=/account/participation, got /login?next=%2Faccount%2Fparticipation (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/participation, got /login?next=%2Faccount%2Fparticipation (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/advanced",
@@ -2913,7 +4549,7 @@
       "purpose": "profile_and_preferences",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/account/advanced",
+      "guest_fallback": "/account/settings",
       "mode": "registered_fallback",
       "proof_class": "registered_fallback",
       "positive_proof": true,
@@ -2921,9 +4557,16 @@
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/account/advanced",
-      "redirect_location": "/login?next=%2Faccount%2Fadvanced",
-      "expectation": "anonymous request redirects to /login?next=/account/advanced",
-      "detail": "expected anonymous redirect to /login?next=/account/advanced, got /login?next=%2Faccount%2Fadvanced (status 302)"
+      "redirect_location": "/account/settings",
+      "expectation": "anonymous request redirects to /account/settings",
+      "detail": "expected anonymous redirect to /account/settings, got /account/settings (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/participate/codex",
@@ -2941,7 +4584,14 @@
       "final_url": "https://chummer.run/participate/codex",
       "redirect_location": "/login?next=%2Fparticipate%2Fcodex",
       "expectation": "anonymous request redirects to /login?next=/participate/codex",
-      "detail": "expected anonymous redirect to /login?next=/participate/codex, got /login?next=%2Fparticipate%2Fcodex (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/participate/codex, got /login?next=%2Fparticipate%2Fcodex (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/packages",
@@ -2959,7 +4609,14 @@
       "final_url": "https://chummer.run/account/packages",
       "redirect_location": "/login?next=%2Faccount%2Fpackages",
       "expectation": "anonymous request redirects to /login?next=/account/packages",
-      "detail": "expected anonymous redirect to /login?next=/account/packages, got /login?next=%2Faccount%2Fpackages (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/packages, got /login?next=%2Faccount%2Fpackages (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/account/packages/{packageId}",
@@ -2977,7 +4634,14 @@
       "final_url": "https://chummer.run/account/packages/desktop-preview",
       "redirect_location": "/login?next=%2Faccount%2Fpackages%2Fdesktop-preview",
       "expectation": "anonymous request redirects to /login?next=/account/packages/desktop-preview",
-      "detail": "expected anonymous redirect to /login?next=/account/packages/desktop-preview, got /login?next=%2Faccount%2Fpackages%2Fdesktop-preview (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/account/packages/desktop-preview, got /login?next=%2Faccount%2Fpackages%2Fdesktop-preview (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     },
     {
       "path": "/admin/packages",
@@ -2995,7 +4659,14 @@
       "final_url": "https://chummer.run/admin/packages",
       "redirect_location": "/login?next=%2Fadmin%2Fpackages",
       "expectation": "anonymous request redirects to /login?next=/admin/packages",
-      "detail": "expected anonymous redirect to /login?next=/admin/packages, got /login?next=%2Fadmin%2Fpackages (status 302)"
+      "detail": "expected anonymous redirect to /login?next=/admin/packages, got /login?next=%2Fadmin%2Fpackages (status 302)",
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "text_excerpt": "",
+      "critical_excerpt": null,
+      "cache_control": null,
+      "etag": null,
+      "last_modified": null,
+      "detection_hits": []
     }
   ],
   "negative_paths": [
