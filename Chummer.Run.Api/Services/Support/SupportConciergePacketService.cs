@@ -213,7 +213,7 @@ public sealed class SupportConciergePacketService
             "/account/access",
             "/api/v1/install-linking/continuation",
             "/api/v1/install-linking/continuation/support",
-            "/contact#support-intake",
+            "/contact",
             "/downloads"
         ];
 

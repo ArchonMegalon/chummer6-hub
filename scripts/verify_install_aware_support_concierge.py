@@ -106,7 +106,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "support_case+claimed_install",
         '"/api/v1/support/cases/{Uri.EscapeDataString(supportCase.CaseId)}/concierge"',
         '"/api/v1/install-linking/continuation/support"',
-        '"/contact#support-intake"',
+        '"/contact"',
         'route.StartsWith("/contact", StringComparison.OrdinalIgnoreCase)',
         "public sealed record InstallAwareSupportConciergePacket(",
         "public sealed record InstallAwareBuildTruth(",

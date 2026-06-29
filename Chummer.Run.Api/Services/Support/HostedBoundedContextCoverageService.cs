@@ -246,7 +246,7 @@ public sealed class HostedBoundedContextCoverageService
             ProjectionId: StableId("hosted-bounded-context-support", supportCase?.CaseId ?? manifest.Version),
             SurfaceId: "support_context",
             Route: route,
-            ComparisonRoute: "/contact#support-intake",
+            ComparisonRoute: "/contact",
             BoundaryOwner: "control_and_support_context",
             DecisionAuthority: "support_case_and_privacy_bounded_status",
             ReleaseChannel: manifest.Channel,
@@ -257,15 +257,15 @@ public sealed class HostedBoundedContextCoverageService
             EvidenceLines:
             [
                 supportCase is null
-                    ? "No support case exists yet, so first-party support intake remains the only safe support route."
+                    ? "No support case exists yet, so Contact remains the safe public route."
                     : $"Support case {supportCase.CaseId} currently reports {supportCase.Status} on the account support page.",
                 "Support status, crash routing, and reporter followthrough stay first-party and privacy-bounded instead of becoming public folklore.",
-                "/contact#support-intake is the public comparison route when a user needs first-party intake before a support case exists."
+                "/contact is the public comparison route when a user needs help before a support case exists."
             ],
             Actions:
             [
                 new HostedBoundedContextCoverageActionProjection("open_account_support", "Open account support", route, "Inspect signed-in support status."),
-                new HostedBoundedContextCoverageActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Compare signed-in support status with first-party intake."),
+                new HostedBoundedContextCoverageActionProjection("open_contact", "Open contact", "/contact", "Compare account support status with the public contact path."),
                 new HostedBoundedContextCoverageActionProjection("open_privacy", "Open privacy", "/privacy", "Inspect the privacy boundary that keeps raw diagnostics out of the wrong context.")
             ],
             EmittedAtUtc: now,

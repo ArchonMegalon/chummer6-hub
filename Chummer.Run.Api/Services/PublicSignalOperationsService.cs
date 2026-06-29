@@ -4984,7 +4984,7 @@ public sealed class PublicSignalOperationsService
         }
 
         return configuredCount == 0
-            ? "No hosted public-board routes are configured here yet, so the Chummer feedback page, roadmap, and changelog stay authoritative for public navigation."
+            ? "No hosted public-board routes are configured here yet, so Participate, roadmap, and changelog stay authoritative for public navigation."
             : $"{configuredCount} of {ProductLiftRoutePaths.Length} hosted public-board routes are configured. Promotion stays blocked until the full domain split is complete and consistent.";
     }
 

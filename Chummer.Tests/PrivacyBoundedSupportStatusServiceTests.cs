@@ -172,13 +172,15 @@ public sealed class PrivacyBoundedSupportStatusServiceTests
 
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "support_status", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "crash_status", StringComparison.Ordinal) && string.Equals(item.Route, "/api/v1/support/crashes/work-items", StringComparison.Ordinal));
-            Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "feedback_status", StringComparison.Ordinal) && string.Equals(item.Route, "/feedback", StringComparison.Ordinal));
+            Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "feedback_status", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "telemetry_rollup", StringComparison.Ordinal) && string.Equals(item.Route, "/progress", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "retention_clocks", StringComparison.Ordinal) && string.Equals(item.Route, "/privacy", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "case_status_followthrough", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal));
             string publicProjectionText = JsonSerializer.Serialize(bundle, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             Assert.Contains("account support page", publicProjectionText, StringComparison.Ordinal);
-            Assert.Contains("first-party feedback path", publicProjectionText, StringComparison.Ordinal);
+            Assert.Contains("public feedback path", publicProjectionText, StringComparison.Ordinal);
+            Assert.DoesNotContain("/contact#support-intake", publicProjectionText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Open support intake", publicProjectionText, StringComparison.Ordinal);
             Assert.DoesNotContain("support account rail", publicProjectionText, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("feedback lane", publicProjectionText, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("governed Participate lane", publicProjectionText, StringComparison.OrdinalIgnoreCase);

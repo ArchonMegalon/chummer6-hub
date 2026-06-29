@@ -229,7 +229,7 @@ public sealed class RegistryTruthBindingService
             BindingId: StableId("registry-truth-support-recovery", manifest.Version),
             SurfaceId: "support_recovery",
             Route: "/api/v1/install-linking/continuation/support",
-            ComparisonRoute: "/contact#support-intake",
+            ComparisonRoute: "/contact",
             RegistrySource: ResolveRegistrySource(manifest),
             ReleaseChannel: manifest.Channel,
             ReleaseVersion: manifest.Version,
@@ -246,7 +246,7 @@ public sealed class RegistryTruthBindingService
             Actions:
             [
                 new RegistryTruthBindingActionProjection("open_support_continuation", "Open support continuation", "/api/v1/install-linking/continuation/support", "Start first-party support recovery with install identity attached."),
-                new RegistryTruthBindingActionProjection("open_contact", "Open support intake", "/contact#support-intake", "Escalate into Chummer support when the linked copy cannot resolve the issue."),
+                new RegistryTruthBindingActionProjection("open_contact", "Open contact", "/contact", "Use Contact when the linked copy cannot resolve the issue."),
                 new RegistryTruthBindingActionProjection("open_downloads", "Open downloads", string.IsNullOrWhiteSpace(artifact?.Id) ? "/downloads" : $"/downloads/install/{Uri.EscapeDataString(artifact!.Id)}", "Compare support recovery with the promoted installer.")
             ],
             EmittedAtUtc: now,

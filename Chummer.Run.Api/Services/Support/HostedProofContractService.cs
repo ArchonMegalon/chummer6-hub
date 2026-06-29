@@ -166,7 +166,7 @@ public sealed class HostedProofContractService
             [
                 new HostedProofContractActionProjection("open_signal_intake", "Open Participate", route, "Review the intake page that classifies public signal before queue synthesis."),
                 new HostedProofContractActionProjection("open_roadmap_projection", "Open roadmap projection", comparisonRoute, "Compare the public signal with the reviewed roadmap projection."),
-                new HostedProofContractActionProjection("open_support_intake", "Open support intake", support?.Route ?? "/contact", "Escalate private or release-bound issues through first-party support instead of public comments.")
+                new HostedProofContractActionProjection("open_contact", "Open contact", support?.Route ?? "/contact", "Use Contact for private or release-bound issues instead of public comments.")
             ],
             EmittedAtUtc: now,
             Locale: context.Locale,

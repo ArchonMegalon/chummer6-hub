@@ -432,9 +432,9 @@ public sealed class PublicPackageCatalogService
                     "Follow records are Chummer-owned and should not leak external board or maintainer tooling names.",
                     "Research status must remain honest even when interest is high."
                 ],
-                "The public participate and feedback pages already separate safe public signal from private support and install work.",
-                "Open feedback",
-                "/feedback",
+                "Participate already separates safe public signal from contact, installs, and account work.",
+                "Open Participate",
+                "/participate",
                 "Account package tracking keeps your follows and votes on the same account page as support and continuity.",
                 "Treat this package as a reviewed proposal surface with clear moderation and compatibility status.")
         ];

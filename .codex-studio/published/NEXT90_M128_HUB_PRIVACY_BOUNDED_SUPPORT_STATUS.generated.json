@@ -26,7 +26,7 @@
     "var privacyBoundedSupportStatus = new PrivacyBoundedSupportStatusService(releases, new SupportConciergePacketService(releases, new SupportCasePresentationService())).Build(new PrivacyBoundedSupportStatusContext(",
     "campaign spine privacy-bounded support status should keep support status on the account support rail.",
     "campaign spine privacy-bounded support status should keep crash status on the crash work-item rail.",
-    "campaign spine privacy-bounded support status should keep feedback status on the governed Participate feedback lane.",
+    "campaign spine privacy-bounded support status should keep feedback status on the shared Participate surface.",
     "campaign spine privacy-bounded support status should keep telemetry rollups on the privacy-bounded progress route.",
     "campaign spine privacy-bounded support status should keep retention clocks on the privacy boundary route.",
     "campaign spine privacy-bounded support status should keep case-status followthrough on the tracked support rail."

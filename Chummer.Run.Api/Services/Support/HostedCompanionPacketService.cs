@@ -385,7 +385,7 @@ public sealed class HostedCompanionPacketService
             [
                 new HostedCompanionActionProjection("resolve_conflict", "Review restore", "/account/access", "Inspect restore conflicts, provenance, and the next safe route."),
                 new HostedCompanionActionProjection("inspect_versions", "Inspect linked copy", "/api/v1/install-linking/continuation", "Keep restore and the claimed device on the same Chummer path."),
-                new HostedCompanionActionProjection("open_support", "Open support intake", "/contact#support-intake", "Escalate restore drift through Chummer support when the hosted path is not enough.")
+                new HostedCompanionActionProjection("open_contact", "Open contact", "/contact", "Use Contact when the hosted path is not enough.")
             ],
             Suppression: BuildSuppression("trigger_class_per_restore_session", hasConflict ? 0 : 21600, hasConflict ? 6 : 1, !hasConflict),
             EaCompile: BuildEaCompile(false, hasConflict ? "first_party_only" : "line_variant_pack", hasConflict ? [] : ["line_variant_pack"], runtimeBlocking: false),
@@ -613,13 +613,13 @@ public sealed class HostedCompanionPacketService
                     Kind: "public_support_truth",
                     Label: "Public support",
                     Summary: manifest.SupportabilitySummary ?? manifest.KnownIssueSummary ?? "Public support stays on Chummer downloads and contact routes.",
-                    Route: "/contact#support-intake")
+                    Route: "/contact")
             ],
             FactSummary: summary,
             AllowedActions:
             [
                 new HostedCompanionActionProjection("open_downloads", "Open downloads", "/downloads", "See the current installers and release notes."),
-                new HostedCompanionActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Use Chummer support when the public page still needs help."),
+                new HostedCompanionActionProjection("open_contact", "Open contact", "/contact", "Use Contact when the public page still needs help."),
                 new HostedCompanionActionProjection("open_account_access", "Create account for guided install", "/account/access", "Move from the public page into a linked install and restore path.")
             ],
             Suppression: BuildSuppression("trigger_class_per_surface", 43200, 1, true),

@@ -335,10 +335,10 @@ public sealed class PublicConciergeService
                 FlowId: "testimonial_capture",
                 Eyebrow: "Public feedback",
                 Heading: "Leave a moderated public note without confusing it for support or a product decision.",
-                Intro: "This wrapper keeps testimonials optional, moderated, and Chummer-owned. It never replaces support intake, account recovery, or publication approval.",
+                Intro: "This wrapper keeps testimonials optional, moderated, and Chummer-owned. It never replaces Contact, account recovery, or publication approval.",
                 EntrySurfaceLabel: "testimonial capture",
-                EntryRoute: "/feedback",
-                ReturnActionLabel: "Back to feedback",
+                EntryRoute: "/participate",
+                ReturnActionLabel: "Back to Participate",
                 SecondaryActionLabel: "Open publications",
                 SecondaryActionHref: "/artifacts"),
             _ => throw new KeyNotFoundException($"Unknown concierge surface '{surfaceKey}'.")
@@ -573,7 +573,7 @@ public sealed class PublicConciergeService
             ("now", "read_notes") => "/now#public-shipped-closeout",
             ("now", "update_help") => "/contact",
             ("now", "book_help") => "/contact",
-            ("contact", "public_feedback") => "/feedback",
+            ("contact", "public_feedback") => "/participate",
             ("contact", "private_support") => "/contact",
             ("contact", "install_continuity") => authenticated ? "/account/access" : "/downloads",
             ("contact", "human_help") => "/contact",
@@ -592,7 +592,7 @@ public sealed class PublicConciergeService
                 : $"/artifacts/publications/{Uri.EscapeDataString(contextId)}",
             ("testimonials", "video_review") => "/contact",
             ("testimonials", "audio_review") => "/contact",
-            ("testimonials", "quick_rating") => "/feedback",
+            ("testimonials", "quick_rating") => "/participate",
             _ => surface.EntryRoute
         };
     }

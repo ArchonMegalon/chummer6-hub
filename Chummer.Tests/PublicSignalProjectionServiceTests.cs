@@ -13,12 +13,12 @@ public sealed class PublicSignalProjectionServiceTests
         using var fixture = new PublicSignalProjectionFixture();
         fixture.WriteSupportFiles();
 
-        var packet = fixture.CreateService().BuildPacket("/feedback");
+        var packet = fixture.CreateService().BuildPacket("/participate");
 
         Assert.NotNull(packet);
         Assert.Equal("Hosted public mirror", packet!.Vendor);
-        Assert.Equal("/feedback", packet.PublicPath);
-        Assert.Equal("/help/feedback", packet.FallbackPath);
+        Assert.Equal("/participate", packet.PublicPath);
+        Assert.Equal("/participate", packet.FallbackPath);
         Assert.Equal("Projection Only", packet.TruthPosture);
         Assert.Equal("Public signal is input. Canon is decided by Chummer.", packet.CoreRule);
         Assert.Contains("Do not post private logs", packet.PublicWarning, StringComparison.Ordinal);
@@ -51,7 +51,7 @@ public sealed class PublicSignalProjectionServiceTests
         using var fixture = new PublicSignalProjectionFixture();
         fixture.WriteSupportFiles();
 
-        var packet = fixture.CreateService().BuildPacket("/participate");
+        var packet = fixture.CreateService().BuildPacket("/feedback");
 
         Assert.Null(packet);
     }
@@ -96,8 +96,8 @@ surfaces:
   - key: public_feedback
     vendor: Hosted public mirror
     policy_source: products/chummer/PUBLIC_SIGNAL_FEEDBACK_ROADMAP_BRIDGE.md
-    public_path: /feedback
-    fallback_path: /help/feedback
+    public_path: /participate
+    fallback_path: /participate
     role: public_feedback_and_voting
     truth_posture: projection_only
     routes_to:
@@ -218,10 +218,9 @@ proof_line: Test
 no_provider_names: true
 no_ltd_names: true
 public_routes:
-  - path: /feedback
+  - path: /participate
   - path: /roadmap
   - path: /changelog
-  - path: /help/feedback
   - path: /horizons
   - path: /now
 registered_routes:

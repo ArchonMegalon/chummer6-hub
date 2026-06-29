@@ -49,8 +49,8 @@ public sealed class PublicSignalToCanonPacketService
         => new(
             PacketId: StableId("signal-feedback", manifest.Version),
             SurfaceId: "feedback",
-            Route: "/feedback",
-            DestinationRoute: "/participate?source=feedback#public-feedback",
+            Route: "/participate",
+            DestinationRoute: "/participate",
             SourceKind: "productlift_feedback",
             SourceClassification: "public_feedback_signal",
             Audience: "public_feedback",
@@ -60,10 +60,10 @@ public sealed class PublicSignalToCanonPacketService
             UpstreamPatchRequirement: "accepted_feedback_must_patch_chummer_owned_source_before_public_output_changes",
             NoChangeRationalePolicy: "allowed_only_with_explicit_governor_or_design_rationale",
             CloseoutPosture: "Accepted feedback patches Chummer-owned source, metadata config, registry YAML, or guide content before regeneration.",
-            Summary: "Public feedback stays on the reviewed first-party feedback page instead of changing release status by itself.",
+            Summary: "Public feedback stays on Participate instead of changing release status by itself.",
             EvidenceLines:
             [
-                "/feedback is the reviewed public feedback surface.",
+                "/participate is the reviewed public feedback surface.",
                 "Public feedback may propose demand, but product decisions still need review.",
                 "Accepted improvements patch reviewed public content before regenerated output is published."
             ],
@@ -72,7 +72,7 @@ public sealed class PublicSignalToCanonPacketService
                 BuildJourneyProofEventRef(
                     eventKey: "productlift_idea_clustered",
                     journeyKey: ProductLiftJourneyKey,
-                    sourceRef: "/feedback",
+                    sourceRef: "/participate",
                     summary: "Public feedback clusters must resolve into a first-party review step before queue or design interpretation.")
             ],
             EmittedAtUtc: now,
@@ -212,8 +212,8 @@ public sealed class PublicSignalToCanonPacketService
         => new(
             PacketId: StableId("signal-productlift", manifest.Version),
             SurfaceId: "productlift_signal",
-            Route: "/feedback",
-            DestinationRoute: "/feedback",
+            Route: "/participate",
+            DestinationRoute: "/participate",
             SourceKind: "productlift_feedback_and_closeout",
             SourceClassification: "public_feedback_signal",
             Audience: "public_feedback_followers",

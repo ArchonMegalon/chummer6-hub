@@ -2992,7 +2992,7 @@ def test_support_and_download_copy_uses_setup_and_release_language() -> None:
         "Moderation and help review",
         "First-party help review",
         "No release download is published yet.",
-        "Chummer feedback page",
+        "Participate",
     ):
         assert expected in combined
 

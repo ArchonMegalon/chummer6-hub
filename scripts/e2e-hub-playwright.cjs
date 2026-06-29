@@ -767,7 +767,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/help', async () => {
     await expectVisible(page, 'text=What is wrong?');
-    await expectVisible(page, 'text=Open support intake');
+    await expectVisible(page, 'text=Contact');
     await assertNoBannedCopy(page, 'Signed-in /help');
   });
 

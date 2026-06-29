@@ -24,7 +24,7 @@ PACKAGE_PROOF = {
 REQUIRED_MARKERS = [
     "var publicSignalPackets = new PublicSignalToCanonPacketService(releases);",
     "var publicSignalPacketBundle = publicSignalPackets.Build(supportCase, \"en-US\");",
-    'campaign spine public signal packets should emit governed feedback packets for the public first-party feedback lane.',
+    'campaign spine public signal packets should emit feedback packets for the public Participate surface.',
     'campaign spine public signal packets should emit governed roadmap packets for the public horizons projection.',
     'campaign spine public signal packets should emit governed changelog packets for shipped closeout posture.',
     'campaign spine public signal packets should emit governed support packets from the first-party contact intake lane.',

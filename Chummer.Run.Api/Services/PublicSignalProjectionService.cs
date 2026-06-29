@@ -84,6 +84,7 @@ public sealed class PublicSignalProjectionService
     {
         string? surfaceId = normalizedPublicPath switch
         {
+            "/participate" => "feedback",
             "/feedback" => "feedback",
             "/roadmap" => "roadmap",
             "/changelog" => "changelog",

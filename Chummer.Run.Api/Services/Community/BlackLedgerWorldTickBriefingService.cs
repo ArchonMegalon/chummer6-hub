@@ -325,7 +325,7 @@ public sealed class BlackLedgerWorldTickBriefingService
             EpisodeTypeLabel: "Turn newsreel",
             PublicSafetyNote: "City bulletin only.",
             ReconstructionNote: "Some shots replay city movement.",
-            FeedbackHref: "/feedback",
+            FeedbackHref: "/participate",
             ActionBeats: actionBeats,
             Rundown: rundown,
             TickerItems: ticker,

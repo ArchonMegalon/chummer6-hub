@@ -70,7 +70,7 @@ public sealed class PrivacyBoundedSupportStatusService
             ProjectionId: StableId("privacy-support-status", latestSupportCase?.CaseId ?? manifest.Version),
             SurfaceId: "support_status",
             Route: route,
-            ComparisonRoute: "/contact#support-intake",
+            ComparisonRoute: "/contact",
             ReleaseChannel: manifest.Channel,
             ReleaseVersion: manifest.Version,
             ProofStatus: ResolveProofStatus(manifest),
@@ -79,7 +79,7 @@ public sealed class PrivacyBoundedSupportStatusService
             EvidenceLines:
             [
                 latestSupportCase is null
-                    ? "No support case is active yet, so the support intake page remains the safe place to start."
+                    ? "No support case is active yet, so Contact remains the safe place to start."
                     : $"Case {latestSupportCase.CaseId} is currently {HumanizeStatus(latestSupportCase.Status).ToLowerInvariant()}.",
                 concierge?.ReleaseExplainer.CorrectnessBasis ?? "Support status stays grounded in the same release status that powers downloads, install help, and fix availability.",
                 ResolveFixAvailabilitySummary(manifest)
@@ -87,7 +87,7 @@ public sealed class PrivacyBoundedSupportStatusService
             Actions:
             [
                 new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", route, "Review the case or the account support page."),
-                new PrivacyBoundedSupportStatusActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Start first-party intake when no support case exists yet."),
+                new PrivacyBoundedSupportStatusActionProjection("open_contact", "Open contact", "/contact", "Use Contact when no support case exists yet."),
                 new PrivacyBoundedSupportStatusActionProjection("open_current_release", "Open current release", "/now", "Compare support posture with the same current release status.")
             ],
             EmittedAtUtc: now,
@@ -143,22 +143,22 @@ public sealed class PrivacyBoundedSupportStatusService
         DateTimeOffset now,
         string locale)
     {
-        string route = feedbackPacket?.DestinationRoute ?? "/feedback";
+        string route = feedbackPacket?.DestinationRoute ?? "/participate";
         if (string.Equals(route, "/participate?source=feedback#public-feedback", StringComparison.OrdinalIgnoreCase)
             || string.Equals(route, "/partizipate?source=feedback#public-feedback", StringComparison.OrdinalIgnoreCase)
             || string.Equals(route, "/participate?productlift=feedback#productlift-feedback", StringComparison.OrdinalIgnoreCase))
         {
-            route = "/feedback";
+            route = "/participate";
         }
         string summary = feedbackPacket is null
-            ? "Feedback stays privacy-bounded until it is classified on the public feedback page and reviewed for product work."
-            : "Feedback stays bounded to the public feedback page instead of becoming support folklore or telemetry surveillance.";
+            ? "Feedback stays privacy-bounded until it is classified on Participate and reviewed for product work."
+            : "Feedback stays bounded to Participate instead of becoming support folklore or telemetry surveillance.";
 
         return new PrivacyBoundedSupportStatusProjection(
             ProjectionId: StableId("privacy-feedback-status", feedbackPacket?.PacketId ?? latestSupportCase?.CaseId ?? manifest.Version),
             SurfaceId: "feedback_status",
             Route: route,
-            ComparisonRoute: "/contact#support-intake",
+            ComparisonRoute: "/contact",
             ReleaseChannel: manifest.Channel,
             ReleaseVersion: manifest.Version,
             ProofStatus: ResolveProofStatus(manifest),
@@ -168,7 +168,7 @@ public sealed class PrivacyBoundedSupportStatusService
             [
                 feedbackPacket?.Summary ?? "Feedback should be classified before it influences queue or release decisions.",
                 feedbackPacket is null
-                    ? "Private or account-linked follow-up still belongs on the first-party support route."
+                    ? "Private or account-linked follow-up still belongs on Contact or the account support page."
                     : feedbackPacket.CloseoutPosture,
                 latestSupportCase is null
                     ? "No private follow-up case is active right now."
@@ -176,9 +176,8 @@ public sealed class PrivacyBoundedSupportStatusService
             ],
             Actions:
             [
-                new PrivacyBoundedSupportStatusActionProjection("open_feedback_lane", "Open feedback", route, "Review the first-party feedback path."),
-                new PrivacyBoundedSupportStatusActionProjection("open_participate", "Open Participate", "/participate", "Inspect the broader public feedback intake."),
-                new PrivacyBoundedSupportStatusActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Escalate private or account-linked feedback through first-party support.")
+                new PrivacyBoundedSupportStatusActionProjection("open_participate", "Open Participate", route, "Review the public feedback path."),
+                new PrivacyBoundedSupportStatusActionProjection("open_contact", "Open contact", "/contact", "Use Contact for private or account-linked feedback.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
