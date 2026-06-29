@@ -1,0 +1,155 @@
+{
+  "contract_name": "chummer.mobile_pwa_public_projection",
+  "status": "pass",
+  "generated_at_utc": "2026-06-29T10:25:18.129170Z",
+  "base_url": "https://chummer.run",
+  "route_results": [
+    {
+      "route": "/mobile",
+      "status_code": 200,
+      "final_url": "https://chummer.run/mobile",
+      "final_route": "/mobile",
+      "expected_final_route": "/mobile"
+    },
+    {
+      "route": "/pwa",
+      "status_code": 200,
+      "final_url": "https://chummer.run/mobile",
+      "final_route": "/mobile",
+      "expected_final_route": "/mobile"
+    },
+    {
+      "route": "/play",
+      "status_code": 200,
+      "final_url": "https://chummer.run/play",
+      "final_route": "/play",
+      "expected_final_route": "/play"
+    },
+    {
+      "route": "/player",
+      "status_code": 200,
+      "final_url": "https://chummer.run/play?role=player",
+      "final_route": "/play?role=player",
+      "expected_final_route": "/play?role=player"
+    },
+    {
+      "route": "/gm",
+      "status_code": 200,
+      "final_url": "https://chummer.run/play?role=gm",
+      "final_route": "/play?role=gm",
+      "expected_final_route": "/play?role=gm"
+    },
+    {
+      "route": "/observer",
+      "status_code": 200,
+      "final_url": "https://chummer.run/play?role=observer",
+      "final_route": "/play?role=observer",
+      "expected_final_route": "/play?role=observer"
+    },
+    {
+      "route": "/session",
+      "status_code": 200,
+      "final_url": "https://chummer.run/play",
+      "final_route": "/play",
+      "expected_final_route": "/play"
+    }
+  ],
+  "manifest": {
+    "id": "/mobile",
+    "start_url": "/mobile",
+    "display": "standalone",
+    "display_override": [
+      "window-controls-overlay",
+      "standalone",
+      "minimal-ui",
+      "browser"
+    ],
+    "shortcut_count": 4,
+    "icon_count": 2,
+    "screenshot_count": 2,
+    "shortcut_urls": [
+      "/mobile",
+      "/packages",
+      "/play",
+      "/play/continuity"
+    ]
+  },
+  "service_worker": {
+    "path": "/service-worker.js?v=1782719395",
+    "status_code": 200,
+    "has_fetch_handler": true,
+    "has_navigation_preload": true,
+    "has_runtime_cache": true,
+    "has_expected_shell_cache_paths": true,
+    "ledger_stream_not_precached": true,
+    "ledger_stream_denied_by_service_worker": true,
+    "has_push_handler": true,
+    "has_notification_click_handler": true,
+    "has_notification_close_handler": true,
+    "has_notification_route_bounds": true,
+    "has_notification_asset_bounds": true,
+    "notification_route_paths": [
+      "/account",
+      "/account/ledger",
+      "/account/ledger/advisory",
+      "/account/ledger/notifications",
+      "/account/ledger/onboarding",
+      "/account/ledger/worldtick/validation",
+      "/account/passport",
+      "/account/passport/open",
+      "/ledger",
+      "/ledger/map",
+      "/ledger/newsroom",
+      "/mobile",
+      "/passport",
+      "/passport/identity-network",
+      "/play",
+      "/play/continuity"
+    ],
+    "notification_route_prefixes": [
+      "/account/ledger/factions/",
+      "/ledger/newsroom/",
+      "/ledger/turns/",
+      "/passport/",
+      "/passport/receipts/"
+    ],
+    "notification_asset_paths": [
+      "/apple-touch-icon.png",
+      "/favicon.ico",
+      "/favicon.svg",
+      "/pwa-icon.svg",
+      "/pwa-maskable.svg"
+    ],
+    "notification_asset_suffixes": [
+      ".ico",
+      ".jpeg",
+      ".jpg",
+      ".png",
+      ".svg",
+      ".webp"
+    ]
+  },
+  "page_assertions": {
+    "has_manifest_link": true,
+    "has_service_worker_registration": true,
+    "has_install_button": true,
+    "has_continuity_action": true,
+    "role_routes_hold": true,
+    "continuity_page_status_code": 200
+  },
+  "continuity": {
+    "receipt_count": 3,
+    "has_boundary": true,
+    "mobile_json_has_routes": true,
+    "receipt_index_route": "/play/continuity/history"
+  },
+  "ledger_stream": {
+    "status": "opt_in_required",
+    "mode": "mobile_pwa_living_world",
+    "has_contract": true,
+    "cache_control": "private, no-store, no-cache, max-age=0",
+    "vary": "Cookie, Authorization",
+    "has_no_store_header": true,
+    "has_personalized_vary": true
+  }
+}

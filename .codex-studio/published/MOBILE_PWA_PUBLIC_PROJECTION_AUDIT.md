@@ -1,0 +1,26 @@
+# Mobile and PWA public projection audit
+
+- Generated: 2026-06-29T10:25:18.129170Z
+- Manifest start URL: `/mobile`
+- Display mode: `standalone`
+- Display override present: `True`
+- Manifest screenshots: `2`
+- Manifest link present on `/mobile`: `True`
+- Service worker registration present on `/mobile`: `True`
+- Install action visible on `/mobile`: `True`
+- Continuity action visible on `/mobile`: `True`
+- Service worker fetch handler present: `True`
+- Service worker navigation preload present: `True`
+- Service worker continuity cache paths present: `True`
+- Personalized ledger stream excluded from precache: `True`
+- Personalized ledger stream denied by service worker: `True`
+- Personalized ledger stream has no-store header: `True`
+- Personalized ledger stream varies by Cookie and Authorization: `True`
+- Service worker push handler present: `True`
+- Service worker notification click handler present: `True`
+- Service worker notification close handler present: `True`
+- Service worker notification route bounds present: `True`
+- Service worker notification asset bounds present: `True`
+- Role-route redirects hold: `True`
+- Continuity receipt count: `3`
+- Continuity boundary present: `True`
