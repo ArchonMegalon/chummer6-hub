@@ -37,7 +37,7 @@ public sealed class PublicEdgeDeployIsolationTests
     }
 
     [Fact]
-    public void PublicEdgeDoesNotOwnPrivateOpsServices()
+    public void PublicEdgeDoesNotOwnOperatorPrivateOps()
     {
         string composePath = RepoPaths.FromRoot("docker-compose.public-edge.yml");
         string envExamplePath = RepoPaths.FromRoot(".env.example");
@@ -47,9 +47,9 @@ public sealed class PublicEdgeDeployIsolationTests
 
         string[] forbiddenPublicEdgeMarkers =
         [
-            "home-girschele-hass",
-            "homeassistant",
-            "HOME_GIRSCHELE",
+            "PRIVATE_OPERATOR_HOME",
+            "LOCAL_HOME_CONTROL",
+            "PRIVATE_OPS_RESTORE",
         ];
         foreach (string marker in forbiddenPublicEdgeMarkers)
         {
@@ -57,14 +57,6 @@ public sealed class PublicEdgeDeployIsolationTests
             Assert.DoesNotContain(marker, envExample, StringComparison.OrdinalIgnoreCase);
         }
 
-        string[] privateOpsFiles =
-        [
-            RepoPaths.FromRoot("scripts", "home_girschele_hass_ops.sh"),
-            RepoPaths.FromRoot("docs", "HOME_GIRSCHELE_HOME_ASSISTANT_RUNBOOK.md"),
-        ];
-        foreach (string path in privateOpsFiles)
-        {
-            Assert.False(File.Exists(path));
-        }
+        Assert.False(Directory.Exists(RepoPaths.FromRoot("private-ops")));
     }
 }
