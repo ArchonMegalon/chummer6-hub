@@ -73,7 +73,7 @@
             Href: "/now",
             Label: "Open current release",
             Title: "Open current release",
-            Summary: "Use the current status page for the live product.",
+            Summary: "Use the current release page for the live product.",
             Details: new[] { "Current status", "Downloads", "Known limits" }),
         ReleaseDetailFamily => (
             Href: "/downloads",
@@ -85,13 +85,13 @@
             Href: "/now",
             Label: "Open current release",
             Title: "Open current release",
-            Summary: "Use the current status page for the live product.",
+            Summary: "Use the current release page for the live product.",
             Details: new[] { "Current status", "Downloads", "Help nearby" }),
         _ => (
             Href: "/now",
             Label: "Open current release",
             Title: "Open current release",
-            Summary: "Use the current status page for the live product.",
+            Summary: "Use the current release page for the live product.",
             Details: new[] { "Current status", "Downloads", "Help nearby" })
     };
 
@@ -293,7 +293,7 @@ else
 <section class="release-footnote">
     <p class="eyebrow">Next</p>
     <h2 class="editorial-title">Move on once this is clear.</h2>
-    <p class="editorial-copy">Take the direct action when it is clear. Open status for the live product, or Help for support.</p>
+    <p class="editorial-copy">Take the direct action when it is clear. Open Downloads for the current build, or Help for support.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@Model.PrimaryAction.Href">@PublicText(Model.PrimaryAction.Label)</a>
         <a class="cta-link cta-link--secondary" href="@deeperRoute.Href">@PublicText(deeperRoute.Label)</a>

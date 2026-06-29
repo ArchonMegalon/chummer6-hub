@@ -51,7 +51,7 @@ public sealed class LegacySurfaceRedirectControllerTests
 
         var content = Assert.IsType<ContentResult>(result);
         Assert.Contains("Browser preview is not ready right now.", content.Content, StringComparison.Ordinal);
-        Assert.Contains("href=\"/status\"", content.Content, StringComparison.Ordinal);
+        Assert.Contains("href=\"/downloads\"", content.Content, StringComparison.Ordinal);
     }
 
     [Fact]

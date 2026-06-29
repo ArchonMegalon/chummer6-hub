@@ -214,9 +214,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("return View(\"~/Views/PublicLanding/Changelog.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("BuildNowPageModel(", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
+        Assert.Contains("=> await RoadmapBoardFallbackAsync(cancellationToken, \"/roadmap\").ConfigureAwait(false);", controller, StringComparison.Ordinal);
         Assert.Contains("return View(", controller, StringComparison.Ordinal);
         Assert.Contains("\"~/Views/PublicLanding/Roadmap.cshtml\"", controller, StringComparison.Ordinal);
-        Assert.Contains("return Redirect($\"/roadmap{Request.QueryString}\");", controller, StringComparison.Ordinal);
+        Assert.Contains("public async Task<IActionResult> RoadmapBoardProxy(string? boardPath, CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Redirect(\"/horizons?source=roadmap#public-roadmap-projection\")", controller, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", changelogView, StringComparison.Ordinal);
         Assert.Contains("Recent changes", changelogView, StringComparison.Ordinal);
@@ -240,27 +241,16 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StatusPageUsesCompactAvailabilitySurface()
+    public void StatusRouteRedirectsToDownloadsInsteadOfRenderingASeparatePage()
     {
-        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
-        string view = File.ReadAllText(viewPath);
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("Status", view, StringComparison.Ordinal);
-        Assert.Contains("<h1>Updated</h1>", view, StringComparison.Ordinal);
-        Assert.Contains("var statusLine = Model.ReleaseExperience.Recommended is null", view, StringComparison.Ordinal);
-        Assert.Contains(": publicPlatformSummary", view, StringComparison.Ordinal);
-        Assert.Contains("@PublicStatusText(statusLine)", view, StringComparison.Ordinal);
-        Assert.Contains("aria-label=\"Status next actions\"", view, StringComparison.Ordinal);
-        Assert.Contains(">Help</a>", view, StringComparison.Ordinal);
-        Assert.Contains(">Downloads</a>", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Chummer is available.", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("PublicStatusText(Model.ReleaseSummary)", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("IsReleaseAvailable(Model.Manifest.ProofStatus)", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("data-status-surface=\"decision-surface\"", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("minimal-platform-list", view, StringComparison.Ordinal);
-        Assert.DoesNotContain(">Contact</a>", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("status-decision-strip", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("What still blocks gold support", view, StringComparison.Ordinal);
+        Assert.Contains("public IActionResult StatusPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
+        Assert.Contains("ApplyNoStoreHeaders(Response.Headers);", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/downloads\");", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Status.cshtml\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("BuildPublicOrAuthenticatedChromeAsync(\"Updated\"", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -298,6 +288,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/status\")", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/downloads\")", controller, StringComparison.Ordinal);
         Assert.Contains("ApplyNoStoreHeaders(Response.Headers);", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/downloads\");", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -329,23 +320,24 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StatusPageUsesOneLineUpdatedSummaryInsteadOfViewLevelStringLaundry()
+    public void PublicViewsDoNotOfferStatusAsASeparateDestination()
     {
-        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
-        string view = File.ReadAllText(viewPath);
+        string[] views =
+        [
+            "Downloads.cshtml",
+            "Horizons.cshtml",
+            "ProductStory.cshtml",
+            "Shelf.cshtml",
+            "FeatureDetail.cshtml"
+        ];
 
-        Assert.Contains("static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);", view, StringComparison.Ordinal);
-        Assert.Contains("var statusLine = Model.ReleaseExperience.Recommended is null", view, StringComparison.Ordinal);
-        Assert.Contains(": publicPlatformSummary", view, StringComparison.Ordinal);
-        Assert.Contains("@PublicStatusText(statusLine)", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Updated {verifiedLabel}", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("PublicStatusText(Model.ReleaseSummary)", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("@PublicStatusText(availabilityText)", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("@PublicStatusText(platform.Summary)", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("@Model.ReleaseSummary", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("@platform.Summary", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("CustomerStatusText(", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("FindLaunchHealthValue(", view, StringComparison.Ordinal);
+        foreach (string viewName in views)
+        {
+            string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", viewName));
+            Assert.DoesNotContain("href=\"/status\"", view, StringComparison.Ordinal);
+            Assert.DoesNotContain("Open status", view, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("status page", view, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     [Fact]
@@ -363,31 +355,15 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StatusPageUsesShortReleaseAndCautionSummariesWithoutLaunchHealthRows()
+    public void StatusRedirectKeepsLaunchHealthRowsOffThePublicRoute()
     {
-        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
-        string view = File.ReadAllText(viewPath);
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
 
         Assert.Contains("BuildPublicStatusReleaseSummary", controller, StringComparison.Ordinal);
         Assert.Contains("BuildPublicStatusCautionSummary", controller, StringComparison.Ordinal);
-        Assert.Contains("<h1>Updated</h1>", view, StringComparison.Ordinal);
-        Assert.Contains("publicPlatformSummary", view, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/downloads\");", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("LaunchHealthRows", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("LaunchHealthRows", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("updateSummary", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Updated {verifiedLabel}", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Chummer is available.", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("@Model.ReleaseExperience.Display.ChannelLabel", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("The build, platforms, and current state in one place.", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("@HumanizeStatusToken(Model.Manifest.RolloutState, \"Current release\")", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Not mirrored", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("HumanizeStatusToken", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Current release at a glance.", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("At a glance", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Status poster", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Signed-in return", view, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -7439,24 +7439,11 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpGet("/status")]
     [HttpHead("/status")]
     [Produces("text/html")]
-    public async Task<IActionResult> StatusPage(CancellationToken cancellationToken)
+    public IActionResult StatusPage(CancellationToken cancellationToken)
     {
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
-        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
-        var pulse = _trustPulse.LoadSnapshot();
-        var releaseSummary = BuildPublicStatusReleaseSummary(manifest, releaseExperience, pulse);
-        var cautionSummary = BuildPublicStatusCautionSummary(manifest, pulse);
-        var model = new StatusPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Updated", "Current Chummer downloads and setup help.", "/status", cancellationToken),
-            Manifest: manifest,
-            ReleaseTruth: BuildReleaseTruthDisplay(manifest),
-            ReleaseExperience: releaseExperience,
-            ReleaseSummary: releaseSummary,
-            CautionSummary: cautionSummary);
-
+        _ = cancellationToken;
         ApplyNoStoreHeaders(Response.Headers);
-        return View("~/Views/PublicLanding/Status.cshtml", model);
+        return Redirect("/downloads");
     }
 
     [HttpGet("/artifacts")]
