@@ -85,13 +85,13 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.Contains("\"~/Views/PublicLanding/Roadmap.cshtml\"", controller, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/roadmap{Request.QueryString}\");", controller, StringComparison.Ordinal);
         Assert.Contains("pageTitle: \"Roadmap - Chummer.run\"", controller, StringComparison.Ordinal);
-        Assert.Contains("hostedHeadingReplacement: \"In progress.\"", controller, StringComparison.Ordinal);
+        Assert.Contains("hostedHeadingReplacement: \"Roadmap.\"", controller, StringComparison.Ordinal);
         Assert.Contains("HostedBoardHtmlLooksUnavailable(html)", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.productlift.dev/", controller, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("BuildRoadmapFallbackPageModelAsync", controller, StringComparison.Ordinal);
         Assert.Contains("RoadmapBoardFallbackAsync", controller, StringComparison.Ordinal);
         Assert.Contains("data-chummer-roadmap-frame", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Work opens below.", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Open requests below.", roadmapView, StringComparison.Ordinal);
     }
 
     [Fact]
