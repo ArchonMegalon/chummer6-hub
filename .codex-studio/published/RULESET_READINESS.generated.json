@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.ruleset_readiness",
-  "generated_at_utc": "2026-06-22T13:24:01.049104Z",
+  "generated_at_utc": "2026-06-29T11:55:31.144794Z",
   "fleet_closeout_status": "pass",
   "frontier_receipts": {
     "ui_sr4_sr6_desktop_parity_frontier": "pass",
@@ -51,13 +51,13 @@
     },
     "sr5": {
       "readiness": "full",
-      "readiness_basis": "rule_authority_minimum_coverage",
+      "readiness_basis": "flagship_ui_release_gate",
       "authority_receipts": [
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
       ],
-      "flagship_ui_status": "fail",
+      "flagship_ui_status": "pass",
       "rule_authority_status": "pass",
-      "ui_orientation": "authority_covered",
+      "ui_orientation": "verified",
       "codec_import_export": "baseline",
       "deterministic_provider_depth": "verified",
       "mechanics_corpus": "verified",
