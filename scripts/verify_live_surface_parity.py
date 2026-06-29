@@ -27,8 +27,9 @@ def build_billing_surface(require_brilliant_directories_checkout: bool) -> dict[
         "path": "/account/billing",
         "required_final_url_prefix": "/login",
         "required_texts": [
-            "Open Chummer",
-            "Email first. Google if you prefer.",
+            "Supporter",
+            "Email first. Billing stays attached after this step.",
+            "After this step, Chummer returns to billing.",
             "Continue with email",
             "Continue with Google",
         ],
@@ -36,7 +37,6 @@ def build_billing_surface(require_brilliant_directories_checkout: bool) -> dict[
             "Account settings",
             "Supporter is not open right now.",
             "Billing is unavailable",
-            "Membership",
         ],
     }
 

@@ -63,13 +63,20 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             return
 
         if self.path.startswith("/login"):
+            billing_login = "next=%2Faccount%2Fbilling" in self.path or "next=/account/billing" in self.path
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(
-                b"<html><body>"
-                b"Open Chummer Email first. Google if you prefer. Continue with email Continue with Google"
-                b"</body></html>"
+                (
+                    b"<html><body>"
+                    + (
+                        b"Supporter Email first. Billing stays attached after this step. After this step, Chummer returns to billing. Continue with email Continue with Google"
+                        if billing_login
+                        else b"Open Chummer Email first. Google if you prefer. Continue with email Continue with Google"
+                    )
+                    + b"</body></html>"
+                )
             )
             return
 
@@ -306,7 +313,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
 
         self.assertEqual("fail", payload["status"])
         billing = next(item for item in payload["results"] if item["path"] == "/account/billing")
-        self.assertIn("Open Chummer", billing["missing_required_texts"])
+        self.assertIn("Email first. Billing stays attached after this step.", billing["missing_required_texts"])
         self.assertIn("Supporter is not open right now.", billing["forbidden_hits"])
 
     def test_mainline_payload_remains_json_serializable(self) -> None:

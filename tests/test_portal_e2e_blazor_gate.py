@@ -85,15 +85,21 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/login":
+            billing_login = "next=%2Faccount%2Fbilling" in self.path or "next=/account/billing" in self.path
             self._send_html(
                 """
                 <html><body>
-                <h1>Open Chummer</h1>
-                <p>Email first. Google if you prefer.</p>
+                <h1>{heading}</h1>
+                <p>{hint}</p>
+                <p>{meta}</p>
                 <button>Continue with email</button>
                 <a href="/auth/google/start">Continue with Google</a>
                 </body></html>
-                """
+                """.format(
+                    heading="Supporter" if billing_login else "Open Chummer",
+                    hint="Email first. Billing stays attached after this step." if billing_login else "Email first. Google if you prefer.",
+                    meta="After this step, Chummer returns to billing." if billing_login else "After this step, Chummer returns to the signed-in product.",
+                )
             )
             return
 
@@ -126,8 +132,9 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 self._send_html(
                     """
                     <html><body>
-                    <h1>Open Chummer</h1>
-                    <p>Email first. Google if you prefer.</p>
+                    <h1>Supporter</h1>
+                    <p>Email first. Billing stays attached after this step.</p>
+                    <p>After this step, Chummer returns to billing.</p>
                     <button>Continue with email</button>
                     <button>Continue with Google</button>
                     </body></html>
@@ -160,10 +167,26 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
             )
             return
 
-        if path == "/participate/board":
+        if path == "/participate/frame":
             self.send_response(302)
-            self.send_header("Location", "/participate")
+            self.send_header("Location", "/participate/board?embed=1")
             self.end_headers()
+            return
+
+        if path == "/participate/board":
+            if "embed=1" in self.path:
+                self._send_html(
+                    """
+                    <html>
+                    <head><base href="/participate/board/" /></head>
+                    <body><p>embedded first-party board</p></body>
+                    </html>
+                    """
+                )
+            else:
+                self.send_response(302)
+                self.send_header("Location", "/participate")
+                self.end_headers()
             return
 
         if path == "/roadmap":

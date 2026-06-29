@@ -42,13 +42,13 @@ function isBlazorFallback(text) {
 
 function isGuestBillingSurface(text) {
   return (
-    text.includes('Open Chummer')
-    && text.includes('Email first. Google if you prefer.')
+    text.includes('Supporter')
+    && text.includes('Email first. Billing stays attached after this step.')
+    && text.includes('After this step, Chummer returns to billing.')
     && text.includes('Continue with email')
     && text.includes('Continue with Google')
     && !text.includes('Supporter is not open right now.')
     && !text.includes('Account settings')
-    && !text.includes('Membership')
   );
 }
 

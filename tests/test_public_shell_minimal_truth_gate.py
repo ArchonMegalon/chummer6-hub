@@ -107,6 +107,7 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/login"):
             og_value = "" if type(self).EMPTY_LOGIN_META else path
+            billing_login = "next=%2Faccount%2Fbilling" in self.path or "next=/account/billing" in self.path
             self._send_html(
                 200,
                 f"""
@@ -116,8 +117,9 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                     <meta name="twitter:url" content="/login?next=%2F" />
                   </head>
                   <body>
-                    <h1>Open Chummer</h1>
-                    <p>Email first. Google if you prefer.</p>
+                    <h1>{"Supporter" if billing_login else "Open Chummer"}</h1>
+                    <p>{"Email first. Billing stays attached after this step." if billing_login else "Email first. Google if you prefer."}</p>
+                    <p>{"After this step, Chummer returns to billing." if billing_login else "After this step, Chummer returns to the signed-in product."}</p>
                     <a href="/auth/email/start">Continue with email</a>
                     <a href="/auth/google/start">Continue with Google</a>
                   </body>

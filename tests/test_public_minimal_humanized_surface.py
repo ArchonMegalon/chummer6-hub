@@ -594,8 +594,9 @@ def test_billing_surface_uses_real_view_and_honest_supporter_copy() -> None:
     assert '__RequestVerificationToken' in billing_view
     assert "Manage supporter" in billing_view
     assert "Checkout stays attached to this account." in billing_view
-    assert "Email first. Supporter status attaches after sign-in." in billing_view
+    assert "Email first. Supporter attaches after that step." in billing_view
     assert "Back to account" in billing_view
+    assert "Back to downloads" in billing_view
     assert "Free · 1 book/month" in billing_view
     assert "Supporter · 2 books/month" in billing_view
     assert "story-example" not in billing_view

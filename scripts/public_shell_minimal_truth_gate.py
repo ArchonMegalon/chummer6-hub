@@ -43,8 +43,8 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
     billing_contract = RouteContract(
         route="/account/billing",
         expected_final_path="/login",
-        required_all=("Open Chummer", "Email first. Google if you prefer.", "Continue with email", "Continue with Google"),
-        forbidden=("Membership", "Supporter is not open right now."),
+        required_all=("Supporter", "Email first. Billing stays attached after this step.", "After this step, Chummer returns to billing.", "Continue with email", "Continue with Google"),
+        forbidden=("Supporter is not open right now.",),
         require_public_meta_urls=True,
     )
 

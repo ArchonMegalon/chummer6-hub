@@ -71,7 +71,6 @@
   margin: 0;
   color: rgba(243, 234, 219, 0.58);
   font-size: 0.68rem;
-  text-transform: uppercase;
 }
 
 .route-login.surface-auth.surface-minimal .auth-panel__meta,
