@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_public_web_recrawl",
-  "generated_at_utc": "2026-06-29T00:40:39Z",
+  "generated_at_utc": "2026-06-29T01:00:03Z",
   "base_url": "https://chummer.run",
   "required_paths": [
     "/",
@@ -47,7 +47,7 @@
       "path": "/ledger",
       "url": "https://chummer.run/ledger",
       "status_code": 200,
-      "sha256": "6db1ca7cf4328b92154d13e006b5b6efc3ef9e77d147fb5acb4bc7b0a825eddb",
+      "sha256": "3ce51ef0ec7c3d175566a1fcfbdea83b0bdfc3bacacb11f9650a62aa81705dd2",
       "excerpt": "Black Ledger command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Help Sign in Install Chummer on Windows The public globe page shows the Black Ledger command map with live district overlays. Campaign city command map Campaign",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
@@ -56,7 +56,7 @@
       "path": "/ledger/map",
       "url": "https://chummer.run/ledger/map",
       "status_code": 200,
-      "sha256": "e15dd1b52be0a995d1c5d5e4e1c08b6f46c8d61d1334b5d86af30d1b9a679537",
+      "sha256": "aef06c6cc88788557a8d1f71b972180709d7b6231084905cfd38e491d88ecca4",
       "excerpt": "Black Ledger command map \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Help Sign in Install Chummer on Windows The public globe page shows the Black Ledger command map with live district overlays. Campaign city command map Campaign",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
@@ -65,7 +65,7 @@
       "path": "/ledger/factions",
       "url": "https://chummer.run/ledger/factions",
       "status_code": 200,
-      "sha256": "d819d6a7b26384400d7fc996ea9965b2deaf1342e8fbd0ec219effbf9412c2d5",
+      "sha256": "15b52ea9ef6fb69f7a88aaf5f96a8fb3a7c9caf708a8f75d230393349620e2bd",
       "excerpt": "Black Ledger factions \u00b7 Emerald Sprawl: First Pressure \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Help Sign in Install Chummer on Windows The public globe page shows the Black Ledger command map with live district overlays. Campaign",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
@@ -74,7 +74,7 @@
       "path": "/ledger/newsroom",
       "url": "https://chummer.run/ledger/newsroom",
       "status_code": 200,
-      "sha256": "43cfb9bcce188f0c1c0d7d2d509cce8faad8c7b9904ab0d3143b3f1027908cc1",
+      "sha256": "2ea7978042186ee8313d8afd90b5b12355d6b6fd1e83de8babe87d326db679b2",
       "excerpt": "Black Ledger newsroom \u00b7 Turn 2 anchor package \u00b7 Chummer Skip to content CHUMMER Shadowrun character manager Home Help Sign in Install Chummer on Windows The public globe page shows the Black Ledger command map with live district overlays. Campaign",
       "x_robots_tag": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
       "forbidden_hits": []
