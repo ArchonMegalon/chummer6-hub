@@ -217,7 +217,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
-    public async Task RoadmapPageFallsBackToParticipateWhenDedicatedRoadmapUrlIsMissing()
+    public async Task RoadmapPageUsesFeedbackBoardWhenDedicatedRoadmapUrlIsMissing()
     {
         var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), roadmapUrl: null);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
@@ -226,26 +226,27 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         IActionResult result = await controller.RoadmapPage(CancellationToken.None);
 
-        ViewResult view = Assert.IsType<ViewResult>(result);
-        Assert.Equal("~/Views/PublicLanding/Roadmap.cshtml", view.ViewName);
-        RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Null(model.HostedBoardHref);
-        Assert.False(string.IsNullOrWhiteSpace(model.PublicRequestSyncedLabel));
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("<base href=\"/roadmap/\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("<link rel=\"canonical\" href=\"/roadmap\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProductLift", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task RoadmapPageDisablesHostedBoardLinkWhenRoadmapUrlMatchesFeedbackUrl()
+    public async Task RoadmapPageStillUsesHostedBoardWhenRoadmapUrlMatchesFeedbackUrl()
     {
-        var controller = CreatePublicLandingController(new HostedBoardPostsHttpClientFactory(), roadmapUrl: "https://ideas.example.test/feedback", seedParticipateSnapshot: true);
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), roadmapUrl: "https://ideas.example.test/feedback", seedParticipateSnapshot: true);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
 
         IActionResult result = await controller.RoadmapPage(CancellationToken.None);
 
-        ViewResult view = Assert.IsType<ViewResult>(result);
-        RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Null(model.HostedBoardHref);
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("<base href=\"/roadmap/\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("<link rel=\"canonical\" href=\"/roadmap\" />", content.Content ?? string.Empty, StringComparison.Ordinal);
     }
 
     [Fact]

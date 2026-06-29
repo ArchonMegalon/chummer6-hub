@@ -3026,19 +3026,7 @@ public sealed class PublicLandingController : Controller
     private Uri? ResolveProductLiftHostedRoadmapUri()
     {
         Uri? uri = ProductLiftHostedUriResolver.TryResolve(_configuration["CHUMMER_PRODUCTLIFT_ROADMAP_URL"]?.Trim());
-        if (uri is null)
-        {
-            return null;
-        }
-
-        Uri? feedbackUri = ResolveProductLiftHostedBoardUri();
-        if (feedbackUri is not null
-            && Uri.Compare(uri, feedbackUri, UriComponents.HttpRequestUrl, UriFormat.SafeUnescaped, StringComparison.OrdinalIgnoreCase) == 0)
-        {
-            return null;
-        }
-
-        return uri;
+        return uri ?? ResolveProductLiftHostedBoardUri();
     }
 
     private static Uri AppendQueryString(Uri baseUri, string? queryString)
