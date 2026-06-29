@@ -120,7 +120,7 @@ public sealed class SignedInShellContinuityViewTests
     }
 
     [Fact]
-    public void AccountViewPublishesOriginDossierGoldLibraryBehindVerifiedArtifactGates()
+    public void AccountViewPublishesOriginDossierLibraryWithPlainReadyLabels()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string view = File.ReadAllText(viewPath);
@@ -128,6 +128,13 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("id=\"origin-dossier-library\"", view, StringComparison.Ordinal);
         Assert.Contains("Origin Dossier library", view, StringComparison.Ordinal);
         Assert.Contains("Finished dossiers appear here.", view, StringComparison.Ordinal);
+        Assert.Contains("private files are ready for this account", view, StringComparison.Ordinal);
+        Assert.Contains("portrait approval", view, StringComparison.Ordinal);
+        Assert.Contains("publication.GoldReady ? \"Ready\" : \"In progress\"", view, StringComparison.Ordinal);
+        Assert.Contains("publication.BookArtifactVerified ? \"Ready\" : \"Pending\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Gold ready", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("files are verified for this account", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("face verification", view, StringComparison.Ordinal);
         Assert.Contains("data-story-scene-cover-uses-selected-character-face", view, StringComparison.Ordinal);
         Assert.Contains("data-audiobookshelf-playback-verified", view, StringComparison.Ordinal);
         Assert.Contains("data-undetectable-humanizer-applied", view, StringComparison.Ordinal);

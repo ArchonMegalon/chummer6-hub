@@ -1510,7 +1510,7 @@
                 <section class="settings-section" data-account-panel id="origin-dossier-library">
                     <div class="settings-section__header">
                         <h2>Origin Dossier library</h2>
-                        <p>Finished dossiers appear here. Read, listen, and video open only after the files are verified for this account.</p>
+                        <p>Finished dossiers appear here. Read, listen, and video open once the private files are ready for this account.</p>
                     </div>
                     @if (originDossierPublications.Length == 0)
                     {
@@ -1532,7 +1532,7 @@
                                          data-audiobookshelf-playback-verified="@publication.AudiobookshelfPlaybackVerified.ToString().ToLowerInvariant()"
                                          data-undetectable-humanizer-applied="@publication.UndetectableHumanizerApplied.ToString().ToLowerInvariant()"
                                          data-telegram-share-delivered="@publication.TelegramShareDelivered.ToString().ToLowerInvariant()">
-                                    <span class="tag">@(publication.GoldReady ? "Gold ready" : "In progress")</span>
+                                    <span class="tag">@(publication.GoldReady ? "Ready" : "In progress")</span>
                                     <h3>@PublicText(publication.Title)</h3>
                                     <p>@PublicText(publication.RunnerAlias) · @HumanizeStatus(publication.PublicationState, "Building edition")</p>
                                     @if (publication.StorySceneCoverUsesSelectedCharacterFace && !string.IsNullOrWhiteSpace(publication.StorySceneCoverUrl))
@@ -1546,7 +1546,7 @@
                                     }
                                     else
                                     {
-                                        <p class="muted-copy">Cover unlocks after face verification.</p>
+                                        <p class="muted-copy">Cover unlocks after portrait approval.</p>
                                     }
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
@@ -1559,19 +1559,19 @@
                                         </div>
                                         <div class="settings-summary-row">
                                             <span>Book</span>
-                                            <strong>@(publication.BookArtifactVerified ? "Verified" : "Pending")</strong>
+                                            <strong>@(publication.BookArtifactVerified ? "Ready" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
                                             <span>Video</span>
-                                            <strong>@(publication.DossierVideoVerified ? "Verified" : "Pending")</strong>
+                                            <strong>@(publication.DossierVideoVerified ? "Ready" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
                                             <span>Cover</span>
-                                            <strong>@(publication.StorySceneCoverUsesSelectedCharacterFace ? "Verified" : "Pending")</strong>
+                                            <strong>@(publication.StorySceneCoverUsesSelectedCharacterFace ? "Ready" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
                                             <span>Audio</span>
-                                            <strong>@(publication.AudiobookshelfPlaybackVerified ? "Verified" : "Pending")</strong>
+                                            <strong>@(publication.AudiobookshelfPlaybackVerified ? "Ready" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
                                             <span>Share</span>

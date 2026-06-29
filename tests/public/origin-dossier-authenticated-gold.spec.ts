@@ -27,7 +27,8 @@ test('signed-in owner can see Origin Dossier cover, tabs, and gated media links 
   await page.goto(`${baseUrl}/account/work#origin-dossier-library`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#origin-dossier-library')).toBeVisible();
   await expect(page.locator('#origin-dossier-library')).toContainText('Route Runner Origin Dossier');
-  await expect(page.locator('#origin-dossier-library')).toContainText('Gold ready');
+  await expect(page.locator('#origin-dossier-library')).toContainText('Ready');
+  await expect(page.locator('#origin-dossier-library')).not.toContainText('Gold ready');
   await expect(page.getByRole('link', { name: 'Listen in Audiobookshelf' })).toHaveAttribute(
     'href',
     `${baseUrl}/account/work/origin-dossiers/${projectId}/listen`,
