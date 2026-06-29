@@ -104,7 +104,8 @@ public sealed record OriginDossierPublicationImportRequest(
     string? ProviderManuscriptAccountAlias = null,
     string? AudiobookProviderAccountAlias = null,
     string? StorySceneCoverAccountAlias = null,
-    string? DossierVideoAccountAlias = null);
+    string? DossierVideoAccountAlias = null,
+    string? BookPackagingAccountAlias = null);
 
 public sealed record OriginDossierPublicationImportResultDto(
     string ProjectId,

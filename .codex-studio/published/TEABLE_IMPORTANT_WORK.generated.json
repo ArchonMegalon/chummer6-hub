@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.teable_important_work.v1",
-  "generated_at_utc": "2026-06-26T19:08:41Z",
+  "generated_at_utc": "2026-06-29T17:28:40Z",
   "status": "ready",
   "table_name": "Chummer Important Work",
   "row_count": 39,
@@ -455,9 +455,9 @@
       "status": "active",
       "cadence": "daily until stable",
       "source": "Provider account update",
-      "why_it_matters": "Origin Dossier visual proofs should stay on the preferred Magicfit lane while Runsite uses the multi-account MagicAI/omagic pool through internal-only credentials and API keys.",
-      "next_action": "Keep Magicfit as the approved Origin Dossier visual receipt lane, mint and store at least one omagic API key, and inventory the MagicAI account pool only in env, EA catalog, and Teable-safe operator surfaces.",
-      "acceptance_gate": "Origin Dossier accepts Magicfit-backed visual receipts, Runsite internal ops can use a stored omagic API key, and Teable reflects the split without exposing raw provider credentials."
+      "why_it_matters": "Origin Dossier visual proofs should stay on the preferred Magicfit lane, book/PDF/ebook packaging should have its own governed provider account role, and Runsite scene renders plus Propertyquarry apartment videos should use the multi-account MagicAI/omagic pool through internal EA skills.",
+      "next_action": "Keep Magicfit as the approved Origin Dossier visual receipt lane, require packaging account aliases on book artifact receipts when configured, mint missing omagic API keys, keep empty key slots explicit in env until minted, and route runsite/propertyquarry render requests through internal-only EA capability surfaces.",
+      "acceptance_gate": "Origin Dossier accepts Magicfit-backed visual receipts, validates configured packaging provider receipts, Runsite and Propertyquarry expose internal render capability receipts, and Teable reflects the split without exposing raw provider credentials."
     },
     {
       "item_id": "code-quality-specialization-pass",
@@ -523,15 +523,15 @@
   "sync": {
     "state": "passed",
     "attempted": true,
-    "started_at_utc": "2026-06-26T19:08:41Z",
-    "finished_at_utc": "2026-06-26T19:09:56Z",
+    "started_at_utc": "2026-06-29T17:28:40Z",
+    "finished_at_utc": "2026-06-29T17:29:33Z",
     "api_base_url": "https://app.teable.ai/api",
     "base_id": "bset367EDGBD4NaB6LZ",
     "table_id": "tblxwx10oPF8KyBggsQ",
     "table_name": "Chummer Important Work",
     "synced_count": 39,
-    "created_count": 1,
-    "updated_count": 38,
+    "created_count": 0,
+    "updated_count": 39,
     "failed_count": 0,
     "errors": []
   }

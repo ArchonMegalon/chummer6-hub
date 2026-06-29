@@ -16,6 +16,7 @@ public sealed class OriginDossierPublicationServiceTests
     private const string OriginAudiobookAccountAlias = "UNMIXR_TIBOR_01";
     private const string OriginTelegramAccountAlias = "EA_TELEGRAM_ORIGIN";
     private const string OriginVisualAccountAlias = "MAGICFIT_ORIGIN_VISUAL_01";
+    private const string OriginPackagingAccountAlias = "INK01_ORIGIN_PACKAGING";
 
     [Fact]
     public void ListForAccountReturnsOnlyOwnedGoldReadyOriginDossierPublication()
@@ -982,6 +983,108 @@ public sealed class OriginDossierPublicationServiceTests
         Assert.Contains("dossier video account alias", publication.MissingGoldRequirements);
     }
 
+    [Fact]
+    public void ListForAccountRequiresConfiguredPackagingAccountAliasesBeforeGoldReady()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-packaging-account-alias.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-packaging-account-alias");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-packaging-account-alias", "Packaging Alias", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PACKAGING_ACCOUNT_ALIASES"] = OriginPackagingAccountAlias
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.True(publication.GoldReady, string.Join(", ", publication.MissingGoldRequirements));
+    }
+
+    [Fact]
+    public void ListForAccountRejectsConfiguredPackagingAccountAliasWhenReceiptDoesNotBindTheAlias()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-missing-packaging-account-alias-match.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-missing-packaging-account-alias-match");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-missing-packaging-account-alias-match", "Missing Packaging Alias", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PACKAGING_ACCOUNT_ALIASES"] = $"{OriginPackagingAccountAlias}_WRONG"
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("book packaging account alias", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountAcceptsPackagingAccountAliasesFromRegistryWithoutDirectAliasEnv()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-registry-packaging-account-alias.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(
+            tempRoot,
+            "origin-registry-packaging-account-alias",
+            bookPackagingProvider: "FlipLink");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-registry-packaging-account-alias", "Registry Packaging Alias", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY"] = $$"""
+                {
+                  "accounts": [
+                    {
+                      "accountAlias": "{{OriginPackagingAccountAlias}}",
+                      "provider": "FlipLink",
+                      "status": "available",
+                      "roles": ["packaging", "book_artifact", "origin_packaging"]
+                    }
+                  ]
+                }
+                """
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.True(publication.GoldReady, string.Join(", ", publication.MissingGoldRequirements));
+    }
+
 
     [Fact]
     public void ListForAccountRequiresApprovedSourcePacketWithExternalProcessingConsent()
@@ -1516,7 +1619,8 @@ public sealed class OriginDossierPublicationServiceTests
             tempRoot,
             projectId,
             runnerName,
-            originNamespace);
+            originNamespace,
+            bookPackagingProvider: "FlipLink");
         File.WriteAllText(
             indexPath,
             JsonSerializer.Serialize(
@@ -1556,6 +1660,12 @@ public sealed class OriginDossierPublicationServiceTests
                       "provider": "Unmixr",
                       "status": "available",
                       "roles": ["audio", "audiobook", "origin"]
+                    },
+                    {
+                      "accountAlias": "{{OriginPackagingAccountAlias}}",
+                      "provider": "FlipLink",
+                      "status": "available",
+                      "roles": ["packaging", "book_artifact", "origin_packaging"]
                     },
                     {
                       "accountAlias": "ABS_ORIGIN_01",
@@ -1677,6 +1787,7 @@ public sealed class OriginDossierPublicationServiceTests
         string? audiobookProviderAccountAlias = OriginAudiobookAccountAlias,
         string? storySceneCoverAccountAlias = OriginVisualAccountAlias,
         string? dossierVideoAccountAlias = OriginVisualAccountAlias,
+        string? bookPackagingAccountAlias = OriginPackagingAccountAlias,
         string audiobookshelfHost = "audio.chummer.run",
         string familyName = "Varga",
         string givenName = "Mira",
@@ -1717,6 +1828,7 @@ public sealed class OriginDossierPublicationServiceTests
             artifacts.HumanizerReceiptPath,
             artifacts.BookArtifactPath,
             artifacts.BookArtifactReceiptPath,
+            bookPackagingAccountAlias,
             artifacts.StorySceneCoverPath,
             artifacts.StorySceneCoverReceiptPath,
             storySceneCoverAccountAlias,
@@ -1742,7 +1854,9 @@ public sealed class OriginDossierPublicationServiceTests
         string runnerAlias = "Vanta",
         string originEditionNamespace = "origin.chummer.run/Varga/Mira/Vanta",
         string storySceneCoverAccountAlias = OriginVisualAccountAlias,
-        string dossierVideoAccountAlias = OriginVisualAccountAlias)
+        string dossierVideoAccountAlias = OriginVisualAccountAlias,
+        string bookPackagingAccountAlias = OriginPackagingAccountAlias,
+        string bookPackagingProvider = "Inkfluence")
     {
         string projectRoot = Path.Combine(tempRoot, projectId);
         Directory.CreateDirectory(projectRoot);
@@ -1780,7 +1894,8 @@ public sealed class OriginDossierPublicationServiceTests
             projectRoot,
             "book.receipt.json",
             "book_artifact_import",
-            "Inkfluence",
+            bookPackagingProvider,
+            accountAlias: bookPackagingAccountAlias,
             artifactPaths: [bookArtifactPath]);
         string ebookArtifactPath = WriteArtifact(projectRoot, "ebook.epub", "EPUB Origin Dossier ebook artifact with embedded cover");
         string ebookAudiobookshelfImportReceiptPath = WriteReceipt(

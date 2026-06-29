@@ -15,6 +15,7 @@ public sealed class OriginDossierPublicationService
     private static readonly IReadOnlyList<string> DefaultApprovedManuscriptProviderTokens = ["Inkfluence", "Youbooks", "First Book", "FirstBook", "Chummer OriginBookEngine"];
     private static readonly IReadOnlyList<string> DefaultApprovedAudiobookProviderTokens = ["Inkfluence", "Unmixr"];
     private static readonly IReadOnlyList<string> DefaultApprovedVisualProviderTokens = ["Magicfit"];
+    private static readonly IReadOnlyList<string> DefaultApprovedPackagingProviderTokens = ["Inkfluence", "FlipLink", "Runbook Press"];
     private static readonly IReadOnlyList<string> DefaultTrustedAudiobookshelfHosts = ["audio.chummer.run", "audiobookshelf.chummer.run", "audiobookshelf.girschele.com"];
     private const string SelectedCharacterFaceProofToken = "selected_character_face";
     private const string ApprovedSourcePacketToken = "approved_source_packet";
@@ -438,7 +439,8 @@ public sealed class OriginDossierPublicationService
             "Undetectable Humanizer receipt path");
         AddIfMissing(missing, HasCanonAuditReceipt(entry.SourcePacketPath, entry.ProviderManuscriptPath, entry.CanonAuditReceiptPath), "Chummer canon audit receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.BookArtifactPath), "book artifact path");
-        AddIfMissing(missing, HasArtifactReceipt(entry.BookArtifactPath, entry.BookArtifactReceiptPath, "book_artifact_import", null, ExternalProviderReceiptTokens()), "book artifact receipt path");
+        AddIfMissing(missing, HasBookArtifactReceipt(entry), "book artifact receipt path");
+        AddIfMissing(missing, HasProviderAccountAliasReceipt(entry.BookPackagingAccountAlias, entry.BookArtifactReceiptPath, "CHUMMER_ORIGIN_PACKAGING_ACCOUNT_ALIASES", "OriginDossier:PackagingAccountAliases"), "book packaging account alias");
         AddIfMissing(missing, HasArchivedArtifact(entry.EbookArtifactPath), "ebook artifact path");
         AddIfMissing(missing, HasAudiobookshelfDossierImportReceipt(entry), "Audiobookshelf dossier ebook import receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.StorySceneCoverPath), "story scene cover artifact path");
@@ -710,7 +712,9 @@ public sealed class OriginDossierPublicationService
             ? "audio"
             : envKey.Contains("VISUAL", StringComparison.OrdinalIgnoreCase)
                 ? "visual"
-                : "manuscript";
+                : envKey.Contains("PACKAGING", StringComparison.OrdinalIgnoreCase)
+                    ? "packaging"
+                    : "manuscript";
 
     private static bool HasSourcePacketReceipt(string? sourcePacketPath, string? receiptPath)
         => HasArtifactReceipt(
@@ -771,6 +775,21 @@ public sealed class OriginDossierPublicationService
                 "CHUMMER_ORIGIN_VISUAL_PROVIDER_TOKENS",
                 "OriginDossier:VisualProviderTokens",
                 DefaultApprovedVisualProviderTokens));
+    }
+
+    private bool HasBookArtifactReceipt(OriginDossierPublicationIndexEntry entry)
+    {
+        if (!HasArtifactReceipt(entry.BookArtifactPath, entry.BookArtifactReceiptPath, "book_artifact_import", null, ExternalProviderReceiptTokens()))
+        {
+            return false;
+        }
+
+        return ReceiptProviderMatchesAnyToken(
+            entry.BookArtifactReceiptPath,
+            ResolveApprovedProviderTokens(
+                "CHUMMER_ORIGIN_PACKAGING_PROVIDER_TOKENS",
+                "OriginDossier:PackagingProviderTokens",
+                DefaultApprovedPackagingProviderTokens));
     }
 
     private static bool HasAudiobookshelfDossierImportReceipt(OriginDossierPublicationIndexEntry entry)
@@ -1522,6 +1541,7 @@ public sealed class OriginDossierPublicationService
             HumanizerReceiptPath = CleanNullable(request.HumanizerReceiptPath),
             BookArtifactPath = CleanNullable(request.BookArtifactPath),
             BookArtifactReceiptPath = CleanNullable(request.BookArtifactReceiptPath),
+            BookPackagingAccountAlias = CleanNullable(request.BookPackagingAccountAlias),
             StorySceneCoverPath = CleanNullable(request.StorySceneCoverPath),
             StorySceneCoverReceiptPath = CleanNullable(request.StorySceneCoverReceiptPath),
             StorySceneCoverAccountAlias = CleanNullable(request.StorySceneCoverAccountAlias),
@@ -1690,6 +1710,7 @@ internal sealed class OriginDossierPublicationIndexEntry
     public string? HumanizerReceiptPath { get; init; }
     public string? BookArtifactPath { get; init; }
     public string? BookArtifactReceiptPath { get; init; }
+    public string? BookPackagingAccountAlias { get; init; }
     public string? StorySceneCoverPath { get; init; }
     public string? StorySceneCoverReceiptPath { get; init; }
     public string? StorySceneCoverAccountAlias { get; init; }

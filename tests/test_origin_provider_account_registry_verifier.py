@@ -44,6 +44,12 @@ def valid_registry() -> dict:
                 "roles": ["visual", "scene_render", "origin"],
             },
             {
+                "accountAlias": "FLIPLINK_ORIGIN_PACKAGE_01",
+                "provider": "FlipLink",
+                "status": "available",
+                "roles": ["packaging", "book_artifact", "origin_packaging"],
+            },
+            {
                 "accountAlias": "ABS_ORIGIN_01",
                 "provider": "Audiobookshelf",
                 "status": "available",
@@ -72,6 +78,7 @@ def test_verifier_accepts_redacted_complete_registry(tmp_path: Path) -> None:
     assert receipt["enabledRoleCounts"]["manuscript"] >= 1
     assert receipt["enabledRoleCounts"]["audio"] >= 1
     assert receipt["enabledRoleCounts"]["visual"] >= 1
+    assert receipt["enabledRoleCounts"]["packaging"] >= 1
     assert receipt["enabledRoleCounts"]["audiobookshelf"] >= 1
     assert receipt["enabledRoleCounts"]["telegram"] == 1
     assert "rangersofB5" not in json.dumps(receipt)
@@ -93,7 +100,7 @@ def test_verifier_rejects_secret_bearing_registry(tmp_path: Path) -> None:
     module = load_module()
     payload = valid_registry()
     payload["accounts"][1]["api_key"] = "UNMIXR_API_KEY=leaked"
-    payload["accounts"][3]["botToken"] = "https://api.telegram.org/bot123"
+    payload["accounts"][5]["botToken"] = "https://api.telegram.org/bot123"
     registry = write_json(tmp_path / "origin-provider-accounts.json", payload)
 
     ok, receipt = module.verify(registry, require_all_roles=True)
@@ -113,6 +120,7 @@ def test_verifier_rejects_missing_required_roles(tmp_path: Path) -> None:
 
     assert ok is False
     assert "required_role_missing:audiobookshelf" in receipt["issues"]
+    assert "required_role_missing:packaging" in receipt["issues"]
     assert "required_role_missing:telegram" in receipt["issues"]
     assert "required_role_missing:visual" in receipt["issues"]
 
@@ -120,7 +128,7 @@ def test_verifier_rejects_missing_required_roles(tmp_path: Path) -> None:
 def test_verifier_rejects_audiobookshelf_account_without_share_host(tmp_path: Path) -> None:
     module = load_module()
     payload = valid_registry()
-    payload["accounts"][3].pop("shareHost")
+    payload["accounts"][4].pop("shareHost")
     registry = write_json(tmp_path / "origin-provider-accounts.json", payload)
 
     ok, receipt = module.verify(registry, require_all_roles=True)
@@ -132,14 +140,14 @@ def test_verifier_rejects_audiobookshelf_account_without_share_host(tmp_path: Pa
 def test_verifier_rejects_origin_share_only_as_required_delivery_roles(tmp_path: Path) -> None:
     module = load_module()
     payload = valid_registry()
-    payload["accounts"][3] = {
+    payload["accounts"][4] = {
         "accountAlias": "ABS_ORIGIN_01",
         "provider": "Audiobookshelf",
         "status": "available",
         "roles": ["origin_share"],
         "shareHost": "audio.chummer.run",
     }
-    payload["accounts"][4] = {
+    payload["accounts"][5] = {
         "accountAlias": "EA_TELEGRAM_ORIGIN",
         "provider": "Telegram",
         "status": "available",
