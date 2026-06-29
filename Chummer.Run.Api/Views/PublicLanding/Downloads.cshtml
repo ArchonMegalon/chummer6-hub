@@ -84,7 +84,7 @@
 <section class="minimal-page-hero downloads-simple-hero">
     <div>
         <h1>Downloads</h1>
-        <p>Download Chummer from the current release page. The current installer is selected for this browser when available. Other downloads stay below.</p>
+        <p>Download Chummer from the current release page. Chummer selects the best installer when it can. Other downloads stay below.</p>
         <p class="muted-copy">Sign in later only if you want to attach this installed copy to your account.</p>
     </div>
 </section>
@@ -104,7 +104,7 @@ else
             <div>
                 <span>Stable</span>
                 <h2>@(stable is null ? $"{release.RequestedPlatformLabel} unavailable" : stable.PlatformLabel)</h2>
-                <p>@(stable is null ? "No public installer for this browser yet." : "Main build for this browser.")</p>
+                <p>@(stable is null ? "No matching public installer yet." : "Stable release.")</p>
             </div>
             @if (stable is null)
             {

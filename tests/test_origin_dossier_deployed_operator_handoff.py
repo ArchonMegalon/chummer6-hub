@@ -101,6 +101,7 @@ def seed_handoff_inputs(root: Path, *, deployed_status: str = "blocked", gold_st
             "canon_privacy_receipts_present": deployed_pass,
             "no_fallback_media_verified": deployed_pass,
             "canon_audit_content_verified": deployed_pass,
+            "canon_audit_route_verified": deployed_pass,
             "read_gate_verified": deployed_pass,
             "chummer_run_listen_gate_verified": deployed_pass,
             "watch_gate_verified": deployed_pass,
@@ -123,6 +124,7 @@ def seed_handoff_inputs(root: Path, *, deployed_status: str = "blocked", gold_st
             "unauthenticated_book_redirect_verified": True,
             "unauthenticated_cover_redirect_verified": True,
             "unauthenticated_video_redirect_verified": True,
+            "unauthenticated_canon_audit_redirect_verified": True,
             "all_private_routes_login_protected": True,
         },
     )

@@ -45,7 +45,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Downloads The current installer is selected for this browser when available. Main build for this browser. Nightly Stable Build from source Download script"
+                b"Downloads Chummer selects the best installer when it can. Stable release. Nightly Stable Build from source Download script"
                 b"</body></html>"
             )
             return

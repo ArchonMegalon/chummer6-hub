@@ -169,6 +169,7 @@ def materialize(
                 video_route = f"{owner_url}/video"
                 cover_route = f"{owner_url}/cover"
                 book_route = f"{owner_url}/book"
+                canon_audit_route = f"{owner_url}/canon-audit"
 
                 anonymous = requests.Session()
                 anon_detail = get(anonymous, owner_url)
@@ -177,6 +178,7 @@ def materialize(
                 anon_book = get(anonymous, book_route)
                 anon_cover = get(anonymous, cover_route)
                 anon_video = get(anonymous, video_route)
+                anon_canon_audit = get(anonymous, canon_audit_route)
                 require(anon_detail.status_code in {302, 303, 307, 308}, "anonymous detail did not redirect", failures)
                 require("/login?next=" in anon_detail.headers.get("location", ""), "anonymous detail redirect missing login next", failures)
                 require(anon_read.status_code in {302, 303, 307, 308}, "anonymous read did not redirect", failures)
@@ -189,6 +191,8 @@ def materialize(
                 require("/login?next=" in anon_cover.headers.get("location", ""), "anonymous cover redirect missing login next", failures)
                 require(anon_video.status_code in {302, 303, 307, 308}, "anonymous video did not redirect", failures)
                 require("/login?next=" in anon_video.headers.get("location", ""), "anonymous video redirect missing login next", failures)
+                require(anon_canon_audit.status_code in {302, 303, 307, 308}, "anonymous canon audit did not redirect", failures)
+                require("/login?next=" in anon_canon_audit.headers.get("location", ""), "anonymous canon audit redirect missing login next", failures)
 
                 signed = requests.Session()
                 signed.cookies.set("chummer_hub_access_token", token, domain="127.0.0.1", path="/")
@@ -242,12 +246,15 @@ def materialize(
                 video = get(signed, video_route)
                 read = get(signed, read_route)
                 listen = get(signed, listen_route)
+                canon_audit = get(signed, canon_audit_route)
                 require(cover.status_code == 200, f"cover status {cover.status_code}", failures)
                 require("image/" in cover.headers.get("content-type", ""), "cover content type not image", failures)
                 require(book.status_code == 200, f"book status {book.status_code}", failures)
                 require("epub" in book.headers.get("content-type", "").lower(), "book content type not epub", failures)
                 require(video.status_code == 200, f"video status {video.status_code}", failures)
                 require("video/mp4" in video.headers.get("content-type", ""), "video content type not mp4", failures)
+                require(canon_audit.status_code == 200, f"canon audit status {canon_audit.status_code}", failures)
+                require("application/json" in canon_audit.headers.get("content-type", ""), "canon audit content type not json", failures)
                 cover_sha = sha256_response(cover)
                 book_sha = sha256_response(book)
                 video_sha = sha256_response(video)
@@ -282,6 +289,7 @@ def materialize(
                     "book_url": book_route,
                     "listen_url": listen_route,
                     "watch_url": video_route,
+                    "canon_audit_url": canon_audit_route,
                     "audiobookshelf_redirect": entry["audiobookshelfAudiobookShareUrl"],
                     "rawCredentialExposed": False,
                     "rawSessionTokenExposed": False,
@@ -293,14 +301,15 @@ def materialize(
                     "anonymousBookRedirectVerified": anon_book.status_code in {302, 303, 307, 308},
                     "anonymousCoverRedirectVerified": anon_cover.status_code in {302, 303, 307, 308},
                     "anonymousVideoRedirectVerified": anon_video.status_code in {302, 303, 307, 308},
+                    "anonymousCanonAuditRedirectVerified": anon_canon_audit.status_code in {302, 303, 307, 308},
                     "anonymousArtifactRedirectVerified": all(
                         response.status_code in {302, 303, 307, 308}
-                        for response in (anon_read, anon_listen, anon_book, anon_cover, anon_video)
+                        for response in (anon_read, anon_listen, anon_book, anon_cover, anon_video, anon_canon_audit)
                     ),
                     "all_private_routes_login_protected": all(
                         response.status_code in {302, 303, 307, 308}
                         and "/login?next=" in response.headers.get("location", "")
-                        for response in (anon_detail, anon_read, anon_listen, anon_book, anon_cover, anon_video)
+                        for response in (anon_detail, anon_read, anon_listen, anon_book, anon_cover, anon_video, anon_canon_audit)
                     ),
                     "logged_in_browser_verified": detail.status_code == 200,
                     "readTabVisible": "href=\"#origin-edition-read\"" in detail_text and read_section_visible,
@@ -346,6 +355,7 @@ def materialize(
                     "watchRouteVerified": video.status_code == 200 and "video/mp4" in video.headers.get("content-type", ""),
                     "coverRouteVerified": cover.status_code == 200 and "image/" in cover.headers.get("content-type", ""),
                     "bookRouteVerified": book.status_code == 200 and "epub" in book.headers.get("content-type", "").lower(),
+                    "canonAuditRouteVerified": canon_audit.status_code == 200 and "application/json" in canon_audit.headers.get("content-type", ""),
                     "cover_sha_matches_import": cover_sha == expected_cover_sha,
                     "book_sha_matches_import": book_sha == expected_book_sha,
                     "video_sha_matches_import": video_sha == expected_video_sha,
@@ -377,6 +387,7 @@ def materialize(
                         "video": sha256_text(video_route),
                         "cover": sha256_text(cover_route),
                         "book": sha256_text(book_route),
+                        "canon_audit": sha256_text(canon_audit_route),
                     },
                     "failures": failures,
                     "visibleMissingGoldRequirements": visible_missing_requirements,
@@ -388,6 +399,7 @@ def materialize(
                         "canon_audit_tab_visible",
                         "anonymous_private_access_redirects_to_login",
                         "owner_read_listen_watch_routes_verified",
+                        "owner_read_listen_watch_canon_audit_routes_verified",
                     ],
                 }
                 write_json(output_path, payload)

@@ -11,8 +11,8 @@
 
 <input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken" />
 
-<section class="trust-page-hero trust-page-hero--compact">
-    <div class="trust-page-hero__copy">
+<section class="minimal-page-hero pwa-minimal-hero">
+    <div>
         <p class="eyebrow">@PublicMobileText(Model.Eyebrow)</p>
         <h1 class="page-title">@PublicMobileText(Model.Heading)</h1>
         <p class="page-copy">@PublicMobileText(Model.Intro)</p>
@@ -29,61 +29,26 @@
     </div>
 </section>
 
-<section class="workflow-band workflow-band--compact">
-    <div class="workflow-band__lead">
-        <p class="eyebrow">Installability state</p>
-        <h2 class="editorial-title">Install like an app. Re-enter like a session shell.</h2>
-        <p class="editorial-copy">@PublicMobileText(Model.InstallabilitySummary)</p>
+<section class="minimal-section minimal-section--tight" id="pwa-ledger-stream">
+    <div class="minimal-section__lead">
+        <p class="eyebrow">Living world</p>
+        <h2>Black Ledger live tracker</h2>
+        <p>Heat, movement, turn state, and reconnect status stay in one compact mobile view.</p>
     </div>
-    <div class="flagship-gateway-grid flagship-gateway-grid--compact">
-        <article class="gateway-card">
-            <div class="gateway-card__header">
-                <span class="tag" data-pwa-online-state>Checking</span>
-                <h3>Install readiness</h3>
-            </div>
-            <p data-pwa-install-state>The mobile view is available now. Install prompts depend on the browser, but the app page and offline return path are ready.</p>
+    <div class="minimal-facts">
+        <article>
+            <p class="eyebrow">Install</p>
+            <h3><span data-pwa-online-state>Checking</span></h3>
+            <p data-pwa-install-state>@PublicMobileText(Model.InstallabilitySummary) The offline return path stays ready.</p>
             <div class="stacked-actions">
                 <a class="editorial-strip__action" href="/mobile">Open mobile view</a>
                 <a class="editorial-strip__action" href="/downloads">Desktop downloads</a>
-            </div>
-        </article>
-        <article class="gateway-card">
-            <div class="gateway-card__header">
-                <span class="tag">Live</span>
-                <h3>Offline return path</h3>
-            </div>
-            <p>Chummer keeps the mobile path, play view, return path, and install assets ready so a reconnect starts from the right place.</p>
-            <div class="stacked-actions">
-                <a class="editorial-strip__action" href="/play/continuity">Open continuity</a>
-                <a class="editorial-strip__action" href="/help">Open help</a>
-            </div>
-        </article>
-        <article class="gateway-card">
-            <div class="gateway-card__header">
-                <span class="tag">Continuity</span>
-                <h3>Next safe action</h3>
-            </div>
-            <p>The installable shell does not replace downloads, support, or account recovery. It keeps the return path explicit when you move between public, linked, and session surfaces.</p>
-            <div class="stacked-actions">
-                <a class="editorial-strip__action" href="/play/continuity">Open continuity</a>
                 <a class="editorial-strip__action" href="/help">Open setup help</a>
             </div>
         </article>
-    </div>
-</section>
-
-<section class="workflow-band workflow-band--compact">
-    <div class="workflow-band__lead">
-        <p class="eyebrow">Living world</p>
-        <h2 class="editorial-title">Black Ledger live tracker</h2>
-        <p class="editorial-copy">Enable updates in account preferences to keep heat, movement, and turn status visible in the same mobile shell.</p>
-    </div>
-    <div class="flagship-gateway-grid flagship-gateway-grid--compact" id="pwa-ledger-stream">
-        <article class="gateway-card">
-            <div class="gateway-card__header">
-                <span class="tag" data-pwa-ledger-status>Checking</span>
-                <h3>Board snapshot</h3>
-            </div>
+        <article>
+            <p class="eyebrow">Ledger</p>
+            <h3><span data-pwa-ledger-status>Checking</span></h3>
             <p data-pwa-ledger-summary>Waiting for live board stream data.</p>
             <p class="muted-copy">
                 <span>World:</span>
@@ -114,11 +79,9 @@
             <div class="muted-copy" data-pwa-ledger-follow-state>Sign in to opt in and follow a living world.</div>
             <div class="muted-copy" data-pwa-ledger-follow-hint></div>
         </article>
-        <article class="gateway-card">
-            <div class="gateway-card__header">
-                <span class="tag">Top districts</span>
-                <h3>Continuity and heat</h3>
-            </div>
+        <article>
+            <p class="eyebrow">Continuity</p>
+            <h3>Turn and heat</h3>
             <p class="muted-copy">
                 <span>Continuity turn:</span>
                 <span data-pwa-continuity-turn>—</span>
@@ -131,26 +94,22 @@
             <ul class="gateway-card__list" data-pwa-ledger-top-districts>
                 <li>No live district data yet.</li>
             </ul>
-            <p class="muted-copy">This list updates from the living world stream when you allow table-safe updates.</p>
         </article>
-        <article class="gateway-card">
-            <div class="gateway-card__header">
-                <span class="tag">Update stream</span>
-                <h3>Polling state</h3>
-            </div>
-            <p>
+        <article>
+            <p class="eyebrow">Links</p>
+            <h3>Details</h3>
+            <p class="muted-copy">
                 <span>Route:</span>
                 <span>/mobile/pwa/ledger.json</span>
             </p>
-            <p>
+            <p class="muted-copy">
                 <span>Turn detail:</span>
                 <a class="editorial-strip__action" data-pwa-ledger-turn-route href="/ledger/turns/1">Open live turn</a>
             </p>
-            <p>
+            <p class="muted-copy">
                 <span>Turn newsreel:</span>
                 <a class="editorial-strip__action" data-pwa-ledger-newsreel-route href="/ledger/turns/1/newsreel.json">Open live newsreel</a>
             </p>
-            <p class="muted-copy">Updates refresh every 30 seconds while the page is open.</p>
             <p class="muted-copy">
                 <span>Last update:</span>
                 <span data-pwa-ledger-updated>never</span>
@@ -159,40 +118,16 @@
     </div>
 </section>
 
-<section class="workflow-band workflow-band--compact">
-    <div class="workflow-band__lead">
-        <p class="eyebrow">Capabilities</p>
-        <h2 class="editorial-title">One mobile view, five clear promises.</h2>
+<section class="minimal-section minimal-section--tight">
+    <div class="minimal-section__lead">
+        <p class="eyebrow">Roles</p>
+        <h2>Open the right shell.</h2>
+        <p>Player, GM, and observer entry points meet in one shell.</p>
     </div>
-    <div class="flagship-gateway-grid flagship-gateway-grid--compact">
-        @foreach (var capability in Model.Capabilities)
-        {
-            <article class="gateway-card">
-                <div class="gateway-card__header">
-                    <span class="tag">Included</span>
-                    <h3>@PublicMobileText(capability.Label)</h3>
-                </div>
-                <p>@PublicMobileText(capability.Summary)</p>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="workflow-band workflow-band--compact">
-    <div class="workflow-band__lead">
-        <p class="eyebrow">Role entry</p>
-        <h2 class="editorial-title">Player, GM, and observer entry points meet in one shell.</h2>
-        <p class="editorial-copy">Choose a role-specific front door without splitting the product into different stories. The same app shell keeps install, return, and reconnect status visible in every role.</p>
-    </div>
-    <div class="route-choice-grid route-choice-grid--three">
+    <div class="minimal-actions" aria-label="Role entry">
         @foreach (var role in Model.Roles)
         {
-            <article class="route-choice-card">
-                <span class="tag">@(role.Current ? "Current role" : "Role alias")</span>
-                <h3>@PublicMobileText(role.Label)</h3>
-                <p>@PublicMobileText(role.Summary)</p>
-                <a class="editorial-strip__action" href="@role.Href">Open @PublicMobileText(role.Label)</a>
-            </article>
+            <a class="button-like @(role.Current ? "button-like--primary" : "button-like--secondary")" href="@role.Href">Open @PublicMobileText(role.Label)</a>
         }
     </div>
 </section>

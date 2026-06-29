@@ -114,6 +114,7 @@ def authenticated_route_receipt(
             "watch_url": f"{owner}/video",
             "selected_face_cover_url": f"{owner}/cover",
             "book_url": f"{owner}/book",
+            "canon_audit_url": f"{owner}/canon-audit",
             "ownerDetailStatus": 200,
             "ownerLibraryStatus": 200,
             "anonymousDetailRedirectVerified": True,
@@ -122,6 +123,7 @@ def authenticated_route_receipt(
             "anonymousBookRedirectVerified": True,
             "anonymousCoverRedirectVerified": True,
             "anonymousVideoRedirectVerified": True,
+            "anonymousCanonAuditRedirectVerified": True,
             "anonymousArtifactRedirectVerified": True,
             "all_private_routes_login_protected": True,
             "logged_in_browser_verified": True,
@@ -142,6 +144,7 @@ def authenticated_route_receipt(
             "watch_gate_verified": True,
             "coverRouteVerified": True,
             "bookRouteVerified": True,
+            "canonAuditRouteVerified": True,
             "cover_sha_matches_import": True,
             "book_sha_matches_import": True,
             "video_sha_matches_import": True,
@@ -154,6 +157,7 @@ def authenticated_route_receipt(
                 "video": sha256_text(f"{owner}/video"),
                 "cover": sha256_text(f"{owner}/cover"),
                 "book": sha256_text(f"{owner}/book"),
+                "canon_audit": sha256_text(f"{owner}/canon-audit"),
             },
             "tokens": [
                 "authenticated_chummer_run_route_proof",
@@ -162,7 +166,7 @@ def authenticated_route_receipt(
                 "watch_tab_visible",
                 "canon_audit_tab_visible",
                 "anonymous_private_access_redirects_to_login",
-                "owner_read_listen_watch_routes_verified",
+                "owner_read_listen_watch_canon_audit_routes_verified",
             ],
         },
     )
@@ -502,6 +506,7 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
             "watch_section_visible": deployed_pass,
             "canon_audit_tab_visible": deployed_pass,
             "canon_audit_content_verified": deployed_pass,
+            "canon_audit_route_verified": deployed_pass,
             "chummer_canon_owner_visible": deployed_pass,
             "provider_created_facts_blocked_visible": deployed_pass,
             "canon_privacy_receipts_present": deployed_pass,
@@ -526,6 +531,7 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
             "unauthenticated_book_redirect_verified": True,
             "unauthenticated_cover_redirect_verified": True,
             "unauthenticated_video_redirect_verified": True,
+            "unauthenticated_canon_audit_redirect_verified": True,
             "all_private_routes_login_protected": True,
             "blockers": [] if deployed_pass else ["missing_deployed_identity_token"],
         },
@@ -796,6 +802,33 @@ def test_completion_matrix_blocks_when_deployed_canon_audit_content_is_missing(t
     assert "deployed_user_login_read_listen_watch" in result["blockedRows"]
     assert deployed_row["flags"]["canon_audit_content_verified"] is False
     assert deployed_row["flags"]["chummer_canon_owner_visible"] is False
+
+
+def test_completion_matrix_blocks_when_deployed_canon_audit_route_is_missing(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    probe_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/deployed-chummer-browser-probe.receipt.json"
+    probe = json.loads(probe_path.read_text(encoding="utf-8"))
+    probe["canon_audit_route_verified"] = False
+    probe["unauthenticated_canon_audit_redirect_verified"] = False
+    probe["all_private_routes_login_protected"] = False
+    probe["blockers"] = [
+        "canon_audit_route_verified",
+        "unauthenticated_canon_audit_redirect_verified",
+        "all_private_routes_login_protected",
+    ]
+    write_json(probe_path, probe)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    deployed_row = next(row for row in result["rows"] if row["id"] == "deployed_user_login_read_listen_watch")
+
+    assert result["status"] == "blocked"
+    assert result["goalCompletionClaimAllowed"] is False
+    assert "deployed_user_login_read_listen_watch" in result["blockedRows"]
+    assert deployed_row["flags"]["canon_audit_content_verified"] is True
+    assert deployed_row["flags"]["canon_audit_route_verified"] is False
+    assert deployed_row["flags"]["unauthenticated_canon_audit_redirect_verified"] is False
+    assert deployed_row["flags"]["all_private_routes_login_protected"] is False
 
 
 def test_completion_matrix_blocks_artifacts_outside_required_origin_branches(tmp_path: Path) -> None:
@@ -1394,6 +1427,41 @@ def test_completion_matrix_blocks_when_local_private_artifact_route_is_public(tm
     assert "all_private_routes_login_protected" in row["failedFlags"]
 
 
+def test_completion_matrix_blocks_when_local_canon_audit_route_is_missing(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    route_path = tmp_path / "origin.chummer.run/Varga/Mira/Kestrel/authenticated-chummer-route-live.receipt.json"
+    route = json.loads(route_path.read_text(encoding="utf-8"))
+    route["canon_audit_url"] = ""
+    route["anonymousCanonAuditRedirectVerified"] = False
+    route["canonAuditRouteVerified"] = False
+    route["urlHashes"].pop("canon_audit", None)
+    route["tokens"] = [
+        "authenticated_chummer_run_route_proof",
+        "read_tab_visible",
+        "listen_tab_visible",
+        "watch_tab_visible",
+        "canon_audit_tab_visible",
+        "anonymous_private_access_redirects_to_login",
+        "owner_read_listen_watch_routes_verified",
+    ]
+    write_json(route_path, route)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "local_authenticated_route_tabs_verified")
+
+    assert result["status"] == "blocked"
+    assert "local_authenticated_route_tabs_verified" in result["blockedRows"]
+    assert row["flags"]["anonymous_canon_audit_redirect_verified"] is False
+    assert row["flags"]["canon_audit_route_verified"] is False
+    assert row["flags"]["local_route_urls_are_private_origin_routes"] is False
+    assert row["flags"]["url_hashes_match_expected_local_routes"] is False
+    assert row["flags"]["required_tokens_present"] is False
+    assert "anonymous_canon_audit_redirect_verified" in row["failedFlags"]
+    assert "canon_audit_route_verified" in row["failedFlags"]
+    assert "required_tokens_present" in row["failedFlags"]
+
+
 def test_completion_matrix_blocks_when_local_authenticated_route_media_hash_mismatches_import(tmp_path: Path) -> None:
     module = load_module()
     seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
@@ -1425,8 +1493,13 @@ def test_completion_matrix_accepts_local_authenticated_route_on_ephemeral_port(t
     row = next(item for item in result["rows"] if item["id"] == "local_authenticated_route_tabs_verified")
 
     assert row["status"] == "proved"
+    assert row["flags"]["canon_audit_route_verified"] is True
+    assert row["flags"]["anonymous_canon_audit_redirect_verified"] is True
     assert row["flags"]["local_route_urls_are_private_origin_routes"] is True
     assert row["flags"]["url_hashes_match_expected_local_routes"] is True
+    assert row["localRouteUrlHashes"]["canon_audit"] == sha256_text(
+        "http://127.0.0.1:47019/account/work/origin-dossiers/varga-mira-kestrel/canon-audit"
+    )
     assert "local_authenticated_route_tabs_verified" not in result["blockedRows"]
 
 

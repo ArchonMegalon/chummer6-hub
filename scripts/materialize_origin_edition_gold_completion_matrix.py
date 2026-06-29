@@ -943,6 +943,7 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
         "anonymous_book_redirect_verified": False,
         "anonymous_cover_redirect_verified": False,
         "anonymous_video_redirect_verified": False,
+        "anonymous_canon_audit_redirect_verified": False,
         "anonymous_artifact_redirect_verified": False,
         "all_private_routes_login_protected": False,
         "logged_in_browser_verified": False,
@@ -963,6 +964,7 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
         "watch_gate_verified": False,
         "cover_route_verified": False,
         "book_route_verified": False,
+        "canon_audit_route_verified": False,
         "cover_sha_matches_import": False,
         "book_sha_matches_import": False,
         "video_sha_matches_import": False,
@@ -993,6 +995,7 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
         "video": string(payload.get("watch_url")),
         "cover": string(payload.get("selected_face_cover_url")),
         "book": string(payload.get("book_url")),
+        "canon_audit": string(payload.get("canon_audit_url")),
     }
     expected_paths = {
         "owner": f"/account/work/origin-dossiers/{project_id}",
@@ -1001,6 +1004,7 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
         "video": f"/account/work/origin-dossiers/{project_id}/video",
         "cover": f"/account/work/origin-dossiers/{project_id}/cover",
         "book": f"/account/work/origin-dossiers/{project_id}/book",
+        "canon_audit": f"/account/work/origin-dossiers/{project_id}/canon-audit",
     }
     flags["receipt_passed"] = is_pass(payload)
     flags["local_authenticated_instance"] = payload.get("localAuthenticatedRunSiteInstance") is True
@@ -1015,6 +1019,7 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
     flags["anonymous_book_redirect_verified"] = payload.get("anonymousBookRedirectVerified") is True
     flags["anonymous_cover_redirect_verified"] = payload.get("anonymousCoverRedirectVerified") is True
     flags["anonymous_video_redirect_verified"] = payload.get("anonymousVideoRedirectVerified") is True
+    flags["anonymous_canon_audit_redirect_verified"] = payload.get("anonymousCanonAuditRedirectVerified") is True
     flags["anonymous_artifact_redirect_verified"] = payload.get("anonymousArtifactRedirectVerified") is True
     flags["all_private_routes_login_protected"] = payload.get("all_private_routes_login_protected") is True
     flags["logged_in_browser_verified"] = payload.get("logged_in_browser_verified") is True
@@ -1035,6 +1040,7 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
     flags["watch_gate_verified"] = payload.get("watch_gate_verified") is True
     flags["cover_route_verified"] = payload.get("coverRouteVerified") is True
     flags["book_route_verified"] = payload.get("bookRouteVerified") is True
+    flags["canon_audit_route_verified"] = payload.get("canonAuditRouteVerified") is True
     flags["cover_sha_matches_import"] = payload.get("cover_sha_matches_import") is True
     flags["book_sha_matches_import"] = payload.get("book_sha_matches_import") is True
     flags["video_sha_matches_import"] = payload.get("video_sha_matches_import") is True
@@ -1057,7 +1063,7 @@ def local_authenticated_route_row(path: Path, request: dict[str, Any], context: 
         "watch_tab_visible",
         "canon_audit_tab_visible",
         "anonymous_private_access_redirects_to_login",
-        "owner_read_listen_watch_routes_verified",
+        "owner_read_listen_watch_canon_audit_routes_verified",
     ))
     failed = [key for key, passed in flags.items() if not passed]
     row.update(
@@ -1169,6 +1175,7 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         "watch_section_visible": deployed_probe.get("watch_section_visible") is True,
         "canon_audit_tab_visible": deployed_probe.get("canon_audit_tab_visible") is True,
         "canon_audit_content_verified": deployed_probe.get("canon_audit_content_verified") is True,
+        "canon_audit_route_verified": deployed_probe.get("canon_audit_route_verified") is True,
         "chummer_canon_owner_visible": deployed_probe.get("chummer_canon_owner_visible") is True,
         "provider_created_facts_blocked_visible": deployed_probe.get("provider_created_facts_blocked_visible") is True,
         "canon_privacy_receipts_present": deployed_probe.get("canon_privacy_receipts_present") is True,
@@ -1192,6 +1199,7 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         "unauthenticated_book_redirect_verified": deployed_probe.get("unauthenticated_book_redirect_verified") is True,
         "unauthenticated_cover_redirect_verified": deployed_probe.get("unauthenticated_cover_redirect_verified") is True,
         "unauthenticated_video_redirect_verified": deployed_probe.get("unauthenticated_video_redirect_verified") is True,
+        "unauthenticated_canon_audit_redirect_verified": deployed_probe.get("unauthenticated_canon_audit_redirect_verified") is True,
         "all_private_routes_login_protected": deployed_probe.get("all_private_routes_login_protected") is True,
         "owner_playback_e2e_verified": deployed_probe.get("owner_playback_e2e_verified") is True,
     }

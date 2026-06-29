@@ -76,8 +76,8 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             "path": "/downloads",
             "required_texts": [
                 "Downloads",
-                "The current installer is selected for this browser when available.",
-                "Main build for this browser",
+                "Chummer selects the best installer when it can.",
+                "Stable release",
                 "Nightly",
                 "Stable",
                 "Build from source",
@@ -109,8 +109,8 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             "required_final_url_prefix": "/downloads",
             "required_texts": [
                 "Downloads",
-                "The current installer is selected for this browser when available.",
-                "Main build for this browser",
+                "Chummer selects the best installer when it can.",
+                "Stable release",
                 "Build from source",
             ],
             "forbidden_texts": [

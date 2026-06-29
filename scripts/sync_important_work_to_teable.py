@@ -118,8 +118,8 @@ def important_work_items() -> list[ImportantWorkItem]:
             cadence="daily until released",
             source="Product direction",
             why_it_matters="The feature should feel like creating a book, not filling an internal options form.",
-            next_action="Verify the next installed desktop build starts from race/metatype and archetype, shows the story first, and labels the primary handoff as a book before audio/video.",
-            acceptance_gate="A user can start a dossier, read the story first, open the FlipLink-style book, then request audio/video without touching advanced controls.",
+            next_action="Verify the next installed desktop build starts from race/metatype and archetype, shows the story first, labels the primary handoff as a book before audio/video, and preserves authenticated read/listen/watch/canon-audit owner routes.",
+            acceptance_gate="A user can start a dossier, read the story first, open the FlipLink-style book, then request audio/video and access private read/listen/watch/canon-audit routes only as the signed-in owner.",
         ),
         ImportantWorkItem(
             item_id="origin-dossier-alice-seed",
@@ -466,8 +466,8 @@ def important_work_items() -> list[ImportantWorkItem]:
             cadence="daily until stable",
             source="Provider account update",
             why_it_matters="Origin Dossier visual proofs should stay on the preferred Magicfit lane, book/PDF/ebook packaging should have its own governed provider account role, and Runsite scene renders plus Propertyquarry apartment videos should use the multi-account MagicAI/omagic pool through internal EA skills.",
-            next_action="Keep Magicfit as the approved Origin Dossier visual receipt lane, require packaging account aliases on book artifact receipts when configured, keep provider credit reservation audit-only checks read-only, mint missing omagic API keys, keep empty key slots explicit in env until minted, and route runsite/propertyquarry render requests through internal-only EA capability surfaces.",
-            acceptance_gate="Origin Dossier accepts Magicfit-backed visual receipts, validates configured packaging provider receipts, proves no-credit-burn provider readiness audits, Runsite and Propertyquarry expose internal render capability receipts, and Teable reflects the split without exposing raw provider credentials.",
+            next_action="Keep Magicfit as the approved Origin Dossier visual receipt lane, require packaging account aliases on book artifact receipts when configured, keep provider credit reservation audit-only checks read-only across free/supporter tiers, mint missing omagic API keys, keep empty key slots explicit in env until minted, and route runsite/propertyquarry render requests through internal-only EA capability surfaces.",
+            acceptance_gate="Origin Dossier accepts Magicfit-backed visual receipts, validates configured packaging provider receipts, proves no-credit-burn provider readiness audits and free/supporter credit gates, Runsite and Propertyquarry expose internal render capability receipts, and Teable reflects the split without exposing raw provider credentials.",
         ),
         ImportantWorkItem(
             item_id="code-quality-specialization-pass",

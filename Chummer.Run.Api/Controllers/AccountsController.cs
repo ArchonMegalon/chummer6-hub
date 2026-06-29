@@ -1027,6 +1027,9 @@ public sealed class AccountsController : Controller
             && !string.Equals(artifactKind, "video", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(artifactKind, "watch", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(artifactKind, "movie", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactKind, "canon-audit", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactKind, "canon", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(artifactKind, "audit", StringComparison.OrdinalIgnoreCase)
             && !string.Equals(artifactKind, "listen", StringComparison.OrdinalIgnoreCase))
         {
             return NotFound();
@@ -1090,6 +1093,7 @@ public sealed class AccountsController : Controller
             string resolvedArtifactKind = artifactKind.Trim().ToLowerInvariant() switch
             {
                 "watch" or "movie" => "video",
+                "canon" or "audit" => "canon-audit",
                 _ => artifactKind
             };
             OriginDossierPublicationArtifact? artifact = _originDossierPublications.GetArtifactForAccount(

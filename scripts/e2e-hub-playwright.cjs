@@ -462,7 +462,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Downloads');
     await expectVisible(page, 'text=Nightly');
     await expectVisible(page, 'text=Stable');
-    await expectVisible(page, 'text=Main build for this browser.');
+    await expectVisible(page, 'text=Stable release.');
     await expectVisible(page, 'text=Other downloads');
     await page.locator('summary:has-text("Other downloads")').click();
     await expectVisible(page, 'text=Build from source');
@@ -755,7 +755,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Downloads');
     await expectVisible(page, 'text=Stable');
     await expectVisible(page, 'text=Nightly');
-    await expectVisible(page, 'text=Main build for this browser.');
+    await expectVisible(page, 'text=Stable release.');
     await assertNoBannedCopy(page, 'Signed-in /downloads');
   });
 

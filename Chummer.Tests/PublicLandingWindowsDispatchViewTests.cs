@@ -42,12 +42,12 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("preview rollout", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Create account to get preview", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Download Chummer from the current release page.", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("The current installer is selected for this browser when available. Other downloads stay below.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Chummer selects the best installer when it can. Other downloads stay below.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("attach this installed copy to your account", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"stable\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"nightly\"", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Main build for this browser.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Stable release.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Newer than Stable.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<summary>Other downloads</summary>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("No sudo. Updates default to notify.", downloadsView, StringComparison.Ordinal);

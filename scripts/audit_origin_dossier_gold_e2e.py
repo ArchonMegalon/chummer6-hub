@@ -36,6 +36,8 @@ REQUIRED_BROWSER_FLAGS = (
     "listen_tab_visible",
     "watch_tab_visible",
     "canon_audit_tab_visible",
+    "canon_audit_content_verified",
+    "canon_audit_route_verified",
     "read_gate_verified",
     "chummer_run_listen_gate_verified",
     "watch_gate_verified",
@@ -45,6 +47,7 @@ REQUIRED_BROWSER_FLAGS = (
     "unauthenticated_book_redirect_verified",
     "unauthenticated_cover_redirect_verified",
     "unauthenticated_video_redirect_verified",
+    "unauthenticated_canon_audit_redirect_verified",
     "all_private_routes_login_protected",
     "live_provider_artifacts_verified",
     "live_provider_delivery_verified",
@@ -284,6 +287,7 @@ def _audit_browser_proof(path: Path, project_id: str, share_url: str, base_url: 
     _add_issue(issues, _chummer_owner_url(_string(payload.get("book_url")), project_id, "/book", base_url=base_url), "browser_book_url_not_chummer_run")
     _add_issue(issues, _chummer_owner_url(_string(payload.get("listen_url")), project_id, "/listen", base_url=base_url), "browser_listen_url_not_chummer_run")
     _add_issue(issues, _chummer_owner_url(_string(payload.get("watch_url")), project_id, "/video", base_url=base_url), "browser_watch_url_not_chummer_run")
+    _add_issue(issues, _chummer_owner_url(_string(payload.get("canon_audit_url")), project_id, "/canon-audit", base_url=base_url), "browser_canon_audit_url_not_chummer_run")
     _add_issue(issues, _string(payload.get("audiobookshelf_redirect")) == share_url, "browser_audiobookshelf_redirect_mismatch")
     _add_issue(issues, _trusted_audiobookshelf_share(_string(payload.get("audiobookshelf_redirect"))), "browser_audiobookshelf_redirect_untrusted")
     _add_issue(issues, not _contains_marker(payload, FAKE_MARKERS), "browser_fake_or_fallback_marker")

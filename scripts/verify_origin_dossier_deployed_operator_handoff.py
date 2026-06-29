@@ -56,6 +56,7 @@ REQUIRED_DEPLOYED_PROBE_FLAGS = (
     "canon_privacy_receipts_present",
     "no_fallback_media_verified",
     "canon_audit_content_verified",
+    "canon_audit_route_verified",
     "read_gate_verified",
     "chummer_run_listen_gate_verified",
     "watch_gate_verified",
@@ -78,6 +79,7 @@ REQUIRED_DEPLOYED_PROBE_FLAGS = (
     "unauthenticated_book_redirect_verified",
     "unauthenticated_cover_redirect_verified",
     "unauthenticated_video_redirect_verified",
+    "unauthenticated_canon_audit_redirect_verified",
     "all_private_routes_login_protected",
 )
 FORBIDDEN_VALUE_MARKERS = (

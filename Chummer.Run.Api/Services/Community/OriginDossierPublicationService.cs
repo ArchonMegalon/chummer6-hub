@@ -121,6 +121,7 @@ public sealed class OriginDossierPublicationService
                 "book" => entry.BookArtifactPath,
                 "cover" => entry.StorySceneCoverPath,
                 "video" => entry.DossierVideoPath,
+                "canon-audit" or "canon" or "audit" => entry.CanonAuditReceiptPath,
                 _ => null
             };
 
@@ -1662,6 +1663,7 @@ public sealed class OriginDossierPublicationService
             "book" when path.EndsWith(".docx", StringComparison.OrdinalIgnoreCase) => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "book" when path.EndsWith(".md", StringComparison.OrdinalIgnoreCase) => "text/markdown; charset=utf-8",
             "book" => "application/pdf",
+            "canon-audit" or "canon" or "audit" => "application/json; charset=utf-8",
             _ => "application/octet-stream"
         };
 }

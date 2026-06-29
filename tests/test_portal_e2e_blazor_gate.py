@@ -41,7 +41,7 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 """
                 <html><body>
                 <h1>Downloads</h1>
-                <p>Main build for this browser</p>
+                <p>Stable release</p>
                 <p>Stable</p>
                 <p>Nightly</p>
                 <p>Build from source</p>

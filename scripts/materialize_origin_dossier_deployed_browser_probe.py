@@ -246,6 +246,7 @@ def materialize(
     book_url = f"{owner_url}/book"
     cover_url = f"{owner_url}/cover"
     watch_url = f"{owner_url}/video"
+    canon_audit_url = f"{owner_url}/canon-audit"
 
     anonymous = requests.Session()
     anonymous_detail = get(anonymous, owner_url)
@@ -254,6 +255,7 @@ def materialize(
     anonymous_book = get(anonymous, book_url)
     anonymous_cover = get(anonymous, cover_url)
     anonymous_video = get(anonymous, watch_url)
+    anonymous_canon_audit = get(anonymous, canon_audit_url)
     share_session = requests.Session()
     audiobook_share = get(share_session, share_url) if share_url else None
     dossier_share = get(share_session, dossier_share_url) if dossier_share_url else None
@@ -267,6 +269,7 @@ def materialize(
     anon_book_redirect = login_redirect(anonymous_book)
     anon_cover_redirect = login_redirect(anonymous_cover)
     anon_video_redirect = login_redirect(anonymous_video)
+    anon_canon_audit_redirect = login_redirect(anonymous_canon_audit)
     all_private_routes_login_protected = all(
         [
             anon_detail_redirect,
@@ -275,6 +278,7 @@ def materialize(
             anon_book_redirect,
             anon_cover_redirect,
             anon_video_redirect,
+            anon_canon_audit_redirect,
         ]
     )
 
@@ -286,6 +290,7 @@ def materialize(
     read = get(signed, read_url) if has_owner_auth else None
     listen = get(signed, listen_url) if has_owner_auth else None
     video = get(signed, watch_url) if has_owner_auth else None
+    canon_audit = get(signed, canon_audit_url) if has_owner_auth else None
 
     detail_text = detail.text if detail is not None and status(detail) == 200 else ""
     logged_in = status(detail) == 200 and "data-origin-dossier-detail" in detail_text
@@ -327,6 +332,7 @@ def materialize(
     watch_gate = status(video) == 200 and "video/mp4" in header(video, "content-type")
     cover_gate = status(cover) == 200 and "image/" in header(cover, "content-type")
     book_gate = status(book) == 200 and "epub" in header(book, "content-type").lower()
+    canon_audit_route = status(canon_audit) == 200 and "application/json" in header(canon_audit, "content-type")
     watch_artifact_nonempty = watch_gate and body_size(video) > 0
     cover_artifact_nonempty = cover_gate and body_size(cover) > 0
     book_artifact_nonempty = book_gate and body_size(book) > 0
@@ -342,6 +348,7 @@ def materialize(
             watch_tab,
             canon_tab,
             canon_audit_content_verified,
+            canon_audit_route,
             read_gate,
             listen_gate,
             watch_gate,
@@ -389,6 +396,7 @@ def materialize(
         "canon_privacy_receipts_present": canon_privacy_receipts_present,
         "no_fallback_media_verified": no_fallback_media_verified,
         "canon_audit_content_verified": canon_audit_content_verified,
+        "canon_audit_route_verified": canon_audit_route,
         "read_gate_verified": read_gate,
         "chummer_run_listen_gate_verified": listen_gate,
         "watch_gate_verified": watch_gate,
@@ -411,6 +419,7 @@ def materialize(
         "unauthenticated_book_redirect_verified": anon_book_redirect,
         "unauthenticated_cover_redirect_verified": anon_cover_redirect,
         "unauthenticated_video_redirect_verified": anon_video_redirect,
+        "unauthenticated_canon_audit_redirect_verified": anon_canon_audit_redirect,
         "all_private_routes_login_protected": all_private_routes_login_protected,
     }
     blockers.extend([key for key, value in checks.items() if not value])
@@ -448,6 +457,7 @@ def materialize(
         "book_url": book_url,
         "listen_url": listen_url,
         "watch_url": watch_url,
+        "canon_audit_url": canon_audit_url,
         "audiobookshelf_redirect": share_url,
         "local_fixture_artifacts": False,
         "deployedRouteClaimAllowed": passed,
@@ -471,6 +481,7 @@ def materialize(
             "anonymous_book": status(anonymous_book),
             "anonymous_cover": status(anonymous_cover),
             "anonymous_video": status(anonymous_video),
+            "anonymous_canon_audit": status(anonymous_canon_audit),
             "audiobook_share": status(audiobook_share),
             "dossier_share": status(dossier_share),
             "owner_detail": status(detail),
@@ -479,11 +490,13 @@ def materialize(
             "read": status(read),
             "listen": status(listen),
             "watch": status(video),
+            "canon_audit": status(canon_audit),
         },
         "response_body_sizes": {
             "cover": body_size(cover),
             "book": body_size(book),
             "watch": body_size(video),
+            "canon_audit": body_size(canon_audit),
             "audiobook_share": body_size(audiobook_share),
             "dossier_share": body_size(dossier_share),
         },
@@ -491,6 +504,7 @@ def materialize(
             "cover": response_sha256(cover),
             "book": response_sha256(book),
             "watch": response_sha256(video),
+            "canon_audit": response_sha256(canon_audit),
         },
         "redirect_location_sha256": {
             "read": sha256_text(header(read, "location")),
@@ -511,6 +525,7 @@ def materialize(
             "book": sha256_text(book_url),
             "listen": sha256_text(listen_url),
             "watch": sha256_text(watch_url),
+            "canon_audit": sha256_text(canon_audit_url),
             "cover": sha256_text(cover_url),
             "audiobookshelf_redirect": sha256_text(share_url),
             "audiobookshelf_dossier_redirect": sha256_text(dossier_share_url),

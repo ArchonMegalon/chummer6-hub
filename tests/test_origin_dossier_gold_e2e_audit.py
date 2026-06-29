@@ -62,6 +62,7 @@ def write_browser_proof(root: Path, *, project_id: str, share_url: str, live: bo
             "book_url": f"{base_url}/account/work/origin-dossiers/{project_id}/book",
             "listen_url": f"{base_url}/account/work/origin-dossiers/{project_id}/listen",
             "watch_url": f"{base_url}/account/work/origin-dossiers/{project_id}/video",
+            "canon_audit_url": f"{base_url}/account/work/origin-dossiers/{project_id}/canon-audit",
             "audiobookshelf_redirect": share_url,
             "logged_in_browser_verified": True,
             "selected_face_cover_visible": True,
@@ -69,6 +70,8 @@ def write_browser_proof(root: Path, *, project_id: str, share_url: str, live: bo
             "listen_tab_visible": True,
             "watch_tab_visible": True,
             "canon_audit_tab_visible": True,
+            "canon_audit_content_verified": True,
+            "canon_audit_route_verified": True,
             "read_gate_verified": True,
             "chummer_run_listen_gate_verified": True,
             "watch_gate_verified": True,
@@ -78,6 +81,7 @@ def write_browser_proof(root: Path, *, project_id: str, share_url: str, live: bo
             "unauthenticated_book_redirect_verified": True,
             "unauthenticated_cover_redirect_verified": True,
             "unauthenticated_video_redirect_verified": True,
+            "unauthenticated_canon_audit_redirect_verified": True,
             "all_private_routes_login_protected": True,
             "owner_playback_e2e_verified": live,
         },
@@ -101,6 +105,7 @@ def write_deployed_probe(root: Path, *, project_id: str, share_url: str, status:
             "book_url": f"https://chummer.run/account/work/origin-dossiers/{project_id}/book",
             "listen_url": f"https://chummer.run/account/work/origin-dossiers/{project_id}/listen",
             "watch_url": f"https://chummer.run/account/work/origin-dossiers/{project_id}/video",
+            "canon_audit_url": f"https://chummer.run/account/work/origin-dossiers/{project_id}/canon-audit",
             "audiobookshelf_redirect": share_url,
             "local_fixture_artifacts": False,
             "deployedRouteClaimAllowed": passed,
@@ -112,6 +117,8 @@ def write_deployed_probe(root: Path, *, project_id: str, share_url: str, status:
             "listen_tab_visible": passed,
             "watch_tab_visible": passed,
             "canon_audit_tab_visible": passed,
+            "canon_audit_content_verified": passed,
+            "canon_audit_route_verified": passed,
             "read_gate_verified": passed,
             "chummer_run_listen_gate_verified": passed,
             "watch_gate_verified": passed,
@@ -121,6 +128,7 @@ def write_deployed_probe(root: Path, *, project_id: str, share_url: str, status:
             "unauthenticated_book_redirect_verified": True,
             "unauthenticated_cover_redirect_verified": True,
             "unauthenticated_video_redirect_verified": True,
+            "unauthenticated_canon_audit_redirect_verified": True,
             "all_private_routes_login_protected": True,
             "owner_playback_e2e_verified": passed,
             "blockers": [] if passed else ["missing_deployed_identity_token", "logged_in_browser_verified"],
@@ -430,9 +438,13 @@ def test_gold_e2e_audit_blocks_incomplete_browser_tab_and_auth_proof(tmp_path: P
     payload = json.loads(browser_proof.read_text(encoding="utf-8"))
     payload["watch_tab_visible"] = False
     payload["canon_audit_tab_visible"] = False
+    payload["canon_audit_content_verified"] = False
+    payload["canon_audit_route_verified"] = False
     payload["unauthenticated_video_redirect_verified"] = False
+    payload["unauthenticated_canon_audit_redirect_verified"] = False
     payload["all_private_routes_login_protected"] = False
     payload["watch_url"] = ""
+    payload["canon_audit_url"] = ""
     write_json(browser_proof, payload)
 
     result = audit_module.audit(
@@ -444,9 +456,13 @@ def test_gold_e2e_audit_blocks_incomplete_browser_tab_and_auth_proof(tmp_path: P
     assert result["status"] == "blocked"
     assert "browser_flag_missing:watch_tab_visible" in result["failedCodes"]
     assert "browser_flag_missing:canon_audit_tab_visible" in result["failedCodes"]
+    assert "browser_flag_missing:canon_audit_content_verified" in result["failedCodes"]
+    assert "browser_flag_missing:canon_audit_route_verified" in result["failedCodes"]
     assert "browser_flag_missing:unauthenticated_video_redirect_verified" in result["failedCodes"]
+    assert "browser_flag_missing:unauthenticated_canon_audit_redirect_verified" in result["failedCodes"]
     assert "browser_flag_missing:all_private_routes_login_protected" in result["failedCodes"]
     assert "browser_watch_url_not_chummer_run" in result["failedCodes"]
+    assert "browser_canon_audit_url_not_chummer_run" in result["failedCodes"]
 
 
 def test_gold_e2e_audit_reports_missing_live_import_request_as_specific_blocker(tmp_path: Path) -> None:

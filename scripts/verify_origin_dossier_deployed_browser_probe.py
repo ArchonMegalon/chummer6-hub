@@ -33,6 +33,7 @@ REQUIRED_PASS_FLAGS = (
     "canon_privacy_receipts_present",
     "no_fallback_media_verified",
     "canon_audit_content_verified",
+    "canon_audit_route_verified",
     "read_gate_verified",
     "chummer_run_listen_gate_verified",
     "watch_gate_verified",
@@ -55,6 +56,7 @@ REQUIRED_PASS_FLAGS = (
     "unauthenticated_book_redirect_verified",
     "unauthenticated_cover_redirect_verified",
     "unauthenticated_video_redirect_verified",
+    "unauthenticated_canon_audit_redirect_verified",
     "all_private_routes_login_protected",
 )
 PRIVATE_ROUTE_FLAGS = (
@@ -64,6 +66,7 @@ PRIVATE_ROUTE_FLAGS = (
     "unauthenticated_book_redirect_verified",
     "unauthenticated_cover_redirect_verified",
     "unauthenticated_video_redirect_verified",
+    "unauthenticated_canon_audit_redirect_verified",
     "all_private_routes_login_protected",
 )
 FORBIDDEN_VALUE_MARKERS = (
@@ -200,7 +203,7 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
             issues.append("missing_owner_session_blocker_with_token_hash")
 
     url_hashes = payload.get("url_hashes") if isinstance(payload.get("url_hashes"), dict) else {}
-    for key in ("owner", "read", "book", "listen", "watch", "cover", "audiobookshelf_redirect", "audiobookshelf_dossier_redirect"):
+    for key in ("owner", "read", "book", "listen", "watch", "cover", "canon_audit", "audiobookshelf_redirect", "audiobookshelf_dossier_redirect"):
         value = str(url_hashes.get(key) or "")
         if len(value) != 64 or any(char not in "0123456789abcdef" for char in value.lower()):
             issues.append(f"url_hash_invalid:{key}")
@@ -214,6 +217,7 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
             "listen": origin_owner_url(base_url, project_id, "listen"),
             "watch": origin_owner_url(base_url, project_id, "video"),
             "cover": origin_owner_url(base_url, project_id, "cover"),
+            "canon_audit": origin_owner_url(base_url, project_id, "canon-audit"),
         }
         for key, expected_url in expected_routes.items():
             if url_hashes.get(key) != sha256_text(expected_url):
@@ -225,6 +229,7 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
             "listen": "listen_url",
             "watch": "watch_url",
             "cover": "selected_face_cover_url",
+            "canon_audit": "canon_audit_url",
         }
         for key, field in raw_route_fields.items():
             raw_value = str(payload.get(field) or "").strip()
@@ -298,6 +303,7 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, list[str]]:
         "cover": ("cover_route_verified", 200),
         "book": ("book_route_verified", 200),
         "watch": ("watch_gate_verified", 200),
+        "canon_audit": ("canon_audit_route_verified", 200),
     }
     for route, (flag, expected_status) in route_status_expectations.items():
         status_key = "watch" if route == "watch" else route

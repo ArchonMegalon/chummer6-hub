@@ -13,6 +13,7 @@ SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_ori
 FAKE_COVER_BYTES = b"\xff\xd8cover-bytes"
 FAKE_BOOK_BYTES = b"PK\x03\x04ebook-bytes"
 FAKE_VIDEO_BYTES = b"\x00\x00\x00\x18ftypmp42movie-bytes"
+FAKE_CANON_AUDIT_BYTES = b'{"status":"pass","tokens":["canon_audit_passed"]}'
 
 
 def load_module():
@@ -120,6 +121,8 @@ class FakeSession:
             return FakeResponse(302, {"location": "https://audiobookshelf.girschele.com/audiobookshelf/share/audio"})
         if url.endswith("/video"):
             return FakeResponse(200, {"content-type": "video/mp4"}, content=FAKE_VIDEO_BYTES)
+        if url.endswith("/canon-audit"):
+            return FakeResponse(200, {"content-type": "application/json; charset=utf-8"}, content=FAKE_CANON_AUDIT_BYTES)
         return FakeResponse(
             200,
             {"content-type": "text/html"},
@@ -155,6 +158,13 @@ class LeakyAnonymousVideoSession(FakeSession):
         return super().get(url, allow_redirects=allow_redirects, timeout=timeout)
 
 
+class LeakyAnonymousCanonAuditSession(FakeSession):
+    def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
+        if not self.has_cookie and not self.headers.get("Authorization", "").startswith("Bearer ") and url.endswith("/canon-audit"):
+            return FakeResponse(200, {"content-type": "application/json; charset=utf-8"}, content=FAKE_CANON_AUDIT_BYTES)
+        return super().get(url, allow_redirects=allow_redirects, timeout=timeout)
+
+
 class BrokenOwnerVideoSession(FakeSession):
     def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
         if (self.has_cookie or self.headers.get("Authorization", "").startswith("Bearer ")) and url.endswith("/video"):
@@ -186,7 +196,7 @@ class BrokenAudiobookshelfShareSession(FakeSession):
 class MissingCanonAuditContentSession(FakeSession):
     def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
         if self.has_cookie or self.headers.get("Authorization", "").startswith("Bearer "):
-            if not any(url.endswith(suffix) for suffix in ("/cover", "/book", "/read", "/listen", "/video")):
+            if not any(url.endswith(suffix) for suffix in ("/cover", "/book", "/read", "/listen", "/video", "/canon-audit")):
                 return FakeResponse(
                     200,
                     {"content-type": "text/html"},
@@ -405,6 +415,7 @@ def test_deployed_probe_passes_with_owner_token_and_real_route_shape(tmp_path: P
     assert result["dossier_share_reachable"] is True
     assert result["watch_gate_verified"] is True
     assert result["canon_audit_content_verified"] is True
+    assert result["canon_audit_route_verified"] is True
     assert result["chummer_canon_owner_visible"] is True
     assert result["provider_created_facts_blocked_visible"] is True
     assert result["canon_privacy_receipts_present"] is True
@@ -418,6 +429,10 @@ def test_deployed_probe_passes_with_owner_token_and_real_route_shape(tmp_path: P
     assert result["response_body_sizes"]["watch"] > 0
     assert result["response_body_sizes"]["cover"] > 0
     assert result["response_body_sizes"]["book"] > 0
+    assert result["response_body_sizes"]["canon_audit"] > 0
+    assert result["http_statuses"]["canon_audit"] == 200
+    assert result["canon_audit_url"] == "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/canon-audit"
+    assert result["url_hashes"]["canon_audit"] == hashlib.sha256(result["canon_audit_url"].encode("utf-8")).hexdigest()
     assert result["owner_playback_e2e_verified"] is True
     assert result["local_fixture_artifacts"] is False
     assert result["all_private_routes_login_protected"] is True
@@ -427,6 +442,7 @@ def test_deployed_probe_passes_with_owner_token_and_real_route_shape(tmp_path: P
     assert result["unauthenticated_book_redirect_verified"] is True
     assert result["unauthenticated_cover_redirect_verified"] is True
     assert result["unauthenticated_video_redirect_verified"] is True
+    assert result["unauthenticated_canon_audit_redirect_verified"] is True
 
 
 def test_deployed_probe_prefers_explicit_audiobook_share_over_legacy_share(tmp_path: Path, monkeypatch) -> None:
@@ -607,6 +623,27 @@ def test_deployed_probe_blocks_if_any_private_artifact_route_is_public_without_l
     assert result["unauthenticated_video_redirect_verified"] is False
     assert "all_private_routes_login_protected" in result["blockers"]
     assert "unauthenticated_video_redirect_verified" in result["blockers"]
+    assert "secret-session" not in serialized
+
+
+def test_deployed_probe_blocks_if_canon_audit_route_is_public_without_login(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(tmp_path)
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", LeakyAnonymousCanonAuditSession)
+
+    output = tmp_path / "probe.json"
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", output)
+    serialized = output.read_text(encoding="utf-8")
+
+    assert result["status"] == "blocked"
+    assert "all_private_routes_login_protected" in result["blocking_reason"]
+    assert "unauthenticated_canon_audit_redirect_verified" in result["progress"]["blockedChecks"]
+    assert result["deployedRouteClaimAllowed"] is False
+    assert result["all_private_routes_login_protected"] is False
+    assert result["unauthenticated_canon_audit_redirect_verified"] is False
+    assert "all_private_routes_login_protected" in result["blockers"]
+    assert "unauthenticated_canon_audit_redirect_verified" in result["blockers"]
     assert "secret-session" not in serialized
 
 

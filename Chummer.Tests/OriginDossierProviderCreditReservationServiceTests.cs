@@ -1,4 +1,5 @@
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Contracts.Billing;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -201,6 +202,30 @@ public sealed class OriginDossierProviderCreditReservationServiceTests
     }
 
     [Fact]
+    public void ReserveUsesSupporterTierMonthlyAllowanceBeforeBlockingPremiumAuthoring()
+    {
+        using Fixture fixture = new(configureSupporterBilling: true);
+        fixture.SyncSupporter("user-origin", "runner@example.invalid");
+        fixture.Billing.ConsumeMyFirstBookQuota("user-origin", Fixture.Now, "runner@example.invalid");
+
+        OriginDossierProviderCreditReservationResult first = fixture.Service.Reserve(
+            ValidRequest(projectId: "origin-supporter-one"),
+            Fixture.Now);
+
+        fixture.Billing.ConsumeMyFirstBookQuota("user-origin", Fixture.Now, "runner@example.invalid");
+        OriginDossierProviderCreditReservationResult second = fixture.Service.Reserve(
+            ValidRequest(projectId: "origin-supporter-two"),
+            Fixture.Now);
+
+        Assert.Equal("reserved", first.Status);
+        Assert.True(first.ProviderBurnAllowed);
+        Assert.Equal("blocked", second.Status);
+        Assert.False(second.ProviderBurnAllowed);
+        Assert.Contains("available premium authoring quota", second.BlockedRequirements);
+        Assert.Single(fixture.Store.Entries);
+    }
+
+    [Fact]
     public void PremiumAuthoringQuotaUsesSharedMonthlyEntitlementMetadata()
     {
         using Fixture fixture = new();
@@ -264,7 +289,8 @@ public sealed class OriginDossierProviderCreditReservationServiceTests
             bool useDirectAliases = true,
             string registryAccountStatus = "available",
             bool useRegistryPath = false,
-            bool malformedRegistry = false)
+            bool malformedRegistry = false,
+            bool configureSupporterBilling = false)
         {
             _root = Path.Combine(Path.GetTempPath(), "chummer-origin-provider-reservations", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_root);
@@ -300,7 +326,9 @@ public sealed class OriginDossierProviderCreditReservationServiceTests
             Dictionary<string, string?> values = new()
                 {
                     ["CHUMMER_BILLING_SYNC_SECRET"] = "sync-secret",
-                    ["CHUMMER_BRILLIANT_DIRECTORIES_MEMBER_STORE_PATH"] = Path.Combine(_root, "billing-members.json"),
+                    ["BRILLIANT_DIRECTORIES_SYNC_SECRET"] = configureSupporterBilling ? "sync-secret" : null,
+                    ["BRILLIANT_DIRECTORIES_SUPPORTER_PLAN_URL"] = configureSupporterBilling ? "https://billing.example.invalid/supporter" : null,
+                    ["CHUMMER_BRILLIANT_DIRECTORIES_BILLING_STORE_PATH"] = Path.Combine(_root, "billing-members.json"),
                     ["CHUMMER_MYFIRSTBOOK_USAGE_STORE_PATH"] = Path.Combine(_root, "myfirstbook-usage.json"),
                     ["CHUMMER_ORIGIN_PROVIDER_RESERVATION_STORE_PATH"] = Path.Combine(_root, "origin-reservations.json"),
                     ["CHUMMER_ORIGIN_PROVIDER_ACCOUNT_ALIASES"] = useDirectAliases ? "FIRSTBOOK_PREMIUM,INK01_ORIGIN,YB02_CHUMMER_PRIVATE" : null,
@@ -324,6 +352,21 @@ public sealed class OriginDossierProviderCreditReservationServiceTests
         public HorizonArtifactQuotaService Quota { get; }
         public OriginDossierProviderCreditReservationStore Store { get; }
         public OriginDossierProviderCreditReservationService Service { get; }
+
+        public void SyncSupporter(string userId, string email)
+        {
+            Billing.SyncMember(
+                new BrilliantDirectoriesMemberSyncRequest(
+                    UserId: userId,
+                    MemberId: $"bd-{userId}",
+                    Email: email,
+                    PlanKey: "supporter",
+                    PlanName: "Supporter",
+                    MembershipStatus: "active",
+                    SupporterActive: true,
+                    ObservedAtUtc: Now),
+                "sync-secret");
+        }
 
         public void Dispose()
         {

@@ -51,6 +51,7 @@ def probe_payload(*, status: str = "blocked") -> dict:
         "canon_privacy_receipts_present": passed,
         "no_fallback_media_verified": passed,
         "canon_audit_content_verified": passed,
+        "canon_audit_route_verified": passed,
         "read_gate_verified": passed,
         "chummer_run_listen_gate_verified": passed,
         "watch_gate_verified": passed,
@@ -73,6 +74,7 @@ def probe_payload(*, status: str = "blocked") -> dict:
         "unauthenticated_book_redirect_verified": True,
         "unauthenticated_cover_redirect_verified": True,
         "unauthenticated_video_redirect_verified": True,
+        "unauthenticated_canon_audit_redirect_verified": True,
         "all_private_routes_login_protected": True,
     }
     return {
@@ -86,6 +88,7 @@ def probe_payload(*, status: str = "blocked") -> dict:
         "book_url": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/book",
         "listen_url": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/listen",
         "watch_url": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/video",
+        "canon_audit_url": "https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/canon-audit",
         "audiobookshelf_redirect": "https://audiobookshelf.girschele.com/audiobookshelf/share/audio",
         "audiobookshelf_dossier_redirect": "https://audiobookshelf.girschele.com/audiobookshelf/share/book",
         "updated_at": "2026-06-25T13:00:00Z",
@@ -118,6 +121,7 @@ def probe_payload(*, status: str = "blocked") -> dict:
             "listen": module_sha256("https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/listen"),
             "watch": module_sha256("https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/video"),
             "cover": module_sha256("https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/cover"),
+            "canon_audit": module_sha256("https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/canon-audit"),
             "audiobookshelf_redirect": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/audio"),
             "audiobookshelf_dossier_redirect": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/book"),
         },
@@ -125,6 +129,7 @@ def probe_payload(*, status: str = "blocked") -> dict:
             "cover": cover_sha if passed else "",
             "book": book_sha if passed else "",
             "watch": video_sha if passed else "",
+            "canon_audit": module_sha256("canon audit") if passed else "",
         },
         "redirect_location_sha256": {
             "read": module_sha256("https://audiobookshelf.girschele.com/audiobookshelf/share/book") if passed else "",
@@ -138,6 +143,7 @@ def probe_payload(*, status: str = "blocked") -> dict:
             "cover": 10 if passed else 0,
             "book": 10 if passed else 0,
             "watch": 10 if passed else 0,
+            "canon_audit": 10 if passed else 0,
             "audiobook_share": 100 if passed else 0,
             "dossier_share": 100 if passed else 0,
         },
@@ -145,6 +151,7 @@ def probe_payload(*, status: str = "blocked") -> dict:
             "cover": 200 if passed else None,
             "book": 200 if passed else None,
             "watch": 200 if passed else None,
+            "canon_audit": 200 if passed else None,
             "read": 302 if passed else None,
             "listen": 302 if passed else None,
             "audiobook_share": 200 if passed else None,
@@ -193,6 +200,21 @@ def test_verifier_rejects_public_private_artifact_route(tmp_path: Path) -> None:
 
     assert ok is False
     assert "private_route_flag_not_true:unauthenticated_video_redirect_verified" in issues
+    assert "private_route_flag_not_true:all_private_routes_login_protected" in issues
+
+
+def test_verifier_rejects_public_canon_audit_artifact_route(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload()
+    payload["unauthenticated_canon_audit_redirect_verified"] = False
+    payload["all_private_routes_login_protected"] = False
+    write_json(path, payload)
+
+    ok, issues = module.verify(path)
+
+    assert ok is False
+    assert "private_route_flag_not_true:unauthenticated_canon_audit_redirect_verified" in issues
     assert "private_route_flag_not_true:all_private_routes_login_protected" in issues
 
 
@@ -393,6 +415,21 @@ def test_verifier_rejects_raw_route_that_does_not_match_declared_project(tmp_pat
     assert ok is False
     assert "url_hash_mismatch:read" in issues
     assert "raw_route_mismatch:read_url" in issues
+
+
+def test_verifier_rejects_raw_canon_audit_route_that_does_not_match_declared_project(tmp_path: Path) -> None:
+    module = load_module()
+    path = tmp_path / "probe.json"
+    payload = probe_payload(status="pass")
+    payload["canon_audit_url"] = "https://chummer.run/account/work/origin-dossiers/other/canon-audit"
+    payload["url_hashes"]["canon_audit"] = module_sha256(payload["canon_audit_url"])
+    write_json(path, payload)
+
+    ok, issues = module.verify(path, require_pass=True)
+
+    assert ok is False
+    assert "url_hash_mismatch:canon_audit" in issues
+    assert "raw_route_mismatch:canon_audit_url" in issues
 
 
 def test_verifier_rejects_raw_audiobookshelf_share_hash_mismatch(tmp_path: Path) -> None:

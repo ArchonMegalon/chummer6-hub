@@ -30,7 +30,7 @@ class MinimalExperienceGateTests(unittest.TestCase):
             """,
             "https://example.invalid/downloads": """
                 <span>Updated</span>
-                <article id="stable"><span>Stable</span><p>Main build for this browser.</p></article>
+                <article id="stable"><span>Stable</span><p>Stable release.</p></article>
                 <article id="nightly"><span>Nightly</span><h2>No newer build</h2></article>
             """,
             "https://example.invalid/status": """
@@ -66,7 +66,7 @@ class MinimalExperienceGateTests(unittest.TestCase):
             """,
             "https://example.invalid/downloads": """
                 <span>Updated</span><span>Updated</span>
-                <article id="stable"><span>Stable</span><p>Main build for this browser.</p></article>
+                <article id="stable"><span>Stable</span><p>Stable release.</p></article>
                 <article id="nightly"><span>Nightly</span><h2>No newer build</h2></article>
                 <p>Released 2026-06-23</p>
             """,

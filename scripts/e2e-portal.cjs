@@ -68,7 +68,7 @@ const checks = [
     url: `${baseUrl}/downloads/`,
     assert: text =>
       text.includes('Downloads')
-      && text.includes('Main build for this browser')
+      && text.includes('Stable release')
       && text.includes('Stable')
       && text.includes('Nightly')
       && text.includes('Build from source')
@@ -242,7 +242,7 @@ const checks = [
       /\/downloads\/?$/.test(response.url)
       && text.includes('Downloads')
       && text.includes('Stable')
-      && text.includes('Main build for this browser')
+      && text.includes('Stable release')
       && text.includes('Build from source')
   },
   {

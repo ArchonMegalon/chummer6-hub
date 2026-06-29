@@ -312,7 +312,8 @@ def materialize(
                 "Read in Audiobookshelf",
                 "Listen in Audiobookshelf",
                 "Watch scene movie",
-                "Chummer will not publish provider-created facts directly.",
+                "data-chummer-owns-canon=\"true\"",
+                "data-provider-created-facts-auto-canon=\"false\"",
             ],
             repo_root,
         )

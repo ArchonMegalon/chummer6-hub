@@ -945,9 +945,9 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Linux" in downloads
     assert "Build from source" in downloads
     assert "Download Chummer from the current release page." in downloads
-    assert "The current installer is selected for this browser when available. Other downloads stay below." in downloads
+    assert "Chummer selects the best installer when it can. Other downloads stay below." in downloads
     assert "attach this installed copy to your account" in downloads
-    assert "Main build for this browser." in downloads
+    assert "Stable release." in downloads
     assert "<summary>Other downloads</summary>" in downloads
     assert "showLinuxSourcePrimary" in downloads
     assert "No sudo. Updates default to notify." in downloads

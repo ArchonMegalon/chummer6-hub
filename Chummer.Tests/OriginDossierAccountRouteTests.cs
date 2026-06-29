@@ -123,12 +123,19 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal(artifacts.DossierVideoPath, watch.FileName);
         Assert.Equal("video/mp4", watch.ContentType);
 
+        IActionResult canonAuditResult = await controller.OriginDossierArtifact("origin-route", "canon-audit", CancellationToken.None);
+        PhysicalFileResult canonAudit = Assert.IsType<PhysicalFileResult>(canonAuditResult);
+        Assert.Equal(artifacts.CanonAuditReceiptPath, canonAudit.FileName);
+        Assert.Equal("application/json; charset=utf-8", canonAudit.ContentType);
+        Assert.True(canonAudit.EnableRangeProcessing);
+
         IReadOnlyList<HorizonArtifactRequestReceipt> receipts = fixture.ArtifactRequestReceipts.ListRecent("origin-dossier", fixture.UserId, limit: 10);
-        Assert.Equal(4, receipts.Count);
+        Assert.Equal(5, receipts.Count);
         Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:cover" && receipt.Quota is null && receipt.Visibility == "private");
         Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:listen" && receipt.Quota is null && receipt.Visibility == "private");
         Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:read" && receipt.Quota is null && receipt.Visibility == "private");
         Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:watch" && receipt.Quota is null && receipt.Visibility == "private");
+        Assert.Contains(receipts, receipt => receipt.Status == "accepted" && receipt.SourceRef == "origin-dossier:origin-route:canon-audit" && receipt.Quota is null && receipt.Visibility == "private");
 
         AccountsController anonymous = fixture.CreateController(authenticated: false);
         IActionResult anonymousResult = await anonymous.OriginDossierArtifact("origin-route", "listen", CancellationToken.None);
@@ -146,9 +153,11 @@ public sealed class OriginDossierAccountRouteTests
 
         IActionResult coverResult = await controller.OriginDossierArtifact("origin-other-owner", "cover", CancellationToken.None);
         IActionResult listenResult = await controller.OriginDossierArtifact("origin-other-owner", "listen", CancellationToken.None);
+        IActionResult canonAuditResult = await controller.OriginDossierArtifact("origin-other-owner", "canon-audit", CancellationToken.None);
 
         Assert.IsType<NotFoundResult>(coverResult);
         Assert.IsType<NotFoundResult>(listenResult);
+        Assert.IsType<NotFoundResult>(canonAuditResult);
     }
 
     private sealed class OriginDossierRouteFixture : IDisposable

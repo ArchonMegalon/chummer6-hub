@@ -11994,7 +11994,7 @@ def main() -> int:
             "/downloads",
             "Downloads",
             required_texts=(
-                "Current public installer is selected for this browser when available.",
+                "Chummer selects the best installer when it can.",
                 "Nightly",
                 "Stable",
                 "Linux",

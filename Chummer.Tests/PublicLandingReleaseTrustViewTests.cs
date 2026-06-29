@@ -12,7 +12,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("<h1>Downloads</h1>", view, StringComparison.Ordinal);
         Assert.Contains("Download Chummer from the current release page.", view, StringComparison.Ordinal);
-        Assert.Contains("The current installer is selected for this browser when available.", view, StringComparison.Ordinal);
+        Assert.Contains("Chummer selects the best installer when it can.", view, StringComparison.Ordinal);
         Assert.Contains("attach this installed copy to your account", view, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
@@ -22,7 +22,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.True(
             view.IndexOf("id=\"linux-source\"", StringComparison.Ordinal) >
             view.IndexOf("<summary>Other downloads</summary>", StringComparison.Ordinal));
-        Assert.Contains("The current installer is selected for this browser when available. Other downloads stay below.", view, StringComparison.Ordinal);
+        Assert.Contains("Chummer selects the best installer when it can. Other downloads stay below.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Pick one.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer picks the right installer for this browser.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", view, StringComparison.Ordinal);
@@ -107,12 +107,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("id=\"linux-source\"", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
-        Assert.Contains("Main build for this browser.", view, StringComparison.Ordinal);
+        Assert.Contains("Stable release.", view, StringComparison.Ordinal);
         Assert.Contains("Newer than Stable.", view, StringComparison.Ordinal);
         Assert.Contains("No sudo. Updates default to notify.", view, StringComparison.Ordinal);
         Assert.Contains("Download script", view, StringComparison.Ordinal);
         Assert.Contains("RequestedPlatformHasPublicDownload", view, StringComparison.Ordinal);
-        Assert.Contains("No public installer for this browser yet.", view, StringComparison.Ordinal);
+        Assert.Contains("No matching public installer yet.", view, StringComparison.Ordinal);
         Assert.Contains("var stable = requestedPlatformUnavailable ? null : recommended;", view, StringComparison.Ordinal);
         Assert.Contains("href=\"#other-downloads\"", view, StringComparison.Ordinal);
         Assert.Contains("stable is null ? \"Other downloads\" : \"Use Stable\"", view, StringComparison.Ordinal);
@@ -377,7 +377,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("<h1>Downloads</h1>", downloadsView, StringComparison.Ordinal);
         Assert.Contains(">Nightly<", downloadsView, StringComparison.Ordinal);
         Assert.Contains(">Stable<", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Main build for this browser.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Stable release.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<summary>Other downloads</summary>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Download script", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Open Participate", nowView, StringComparison.Ordinal);
