@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-29T07:41:54Z",
+  "generated_at_utc": "2026-06-29T12:11:20Z",
   "base_url": "https://chummer.run",
   "require_brilliant_directories_checkout": true,
   "status": "pass",
@@ -58,7 +58,7 @@
       "redirect_chain": [],
       "required_texts": [
         "Downloads",
-        "Current public installer is selected for this browser when available.",
+        "The current installer is selected for this browser when available.",
         "Main build for this browser",
         "Nightly",
         "Stable",
@@ -107,7 +107,7 @@
       "status_code": 200,
       "redirect_chain": [],
       "required_texts": [
-        "Status",
+        "Now",
         "Updated",
         "Downloads",
         "Help"
@@ -201,10 +201,14 @@
       "redirect_chain": [],
       "required_texts": [
         "What should Chummer do next?",
-        "Public requests, clear bugs, useful ideas."
+        "Public requests, clear bugs, useful ideas.",
+        "Current requests"
       ],
       "required_any_texts": [],
-      "required_html_texts": [],
+      "required_html_texts": [
+        "data-chummer-participate-frame",
+        "/participate/board?embed=1"
+      ],
       "missing_required_texts": [],
       "missing_required_any_texts": [],
       "missing_required_html_texts": [],
@@ -221,7 +225,8 @@
       ],
       "forbidden_html_texts": [
         "chummer6.productlift.dev",
-        "data-chummer-board-skin"
+        "data-chummer-board-skin",
+        "participate-preview-card"
       ],
       "forbidden_hits": [],
       "forbidden_html_hits": [],

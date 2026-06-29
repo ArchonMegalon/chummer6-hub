@@ -76,7 +76,7 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             "path": "/downloads",
             "required_texts": [
                 "Downloads",
-                "Current public installer is selected for this browser when available.",
+                "The current installer is selected for this browser when available.",
                 "Main build for this browser",
                 "Nightly",
                 "Stable",
@@ -107,7 +107,7 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
         {
             "path": "/status",
             "required_texts": [
-                "Status",
+                "Now",
                 "Updated",
                 "Downloads",
                 "Help",

@@ -46,7 +46,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Downloads Current public installer is selected for this browser when available. Main build for this browser. Nightly Stable Build from source Download script"
+                b"Downloads The current installer is selected for this browser when available. Main build for this browser. Nightly Stable Build from source Download script"
                 b"</body></html>"
             )
             return
@@ -57,7 +57,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Status Updated Windows and Linux downloads are live. Downloads Help"
+                b"Now Updated Windows and Linux downloads are live. Downloads Help"
                 b"</body></html>"
             )
             return
