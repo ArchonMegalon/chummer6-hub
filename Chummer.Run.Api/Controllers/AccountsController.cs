@@ -582,7 +582,7 @@ public sealed class AccountsController : Controller
                 new AccountHubCardViewModel(
                     "Downloads",
                     "Downloads",
-                    "Stable and nightly stay on the public shelf. Signed-in downloads claim themselves back to this account.",
+                    "Stable and nightly stay on the release page. Signed-in downloads claim themselves back to this account.",
                     "Open downloads",
                     "/downloads",
                     "Install help",

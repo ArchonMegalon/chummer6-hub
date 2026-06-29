@@ -51,7 +51,7 @@ test('signed-in owner can see Origin Dossier cover, tabs, and gated media links 
   await expect(page.getByRole('link', { name: 'Read' })).toHaveAttribute('href', '#origin-edition-read');
   await expect(page.getByRole('link', { name: 'Listen' })).toHaveAttribute('href', '#origin-edition-listen');
   await expect(page.getByRole('link', { name: 'Watch' })).toHaveAttribute('href', '#origin-edition-watch');
-  await expect(page.getByRole('link', { name: 'Canon Audit' })).toHaveAttribute('href', '#origin-edition-canon-audit');
+  await expect(page.getByRole('link', { name: 'Canon notes' })).toHaveAttribute('href', '#origin-edition-canon-audit');
   const coverImage = page.getByAltText('Rendered Origin Dossier story scene cover for Route Runner');
   await expect(coverImage).toHaveAttribute('src', `${baseUrl}/account/work/origin-dossiers/${projectId}/cover`);
   await expect(page.getByRole('link', { name: 'Read in Audiobookshelf' })).toHaveAttribute(

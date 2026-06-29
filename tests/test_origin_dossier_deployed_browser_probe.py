@@ -131,7 +131,7 @@ class FakeSession:
               <a href="#origin-edition-read">Read</a>
               <a href="#origin-edition-listen">Listen</a>
               <a href="#origin-edition-watch">Watch</a>
-              <a href="#origin-edition-canon-audit">Canon Audit</a>
+              <a href="#origin-edition-canon-audit">Canon notes</a>
               <section id="origin-edition-read" data-origin-edition-tab="read">Read in Audiobookshelf</section>
               <section id="origin-edition-listen" data-origin-edition-tab="listen">Listen in Audiobookshelf</section>
               <section id="origin-edition-watch" data-origin-edition-tab="watch">Watch scene movie</section>
@@ -141,7 +141,7 @@ class FakeSession:
                        data-provider-created-facts-auto-canon="false"
                        data-canon-privacy-receipts-present="true"
                        data-no-fallback-media-verified="true">
-                Canon Audit
+                Canon notes
               </section>
             </main>
             """,
@@ -198,7 +198,7 @@ class MissingCanonAuditContentSession(FakeSession):
                       <a href="#origin-edition-read">Read</a>
                       <a href="#origin-edition-listen">Listen</a>
                       <a href="#origin-edition-watch">Watch</a>
-                      <a href="#origin-edition-canon-audit">Canon Audit</a>
+                      <a href="#origin-edition-canon-audit">Canon notes</a>
                     </main>
                     """,
                 )

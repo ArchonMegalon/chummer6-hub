@@ -107,7 +107,7 @@ def seed_artifacts(root: Path, *, ready: bool) -> None:
             "requirements": [
                 {
                     "id": "deployed_owner_read_listen_watch_canon",
-                    "label": "Deployed owner can log into Chummer, see cover, read, listen, watch, and verify Canon Audit",
+                    "label": "Deployed owner can log into Chummer, see cover, read, listen, watch, and verify Canon notes",
                     "status": "proved" if ready else "blocked",
                 }
             ],

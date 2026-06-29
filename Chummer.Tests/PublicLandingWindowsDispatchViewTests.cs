@@ -41,8 +41,8 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("Windows preview build", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("preview rollout", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Create account to get preview", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Download Chummer from the current public shelf.", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Current public installer is selected for this browser when available. Other downloads stay below.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Download Chummer from the current release page.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("The current installer is selected for this browser when available. Other downloads stay below.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("attach this installed copy to your account", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"stable\"", downloadsView, StringComparison.Ordinal);
