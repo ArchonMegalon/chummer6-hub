@@ -28,7 +28,8 @@ test('downloads and status stay concise and point to the right next steps', asyn
   await expect(downloadsPage.getByRole('heading', { name: 'Downloads' })).toBeVisible();
   await expect(downloadsPage.locator('body')).toContainText('Stable');
   await expect(downloadsPage.locator('body')).toContainText('Nightly');
-  await expect(downloadsPage.locator('body')).toContainText('Main build for this browser. Other downloads stay below.');
+  await expect(downloadsPage.locator('body')).toContainText('Current public installer is selected for this browser when available.');
+  await expect(downloadsPage.locator('body')).toContainText('Main build for this browser.');
   await expect(downloadsPage.locator('body')).toContainText('Build from source');
   await expect(downloadsMain.getByRole('link', { name: /Download for|Download script|Use Stable/ })).toHaveCount(2);
   await downloadsPage.close();

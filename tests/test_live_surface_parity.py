@@ -46,7 +46,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(
                 b"<html><body>"
-                b"Downloads Main build for this browser. Other downloads stay below. Nightly Stable Build from source Download script"
+                b"Downloads Current public installer is selected for this browser when available. Main build for this browser. Nightly Stable Build from source Download script"
                 b"</body></html>"
             )
             return
