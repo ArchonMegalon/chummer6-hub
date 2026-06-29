@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.design_quality_gate",
-  "generated_at_utc": "2026-06-27T18:08:14Z",
+  "generated_at_utc": "2026-06-29T12:23:26Z",
   "status": "pass",
   "verdict": "DESIGN_READY",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
@@ -14,7 +14,7 @@
     "public_route_proof": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
       "status": "pass",
-      "route_count": 165,
+      "route_count": 183,
       "failed_count": 0,
       "pass": true
     },
@@ -43,14 +43,14 @@
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_FRAME_INTEGRITY.generated.json",
       "status": "pass",
       "base_url": "https://chummer.run",
-      "checked_pages": 60,
+      "checked_pages": 66,
       "failure_count": 0,
       "pass": true
     },
     "screenshot_qa": {
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/SCREENSHOT_QA.generated.json",
       "status": "pass",
-      "base_url": "https://chummer.run",
+      "base_url": "http://127.0.0.1:8091",
       "homepage_viewports": [
         "1366x768",
         "1440x900",
