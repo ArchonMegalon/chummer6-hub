@@ -4,6 +4,9 @@
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 
+const HOSTED_BOARD_SHELL_VISIBLE_BUDGET_MS = 2500;
+const HOSTED_BOARD_DETAIL_FETCH_BUDGET_MS = 4000;
+
 const args = process.argv.slice(2);
 let baseUrl = process.env.CHUMMER_PUBLIC_BASE_URL || 'https://chummer.run';
 for (let index = 0; index < args.length; index += 1) {
@@ -34,6 +37,7 @@ async function navigateLenient(page, url, preferredState = 'domcontentloaded') {
 }
 
 async function fetchText(url) {
+  const startedAt = Date.now();
   const response = await fetch(url, {
     headers: {
       'user-agent': defaultUserAgent,
@@ -46,6 +50,7 @@ async function fetchText(url) {
     status: response.status,
     url: response.url,
     text: await response.text(),
+    durationMs: Date.now() - startedAt,
   };
 }
 
@@ -61,6 +66,7 @@ function stripNonVisibleHtml(html) {
 }
 
 async function assertBoardShell(page, path) {
+  const startedAt = Date.now();
   const response = await navigateLenient(page, `${baseUrl}${path}`, 'domcontentloaded');
   assert(response, `${path} should return a response.`);
   assert.equal(response.status(), 200, `${path} should return 200.`);
@@ -83,9 +89,16 @@ async function assertBoardShell(page, path) {
     ? await detailLink.getAttribute('href')
     : null;
 
+  const visibleDurationMs = Date.now() - startedAt;
+  assert(
+    visibleDurationMs <= HOSTED_BOARD_SHELL_VISIBLE_BUDGET_MS,
+    `${path} should render the first-party board shell within ${HOSTED_BOARD_SHELL_VISIBLE_BUDGET_MS} ms, got ${visibleDurationMs} ms.`,
+  );
+
   return {
     offline,
     detailHref,
+    visibleDurationMs,
   };
 }
 
@@ -105,6 +118,11 @@ async function main() {
   try {
     const wrapper = await assertBoardShell(page, '/participate');
     const board = await assertBoardShell(page, '/participate/board');
+    const timings = {
+      participateShellVisibleMs: wrapper.visibleDurationMs,
+      participateBoardShellVisibleMs: board.visibleDurationMs,
+      detailFetchMs: null,
+    };
 
     let mode = wrapper.offline
       ? 'first_party_wrapper_offline_fallback'
@@ -114,6 +132,10 @@ async function main() {
     if (detailHref) {
       const detailResponse = await fetchText(`${baseUrl}${detailHref}`);
       assert.equal(detailResponse.status, 200, `${detailHref} should return 200.`);
+      assert(
+        detailResponse.durationMs <= HOSTED_BOARD_DETAIL_FETCH_BUDGET_MS,
+        `${detailHref} should return the first-party detail within ${HOSTED_BOARD_DETAIL_FETCH_BUDGET_MS} ms, got ${detailResponse.durationMs} ms.`,
+      );
       const detailVisibleText = stripNonVisibleHtml(detailResponse.text);
       assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(detailVisibleText), false, 'vendor error copy must not be visible in the proxied request detail.');
       assert.equal(/productlift\.dev/i.test(detailResponse.text), false, 'first-party request detail must not leak provider domains.');
@@ -122,6 +144,7 @@ async function main() {
       assert.equal(/id="menubar"/i.test(detailResponse.text), false, 'provider menubar must stay hidden in the proxied request detail.');
       assert.equal(/id="global_search_mount"/i.test(detailResponse.text), false, 'provider search mount must stay hidden in the proxied request detail.');
       assert.equal(/data-chummer-board-skin|data-chummer-home-link-patch/i.test(detailResponse.text), false, 'request detail should not render the hosted board chrome anymore.');
+      timings.detailFetchMs = detailResponse.durationMs;
       mode = `${mode}_with_first_party_detail`;
     }
 
@@ -129,6 +152,7 @@ async function main() {
       status: 'pass',
       url: `${baseUrl}/participate`,
       mode,
+      timings,
     }));
   } finally {
     await browser.close();

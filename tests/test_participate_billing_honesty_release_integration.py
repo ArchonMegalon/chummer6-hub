@@ -104,10 +104,17 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
     def test_partizipate_runtime_fallback_gate_forces_vendor_error_state(self) -> None:
         text = PARTIZIPATE_RUNTIME_FALLBACK_SCRIPT.read_text(encoding="utf-8")
 
+        self.assertIn("HOSTED_BOARD_SHELL_VISIBLE_BUDGET_MS = 2500", text)
+        self.assertIn("HOSTED_BOARD_DETAIL_FETCH_BUDGET_MS = 4000", text)
         self.assertIn("chromium.launch", text)
         self.assertIn("'--no-sandbox'", text)
         self.assertIn("assertBoardShell(page, '/participate')", text)
         self.assertIn("assertBoardShell(page, '/participate/board')", text)
+        self.assertIn("visibleDurationMs <=", text)
+        self.assertIn("detailResponse.durationMs <=", text)
+        self.assertIn("timings.detailFetchMs = detailResponse.durationMs", text)
+        self.assertIn("participateShellVisibleMs", text)
+        self.assertIn("participateBoardShellVisibleMs", text)
         self.assertIn("Something went wrong|Could not load posts|Network error|support@productlift", text)
         self.assertIn("iframe[data-chummer-participate-frame]", text)
         self.assertIn("should keep the hosted board inside the first-party shell", text)
