@@ -66,6 +66,11 @@ def cache_busted_url(base_url: str, public_path: str, digest: str) -> str:
     return f"{base_url.rstrip('/')}{public_path}{separator}v={urllib.parse.quote(token)}"
 
 
+def allows_clean_speech_pauses(audio_module: Any, path: Path) -> bool:
+    clean_speech_groups = set(getattr(audio_module, "CLEAN_SPEECH_AUDIO_GROUPS", set()))
+    return path.stem in clean_speech_groups
+
+
 def load_audio_module():
     script = REPO / "scripts" / "public_video_audio_quality.py"
     spec = importlib.util.spec_from_file_location("public_video_audio_quality_for_live_parity", script)
@@ -111,7 +116,8 @@ def verify_file(
     downloaded_digest = sha256_file(downloaded.path)
     downloaded_size = downloaded.path.stat().st_size
 
-    quality = audio_module.audio_quality(downloaded.path, allow_clean_speech_pauses=False)
+    clean_speech_pauses = allows_clean_speech_pauses(audio_module, path)
+    quality = audio_module.audio_quality(downloaded.path, allow_clean_speech_pauses=clean_speech_pauses)
     probe = audio_module.probe(downloaded.path)
     streams = probe.get("streams") or []
     audio_streams = sum(1 for stream in streams if stream.get("codec_type") == "audio")
@@ -161,6 +167,7 @@ def verify_file(
         },
         "audio_streams": audio_streams,
         "video_streams": video_streams,
+        "clean_speech_pauses_allowed": clean_speech_pauses,
         "quality": quality,
     }
 
@@ -213,6 +220,7 @@ def verify_all(
             "audio_streams_required": 1,
             "video_streams_required": 1,
             "downloaded_audio_quality_must_pass": True,
+            "declared_clean_speech_groups_allow_natural_speech_pauses": True,
             "cache_headers_must_be_no_store": require_no_store,
             "cloudflare_hit_rejected": require_no_store,
         },

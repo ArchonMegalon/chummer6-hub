@@ -24,6 +24,7 @@ def test_public_video_audio_quality_module_is_active() -> None:
     quality = audio.audio_quality(Path("/does/not/exist/asset.mp4"))
 
     assert audio.UNMIXR_PROVIDER == "unmixr-short-tts"
+    assert "table-pulse-90s-deepdive" in audio.CLEAN_SPEECH_AUDIO_GROUPS
     assert quality["status"] == "fail"
     assert quality["reasons"] == ["audio_file_missing:/does/not/exist/asset.mp4"]
     assert audio.retirement_receipt().get("pipeline") == "public_video_audio_quality"
@@ -80,6 +81,7 @@ def test_gate_requires_alice_unmixr_voice_receipt(monkeypatch, tmp_path: Path) -
 
 def test_gate_requires_table_pulse_clean_speech_unmixr_receipt(monkeypatch, tmp_path: Path) -> None:
     gate = _load(GATE_SCRIPT, "verify_horizon_video_audio_exit_gate_table_pulse_for_test")
+    clean_speech_pause_calls: list[bool] = []
     manifest = tmp_path / "manifest.json"
     manifest.write_text(
         json.dumps(
@@ -110,6 +112,7 @@ def test_gate_requires_table_pulse_clean_speech_unmixr_receipt(monkeypatch, tmp_
 
         @staticmethod
         def audio_quality(path, allow_clean_speech_pauses=False):
+            clean_speech_pause_calls.append(bool(allow_clean_speech_pauses))
             return {"status": "pass", "reasons": [], "max_silence_seconds": 0.0, "tail_silence_seconds": 0.0}
 
     monkeypatch.setattr(gate, "load_audio_module", lambda: FakeAudio)
@@ -123,6 +126,7 @@ def test_gate_requires_table_pulse_clean_speech_unmixr_receipt(monkeypatch, tmp_
         "/media/horizons/table-pulse-90s-deepdive.mp4:clean_speech_unmixr_rebuild_receipt_missing"
         in result["issues"]
     )
+    assert clean_speech_pause_calls == [True]
 
 
 def test_clean_speech_style_accepts_explicit_no_bed_no_noise_policy() -> None:

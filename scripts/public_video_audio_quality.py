@@ -19,21 +19,26 @@ if str(SCRIPT_DIR) not in sys.path:
 from _unmixr_tts import UNMIXR_SHORT_TTS_PROVIDER
 
 UNMIXR_PROVIDER = UNMIXR_SHORT_TTS_PROVIDER
-CLEAN_SPEECH_AUDIO_GROUPS: set[str] = set()
+CLEAN_SPEECH_AUDIO_GROUPS: set[str] = {
+    "alice-90s-deepdive",
+    "runsite-90s-deepdive",
+    "runbook-press-90s-deepdive",
+    "table-pulse-90s-deepdive",
+}
 SILENCE_GATE_DBFS = -42.0
 MAX_SILENCE_SECONDS = 0.70
 MAX_EDGE_SILENCE_SECONDS = 0.30
 MAX_START_SILENCE_SECONDS = MAX_EDGE_SILENCE_SECONDS
-NARRATION_END_BEFORE_VIDEO_SECONDS = 0.0
+NARRATION_END_BEFORE_VIDEO_SECONDS = 1.25
 MIN_TAIL_SILENCE_SECONDS = 0.0
-MAX_TAIL_SILENCE_SECONDS = MAX_EDGE_SILENCE_SECONDS
+MAX_TAIL_SILENCE_SECONDS = 1.50
 VIDEO_FADE_OUT_SECONDS = 0.0
 VIDEO_FADE_CONTRACT = "ea.public_video_audio_gate.v1"
 MAX_HIGHBAND_P95_RATIO = 0.18
 MAX_HIGHBAND_P99_RATIO = 0.28
 HIGHBAND_START_HZ = 5500.0
 HIGHBAND_END_HZ = 7600.0
-ALICE_VOICE_POLICY = "mixed_female_or_male_policy_with_fallback"
+ALICE_VOICE_POLICY = "unmixr_premium_female_required_no_edge_fallback"
 ALICE_CLEAN_AUDIO_STYLE = "clean_audiobook_style_no_bed_no_noise_floor"
 ALICE_VOICE_GENDER = "female"
 ALICE_VOICE_QUALITY = "premium"
@@ -67,11 +72,9 @@ def _parse_volume(value: str) -> dict[str, float]:
     return {"mean_volume_db": mean, "max_volume_db": peak}
 
 
-def _parse_silence_report(value: str) -> tuple[float, float]:
-    max_silence = 0.0
-    tail_silence = 0.0
+def _parse_silence_intervals(value: str, media_duration_seconds: float) -> list[tuple[float, float, float]]:
+    intervals: list[tuple[float, float, float]] = []
     last_start = None
-    last_end = None
     for line in value.splitlines():
         start_match = re.search(r"silence_start:\s*([0-9]+(?:\.[0-9]+)?)", line)
         end_match = re.search(r"silence_end:\s*([0-9]+(?:\.[0-9]+)?)", line)
@@ -84,11 +87,25 @@ def _parse_silence_report(value: str) -> tuple[float, float]:
             duration = float(duration_match.group(1)) if duration_match else None
             if duration is None and last_start is not None:
                 duration = end_time - last_start
-            if duration is not None and duration > max_silence:
-                max_silence = duration
-                tail_silence = duration if last_end is None else tail_silence
-            last_end = end_time
+            if duration is not None and duration > 0:
+                start_time = end_time - duration if last_start is None else last_start
+                intervals.append((start_time, end_time, duration))
             last_start = None
+    if last_start is not None and media_duration_seconds > last_start:
+        intervals.append((last_start, media_duration_seconds, media_duration_seconds - last_start))
+    return intervals
+
+
+def _parse_silence_report(value: str, media_duration_seconds: float = 0.0) -> tuple[float, float]:
+    intervals = _parse_silence_intervals(value, media_duration_seconds)
+    if not intervals:
+        return 0.0, 0.0
+    max_silence = 0.0
+    tail_silence = 0.0
+    for start_time, end_time, duration in intervals:
+        max_silence = max(max_silence, duration)
+        if media_duration_seconds and end_time >= media_duration_seconds - 0.05:
+            tail_silence = max(tail_silence, duration)
     return max_silence, tail_silence
 
 
@@ -242,9 +259,24 @@ def audio_quality(path: Path, allow_clean_speech_pauses: bool = False) -> dict[s
                 "null",
                 "-",
             ])
-            max_silence_seconds, tail_silence_seconds = _parse_silence_report(silence_output)
-            if max_silence_seconds > MAX_SILENCE_SECONDS:
-                reasons.append(f"audio_silence_exceeded_{max_silence_seconds:.2f}s")
+            intervals = _parse_silence_intervals(silence_output, duration)
+            if intervals:
+                max_silence_seconds = max(duration_seconds for _, _, duration_seconds in intervals)
+                tail_silence_seconds = max(
+                    (
+                        duration_seconds
+                        for _, end_time, duration_seconds in intervals
+                        if duration and end_time >= duration - 0.05
+                    ),
+                    default=0.0,
+                )
+            for _, end_time, silence_seconds in intervals:
+                is_tail_silence = bool(duration and end_time >= duration - 0.05)
+                if is_tail_silence:
+                    if not MIN_TAIL_SILENCE_SECONDS <= silence_seconds <= MAX_TAIL_SILENCE_SECONDS:
+                        reasons.append(f"audio_tail_silence_out_of_range_{silence_seconds:.2f}s")
+                elif silence_seconds > MAX_SILENCE_SECONDS:
+                    reasons.append(f"audio_silence_exceeded_{silence_seconds:.2f}s")
         except Exception as exc:
             reasons.append(f"audio_silence_probe_failed:{exc}")
 

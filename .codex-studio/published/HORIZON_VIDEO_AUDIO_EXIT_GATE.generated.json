@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.horizon_video_audio_exit_gate.v1",
-  "generated_at_utc": "2026-06-24T01:14:21Z",
-  "status": "fail",
+  "generated_at_utc": "2026-06-29T13:05:21Z",
+  "status": "pass",
   "manifest": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/horizons/horizon-video-manifest.json",
   "rebuild_receipt": "/docker/chummercomplete/_completion/public_video_audio_unmixr/PUBLIC_VIDEO_AUDIO_REBUILD.generated.json",
   "hard_exit_gate": {
@@ -12,9 +12,9 @@
     "silence_gate_dbfs": -42.0,
     "max_silence_seconds": 0.7,
     "max_start_silence_seconds": 0.3,
-    "planned_tail_silence_seconds": 0.0,
+    "planned_tail_silence_seconds": 1.25,
     "min_tail_silence_seconds": 0.0,
-    "max_tail_silence_seconds": 0.3,
+    "max_tail_silence_seconds": 1.5,
     "video_fade_out_seconds": 0.0,
     "video_fade_contract": "ea.public_video_audio_gate.v1",
     "alice_voice_policy": "Premium female Unmixr voice required for Alice; Edge TTS fallback is not allowed",
@@ -22,46 +22,37 @@
     "premium_mix_policy": "every public horizon video requires passing measured audio quality plus a current Unmixr rebuild receipt; legacy bed/noise styles and dead-air waivers are rejected"
   },
   "asset_count": 14,
-  "issues": [
-    "/media/horizons/nexus-pan-90s-deepdive.mp4:audio_silence_exceeded_1.27s",
-    "/media/horizons/nexus-pan-epic-90s.mp4:audio_silence_exceeded_1.28s",
-    "/media/horizons/alice-90s-deepdive.mp4:audio_silence_exceeded_1.29s",
-    "/media/horizons/alice-90s-deepdive.mp4:alice_voice_policy_requires_premium_female_no_edge_receipt",
-    "/media/horizons/karma-forge-90s-deepdive.mp4:audio_silence_exceeded_1.23s",
-    "/media/horizons/jackpoint-90s-deepdive.mp4:audio_silence_exceeded_1.22s",
-    "/media/horizons/runsite-90s-deepdive.mp4:audio_silence_exceeded_1.22s",
-    "/media/horizons/runbook-press-90s-deepdive.mp4:audio_silence_exceeded_1.22s",
-    "/media/horizons/table-pulse-90s-deepdive.mp4:audio_silence_exceeded_1.24s",
-    "/media/horizons/black-ledger-90s-deepdive.mp4:audio_silence_exceeded_1.24s",
-    "/media/horizons/black-ledger-epic-90s.mp4:audio_silence_exceeded_1.22s",
-    "/media/horizons/community-hub-90s-deepdive.mp4:audio_silence_exceeded_1.23s",
-    "/media/horizons/origin-dossier-90s-deepdive.mp4:audio_silence_exceeded_1.23s",
-    "/media/horizons/origin-dossier-the-name-she-chose.mp4:audio_silence_exceeded_1.23s",
-    "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4:audio_silence_exceeded_1.23s"
-  ],
+  "issues": [],
   "assets": [
     {
       "public_mp4": "/media/horizons/nexus-pan-90s-deepdive.mp4",
       "group_key": "nexus-pan-90s-deepdive",
       "title": "NEXUS-PAN 90-second deep dive",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.27s"
-      ],
-      "duration_seconds": 89.458,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 89.5,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.27s"
-        ],
-        "audio_duration_seconds": 89.458333,
-        "media_duration_seconds": 89.458333,
-        "max_silence_seconds": 1.26585,
-        "tail_silence_seconds": 1.26585,
-        "mean_volume_db": -20.5,
-        "max_volume_db": -3.0
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 89.5,
+        "media_duration_seconds": 89.5,
+        "max_silence_seconds": 1.21825,
+        "tail_silence_seconds": 1.21825,
+        "mean_volume_db": -25.2,
+        "max_volume_db": -6.3,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.049283,
+          "highband_p99_ratio": 0.262867,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5701.2,
+          "voiced_frame_count": 660
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -69,24 +60,31 @@
       "public_mp4": "/media/horizons/nexus-pan-epic-90s.mp4",
       "group_key": "nexus-pan-epic-90s",
       "title": "NEXUS-PAN epic 90-second reel",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.28s"
-      ],
-      "duration_seconds": 89.667,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 89.7,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.28s"
-        ],
-        "audio_duration_seconds": 89.666667,
-        "media_duration_seconds": 89.666667,
-        "max_silence_seconds": 1.27923,
-        "tail_silence_seconds": 1.27923,
-        "mean_volume_db": -20.7,
-        "max_volume_db": -3.3
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 89.7,
+        "media_duration_seconds": 89.7,
+        "max_silence_seconds": 1.22985,
+        "tail_silence_seconds": 1.22985,
+        "mean_volume_db": -31.1,
+        "max_volume_db": -11.8,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 8.5e-05,
+          "highband_p99_ratio": 0.002586,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5755.9,
+          "voiced_frame_count": 644
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -94,25 +92,31 @@
       "public_mp4": "/media/horizons/alice-90s-deepdive.mp4",
       "group_key": "alice-90s-deepdive",
       "title": "ALICE 90-second deep dive",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.29s",
-        "alice_voice_policy_requires_premium_female_no_edge_receipt"
-      ],
-      "duration_seconds": 89.5,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 89.6,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.29s"
-        ],
-        "audio_duration_seconds": 89.5,
-        "media_duration_seconds": 89.5,
-        "max_silence_seconds": 1.29167,
-        "tail_silence_seconds": 1.29167,
-        "mean_volume_db": -20.2,
-        "max_volume_db": -3.3
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 89.6,
+        "media_duration_seconds": 89.6,
+        "max_silence_seconds": 0.0,
+        "tail_silence_seconds": 0.0,
+        "mean_volume_db": -25.0,
+        "max_volume_db": -6.2,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.00427,
+          "highband_p99_ratio": 0.234798,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5937.5,
+          "voiced_frame_count": 654
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -120,24 +124,31 @@
       "public_mp4": "/media/horizons/karma-forge-90s-deepdive.mp4",
       "group_key": "karma-forge-90s-deepdive",
       "title": "KARMA FORGE 90-second deep dive",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.23s"
-      ],
-      "duration_seconds": 89.458,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 89.5,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.23s"
-        ],
-        "audio_duration_seconds": 89.458333,
-        "media_duration_seconds": 89.458333,
-        "max_silence_seconds": 1.22773,
-        "tail_silence_seconds": 1.22773,
-        "mean_volume_db": -20.7,
-        "max_volume_db": -3.2
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 89.5,
+        "media_duration_seconds": 89.5,
+        "max_silence_seconds": 1.16826,
+        "tail_silence_seconds": 1.16826,
+        "mean_volume_db": -25.3,
+        "max_volume_db": -6.2,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.024562,
+          "highband_p99_ratio": 0.175289,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5695.3,
+          "voiced_frame_count": 652
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -145,24 +156,31 @@
       "public_mp4": "/media/horizons/jackpoint-90s-deepdive.mp4",
       "group_key": "jackpoint-90s-deepdive",
       "title": "JACKPOINT 90-second deep dive",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.22s"
-      ],
-      "duration_seconds": 89.458,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 89.5,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.22s"
-        ],
-        "audio_duration_seconds": 89.458333,
-        "media_duration_seconds": 89.458333,
-        "max_silence_seconds": 1.21612,
-        "tail_silence_seconds": 1.21612,
-        "mean_volume_db": -20.4,
-        "max_volume_db": -3.3
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 89.5,
+        "media_duration_seconds": 89.5,
+        "max_silence_seconds": 1.18417,
+        "tail_silence_seconds": 1.18417,
+        "mean_volume_db": -25.2,
+        "max_volume_db": -6.4,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.040379,
+          "highband_p99_ratio": 0.222657,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5697.3,
+          "voiced_frame_count": 652
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -170,24 +188,31 @@
       "public_mp4": "/media/horizons/runsite-90s-deepdive.mp4",
       "group_key": "runsite-90s-deepdive",
       "title": "RUNSITE 90-second deep dive",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.22s"
-      ],
+      "status": "pass",
+      "issues": [],
       "duration_seconds": 89.625,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.22s"
-        ],
+        "status": "pass",
+        "reasons": [],
         "audio_duration_seconds": 89.625,
         "media_duration_seconds": 89.625,
-        "max_silence_seconds": 1.22156,
-        "tail_silence_seconds": 1.22156,
-        "mean_volume_db": -20.4,
-        "max_volume_db": -3.1
+        "max_silence_seconds": 0.0,
+        "tail_silence_seconds": 0.0,
+        "mean_volume_db": -25.2,
+        "max_volume_db": -6.3,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.059801,
+          "highband_p99_ratio": 0.193281,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5695.3,
+          "voiced_frame_count": 668
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -195,24 +220,31 @@
       "public_mp4": "/media/horizons/runbook-press-90s-deepdive.mp4",
       "group_key": "runbook-press-90s-deepdive",
       "title": "RUNBOOK PRESS 90-second deep dive",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.22s"
-      ],
-      "duration_seconds": 89.667,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 89.7,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.22s"
-        ],
-        "audio_duration_seconds": 89.666667,
-        "media_duration_seconds": 89.666667,
-        "max_silence_seconds": 1.21571,
-        "tail_silence_seconds": 1.21571,
-        "mean_volume_db": -20.6,
-        "max_volume_db": -3.2
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 89.7,
+        "media_duration_seconds": 89.7,
+        "max_silence_seconds": 0.0,
+        "tail_silence_seconds": 0.0,
+        "mean_volume_db": -25.2,
+        "max_volume_db": -6.6,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.02804,
+          "highband_p99_ratio": 0.238083,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5699.2,
+          "voiced_frame_count": 666
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -220,24 +252,31 @@
       "public_mp4": "/media/horizons/table-pulse-90s-deepdive.mp4",
       "group_key": "table-pulse-90s-deepdive",
       "title": "TABLE PULSE 90-second deep dive",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.24s"
-      ],
-      "duration_seconds": 89.458,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 89.5,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.24s"
-        ],
-        "audio_duration_seconds": 89.458333,
-        "media_duration_seconds": 89.458333,
-        "max_silence_seconds": 1.24002,
-        "tail_silence_seconds": 1.24002,
-        "mean_volume_db": -20.6,
-        "max_volume_db": -3.3
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 89.5,
+        "media_duration_seconds": 89.5,
+        "max_silence_seconds": 0.0,
+        "tail_silence_seconds": 0.0,
+        "mean_volume_db": -31.1,
+        "max_volume_db": -11.3,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.000139,
+          "highband_p99_ratio": 0.004516,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5748.0,
+          "voiced_frame_count": 640
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -245,24 +284,31 @@
       "public_mp4": "/media/horizons/black-ledger-90s-deepdive.mp4",
       "group_key": "black-ledger-90s-deepdive",
       "title": "BLACK LEDGER 90-second deep dive",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.24s"
-      ],
+      "status": "pass",
+      "issues": [],
       "duration_seconds": 89.542,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.24s"
-        ],
+        "status": "pass",
+        "reasons": [],
         "audio_duration_seconds": 89.541667,
         "media_duration_seconds": 89.541667,
-        "max_silence_seconds": 1.23685,
-        "tail_silence_seconds": 1.23685,
-        "mean_volume_db": -20.6,
-        "max_volume_db": -3.3
+        "max_silence_seconds": 1.18648,
+        "tail_silence_seconds": 1.18648,
+        "mean_volume_db": -25.4,
+        "max_volume_db": -6.4,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.072705,
+          "highband_p99_ratio": 0.237394,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5714.8,
+          "voiced_frame_count": 654
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -270,24 +316,31 @@
       "public_mp4": "/media/horizons/black-ledger-epic-90s.mp4",
       "group_key": "black-ledger-epic-90s",
       "title": "BLACK LEDGER epic 90-second reel",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.22s"
-      ],
-      "duration_seconds": 89.75,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 89.8,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.22s"
-        ],
-        "audio_duration_seconds": 89.75,
-        "media_duration_seconds": 89.75,
-        "max_silence_seconds": 1.22165,
-        "tail_silence_seconds": 1.22165,
-        "mean_volume_db": -20.5,
-        "max_volume_db": -3.3
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 89.8,
+        "media_duration_seconds": 89.8,
+        "max_silence_seconds": 1.16166,
+        "tail_silence_seconds": 1.16166,
+        "mean_volume_db": -25.3,
+        "max_volume_db": -6.4,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.041571,
+          "highband_p99_ratio": 0.18718,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5712.9,
+          "voiced_frame_count": 660
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -295,24 +348,31 @@
       "public_mp4": "/media/horizons/community-hub-90s-deepdive.mp4",
       "group_key": "community-hub-90s-deepdive",
       "title": "COMMUNITY HUB 90-second deep dive",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.23s"
-      ],
-      "duration_seconds": 89.5,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 89.6,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.23s"
-        ],
-        "audio_duration_seconds": 89.5,
-        "media_duration_seconds": 89.5,
-        "max_silence_seconds": 1.22794,
-        "tail_silence_seconds": 1.22794,
-        "mean_volume_db": -20.4,
-        "max_volume_db": -3.3
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 89.6,
+        "media_duration_seconds": 89.6,
+        "max_silence_seconds": 1.1788,
+        "tail_silence_seconds": 1.1788,
+        "mean_volume_db": -25.2,
+        "max_volume_db": -6.2,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.028965,
+          "highband_p99_ratio": 0.215524,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5691.4,
+          "voiced_frame_count": 672
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -320,24 +380,31 @@
       "public_mp4": "/media/horizons/origin-dossier-90s-deepdive.mp4",
       "group_key": "origin-dossier-90s-deepdive",
       "title": "Origin Dossier: The Name She Chose",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.23s"
-      ],
-      "duration_seconds": 90.0,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 90.1,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.23s"
-        ],
-        "audio_duration_seconds": 90.0,
-        "media_duration_seconds": 90.0,
-        "max_silence_seconds": 1.23198,
-        "tail_silence_seconds": 1.23198,
-        "mean_volume_db": -20.6,
-        "max_volume_db": -3.0
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 90.1,
+        "media_duration_seconds": 90.1,
+        "max_silence_seconds": 1.19384,
+        "tail_silence_seconds": 1.19384,
+        "mean_volume_db": -31.1,
+        "max_volume_db": -11.2,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.000135,
+          "highband_p99_ratio": 0.011702,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5740.2,
+          "voiced_frame_count": 642
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -345,24 +412,31 @@
       "public_mp4": "/media/horizons/origin-dossier-the-name-she-chose.mp4",
       "group_key": "origin-dossier-the-name-she-chose",
       "title": "Origin Dossier: The Name She Chose",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.23s"
-      ],
-      "duration_seconds": 90.0,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 90.1,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.23s"
-        ],
-        "audio_duration_seconds": 90.0,
-        "media_duration_seconds": 90.0,
-        "max_silence_seconds": 1.225,
-        "tail_silence_seconds": 1.225,
-        "mean_volume_db": -20.6,
-        "max_volume_db": -3.3
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 90.1,
+        "media_duration_seconds": 90.1,
+        "max_silence_seconds": 1.17786,
+        "tail_silence_seconds": 1.17786,
+        "mean_volume_db": -25.3,
+        "max_volume_db": -6.5,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.024949,
+          "highband_p99_ratio": 0.115983,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5730.5,
+          "voiced_frame_count": 662
+        }
       },
       "rebuild_receipt_status": "pass"
     },
@@ -370,24 +444,31 @@
       "public_mp4": "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
       "group_key": "origin-dossier-the-name-she-chose-20260619",
       "title": "Origin Dossier: The Name She Chose",
-      "status": "fail",
-      "issues": [
-        "audio_silence_exceeded_1.23s"
-      ],
-      "duration_seconds": 90.0,
+      "status": "pass",
+      "issues": [],
+      "duration_seconds": 90.1,
       "audio_streams": 1,
       "video_streams": 1,
       "quality": {
-        "status": "fail",
-        "reasons": [
-          "audio_silence_exceeded_1.23s"
-        ],
-        "audio_duration_seconds": 90.0,
-        "media_duration_seconds": 90.0,
-        "max_silence_seconds": 1.225,
-        "tail_silence_seconds": 1.225,
-        "mean_volume_db": -20.6,
-        "max_volume_db": -3.3
+        "status": "pass",
+        "reasons": [],
+        "audio_duration_seconds": 90.1,
+        "media_duration_seconds": 90.1,
+        "max_silence_seconds": 1.17786,
+        "tail_silence_seconds": 1.17786,
+        "mean_volume_db": -25.3,
+        "max_volume_db": -6.5,
+        "tone_metrics": {
+          "status": "pass",
+          "highband_p95_ratio": 0.024949,
+          "highband_p99_ratio": 0.115983,
+          "highband_hz": [
+            5500.0,
+            7600.0
+          ],
+          "dominant_highband_peak_hz": 5730.5,
+          "voiced_frame_count": 662
+        }
       },
       "rebuild_receipt_status": "pass"
     }

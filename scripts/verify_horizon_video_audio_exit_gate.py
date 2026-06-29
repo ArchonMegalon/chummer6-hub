@@ -106,12 +106,12 @@ def verify_manifest(manifest_path: Path) -> dict[str, Any]:
         clean_speech_audio = True
         alice_clean_audio = group_key == "alice-90s-deepdive"
         rebuild_receipt = group_receipts.get(group_key) or {}
-        try:
-            quality = audio.audio_quality(path, allow_clean_speech_pauses=False)
-        except TypeError:
-            quality = audio.audio_quality(path)
         clean_speech_groups = set(getattr(audio, "CLEAN_SPEECH_AUDIO_GROUPS", set()))
         requires_clean_speech_receipt = group_key in clean_speech_groups
+        try:
+            quality = audio.audio_quality(path, allow_clean_speech_pauses=requires_clean_speech_receipt)
+        except TypeError:
+            quality = audio.audio_quality(path)
         if not MIN_VIDEO_DURATION_SECONDS <= duration_seconds <= MAX_VIDEO_DURATION_SECONDS:
             row_issues.append("duration_not_90s")
         if audio_streams != 1:
