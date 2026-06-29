@@ -5,13 +5,18 @@ import argparse
 
 import requests
 
-from absolute_completion_common import LocalHubApp, completion_path, now_iso, write_json, write_text
+from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completion_path, now_iso, write_json, write_text
 
 
-REQUIRED_PHRASES = [
+REQUIRED_VISIBLE_PHRASES = [
     "Participate",
-    "participate-board",
-    "/participate/board",
+    "Participate board",
+]
+
+REQUIRED_SOURCE_PHRASES = [
+    '[HttpGet("/participate/board")]',
+    "BuildParticipateFrameHref",
+    "?embed=1",
 ]
 
 FORBIDDEN_PHRASES = [
@@ -30,6 +35,7 @@ ROUTES = [
     "/feedback",
     "/participate",
 ]
+PARTICIPATE_CONTROLLER = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Controllers" / "ParticipateController.cs"
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,12 +56,16 @@ def run(base_url: str) -> int:
         route_statuses.append({"route": route, "status_code": response.status_code})
 
     joined = "\n".join(combined_html)
-    for phrase in REQUIRED_PHRASES:
+    for phrase in REQUIRED_VISIBLE_PHRASES:
         if phrase not in joined:
-            failures.append(f"missing required phrase: {phrase}")
+            failures.append(f"missing required visible phrase: {phrase}")
     for phrase in FORBIDDEN_PHRASES:
         if phrase in joined:
             failures.append(f"forbidden phrase present: {phrase}")
+    controller_source = PARTICIPATE_CONTROLLER.read_text(encoding="utf-8")
+    for phrase in REQUIRED_SOURCE_PHRASES:
+        if phrase not in controller_source:
+            failures.append(f"participate controller missing required board route phrase: {phrase}")
 
     payload = {
         "contract_name": "chummer.gamification_public_copy_gate",
@@ -63,7 +73,9 @@ def run(base_url: str) -> int:
         "generated_at_utc": now_iso(),
         "base_url": base_url,
         "routes": route_statuses,
-        "required_phrases": REQUIRED_PHRASES,
+        "required_visible_phrases": REQUIRED_VISIBLE_PHRASES,
+        "required_source_phrases": REQUIRED_SOURCE_PHRASES,
+        "participate_controller": str(PARTICIPATE_CONTROLLER),
         "forbidden_phrases": FORBIDDEN_PHRASES,
         "failure_count": len(failures),
         "failures": failures,

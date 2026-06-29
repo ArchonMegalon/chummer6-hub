@@ -182,7 +182,7 @@ public sealed class ParticipateController : Controller
             RoadmapHref: "/roadmap",
             HostedBoardHref: boardShellHref,
             SupportHref: "/contact",
-            RetryHref: currentPath,
+            RetryHref: BuildParticipateBoardRouteHref(normalizedBoardPath),
             SupporterHref: supporterHref,
             LoadedFromBoard: false,
             EmbeddedBoardEnabled: hostedBoardAvailable,

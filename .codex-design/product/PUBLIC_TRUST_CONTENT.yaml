@@ -123,7 +123,7 @@ trust_pages:
   - id: contact
     eyebrow: "Contact"
     heading: "Contact"
-    intro: "Use the Chummer5 Discord server."
+    intro: "Use the Chummer5 Discord server. Keep private details out of public comments."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
@@ -140,7 +140,7 @@ trust_pages:
       - id: discord
         eyebrow: "Discord"
         heading: "Use the Chummer5 server for normal contact"
-        body: "Questions, quick feedback, and normal discussion belong in Discord where the Chummer community already is."
+        body: "Questions, quick feedback, and normal discussion belong in Discord where the Chummer community already is. Private details stay out of public comments."
 faq_pages:
   - id: faq
     eyebrow: "FAQ"

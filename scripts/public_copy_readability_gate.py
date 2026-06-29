@@ -15,23 +15,26 @@ ROUTE_REQUIREMENTS = {
         "Nightly",
     ],
     "/feedback": [
-        "participate-board",
-        "/participate/board",
+        "Participate board",
     ],
     "/participate": [
-        "participate-board",
-        "/participate/board",
+        "Participate board",
     ],
 }
+PARTICIPATE_SOURCE_REQUIREMENTS = (
+    '[HttpGet("/participate/board")]',
+    "BuildParticipateFrameHref",
+    "?embed=1",
+)
 ROUTE_FORBIDDEN = (
     "Top voters decide roadmap",
     "Guaranteed implementation",
     "Public bug reports are support tickets",
 )
 ACCOUNT_SOURCE_REQUIREMENTS = (
-    "Participation dashboard",
-    "Contribution cred",
-    "Impact closeout notifications",
+    "Participation state",
+    "Contribution points",
+    "Impact journal",
     "Public recognition stays off unless you opt in.",
     "Votes show demand; only finished work ships.",
 )
@@ -40,6 +43,7 @@ ACCOUNT_SOURCE_FORBIDDEN = (
     "Top voters decide roadmap",
 )
 ACCOUNT_SOURCE = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
+PARTICIPATE_CONTROLLER = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Controllers" / "ParticipateController.cs"
 
 
 def parse_args() -> argparse.Namespace:
@@ -89,9 +93,19 @@ def check_account_source() -> list[str]:
     return failures
 
 
+def check_participate_source() -> list[str]:
+    failures: list[str] = []
+    source = PARTICIPATE_CONTROLLER.read_text(encoding="utf-8")
+    for phrase in PARTICIPATE_SOURCE_REQUIREMENTS:
+        if phrase not in source:
+            failures.append(f"participate controller missing required phrase: {phrase}")
+    return failures
+
+
 def run(base_url: str) -> int:
     failures, route_statuses = check_route_copy(base_url)
     failures.extend(check_account_source())
+    failures.extend(check_participate_source())
 
     payload = {
         "contract_name": "chummer.public_copy_readability_gate",
@@ -101,6 +115,7 @@ def run(base_url: str) -> int:
         "route_count": len(route_statuses),
         "route_statuses": route_statuses,
         "account_source": str(ACCOUNT_SOURCE),
+        "participate_controller": str(PARTICIPATE_CONTROLLER),
         "failure_count": len(failures),
         "failures": failures,
     }

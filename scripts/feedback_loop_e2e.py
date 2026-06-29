@@ -6,7 +6,7 @@ import argparse
 from absolute_completion_common import RUN_SERVICES_ROOT, completion_path, now_iso, write_json
 
 
-FEEDBACK_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Feedback.cshtml"
+FEEDBACK_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Partizipate.cshtml"
 ACCOUNT_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
 DRY_RUN_RECEIPT = completion_path("FEEDBACK_EA_FLEET_DRY_RUN.generated.json")
 
@@ -24,10 +24,12 @@ def main() -> int:
     feedback_view = FEEDBACK_VIEW.read_text(encoding="utf-8")
     account_view = ACCOUNT_VIEW.read_text(encoding="utf-8")
 
-    if "The loop closes only after people can use it" not in feedback_view:
-        failures.append("feedback view lost user-available closeout wording")
-    if "Votes show demand. Chummer decides what ships." not in feedback_view:
-        failures.append("feedback view lost vote-vs-shipping wording")
+    if 'aria-label="Participate board"' not in feedback_view:
+        failures.append("participate view lost first-party board landmark")
+    if "data-chummer-participate-frame" not in feedback_view:
+        failures.append("participate view lost embedded board frame hook")
+    if "Board offline right now. Use Contact for the Chummer5 Discord server." not in feedback_view:
+        failures.append("participate view lost first-party fallback wording")
     if args.stub_delivery and not DRY_RUN_RECEIPT.is_file():
         failures.append(f"missing dry-run receipt: {DRY_RUN_RECEIPT}")
     if args.with_impact_receipt and "Impact journal" not in account_view:

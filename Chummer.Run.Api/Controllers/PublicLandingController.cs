@@ -2283,7 +2283,7 @@ public sealed class PublicLandingController : Controller
             RoadmapHref: "/roadmap",
             HostedBoardHref: boardShellHref,
             SupportHref: "/contact",
-            RetryHref: currentPath,
+            RetryHref: BuildParticipateBoardRouteHref(normalizedBoardPath),
             SupporterHref: supporterHref,
             LoadedFromBoard: loadedFromBoard,
             EmbeddedBoardEnabled: hostedBoardAvailable,
