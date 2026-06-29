@@ -68,7 +68,7 @@ public sealed class CampaignAdoptionLoopServiceTests
                     "Spoiler-safe notes stay bounded to the same closeout draft.",
                     "No VTT map state or engine math is owned by hub here."
                 ],
-                NextSafeAction: "Open ResolutionReport and keep the same return lane on /account/work#runboard.",
+                NextSafeAction: "Open ResolutionReport and keep the same return lane on /account/roster#runboard.",
                 Note: "Campaign adoption loop test setup."));
 
             campaignSpine.UpsertCampaignAdoption(user, workspace, new CampaignAdoptionUpdateRequest(
@@ -87,7 +87,7 @@ public sealed class CampaignAdoptionLoopServiceTests
                     "Keep future changes only and preserve legacy notes on the reviewed return path."
                 ],
                 Summary: "Campaign adoption wizard says this workspace is safe to play while unknown provenance stays explicit.",
-                NextSafeAction: "Review the adoption wizard on /account/work#adoption before you reopen the next campaign return.",
+                NextSafeAction: "Review the adoption wizard on /account/roster#adoption before you reopen the next campaign return.",
                 Note: "Campaign adoption loop service proof."));
 
             RunnerGoalProjection goal = campaignSpine.UpsertRunnerGoal(user, workspace, new RunnerGoalUpdateRequest(
@@ -100,7 +100,7 @@ public sealed class CampaignAdoptionLoopServiceTests
                 KarmaReserved: 12,
                 DowntimeDays: 4,
                 ApprovalStatus: "gm_review",
-                NextSafeAction: "Review runner goal pins on /account/work#runner-goals before you close the next ResolutionReport.",
+                NextSafeAction: "Review runner goal pins on /account/roster#runner-goals before you close the next ResolutionReport.",
                 Note: "Campaign adoption loop service proof."));
 
             ResolutionReportApprovalProjection approval = campaignSpine.ApproveResolutionReport(user, workspace, new ResolutionReportApprovalRequest(
@@ -112,7 +112,7 @@ public sealed class CampaignAdoptionLoopServiceTests
                 NewsSummary: "Player-safe reports say a courier vanished after a dockside outage, but the source stays preview-only.",
                 NewsSource: "Tacoma Shadowfeed",
                 NewsUrl: "https://example.invalid/news/tacoma-courier-rumor",
-                NextSafeAction: "Review the first WorldTick and player-safe news item on /account/work#campaign-memory before you reopen the runboard.",
+                NextSafeAction: "Review the first WorldTick and player-safe news item on /account/roster#campaign-memory before you reopen the runboard.",
                 Note: "Campaign adoption loop service proof."));
 
             Assert.Equal(run.RunId, approval.RunId);

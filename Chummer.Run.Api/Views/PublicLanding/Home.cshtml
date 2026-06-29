@@ -37,20 +37,20 @@
     var leadCommunityBoard = leadCommunityOperation?.SeasonBoardEntries.FirstOrDefault();
     var leadCommunitySponsorSession = leadCommunityOperation?.RecentSponsorSessions.FirstOrDefault();
     var leadCommunityBoardHref = leadCommunityOperation is null
-        ? "/account/work#community-ops"
-        : $"/account/work#community-op-board-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
+        ? "/account/roster#community-ops"
+        : $"/account/roster#community-op-board-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadCommunityLeagueHref = leadCommunityOperation is null
-        ? "/account/work#community-ops"
-        : $"/account/work#community-op-league-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
+        ? "/account/roster#community-ops"
+        : $"/account/roster#community-op-league-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadCommunityInviteHref = leadCommunityOperation is null
-        ? "/account/work#community-ops"
-        : $"/account/work#community-op-invites-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
+        ? "/account/roster#community-ops"
+        : $"/account/roster#community-op-invites-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadCommunitySponsorHref = leadCommunityOperation is null
-        ? "/account/work#community-ops"
-        : $"/account/work#community-op-sponsor-sessions-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
+        ? "/account/roster#community-ops"
+        : $"/account/roster#community-op-sponsor-sessions-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     var leadCommunityGuidanceHref = leadCommunityOperation is null
-        ? "/account/work#community-ops"
-        : $"/account/work#community-op-guidance-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
+        ? "/account/roster#community-ops"
+        : $"/account/roster#community-op-guidance-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
     bool IsCalmHomeNoticeKind(string? kind)
         => string.Equals(kind, "portable_exchange", StringComparison.OrdinalIgnoreCase)
             || string.Equals(kind, "gm_operations_readiness", StringComparison.OrdinalIgnoreCase)
@@ -448,7 +448,7 @@
                                                         <h3>@dossier.DisplayName</h3>
                                                         <p>@(dossier.LatestContinuity?.Summary ?? "Living dossier is ready for the next return.")</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/work">Open dossiers</a>
+                                                    <a class="inline-link" href="/account/roster">Open dossiers</a>
                                                 </article>
                                             }
                                             @foreach (var campaign in campaigns)
@@ -459,7 +459,7 @@
                                                         <h3>@campaign.Name</h3>
                                                         <p>@(campaign.LatestContinuity?.Summary ?? "Campaign return is live.")</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/work">Open campaign return</a>
+                                                    <a class="inline-link" href="/account/roster">Open campaign return</a>
                                                 </article>
                                             }
                                             @foreach (var run in runs)
@@ -470,7 +470,7 @@
                                                         <h3>@run.Title</h3>
                                                         <p>@run.Objectives.Count objectives · @(run.ActiveSceneId is null ? "No active scene" : "Scene live") · @(run.LatestContinuity?.Summary ?? run.Summary)</p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/work">Open run context</a>
+                                                    <a class="inline-link" href="/account/roster">Open run context</a>
                                                 </article>
                                             }
                                             @foreach (var workspace in workspaces)
@@ -555,7 +555,7 @@
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}")">Open campaign</a>
+                                                    <a class="inline-link" href="@($"/account/campaigns/{Uri.EscapeDataString(workspace.WorkspaceId)}")">Open campaign</a>
                                                 </article>
                                             }
                                         }
@@ -598,7 +598,7 @@
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open campaign</a>
+                                                    <a class="inline-link" href="@($"/account/campaigns/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open campaign</a>
                                                 </article>
 
                                                 @if (leadFirstPlayableSession is not null)
@@ -620,7 +620,7 @@
                                                                 <p class="muted-copy">Note: @leadFirstPlayableEvidence</p>
                                                             }
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session</a>
+                                                        <a class="inline-link" href="@($"/account/campaigns/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session</a>
                                                     </article>
                                                 }
 
@@ -640,7 +640,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-next-session-carry-forward")">Open next-session return</a>
+                                                        <a class="inline-link" href="@($"/account/campaigns/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-next-session-carry-forward")">Open next-session return</a>
                                                     </article>
                                                 }
 
@@ -733,7 +733,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">@leadAftermathRouteLabel</a>
+                                                        <a class="inline-link" href="@($"/account/campaigns/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#aftermath-packages")">@leadAftermathRouteLabel</a>
                                                         <p class="muted-copy">Table Pulse aftermath: account reaction fallout stays on the same campaign page.</p>
                                                         @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.BuildHandoffId))
                                                         {
@@ -765,7 +765,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-downtime-brief")">Open downtime brief</a>
+                                                        <a class="inline-link" href="@($"/account/campaigns/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-downtime-brief")">Open downtime brief</a>
                                                     </article>
                                                 }
 
@@ -785,7 +785,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-campaign-memory")">Open campaign memory</a>
+                                                        <a class="inline-link" href="@($"/account/campaigns/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}#selected-campaign-memory")">Open campaign memory</a>
                                                     </article>
                                                 }
 
@@ -803,7 +803,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open campaign</a>
+                                                        <a class="inline-link" href="@($"/account/campaigns/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open campaign</a>
                                                     </article>
                                                 }
 
@@ -822,7 +822,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="/account/work#community-ops">Open roster moves</a>
+                                                        <a class="inline-link" href="/account/roster#community-ops">Open roster moves</a>
                                                     </article>
                                                 }
 
@@ -913,7 +913,7 @@
                                                             <span> Safehouse / travel mode: @PublicText(leadWorkspaceServerPlane.TravelMode.PrefetchInventorySummary).</span>
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open prep and travel</a>
+                                                    <a class="inline-link" href="@($"/account/campaigns/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open prep and travel</a>
                                                 </article>
                                             }
 
@@ -1139,7 +1139,7 @@
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="/account/work">Open migration return</a>
+                                                    <a class="inline-link" href="/account/roster">Open migration return</a>
                                                 </article>
                                             }
                                             @if (creatorPublications.Length > 0)
@@ -1388,12 +1388,12 @@
         });
         const workspaceId = payload?.WorkspaceId || payload?.workspaceId;
         if (typeof workspaceId === "string" && workspaceId.length > 0) {
-          window.location.href = `/account/work/workspaces/${encodeURIComponent(workspaceId)}`;
+          window.location.href = `/account/campaigns/${encodeURIComponent(workspaceId)}`;
           return;
         }
 
         setStarterWorkspaceNotice("Starter campaign is not ready yet. Open Account Work to continue.");
-        window.location.href = "/account/work";
+        window.location.href = "/account/roster";
       });
     } catch (error) {
       setStarterWorkspaceNotice(ui.describeError(error, "Starter campaign could not be seeded right now."));

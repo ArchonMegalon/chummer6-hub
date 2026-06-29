@@ -6,7 +6,7 @@
 
     var handoff = Model.SelectedBuildLabHandoff;
     var insights = Model.SelectedBuildLabInsights?.ToArray() ?? Array.Empty<Chummer.Run.Api.Services.KarmaForge.BuildGhostConciergeInsightProjection>();
-    var rulesHref = handoff is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(handoff.ExplainEntryId)}";
+    var rulesHref = handoff is null ? "/account/roster" : $"/account/work/rules/{Uri.EscapeDataString(handoff.ExplainEntryId)}";
 }
 
 @if (handoff is null)
@@ -17,7 +17,7 @@
             <h1>Build handoff not found</h1>
             <p>This handoff is not attached to this account anymore.</p>
             <div class="minimal-actions">
-                <a class="button-like button-like--primary" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--primary" href="/account/roster">Back to roster</a>
             </div>
         </div>
     </section>
@@ -35,7 +35,7 @@ else
                 <li>@handoff.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</li>
             </ul>
             <div class="minimal-actions">
-                <a class="button-like button-like--ghost" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--ghost" href="/account/roster">Back to roster</a>
                 <a class="button-like button-like--secondary" href="@rulesHref">Open rules answer</a>
             </div>
         </div>

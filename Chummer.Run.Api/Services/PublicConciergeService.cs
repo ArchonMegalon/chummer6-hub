@@ -578,7 +578,7 @@ public sealed class PublicConciergeService
             ("contact", "install_continuity") => authenticated ? "/account/access" : "/downloads",
             ("contact", "human_help") => "/contact",
             ("campaign-invite", "continue_join") => authenticated
-                ? "/account/work#community-op-invites"
+                ? "/account/roster#community-op-invites"
                 : BuildInviteContinuationRoute(contextId),
             ("campaign-invite", "watch_primer") => BuildInvitePrimerHref("video", contextId),
             ("campaign-invite", "open_primer_packet") => BuildInvitePrimerHref("packet", contextId),

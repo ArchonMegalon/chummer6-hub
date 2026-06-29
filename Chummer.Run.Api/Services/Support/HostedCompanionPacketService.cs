@@ -454,21 +454,21 @@ public sealed class HostedCompanionPacketService
                     Kind: "campaign_workspace_change",
                     Label: workspace.CampaignName,
                     Summary: summary,
-                    Route: "/account/work",
+                    Route: "/account/roster",
                     ReceiptId: changePacket?.PacketId),
                 new HostedCompanionFactRefProjection(
                     FactId: StableId("campaign-world", workspace.WorkspaceId),
                     Kind: "campaign_memory",
                     Label: "Campaign memory follow-through",
                     Summary: workspace.CampaignMemory?.Summary ?? workspace.NextSessionCarryForward?.Summary ?? workspace.ReturnSummary,
-                    Route: "/account/work#campaign-memory")
+                    Route: "/account/roster#campaign-memory")
             ],
             FactSummary: summary,
             AllowedActions:
             [
-                new HostedCompanionActionProjection("open_campaign_workspace", "Open campaign workspace", "/account/work", "See what changed and pick up the same campaign workspace."),
-                new HostedCompanionActionProjection("review_impacts", "Review impacts", "/account/work#campaign-memory", "Inspect world-tick, player-safe news, and next-session follow-through."),
-                new HostedCompanionActionProjection("open_runboard", "Open runboard", "/account/work#runboard", "Resume the runboard without recreating the session state.")
+                new HostedCompanionActionProjection("open_campaign_workspace", "Open campaign workspace", "/account/roster", "See what changed and pick up the same campaign workspace."),
+                new HostedCompanionActionProjection("review_impacts", "Review impacts", "/account/roster#campaign-memory", "Inspect world-tick, player-safe news, and next-session follow-through."),
+                new HostedCompanionActionProjection("open_runboard", "Open runboard", "/account/roster#runboard", "Resume the runboard without recreating the session state.")
             ],
             Suppression: BuildSuppression("trigger_class_per_campaign", 43200, 1, true),
             EaCompile: BuildEaCompile(true, "line_variant_pack", ["line_variant_pack"], runtimeBlocking: false),
@@ -545,7 +545,7 @@ public sealed class HostedCompanionPacketService
             AllowedActions:
             [
                 new HostedCompanionActionProjection("open_publication", discoverable ? "Open publication" : "Open publication detail", discoverable ? publicRoute : "/account/publications", "Review the publication and its current status."),
-                new HostedCompanionActionProjection("review_workspace", "Open campaign workspace", "/account/work", "Return to the workspace that created the publication."),
+                new HostedCompanionActionProjection("review_workspace", "Open campaign workspace", "/account/roster", "Return to the workspace that created the publication."),
                 new HostedCompanionActionProjection("review_support", "Review support status", "/account/support", "Keep publication, support, and rollout follow-up inside Chummer when more work is needed.")
             ],
             Suppression: BuildSuppression("trigger_class_per_campaign", 86400, 1, true),

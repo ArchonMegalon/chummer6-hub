@@ -43,7 +43,7 @@ public sealed class PropertyquarryRouteTests
 
         IActionResult detail = await controller.PropertyquarryPropertyPage("northbound-research-lab", CancellationToken.None);
         RedirectResult detailRedirect = Assert.IsType<RedirectResult>(detail);
-        Assert.StartsWith("/account/work/workspaces/", detailRedirect.Url, StringComparison.Ordinal);
+        Assert.StartsWith("/account/campaigns/", detailRedirect.Url, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=Northbound%20research%20lab", detailRedirect.Url, StringComparison.Ordinal);
     }
 
@@ -77,14 +77,14 @@ public sealed class PropertyquarryRouteTests
         Assert.Equal("/account/propertyquarry/northbound-research-lab", workspace.GetProperty("property").GetProperty("accountHref").GetString());
         string? workspacePrepSearchHref = workspace.GetProperty("property").GetProperty("prepSearchAccountHref").GetString();
         Assert.NotNull(workspacePrepSearchHref);
-        Assert.StartsWith("/account/work/workspaces/", workspacePrepSearchHref, StringComparison.Ordinal);
+        Assert.StartsWith("/account/campaigns/", workspacePrepSearchHref, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=Northbound%20research%20lab", workspacePrepSearchHref, StringComparison.Ordinal);
         Assert.Equal("/account/propertyquarry", workspace.GetProperty("routes").GetProperty("accountEntryHref").GetString());
         Assert.Equal("/account/propertyquarry/open", workspace.GetProperty("routes").GetProperty("accountRedirectHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/property-continuity/{propertyId}", workspace.GetProperty("routes").GetProperty("continuityApiHrefTemplate").GetString());
         JsonElement selectedWorkspace = workspace.GetProperty("selectedWorkspace");
         Assert.Equal(JsonValueKind.Object, selectedWorkspace.ValueKind);
-        Assert.StartsWith("/account/work/workspaces/", selectedWorkspace.GetProperty("accountHref").GetString(), StringComparison.Ordinal);
+        Assert.StartsWith("/account/campaigns/", selectedWorkspace.GetProperty("accountHref").GetString(), StringComparison.Ordinal);
         Assert.Contains("?prepQuery=Northbound%20research%20lab", selectedWorkspace.GetProperty("accountHref").GetString(), StringComparison.Ordinal);
         Assert.Contains("?queryText=Northbound%20research%20lab", selectedWorkspace.GetProperty("prepLibraryApiHref").GetString(), StringComparison.Ordinal);
 
@@ -93,11 +93,11 @@ public sealed class PropertyquarryRouteTests
         Assert.Equal("propertyquarry", continuity.GetProperty("horizon").GetString());
         string? continuityPrepSearchHref = continuity.GetProperty("property").GetProperty("prepSearchAccountHref").GetString();
         Assert.NotNull(continuityPrepSearchHref);
-        Assert.StartsWith("/account/work/workspaces/", continuityPrepSearchHref, StringComparison.Ordinal);
+        Assert.StartsWith("/account/campaigns/", continuityPrepSearchHref, StringComparison.Ordinal);
         Assert.Contains("?prepQuery=Northbound%20research%20lab", continuityPrepSearchHref, StringComparison.Ordinal);
         Assert.True(continuity.GetProperty("continuity").GetProperty("workspaceAvailable").GetBoolean());
         Assert.Equal("Northbound research lab", continuity.GetProperty("continuity").GetProperty("searchQuery").GetString());
-        Assert.StartsWith("/account/work/workspaces/", continuity.GetProperty("continuity").GetProperty("workspaceAccountHref").GetString(), StringComparison.Ordinal);
+        Assert.StartsWith("/account/campaigns/", continuity.GetProperty("continuity").GetProperty("workspaceAccountHref").GetString(), StringComparison.Ordinal);
         Assert.Contains("?prepQuery=Northbound%20research%20lab", continuity.GetProperty("continuity").GetProperty("workspaceAccountHref").GetString(), StringComparison.Ordinal);
         Assert.Contains("?queryText=Northbound%20research%20lab", continuity.GetProperty("continuity").GetProperty("prepLibraryApiHref").GetString(), StringComparison.Ordinal);
         Assert.Equal("not_exposed", continuity.GetProperty("boundary").GetProperty("providerTruth").GetString());

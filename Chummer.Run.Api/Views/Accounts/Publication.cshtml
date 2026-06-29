@@ -10,7 +10,7 @@
     var receipt = Model.SelectedCreatorPublicationReceipt;
     var buildHref = !string.IsNullOrWhiteSpace(publication?.BuildHandoffId)
         ? $"/account/work/build-handoffs/{Uri.EscapeDataString(publication.BuildHandoffId)}"
-        : "/account/work";
+        : "/account/roster";
     var publicHref = publication is not null
         ? $"/artifacts/publications/{Uri.EscapeDataString(publication.PublicationId)}"
         : "/artifacts";
@@ -50,7 +50,7 @@
             <h1>Publication not found</h1>
             <p>This publication is not attached to this account anymore.</p>
             <div class="minimal-actions">
-                <a class="button-like button-like--primary" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--primary" href="/account/roster">Back to roster</a>
             </div>
         </div>
     </section>
@@ -68,7 +68,7 @@ else
                 <li>@publication.UpdatedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</li>
             </ul>
             <div class="minimal-actions">
-                <a class="button-like button-like--ghost" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--ghost" href="/account/roster">Back to roster</a>
                 @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
                 {
                     <a class="button-like button-like--secondary" href="@buildHref">Open build details</a>

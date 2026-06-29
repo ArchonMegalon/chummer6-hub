@@ -409,7 +409,7 @@ public sealed class PublicConciergeController : Controller
     {
         if (authenticated)
         {
-            return "/account/work#community-op-invites";
+            return "/account/roster#community-op-invites";
         }
 
         Dictionary<string, string?> nextQuery = new(StringComparer.OrdinalIgnoreCase);

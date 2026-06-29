@@ -825,7 +825,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             Summary: packages.Length == 0
                 ? $"{workspace.CampaignName} has no governed downtime or aftermath packages yet."
                 : $"{packages.Length} governed downtime and aftermath package(s) stay attached to the shared return path.",
-            ReturnLoopRoute: "/account/work#aftermath-packages",
+            ReturnLoopRoute: "/account/roster#aftermath-packages",
             ReturnLoopActions: returnLoopActions,
             Packages: packages,
             Consequences: consequences,
@@ -1251,7 +1251,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         => scope switch
         {
             RestoreReceiptStatusScope.EntitlementSync => "/account/access",
-            _ => "/account/work"
+            _ => "/account/roster"
         };
 
     private static string ResolveRestoreReceiptStatusFallbackRecoverySummary(RestoreReceiptStatusScope scope)
@@ -1265,7 +1265,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         => route switch
         {
             "/account/access" => "Open account access",
-            "/account/work" => "Open shared campaign view",
+            "/account/roster" => "Open shared campaign view",
             "/downloads" => "Open downloads",
             _ when !string.IsNullOrWhiteSpace(route) && route.StartsWith("/", StringComparison.Ordinal) => $"Open {route}",
             _ => "Review this route"
@@ -1465,7 +1465,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         string kind = NormalizeOptional(receipt.Kind) ?? string.Empty;
         return kind.Contains("claimed_installation", StringComparison.OrdinalIgnoreCase)
             ? "/account/access"
-            : "/account/work";
+            : "/account/roster";
     }
 
     private static string ResolveRestoreProvenanceRecoverySummary(WorkspaceRestoreProvenanceReceipt receipt)
@@ -1701,7 +1701,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         string kind = ResolveRestoreConflictKind(receipt);
         return kind.Contains("claimed_installation", StringComparison.OrdinalIgnoreCase)
             ? "/account/access"
-            : "/account/work";
+            : "/account/roster";
     }
 
     private static string ResolveRestoreConflictRecoveryHint(WorkspaceRestoreConflictReceipt receipt)
@@ -3257,7 +3257,7 @@ public sealed class CampaignWorkspaceServerPlaneService
                 Kind: "workspace_watchout",
                 Summary: digest!.Watchouts[0],
                 ActionLabel: "Open shared campaign view",
-                ActionHref: $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}"));
+                ActionHref: $"/account/campaigns/{Uri.EscapeDataString(workspace.WorkspaceId)}"));
         }
 
         if (ResolvePrioritySupportDigest(supportDigests) is { } leadCase)
@@ -3313,7 +3313,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             Kind: "gm_operations_readiness",
             Summary: summary,
             ActionLabel: "Open GM operations",
-            ActionHref: $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#prep-launches");
+            ActionHref: $"/account/campaigns/{Uri.EscapeDataString(workspace.WorkspaceId)}#prep-launches");
     }
 
     private static DecisionNotice BuildTravelCacheRefreshDecisionNotice(
@@ -3326,7 +3326,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             Kind: "travel_cache_refresh",
             Summary: summary,
             ActionLabel: "Stage travel prefetch",
-            ActionHref: $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#travel-prefetches");
+            ActionHref: $"/account/campaigns/{Uri.EscapeDataString(workspace.WorkspaceId)}#travel-prefetches");
     }
 
     private static DecisionNotice BuildPortableExchangeDecisionNotice(
@@ -3348,7 +3348,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             Kind: "portable_exchange",
             Summary: summary,
             ActionLabel: "Review portable exchange",
-            ActionHref: $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#portable-exchange");
+            ActionHref: $"/account/campaigns/{Uri.EscapeDataString(workspace.WorkspaceId)}#portable-exchange");
     }
 
     private static string BuildPortableExchangeScopeSummary(

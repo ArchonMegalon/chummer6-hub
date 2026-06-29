@@ -101,7 +101,7 @@ public sealed class CampaignSpineController : ControllerBase
                 leadTargets = new
                 {
                     builds = leadHandoff is null ? "/account/alice" : $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}",
-                    rules = leadRule is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
+                    rules = leadRule is null ? "/account/roster" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
                     runsites = leadWorkspace is null ? "/account/runsites" : $"/account/runsites/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}",
                     creator = leadPublication is null ? "/account/creator" : $"/account/creator/{Uri.EscapeDataString(leadPublication.PublicationId)}",
                     briefings = leadPublication is null ? "/account/jackpoint" : $"/account/jackpoint/{Uri.EscapeDataString(leadPublication.PublicationId)}"
@@ -152,7 +152,7 @@ public sealed class CampaignSpineController : ControllerBase
                     focus = "rules",
                     label = "Rules answers",
                     available = leadRule is not null,
-                    href = leadRule is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
+                    href = leadRule is null ? "/account/roster" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
                     summary = leadRule is null ? "Rules Navigator remains ready for the next typed answer." : leadRule.Question
                 },
                 new
@@ -2004,8 +2004,8 @@ public sealed class CampaignSpineController : ControllerBase
     {
         string escapedQuery = Uri.EscapeDataString(propertyLabel);
         return string.IsNullOrWhiteSpace(workspaceId)
-            ? $"/account/work?prepQuery={escapedQuery}"
-            : $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}?prepQuery={escapedQuery}";
+            ? $"/account/roster?prepQuery={escapedQuery}"
+            : $"/account/campaigns/{Uri.EscapeDataString(workspaceId)}?prepQuery={escapedQuery}";
     }
 
     private static string BuildPropertyquarryPrepLibraryApiHref(string workspaceId, string propertyLabel)

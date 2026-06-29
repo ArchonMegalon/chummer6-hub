@@ -4158,7 +4158,7 @@ document.addEventListener('DOMContentLoaded', function () {
             {
                 AccountEntryHref = "/account/alice",
                 AccountRedirectHref = "/account/alice/open",
-                AccountFallbackHref = "/account/work",
+                AccountFallbackHref = "/account/roster",
                 HandoffDetailHrefTemplate = "/account/alice/{handoffId}",
                 HandoffIndexApiHref = "/api/v1/campaign-spine/me/build-handoffs",
                 HandoffDetailApiHrefTemplate = "/api/v1/campaign-spine/me/build-handoffs/{handoffId}",
@@ -4434,7 +4434,7 @@ document.addEventListener('DOMContentLoaded', function () {
             AftermathRail = new
             {
                 Status = "live",
-                WorkspaceHref = "/account/work#aftermath-packages",
+                WorkspaceHref = "/account/roster#aftermath-packages",
                 ApiRoutes = new[]
                 {
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages",
@@ -4864,7 +4864,7 @@ document.addEventListener('DOMContentLoaded', function () {
             dispatchRoute: "/table-pulse/debrief",
             sourceId: "live-and-aftermath",
             surface: surface,
-            dispatchTarget: "/account/work#aftermath-packages",
+            dispatchTarget: "/account/roster#aftermath-packages",
             emitRunsiteHeaders: false,
             fallbackQuotaUnavailableMessage: "Unable to confirm debrief packet allowance receipt right now.",
             cancellationToken: cancellationToken);
@@ -5704,10 +5704,10 @@ document.addEventListener('DOMContentLoaded', function () {
             {
                 AccountEntryHref = "/account/passport",
                 AccountRedirectHref = "/account/passport/open",
-                AccountFallbackHref = "/account/work#aftermath-packages",
+                AccountFallbackHref = "/account/roster#aftermath-packages",
                 LiveNotificationsHref = "/account/ledger/notifications",
                 LeaderBriefingHrefTemplate = "/account/ledger/factions/{factionId}/leader-briefing",
-                AftermathHref = "/account/work#aftermath-packages",
+                AftermathHref = "/account/roster#aftermath-packages",
                 Summary = "Runner Passport keeps account identity connected to the Table Pulse inbox, leader briefings, and the private aftermath return."
             },
             Boundary = new
@@ -5791,7 +5791,7 @@ document.addEventListener('DOMContentLoaded', function () {
             {
                 AccountEntryHref = "/account/community",
                 AccountRedirectHref = "/account/community/open",
-                AccountFallbackHref = "/account/work#community-ops",
+                AccountFallbackHref = "/account/roster#community-ops",
                 OpenRunIndexApiHref = "/api/v1/campaign-spine/me/open-runs",
                 OpenRunDetailApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}",
                 OpenRunCreateApiHrefTemplate = "/api/v1/campaign-spine/me/workspaces/{workspaceId}/open-runs",
@@ -5873,7 +5873,7 @@ document.addEventListener('DOMContentLoaded', function () {
             {
                 AccountEntryHref = "/account/creator",
                 AccountRedirectHref = "/account/creator/open",
-                AccountFallbackHref = "/account/work",
+                AccountFallbackHref = "/account/roster",
                 PublicationDetailHrefTemplate = "/account/creator/{publicationId}",
                 PublicationFallbackDetailHrefTemplate = "/account/work/publications/{publicationId}",
                 PublicDetailHrefTemplate = "/artifacts/publications/{publicationId}",
@@ -8150,7 +8150,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (string.Equals(section, "work", StringComparison.OrdinalIgnoreCase))
         {
-            return Redirect("/account/work");
+            return Redirect("/account/roster");
         }
 
         var selectedSection = NormalizeHomeSection(section);
@@ -9521,7 +9521,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 Summary: leadFocus is null
                     ? "Quicksilver stays ready even when no focus target is populated yet."
                     : $"{leadFocus.Label} is currently the lead jump target, and it opens a focused Chummer page instead of dropping you into a generic view.",
-                Href: leadFocus?.FocusHref ?? "/account/work",
+                Href: leadFocus?.FocusHref ?? "/account/roster",
                 StatusLabel: leadFocus is null ? "Ready" : "Focus")
         ];
 
@@ -9741,7 +9741,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 Summary: leadRun is null
                     ? "RUN CONTROL stays ready even when no live run is attached to the account yet."
                     : $"{leadRun.Title} is the current lead run, with {(string.IsNullOrWhiteSpace(leadRun.ActiveSceneTitle) ? "no active scene yet" : $"{leadRun.ActiveSceneTitle} active")} and explicit next-step continuity.",
-                Href: leadRun?.AccountHref ?? "/account/work",
+                Href: leadRun?.AccountHref ?? "/account/roster",
                 StatusLabel: leadRun is null ? "Ready" : "Run")
         ];
 
@@ -9862,7 +9862,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 Summary: leadHead is null
                     ? "EDITION STUDIO stays ready even when no rule environments are attached yet."
                     : $"{leadHead.Label} currently leads with {leadHead.EnvironmentCount} matching environment(s).",
-                Href: leadHead?.AccountHref ?? "/account/work",
+                Href: leadHead?.AccountHref ?? "/account/roster",
                 StatusLabel: leadHead is null ? "Ready" : "Focus")
         ];
 
@@ -9957,7 +9957,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 FocusTargets:
                 [
                 new QuicksilverFocusTarget("builds", "Build handoffs", false, "/account/quicksilver/builds", "/api/v1/campaign-spine/me/build-handoffs", "Jump straight into ALICE build history."),
-                    new QuicksilverFocusTarget("rules", "Rules answers", false, "/account/quicksilver/rules", "/account/work", "Jump into the rules answer view without losing the supporting context."),
+                    new QuicksilverFocusTarget("rules", "Rules answers", false, "/account/quicksilver/rules", "/account/roster", "Jump into the rules answer view without losing the supporting context."),
                     new QuicksilverFocusTarget("runsites", "Prep benches", false, "/account/quicksilver/runsites", "/api/v1/campaign-spine/me/workspace-digests", "Jump into prep and workspace continuity."),
                     new QuicksilverFocusTarget("creator", "Creator desk", false, "/account/quicksilver/creator", "/api/v1/campaign-spine/me/publications", "Jump into signed-in publication desks without leaving Chummer paths."),
                     new QuicksilverFocusTarget("briefings", "JACKPOINT desk", false, "/account/quicksilver/briefings", "/api/v1/campaign-spine/me/publications", "Jump into briefing-safe publication history.")
@@ -10011,8 +10011,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     "rules",
                     "Rules answers",
                     leadRule is not null,
-                    leadRule is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
-                    leadRule is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
+                    leadRule is null ? "/account/roster" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
+                    leadRule is null ? "/account/roster" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
                     leadRule is null ? "Rules Navigator remains available when the next trustworthy answer appears." : $"Lead rules answer: {leadRule.Question}"),
                 new QuicksilverFocusTarget(
                     "runsites",
@@ -11320,7 +11320,7 @@ Boundary:
                 "Open campaigns and start your first playable session",
                 "Your install is linked. Open campaigns to move into the first playable session before you spend time anywhere else.",
                 "Open campaigns",
-                "/account/work",
+                "/account/roster",
                 "primary");
         }
 
@@ -11907,7 +11907,7 @@ Boundary:
         {
             new SectionLinkViewModel("overview", "Overview", "/home", string.Equals(currentSection, "overview", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("access", "Installs", "/account/access", false),
-            new SectionLinkViewModel("work", "Roster", "/account/work", false),
+            new SectionLinkViewModel("work", "Roster", "/account/roster", false),
             new SectionLinkViewModel("setup", "Setup", "/home/setup", string.Equals(currentSection, "setup", StringComparison.OrdinalIgnoreCase))
         };
 
@@ -12535,7 +12535,7 @@ Boundary:
                 Summary: "Character help is ready as soon as a runner, workspace, or guided build path has produced a build handoff.",
                 EntryHref: "/account/alice/open",
                 EntryLabel: "Open character help",
-                LeadHandoffHref: "/account/work",
+                LeadHandoffHref: "/account/roster",
                 LeadHandoffTitle: "No build handoff yet",
                 LeadHandoffSummary: "Create or restore a runner, then return here to inspect compare history, planner coverage, and safe output paths.",
                 ProofPoints:
@@ -17668,7 +17668,7 @@ echo "Help: ${HELP_URL}"
         string aftermathSummary = aftermathCount > 0
             ? $"Aftermath currently holds {aftermathCount} package(s), so remote reactions can return as records and next steps instead of disappearing into flavor-only copy."
             : "No aftermath package is attached yet, so the next-step path stays ready until the next safe action writes one.";
-        string aftermathHref = "/account/work#aftermath-packages";
+        string aftermathHref = "/account/roster#aftermath-packages";
         string summary = "After a Table Pulse Live reaction resolves, the result should survive as a durable next step: Signal Deck keeps the pressure cue visible, and Runner Passport keeps the return story clear.";
         string boundaryLine = "Next steps stay on Chummer pages only. Signal Deck shows current consequence state, and Runner Passport shows public continuity history without leaking private account or moderation detail.";
 
@@ -17697,7 +17697,7 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Aftermath return",
                 Summary: "Any remote reaction that lands as downtime or aftermath stays on the return path instead of becoming orphaned flavor text.",
-                Href: "/account/work#aftermath-packages",
+                Href: "/account/roster#aftermath-packages",
                 StatusLabel: "Return")
         ];
 
@@ -17760,7 +17760,7 @@ echo "Help: ${HELP_URL}"
                 Summary: aftermathCount > 0
                     ? $"{aftermathCount} aftermath package(s) are on the return path, so Passport continuity survives the off-table return."
                     : "Aftermath return stays ready even when the queue is empty, so status does not vanish when a session moves off-table.",
-                Href: "/account/work#aftermath-packages",
+                Href: "/account/roster#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
         ];
 
@@ -17812,7 +17812,7 @@ echo "Help: ${HELP_URL}"
                 Summary: aftermathCount > 0
                     ? $"{aftermathCount} aftermath package(s) are already queued, so Signal Deck pressure survives the off-table return."
                     : "Aftermath return stays attached even when no package is queued yet, so command pressure does not disappear after adjudication.",
-                Href: "/account/work#aftermath-packages",
+                Href: "/account/roster#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed"),
             new(
                 Label: "Public records",
@@ -17874,7 +17874,7 @@ echo "Help: ${HELP_URL}"
                 Summary: aftermathCount > 0
                     ? $"{aftermathCount} aftermath package(s) are already queued, so Living World fallout survives the off-table return."
                     : "Aftermath return stays attached even before the next package is written, so the between-session path stays concrete.",
-                Href: "/account/work#aftermath-packages",
+                Href: "/account/roster#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
         ];
 
@@ -17926,7 +17926,7 @@ echo "Help: ${HELP_URL}"
                 Summary: aftermathCount > 0
                     ? $"{aftermathCount} aftermath package(s) are on the return path, so this board can review fallout instead of losing the thread after adjudication."
                     : "Aftermath return is attached even when the queue is empty, so the board stays connected to follow-up status.",
-                Href: "/account/work#aftermath-packages",
+                Href: "/account/roster#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
         ];
 
@@ -18173,7 +18173,7 @@ echo "Help: ${HELP_URL}"
             SignalDeckPosture: signalDeckPosture,
             RunnerPassportPosture: runnerPassportPosture,
             AftermathPosture: aftermathPosture,
-            AftermathHref: "/account/work",
+            AftermathHref: "/account/roster",
             EntryHref: status.NotificationsHref,
             Labels: labels,
             Cues: cues,
@@ -18193,35 +18193,35 @@ echo "Help: ${HELP_URL}"
                 State: "contained",
                 Summary: "Remote intercept adjudication absorbed the hottest pressure line before it spilled into the next turn packet.",
                 ReturnLoopAction: "Review heat fallout",
-                ReturnLoopRoute: "/account/work",
+                ReturnLoopRoute: "/account/roster",
                 Note: "Table Pulse Live remote reaction: intercept"),
             "cover-story" => new CampaignConsequenceUpdateRequest(
                 Kind: "reputation",
                 State: "under_review",
                 Summary: "Cover Story adjudication is holding the public narrative in review until records catch up.",
                 ReturnLoopAction: "Review reputation fallout",
-                ReturnLoopRoute: "/account/work",
+                ReturnLoopRoute: "/account/roster",
                 Note: "Table Pulse Live remote reaction: cover story"),
             "scramble" => new CampaignConsequenceUpdateRequest(
                 Kind: "contact",
                 State: "fragile",
                 Summary: "Scramble adjudication kept the contact network live, but the route is still fragile and needs a continuity pass.",
                 ReturnLoopAction: "Review contact fallout",
-                ReturnLoopRoute: "/account/work",
+                ReturnLoopRoute: "/account/roster",
                 Note: "Table Pulse Live remote reaction: scramble"),
             "temptation" => new CampaignConsequenceUpdateRequest(
                 Kind: "faction",
                 State: "strained",
                 Summary: "Temptation adjudication created faction leverage, but it also strained the standing that has to be justified on the next safe return.",
                 ReturnLoopAction: "Confirm faction standing",
-                ReturnLoopRoute: "/account/work",
+                ReturnLoopRoute: "/account/roster",
                 Note: "Table Pulse Live remote reaction: temptation"),
             "shadow-reply" => new CampaignConsequenceUpdateRequest(
                 Kind: "downtime",
                 State: "queued",
                 Summary: "Shadow Reply adjudication queued an off-table response packet on the aftermath path.",
                 ReturnLoopAction: "Review downtime obligations",
-                ReturnLoopRoute: "/account/work#aftermath-packages",
+                ReturnLoopRoute: "/account/roster#aftermath-packages",
                 Note: "Table Pulse Live remote reaction: shadow reply"),
             _ => throw new ArgumentException($"Unsupported Table Pulse Live reaction id: {reactionId}", nameof(reactionId))
         };
@@ -18287,7 +18287,7 @@ echo "Help: ${HELP_URL}"
         string aftermathSummary = aftermathCount > 0
             ? $"Aftermath queue has {aftermathCount} package(s) waiting on the return path, so GM review can stay attached to concrete fallout instead of freeform notes."
             : "Aftermath queue is empty right now, so this cockpit is reading state rather than shepherding live fallout packages.";
-        string aftermathHref = "/account/work#aftermath-packages";
+        string aftermathHref = "/account/roster#aftermath-packages";
         string summary = "GM cockpit keeps remote-reaction aftermath on one command path: review consequences, escalate to leader intent, preserve Signal Deck continuity, and keep Runner Passport limited.";
         string boundaryLine = "This cockpit can interpret and escalate current consequence state only. It does not create public scores, mutate world state directly, or reveal private session transcripts.";
         BlackLedgerFollowThroughCueViewModel[] cues =
@@ -18300,7 +18300,7 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Aftermath return",
                 Summary: "Downtime and aftermath consequences stay attached to the return path when a remote reaction resolves off-table.",
-                Href: "/account/work#aftermath-packages",
+                Href: "/account/roster#aftermath-packages",
                 StatusLabel: "Return"),
             new(
                 Label: "Runner Passport",

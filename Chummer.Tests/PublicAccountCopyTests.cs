@@ -40,6 +40,9 @@ public sealed class PublicAccountCopyTests
         Assert.Contains("Heading: \"Account\"", accountsController, StringComparison.Ordinal);
         Assert.Contains("Summary: \"Installs, runners, help, and membership live here.\"", accountsController, StringComparison.Ordinal);
         Assert.Contains("\"Roster\"", accountsController, StringComparison.Ordinal);
+        Assert.Contains("\"/account/roster\"", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/campaigns/{workspaceId}\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("\"roster\" => \"work\"", accountsController, StringComparison.Ordinal);
         Assert.Contains("\"Installs\"", accountsController, StringComparison.Ordinal);
         Assert.Contains("<li>@Model.User.DisplayName</li>", accountHubView, StringComparison.Ordinal);
         Assert.Contains("<li>@Model.MembershipLabel · @Model.MembershipSummary</li>", accountHubView, StringComparison.Ordinal);

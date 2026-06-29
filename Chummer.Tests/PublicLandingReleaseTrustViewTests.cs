@@ -990,7 +990,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/account/passport\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/passport/open\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("/account/ledger/notifications", controller, StringComparison.Ordinal);
-        Assert.Contains("/account/work#aftermath-packages", controller, StringComparison.Ordinal);
+        Assert.Contains("/account/roster#aftermath-packages", controller, StringComparison.Ordinal);
     }
 
     [Fact]

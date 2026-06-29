@@ -32,7 +32,11 @@ public sealed class AccountBuildLabHandoffViewTests
         Assert.Contains("return Redirect($\"/account/access?localCoProcessor={Uri.EscapeDataString(normalizedProfile)}\")", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("/account/advanced?localCoProcessor=", controller, StringComparison.Ordinal);
         Assert.Contains("new SectionLinkViewModel(\"access\", \"Installs\"", controller, StringComparison.Ordinal);
-        Assert.Contains("new SectionLinkViewModel(\"work\", \"Roster\"", controller, StringComparison.Ordinal);
+        Assert.Contains("new SectionLinkViewModel(\"work\", \"Roster\", \"/account/roster\"", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/campaigns/{workspaceId}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("\"roster\" => \"work\"", controller, StringComparison.Ordinal);
+        Assert.Contains("\"work\" => \"/account/roster\"", controller, StringComparison.Ordinal);
+        Assert.Contains("$\"/account/campaigns/{Uri.EscapeDataString(workspaceId)}\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"profile\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"advanced\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"settings\"", controller, StringComparison.Ordinal);

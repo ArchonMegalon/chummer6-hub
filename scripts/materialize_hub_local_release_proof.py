@@ -835,7 +835,7 @@ def main() -> int:
             "/home/access",
             "/home/work",
             "/account/access",
-            "/account/work",
+            "/account/roster",
             "/account/support",
             "/contact",
             "/downloads",
@@ -1046,7 +1046,7 @@ def main() -> int:
                 "summary": "Workspace restore continuity emits provenance receipts and typed recovery actions for claimed installs, recent artifacts, rule environments, and restore inventory on the shared account workspace surfaces.",
                 "routes": [
                     "/home/work",
-                    "/account/work",
+                    "/account/roster",
                     "/account/access",
                 ],
                 "surfaces": [
@@ -1064,7 +1064,7 @@ def main() -> int:
                 "summary": "Entitlement drift, stale claims, missing grants, and continue-blocking conflicts emit recoverable receipts and typed account-access actions on the same restore lane instead of falling back to support folklore.",
                 "routes": [
                     "/home/work",
-                    "/account/work",
+                    "/account/roster",
                     "/account/access",
                     "/downloads",
                 ],
@@ -1123,7 +1123,7 @@ def main() -> int:
                 "routes": [
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/campaign-memory",
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/consequence-truth",
-                    "/account/work#campaign-consequences",
+                    "/account/roster#campaign-consequences",
                 ],
                 "surfaces": [
                     "campaign_memory:consequence_truth",
@@ -1140,7 +1140,7 @@ def main() -> int:
                 "routes": [
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages",
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/downtime-aftermath",
-                    "/account/work#aftermath-packages",
+                    "/account/roster#aftermath-packages",
                 ],
                 "surfaces": [
                     "downtime_aftermath:api",
@@ -1156,7 +1156,7 @@ def main() -> int:
                 "summary": "Campaign rules answers, workspace readiness cues, and rule-environment studio lifecycle all keep the same explain-entry receipts visible on signed-in campaign surfaces instead of splitting campaign truth into separate support-only interpretations.",
                 "routes": [
                     "/home",
-                    "/account/work",
+                    "/account/roster",
                     "/api/v1/campaign-spine/me",
                     "/api/v1/campaign-spine/me/rules/{entryId}",
                 ],
@@ -1202,7 +1202,7 @@ def main() -> int:
                 "routes": [
                     "/api/v1/support/cases/assistant",
                     "/account/access",
-                    "/account/work",
+                    "/account/roster",
                     "/home",
                 ],
                 "surfaces": [
@@ -1228,7 +1228,7 @@ def main() -> int:
                     "/artifacts/publications/{publicationId}",
                     "/api/v1/public/artifacts/publications/{publicationId}",
                     "/home/work",
-                    "/account/work",
+                    "/account/roster",
                 ],
                 "surfaces": [
                     "artifact_shelf:v2",
@@ -1253,7 +1253,7 @@ def main() -> int:
                 "routes": [
                     "/artifacts",
                     "/home/work",
-                    "/account/work",
+                    "/account/roster",
                 ],
                 "surfaces": [
                     "artifact_audience_filters",
@@ -1279,7 +1279,7 @@ def main() -> int:
                 "routes": [
                     "/api/v1/campaign-spine/me/organizer-ops",
                     "/home/work",
-                    "/account/work",
+                    "/account/roster",
                 ],
                 "surfaces": [
                     "organizer_ops",
@@ -1302,7 +1302,7 @@ def main() -> int:
                 "routes": [
                     "/api/v1/campaign-spine/me/organizer-ops",
                     "/home/work",
-                    "/account/work",
+                    "/account/roster",
                 ],
                 "surfaces": [
                     "league_convention_season_ops",
@@ -1376,7 +1376,7 @@ def main() -> int:
                 "routes": [
                     "/home",
                     "/home/work",
-                    "/account/work",
+                    "/account/roster",
                     "/api/v1/campaign-spine/me",
                     "/api/v1/campaign-spine/me/workspaces/starter",
                 ],
@@ -1399,7 +1399,7 @@ def main() -> int:
                 "summary": "The hub-owned first-session path gives signed-in users one calmer route from linked install into first-session detail, build next steps, campaign-primer return, and install support without hiding the next safe action behind deeper admin-only pages.",
                 "routes": [
                     "/home/work",
-                    "/account/work",
+                    "/account/roster",
                     "/account/access",
                     "/contact",
                 ],

@@ -71,7 +71,7 @@ public sealed class OpenRunServiceTests
                     "Spoiler-safe notes stay bounded to the same closeout draft.",
                     "No VTT map state or engine math is owned by hub here."
                 ],
-                NextSafeAction: "Open ResolutionReport and keep the same return lane on /account/work#runboard.",
+                NextSafeAction: "Open ResolutionReport and keep the same return lane on /account/roster#runboard.",
                 Note: "Open-run service proof setup."));
 
             OpenRunListingProjection listing = campaignSpine.CreateOpenRun(gm, gmWorkspace.WorkspaceId, new OpenRunCreateRequest(

@@ -204,14 +204,14 @@ public sealed class HostedProofContractServiceTests
                 OpenRun: openRun,
                 PublicSignals: signalBundle,
                 InstallLinking: installLinking,
-                CommunityHubRoute: "/account/work#community-ops",
-                CommunityWorkspaceRoute: "/account/work/workspaces/workspace-demo-001",
+                CommunityHubRoute: "/account/roster#community-ops",
+                CommunityWorkspaceRoute: "/account/campaigns/workspace-demo-001",
                 Locale: "en-US"));
 
             Assert.Contains(bundle.Contracts, item => string.Equals(item.SurfaceId, "open_runs", StringComparison.Ordinal) && string.Equals(item.Route, "/api/v1/campaign-spine/me/open-runs/open-run-demo-001", StringComparison.Ordinal));
             Assert.Contains(bundle.Contracts, item => string.Equals(item.SurfaceId, "shadowcasters", StringComparison.Ordinal) && string.Equals(item.ComparisonRoute, "/roadmap/black-ledger", StringComparison.Ordinal));
             Assert.Contains(bundle.Contracts, item => string.Equals(item.SurfaceId, "public_signal", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal));
-            Assert.Contains(bundle.Contracts, item => string.Equals(item.SurfaceId, "community_hub", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work#community-ops", StringComparison.Ordinal));
+            Assert.Contains(bundle.Contracts, item => string.Equals(item.SurfaceId, "community_hub", StringComparison.Ordinal) && string.Equals(item.Route, "/account/roster#community-ops", StringComparison.Ordinal));
             Assert.Contains(bundle.Contracts, item => string.Equals(item.SurfaceId, "account_aware_horizon_conversion", StringComparison.Ordinal) && string.Equals(item.ComparisonRoute, "/account/access", StringComparison.Ordinal));
             string contractText = string.Join(
                 "\n",

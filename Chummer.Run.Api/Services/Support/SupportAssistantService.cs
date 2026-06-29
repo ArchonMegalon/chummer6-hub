@@ -248,7 +248,7 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
                             $"Return: {entry.CampaignReturnSummary ?? entry.ProgressionLabel}",
                             $"Support: {entry.SupportClosureSummary ?? string.Join(" | ", entry.ProgressionOutcomes.Take(1))}"
                         }.Where(static item => !string.IsNullOrWhiteSpace(item)))),
-                    Href: "/account/work",
+                    Href: "/account/roster",
                     ReceiptId: entry.ExplainEntryId))
                 .ToArray();
         }
@@ -352,7 +352,7 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
 
         if (ShouldUseBuildJourneyTruth(tokens))
         {
-            Add("open_work", "Open work", "/account/work", "Review the current build path, living dossier, and campaign return rail.");
+            Add("open_work", "Open work", "/account/roster", "Review the current build path, living dossier, and campaign return rail.");
         }
 
         return actions.Values.ToList();

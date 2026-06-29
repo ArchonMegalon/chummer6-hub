@@ -59,15 +59,15 @@ public sealed class SignedInShellContinuityViewTests
     }
 
     [Fact]
-    public void HomeHandsOffCampaignReturnToAccountWork()
+    public void HomeHandsOffCampaignReturnToRoster()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("return Redirect(\"/account/work\");", controller, StringComparison.Ordinal);
-        Assert.Contains("new SectionLinkViewModel(\"work\", \"Roster\", \"/account/work\", false)", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect(\"/account/roster\");", controller, StringComparison.Ordinal);
+        Assert.Contains("new SectionLinkViewModel(\"work\", \"Roster\", \"/account/roster\", false)", controller, StringComparison.Ordinal);
         Assert.Contains("\"Open campaigns\",", controller, StringComparison.Ordinal);
-        Assert.Contains("\"/account/work\",", controller, StringComparison.Ordinal);
+        Assert.Contains("\"/account/roster\",", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("new SectionLinkViewModel(\"work\", \"Campaigns\", \"/account/work\", false)", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("\"/home/work\",", controller, StringComparison.Ordinal);
     }
@@ -198,7 +198,8 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("[HttpGet(\"/account/open/group/{groupId}\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/open/example/{exampleId}\")]", controller, StringComparison.Ordinal);
         Assert.Contains("_desktopLaunchTickets.Issue", controller, StringComparison.Ordinal);
-        Assert.Contains("return Redirect(\"/downloads\");", controller, StringComparison.Ordinal);
+        Assert.Contains("PrimaryHref: \"/downloads\"", controller, StringComparison.Ordinal);
+        Assert.Contains("SecondaryHref: \"/account/roster\"", controller, StringComparison.Ordinal);
         Assert.Contains("chummer://open?ticket=", controller, StringComparison.Ordinal);
         Assert.Contains("public sealed record AccountDesktopLaunchPageViewModel(", viewModels, StringComparison.Ordinal);
         Assert.Contains("id=\"launch-in-chummer\"", launchView, StringComparison.Ordinal);

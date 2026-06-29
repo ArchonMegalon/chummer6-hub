@@ -47,7 +47,7 @@ public sealed class HostedProofContractService
 
         string route = $"/api/v1/campaign-spine/me/open-runs/{Uri.EscapeDataString(openRun.Listing.OpenRunId)}";
         string comparisonRoute = string.IsNullOrWhiteSpace(context.CommunityHubRoute)
-            ? "/account/work#community-ops"
+            ? "/account/roster#community-ops"
             : context.CommunityHubRoute!;
         string summary = openRun.Closeout is null
             ? $"{openRun.Listing.ListingTitle} stays on the reviewed open-run page until schedule, meeting details, and closeout status agree."

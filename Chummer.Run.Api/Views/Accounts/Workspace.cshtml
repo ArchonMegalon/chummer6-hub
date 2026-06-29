@@ -42,14 +42,14 @@
         ? "Runner Passport will update from the current fallout."
         : "Runner Passport will update on the next reaction.";
     var aftermathHref = workspace is null
-        ? "/account/work"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#aftermath-packages";
+        ? "/account/roster"
+        : $"/account/campaigns/{Uri.EscapeDataString(workspace.WorkspaceId)}#aftermath-packages";
     var carryForwardHref = workspace is null
-        ? "/account/work"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#selected-next-session-carry-forward";
+        ? "/account/roster"
+        : $"/account/campaigns/{Uri.EscapeDataString(workspace.WorkspaceId)}#selected-next-session-carry-forward";
     var memoryHref = workspace is null
-        ? "/account/work"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}#selected-campaign-memory";
+        ? "/account/roster"
+        : $"/account/campaigns/{Uri.EscapeDataString(workspace.WorkspaceId)}#selected-campaign-memory";
 
     static string Humanize(string? value, string fallback)
     {
@@ -70,7 +70,7 @@
             <h1>Campaign not found</h1>
             <p>This campaign is not attached to this account anymore.</p>
             <div class="minimal-actions">
-                <a class="button-like button-like--primary" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--primary" href="/account/roster">Back to roster</a>
             </div>
         </div>
     </section>
@@ -88,7 +88,7 @@ else
                 <li>@workspace.Runs.Count run@(workspace.Runs.Count == 1 ? string.Empty : "s")</li>
             </ul>
             <div class="minimal-actions">
-                <a class="button-like button-like--ghost" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--ghost" href="/account/roster">Back to roster</a>
                 <a class="button-like button-like--secondary" href="/account/access">Installs</a>
             </div>
         </div>

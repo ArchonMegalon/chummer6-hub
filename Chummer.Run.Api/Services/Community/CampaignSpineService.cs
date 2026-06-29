@@ -1218,7 +1218,7 @@ public sealed class CampaignSpineService
                                 && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase))
                             .Select(static item => $"Clear {item.Title} before you close the current runboard handoff.")));
             string nextSafeAction = normalizedNextSafeAction
-                ?? $"Open ResolutionReport for {storedRun.Title} and keep the next governed return on /account/work.";
+                ?? $"Open ResolutionReport for {storedRun.Title} and keep the next governed return on /account/roster.";
             IReadOnlyList<string> turnLedgerEvidenceLines = FinalizeLines(
                 new[]
                 {
@@ -1346,8 +1346,8 @@ public sealed class CampaignSpineService
             string nextSafeAction = normalizedNextSafeAction
                 ?? recommendedNextActions.FirstOrDefault()
                 ?? (request.SafeToPlay
-                    ? "Open the reviewed workspace return on /account/work."
-                    : "Resolve the adoption unknowns before reopening the shared campaign return on /account/work.");
+                    ? "Open the reviewed campaign return on /account/roster."
+                    : "Resolve the adoption unknowns before reopening the shared campaign return on /account/roster.");
 
             var adoption = new CampaignAdoptionProjection(
                 AdoptionId: StableId("campaign-adoption", workspace.WorkspaceId),
@@ -1432,7 +1432,7 @@ public sealed class CampaignSpineService
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
             string nextSafeAction = normalizedNextSafeAction
-                ?? $"Advance {dossier.RunnerHandle}'s goal pin on /account/work#runner-goals before the next governed closeout.";
+                ?? $"Advance {dossier.RunnerHandle}'s goal pin on /account/roster#runner-goals before the next governed closeout.";
             var goal = new RunnerGoalProjection(
                 GoalId: StableId("runner-goal", $"{workspace.WorkspaceId}:{normalizedDossierId}:{normalizedTargetKind}:{normalizedTargetReference}"),
                 WorkspaceId: workspace.WorkspaceId,
@@ -1519,7 +1519,7 @@ public sealed class CampaignSpineService
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
             string nextSafeAction = normalizedNextSafeAction
-                ?? "Review the first governed WorldTick and player-safe news item on /account/work before reopening the shared runboard.";
+                ?? "Review the first governed WorldTick and player-safe news item on /account/roster before reopening the shared runboard.";
             string worldTickId = StableId("world-tick", $"{workspace.WorkspaceId}:{storedRun.RunId}");
             string newsId = StableId("player-safe-news", $"{workspace.WorkspaceId}:{storedRun.RunId}");
             string approvalId = StableId("resolution-report-approval", $"{workspace.WorkspaceId}:{storedRun.RunId}");
@@ -6440,7 +6440,7 @@ public sealed class CampaignSpineService
         string nextSafeAction = approval?.NextSafeAction
             ?? orderedGoals.FirstOrDefault()?.NextSafeAction
             ?? adoption?.NextSafeAction
-            ?? "Open the reviewed workspace return on /account/work.";
+            ?? "Open the reviewed campaign return on /account/roster.";
         string summary = approval is not null
             ? $"{campaign.Name} keeps campaign adoption, runner-goal pins, ResolutionReport closeout, and the first BLACK LEDGER WorldTick on one reviewed return path."
             : adoption is not null && orderedGoals.Length > 0
@@ -7495,7 +7495,7 @@ public sealed class CampaignSpineService
         if (string.Equals(normalizedKind, "downtime", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "aftermath", StringComparison.OrdinalIgnoreCase))
         {
-            evidenceLines.Add("Return-loop route: /account/work#aftermath-packages.");
+            evidenceLines.Add("Return-loop route: /account/roster#aftermath-packages.");
         }
 
         evidenceLines.Add("Return-loop action: Review downtime obligations.");
@@ -7518,9 +7518,9 @@ public sealed class CampaignSpineService
                     SourceKind: ReturnLoopActionSourceKind,
                     Summary: "Review downtime obligations"),
                 CampaignConsequence(
-                    ReceiptId: "/account/work#aftermath-packages",
+                    ReceiptId: "/account/roster#aftermath-packages",
                     SourceKind: ReturnLoopRouteSourceKind,
-                    Summary: "Return-loop route: /account/work#aftermath-packages.")
+                    Summary: "Return-loop route: /account/roster#aftermath-packages.")
             ],
             UpdatedAtUtc: package.GeneratedAtUtc);
     }
@@ -7692,8 +7692,8 @@ public sealed class CampaignSpineService
     {
         string canonicalRoute = consequenceKind switch
         {
-            "downtime" or "aftermath" => "/account/work#aftermath-packages",
-            _ => "/account/work"
+            "downtime" or "aftermath" => "/account/roster#aftermath-packages",
+            _ => "/account/roster"
         };
 
         string? normalizedRoute = AccountService.NormalizeOptional(returnLoopRoute);

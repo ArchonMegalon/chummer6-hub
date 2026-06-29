@@ -117,6 +117,7 @@ public sealed class AccountsController : Controller
 
     [HttpGet("/account")]
     [HttpGet("/account/{section}")]
+    [HttpGet("/account/campaigns/{workspaceId}")]
     [HttpGet("/account/support/{caseId}")]
     [HttpGet("/account/work/workspaces/{workspaceId}")]
     [HttpGet("/account/work/runs/{runId}")]
@@ -455,7 +456,7 @@ public sealed class AccountsController : Controller
                 "Runners",
                 campaignSummary,
                 "Open Chummer",
-                "/account/work"),
+                "/account/roster"),
             new(
                 "Help",
                 "Help",
@@ -674,7 +675,7 @@ public sealed class AccountsController : Controller
                 "Open in Chummer",
                 $"/account/open/campaign/{Uri.EscapeDataString(latestWorkspace.CampaignId)}",
                 "Open in browser",
-                $"/account/work/workspaces/{Uri.EscapeDataString(latestWorkspace.WorkspaceId)}")
+                $"/account/campaigns/{Uri.EscapeDataString(latestWorkspace.WorkspaceId)}")
             : latestGroup is not null
                 ? new AccountHubCardViewModel(
                     "Group",
@@ -705,7 +706,7 @@ public sealed class AccountsController : Controller
                     : "Campaign",
                 latestWorkspace is null
                     ? "/account"
-                    : $"/account/work/workspaces/{Uri.EscapeDataString(latestWorkspace.WorkspaceId)}")
+                    : $"/account/campaigns/{Uri.EscapeDataString(latestWorkspace.WorkspaceId)}")
             : new AccountHubCardViewModel(
                 "Browser",
                 "No campaign page is open yet",
@@ -719,7 +720,7 @@ public sealed class AccountsController : Controller
             Chrome: _chrome.BuildAuthenticatedChrome(
                 "Account · Roster",
                 "Open runners, groups, and campaigns.",
-                "/account/work",
+                "/account/roster",
                 user.DisplayName,
                 user.Email),
             Eyebrow: "Roster",
@@ -976,7 +977,7 @@ public sealed class AccountsController : Controller
                     SupportLine: "This account does not have a verified Origin Dossier publication for that project.",
                     Notice: "Open your library to see the dossiers that belong to this account.",
                     PrimaryLabel: "Open Origin Dossier library",
-                    PrimaryHref: "/account/work#origin-dossier-library",
+                    PrimaryHref: "/account/roster#origin-dossier-library",
                     SecondaryLabel: "Return to account",
                     SecondaryHref: "/account"));
             }
@@ -990,7 +991,7 @@ public sealed class AccountsController : Controller
                     user.Email),
                 Publication: publication,
                 AccountHref: "/account",
-                LibraryHref: "/account/work#origin-dossier-library");
+                LibraryHref: "/account/roster#origin-dossier-library");
             return View("~/Views/Accounts/OriginDossier.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -1006,7 +1007,7 @@ public sealed class AccountsController : Controller
                 SupportLine: "Chummer could not open this private Origin Dossier right now. The dossier and account were not changed.",
                 Notice: null,
                 PrimaryLabel: "Try account again",
-                PrimaryHref: "/account/work#origin-dossier-library",
+                PrimaryHref: "/account/roster#origin-dossier-library",
                 SecondaryLabel: "Return home",
                 SecondaryHref: "/home"));
         }
@@ -1171,7 +1172,7 @@ public sealed class AccountsController : Controller
                 .FirstOrDefault();
 
             return Redirect(leadHandoff is null
-                ? "/account/work"
+                ? "/account/roster"
                 : $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}");
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -1220,7 +1221,7 @@ public sealed class AccountsController : Controller
                 return Redirect($"/account/work/runs/{Uri.EscapeDataString(leadOpenRun.RunId)}#community-ops");
             }
 
-            return Redirect("/account/work#community-ops");
+            return Redirect("/account/roster#community-ops");
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
@@ -1321,7 +1322,7 @@ public sealed class AccountsController : Controller
             }
             else
             {
-                return Redirect("/account/work");
+                return Redirect("/account/roster");
             }
 
             var ticket = _desktopLaunchTickets.Issue(launchKind, resourceId, user.UserId, subject.SubjectId);
@@ -1334,7 +1335,7 @@ public sealed class AccountsController : Controller
                 PrimaryLabel: "Open in Chummer",
                 PrimaryHref: "/downloads",
                 SecondaryLabel: "Open downloads",
-                SecondaryHref: "/account/work",
+                SecondaryHref: "/account/roster",
                 Notes: new[]
                 {
                     "If the app does not answer, use downloads or Installs instead of repeating the same dead click.",
@@ -1409,7 +1410,7 @@ public sealed class AccountsController : Controller
                 .FirstOrDefault();
 
             return Redirect(leadPublication is null
-                ? "/account/work"
+                ? "/account/roster"
                 : $"/account/creator/{Uri.EscapeDataString(leadPublication.PublicationId)}");
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -1556,7 +1557,7 @@ public sealed class AccountsController : Controller
                     .FirstOrDefault();
 
             return Redirect(leadWorkspace is null
-                ? "/account/work"
+                ? "/account/roster"
                 : $"/account/runsites/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}");
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -1632,7 +1633,7 @@ public sealed class AccountsController : Controller
             await _identity.RequireSubjectAsync(Request, cancellationToken);
             MediaArtifactDocument? leadProperty = _mediaHorizons?.ListPropertyquarryProperties().FirstOrDefault();
             return Redirect(leadProperty is null
-                ? "/account/work"
+                ? "/account/roster"
                 : $"/account/propertyquarry/{Uri.EscapeDataString(leadProperty.Id)}");
         }
         catch (InvalidOperationException ex)
@@ -1711,7 +1712,7 @@ public sealed class AccountsController : Controller
                 .FirstOrDefault();
 
             return Redirect(leadRun is null
-                ? "/account/work"
+                ? "/account/roster"
                 : $"/account/run-control/{Uri.EscapeDataString(leadRun.RunId)}");
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -1861,7 +1862,7 @@ public sealed class AccountsController : Controller
             return Redirect($"/login?next={Uri.EscapeDataString(requestedPath)}");
         }
 
-        return Redirect($"/account/work?edition={Uri.EscapeDataString(normalizedEdition)}");
+        return Redirect($"/account/roster?edition={Uri.EscapeDataString(normalizedEdition)}");
     }
 
     [HttpGet("/account/local-co-processor")]
@@ -1952,7 +1953,7 @@ public sealed class AccountsController : Controller
 
             if (accountSummary.Workspaces.Count > 0)
             {
-                return Redirect("/account/work#aftermath-packages");
+                return Redirect("/account/roster#aftermath-packages");
             }
 
             return Redirect("/account/access");
@@ -2017,7 +2018,7 @@ public sealed class AccountsController : Controller
                 return Redirect("/account/quicksilver/creator");
             }
 
-            return Redirect("/account/work");
+            return Redirect("/account/roster");
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
@@ -2052,7 +2053,7 @@ public sealed class AccountsController : Controller
             return normalizedFocus switch
             {
                 "builds" => Redirect(leadHandoff is null ? "/account/alice" : $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}"),
-                "rules" => Redirect(leadRule is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}"),
+                "rules" => Redirect(leadRule is null ? "/account/roster" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}"),
                 "runsites" => Redirect(starterWorkspace is null ? "/account/runsites" : $"/account/runsites/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}"),
                 "creator" => Redirect(leadPublication is null ? "/account/creator" : $"/account/creator/{Uri.EscapeDataString(leadPublication.PublicationId)}"),
                 "briefings" => Redirect(leadPublication is null ? "/account/jackpoint" : $"/account/jackpoint/{Uri.EscapeDataString(leadPublication.PublicationId)}"),
@@ -2222,7 +2223,7 @@ public sealed class AccountsController : Controller
 
         if (!string.IsNullOrWhiteSpace(workspaceId))
         {
-            return $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}";
+            return $"/account/campaigns/{Uri.EscapeDataString(workspaceId)}";
         }
 
         if (!string.IsNullOrWhiteSpace(runId))
@@ -2245,9 +2246,12 @@ public sealed class AccountsController : Controller
             return $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
         }
 
-        return selectedSection == "profile"
-            ? "/account"
-            : $"/account/{selectedSection}";
+        return selectedSection switch
+        {
+            "profile" => "/account",
+            "work" => "/account/roster",
+            _ => $"/account/{selectedSection}"
+        };
     }
 
     private static string BuildAccountOpenCurrentPath(
@@ -2276,7 +2280,7 @@ public sealed class AccountsController : Controller
             return $"/account/open/example/{Uri.EscapeDataString(exampleId)}";
         }
 
-        return "/account/work";
+        return "/account/roster";
     }
 
     private static TItem? FindById<TItem>(
@@ -2341,6 +2345,7 @@ public sealed class AccountsController : Controller
                 "support" => "support",
                 "access" => "access",
                 "work" => "work",
+                "roster" => "work",
                 "participation" => "participation",
                 "settings" => "settings",
                 _ => "profile"
@@ -2350,7 +2355,7 @@ public sealed class AccountsController : Controller
         => new[]
         {
             new SectionLinkViewModel("access", "Installs", "/account/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
-            new SectionLinkViewModel("work", "Roster", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("work", "Roster", "/account/roster", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("support", "Support", "/account/support", string.Equals(currentSection, "support", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("participation", "Participate", "/account/participation", string.Equals(currentSection, "participation", StringComparison.OrdinalIgnoreCase))
         };
@@ -2386,8 +2391,8 @@ public sealed class AccountsController : Controller
     {
         string escapedQuery = Uri.EscapeDataString(propertyLabel);
         return string.IsNullOrWhiteSpace(workspaceId)
-            ? $"/account/work?prepQuery={escapedQuery}"
-            : $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}?prepQuery={escapedQuery}";
+            ? $"/account/roster?prepQuery={escapedQuery}"
+            : $"/account/campaigns/{Uri.EscapeDataString(workspaceId)}?prepQuery={escapedQuery}";
     }
 
     [HttpGet("me")]

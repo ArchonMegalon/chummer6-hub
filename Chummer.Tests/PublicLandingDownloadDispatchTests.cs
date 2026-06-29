@@ -655,7 +655,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
         Assert.Equal("pass", payload.RootElement.GetProperty("SeparationStatus").GetString());
         Assert.Equal("/account/ledger/notifications", payload.RootElement.GetProperty("LiveRail").GetProperty("NotificationsHref").GetString());
-        Assert.Equal("/account/work#aftermath-packages", payload.RootElement.GetProperty("AftermathRail").GetProperty("WorkspaceHref").GetString());
+        Assert.Equal("/account/roster#aftermath-packages", payload.RootElement.GetProperty("AftermathRail").GetProperty("WorkspaceHref").GetString());
         Assert.Equal(2, payload.RootElement.GetProperty("AftermathRail").GetProperty("ApiRoutes").GetArrayLength());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
@@ -858,7 +858,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/account/passport", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountEntryHref").GetString());
         Assert.Equal("/account/passport/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
         Assert.Equal("/account/ledger/notifications", payload.RootElement.GetProperty("SignedInBench").GetProperty("LiveNotificationsHref").GetString());
-        Assert.Equal("/account/work#aftermath-packages", payload.RootElement.GetProperty("SignedInBench").GetProperty("AftermathHref").GetString());
+        Assert.Equal("/account/roster#aftermath-packages", payload.RootElement.GetProperty("SignedInBench").GetProperty("AftermathHref").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
         Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=runner_passport&artifactKindOrCapabilityId=runner_passport-identity-network", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
@@ -3610,7 +3610,7 @@ public sealed class PublicLandingDownloadDispatchTests
         IActionResult result = await fixture.Controller.TablePulseDebriefDispatch(CancellationToken.None);
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/account/work#aftermath-packages", redirect.Url);
+        Assert.Equal("/account/roster#aftermath-packages", redirect.Url);
         Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
         HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("table-pulse", fixture.DispatchUserId, limit: 10));
         Assert.Equal("accepted", receipt.Status);

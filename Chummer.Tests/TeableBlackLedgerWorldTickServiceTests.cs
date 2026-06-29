@@ -37,7 +37,7 @@ public sealed class TeableBlackLedgerWorldTickServiceTests
             ResolutionReportStatus: "draft",
             ResolutionReportSummary: "ResolutionReport draft keeps the courier handoff and matrix fallout continuity on one hub lane.",
             ResolutionNotes: ["Spoiler-safe notes stay bounded to the same closeout draft."],
-            NextSafeAction: "Open ResolutionReport and keep the same return lane on /account/work#runboard.",
+            NextSafeAction: "Open ResolutionReport and keep the same return lane on /account/roster#runboard.",
             Note: "BLACK LEDGER Teable projection test."));
 
         ResolutionReportApprovalProjection approval = fixture.CampaignSpine.ApproveResolutionReport(user, workspace, new ResolutionReportApprovalRequest(
@@ -49,7 +49,7 @@ public sealed class TeableBlackLedgerWorldTickServiceTests
             NewsSummary: "Player-safe reports say a courier vanished after a dockside outage.",
             NewsSource: "Tacoma Shadowfeed",
             NewsUrl: "https://example.invalid/news/tacoma-courier-rumor",
-            NextSafeAction: "Review the first WorldTick and player-safe news item on /account/work#campaign-memory before you reopen the runboard.",
+            NextSafeAction: "Review the first WorldTick and player-safe news item on /account/roster#campaign-memory before you reopen the runboard.",
             Note: "BLACK LEDGER Teable projection test."));
 
         Assert.False(string.IsNullOrWhiteSpace(approval.WorldTickId));

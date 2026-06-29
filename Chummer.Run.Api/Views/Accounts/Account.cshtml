@@ -156,14 +156,14 @@
     var selectedWorkspaceCampaignMemory = selectedWorkspaceServerPlane?.CampaignMemory ?? selectedWorkspace?.CampaignMemory;
     var selectedWorkspaceCampaignMemoryEvidence = selectedWorkspaceCampaignMemory?.EvidenceLines.FirstOrDefault();
     var selectedWorkspaceAftermathHref = selectedWorkspace is null
-        ? "/account/work#aftermath-packages"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#aftermath-packages";
+        ? "/account/roster#aftermath-packages"
+        : $"/account/campaigns/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#aftermath-packages";
     var selectedWorkspaceCarryForwardHref = selectedWorkspace is null
-        ? "/account/work#selected-next-session-carry-forward"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-next-session-carry-forward";
+        ? "/account/roster#selected-next-session-carry-forward"
+        : $"/account/campaigns/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-next-session-carry-forward";
     var selectedWorkspaceMemoryHref = selectedWorkspace is null
-        ? "/account/work#selected-campaign-memory"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-campaign-memory";
+        ? "/account/roster#selected-campaign-memory"
+        : $"/account/campaigns/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-campaign-memory";
     @* Continuity verifier markers kept stable:
        Table Pulse Live is armed on this workspace and ready for command packets, but this campaign is not yet attached to live continuity.
        Table Pulse Live is already carrying consequence cue(s) on this campaign, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath continuity are attached to real campaign return instead of flavor-only recap copy.
@@ -192,14 +192,14 @@
         : Model.CampaignSpine.Workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, selectedRun.CampaignId, StringComparison.OrdinalIgnoreCase));
     var selectedRunActiveScene = selectedRun?.Scenes.FirstOrDefault(scene => string.Equals(scene.SceneId, selectedRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase));
     var selectedRunWorkspaceHref = selectedRunWorkspace is null
-        ? "/account/work"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}";
+        ? "/account/roster"
+        : $"/account/campaigns/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}";
     var selectedRunAftermathHref = selectedRunWorkspace is null
-        ? "/account/work#aftermath-packages"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#aftermath-packages";
+        ? "/account/roster#aftermath-packages"
+        : $"/account/campaigns/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#aftermath-packages";
     var selectedRunCarryForwardHref = selectedRunWorkspace is null
-        ? "/account/work#selected-next-session-carry-forward"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#selected-next-session-carry-forward";
+        ? "/account/roster#selected-next-session-carry-forward"
+        : $"/account/campaigns/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#selected-next-session-carry-forward";
     @* Continuity verifier markers kept stable:
        This run already has live continuity, so the next Table Pulse Live reaction should return through the same campaign path instead of splitting into a separate Table Pulse Aftermath story.
        This run is ready to bind the next reaction, carry-forward detail, and aftermath package on the shared command path.
@@ -341,7 +341,7 @@
         => route switch
         {
             "/account/access" => "Open account access",
-            "/account/work" => "Open campaigns",
+            "/account/roster" => "Open campaigns",
             "/downloads" => "Open downloads",
             _ when IsNavigableAccountRoute(route) => $"Open {route}",
             _ => "Open this page"
@@ -441,12 +441,12 @@
             _ => "Open participation details and choose the latest recovery action."
         };
 
-    static string WorkspaceDetailHref(string workspaceId) => $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}";
+    static string WorkspaceDetailHref(string workspaceId) => $"/account/campaigns/{Uri.EscapeDataString(workspaceId)}";
     static string RunDetailHref(string runId) => $"/account/work/runs/{Uri.EscapeDataString(runId)}";
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
     static string RulesDetailHref(string entryId) => $"/account/work/rules/{Uri.EscapeDataString(entryId)}";
     static string PublicationDetailHref(string publicationId) => $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
-    static string WorkspacePrepLibrarySearchHref(string workspaceId, string query) => $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}?prepQuery={Uri.EscapeDataString(query)}";
+    static string WorkspacePrepLibrarySearchHref(string workspaceId, string query) => $"/account/campaigns/{Uri.EscapeDataString(workspaceId)}?prepQuery={Uri.EscapeDataString(query)}";
     static string PublicCreatorPublicationHref(string publicationId) => $"/artifacts/publications/{Uri.EscapeDataString(publicationId)}";
     static string AccountOpenCharacterHref(string dossierId) => $"/account/open/character/{Uri.EscapeDataString(dossierId)}";
     static string AccountOpenCampaignHref(string campaignId) => $"/account/open/campaign/{Uri.EscapeDataString(campaignId)}";
@@ -1469,7 +1469,7 @@
                                     : "This account does not have a linked desktop copy yet, so clicks should take you into install and claim first.")</p>
                                 <div class="stacked-actions">
                                     <a class="button-like button-like--secondary" href="@launcherSecondaryHref">@launcherSecondaryLabel</a>
-                                    <a class="button-like button-like--ghost" href="/account/work">Open campaigns on the web</a>
+                                    <a class="button-like button-like--ghost" href="/account/roster">Open campaigns on the web</a>
                                     <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
                                 </div>
                             </article>
@@ -4191,7 +4191,7 @@
                                                 {
                                                     <span> Needs attention: @entry.WatchoutSummary</span>
                                                 }
-                                                <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(entry.WorkspaceId)}")">Open campaign</a>
+                                                <a class="inline-link" href="@($"/account/campaigns/{Uri.EscapeDataString(entry.WorkspaceId)}")">Open campaign</a>
                                             </li>
                                         }
                                     </ul>
@@ -4616,7 +4616,7 @@
   const travelModeDevices = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceServerPlane?.TravelMode.Devices ?? Array.Empty<Chummer.Run.Api.Contracts.TravelModeDeviceReadinessCue>()));
   const travelPrefetchInventorySummary = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspaceServerPlane?.TravelMode.PrefetchInventorySummary));
   const selectedWorkspaceId = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedWorkspace?.WorkspaceId));
-  const workspaceDetailHref = (workspaceId) => `/account/work/workspaces/${encodeURIComponent(workspaceId)}`;
+  const workspaceDetailHref = (workspaceId) => `/account/campaigns/${encodeURIComponent(workspaceId)}`;
   const starterWorkspaceButton = document.getElementById("seedStarterWorkspaceFromAccount");
   const starterWorkspaceNotice = document.getElementById("starterWorkspaceAccountNotice");
   const setStarterWorkspaceNotice = (message, isError = false) => {
@@ -5270,7 +5270,7 @@
           note: noteInput.value.trim() || null
         }
       });
-      window.location.href = "/account/work#community-ops";
+      window.location.href = "/account/roster#community-ops";
     } catch (error) {
       ui.setNotice(notice, ui.describeError(error, "Roster transfer could not be recorded right now."), true);
     } finally {

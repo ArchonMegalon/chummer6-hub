@@ -44,6 +44,7 @@ public sealed class AccountHubRouteTests
         Assert.Equal(4, model.Cards.Count);
         Assert.Equal("Installs", model.Cards[0].Title);
         Assert.Equal("Runners", model.Cards[1].Title);
+        Assert.Equal("/account/roster", model.Cards[1].PrimaryHref);
         Assert.Equal("Help", model.Cards[2].Title);
         Assert.Equal("Membership", model.Cards[3].Title);
         Assert.Equal("Become supporter", model.Cards[3].PrimaryLabel);
@@ -199,6 +200,22 @@ public sealed class AccountHubRouteTests
         Assert.Equal("Roster", model.Heading);
         Assert.Equal("Open runners, groups, and campaigns.", model.Summary);
         Assert.Equal(3, model.Cards.Count);
+        Assert.StartsWith("/account/campaigns/", model.Cards[1].SecondaryHref, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AccountRosterRouteIsThePublicRosterAlias()
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.AccountPage("roster", null, CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Accounts/Section.cshtml", view.ViewName);
+        AccountSectionPageViewModel model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        Assert.Equal("Roster", model.Heading);
+        Assert.StartsWith("/account/campaigns/", model.Cards[1].SecondaryHref, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -291,7 +308,7 @@ public sealed class AccountHubRouteTests
     }
 
     [Fact]
-    public async Task AccountWorkspaceDetailRouteShowsMinimalWorkspaceSurface()
+    public async Task AccountCampaignDetailRouteShowsMinimalCampaignSurface()
     {
         using var fixture = AccountHubRouteFixture.Create();
         AccountsController controller = fixture.CreateController();

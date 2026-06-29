@@ -253,12 +253,12 @@ public sealed class HostedBoundedContextCoverageServiceTests
                 PublicSignals: signalBundle,
                 InstallLinking: installLinking,
                 Locale: "en-US",
-                CommunityHubRoute: "/account/work#community-ops"));
+                CommunityHubRoute: "/account/roster#community-ops"));
 
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "public_context", StringComparison.Ordinal) && string.Equals(item.Route, "/", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "account_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account", StringComparison.Ordinal));
-            Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "community_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work#community-ops", StringComparison.Ordinal));
-            Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "campaign_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work/workspaces/workspace-demo-135", StringComparison.Ordinal));
+            Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "community_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/roster#community-ops", StringComparison.Ordinal));
+            Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "campaign_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/campaigns/workspace-demo-135", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "support_context", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "orchestration_boundary", StringComparison.Ordinal) && string.Equals(item.Route, "/downloads/install", StringComparison.Ordinal));
             Assert.Contains(bundle.Projections, item => string.Equals(item.SurfaceId, "bounded_context_closure", StringComparison.Ordinal) && string.Equals(item.Route, "/progress", StringComparison.Ordinal));

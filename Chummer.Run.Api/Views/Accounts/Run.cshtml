@@ -10,14 +10,14 @@
         ? null
         : Model.CampaignSpine.Workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, selectedRun.CampaignId, StringComparison.OrdinalIgnoreCase));
     var selectedRunWorkspaceHref = selectedRunWorkspace is null
-        ? "/account/work"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}";
+        ? "/account/roster"
+        : $"/account/campaigns/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}";
     var selectedRunAftermathHref = selectedRunWorkspace is null
-        ? "/account/work#aftermath-packages"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#aftermath-packages";
+        ? "/account/roster#aftermath-packages"
+        : $"/account/campaigns/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#aftermath-packages";
     var selectedRunCarryForwardHref = selectedRunWorkspace is null
-        ? "/account/work#selected-next-session-carry-forward"
-        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#selected-next-session-carry-forward";
+        ? "/account/roster#selected-next-session-carry-forward"
+        : $"/account/campaigns/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#selected-next-session-carry-forward";
     var statusLabel = string.IsNullOrWhiteSpace(selectedRun?.Status)
         ? "Active"
         : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(selectedRun.Status.Replace('_', ' '));
@@ -37,7 +37,7 @@
             <h1>Run not found</h1>
             <p>This run is not attached to this account anymore.</p>
             <div class="minimal-actions">
-                <a class="button-like button-like--primary" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--primary" href="/account/roster">Back to roster</a>
             </div>
         </div>
     </section>
@@ -55,7 +55,7 @@ else
                 <li>@selectedRun.Scenes.Count scene@(selectedRun.Scenes.Count == 1 ? string.Empty : "s")</li>
             </ul>
             <div class="minimal-actions">
-                <a class="button-like button-like--ghost" href="/account/work">Back to roster</a>
+                <a class="button-like button-like--ghost" href="/account/roster">Back to roster</a>
                 <a class="button-like button-like--secondary" href="@selectedRunWorkspaceHref">Open campaign</a>
             </div>
         </div>

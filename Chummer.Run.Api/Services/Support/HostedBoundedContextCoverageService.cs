@@ -29,7 +29,7 @@ public sealed class HostedBoundedContextCoverageService
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .FirstOrDefault();
         string communityHubRoute = string.IsNullOrWhiteSpace(context.CommunityHubRoute)
-            ? "/account/work#community-ops"
+            ? "/account/roster#community-ops"
             : context.CommunityHubRoute!;
         SignalToCanonPacketProjection? feedbackPacket = context.PublicSignals?.Packets
             .FirstOrDefault(item => string.Equals(item.SurfaceId, "feedback", StringComparison.Ordinal));
@@ -174,7 +174,7 @@ public sealed class HostedBoundedContextCoverageService
             [
                 new HostedBoundedContextCoverageActionProjection("open_community_hub", "Open community hub", communityHubRoute, "Inspect the account community operations page."),
                 new HostedBoundedContextCoverageActionProjection("open_groups", "Open groups", groupRoute, "Compare community operations against the reviewed group page."),
-                new HostedBoundedContextCoverageActionProjection("open_open_runs", "Open open runs", "/account/work#community-ops", "Return to the community page that owns discovery and join status.")
+                new HostedBoundedContextCoverageActionProjection("open_open_runs", "Open open runs", "/account/roster#community-ops", "Return to the community page that owns discovery and join status.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -189,8 +189,8 @@ public sealed class HostedBoundedContextCoverageService
         string locale)
     {
         string route = openRun is null
-            ? "/account/work"
-            : $"/account/work/workspaces/{Uri.EscapeDataString(openRun.Listing.WorkspaceId)}";
+            ? "/account/roster"
+            : $"/account/campaigns/{Uri.EscapeDataString(openRun.Listing.WorkspaceId)}";
         string comparisonRoute = openRun is null
             ? communityHubRoute
             : $"/api/v1/campaign-spine/me/open-runs/{Uri.EscapeDataString(openRun.Listing.OpenRunId)}";
