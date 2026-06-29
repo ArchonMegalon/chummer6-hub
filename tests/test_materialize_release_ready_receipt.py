@@ -25,9 +25,10 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="release-ready-receipt-") as temp_dir:
             output_path = Path(temp_dir) / "RELEASE_READY.generated.json"
 
-            completed = mock.Mock(returncode=0, stdout="RELEASE READY\n", stderr="")
+            process = mock.Mock(pid=1234, returncode=0)
+            process.communicate.return_value = ("RELEASE READY\n", "")
 
-            with mock.patch.object(module, "OUTPUT_PATH", output_path), mock.patch.object(module.subprocess, "run", return_value=completed):
+            with mock.patch.object(module, "OUTPUT_PATH", output_path), mock.patch.object(module.subprocess, "Popen", return_value=process):
                 result = module.main()
 
             self.assertEqual(0, result)
@@ -45,14 +46,25 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             timeout = module.subprocess.TimeoutExpired(
                 cmd=["bash", str(module.VERIFY_SCRIPT)],
                 timeout=module.TIMEOUT_SECONDS,
-                output="FAIL verify_live_surface_parity\nstill running\n",
-                stderr="",
+                output=b"FAIL verify_live_surface_parity\nstill running\n",
+                stderr=b"",
             )
 
-            with mock.patch.object(module, "OUTPUT_PATH", output_path), mock.patch.object(module.subprocess, "run", side_effect=timeout):
+            process = mock.Mock(pid=1234, returncode=None)
+            process.communicate.side_effect = [
+                timeout,
+                (b"FAIL verify_live_surface_parity\nstill running\n", b""),
+            ]
+
+            with (
+                mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(module.subprocess, "Popen", return_value=process),
+                mock.patch.object(module.os, "killpg") as killpg,
+            ):
                 result = module.main()
 
             self.assertEqual(0, result)
+            killpg.assert_called_once_with(1234, module.signal.SIGTERM)
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual("fail", payload["status"])
             self.assertEqual("NOT_RELEASE_READY", payload["verdict"])

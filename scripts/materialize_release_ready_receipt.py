@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,38 +14,67 @@ RUN_SERVICES_ROOT = ROOT / "chummer.run-services"
 OUTPUT_PATH = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "RELEASE_READY.generated.json"
 VERIFY_SCRIPT = ROOT / "scripts" / "release" / "verify_chummer6_release_ready.sh"
 TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_RELEASE_READY_TIMEOUT_SECONDS", "900"))
+TERMINATION_GRACE_SECONDS = int(os.environ.get("CHUMMER_RELEASE_READY_TERMINATION_GRACE_SECONDS", "10"))
 
 
 def now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def coerce_output(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def terminate_process_group(process: subprocess.Popen[str]) -> tuple[str, str]:
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+
+    try:
+        stdout, stderr = process.communicate(timeout=TERMINATION_GRACE_SECONDS)
+        return coerce_output(stdout), coerce_output(stderr)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        stdout, stderr = process.communicate()
+        return coerce_output(stdout), coerce_output(stderr)
+
+
+def run_release_verifier(env: dict[str, str]) -> tuple[int, bool, str, str]:
+    process = subprocess.Popen(
+        ["bash", str(VERIFY_SCRIPT)],
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+
+    try:
+        stdout, stderr = process.communicate(timeout=TIMEOUT_SECONDS)
+        return process.returncode or 0, False, coerce_output(stdout).strip(), coerce_output(stderr).strip()
+    except subprocess.TimeoutExpired as exc:
+        timeout_stdout = coerce_output(exc.stdout).strip()
+        timeout_stderr = coerce_output(exc.stderr).strip()
+        terminated_stdout, terminated_stderr = terminate_process_group(process)
+        stdout = terminated_stdout.strip() or timeout_stdout
+        stderr = terminated_stderr.strip() or timeout_stderr
+        return 124, True, stdout, stderr
+
+
 def main() -> int:
     env = os.environ.copy()
     env.setdefault("CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE", "1")
     env.setdefault("CHUMMER_PUBLIC_BASE_URL", "https://chummer.run")
-    timed_out = False
-    returncode = 0
-    stdout = ""
-    stderr = ""
-
-    try:
-        completed = subprocess.run(
-            ["bash", str(VERIFY_SCRIPT)],
-            cwd=ROOT,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=TIMEOUT_SECONDS,
-        )
-        returncode = completed.returncode
-        stdout = completed.stdout.strip()
-        stderr = completed.stderr.strip()
-    except subprocess.TimeoutExpired as exc:
-        timed_out = True
-        returncode = 124
-        stdout = (exc.stdout or "").strip()
-        stderr = (exc.stderr or "").strip()
+    returncode, timed_out, stdout, stderr = run_release_verifier(env)
 
     failure_lines = [
         line.strip()
