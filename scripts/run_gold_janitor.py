@@ -28,6 +28,7 @@ def build_commands(base_url: str, *, allow_participate_unavailable: bool = False
         ["python3", "scripts/operator_notification_privacy_gate.py"],
         ["python3", "scripts/verify_pwa_notification_runtime.py", "--base-url", base_url],
         ["python3", "scripts/verify_mobile_pwa_public_projection.py", "--base-url", base_url],
+        ["python3", "scripts/verify_blazor_execution_horizon_bridge.py"],
         ["python3", "scripts/validate_engagement_drivers_matrix.py"],
         ["python3", "scripts/engagement_backlog_validate.py"],
         ["python3", "scripts/feedback_loop_e2e.py", "--stub-delivery", "--with-impact-receipt"],

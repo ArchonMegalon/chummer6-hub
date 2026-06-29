@@ -197,6 +197,7 @@ GATE_SPECS: tuple[GateSpec, ...] = (
         next_action="Keep PWA manifest, service worker, and accessibility artifacts current.",
         commands=(
             CommandSpec("python3 scripts/verify_mobile_pwa_public_projection.py", str(RUN_SERVICES_ROOT)),
+            CommandSpec("python3 scripts/verify_blazor_execution_horizon_bridge.py", str(RUN_SERVICES_ROOT)),
         ),
         e2e_journey_name="pwa install / offline/reconnect / auth / session resume / tap target/accessibility",
     ),

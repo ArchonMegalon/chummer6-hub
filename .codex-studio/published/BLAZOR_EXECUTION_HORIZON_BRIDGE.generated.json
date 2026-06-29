@@ -1,0 +1,42 @@
+{
+  "boundaries": {
+    "does_not_upgrade_smoke_to_full": true,
+    "full_matrix_requires_current_passing_full_scope_receipt": true,
+    "hub_mobile_pwa_projection_is_not_blazor_full_execution": true
+  },
+  "contract_name": "chummer.blazor_execution_horizon_bridge",
+  "failures": [],
+  "generated_at_utc": "2026-06-29T11:17:49Z",
+  "notes": [
+    "This Hub bridge keeps mobile/PWA readiness, Blazor PWA installability, and Blazor hosted execution horizons visible together.",
+    "A passing bridge does not mean the full live Blazor public-edge execution matrix is proven unless mid_term_full_matrix_status is proven.",
+    "Living-world opt-in and Black Ledger mobile projection remain Hub-owned; Blazor hosted execution breadth remains presentation-owned."
+  ],
+  "proofs": {
+    "blazor_hosted_execution_horizon": {
+      "contract_name": "chummer6-ui.blazor_public_edge_execution_horizon",
+      "mid_term_full_covered_workflow_family_count": 9,
+      "mid_term_full_matrix_status": "not_proven",
+      "mid_term_full_required_workflow_family_count": 49,
+      "near_term_smoke_status": "proven",
+      "pass": true,
+      "path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/BLAZOR_PUBLIC_EDGE_EXECUTION_HORIZON.generated.json",
+      "status": "passed"
+    },
+    "blazor_hosted_pwa_public_edge": {
+      "contract_name": "chummer6-ui.blazor_pwa_public_edge_proof",
+      "pass": true,
+      "path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/BLAZOR_PWA_PUBLIC_EDGE_PROOF.generated.json",
+      "route_lane": "blazor_pwa_play_shell",
+      "status": "passed"
+    },
+    "hub_mobile_pwa_public_projection": {
+      "contract_name": "chummer.mobile_pwa_public_projection",
+      "pass": true,
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json",
+      "status": "pass"
+    }
+  },
+  "status": "pass",
+  "verdict": "mobile_pwa_and_blazor_smoke_integrated_full_matrix_not_proven"
+}
