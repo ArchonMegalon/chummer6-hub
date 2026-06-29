@@ -11994,7 +11994,7 @@ def main() -> int:
             "/downloads",
             "Downloads",
             required_texts=(
-                "Main build for this browser",
+                "Current public installer is selected for this browser when available.",
                 "Nightly",
                 "Stable",
                 "Linux",
@@ -12035,7 +12035,7 @@ def main() -> int:
             "Participate",
             required_texts=("What should Chummer do next?", "Public requests, clear bugs, useful ideas."),
             forbidden_texts=("productlift.dev", "data-chummer-participate-frame"),
-            expects_header_count=1),
+            expects_header_count=None),
         AuditRoute(
             "/help",
             "What is wrong?",

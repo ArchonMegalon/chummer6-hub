@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import html
 import re
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -28,6 +29,7 @@ EXPECTED_NOTIFICATION_ROUTE_PREFIXES = {"/account/ledger/factions/", "/ledger/tu
 EXPECTED_NOTIFICATION_ASSET_PATHS = {"/apple-touch-icon.png", "/favicon.ico", "/favicon.svg", "/pwa-icon.svg"}
 EXPECTED_NOTIFICATION_ASSET_SUFFIXES = {".ico", ".png", ".svg", ".webp"}
 PERSONALIZED_LEDGER_STREAM_ROUTE = "/mobile/pwa/ledger.json"
+SERVICE_WORKER_REGISTRATION_RE = re.compile(r'serviceWorker\.register\("([^"]*service-worker\.js[^"]*)"')
 
 
 def extract_js_string_array(source: str, name: str) -> set[str]:
@@ -36,6 +38,14 @@ def extract_js_string_array(source: str, name: str) -> set[str]:
         return set()
 
     return set(re.findall(r'"([^"]+)"', match.group(1)))
+
+
+def extract_registered_service_worker_path(markup: str) -> str | None:
+    match = SERVICE_WORKER_REGISTRATION_RE.search(markup)
+    if not match:
+        return None
+
+    return html.unescape(match.group(1))
 
 
 def parse_args() -> argparse.Namespace:
@@ -92,7 +102,9 @@ def run(base_url: str) -> int:
     receipt_index_response.raise_for_status()
     manifest_response = session.get(f"{base_url}/manifest.json", timeout=30)
     manifest_response.raise_for_status()
-    service_worker_response = session.get(f"{base_url}/service-worker.js", timeout=30)
+    registered_service_worker_path = extract_registered_service_worker_path(mobile_html.text)
+    service_worker_path = registered_service_worker_path or "/service-worker.js"
+    service_worker_response = session.get(urljoin(f"{base_url}/", service_worker_path.lstrip("/")), timeout=30)
     service_worker_response.raise_for_status()
 
     manifest = manifest_response.json()
@@ -109,7 +121,7 @@ def run(base_url: str) -> int:
     ledger_stream_cache_control = ledger_stream_response.headers.get("Cache-Control", "")
     ledger_stream_vary = ledger_stream_response.headers.get("Vary", "")
     has_manifest_link = 'rel="manifest"' in mobile_html.text and "/manifest.json" in mobile_html.text
-    has_sw_registration = "serviceWorker.register(\"/service-worker.js\"" in mobile_html.text
+    has_sw_registration = registered_service_worker_path is not None
     has_install_button = "Install this app" in mobile_html.text
     has_continuity_action = "/play/continuity" in mobile_html.text
     shortcut_urls = {shortcut.get("url") for shortcut in (manifest.get("shortcuts") or []) if isinstance(shortcut, dict)}
@@ -206,7 +218,7 @@ def run(base_url: str) -> int:
             "shortcut_urls": sorted(shortcut_urls),
         },
         "service_worker": {
-            "path": "/service-worker.js",
+            "path": service_worker_path,
             "status_code": service_worker_response.status_code,
             "has_fetch_handler": "self.addEventListener(\"fetch\"" in service_worker_text,
             "has_navigation_preload": has_navigation_preload,

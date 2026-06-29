@@ -1,7 +1,13 @@
+@using System.Globalization
 @using Chummer.Run.Api.ViewModels
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment HubWebHostEnvironment
 @{
     var chrome = ViewData["Chrome"] as SiteChromeViewModel ?? throw new InvalidOperationException("Site chrome was not provided to the layout.");
     var pageTitle = ViewData["Title"] as string ?? chrome.Title;
+    var serviceWorkerFile = HubWebHostEnvironment.WebRootFileProvider.GetFileInfo("service-worker.js");
+    var serviceWorkerVersion = serviceWorkerFile.Exists
+        ? serviceWorkerFile.LastModified.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)
+        : "missing";
     var routeKey = string.IsNullOrWhiteSpace(chrome.CurrentPath) || string.Equals(chrome.CurrentPath, "/", StringComparison.Ordinal)
         ? "landing"
         : chrome.CurrentPath.Trim('/').Replace("/", "-", StringComparison.Ordinal).Replace("?", "-", StringComparison.Ordinal).Replace("&", "-", StringComparison.Ordinal).Replace("=", "-", StringComparison.Ordinal).Replace(".", "-", StringComparison.Ordinal);
@@ -686,7 +692,7 @@
             }
 
             window.addEventListener("load", function () {
-                navigator.serviceWorker.register("/service-worker.js", { scope: "/" }).catch(function () {
+                navigator.serviceWorker.register("/service-worker.js?v=@serviceWorkerVersion", { scope: "/" }).catch(function () {
                 });
             });
         })();

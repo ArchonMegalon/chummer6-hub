@@ -5,7 +5,7 @@ import subprocess
 import textwrap
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +24,30 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
         self.assertIn("pwa_notification_runtime:ok", result.stdout)
+
+    def test_verifier_prefers_registered_service_worker_url_for_live_base(self) -> None:
+        module_globals: dict[str, object] = {
+            "__file__": str(VERIFY_SCRIPT),
+            "__name__": "verify_pwa_notification_runtime_test",
+        }
+        exec(VERIFY_SCRIPT.read_text(encoding="utf-8"), module_globals)
+        load_service_worker_text = module_globals["load_service_worker_text"]
+        service_worker_text = SERVICE_WORKER.read_text(encoding="utf-8")
+        requested_urls: list[str] = []
+
+        def fake_get(url: str, timeout: int = 30) -> Mock:
+            del timeout
+            requested_urls.append(url)
+            if url.endswith("/mobile"):
+                return Mock(ok=True, text='navigator.serviceWorker.register("/service-worker.js?v=proof", { scope: "/" });')
+
+            return Mock(ok=True, text=service_worker_text, raise_for_status=lambda: None)
+
+        with patch.object(module_globals["requests"], "get", side_effect=fake_get):
+            text = load_service_worker_text("https://chummer.run")
+
+        self.assertEqual(text, service_worker_text)
+        self.assertIn("https://chummer.run/service-worker.js?v=proof", requested_urls)
 
     def test_service_worker_push_and_notification_routes_are_bounded(self) -> None:
         node_script = textwrap.dedent(

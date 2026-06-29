@@ -16,27 +16,29 @@ test('public play shell exposes manifest, service worker, notifications, and liv
   expect(manifestResponse.status()).toBe(200);
   const manifest = await manifestResponse.json();
 
-  const swResponse = await request.get(`${baseUrl}/service-worker.js`);
-  expect(swResponse.status()).toBe(200);
-  const swText = await swResponse.text();
-
   const serviceWorkerState = await page.evaluate(async () => {
     if (!('serviceWorker' in navigator)) {
-      return { supported: false, controller: false, ready: false };
+      return { supported: false, controller: false, ready: false, scriptURL: null };
     }
 
     const registration = await navigator.serviceWorker.getRegistration('/');
     if (!registration) {
-      return { supported: true, controller: !!navigator.serviceWorker.controller, ready: false };
+      return { supported: true, controller: !!navigator.serviceWorker.controller, ready: false, scriptURL: null };
     }
 
     try {
-      await navigator.serviceWorker.ready;
-      return { supported: true, controller: !!navigator.serviceWorker.controller, ready: true };
+      const readyRegistration = await navigator.serviceWorker.ready;
+      const worker = readyRegistration.active ?? readyRegistration.waiting ?? readyRegistration.installing;
+      return { supported: true, controller: !!navigator.serviceWorker.controller, ready: true, scriptURL: worker?.scriptURL ?? null };
     } catch {
-      return { supported: true, controller: !!navigator.serviceWorker.controller, ready: false };
+      const worker = registration.active ?? registration.waiting ?? registration.installing;
+      return { supported: true, controller: !!navigator.serviceWorker.controller, ready: false, scriptURL: worker?.scriptURL ?? null };
     }
   });
+  const serviceWorkerScriptUrl = serviceWorkerState.scriptURL || `${baseUrl}/service-worker.js`;
+  const swResponse = await request.get(serviceWorkerScriptUrl);
+  expect(swResponse.status()).toBe(200);
+  const swText = await swResponse.text();
 
   writeJsonArtifact('PWA_MANIFEST_LIVE.generated.json', {
     generated_at_utc: new Date().toISOString(),
@@ -55,7 +57,7 @@ test('public play shell exposes manifest, service worker, notifications, and liv
       ? 'pass'
       : 'fail',
     base_url: baseUrl,
-    path: '/service-worker.js',
+    path: serviceWorkerScriptUrl,
     has_fetch_handler: swText.includes('self.addEventListener("fetch"'),
     has_push_handler: swText.includes('self.addEventListener("push"'),
     has_notification_click_handler: swText.includes('self.addEventListener("notificationclick"'),

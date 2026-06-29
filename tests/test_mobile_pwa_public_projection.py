@@ -46,7 +46,7 @@ class _FakeSession:
                 url,
                 text=(
                     '<link rel="manifest" href="/manifest.json">'
-                    '<script>serviceWorker.register("/service-worker.js")</script>'
+                    '<script>serviceWorker.register("/service-worker.js?v=test")</script>'
                     "Install this app /play/continuity"
                 ),
             )
@@ -115,7 +115,7 @@ class _FakeSession:
                     "icons": [{"src": "/icon.png"}],
                 },
             )
-        if url.endswith("/service-worker.js"):
+        if "/service-worker.js" in url:
             return _FakeResponse(
                 url,
                 text=(
@@ -229,7 +229,7 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
                 if url.endswith("/mobile"):
                     return _FakeResponse(
                         response.url,
-                        text=response.text.replace('serviceWorker.register("/service-worker.js")', "console.log('no sw')", 1),
+                        text=response.text.replace('serviceWorker.register("/service-worker.js?v=test")', "console.log('no sw')", 1),
                     )
                 return response
 
@@ -279,7 +279,7 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
         class DriftedSession(_FakeSession):
             def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
                 response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
-                if url.endswith("/service-worker.js"):
+                if "/service-worker.js" in url:
                     return _FakeResponse(
                         response.url,
                         text=response.text.replace('"/play/continuity", ', "", 1),
@@ -306,7 +306,7 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
         class DriftedSession(_FakeSession):
             def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
                 response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
-                if url.endswith("/service-worker.js"):
+                if "/service-worker.js" in url:
                     return _FakeResponse(
                         response.url,
                         text=response.text.replace('"/mobile/pwa/ledger.json"', "", 1),
@@ -333,7 +333,7 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
         class DriftedSession(_FakeSession):
             def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
                 response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
-                if url.endswith("/service-worker.js"):
+                if "/service-worker.js" in url:
                     return _FakeResponse(
                         response.url,
                         text=response.text.replace("const NOTIFICATION_ROUTE_PATHS", "const DROPPED_NOTIFICATION_ROUTE_PATHS", 1),
