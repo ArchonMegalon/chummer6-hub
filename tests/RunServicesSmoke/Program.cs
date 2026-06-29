@@ -5765,8 +5765,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHorizonsModel?.TrustPulse is not null, "authenticated horizons page should keep the weekly public trust pulse visible.");
     Assert(authenticatedHorizonsModel?.SignedInStatus is not null, "authenticated horizons page should project the shared signed-in trust status.");
 
-    Assert(string.Equals(participateModel!.Heading, "What should Chummer do next?", StringComparison.Ordinal), "participate page should keep the first-party prompt.");
-    Assert(!participateModel.Posts.Any(static item => item.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
+    var participateHtml = participateContent?.Content ?? string.Empty;
+    Assert(participateHtml.Contains("What should Chummer do next?", StringComparison.Ordinal), "participate page should keep the first-party prompt.");
+    Assert(!participateHtml.Contains("worker host", StringComparison.OrdinalIgnoreCase), "public participate copy should not leak worker-host jargon");
 
     var homeResult = await controller.HomePage(null, CancellationToken.None);
     var homeRedirect = homeResult as RedirectResult;
