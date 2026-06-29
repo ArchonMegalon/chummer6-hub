@@ -17582,13 +17582,13 @@ echo "Help: ${HELP_URL}"
             "manage" => "Signed-in faction management for campaign pressure, district coverage, and private coordination.",
             "stewards" => "Steward roles stay explicit here so public summary roles never get confused with private campaign authority.",
             "private-lore" => "Private lore overlays can exist here for campaign context, but public Ledger routes must never render them.",
-            _ => "Faction command workspace for the same Black Ledger world, with private labels and management details kept off public pages.",
+            _ => "Faction command board for the same Black Ledger world, with private labels and management details kept off public pages.",
         };
 
         return new BlackLedgerFactionWorkspacePageViewModel(
-            Chrome: _chrome.BuildAuthenticatedChrome($"{faction.PublicName} workspace", "Signed-in Black Ledger faction management and private lore.", currentPath, user.DisplayName, user.Email),
-            Eyebrow: "Faction command workspace",
-            Heading: $"{faction.PublicName} workspace",
+            Chrome: _chrome.BuildAuthenticatedChrome($"{faction.PublicName} board", "Signed-in Black Ledger faction management and private lore.", currentPath, user.DisplayName, user.Email),
+            Eyebrow: "Faction command board",
+            Heading: $"{faction.PublicName} board",
             Intro: intro,
             CurrentSection: currentSection,
             World: world,
@@ -17599,7 +17599,7 @@ echo "Help: ${HELP_URL}"
             Dispatches: _blackLedgerDispatches.ListPublishedDispatches(world.CurrentTurn, faction.Id),
             Tabs: tabs,
             PublicProfileHref: $"/ledger/factions/{normalizedFactionId}",
-            PrivacyNote: "Faction command workspaces may render private labels and campaign-scoped overlays. Public Ledger routes never do.",
+            PrivacyNote: "Faction command boards may render private labels and campaign-scoped overlays. Public Ledger routes never do.",
             Allegiance: _blackLedgerFactions.GetAllegiance(user),
             AvailableActions: string.Equals(currentSection, "manage", StringComparison.OrdinalIgnoreCase) ? _blackLedgerFactions.GetActionDefinitions(faction.Id) : Array.Empty<BlackLedgerFactionActionDefinitionDto>(),
             RecentActionReceipts: _blackLedgerFactions.GetActionReceipts(faction.Id).Take(6).ToArray(),
@@ -17893,14 +17893,14 @@ echo "Help: ${HELP_URL}"
     {
         int consequenceCount = workspaceServerPlane?.Consequences.Count ?? 0;
         int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
-        string summary = "Faction workspace is part of the same command path as Table Pulse Live, Signal Deck, Runner Passport, Living Newsroom, and aftermath. Command does not end at action points; it carries through to fallout.";
-        string boundaryLine = "Workspace command stays in the account and attached to Chummer state. It can route pressure, command, and fallout, but it does not publish private lore or invent public world state outside Chummer pages.";
+        string summary = "The faction board is part of the same command path as Table Pulse Live, Signal Deck, Runner Passport, Living Newsroom, and aftermath. Command does not end at action points; it carries through to fallout.";
+        string boundaryLine = "Faction command stays in the account and attached to Chummer state. It can route pressure, command, and fallout, but it does not publish private lore or invent public world state outside Chummer pages.";
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
             new(
                 Label: "Table Pulse Live inbox",
                 Summary: consequenceCount > 0
-                    ? $"{consequenceCount} consequence cue(s) are already live from the inbox, so this workspace can act on real pressure."
+                    ? $"{consequenceCount} consequence cue(s) are already live from the inbox, so this board can act on real pressure."
                     : "Open the account inbox to review or trigger the next remote reaction before spending command effort here.",
                 Href: "/account/ledger/notifications",
                 StatusLabel: consequenceCount > 0 ? "Consequence-backed" : "Inbox"),
@@ -17924,8 +17924,8 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Aftermath return",
                 Summary: aftermathCount > 0
-                    ? $"{aftermathCount} aftermath package(s) are on the return path, so this workspace can review fallout instead of losing the thread after adjudication."
-                    : "Aftermath return is attached even when the queue is empty, so the workspace stays connected to follow-up status.",
+                    ? $"{aftermathCount} aftermath package(s) are on the return path, so this board can review fallout instead of losing the thread after adjudication."
+                    : "Aftermath return is attached even when the queue is empty, so the board stays connected to follow-up status.",
                 Href: "/account/work#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
         ];

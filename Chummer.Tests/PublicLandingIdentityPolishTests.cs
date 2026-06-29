@@ -27,7 +27,8 @@ public sealed class PublicLandingIdentityPolishTests
         Assert.Contains("RUNSITE prep", controller, StringComparison.Ordinal);
         Assert.Contains("Package record", controller, StringComparison.Ordinal);
         Assert.Contains("KARMA FORGE", controller, StringComparison.Ordinal);
-        Assert.Contains("Faction command workspace", controller, StringComparison.Ordinal);
+        Assert.Contains("Faction command board", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Faction command workspace", controller, StringComparison.Ordinal);
     }
 
     [Fact]

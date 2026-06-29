@@ -43,6 +43,10 @@ public sealed class BlackLedgerTickNewsTests
         Assert.Contains("Open turn summary", accountView, StringComparison.Ordinal);
         Assert.Contains("Open turn summary", notificationsView, StringComparison.Ordinal);
         Assert.Contains("Current turn summary", accountView, StringComparison.Ordinal);
+        Assert.Contains("Open faction board", accountView, StringComparison.Ordinal);
+        Assert.Contains("Faction board", accountView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Open faction workspace", accountView, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span class=\"tag\">Workspace</span>", accountView, StringComparison.Ordinal);
         Assert.DoesNotContain("Current world-turn packet", accountView, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Inbox", notificationsView, StringComparison.Ordinal);
         Assert.Contains("Actual messages, not just status", notificationsView, StringComparison.Ordinal);
