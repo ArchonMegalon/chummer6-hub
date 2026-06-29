@@ -23,6 +23,10 @@ EXPECTED_FINAL_ROUTES = {
 EXPECTED_SHORTCUTS = {"/mobile", "/play", "/play/continuity"}
 EXPECTED_SHELL_CACHE_PATHS = {"/mobile", "/play", "/play/continuity", "/mobile/pwa.json", "/ready/handoff/mobile.json"}
 EXPECTED_PWA_LEDGER_STATUSES = {"opt_in_required", "no_world_data", "live", "world_not_followed"}
+EXPECTED_NOTIFICATION_ROUTE_PATHS = {"/account/ledger/notifications", "/mobile", "/play", "/play/continuity", "/ledger/map", "/passport"}
+EXPECTED_NOTIFICATION_ROUTE_PREFIXES = {"/account/ledger/factions/", "/ledger/turns/", "/ledger/newsroom/", "/passport/receipts/"}
+EXPECTED_NOTIFICATION_ASSET_PATHS = {"/apple-touch-icon.png", "/favicon.ico", "/favicon.svg", "/pwa-icon.svg"}
+EXPECTED_NOTIFICATION_ASSET_SUFFIXES = {".ico", ".png", ".svg", ".webp"}
 PERSONALIZED_LEDGER_STREAM_ROUTE = "/mobile/pwa/ledger.json"
 
 
@@ -98,6 +102,10 @@ def run(base_url: str) -> int:
     service_worker_text = service_worker_response.text
     precache_urls = extract_js_string_array(service_worker_text, "PRECACHE_URLS")
     non_cacheable_paths = extract_js_string_array(service_worker_text, "NON_CACHEABLE_PATHS")
+    notification_route_paths = extract_js_string_array(service_worker_text, "NOTIFICATION_ROUTE_PATHS")
+    notification_route_prefixes = extract_js_string_array(service_worker_text, "NOTIFICATION_ROUTE_PREFIXES")
+    notification_asset_paths = extract_js_string_array(service_worker_text, "NOTIFICATION_ASSET_PATHS")
+    notification_asset_suffixes = extract_js_string_array(service_worker_text, "NOTIFICATION_ASSET_SUFFIXES")
     ledger_stream_cache_control = ledger_stream_response.headers.get("Cache-Control", "")
     ledger_stream_vary = ledger_stream_response.headers.get("Vary", "")
     has_manifest_link = 'rel="manifest"' in mobile_html.text and "/manifest.json" in mobile_html.text
@@ -119,6 +127,18 @@ def run(base_url: str) -> int:
     has_push_handler = 'self.addEventListener("push"' in service_worker_text
     has_notification_click_handler = 'self.addEventListener("notificationclick"' in service_worker_text
     has_notification_close_handler = 'self.addEventListener("notificationclose"' in service_worker_text
+    has_notification_route_bounds = (
+        EXPECTED_NOTIFICATION_ROUTE_PATHS.issubset(notification_route_paths)
+        and EXPECTED_NOTIFICATION_ROUTE_PREFIXES.issubset(notification_route_prefixes)
+        and "tryNormalizeNotificationHref(" in service_worker_text
+        and "isAllowedNotificationHref(" in service_worker_text
+    )
+    has_notification_asset_bounds = (
+        EXPECTED_NOTIFICATION_ASSET_PATHS.issubset(notification_asset_paths)
+        and EXPECTED_NOTIFICATION_ASSET_SUFFIXES.issubset(notification_asset_suffixes)
+        and "tryNormalizeNotificationAssetPath(" in service_worker_text
+        and "isAllowedNotificationAssetPath(" in service_worker_text
+    )
     continuity_receipt_count = len(receipt_index.get("receipts") or [])
     continuity_boundary_present = bool(receipt_index.get("boundary"))
     mobile_json_has_routes = (
@@ -160,6 +180,8 @@ def run(base_url: str) -> int:
         has_push_handler,
         has_notification_click_handler,
         has_notification_close_handler,
+        has_notification_route_bounds,
+        has_notification_asset_bounds,
         continuity_receipt_count >= 3,
         continuity_boundary_present,
         mobile_json_has_routes,
@@ -195,6 +217,12 @@ def run(base_url: str) -> int:
             "has_push_handler": has_push_handler,
             "has_notification_click_handler": has_notification_click_handler,
             "has_notification_close_handler": has_notification_close_handler,
+            "has_notification_route_bounds": has_notification_route_bounds,
+            "has_notification_asset_bounds": has_notification_asset_bounds,
+            "notification_route_paths": sorted(notification_route_paths),
+            "notification_route_prefixes": sorted(notification_route_prefixes),
+            "notification_asset_paths": sorted(notification_asset_paths),
+            "notification_asset_suffixes": sorted(notification_asset_suffixes),
         },
         "page_assertions": {
             "has_manifest_link": has_manifest_link,
@@ -246,6 +274,8 @@ def run(base_url: str) -> int:
                 f"- Service worker push handler present: `{has_push_handler}`",
                 f"- Service worker notification click handler present: `{has_notification_click_handler}`",
                 f"- Service worker notification close handler present: `{has_notification_close_handler}`",
+                f"- Service worker notification route bounds present: `{has_notification_route_bounds}`",
+                f"- Service worker notification asset bounds present: `{has_notification_asset_bounds}`",
                 f"- Role-route redirects hold: `{role_routes_hold}`",
                 f"- Continuity receipt count: `{continuity_receipt_count}`",
                 f"- Continuity boundary present: `{continuity_boundary_present}`",

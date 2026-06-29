@@ -80,11 +80,16 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
                 json: () => ({{
                   title: "Table Pulse",
                   body: "Heat moved in Tacoma.",
-                  href: "/account/ledger/notifications",
+                  href: "/admin/hidden-ops",
                   tag: "table-pulse",
-                  icon: "https://evil.invalid/track.png",
+                  icon: "/admin/track.png",
                   badge: "/favicon.svg",
                   actions: [
+                    {{
+                      action: "open-admin",
+                      title: "Open admin",
+                      href: "/admin/hidden-ops"
+                    }},
                     {{
                       action: "open-passport",
                       title: "Open passport",
@@ -151,6 +156,8 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["notifications"][0]["options"]["data"]["href"], "/account/ledger/notifications")
         self.assertEqual(payload["notifications"][0]["options"]["icon"], "/apple-touch-icon.png")
         self.assertEqual(payload["notifications"][0]["options"]["badge"], "/favicon.svg")
+        self.assertEqual(payload["notifications"][0]["options"]["actions"], [{"action": "open-passport", "title": "Open passport"}])
+        self.assertEqual(payload["notifications"][0]["options"]["data"]["actionRoutes"], {"open-passport": "/passport"})
 
         message_types = [entry["type"] for entry in payload["clientMessages"]]
         self.assertIn("chummer:pwa-notification-push", message_types)
@@ -204,7 +211,12 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
               apiGet: context.isPublicRuntimeCacheableRequest(apiGet),
               publicAsset: context.isPublicRuntimeCacheableRequest(publicAsset),
               publicResponse: context.shouldCacheResponse(publicNavigate, new Response("ok", {{ status: 200 }})),
-              accountResponse: context.shouldCacheResponse(accountNavigate, new Response("ok", {{ status: 200 }}))
+              accountResponse: context.shouldCacheResponse(accountNavigate, new Response("ok", {{ status: 200 }})),
+              validNotificationHref: context.normalizeNotificationHref("/ledger/turns/42?source=pwa"),
+              invalidNotificationHref: context.normalizeNotificationHref("/admin/hidden-ops"),
+              externalNotificationHref: context.normalizeNotificationHref("https://evil.invalid/passport"),
+              validNotificationAsset: context.normalizeNotificationAssetPath("/media/ledger/globe/black-ledger-video-globe-idle-poster.png", "/fallback.png"),
+              invalidNotificationAsset: context.normalizeNotificationAssetPath("/api/v1/account/ledger/track.png", "/fallback.png")
             }};
             process.stdout.write(JSON.stringify(payload));
             """
@@ -226,6 +238,11 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
         self.assertFalse(payload["accountNavigate"])
         self.assertFalse(payload["apiGet"])
         self.assertFalse(payload["accountResponse"])
+        self.assertEqual(payload["validNotificationHref"], "/ledger/turns/42?source=pwa")
+        self.assertEqual(payload["invalidNotificationHref"], "/account/ledger/notifications")
+        self.assertEqual(payload["externalNotificationHref"], "/account/ledger/notifications")
+        self.assertEqual(payload["validNotificationAsset"], "/media/ledger/globe/black-ledger-video-globe-idle-poster.png")
+        self.assertEqual(payload["invalidNotificationAsset"], "/fallback.png")
 
     def test_verifier_accepts_served_service_worker_asset(self) -> None:
         class FakeResponse:

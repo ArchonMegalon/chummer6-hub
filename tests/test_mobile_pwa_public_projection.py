@@ -127,6 +127,14 @@ class _FakeSession:
                     "RUNTIME_CACHE\n"
                     'const PRECACHE_URLS = ["/mobile", "/play", "/play/continuity", "/mobile/pwa.json", "/ready/handoff/mobile.json"];\n'
                     'const NON_CACHEABLE_PATHS = new Set(["/mobile/pwa/ledger.json"]);\n'
+                    'const NOTIFICATION_ROUTE_PATHS = new Set(["/account/ledger/notifications", "/mobile", "/play", "/play/continuity", "/ledger/map", "/passport"]);\n'
+                    'const NOTIFICATION_ROUTE_PREFIXES = ["/account/ledger/factions/", "/ledger/turns/", "/ledger/newsroom/", "/passport/receipts/"];\n'
+                    'const NOTIFICATION_ASSET_PATHS = new Set(["/apple-touch-icon.png", "/favicon.ico", "/favicon.svg", "/pwa-icon.svg"]);\n'
+                    'const NOTIFICATION_ASSET_SUFFIXES = [".ico", ".png", ".svg", ".webp"];\n'
+                    "tryNormalizeNotificationHref(value);\n"
+                    "isAllowedNotificationHref(pathname);\n"
+                    "tryNormalizeNotificationAssetPath(value);\n"
+                    "isAllowedNotificationAssetPath(pathname);\n"
                 ),
             )
         raise AssertionError(f"unexpected url {url}")
@@ -302,6 +310,33 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
                     return _FakeResponse(
                         response.url,
                         text=response.text.replace('"/mobile/pwa/ledger.json"', "", 1),
+                    )
+                return response
+
+        module = _load_module()
+        stdout = io.StringIO()
+
+        with (
+            patch.object(module.requests, "Session", return_value=DriftedSession()),
+            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
+            patch.object(module, "write_json"),
+            patch.object(module, "write_text"),
+            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
+            redirect_stdout(stdout),
+        ):
+            result = module.run("http://example.test")
+
+        self.assertEqual(result, 1)
+        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+
+    def test_verifier_fails_when_service_worker_drops_notification_route_bounds(self) -> None:
+        class DriftedSession(_FakeSession):
+            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
+                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
+                if url.endswith("/service-worker.js"):
+                    return _FakeResponse(
+                        response.url,
+                        text=response.text.replace("const NOTIFICATION_ROUTE_PATHS", "const DROPPED_NOTIFICATION_ROUTE_PATHS", 1),
                     )
                 return response
 

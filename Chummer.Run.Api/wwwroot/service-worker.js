@@ -7,6 +7,51 @@ const NOTIFICATION_BADGE = "/favicon.ico";
 const DEFAULT_NOTIFICATION_TITLE = "Chummer update";
 const DEFAULT_NOTIFICATION_BODY = "Open Chummer to review the latest activity.";
 const DEFAULT_NOTIFICATION_HREF = "/account/ledger/notifications";
+const NOTIFICATION_ROUTE_PATHS = new Set([
+  "/account/ledger/notifications",
+  "/mobile",
+  "/play",
+  "/play/continuity",
+  "/account",
+  "/account/ledger",
+  "/account/ledger/advisory",
+  "/account/ledger/worldtick/validation",
+  "/account/ledger/onboarding",
+  "/account/passport",
+  "/account/passport/open",
+  "/ledger",
+  "/ledger/map",
+  "/ledger/newsroom",
+  "/passport",
+  "/passport/identity-network"
+]);
+const NOTIFICATION_ROUTE_PREFIXES = [
+  "/account/ledger/factions/",
+  "/ledger/turns/",
+  "/ledger/newsroom/",
+  "/passport/receipts/",
+  "/passport/"
+];
+const NOTIFICATION_ASSET_PATHS = new Set([
+  "/apple-touch-icon.png",
+  "/favicon.ico",
+  "/favicon.svg",
+  "/pwa-icon.svg",
+  "/pwa-maskable.svg"
+]);
+const NOTIFICATION_ASSET_PREFIXES = [
+  "/images/",
+  "/media/ledger/",
+  "/media/promo/"
+];
+const NOTIFICATION_ASSET_SUFFIXES = [
+  ".ico",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".svg",
+  ".webp"
+];
 const PRECACHE_URLS = [
   "/",
   "/mobile",
@@ -290,8 +335,11 @@ async function handlePush(event) {
 
         const actionId = String(action.action).trim();
         const actionTitle = String(action.title).trim();
-        const actionHref = normalizeNotificationHref(action.href || action.route || action.url || "");
+        const actionHref = tryNormalizeNotificationHref(action.href || action.route || action.url || "");
         if (!actionId || !actionTitle) {
+          return null;
+        }
+        if (!actionHref) {
           return null;
         }
 
@@ -386,37 +434,69 @@ function normalizePushPayload(event) {
 }
 
 function normalizeNotificationHref(value) {
+  return tryNormalizeNotificationHref(value) || DEFAULT_NOTIFICATION_HREF;
+}
+
+function tryNormalizeNotificationHref(value) {
   if (!value) {
-    return DEFAULT_NOTIFICATION_HREF;
+    return null;
   }
 
   try {
     const url = new URL(String(value), self.location.origin);
     if (url.origin !== self.location.origin) {
-      return DEFAULT_NOTIFICATION_HREF;
+      return null;
+    }
+
+    if (!isAllowedNotificationHref(url.pathname)) {
+      return null;
     }
 
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
-    return DEFAULT_NOTIFICATION_HREF;
+    return null;
   }
 }
 
 function normalizeNotificationAssetPath(value, fallback) {
+  return tryNormalizeNotificationAssetPath(value) || fallback;
+}
+
+function tryNormalizeNotificationAssetPath(value) {
   if (!value) {
-    return fallback;
+    return null;
   }
 
   try {
     const url = new URL(String(value), self.location.origin);
     if (url.origin !== self.location.origin) {
-      return fallback;
+      return null;
+    }
+
+    if (!isAllowedNotificationAssetPath(url.pathname)) {
+      return null;
     }
 
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
-    return fallback;
+    return null;
   }
+}
+
+function isAllowedNotificationHref(pathname) {
+  return NOTIFICATION_ROUTE_PATHS.has(pathname)
+    || NOTIFICATION_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+function isAllowedNotificationAssetPath(pathname) {
+  const lowerPath = String(pathname || "").toLowerCase();
+  const hasAllowedExtension = NOTIFICATION_ASSET_SUFFIXES.some((suffix) => lowerPath.endsWith(suffix));
+  if (!hasAllowedExtension) {
+    return false;
+  }
+
+  return NOTIFICATION_ASSET_PATHS.has(pathname)
+    || NOTIFICATION_ASSET_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 function resolveNotificationActionHref(actionId, data) {
