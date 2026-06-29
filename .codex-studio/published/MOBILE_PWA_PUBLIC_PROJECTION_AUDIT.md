@@ -1,6 +1,6 @@
 # Mobile and PWA public projection audit
 
-- Generated: 2026-06-29T10:31:20.128671Z
+- Generated: 2026-06-29T10:32:33.564668Z
 - Manifest start URL: `/mobile`
 - Display mode: `standalone`
 - Display override present: `True`
