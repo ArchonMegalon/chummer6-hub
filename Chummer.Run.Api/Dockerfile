@@ -11,7 +11,7 @@ COPY chummer.run-services/Chummer.World.Contracts/Chummer.World.Contracts.csproj
 COPY chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj chummer-core-engine/Chummer.Contracts/
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj chummer-hub-registry/Chummer.Hub.Registry.Contracts/
 COPY chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj chummer-hub-registry/Chummer.Run.Registry/
-COPY --from=fleet-media-factory src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
+COPY --from=fleet-media-factory-contracts Chummer.Media.Contracts.csproj fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 RUN dotnet restore chummer.run-services/Chummer.Run.Api/Chummer.Run.Api.csproj
 COPY chummer.run-services/Chummer.Run.Api/ chummer.run-services/Chummer.Run.Api/
 COPY chummer.run-services/Chummer.Campaign.Contracts/ chummer.run-services/Chummer.Campaign.Contracts/
@@ -24,7 +24,7 @@ COPY chummer-core-engine/Chummer.Contracts/ chummer-core-engine/Chummer.Contract
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/ chummer-hub-registry/Chummer.Hub.Registry.Contracts/
 COPY chummer-hub-registry/Chummer.Run.Registry/ chummer-hub-registry/Chummer.Run.Registry/
 COPY chummer-hub-registry/black-ledger/ chummer-hub-registry/black-ledger/
-COPY --from=fleet-media-factory src/Chummer.Media.Contracts/ fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
+COPY --from=fleet-media-factory-contracts . fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 WORKDIR /src/chummer.run-services/Chummer.Run.Api
 RUN nice -n 10 dotnet build /src/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
  && nice -n 10 dotnet build /src/chummer.run-services/Chummer.World.Contracts/Chummer.World.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
@@ -39,6 +39,6 @@ WORKDIR /app
 COPY --from=build /app/publish .
 COPY --from=build /src/chummer.run-services/.codex-design /app/.codex-design
 COPY --from=build /src/chummer-hub-registry/black-ledger /app/black-ledger
-COPY chummer-design/products/chummer/ /app/.codex-design/product/
+COPY --from=design-product products/chummer/ /app/.codex-design/product/
 ENV ASPNETCORE_URLS=http://+:8080
 ENTRYPOINT ["dotnet", "Chummer.Run.Api.dll"]

@@ -8,7 +8,7 @@ COPY chummer.run-services/Chummer.Run.Contracts/Chummer.Run.Contracts.csproj chu
 COPY chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj chummer.run-services/Chummer.Play.Contracts/
 COPY chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj chummer-core-engine/Chummer.Contracts/
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj chummer-hub-registry/Chummer.Hub.Registry.Contracts/
-COPY --from=fleet-media-factory src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
+COPY --from=fleet-media-factory-contracts Chummer.Media.Contracts.csproj fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 RUN dotnet restore chummer.run-services/Chummer.Run.Identity/Chummer.Run.Identity.csproj
 COPY chummer.run-services/Chummer.Run.Identity/ chummer.run-services/Chummer.Run.Identity/
 COPY chummer.run-services/Chummer.Control.Contracts/ chummer.run-services/Chummer.Control.Contracts/
@@ -16,7 +16,7 @@ COPY chummer.run-services/Chummer.Run.Contracts/ chummer.run-services/Chummer.Ru
 COPY chummer.run-services/Chummer.Play.Contracts/ chummer.run-services/Chummer.Play.Contracts/
 COPY chummer-core-engine/Chummer.Contracts/ chummer-core-engine/Chummer.Contracts/
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/ chummer-hub-registry/Chummer.Hub.Registry.Contracts/
-COPY --from=fleet-media-factory src/Chummer.Media.Contracts/ fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
+COPY --from=fleet-media-factory-contracts . fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 WORKDIR /src/chummer.run-services/Chummer.Run.Identity
 RUN nice -n 10 dotnet build /src/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
  && nice -n 10 dotnet build /src/chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \

@@ -70,7 +70,7 @@ services:
       context: /docker/chummercomplete
       dockerfile: chummer.run-services/Chummer.Run.Identity/Dockerfile
       additional_contexts:
-        fleet-media-factory: /docker/fleet/repos/chummer-media-factory
+        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
     environment:
@@ -111,7 +111,8 @@ services:
       context: /docker/chummercomplete
       dockerfile: chummer.run-services/Chummer.Run.Api/Dockerfile
       additional_contexts:
-        fleet-media-factory: /docker/fleet/repos/chummer-media-factory
+        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
+        design-product: /docker/chummercomplete/chummer-design
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
     env_file:
