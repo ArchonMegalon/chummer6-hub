@@ -6,6 +6,25 @@ from pathlib import Path
 from absolute_completion_common import completion_path, read_json, read_yaml, write_yaml
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PUBLISHED_ROOT = REPO_ROOT / ".codex-studio" / "published"
+
+
+def read_json_with_published_fallback(name: str) -> tuple[dict, Path]:
+    path = completion_path(name)
+    if not path.exists():
+        fallback = PUBLISHED_ROOT / name
+        if fallback.exists():
+            path = fallback
+        else:
+            return {}, path
+
+    payload = read_json(path)
+    if isinstance(payload, dict):
+        return payload, path
+    return {}, path
+
+
 def claim_entry(claim: str, file_or_route: str, required_proof: str, proof_path: Path, verdict: str) -> dict:
     return {
         "claim": claim,
@@ -24,6 +43,7 @@ def main() -> int:
     receipt_proof = read_json(completion_path("RECEIPT_ROUTE_POSITIVE_PROOF.generated.json"))
     package_proof = read_json(completion_path("PACKAGE_ROUTE_AND_API_AUDIT.generated.json"))
     mobile_proof = read_json(completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"))
+    blazor_bridge, blazor_bridge_path = read_json_with_published_fallback("BLAZOR_EXECUTION_HORIZON_BRIDGE.generated.json")
     screenshot_manifest = read_yaml(completion_path("PUBLIC_SCREENSHOT_MANIFEST.generated.yaml"))
     provider_scan = read_json(completion_path("PUBLIC_FORBIDDEN_STRING_SCAN.generated.json"))
     download_authority = read_json(completion_path("PUBLIC_DOWNLOAD_AUTHORITY.generated.json"))
@@ -57,6 +77,17 @@ def main() -> int:
             "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json + PUBLIC_SCREENSHOT_MANIFEST.generated.yaml",
             completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"),
             "supported" if mobile_proof.get("status") == "pass" and screenshot_manifest.get("status") == "pass" else "unsupported",
+        ),
+        claim_entry(
+            "Mobile PWA readiness and Blazor hosted play-shell execution horizon are integrated without upgrading smoke proof into a full live public-edge matrix claim.",
+            "/mobile, /play, /blazor",
+            "BLAZOR_EXECUTION_HORIZON_BRIDGE.generated.json",
+            blazor_bridge_path,
+            "supported"
+            if blazor_bridge.get("status") == "pass"
+            and (blazor_bridge.get("boundaries") or {}).get("does_not_upgrade_smoke_to_full") is True
+            and (blazor_bridge.get("boundaries") or {}).get("full_matrix_requires_current_passing_full_scope_receipt") is True
+            else "unsupported",
         ),
         claim_entry(
             "Public surfaces avoid provider and LTD names.",
