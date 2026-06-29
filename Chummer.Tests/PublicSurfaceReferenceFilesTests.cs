@@ -85,6 +85,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/feedback/operations", manifest, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations/lookup", manifest, StringComparison.Ordinal);
         Assert.Contains("/alice", manifest, StringComparison.Ordinal);
+        Assert.Contains("/build", manifest, StringComparison.Ordinal);
         Assert.Contains("/alice/receipts/build-ghost.json", manifest, StringComparison.Ordinal);
         Assert.Contains("/table-pulse", manifest, StringComparison.Ordinal);
         Assert.Contains("/table-pulse/receipts/live-and-aftermath.json", manifest, StringComparison.Ordinal);

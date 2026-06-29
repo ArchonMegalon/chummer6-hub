@@ -81,7 +81,7 @@ const checks = [
       && text.includes('Pick the next step.')
       && text.includes('Install or update')
       && text.includes('Account recovery')
-      && text.includes('Private support')
+      && text.includes('Contact')
       && text.includes('Read the FAQ')
   },
   {
@@ -121,13 +121,12 @@ const checks = [
   {
     url: `${baseUrl}/contact`,
     assert: text =>
-      (text.includes('Discord for normal questions. Private form when needed.')
-        || text.includes('Discord first. Private form if needed.'))
-      && text.includes('Discord')
-      && text.includes('Private form for account or crash details')
-      && text.includes('Open private form')
-      && text.includes('Discord or private')
-      && text.includes('Send support request')
+      text.includes('Use the Chummer5 Discord server.')
+      && text.includes('Normal questions and feedback belong in the Chummer5 server.')
+      && text.includes('Chummer5 Discord')
+      && text.includes('Open Discord')
+      && !text.includes('Open private form')
+      && !text.includes('Send support request')
   },
   {
     url: `${baseUrl}/account/billing`,
@@ -139,7 +138,8 @@ const checks = [
     assert: text =>
       text.includes('What should Chummer do next?')
       && text.includes('Public requests, clear bugs, useful ideas.')
-      && !text.includes('data-chummer-participate-frame')
+      && text.includes('Current requests')
+      && text.includes('Board is live.')
       && !text.includes('data-chummer-board-skin')
       && !text.includes('ProductLift')
       && !text.includes('Something went wrong')
@@ -150,6 +150,7 @@ const checks = [
     assert: (text, response) =>
       /\/participate\/board\/?\?embed=1$/.test(response.url)
       && text.includes('<base href="/participate/board/"')
+      && text.includes('Chummer.run')
       && !text.includes('productlift.dev')
       && !text.includes('support@productlift.dev')
   },

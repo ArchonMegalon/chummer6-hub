@@ -2762,6 +2762,13 @@ public sealed class PublicSignalOperationsService
 
     private static ProductLiftRoutingReceiptState NormalizeStoredRoutingReceipt(ProductLiftRoutingReceiptState receipt)
     {
+        string targetPath = NormalizeOptional(receipt.TargetPath) ?? "/help";
+        if (targetPath.StartsWith("/contact#support-intake", StringComparison.OrdinalIgnoreCase)
+            || targetPath.Contains("#support-intake", StringComparison.OrdinalIgnoreCase))
+        {
+            targetPath = "/contact";
+        }
+
         return receipt with
         {
             ReceiptId = NormalizeOptional(receipt.ReceiptId) ?? $"plroute_{Guid.NewGuid():N}",
@@ -2769,7 +2776,7 @@ public sealed class PublicSignalOperationsService
             SourceReceiptId = NormalizeOptional(receipt.SourceReceiptId) ?? "unknown",
             RouteKind = NormalizeOptional(receipt.RouteKind) ?? "support_handoff",
             StatusLabel = NormalizeOptional(receipt.StatusLabel) ?? "First-party help review",
-            TargetPath = NormalizeOptional(receipt.TargetPath) ?? "/help",
+            TargetPath = targetPath,
             Summary = NormalizeOptional(receipt.Summary) ?? "Public signal was redirected to a calmer first-party boundary."
         };
     }
@@ -2995,7 +3002,7 @@ public sealed class PublicSignalOperationsService
         {
             routeKind = "moderation_review";
             statusLabel = category.SupportMisrouteLikely ? "Moderation and help review" : "Moderation review required";
-            targetPath = "/contact#support-intake";
+            targetPath = "/contact";
         }
         else
         {

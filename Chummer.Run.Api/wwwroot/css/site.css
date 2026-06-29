@@ -8874,6 +8874,32 @@ body {
   border-color: var(--minimal-line);
 }
 
+.surface-minimal .site-open-chummer-menu .site-account-menu__summary {
+  min-height: 36px;
+  padding: 0.55rem 0.85rem;
+  border-color: var(--minimal-line);
+  background: rgba(247, 240, 223, 0.055);
+  color: var(--minimal-ink);
+  font-weight: 600;
+}
+
+.surface-minimal .site-open-chummer-menu .site-account-menu__panel {
+  left: 0;
+  right: auto;
+  min-width: 11rem;
+  border-color: var(--minimal-line);
+  background: var(--minimal-surface);
+}
+
+.surface-minimal .site-open-chummer-menu .site-account-menu__link {
+  color: var(--minimal-ink);
+}
+
+.surface-minimal .site-open-chummer-menu .site-account-menu__link:hover,
+.surface-minimal .site-open-chummer-menu .site-account-menu__link:focus-visible {
+  background: rgba(247, 240, 223, 0.08);
+}
+
 .surface-minimal .site-footer {
   margin-top: 0.9rem;
   background: var(--minimal-surface);

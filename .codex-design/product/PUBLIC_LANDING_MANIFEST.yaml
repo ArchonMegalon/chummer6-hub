@@ -679,6 +679,15 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: first-party build compare entry with bounded public-safe framing and real first-party runtime ownership
+- path: /build
+  title: Build
+  audience: public
+  purpose: build_entry
+  requires_auth: false
+  guest_fallback: /build
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: guided build entry with public-safe framing and first-party runtime ownership
 - path: /alice/receipts/build-ghost.json
   title: ALICE build ghost receipt
   audience: public

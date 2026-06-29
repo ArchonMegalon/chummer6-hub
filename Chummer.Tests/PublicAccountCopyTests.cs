@@ -24,8 +24,8 @@ public sealed class PublicAccountCopyTests
         Assert.Contains("title: Claim your copy", manifest, StringComparison.Ordinal);
         Assert.Contains("Claim your copy only when you want recovery or linked installs.", trustContent, StringComparison.Ordinal);
         Assert.Contains("Claiming your copy gives you a recovery path and linked installs when you want them.", trustContent, StringComparison.Ordinal);
-        Assert.Contains("Discord first. Private form if needed.", trustContent, StringComparison.Ordinal);
-        Assert.Contains("Use Discord for normal questions. Use Contact for private details.", trustContent, StringComparison.Ordinal);
+        Assert.Contains("Use the Chummer5 Discord server.", trustContent, StringComparison.Ordinal);
+        Assert.Contains("Use Contact to reach the Chummer5 Discord server.", trustContent, StringComparison.Ordinal);
         Assert.Contains("Private help stays private", trustContent, StringComparison.Ordinal);
         Assert.Contains("No. You can get help without using Participate.", trustContent, StringComparison.Ordinal);
         Assert.Contains(">Open Chummer</a>", nowView, StringComparison.Ordinal);
@@ -79,10 +79,10 @@ public sealed class PublicAccountCopyTests
     {
         string trustPageView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml"));
 
-        Assert.Contains("Title: \"Discord\"", trustPageView, StringComparison.Ordinal);
+        Assert.Contains("Title: \"Chummer5 Discord\"", trustPageView, StringComparison.Ordinal);
         Assert.Contains("Label: \"Open Discord\"", trustPageView, StringComparison.Ordinal);
-        Assert.Contains("Title: \"Private message\"", trustPageView, StringComparison.Ordinal);
-        Assert.Contains("Label: \"Open private form\"", trustPageView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Title: \"Private form\"", trustPageView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label: \"Open private form\"", trustPageView, StringComparison.Ordinal);
 
         Assert.DoesNotContain("Id: \"public-feedback\"", trustPageView, StringComparison.Ordinal);
         Assert.DoesNotContain("Title: \"Public bugs and requests\"", trustPageView, StringComparison.Ordinal);

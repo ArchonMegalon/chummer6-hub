@@ -610,13 +610,14 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("Use notes:", packages, StringComparison.Ordinal);
         Assert.DoesNotContain("tracked follow-through", packages, StringComparison.Ordinal);
 
-        Assert.Contains("id=\"support-intake\"", trustPage, StringComparison.Ordinal);
-        Assert.Contains("Send support request", trustPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"support-intake\"", trustPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Send support request", trustPage, StringComparison.Ordinal);
         Assert.DoesNotContain("human escalation", trustPage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Browser handoff", trustPage, StringComparison.Ordinal);
 
-        Assert.Contains("Use support for private problems", faq, StringComparison.Ordinal);
-        Assert.Contains("Open support", faq, StringComparison.Ordinal);
+        Assert.Contains("Use contact when a human answer helps", faq, StringComparison.Ordinal);
+        Assert.Contains("Open contact", faq, StringComparison.Ordinal);
+        Assert.DoesNotContain("Use support for private problems", faq, StringComparison.Ordinal);
         Assert.DoesNotContain("support follow-through", faq, StringComparison.Ordinal);
 
         Assert.Contains("command carry-forward", ledgerNotifications, StringComparison.Ordinal);
@@ -1268,7 +1269,7 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void ContactSupportPageUsesDiscordBeforePrivateIntake()
+    public void ContactPageUsesDiscordOnly()
     {
         string trustViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
@@ -1276,21 +1277,20 @@ public sealed class PublicLandingReleaseTrustViewTests
         string trustView = File.ReadAllText(trustViewPath);
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("Title: \"Discord\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("Title: \"Chummer5 Discord\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Href: \"https://discord.gg/chummer\"", trustView, StringComparison.Ordinal);
         Assert.Contains("Label: \"Open Discord\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Private form if needed.", controller, StringComparison.Ordinal);
-        Assert.Contains("Discord for normal questions. Private form for account or crash details.", trustView, StringComparison.Ordinal);
-        Assert.Contains("Title: \"Private form\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Label: \"Open private form\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("placeholder=\"Installer opens, then stops\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("placeholder=\"I expected the app to start. It did not.\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("placeholder=\"What did you try, what happened, and what should I check first?\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("placeholder=\"Version or build, if visible\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("placeholder=\"Desktop app, if visible\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("authenticated ? \"Open account support\" : \"Open private form\"", controller, StringComparison.Ordinal);
-        Assert.Contains("Normal questions are quicker on Discord.", controller, StringComparison.Ordinal);
+        Assert.Contains("Use the Chummer5 Discord server.", controller, StringComparison.Ordinal);
+        Assert.Contains("Normal questions and feedback belong in the Chummer5 server.", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Title: \"Private form\"", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Label: \"Open private form\"", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("placeholder=\"Installer opens, then stops\"", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("placeholder=\"I expected the app to start. It did not.\"", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("placeholder=\"What did you try, what happened, and what should I check first?\"", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("placeholder=\"Version or build, if visible\"", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("placeholder=\"Desktop app, if visible\"", trustView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Normal questions are quicker on Discord.", trustView, StringComparison.Ordinal);
         Assert.DoesNotContain("Save support history", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("saved support history", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("Choose one", trustView, StringComparison.Ordinal);

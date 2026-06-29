@@ -1207,7 +1207,7 @@ def verify_signed_in_work_audit(
     signed_in_minimal_expectations = {
         "/downloads": ("Install Chummer", "Stable", "Nightly"),
         "/now": ("Current build", "Known issues and install help"),
-        "/help": ("What is wrong?", "Open support intake"),
+        "/help": ("What is wrong?", "Open contact"),
     }
     for signed_in_path, expected_snippets in signed_in_minimal_expectations.items():
         status, body, _, _ = fetch(
@@ -12039,22 +12039,22 @@ def main() -> int:
         AuditRoute(
             "/help",
             "What is wrong?",
-            required_texts=("Open downloads", "Open support", "Claim your copy"),
+            required_texts=("Open downloads", "Open contact", "Claim your copy"),
             expects_header_count=1),
         AuditRoute(
             "/faq",
             "Plain answers before you spend more time",
-            required_texts=("Open downloads", "Open support", "Claim your copy"),
+            required_texts=("Open downloads", "Open contact", "Claim your copy"),
             expects_header_count=1),
         AuditRoute(
             "/contact",
             "Contact",
-            required_texts=("Send support request", "Open private form", "Open downloads"),
+            required_texts=("Use the Chummer5 Discord server", "Open Discord", "Chummer5 Discord"),
             expects_header_count=1),
         AuditRoute(
             "/privacy",
             "What Chummer stores, and what it does not",
-            required_texts=("Open support", "Install linking", "What stays out"),
+            required_texts=("Open contact", "Install linking", "What stays out"),
             expects_header_count=1),
         AuditRoute(
             "/terms",

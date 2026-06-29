@@ -13,8 +13,8 @@ trust_pages:
       - "Private help stays private"
       - "Downloads and setup stay clear"
     actions:
-      - label: "Open support"
-        href: "/contact#support-intake"
+      - label: "Open contact"
+        href: "/contact"
         tone: primary
       - label: "Open downloads"
         href: "/downloads"
@@ -39,11 +39,11 @@ trust_pages:
           - "Claim only when you want recovery."
       - id: product-bug
         eyebrow: "Bug report"
-        heading: "Private support"
-        body: "Use Contact for crashes, install trouble, or account details."
+        heading: "Contact"
+        body: "Use Discord for normal questions, confusing behavior, and quick feedback."
         bullets:
-          - "One issue per message."
-          - "Use Discord for normal questions."
+          - "The Chummer community is already there."
+          - "Keep account details out of public chat."
       - id: product-question
         eyebrow: "Product question"
         heading: "FAQ"
@@ -68,8 +68,8 @@ trust_pages:
       - label: "Read terms"
         href: "/terms"
         tone: secondary
-      - label: "Open support"
-        href: "/contact#support-intake"
+      - label: "Open contact"
+        href: "/contact"
         tone: ghost
     sections:
       - id: hosted-account
@@ -123,32 +123,24 @@ trust_pages:
   - id: contact
     eyebrow: "Contact"
     heading: "Contact"
-    intro: "Discord first. Private form if needed."
+    intro: "Use the Chummer5 Discord server."
     effective_date: "2026-03-25"
     updated_date: "2026-03-25"
     summary_points:
       - "Discord for normal questions"
-      - "Private form for account or crash details"
-      - "Account history if you sign in"
+      - "Quick feedback belongs there too"
     actions:
       - label: "Open Discord"
         href: "https://discord.gg/chummer"
         tone: primary
-      - label: "Private support"
-        href: "/contact#support-intake"
-        tone: secondary
       - label: "Read help first"
         href: "/help"
-        tone: ghost
+        tone: secondary
     sections:
       - id: discord
         eyebrow: "Discord"
         heading: "Use the Chummer5 server for normal contact"
         body: "Questions, quick feedback, and normal discussion belong in Discord where the Chummer community already is."
-      - id: tracked-support
-        eyebrow: "Private"
-        heading: "Use the form only when Discord is the wrong place"
-        body: "Install failures, crashes, screenshots, logs, or account details should stay private. The form is for those cases."
 faq_pages:
   - id: faq
     eyebrow: "FAQ"
@@ -158,8 +150,8 @@ faq_pages:
       - label: "Open downloads"
         href: "/downloads"
         tone: primary
-      - label: "Open support"
-        href: "/contact#support-intake"
+      - label: "Open contact"
+        href: "/contact"
         tone: secondary
       - label: "Claim your copy"
         href: "/signup?next=/home"
@@ -180,12 +172,12 @@ faq_pages:
           - question: "Does the account change the download file?"
             answer: "No. The published package stays the same for everyone. Account linking is separate from the file itself."
           - question: "Where do I go if install or update goes sideways?"
-            answer: "Start with Downloads, then use Contact or Account > Support."
+            answer: "Start with Downloads, then use Discord through Contact if you still need a human answer."
       - title: "Participation and help"
         entries:
           - question: "What went wrong?"
-            answer: "Use Discord for normal questions. Use Contact for private details."
+            answer: "Use Contact to reach the Chummer5 Discord server."
           - question: "Do I need to participate to help or report a bug?"
             answer: "No. You can get help without using Participate."
           - question: "Can I get help without another account?"
-            answer: "Yes. Use Discord or Contact. Claim your copy only when recovery matters."
+            answer: "Yes. Use Discord through Contact. Claim your copy only when recovery matters."

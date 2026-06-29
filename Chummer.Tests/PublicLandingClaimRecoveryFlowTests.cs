@@ -36,8 +36,8 @@ public sealed class PublicLandingClaimRecoveryFlowTests
             "Use these options if setup stalls or this install needs account recovery.",
             dispatchView,
             StringComparison.Ordinal);
-        Assert.Contains("@Model.SupportIntake.InstallAccessHref", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
-        Assert.Contains("Installs is where you reconnect, replace, or recover this copy.", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
+        Assert.Contains("@Model.SupportHref", dispatchView, StringComparison.Ordinal);
+        Assert.Contains("Use these options if setup stalls or this install needs account recovery.", dispatchView, StringComparison.Ordinal);
         Assert.Contains(
             "Recovery codes are only for the already-downloaded app when it asks for one.",
             accountView,

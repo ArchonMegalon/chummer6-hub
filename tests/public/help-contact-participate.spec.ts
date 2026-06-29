@@ -51,12 +51,14 @@ test('help, contact, and participate keep public and private paths clear', async
   expect(contactRobots).toContain('index');
   expect(participateText).toContain('What should Chummer do next?');
   expect(participateText).toContain('Public requests, clear bugs, useful ideas.');
-  expect(participateText).not.toContain('data-chummer-participate-frame');
+  expect(participateText).toContain('data-chummer-participate-frame');
+  expect(participateText).toContain('/participate/board?embed=1');
   expect(participateText).not.toContain('ProductLift');
   expect(new URL(participateBoardResponse.url()).pathname).toBe('/participate');
   expect(participateBoardText).toContain('What should Chummer do next?');
   expect(participateBoardText).toContain('Public requests, clear bugs, useful ideas.');
-  expect(participateBoardText).not.toContain('data-chummer-participate-frame');
+  expect(participateBoardText).toContain('data-chummer-participate-frame');
+  expect(participateBoardText).toContain('/participate/board?embed=1');
   expect(participateBoardText).not.toContain('ProductLift');
   expect(new URL(participateFrameResponse.url()).pathname).toBe('/participate/board');
   expect(new URL(participateFrameResponse.url()).search).toContain('embed=1');
@@ -74,19 +76,20 @@ test('help, contact, and participate keep public and private paths clear', async
 
   const contactPage = await openPublicPage(browser, '/contact');
   await expect(contactPage.getByRole('heading', { name: 'Contact' })).toBeVisible();
-  await expect(contactPage.locator('body')).toContainText('Discord first. Private form if needed.');
-  await expect(contactPage.locator('body')).toContainText('Discord for normal questions. Private form for account or crash details.');
+  await expect(contactPage.locator('body')).toContainText('Use the Chummer5 Discord server.');
+  await expect(contactPage.locator('body')).toContainText('Normal questions and feedback belong in the Chummer5 server.');
   await expect(contactPage.locator('body')).not.toContainText('Public ideas go to Participate. Private problems stay here.');
   await expect(contactPage.locator('body')).not.toContainText('Public requests belong on Participate.');
   await expect(contactPage.getByRole('link', { name: 'Open Discord' })).toBeVisible();
-  await expect(contactPage.getByRole('link', { name: 'Open private form' })).toBeVisible();
+  await expect(contactPage.getByRole('link', { name: 'Open private form' })).toHaveCount(0);
   await contactPage.close();
 
   const participatePage = await openPublicPage(browser, '/participate');
   await expect(participatePage.getByRole('heading', { name: 'What should Chummer do next?' })).toBeVisible();
   await expect(participatePage.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
   await expect(participatePage.locator('body')).not.toContainText('Board offline right now');
-  await expect(participatePage.locator('[data-chummer-participate-frame]')).toHaveCount(0);
+  await expect(participatePage.locator('[data-chummer-participate-frame]')).toHaveCount(1);
+  await expect(participatePage.locator('[data-chummer-participate-frame]')).toHaveAttribute('src', '/participate/board?embed=1');
   await expect(participatePage.locator('body')).not.toContainText('ProductLift');
   await participatePage.close();
 
@@ -100,6 +103,6 @@ test('help, contact, and participate keep public and private paths clear', async
     help_robots: helpRobots,
     contact_robots: contactRobots,
     participate_robots: participateRobots,
-    participate_mode: 'first_party_productlift_proxy',
+    participate_mode: 'first_party_embedded_board',
   });
 });

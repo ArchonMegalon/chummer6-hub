@@ -63,7 +63,8 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 <p>Pick the next step.</p>
                 <p>Install or update</p>
                 <p>Account recovery</p>
-                <p>Private support</p>
+                <p>Contact</p>
+                <a href="/contact">Open contact</a>
                 <a href="/faq">Read the FAQ</a>
                 </body></html>
                 """
@@ -115,13 +116,10 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 """
                 <html><body>
                 <h1>Contact</h1>
-                <p>Discord first. Private form if needed.</p>
-                <p>Discord for normal questions. Private form for account or crash details.</p>
+                <p>Use the Chummer5 Discord server.</p>
+                <p>Normal questions and feedback belong in the Chummer5 server.</p>
                 <a href="https://discord.gg/chummer">Open Discord</a>
-                <a href="/contact#support-intake">Open private form</a>
-                <button>Send support request</button>
-                <p>Discord</p>
-                <p>Discord or private</p>
+                <p>Chummer5 Discord</p>
                 </body></html>
                 """
             )
@@ -159,6 +157,8 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 <h1>What should Chummer do next?</h1>
                 <p>Public requests, clear bugs, useful ideas.</p>
                 <h2>Current requests</h2>
+                <p>Board is live.</p>
+                <iframe src="/participate/frame" data-chummer-participate-frame></iframe>
                 <a href="/participate/p/better-roster-ux-ab12">Better roster UX</a>
                 </body></html>
                 """
@@ -177,7 +177,7 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                     """
                     <html>
                     <head><base href="/participate/board/" /></head>
-                    <body><p>embedded first-party board</p></body>
+                    <body><p>Chummer.run</p><p>embedded first-party board</p></body>
                     </html>
                     """
                 )

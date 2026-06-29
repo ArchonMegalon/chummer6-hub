@@ -398,7 +398,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     );
     assert.equal(await readFirstHref(page, 'a.button-like[href="/terms"]', '/privacy terms link'), '/terms');
     assert.equal(await readFirstHref(page, 'a.button-like[href="/help"]', '/privacy help link'), '/help');
-    assert.equal(await readFirstHref(page, 'a.button-like[href="/contact#support-intake"]', '/privacy support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/contact"]', '/privacy support link'), '/contact');
     await assertNoBannedCopy(page, '/privacy');
   });
 
@@ -436,7 +436,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
       `/help downloads link should stay on a bounded install or signed-in return route, got ${helpDownloadsNext}.`
     );
     assert.equal(await readFirstHref(page, 'a[href="/faq"]', '/help faq link'), '/faq');
-    assert.equal(await readFirstHref(page, 'a[href="/contact#support-intake"]', '/help support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a[href="/contact"]', '/help support link'), '/contact');
     await assertNoBannedCopy(page, '/help');
   });
 
@@ -471,11 +471,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
     await expectVisible(page, 'text=Contact');
-    await expectVisible(page, 'text=Discord first. Private form if needed.');
-    await expectVisible(page, 'text=Discord for normal questions. Private form for account or crash details.');
-    await expectVisible(page, 'text=Open private form');
-    await page.locator('summary:has-text("Private message")').click();
-    await expectVisible(page, 'text=Send support request');
+    await expectVisible(page, 'text=Use the Chummer5 Discord server.');
+    await expectVisible(page, 'text=Normal questions and feedback belong in the Chummer5 server.');
+    await expectVisible(page, 'text=Open Discord');
   });
   await gotoAndAssert(
     page,
@@ -483,35 +481,19 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     '/contact?kind=install_help&title=Mobile%20follow-through%20needs%20grounded%20runtime&summary=Scene%20resume%20needs%20support%20review&detail=Session%3A%20session-redmond&sessionId=session-redmond&sceneId=scene-redmond&runtime=sr6.preview.v1&bundle=bundle-redmond',
     async () => {
       await expectVisible(page, 'text=Contact');
-      await page.locator('summary:has-text("Private message")').click();
-      assert.equal(await page.locator('#supportKind').inputValue(), 'install_help', 'Prefilled contact route should preserve the support kind.');
-      assert.equal(await page.locator('#supportTitle').inputValue(), 'Mobile follow-through needs grounded runtime', 'Prefilled contact route should preserve the support title.');
-      assert.equal(await page.locator('#supportSummary').inputValue(), 'Scene resume needs support review', 'Prefilled contact route should preserve the support summary.');
-      assert.equal(await page.locator('#supportDetail').inputValue(), 'Session: session-redmond', 'Prefilled contact route should preserve the support detail.');
-      await page.getByText('Optional environment details').click();
-      await expectVisible(page, 'text=Context opened with session session-redmond · scene scene-redmond · app sr6.preview.v1 · bundle bundle-redmond.');
+      await expectVisible(page, 'text=Use the Chummer5 Discord server.');
+      await expectVisible(page, 'text=Open Discord');
+      assert.equal(await page.locator('#support-intake').count(), 0, 'Public contact route should not expose private support intake.');
     });
   await gotoAndAssert(page, pageErrors, '/contact', async () => {
     await expectVisible(page, 'text=Contact');
+    await expectVisible(page, 'text=Use the Chummer5 Discord server.');
+    await expectVisible(page, 'text=Open Discord');
+    assert.equal(await page.locator('#support-intake').count(), 0, 'Public contact route should stay Discord-only.');
   });
-  await page.locator('summary:has-text("Private message")').click();
-  await page.selectOption('#supportKind', 'bug_report');
-  await page.fill('#supportTitle', 'Guest support intake smoke');
-  await page.fill('#supportSummary', 'Guest support submission should land on the first-party confirmation page.');
-  await page.fill('#supportDetail', 'Browser harness is validating the public support intake route, reply-email requirement, and confirmation flow.');
-  await page.fill('#supportReplyEmail', uniqueEmail);
-  await page.getByText('Optional environment details').click();
-  await page.fill('#supportPlatform', 'Linux');
-  await page.fill('#supportVersion', 'preview-smoke');
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-    page.getByRole('button', { name: /Send support request/i }).click()
-  ]);
-  assert(/\/contact\/submitted\/support_case_/i.test(page.url()), 'Public contact form should redirect to the support confirmation route.');
-  await expectVisible(page, 'text=Support case received');
-  await expectVisible(page, 'text=Watch your reply email');
-  await assertNoBannedCopy(page, 'Public support confirmation');
-  await assertNoPageErrors(page, pageErrors, 'Public support confirmation');
+  assert.equal(await page.getByRole('button', { name: /Send support request/i }).count(), 0, 'Public contact should not submit support cases.');
+  await assertNoBannedCopy(page, 'Public contact');
+  await assertNoPageErrors(page, pageErrors, 'Public contact');
 
   await gotoAndAssert(page, pageErrors, '/now', async () => {
     await expectVisible(page, 'text=Current release');
@@ -8209,7 +8191,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Compare with current proof');
     await expectVisible(page, 'text=Need a decision instead?');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/roadmap/nexus-pan compare link'), '/now');
-    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/roadmap/nexus-pan support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact"]', '/roadmap/nexus-pan support link'), '/contact');
     await assertNoBannedCopy(page, '/roadmap/nexus-pan');
   });
 
@@ -8219,7 +8201,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=See the world-state foundation');
     await expectVisible(page, 'text=Need a decision instead?');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/roadmap/black-ledger"]', '/roadmap/shadowcasters-network primary link'), '/roadmap/black-ledger');
-    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/roadmap/shadowcasters-network support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact"]', '/roadmap/shadowcasters-network support link'), '/contact');
     await assertNoBannedCopy(page, '/roadmap/shadowcasters-network');
   });
 
@@ -8229,7 +8211,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=See the related artifact preview');
     await expectVisible(page, 'text=Need a decision instead?');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/artifacts/replay-after-action"]', '/roadmap/black-ledger primary link'), '/artifacts/replay-after-action');
-    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/roadmap/black-ledger support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact"]', '/roadmap/black-ledger support link'), '/contact');
     await assertNoBannedCopy(page, '/roadmap/black-ledger');
   });
 
@@ -8241,7 +8223,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Open current release');
     await expectVisible(page, 'text=Open support');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/artifacts/current-preview-build release link'), '/now');
-    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/artifacts/current-preview-build support link'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact"]', '/artifacts/current-preview-build support link'), '/contact');
     await assertNoBannedCopy(page, '/artifacts/current-preview-build');
   });
 

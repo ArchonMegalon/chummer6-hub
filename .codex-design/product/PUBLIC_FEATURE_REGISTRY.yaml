@@ -719,11 +719,11 @@ cards:
     bucket: participate
     title: Report a problem
     summary: Use the public support path when you want to flag a bug, confusing copy, or a concrete improvement.
-    href: /contact#support-intake
+    href: /contact
     badge: Public
     audience: public
     image_family: archive_stair
-    action_label: Open support intake
+    action_label: Open contact
   - id: participate_future
     bucket: participate
     title: Start KARMA FORGE discovery

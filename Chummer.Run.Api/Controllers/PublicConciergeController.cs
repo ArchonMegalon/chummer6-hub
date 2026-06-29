@@ -159,7 +159,7 @@ public sealed class PublicConciergeController : Controller
                         "secondary"),
                     SecondaryAction: new TrustPageActionViewModel(
                         "Ask invite questions",
-                        "/contact?kind=campaign_invite&title=Need%20campaign%20invite%20help&summary=Need%20invite%20or%20primer%20follow-up#support-intake",
+                        "/contact",
                         "ghost")),
                 new CampaignInvitePrimerSectionViewModel(
                     Id: "session-zero",
@@ -174,7 +174,7 @@ public sealed class PublicConciergeController : Controller
                     ],
                     PrimaryAction: new TrustPageActionViewModel(
                         "Request session-zero help",
-                        "/contact?kind=session_zero&title=Request%20session%20zero%20help&summary=Need%20a%20short%20session%20zero%20or%20invite%20briefing#support-intake",
+                        "/contact",
                         "ghost"),
                     SecondaryAction: new TrustPageActionViewModel("Open help", "/help", "secondary"))
             ],

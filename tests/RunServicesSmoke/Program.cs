@@ -3259,18 +3259,16 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedArtifactDetailModel?.TrustPulse is not null, "authenticated artifact detail should keep the weekly public trust pulse visible.");
     Assert(authenticatedArtifactDetailModel?.SignedInStatus is not null, "authenticated artifact detail should project the shared signed-in trust status.");
     var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
-    var participateModel = participateView?.Model as ParticipatePageViewModel;
+    var participateModel = participateView?.Model as FirstPartyParticipateBoardViewModel;
     Assert(participateModel is not null, "participate page should render through the MVC view layer.");
-    Assert(participateModel!.Lanes.Any(static lane => string.Equals(lane.Label, "Idea", StringComparison.Ordinal) && string.Equals(lane.Href, "#participate-submit", StringComparison.Ordinal)), "participate page should keep ideas on the first-party submit panel.");
-    Assert(participateModel.Lanes.Any(static lane => string.Equals(lane.Label, "Bug", StringComparison.Ordinal) && string.Equals(lane.Href, "/contact#support-intake", StringComparison.Ordinal)), "participate page should route private or support-shaped bugs to Help.");
-    Assert(participateModel.Items.Any(static item => item.Title.Contains("Readable dark mode", StringComparison.OrdinalIgnoreCase)), "participate page should show current public ideas without leaving the site.");
-    Assert(string.Equals(participateModel.PrivateHelpHref, "/contact#support-intake", StringComparison.Ordinal), "participate page should keep private help first-party.");
+    Assert(string.Equals(participateModel!.Heading, "What should Chummer do next?", StringComparison.Ordinal), "participate page should keep the first-party prompt.");
+    Assert(participateModel.Posts.Any(static item => item.Title.Contains("Readable dark mode", StringComparison.OrdinalIgnoreCase)), "participate page should show current public ideas without leaving the site.");
+    Assert(string.Equals(participateModel.SupportHref, "/contact", StringComparison.Ordinal), "participate page should route support-shaped issues to Contact.");
     Assert(string.Equals(participateModel.RoadmapHref, "/roadmap", StringComparison.Ordinal), "participate page should keep roadmap first-party.");
-    Assert(string.Equals(participateModel.ChangelogHref, "/changelog", StringComparison.Ordinal), "participate page should keep changelog first-party.");
     var authenticatedParticipateView = await authenticatedLandingController.ParticipatePage(CancellationToken.None) as ViewResult;
-    var authenticatedParticipateModel = authenticatedParticipateView?.Model as ParticipatePageViewModel;
+    var authenticatedParticipateModel = authenticatedParticipateView?.Model as FirstPartyParticipateBoardViewModel;
     Assert(authenticatedParticipateModel is not null, "authenticated participate page should render through the MVC view layer.");
-    Assert(authenticatedParticipateModel!.Lanes.Any(static lane => string.Equals(lane.Label, "Roadmap", StringComparison.Ordinal) && string.Equals(lane.Href, "/roadmap", StringComparison.Ordinal)), "authenticated participate page should use the same first-party public routes.");
+    Assert(string.Equals(authenticatedParticipateModel!.RoadmapHref, "/roadmap", StringComparison.Ordinal), "authenticated participate page should use the same first-party public routes.");
     var privacyPage = trustContent.BuildPrivacyPage(chrome.BuildPublicChrome("Privacy", "What Chummer stores, and what it does not.", "/privacy"));
     Assert(privacyPage.Actions.Any(static action => string.Equals(action.Label, "Create account", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "privacy page should adapt account-only actions into signup-first actions for guests.");
     var publicPrivacyView = await controller.PrivacyPage(CancellationToken.None) as ViewResult;
@@ -5770,8 +5768,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHorizonsModel?.TrustPulse is not null, "authenticated horizons page should keep the weekly public trust pulse visible.");
     Assert(authenticatedHorizonsModel?.SignedInStatus is not null, "authenticated horizons page should project the shared signed-in trust status.");
 
-    Assert(participateModel!.Lanes.Any(static lane => string.Equals(lane.Label, "Idea", StringComparison.Ordinal) && string.Equals(lane.Href, "#participate-submit", StringComparison.Ordinal)), "participate page should keep the first action on the in-page feedback form.");
-    Assert(!participateModel.Items.Any(static item => item.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
+    Assert(string.Equals(participateModel!.Heading, "What should Chummer do next?", StringComparison.Ordinal), "participate page should keep the first-party prompt.");
+    Assert(!participateModel.Posts.Any(static item => item.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
 
     var homeResult = await controller.HomePage(null, CancellationToken.None);
     var homeRedirect = homeResult as RedirectResult;

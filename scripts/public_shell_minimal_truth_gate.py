@@ -94,8 +94,8 @@ ROUTE_CONTRACTS = build_route_contracts(require_brilliant_directories_checkout=F
 
 PARTICIPATE_UNAVAILABLE_REQUIRED_ALL = (
     "The board is unavailable",
-    "Use Contact only for private details.",
-    "Private support",
+    "Use Contact for the Chummer5 Discord server.",
+    "Contact",
 )
 
 

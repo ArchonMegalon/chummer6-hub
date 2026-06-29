@@ -33,10 +33,10 @@ def test_main_public_routes_use_minimal_surface_contract() -> None:
     assert 'if (helpPage || contactPage)' in trust_page
     assert 'return "/downloads";' in trust_page
     assert 'route-choice-grid--compact' in trust_page
-    assert 'Discord or private' in trust_page
-    assert 'Discord for normal questions. Private form for account or crash details.' in trust_page
+    assert '<h2>Discord</h2>' in trust_page
+    assert 'Normal questions and feedback belong in the Chummer5 server.' in trust_page
     assert 'Public ideas go to Participate. Private problems stay here.' not in trust_page
-    assert 'Send support request' in trust_page
+    assert 'Send support request' not in trust_page
     assert 'other routes below' not in trust_page
     assert 'minimal-help-card__list' not in trust_page
     assert 'aria-label="Quick notes"' not in trust_page
@@ -63,13 +63,6 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         "@PublicText(choice.Label)",
         "@PublicText(pageSection.Eyebrow)",
         "@PublicText(pageSection.Body)",
-        "@PublicText(Model.SupportIntake.Heading)",
-        "@PublicText(Model.SupportIntake.Intro)",
-        "@PublicText(Model.SupportIntake.SubmissionNotice)",
-        "@PublicText(option.Label)",
-        "@PublicText(Model.SupportIntake.AccountSupportLabel)",
-        "@PublicText(Model.SupportIntake.InstallAccessLabel)",
-        "@PublicText(Model.SupportIntake.InstallRailLabel)",
     ):
         assert expected in trust_page
 
@@ -124,15 +117,11 @@ def test_help_and_contact_pages_clean_dynamic_copy_before_rendering() -> None:
         assert forbidden not in combined
 
     for expected in (
-        "Installs is where you reconnect, replace, or recover this copy.",
-        "Return to setup",
-        "Go back to setup when you are ready",
         "use this claim code only if Chummer asks for it on that device",
         "Contact",
-        "Discord first. Private form if needed.",
-        "Discord for normal questions. Private form for account or crash details.",
-        "Open private form",
-        "Private form",
+        "Use the Chummer5 Discord server.",
+        "Use Contact to reach the Chummer5 Discord server.",
+        "Chummer5 Discord",
     ):
         assert expected in combined
 
@@ -457,8 +446,8 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "@PublicParticipateText(Model.Heading)" in participate
     assert "@PublicParticipateText(Model.Summary)" in participate
     assert "Board offline right now" in participate
-    assert "Use private support only when it should stay private." in participate
-    assert "Private support" in participate
+    assert "Use Contact for the Chummer5 Discord server." in participate
+    assert "Private support" not in participate
     assert "Supporter" in participate
     assert "Support Chummer" not in participate
     assert "participate-preview-list" not in participate

@@ -426,11 +426,11 @@ public sealed class PublicConciergeService
                 "primary",
                 "Public feedback"),
             ("contact", "private_support") => new ConciergeBranchPresentation(
-                "This needs private support",
-                "Keep logs, account detail, and support history on the private support path.",
-                "Open private support",
+                "This needs contact",
+                "Keep account details out of public chat unless someone asks for them.",
+                "Open contact",
                 "secondary",
-                "Private support"),
+                "Contact"),
             ("contact", "install_continuity") => new ConciergeBranchPresentation(
                 "I need account return",
                 authenticated
@@ -567,31 +567,31 @@ public sealed class PublicConciergeService
         {
             ("downloads", "download_now") => "/downloads#recommended-download",
             ("downloads", "platform_help") => "/downloads#platform-shelf",
-            ("downloads", "setup_help") => "/contact?kind=install_help&title=Setup%20help&summary=Need%20setup%20help#support-intake",
-            ("downloads", "unresolved_setup_issue") => "/contact?kind=install_help&title=Setup%20is%20still%20blocked&summary=Setup%20still%20fails%20after%20using%20the%20current%20installer#support-intake",
+            ("downloads", "setup_help") => "/contact",
+            ("downloads", "unresolved_setup_issue") => "/contact",
             ("now", "watch_whats_new") => "/changelog",
             ("now", "read_notes") => "/now#public-shipped-closeout",
-            ("now", "update_help") => "/contact?kind=install_update&title=Need%20update%20help&summary=Need%20update%20help#support-intake",
-            ("now", "book_help") => "/contact?kind=install_update&title=Update%20is%20still%20blocked&summary=Update%20still%20fails%20after%20using%20the%20current%20build#support-intake",
+            ("now", "update_help") => "/contact",
+            ("now", "book_help") => "/contact",
             ("contact", "public_feedback") => "/feedback",
-            ("contact", "private_support") => "/contact#support-intake",
+            ("contact", "private_support") => "/contact",
             ("contact", "install_continuity") => authenticated ? "/account/access" : "/downloads",
-            ("contact", "human_help") => "/contact?kind=install_help&title=Still%20blocked&summary=Need%20private%20support%20follow-up#support-intake",
+            ("contact", "human_help") => "/contact",
             ("campaign-invite", "continue_join") => authenticated
                 ? "/account/work#community-op-invites"
                 : BuildInviteContinuationRoute(contextId),
             ("campaign-invite", "watch_primer") => BuildInvitePrimerHref("video", contextId),
             ("campaign-invite", "open_primer_packet") => BuildInvitePrimerHref("packet", contextId),
-            ("campaign-invite", "ask_questions") => "/contact?kind=campaign_invite&title=Need%20campaign%20invite%20help&summary=Need%20invite%20or%20primer%20follow-up#support-intake",
-            ("campaign-invite", "session_zero_call") => "/contact?kind=session_zero&title=Request%20session%20zero%20help&summary=Need%20a%20short%20session%20zero%20or%20invite%20briefing#support-intake",
+            ("campaign-invite", "ask_questions") => "/contact",
+            ("campaign-invite", "session_zero_call") => "/contact",
             ("creator-publication", "how_publishing_works") => "/artifacts#public-shared-publications",
-            ("creator-publication", "book_consult") => "/contact?kind=creator_consult&title=Need%20creator%20consult&summary=Request%20a%20creator%20consult#support-intake",
-            ("creator-publication", "submit_interest") => "/contact?kind=creator_interest&title=Submit%20creator%20interest&summary=Need%20creator%20follow-up#support-intake",
+            ("creator-publication", "book_consult") => "/contact",
+            ("creator-publication", "submit_interest") => "/contact",
             ("creator-publication", "open_creator_packet") => string.IsNullOrWhiteSpace(contextId)
                 ? "/artifacts#public-shared-publications"
                 : $"/artifacts/publications/{Uri.EscapeDataString(contextId)}",
-            ("testimonials", "video_review") => "/contact?kind=public_note&title=Share%20video%20note&summary=Want%20to%20leave%20a%20moderated%20video%20testimonial#support-intake",
-            ("testimonials", "audio_review") => "/contact?kind=public_note&title=Share%20audio%20note&summary=Want%20to%20leave%20a%20moderated%20audio%20testimonial#support-intake",
+            ("testimonials", "video_review") => "/contact",
+            ("testimonials", "audio_review") => "/contact",
             ("testimonials", "quick_rating") => "/feedback",
             _ => surface.EntryRoute
         };

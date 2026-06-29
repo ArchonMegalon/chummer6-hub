@@ -43,7 +43,8 @@ public sealed class PublicWebsiteFirstPartyThemeTests
         Assert.DoesNotContain("launcherDesktopLabel", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("launcherWebLabel", layout, StringComparison.Ordinal);
         Assert.Contains("href: /participate", appNavigation, StringComparison.Ordinal);
-        Assert.DoesNotContain("href: /mobile", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("label: PWA", appNavigation, StringComparison.Ordinal);
+        Assert.Contains("href: /mobile", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Get Chummer", appNavigation, StringComparison.Ordinal);
         Assert.DoesNotContain("productlift.dev", appNavigation, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("data-chummer-participate-frame", participateView, StringComparison.Ordinal);

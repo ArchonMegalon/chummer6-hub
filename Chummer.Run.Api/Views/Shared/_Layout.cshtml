@@ -112,6 +112,8 @@
             ? "Download"
             : action.Label;
     }
+    bool isOpenChummerAction(SiteChromeActionViewModel action)
+        => string.Equals(action.Label, "Open Chummer", StringComparison.OrdinalIgnoreCase);
     var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass}".Trim();
     var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "artifacts" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "privacy" or "terms" or "contact"
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
@@ -466,6 +468,19 @@
                                             <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
                                         </form>
                                     }
+                                    else if (isOpenChummerAction(action))
+                                    {
+                                        <details class="site-account-menu site-open-chummer-menu">
+                                            <summary class="site-account-menu__summary">
+                                                <span class="site-account-menu__label">Open Chummer</span>
+                                            </summary>
+                                            <div class="site-account-menu__panel" aria-label="Open Chummer options">
+                                                <a class="site-account-menu__link site-open-chummer-menu__button" href="/build">Build</a>
+                                                <a class="site-account-menu__link site-open-chummer-menu__button" href="/play">Play</a>
+                                                <a class="site-account-menu__link" href="@action.Href">@renderedActionLabel</a>
+                                            </div>
+                                        </details>
+                                    }
                                     else if (action.Current)
                                     {
                                         <span class="action-pill action-pill--current">@renderedActionLabel</span>
@@ -562,6 +577,19 @@
                                     @Html.AntiForgeryToken()
                                     <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
                                 </form>
+                            }
+                            else if (isOpenChummerAction(action))
+                            {
+                                <details class="site-account-menu site-open-chummer-menu">
+                                    <summary class="site-account-menu__summary">
+                                        <span class="site-account-menu__label">Open Chummer</span>
+                                    </summary>
+                                    <div class="site-account-menu__panel" aria-label="Open Chummer options">
+                                        <a class="site-account-menu__link site-open-chummer-menu__button" href="/build">Build</a>
+                                        <a class="site-account-menu__link site-open-chummer-menu__button" href="/play">Play</a>
+                                        <a class="site-account-menu__link" href="@action.Href">@renderedActionLabel</a>
+                                    </div>
+                                </details>
                             }
                             else
                             {

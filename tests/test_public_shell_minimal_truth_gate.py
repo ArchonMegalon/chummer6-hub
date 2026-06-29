@@ -50,8 +50,8 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                       </head>
                       <body>
                         <h1>The board is unavailable</h1>
-                        <p>Use Contact only for private details.</p>
-                        <a href="/contact#support-intake">Private support</a>
+                        <p>Use Contact for the Chummer5 Discord server.</p>
+                        <a href="/contact">Contact</a>
                       </body>
                     </html>
                     """,

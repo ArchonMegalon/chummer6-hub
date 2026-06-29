@@ -1270,6 +1270,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/mobile")]
+    [HttpHead("/mobile")]
     [Produces("text/html")]
     public async Task<IActionResult> MobileProjectionPage(CancellationToken cancellationToken)
     {
@@ -1288,10 +1289,12 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/pwa")]
+    [HttpHead("/pwa")]
     public IActionResult PwaProjectionAlias()
         => Redirect("/mobile");
 
     [HttpGet("/play")]
+    [HttpHead("/play")]
     [Produces("text/html")]
     public async Task<IActionResult> PlayProjectionPage([FromQuery] string? role, CancellationToken cancellationToken)
     {
@@ -1315,14 +1318,17 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/player")]
+    [HttpHead("/player")]
     public IActionResult PlayerProjectionAlias()
         => Redirect("/play?role=player");
 
     [HttpGet("/gm")]
+    [HttpHead("/gm")]
     public IActionResult GmProjectionAlias()
         => Redirect("/play?role=gm");
 
     [HttpGet("/observer")]
+    [HttpHead("/observer")]
     public IActionResult ObserverProjectionAlias()
         => Redirect("/play?role=observer");
 
@@ -1343,6 +1349,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/play/anarchy")]
+    [HttpHead("/play/anarchy")]
     [Produces("text/html")]
     public async Task<IActionResult> AnarchyPlayPage(CancellationToken cancellationToken)
     {
@@ -2191,19 +2198,7 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
-        Uri? upstream = ResolveProductLiftHostedBoardUri();
-        if (upstream is null || ShouldShortCircuitHostedBoardUpstream(upstream))
-        {
-            return await ParticipateBoardFallbackAsync(cancellationToken, "/participate", disableHostedBoard: true).ConfigureAwait(false);
-        }
-
-        return await ParticipateBoardProxyCore(
-            null,
-            cancellationToken,
-            localOrigin: "/participate",
-            localBaseHref: "/participate/",
-            canonicalHref: "/participate",
-            fallbackPath: "/participate").ConfigureAwait(false);
+        return await ParticipateBoardFallbackAsync(cancellationToken, "/participate").ConfigureAwait(false);
     }
 
     private async Task<IActionResult> ParticipateBoardFallbackAsync(
@@ -2256,7 +2251,7 @@ public sealed class PublicLandingController : Controller
                 ? "Browse without signing in. If you later sign in on the board, use the same email."
                 : hostedBoardAvailable
                 ? "Open the board here. If it asks you to sign in there, use the same email."
-                : "Board offline right now. Use private support only when it should stay private."
+                : "Board offline right now. Use Contact for the Chummer5 Discord server."
             : $"{(string.IsNullOrWhiteSpace(subject.DisplayName) ? "This account" : subject.DisplayName)} is signed in here. If the board asks again, use the same email.";
         string? supporterHref = subject is null ? null : ResolveParticipateSupporterHref();
 
@@ -2287,7 +2282,7 @@ public sealed class PublicLandingController : Controller
                     : "Board offline right now",
             RoadmapHref: "/roadmap",
             HostedBoardHref: boardShellHref,
-            SupportHref: "/contact#support-intake",
+            SupportHref: "/contact",
             RetryHref: currentPath,
             SupporterHref: supporterHref,
             LoadedFromBoard: loadedFromBoard,
@@ -2345,7 +2340,7 @@ public sealed class PublicLandingController : Controller
             BodyParagraphs: detail.BodyParagraphs,
             SyncedLabel: FormatParticipateSyncedLabel(_participateSnapshots.GetSnapshot().SyncedAtUtc),
             BackHref: "/participate",
-            SupportHref: "/contact#support-intake",
+            SupportHref: "/contact",
             EntryHref: entryHref,
             EntryLabel: entryLabel,
             EntrySummary: entrySummary,
@@ -2495,11 +2490,11 @@ public sealed class PublicLandingController : Controller
                 ? BuildHostedBoardEmbedFallbackResult(
                     "Participate",
                     "Board offline right now",
-                    "Try again shortly. Use private support only when it should stay private.",
+                    "Try again shortly. Use Contact for the Chummer5 Discord server.",
                     primaryHref: "/participate",
                     primaryLabel: "Retry",
-                    secondaryHref: "/contact#support-intake",
-                    secondaryLabel: "Private support")
+                    secondaryHref: "/contact",
+                    secondaryLabel: "Contact")
                 : await ParticipateBoardFallbackAsync(cancellationToken, fallbackPath, disableHostedBoard: true).ConfigureAwait(false);
         }
 
@@ -2558,11 +2553,11 @@ public sealed class PublicLandingController : Controller
                         ? BuildHostedBoardEmbedFallbackResult(
                             "Participate",
                             "Board offline right now",
-                            "Try again shortly. Use private support only when it should stay private.",
+                            "Try again shortly. Use Contact for the Chummer5 Discord server.",
                             primaryHref: "/participate",
                             primaryLabel: "Retry",
-                            secondaryHref: "/contact#support-intake",
-                            secondaryLabel: "Private support")
+                            secondaryHref: "/contact",
+                            secondaryLabel: "Contact")
                         : await ParticipateBoardFallbackAsync(cancellationToken, fallbackPath, disableHostedBoard: true).ConfigureAwait(false);
                 }
 
@@ -2588,11 +2583,11 @@ public sealed class PublicLandingController : Controller
                     hostedLeadReplacement: "Public requests, clear bugs, useful ideas.",
                     applyFeedbackPolish: true,
                     failureTitle: "Board offline right now",
-                    failureSummary: "Try again shortly. Use private support only when it should stay private.",
+                    failureSummary: "Try again shortly. Use Contact for the Chummer5 Discord server.",
                     failurePrimaryHref: "/participate",
                     failurePrimaryLabel: "Participate",
-                    failureSecondaryHref: "/contact#support-intake",
-                    failureSecondaryLabel: "Private support",
+                    failureSecondaryHref: "/contact",
+                    failureSecondaryLabel: "Contact",
                     failureReturnHref: fallbackPath,
                     failureReturnLabel: "Retry");
                 StoreHostedBoardHtmlCache(cacheKey, rewritten);
@@ -2618,11 +2613,11 @@ public sealed class PublicLandingController : Controller
                 ? BuildHostedBoardEmbedFallbackResult(
                     "Participate",
                     "Board offline right now",
-                    "Try again shortly. Use private support only when it should stay private.",
+                    "Try again shortly. Use Contact for the Chummer5 Discord server.",
                     primaryHref: "/participate",
                     primaryLabel: "Retry",
-                    secondaryHref: "/contact#support-intake",
-                    secondaryLabel: "Private support")
+                    secondaryHref: "/contact",
+                    secondaryLabel: "Contact")
                 : await ParticipateBoardFallbackAsync(cancellationToken, fallbackPath, disableHostedBoard: true).ConfigureAwait(false);
         }
         catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
@@ -2640,11 +2635,11 @@ public sealed class PublicLandingController : Controller
                 ? BuildHostedBoardEmbedFallbackResult(
                     "Participate",
                     "Board offline right now",
-                    "Try again shortly. Use private support only when it should stay private.",
+                    "Try again shortly. Use Contact for the Chummer5 Discord server.",
                     primaryHref: "/participate",
                     primaryLabel: "Retry",
-                    secondaryHref: "/contact#support-intake",
-                    secondaryLabel: "Private support")
+                    secondaryHref: "/contact",
+                    secondaryLabel: "Contact")
                 : await ParticipateBoardFallbackAsync(cancellationToken, fallbackPath, disableHostedBoard: true).ConfigureAwait(false);
         }
     }
@@ -4110,7 +4105,20 @@ document.addEventListener('DOMContentLoaded', function () {
     public async Task<IActionResult> BuildGhostConciergePage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(cancellationToken));
 
+    [HttpGet("/build")]
+    [HttpHead("/build")]
+    [Produces("text/html")]
+    public async Task<IActionResult> BuildPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(
+            cancellationToken,
+            currentPath: "/build",
+            title: "Build",
+            eyebrow: "Build",
+            heading: "Build a runner",
+            intro: "Use Build when you want a guided runner plan, tradeoff notes, legality explanations, or a clean way to discard and apply suggested changes."));
+
     [HttpGet("/alice")]
+    [HttpHead("/alice")]
     [Produces("text/html")]
     public async Task<IActionResult> AlicePage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(cancellationToken, currentPath: "/alice", title: "Character help", eyebrow: "Build help", heading: "Character help", intro: "Use character help when you want a guided build plan, tradeoff notes, legality explanations, or a clean way to discard and apply suggested changes." ));
@@ -5478,7 +5486,7 @@ document.addEventListener('DOMContentLoaded', function () {
             [
                 new TrustPageActionViewModel("Open community hub", "/community", "primary"),
                 new TrustPageActionViewModel("Open participate", "/participate", "secondary"),
-                new TrustPageActionViewModel("Open support", "/contact#support-intake", "ghost")
+                new TrustPageActionViewModel("Open contact", "/contact", "ghost")
             ],
             cancellationToken: cancellationToken,
             summaryPoints:
@@ -7940,7 +7948,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [Produces("text/html")]
     public async Task<IActionResult> ContactPage(CancellationToken cancellationToken)
     {
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Discord first. Private form if needed.", "/contact", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Contact", "Use the Chummer5 Discord server.", "/contact", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildContactPageModelAsync(chrome, manifest, releaseExperience, cancellationToken));
@@ -8002,7 +8010,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         else if (sampleReceipt)
         {
-            actions.Add(new TrustPageActionViewModel("Return to contact", "/contact#support-intake", "primary"));
+            actions.Add(new TrustPageActionViewModel("Return to contact", "/contact", "primary"));
         }
         else if (authenticated)
         {
@@ -12195,19 +12203,14 @@ Boundary:
         ReleaseExperienceViewModel releaseExperience,
         CancellationToken cancellationToken)
     {
-        var installDefaults = await ResolveSupportIntakeDefaultsAsync(cancellationToken);
-        var overrides = ResolveSupportIntakeOverridesFromQuery();
+        await Task.CompletedTask.ConfigureAwait(false);
+        _ = cancellationToken;
         return _trustContent.BuildContactPage(chrome) with
         {
             PrivacyBoundary = _privacyBoundaries.BuildPanel("contact"),
             TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
-            SupportIntake = BuildSupportIntakeModel(
-                authenticated: chrome.Authenticated,
-                submissionNotice: null,
-                manifest,
-                installDefaults,
-                overrides)
+            SignedInStatus = null,
+            SupportIntake = null
         };
     }
 
@@ -13142,7 +13145,7 @@ Boundary:
         [
             new("Open KARMA FORGE", "/participate/karma-forge", "primary"),
             new("Read the maintenance note", "/roadmap/karma-forge", "secondary"),
-            new("Open support intake", "/contact#support-intake", "ghost")
+            new("Open contact", "/contact", "ghost")
         ];
 
         string affectedDomains = submission.Packet.AffectedDomains.Count == 0

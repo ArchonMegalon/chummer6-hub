@@ -66,7 +66,7 @@ public sealed class HubPageChromeServiceTests
     }
 
     [Fact]
-    public void BuildPublicChromeHidesParticipateFromGuestPrimaryNavigation()
+    public void BuildPublicChromeShowsPwaButHidesParticipateFromGuestPrimaryNavigation()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -80,10 +80,12 @@ public sealed class HubPageChromeServiceTests
         var chrome = service.BuildPublicChrome("Home", "Flagship shell.", "/");
 
         Assert.Equal(
-            ["Home", "Help"],
+            ["Home", "PWA", "Help"],
             chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
         Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
-        Assert.Equal("/help", chrome.PrimaryNavigation[1].Href);
+        Assert.Equal("/mobile", chrome.PrimaryNavigation[1].Href);
+        Assert.Equal("/help", chrome.PrimaryNavigation[2].Href);
+        Assert.Contains(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/mobile", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/participate", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(chrome.PrimaryNavigation, link => string.Equals(link.Href, "/partizipate", StringComparison.OrdinalIgnoreCase));
     }
@@ -136,6 +138,9 @@ public sealed class HubPageChromeServiceTests
         Assert.Contains("routeKey is not \"landing\"", layout, StringComparison.Ordinal);
         Assert.Contains("!normalizeHeaderActionPath(action.Href).StartsWith(\"/downloads\"", layout, StringComparison.Ordinal);
         Assert.Contains("@foreach (var action in visibleHeaderActions)", layout, StringComparison.Ordinal);
+        Assert.Contains("site-open-chummer-menu", layout, StringComparison.Ordinal);
+        Assert.Contains("href=\"/build\"", layout, StringComparison.Ordinal);
+        Assert.Contains("href=\"/play\"", layout, StringComparison.Ordinal);
     }
 
     [Fact]

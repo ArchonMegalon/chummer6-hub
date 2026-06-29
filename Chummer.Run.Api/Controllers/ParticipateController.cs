@@ -181,7 +181,7 @@ public sealed class ParticipateController : Controller
             SyncedLabel: hostedBoardAvailable ? "Board is live." : "Board offline right now",
             RoadmapHref: "/roadmap",
             HostedBoardHref: boardShellHref,
-            SupportHref: "/contact#support-intake",
+            SupportHref: "/contact",
             RetryHref: currentPath,
             SupporterHref: supporterHref,
             LoadedFromBoard: false,

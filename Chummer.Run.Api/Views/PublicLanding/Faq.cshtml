@@ -43,12 +43,12 @@
         },
         new
         {
-            Badge = "Support",
-            Title = "Use support for private problems",
-            Summary = "Private issues usually need logs and a direct answer.",
+            Badge = "Contact",
+            Title = "Use contact when a human answer helps",
+            Summary = "Normal questions and quick feedback belong in the Chummer5 Discord server.",
             Href = "/contact",
-            Label = "Open support",
-            Highlights = new[] { "Discord first", "Private form", "Logs" }
+            Label = "Open contact",
+            Highlights = new[] { "Discord", "Questions", "Feedback" }
         }
     };
 
@@ -86,7 +86,7 @@
             || combined.Contains("help", StringComparison.Ordinal)
             || combined.Contains("support", StringComparison.Ordinal))
         {
-            return new TrustPageActionViewModel("Open support", "/contact", "secondary");
+            return new TrustPageActionViewModel("Open contact", "/contact", "secondary");
         }
 
         if (combined.Contains("trust", StringComparison.Ordinal) || combined.Contains("use chummer right now", StringComparison.Ordinal))
@@ -169,10 +169,10 @@
 <section class="minimal-section minimal-section--support">
     <div class="minimal-section__lead">
         <h2>Still stuck?</h2>
-        <p>If the FAQ missed the edge case, open support and keep the context together.</p>
+        <p>If the FAQ missed the edge case, use Contact to reach the Chummer5 Discord server.</p>
     </div>
     <div class="minimal-actions">
-        <a class="button-like button-like--secondary" href="/contact">Open support</a>
+        <a class="button-like button-like--secondary" href="/contact">Open contact</a>
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </div>
 </section>

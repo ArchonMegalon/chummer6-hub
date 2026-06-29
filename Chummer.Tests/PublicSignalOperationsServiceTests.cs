@@ -390,7 +390,7 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal(0, packet.CloseoutDeliveryReceiptCount);
         Assert.Single(packet.RecentRoutingReceipts);
         Assert.Equal("Moderation review required", packet.RecentRoutingReceipts[0].StatusLabel);
-        Assert.Equal("/contact#support-intake", packet.RecentRoutingReceipts[0].TargetPath);
+        Assert.Equal("/contact", packet.RecentRoutingReceipts[0].TargetPath);
     }
 
     [Fact]

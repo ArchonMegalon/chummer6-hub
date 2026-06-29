@@ -408,6 +408,8 @@ public sealed partial class PublicFrontDoorCopyPolishTests
 
         Assert.Contains("label: Home", navigation, StringComparison.Ordinal);
         Assert.Contains("href: /", navigation, StringComparison.Ordinal);
+        Assert.Contains("label: PWA", navigation, StringComparison.Ordinal);
+        Assert.Contains("href: /mobile", navigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: Get Chummer", firstVisitSource, StringComparison.Ordinal);
         Assert.DoesNotContain("href: /downloads", firstVisitSource, StringComparison.Ordinal);
         Assert.Contains("label: Participate", navigation, StringComparison.Ordinal);

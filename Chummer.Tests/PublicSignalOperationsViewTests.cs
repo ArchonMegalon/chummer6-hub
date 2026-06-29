@@ -57,7 +57,7 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("Public feedback stays easy to sort.", partial, StringComparison.Ordinal);
         Assert.Contains("Open roadmap", partial, StringComparison.Ordinal);
         Assert.Contains("Open changelog", partial, StringComparison.Ordinal);
-        Assert.Contains("Open Help", partial, StringComparison.Ordinal);
+        Assert.Contains("Open contact", partial, StringComparison.Ordinal);
         Assert.Contains("Public feedback", partial, StringComparison.Ordinal);
         Assert.Contains("Chummer follow-up is not visible here yet.", partial, StringComparison.Ordinal);
         Assert.Contains("Model.CategoryCount", partial, StringComparison.Ordinal);
@@ -282,11 +282,11 @@ public sealed class PublicSignalOperationsViewTests
                 "Public requests, clear bugs, useful ideas.",
                 true,
                 "Board offline right now",
-                "Try again shortly. Use private support only when it should stay private.",
+                "Try again shortly. Use Contact for the Chummer5 Discord server.",
                 "/roadmap",
                 "Roadmap",
-                "/contact#support-intake",
-                "Private support",
+                "/contact",
+                "Contact",
                 "/participate",
                 "Retry"
             ])!;
@@ -376,11 +376,11 @@ public sealed class PublicSignalOperationsViewTests
                 "Public requests, clear bugs, useful ideas.",
                 true,
                 "Board offline right now",
-                "Try again shortly. Use private support only when it should stay private.",
+                "Try again shortly. Use Contact for the Chummer5 Discord server.",
                 "/roadmap",
                 "Roadmap",
-                "/contact#support-intake",
-                "Private support",
+                "/contact",
+                "Contact",
                 "/participate",
                 "Retry"
             ])!;

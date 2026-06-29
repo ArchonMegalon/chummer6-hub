@@ -128,7 +128,7 @@ public sealed class PublicPrivacyBoundaryService
         var secondary = pageId switch
         {
             "contact" => new TrustPageActionViewModel("Open help", "/help", "ghost"),
-            _ => new TrustPageActionViewModel("Open private help", "/contact#support-intake", "ghost")
+            _ => new TrustPageActionViewModel("Open contact", "/contact", "ghost")
         };
 
         _routes.ValidateRouteTarget(primary.Href, $"privacy boundary action '{primary.Label}'");

@@ -49,7 +49,7 @@
     {
         "install-update" => new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
         "sign-in-recovery" => new TrustPageActionViewModel(authenticated ? "Open account" : "Claim your copy", authenticated ? "/account" : "/signup?next=/home", "secondary"),
-        "product-bug" => new TrustPageActionViewModel("Open support", "/contact#support-intake", "secondary"),
+        "product-bug" => new TrustPageActionViewModel("Open contact", "/contact", "secondary"),
         "product-question" => new TrustPageActionViewModel("Read the FAQ", "/faq", "secondary"),
         _ => null
     };
@@ -86,35 +86,16 @@
         }
     }
 
-    if (contactPage && Model.SupportIntake is not null)
+    if (contactPage)
     {
-        string installHref = ContextualPreviewHref(Model.SupportIntake.InstallAccessHref);
-        string installSummary = string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary)
-            ? "Installs is where you reconnect, replace, or recover this copy."
-            : Model.SupportIntake.InstallRailSummary!;
-        string installTitle = Model.SupportIntake.RecoveryModeOnly
-            ? "Install recovery stays on the same device page"
-            : "Account return stays attached to the affected copy";
-        string installRouteLabel = string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
-            ? Model.SupportIntake.InstallAccessLabel
-            : Model.SupportIntake.InstallRailLabel!;
         contactRouteChoices.Add((
             Id: "discord-contact",
             Badge: "Discord",
-            Title: "Discord",
-            Summary: "Use it for normal questions and quick feedback.",
+            Title: "Chummer5 Discord",
+            Summary: "Use the Chummer5 server for questions, quick feedback, and normal discussion.",
             Href: "https://discord.gg/chummer",
             Label: "Open Discord",
             Details: new[] { "Normal contact", "Community context", "Fastest path" }));
-        // Source marker for contract tests: Title: "Private message"
-        contactRouteChoices.Add((
-            Id: "private-help",
-            Badge: "Private",
-            Title: "Private form",
-            Summary: "Use the form when it should stay private.",
-            Href: "#support-intake",
-            Label: "Open private form",
-            Details: new[] { "Guest allowed", "Private reply", "Tracked if you sign in" }));
     }
 }
 
@@ -249,14 +230,14 @@ else if (!contactPage)
     </section>
 }
 
-@if (Model.SupportIntake is not null && contactPage)
+@if (contactPage)
 {
     <section class="minimal-section minimal-section--tight">
         <div class="minimal-section__lead">
-            <h2>Discord or private</h2>
-            <p>Discord for normal questions. Private form for account or crash details.</p>
+            <h2>Discord</h2>
+            <p>Normal questions and feedback belong in the Chummer5 server.</p>
         </div>
-        <div class="route-choice-grid route-choice-grid--two route-choice-grid--compact" id="contact-paths">
+        <div class="route-choice-grid route-choice-grid--compact" id="contact-paths">
             @foreach (var choice in contactRouteChoices)
             {
                 <article class="route-choice-card" id="@choice.Id">
@@ -267,116 +248,6 @@ else if (!contactPage)
                 </article>
             }
         </div>
-    </section>
-
-    <section class="minimal-section minimal-section--tight" id="support-intake">
-        <details class="details-drawer minimal-help-card" id="private-support-form">
-            <summary>Private message</summary>
-            <article class="trust-page-section trust-page-section--form">
-            <p class="eyebrow">Support</p>
-            <h2>@PublicText(Model.SupportIntake.Heading)</h2>
-            <p>@PublicText(Model.SupportIntake.Intro)</p>
-
-            @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.SubmissionNotice))
-            {
-                <p class="status-copy status-copy--success">@PublicText(Model.SupportIntake.SubmissionNotice)</p>
-            }
-            <p class="muted-copy">One problem per message keeps the reply clear.</p>
-
-            <form class="settings-form" method="post" action="@Model.SupportIntake.ActionHref" enctype="multipart/form-data">
-                @Html.AntiForgeryToken()
-                <div class="field">
-                    <label for="supportKind">Problem type</label>
-                    <select id="supportKind" name="kind" required>
-                        @foreach (var option in Model.SupportIntake.Options)
-                        {
-                            <option value="@option.Value" selected="@(string.Equals(Model.SupportIntake.DefaultKind, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@PublicText(option.Label)</option>
-                        }
-                    </select>
-                </div>
-                <div class="field">
-                    <label for="supportTitle">Title</label>
-                    <input id="supportTitle" name="title" maxlength="160" placeholder="Installer opens, then stops" value="@Model.SupportIntake.DefaultTitle" required />
-                </div>
-                <div class="field">
-                    <label for="supportSummary">Short summary</label>
-                    <input id="supportSummary" name="summary" maxlength="280" placeholder="I expected the app to start. It did not." value="@Model.SupportIntake.DefaultSummary" required />
-                </div>
-                <div class="field">
-                    <label for="supportDetail">What happened</label>
-                    <textarea id="supportDetail" name="detail" rows="6" placeholder="What did you try, what happened, and what should I check first?" required>@Model.SupportIntake.DefaultDetail</textarea>
-                </div>
-                @if (!Model.SupportIntake.Authenticated)
-                {
-                    <div class="field">
-                        <label for="supportReplyEmail">Reply email</label>
-                        <input id="supportReplyEmail" name="replyEmail" type="email" placeholder="runner@example.com" required />
-                    </div>
-                }
-                <details class="details-drawer">
-                    <summary>Optional environment details</summary>
-                    @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.ContextHint))
-                    {
-                        <p class="muted-copy">@PublicText(Model.SupportIntake.ContextHint)</p>
-                    }
-                    <div class="field">
-                        <label for="supportPlatform">Platform</label>
-                        <input id="supportPlatform" name="platform" maxlength="64" placeholder="Windows, Linux, or macOS" value="@Model.SupportIntake.DefaultPlatform" />
-                    </div>
-                    <div class="field">
-                        <label for="supportVersion">Version</label>
-                        <input id="supportVersion" name="applicationVersion" maxlength="64" placeholder="Version or build, if visible" value="@Model.SupportIntake.DefaultApplicationVersion" />
-                    </div>
-                    <div class="field">
-                        <label for="supportReleaseChannel">Release channel</label>
-                        <input id="supportReleaseChannel" name="releaseChannel" maxlength="64" placeholder="public release, beta, or stable" value="@Model.SupportIntake.DefaultReleaseChannel" />
-                    </div>
-                    <div class="field">
-                        <label for="supportHeadId">App copy</label>
-                        <input id="supportHeadId" name="headId" maxlength="64" placeholder="Desktop app, if visible" value="@Model.SupportIntake.DefaultHeadId" />
-                    </div>
-                    <div class="field">
-                        <label for="supportInstallationId">Installed copy</label>
-                        <input id="supportInstallationId" name="installationId" maxlength="64" placeholder="Optional value from setup" value="@Model.SupportIntake.DefaultInstallationId" />
-                    </div>
-                    <div class="field">
-                        <label for="supportArch">Architecture</label>
-                        <input id="supportArch" name="arch" maxlength="32" placeholder="x64 or arm64" value="@Model.SupportIntake.DefaultArch" />
-                    </div>
-                </details>
-                <details class="details-drawer">
-                    <summary>Attachments</summary>
-                    <p class="muted-copy">@PublicText(Model.SupportIntake.AttachmentHelp)</p>
-                    <div class="field">
-                        <label for="supportAttachments">Screenshots, logs, or small bundles</label>
-                        <input id="supportAttachments" name="attachments" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.txt,.log,.json,.zip,.md" />
-                    </div>
-                </details>
-                <div class="minimal-actions">
-                    <button class="button-like button-like--primary" type="submit">Send support request</button>
-                </div>
-            </form>
-            <p class="muted-copy">
-                @if (Model.SupportIntake.Authenticated
-                    && !string.IsNullOrWhiteSpace(Model.SupportIntake.AccountSupportHref)
-                    && !string.IsNullOrWhiteSpace(Model.SupportIntake.AccountSupportLabel))
-                {
-                    <text>Signed-in history stays in <a class="inline-link" href="@Model.SupportIntake.AccountSupportHref">@PublicText(Model.SupportIntake.AccountSupportLabel)</a>.</text>
-                }
-                @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.InstallAccessHref)
-                    && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallAccessLabel))
-                {
-                    <text> Setup recovery stays in <a class="inline-link" href="@Model.SupportIntake.InstallAccessHref">@PublicText(Model.SupportIntake.InstallAccessLabel)</a>.</text>
-                }
-            </p>
-            @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailHref)
-                && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
-                && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary))
-            {
-                <p class="muted-copy">Back to setup: <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@PublicText(Model.SupportIntake.InstallRailLabel)</a></p>
-            }
-            </article>
-        </details>
     </section>
 }
 

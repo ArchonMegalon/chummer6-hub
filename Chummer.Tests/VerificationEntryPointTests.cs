@@ -3560,6 +3560,9 @@ public sealed class VerificationEntryPointTests
         Assert.DoesNotContain("Open Black Ledger", landingView, StringComparison.Ordinal);
         Assert.Contains("Download Chummer", landingView, StringComparison.Ordinal);
         Assert.Contains("href=\"/downloads\"", landingView, StringComparison.Ordinal);
+        Assert.Contains("Open Chummer", landingView, StringComparison.Ordinal);
+        Assert.Contains("href=\"/build\"", landingView, StringComparison.Ordinal);
+        Assert.Contains("href=\"/play\"", landingView, StringComparison.Ordinal);
         Assert.Contains("minimal-inline-links", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"help\"", landingView, StringComparison.Ordinal);
         Assert.Contains("href=\"/participate\"", landingView, StringComparison.Ordinal);
