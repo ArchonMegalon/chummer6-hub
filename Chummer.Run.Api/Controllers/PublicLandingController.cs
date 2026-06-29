@@ -2268,7 +2268,7 @@ public sealed class PublicLandingController : Controller
                     string.IsNullOrWhiteSpace(subject.DisplayName) ? "Signed in" : subject.DisplayName,
                     subject.Email),
             Heading: "Participate",
-            Summary: "Feedback and roadmap live on the board.",
+            Summary: "Public requests, clear bugs, useful ideas.",
             StatusLabel: hostedBoardAvailable ? "Open" : loadedFromBoard ? "Cached" : "Offline",
             Posts: visiblePosts,
             FallbackItems: fallbackItems,

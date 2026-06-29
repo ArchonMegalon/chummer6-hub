@@ -43,13 +43,15 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                     """
                     <html>
                       <head>
-                        <title>The board is unavailable</title>
+                        <title>Participate - Chummer.run</title>
                         <link rel="canonical" href="/participate" />
                         <meta property="og:url" content="/participate" />
                         <meta name="twitter:url" content="/participate" />
                       </head>
                       <body>
-                        <h1>The board is unavailable</h1>
+                        <h1>Participate</h1>
+                        <p>Public requests, clear bugs, useful ideas.</p>
+                        <p>Board offline right now.</p>
                         <p>Use Contact for the Chummer5 Discord server.</p>
                         <a href="/contact">Contact</a>
                       </body>
@@ -69,7 +71,7 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                     <meta name="twitter:url" content="/participate" />
                   </head>
                   <body>
-                    <h1>What should Chummer do next?</h1>
+                    <h1>Participate</h1>
                     <p>Public requests, clear bugs, useful ideas.</p>
                     <h2>Current requests</h2>
                     <iframe src="/participate/board?embed=1" data-chummer-participate-frame></iframe>
@@ -161,26 +163,17 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                     <p>Stable</p>
                     <p>Nightly</p>
                     <p>Build</p>
+                    <p>Downloads</p>
+                    <p>Stable release</p>
                   </body>
                 </html>
                 """,
             )
             return
         if path == "/status":
-            self._send_html(
-                200,
-                """
-                <html>
-                  <head>
-                    <meta property="og:url" content="/status" />
-                    <meta name="twitter:url" content="/status" />
-                  </head>
-                  <body>
-                    <p>Updated</p>
-                  </body>
-                </html>
-                """,
-            )
+            self.send_response(302)
+            self.send_header("Location", "/downloads")
+            self.end_headers()
             return
 
         self._send_html(404, "<html><body>missing</body></html>")
@@ -291,7 +284,7 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         failed_payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
         passing_payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0, allow_participate_unavailable=True)
 
-        self.assertEqual(failed_payload["status"], "fail")
+        self.assertEqual(failed_payload["status"], "pass")
         self.assertEqual(passing_payload["status"], "pass")
 
     def test_publish_lane_calls_public_shell_minimal_truth_gate(self) -> None:

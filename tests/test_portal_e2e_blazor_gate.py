@@ -46,6 +46,7 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 <p>Nightly</p>
                 <p>Build from source</p>
                 <a href="/downloads/source">Download script</a>
+                <a href="/help">Help</a>
                 </body></html>
                 """
             )
@@ -72,17 +73,9 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
             return
 
         if path in {"/status", "/status/"}:
-            self._send_html(
-                """
-                <html><body>
-                <p>Status</p>
-                <h1>Updated</h1>
-                <p>Windows and Linux downloads are live.</p>
-                <a href="/downloads">Downloads</a>
-                <a href="/help">Help</a>
-                </body></html>
-                """
-            )
+            self.send_response(302)
+            self.send_header("Location", "/downloads/")
+            self.end_headers()
             return
 
         if path == "/login":
@@ -154,7 +147,7 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
             self._send_html(
                 """
                 <html><body>
-                <h1>What should Chummer do next?</h1>
+                <h1>Participate</h1>
                 <p>Public requests, clear bugs, useful ideas.</p>
                 <h2>Current requests</h2>
                 <iframe src="/participate/board?embed=1" data-chummer-participate-frame></iframe>
@@ -190,9 +183,7 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 """
                 <html><body>
                 <h1>Roadmap</h1>
-                <p>In progress.</p>
-                <p>Planned work lives here. Shipped work moves to Changelog.</p>
-                <p>Work opens below.</p>
+                <p>Planned work and current requests.</p>
                 <div>data-chummer-roadmap-frame</div>
                 </body></html>
                 """
@@ -201,7 +192,7 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
 
         if path == "/roadmap/board":
             self.send_response(302)
-            self.send_header("Location", "/roadmap")
+            self.send_header("Location", "/participate")
             self.end_headers()
             return
 
@@ -237,8 +228,10 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                     <html>
                     <head><base href="/blazor/"></head>
                     <body>
-                    <h1>Published browser client</h1>
-                    <a href="/blazor/app">Launch browser workbench</a>
+                    <span>Chummer Online</span>
+                    <h1>Character Roster</h1>
+                    <a href="/blazor/app?command=new_character">New runner</a>
+                    <a href="/blazor/app?command=open_character">Import</a>
                     </body>
                     </html>
                     """
@@ -273,7 +266,7 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
 
         if path == "/coach/":
             self.send_response(302)
-            self.send_header("Location", "/status/")
+            self.send_header("Location", "/downloads/")
             self.end_headers()
             return
 

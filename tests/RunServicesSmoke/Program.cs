@@ -2848,8 +2848,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicControllerSource.Contains("return await ParticipateBoardProxyCore(", StringComparison.Ordinal), "participate should resolve the canonical route straight into the first-party ProductLift proxy.");
     Assert(publicControllerSource.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", StringComparison.Ordinal), "participate should keep a deliberate board route for the full ProductLift queue.");
     Assert(publicControllerSource.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", StringComparison.Ordinal), "participate should keep the live board behind a first-party wrapper and frame handoff.");
-    Assert(publicControllerSource.Contains("What should Chummer do next?", StringComparison.Ordinal), "participate should keep the public heading explicit and first-party.");
-    Assert(publicControllerSource.Contains("Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate should keep the public summary in restrained product language.");
+    Assert(publicControllerSource.Contains("Heading: \"Participate\"", StringComparison.Ordinal), "participate should keep the public heading explicit and first-party.");
+    Assert(publicControllerSource.Contains("Summary: \"Public requests, clear bugs, useful ideas.\"", StringComparison.Ordinal), "participate should keep the public summary in restrained product language.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
@@ -3261,13 +3261,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var participateView = await controller.ParticipatePage(CancellationToken.None) as ViewResult;
     var participateModel = participateView?.Model as FirstPartyParticipateBoardViewModel;
     Assert(participateModel is not null, "participate page should render the Chummer-owned board shell.");
-    Assert(string.Equals(participateModel!.Heading, "What should Chummer do next?", StringComparison.Ordinal), "participate page should keep the first-party prompt.");
+    Assert(string.Equals(participateModel!.Heading, "Participate", StringComparison.Ordinal), "participate page should keep the first-party heading.");
     Assert(string.Equals(participateModel.Summary, "Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate page should keep the public board summary.");
     Assert(participateModel.EmbeddedBoardEnabled && string.Equals(participateModel.EmbeddedBoardHref, "/participate/board?embed=1", StringComparison.Ordinal), "participate page should host the same-origin ProductLift board frame.");
     var authenticatedParticipateView = await authenticatedLandingController.ParticipatePage(CancellationToken.None) as ViewResult;
     var authenticatedParticipateModel = authenticatedParticipateView?.Model as FirstPartyParticipateBoardViewModel;
     Assert(authenticatedParticipateModel is not null, "authenticated participate page should use the same Chummer-owned board shell.");
-    Assert(string.Equals(authenticatedParticipateModel!.Heading, "What should Chummer do next?", StringComparison.Ordinal), "authenticated participate page should keep the same first-party prompt.");
+    Assert(string.Equals(authenticatedParticipateModel!.Heading, "Participate", StringComparison.Ordinal), "authenticated participate page should keep the same first-party heading.");
     var privacyPage = trustContent.BuildPrivacyPage(chrome.BuildPublicChrome("Privacy", "What Chummer stores, and what it does not.", "/privacy"));
     Assert(privacyPage.Actions.Any(static action => string.Equals(action.Label, "Create account", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "privacy page should adapt account-only actions into signup-first actions for guests.");
     var publicPrivacyView = await controller.PrivacyPage(CancellationToken.None) as ViewResult;
@@ -5749,7 +5749,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHorizonsModel?.SignedInStatus is not null, "authenticated horizons page should project the shared signed-in trust status.");
 
     var participateHtml = participateContent?.Content ?? string.Empty;
-    Assert(participateHtml.Contains("What should Chummer do next?", StringComparison.Ordinal), "participate page should keep the first-party prompt.");
+    Assert(participateHtml.Contains("Participate", StringComparison.Ordinal), "participate page should keep the first-party heading.");
+    Assert(participateHtml.Contains("Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate page should keep the public summary.");
     Assert(!participateHtml.Contains("worker host", StringComparison.OrdinalIgnoreCase), "public participate copy should not leak worker-host jargon");
 
     var homeResult = await controller.HomePage(null, CancellationToken.None);

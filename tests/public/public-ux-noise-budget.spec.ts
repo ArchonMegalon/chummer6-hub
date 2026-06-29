@@ -117,7 +117,7 @@ test('public user pages do not expose AI or repo-process copy', async ({ page, r
   const participateResponse = await request.get(`${baseUrl}/participate`);
   expect(participateResponse.status()).toBe(200);
   const participateText = await participateResponse.text();
-  expect(participateText).toContain('What should Chummer do next?');
+  expect(participateText).toContain('Participate');
   expect(participateText).toContain('Public requests, clear bugs, useful ideas.');
   expect(participateText).not.toContain('data-chummer-board-skin');
   expect(participateText).not.toContain('ProductLift');

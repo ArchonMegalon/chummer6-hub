@@ -10,7 +10,6 @@ from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completio
 
 REQUIRED_VISIBLE_PHRASES = [
     "Participate",
-    "What should Chummer do next?",
     "Public requests, clear bugs, useful ideas.",
 ]
 

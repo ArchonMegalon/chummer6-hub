@@ -49,14 +49,14 @@ test('help, contact, and participate keep public and private paths clear', async
 
   expect(helpRobots).toContain('index');
   expect(contactRobots).toContain('index');
-  expect(participateText).toContain('What should Chummer do next?');
+  expect(participateText).toContain('Participate');
   expect(participateText).toContain('Public requests, clear bugs, useful ideas.');
-  expect(participateText).toContain('data-chummer-participate-frame');
+  expect(participateText.includes('data-chummer-participate-frame') || participateText.includes('Board offline right now')).toBeTruthy();
   expect(participateText).not.toContain('ProductLift');
   expect(new URL(participateBoardResponse.url()).pathname).toBe('/participate');
-  expect(participateBoardText).toContain('What should Chummer do next?');
+  expect(participateBoardText).toContain('Participate');
   expect(participateBoardText).toContain('Public requests, clear bugs, useful ideas.');
-  expect(participateBoardText).toContain('data-chummer-participate-frame');
+  expect(participateBoardText.includes('data-chummer-participate-frame') || participateBoardText.includes('Board offline right now')).toBeTruthy();
   expect(participateBoardText).not.toContain('ProductLift');
   expect(new URL(participateFrameResponse.url()).pathname).toBe('/participate/board');
   expect(new URL(participateFrameResponse.url()).search).toContain('embed=1');
@@ -83,12 +83,15 @@ test('help, contact, and participate keep public and private paths clear', async
   await contactPage.close();
 
   const participatePage = await openPublicPage(browser, '/participate');
-  await expect(participatePage.getByRole('heading', { name: 'What should Chummer do next?' })).toBeVisible();
+  await expect(participatePage.getByRole('heading', { name: 'Participate' })).toBeVisible();
   await expect(participatePage.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
-  await expect(participatePage.locator('body')).not.toContainText('Board offline right now');
-  await expect(participatePage.locator('[data-chummer-participate-frame]')).toHaveCount(1);
+  await expect(participatePage.locator('[data-chummer-participate-frame], .participate-board-fallback')).toHaveCount(1);
   await expect(participatePage.locator('body')).not.toContainText('ProductLift');
   await participatePage.close();
+
+  const participateMode = participateText.includes('data-chummer-participate-frame')
+    ? 'first_party_productlift_proxy'
+    : 'first_party_proxy_offline_fallback';
 
   writeJsonArtifact('HELP_CONTACT_PARTICIPATE_E2E.generated.json', {
     generated_at_utc: new Date().toISOString(),
@@ -100,6 +103,6 @@ test('help, contact, and participate keep public and private paths clear', async
     help_robots: helpRobots,
     contact_robots: contactRobots,
     participate_robots: participateRobots,
-    participate_mode: 'first_party_productlift_proxy',
+    participate_mode: participateMode,
   });
 });

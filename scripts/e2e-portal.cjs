@@ -27,9 +27,19 @@ function hasBlazorBaseHref(html) {
 
 function isBlazorReady(text) {
   return (
-    (text.includes('Published browser surface') || text.includes('Published browser client'))
-    && (text.includes('Launch browser workbench') || text.includes('Explore Chummer App'))
-    && hasBlazorBaseHref(text)
+    hasBlazorBaseHref(text)
+    && (
+      (
+        text.includes('Chummer Online')
+        && text.includes('Character Roster')
+        && text.includes('New runner')
+        && text.includes('Import')
+      )
+      || (
+        (text.includes('Published browser surface') || text.includes('Published browser client'))
+        && (text.includes('Launch browser workbench') || text.includes('Explore Chummer App'))
+      )
+    )
   );
 }
 

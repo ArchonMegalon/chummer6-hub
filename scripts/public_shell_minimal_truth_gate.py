@@ -69,21 +69,22 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
         ),
         RouteContract(
             route="/status",
-            required_all=("Updated",),
+            expected_final_path="/downloads",
+            required_all=("Downloads", "Stable release"),
             forbidden=("Released", "Checks passed"),
             require_public_meta_urls=True,
         ),
         RouteContract(
             route="/participate",
             expected_final_path="/participate",
-            required_all=("What should Chummer do next?", "Public requests, clear bugs, useful ideas."),
+            required_all=("Participate", "Public requests, clear bugs, useful ideas."),
             required_any=("Public requests, clear bugs, useful ideas.", "Board offline right now"),
             require_public_meta_urls=True,
         ),
         RouteContract(
             route="/partizipate",
             expected_final_path="/participate",
-            required_all=("What should Chummer do next?", "Public requests, clear bugs, useful ideas."),
+            required_all=("Participate", "Public requests, clear bugs, useful ideas."),
             required_any=("Public requests, clear bugs, useful ideas.", "Board offline right now"),
             require_public_meta_urls=True,
         ),
@@ -93,7 +94,7 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
 ROUTE_CONTRACTS = build_route_contracts(require_brilliant_directories_checkout=False)
 
 PARTICIPATE_UNAVAILABLE_REQUIRED_ALL = (
-    "The board is unavailable",
+    "Board offline right now",
     "Use Contact for the Chummer5 Discord server.",
     "Contact",
 )
@@ -180,7 +181,7 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float, allow
     if (
         allow_participate_unavailable
         and contract.route in {"/participate", "/partizipate"}
-        and normalize_text("The board is unavailable") in normalized_body
+        and normalize_text("Board offline right now") in normalized_body
     ):
         required_all = PARTICIPATE_UNAVAILABLE_REQUIRED_ALL
         required_any = ()

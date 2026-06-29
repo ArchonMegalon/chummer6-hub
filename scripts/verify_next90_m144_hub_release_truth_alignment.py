@@ -78,7 +78,7 @@ SOURCE_MARKERS = {
         "Downloads, support, and recovery are all using the same claimed install context right now.",
     ],
     "tests/RunServicesSmoke/Program.cs": [
-        'Assert(authenticatedStatusModel?.SignedInStatus is not null, "authenticated status page should project the shared signed-in trust status.");',
+        'Assert(authenticatedHorizonsModel?.SignedInStatus is not null, "authenticated horizons page should project the shared signed-in trust status.");',
         'Assert(publicArtifactsModel?.SignedInCreatorPublications?.All(static item => item.Discoverable && string.Equals(item.PublicationStatus, "published", StringComparison.OrdinalIgnoreCase)) == true, "public artifact view should keep only discoverable published creator-publication cards on the signed-in public rail.");',
         'Assert(publicArtifactsModel?.SignedInRecapShelf?.Count == 0, "public artifact view should not blend private recap artifacts into the signed-in public publication rail.");',
     ],

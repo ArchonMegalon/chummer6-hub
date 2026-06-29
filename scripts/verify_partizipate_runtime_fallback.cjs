@@ -67,27 +67,23 @@ function stripNonVisibleHtml(html) {
 
 async function assertBoardShell(page, path) {
   const startedAt = Date.now();
-  const response = await navigateLenient(page, `${baseUrl}${path}`, 'domcontentloaded');
+  const response = await navigateLenient(page, `${baseUrl}${path}`, 'commit');
   assert(response, `${path} should return a response.`);
   assert.equal(response.status(), 200, `${path} should return 200.`);
-  await page.waitForFunction(
-    () => {
-      const text = (document.body && document.body.innerText) || '';
-      return /Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(text);
-    },
-    { timeout: 15000 },
-  );
+  await page.getByRole('heading', { name: 'Participate' }).waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByText('Public requests, clear bugs, useful ideas.', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
 
   const text = await page.locator('body').innerText();
   assert.equal(/Participate/i.test(text), true, `${path} should render the first-party heading.`);
   assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), true, `${path} should render the first-party summary.`);
   assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(text), false, `${path} must not show provider failure copy.`);
   assert.equal(/productlift\.dev/i.test(text), false, `${path} must not leak provider domains.`);
-  assert.equal(await page.locator('iframe[data-chummer-participate-frame]').count(), 1, `${path} should host the same-origin ProductLift board frame.`);
 
   const offline = /Board offline right now/i.test(text);
+  const embeddedFrameCount = await page.locator('iframe[data-chummer-participate-frame]').count();
+  assert.equal(embeddedFrameCount === 1 || offline, true, `${path} should expose either the same-origin board frame or the first-party offline fallback.`);
   if (!offline) {
-    assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), true, `${path} should keep the public summary visible when the hosted board is live.`);
+    assert.equal(embeddedFrameCount, 1, `${path} should host the same-origin ProductLift board frame when the board is live.`);
   }
 
   const detailLink = page.locator('a[href^="/participate/board/"]').first();

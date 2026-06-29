@@ -15,11 +15,11 @@ ROUTE_REQUIREMENTS = {
         "Nightly",
     ],
     "/feedback": [
-        "What should Chummer do next?",
+        "Participate",
         "Public requests, clear bugs, useful ideas.",
     ],
     "/participate": [
-        "What should Chummer do next?",
+        "Participate",
         "Public requests, clear bugs, useful ideas.",
     ],
 }

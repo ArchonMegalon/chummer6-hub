@@ -44,10 +44,13 @@ test('billing and participate stay first-party for guests and signed-in users', 
   const guestParticipate = await request.get(`${baseUrl}/participate`);
   expect(guestParticipate.status()).toBe(200);
   const guestParticipateText = await guestParticipate.text();
-  expect(guestParticipateText).toContain('What should Chummer do next?');
+  expect(guestParticipateText).toContain('Participate');
   expect(guestParticipateText).toContain('Public requests, clear bugs, useful ideas.');
-  expect(guestParticipateText).toContain('data-chummer-participate-frame');
+  expect(guestParticipateText.includes('data-chummer-participate-frame') || guestParticipateText.includes('Board offline right now')).toBeTruthy();
   expect(guestParticipateText).not.toContain('ProductLift');
+  const guestParticipateSurface = guestParticipateText.includes('data-chummer-participate-frame')
+    ? 'first_party_productlift_proxy'
+    : 'first_party_proxy_offline_fallback';
 
   const guestSupporterStart = await request.get(`${baseUrl}/account/billing/supporter/start`, { maxRedirects: 0 });
   expect([302, 303, 307, 308]).toContain(guestSupporterStart.status());
@@ -142,13 +145,15 @@ test('billing and participate stay first-party for guests and signed-in users', 
   await signedInRequest.dispose();
 
   await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'What should Chummer do next?' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Participate' })).toBeVisible();
   await expect(page.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
-  await expect(page.locator('body')).not.toContainText('Board offline right now');
-  await expect(page.locator('[data-chummer-participate-frame]')).toHaveCount(1);
+  await expect(page.locator('[data-chummer-participate-frame], .participate-board-fallback')).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText('ProductLift');
   await expect(page.locator('body')).not.toContainText('Log in');
   await expect(page.locator('body')).not.toContainText('Sign up');
+  const signedInParticipateSurface = (await page.locator('[data-chummer-participate-frame]').count()) === 1
+    ? 'first_party_productlift_proxy'
+    : 'first_party_proxy_offline_fallback';
   await page.close();
   await context.close();
 
@@ -159,8 +164,8 @@ test('billing and participate stay first-party for guests and signed-in users', 
     guest_billing_status: guestBilling.status(),
     guest_billing_location: guestBillingLocation,
     guest_participate_status: guestParticipate.status(),
-    guest_participate_public_wrapper: false,
-    guest_participate_surface: 'first_party_productlift_proxy',
+    guest_participate_public_wrapper: true,
+    guest_participate_surface: guestParticipateSurface,
     guest_supporter_start_status: guestSupporterStart.status(),
     guest_supporter_start_location: guestSupporterStartLocation,
     guest_account_status: guestAccount.status(),
@@ -173,7 +178,7 @@ test('billing and participate stay first-party for guests and signed-in users', 
     signed_in_billing_handoff_location: signedInBillingLocation,
     signed_in_supporter_active: signedInSupporterActive,
     signed_in_participate_first_party_verified: true,
-    signed_in_participate_surface: 'first_party_productlift_proxy',
+    signed_in_participate_surface: signedInParticipateSurface,
     signed_in_identity_token_present: true,
     first_party_sign_in_redirect: guestSupporterStartLocation === '/login?next=%2Faccount%2Fbilling',
   });

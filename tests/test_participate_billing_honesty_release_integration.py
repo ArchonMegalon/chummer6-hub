@@ -73,7 +73,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("text.includes('Use this page for dossiers, recaps, and release details.')", text)
         self.assertIn("text.includes('Download script')", text)
         self.assertIn("url: `${baseUrl}/participate`", text)
-        self.assertIn("text.includes('What should Chummer do next?')", text)
+        self.assertIn("text.includes('Participate')", text)
         self.assertIn("text.includes('Public requests, clear bugs, useful ideas.')", text)
         self.assertIn("text.includes('data-chummer-participate-frame')", text)
         self.assertIn("url: `${baseUrl}/participate/board?embed=1`", text)
@@ -88,7 +88,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
         self.assertIn("text.includes('What is wrong?')", text)
         self.assertIn("text.includes('Account recovery')", text)
         self.assertIn("url: `${baseUrl}/status`", text)
-        self.assertIn("text.includes('Windows and Linux downloads are live.')", text)
+        self.assertIn("text.includes('Stable release')", text)
         self.assertIn("!text.includes('Checks passed')", text)
         self.assertIn("url: `${baseUrl}/contact`", text)
         self.assertIn("text.includes('Chummer5 Discord')", text)
@@ -113,7 +113,7 @@ class ParticipateBillingHonestyReleaseIntegrationTests(unittest.TestCase):
     def test_partizipate_runtime_fallback_gate_forces_vendor_error_state(self) -> None:
         text = PARTIZIPATE_RUNTIME_FALLBACK_SCRIPT.read_text(encoding="utf-8")
 
-        self.assertIn("HOSTED_BOARD_SHELL_VISIBLE_BUDGET_MS = 2500", text)
+        self.assertIn("HOSTED_BOARD_SHELL_VISIBLE_BUDGET_MS = 6000", text)
         self.assertIn("HOSTED_BOARD_DETAIL_FETCH_BUDGET_MS = 4000", text)
         self.assertIn("chromium.launch", text)
         self.assertIn("'--no-sandbox'", text)

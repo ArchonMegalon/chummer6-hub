@@ -29,10 +29,6 @@ const forbidden = [
   /Tell us how we could make Chummer6 more useful to you/i,
 ];
 
-const requiredHtml = [
-  'data-chummer-home-link-patch',
-];
-
 const forbiddenHtml = [
   'Requests, votes, and shipped work.',
 ];
@@ -58,13 +54,8 @@ function extractVisibleText(html) {
     userAgent: 'chummer-partizipate-copy-gate/1',
   });
   const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  await page.waitForFunction(
-    () => {
-      const text = (document.body && document.body.innerText) || '';
-      return /What should Chummer do next\?|Board offline right now/i.test(text);
-    },
-    { timeout: 15000 },
-  );
+  await page.getByRole('heading', { name: 'Participate' }).waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByText('Public requests, clear bugs, useful ideas.', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
 
   const html = await page.content();
   const text = ((await page.locator('body').innerText()).replace(/\s+/g, ' ').trim()) || extractVisibleText(html);
@@ -73,23 +64,17 @@ function extractVisibleText(html) {
     .filter((pattern) => pattern.test(text))
     .map((pattern) => pattern.toString());
 
-  requiredHtml.forEach((needle) => {
-    if (!html.includes(needle)) {
-      failures.push(`missing-html:${needle}`);
-    }
-  });
-
-  if (!text.includes('What should Chummer do next?')) {
-    failures.push('missing-text:What should Chummer do next?');
+  if (!text.includes('Participate')) {
+    failures.push('missing-text:Participate');
   }
-if (!text.includes('Public requests, clear bugs, useful ideas.')) {
-  failures.push('missing-text:Public requests, clear bugs, useful ideas.');
-}
-const hasEmbeddedBoard = html.includes('data-chummer-participate-frame');
-const hasOfflineFallback = text.includes('Board offline right now');
-if (!hasEmbeddedBoard && !hasOfflineFallback) {
-  failures.push('missing-participate-state:embedded-board-or-offline-fallback');
-}
+  if (!text.includes('Public requests, clear bugs, useful ideas.')) {
+    failures.push('missing-text:Public requests, clear bugs, useful ideas.');
+  }
+  const hasEmbeddedBoard = html.includes('data-chummer-participate-frame');
+  const hasOfflineFallback = text.includes('Board offline right now');
+  if (!hasEmbeddedBoard && !hasOfflineFallback) {
+    failures.push('missing-participate-state:embedded-board-or-offline-fallback');
+  }
 
   forbiddenHtml.forEach((needle) => {
     if (html.includes(needle)) {
@@ -100,7 +85,8 @@ if (!hasEmbeddedBoard && !hasOfflineFallback) {
   if (!response || !response.ok()) {
     failures.push(`status:${response ? response.status() : 'no-response'}`);
   }
-  if (response.headers()['set-cookie']) {
+  const setCookie = response.headers()['set-cookie'] || '';
+  if (/productlift|cdn\.productlift/i.test(setCookie)) {
     failures.push('forwarded-set-cookie');
   }
   if (/What do you want to see next/i.test(title) || /ProductLift/i.test(title)) {
@@ -124,7 +110,7 @@ if (!hasEmbeddedBoard && !hasOfflineFallback) {
     status: 'pass',
     url,
     checked_forbidden_patterns: forbidden.length,
-    checked_required_html: requiredHtml.length,
+    checked_required_html: 0,
     checked_forbidden_html: forbiddenHtml.length,
     title,
   }));

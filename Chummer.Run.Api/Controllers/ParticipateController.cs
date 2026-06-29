@@ -173,7 +173,7 @@ public sealed class ParticipateController : Controller
                     string.IsNullOrWhiteSpace(subject.DisplayName) ? "Signed in" : subject.DisplayName,
                     subject.Email),
             Heading: "Participate",
-            Summary: "Feedback and roadmap live on the board.",
+            Summary: "Public requests, clear bugs, useful ideas.",
             StatusLabel: hostedBoardAvailable ? "Open" : "Offline",
             Posts: Array.Empty<FirstPartyParticipatePostViewModel>(),
             FallbackItems: Array.Empty<ParticipateItemViewModel>(),

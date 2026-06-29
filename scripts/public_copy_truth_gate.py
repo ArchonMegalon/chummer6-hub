@@ -14,7 +14,7 @@ OPERATIONS_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "
 PROJECTION_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_PublicSignalProjectionPacket.cshtml"
 
 REQUIRED_HTML_PHRASES = (
-    "What should Chummer do next?",
+    "Participate",
     "Public requests, clear bugs, useful ideas.",
 )
 FORBIDDEN_HTML_PHRASES = (

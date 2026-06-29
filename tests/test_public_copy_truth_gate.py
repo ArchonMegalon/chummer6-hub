@@ -58,7 +58,7 @@ def test_feedback_copy_keeps_public_safe_closeout_language() -> None:
     assert "release-backed closeout" not in gate_module.REQUIRED_SOURCE_PHRASES
     assert "proof-bound" not in gate_module.REQUIRED_HTML_PHRASES
     assert "proof-bound" not in gate_module.REQUIRED_SOURCE_PHRASES
-    assert "What should Chummer do next?" in gate_module.REQUIRED_HTML_PHRASES
+    assert "Participate" in gate_module.REQUIRED_HTML_PHRASES
     assert "Public requests, clear bugs, useful ideas." in gate_module.REQUIRED_HTML_PHRASES
     assert "public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)" in gate_module.REQUIRED_SOURCE_PHRASES
     assert "return Redirect($\"/participate{Request.QueryString}\");" in gate_module.REQUIRED_SOURCE_PHRASES

@@ -431,9 +431,10 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert 'DirectBoardHref: boardShellHref,' in controller
     assert "ResolveParticipateSupporterHref()" in controller
     assert 'BrilliantDirectoriesBillingService? billing = HttpContext?.RequestServices.GetService<BrilliantDirectoriesBillingService>();' in controller
-    assert "hostedHeadingReplacement: \"What should Chummer do next?\"" in controller
-    assert "hostedSummaryReplacement: \"Public requests, clear bugs, useful ideas.\"" in controller
-    assert "What should Chummer do next?" in controller
+    assert "hostedHeadingReplacement: null," in controller
+    assert "hostedSummaryReplacement: null," in controller
+    assert 'Heading: "Participate"' in controller
+    assert 'Summary: "Public requests, clear bugs, useful ideas."' in controller
     assert "Public requests, clear bugs, useful ideas." in controller
     assert 'public IActionResult ParticipateBoardFrame(string? boardPath)' in controller
     assert ".text-primary," in controller
@@ -442,13 +443,13 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "Current requests" in participate
     assert "participate-preview-card" not in participate
     assert "data-chummer-participate-frame" in participate
-    assert "Model.SupporterHref" in participate
+    assert "Model.SupporterHref" not in participate
     assert "@PublicParticipateText(Model.Heading)" in participate
     assert "@PublicParticipateText(Model.Summary)" in participate
     assert "Board offline right now" in participate
     assert "Use Contact for the Chummer5 Discord server." in participate
     assert "Private support" not in participate
-    assert "Supporter" in participate
+    assert "Supporter" not in participate
     assert "Support Chummer" not in participate
     assert "participate-preview-list" not in participate
     assert "participate-preview-card" not in participate
@@ -841,10 +842,11 @@ def test_public_copy_cleanup_is_centralized_for_planning_and_package_pages() -> 
     ):
         source = read(view_path)
         if view_path == "Chummer.Run.Api/Views/PublicLanding/Roadmap.cshtml":
-            assert "In progress." in source
-            assert "Requests stay in Participate." in source
-            assert "Planned work lives here. Shipped work moves to Changelog." in source
-            assert "Work opens below." in source
+            assert "Planned work and current requests." in source
+            assert "In progress." not in source
+            assert "Requests stay in Participate." not in source
+            assert "Planned work lives here. Shipped work moves to Changelog." not in source
+            assert "Work opens below." not in source
             assert 'href="/participate"' in source
             assert 'href="/changelog"' in source
         else:
@@ -1058,9 +1060,7 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
 
     for required in (
         "Roadmap",
-        "In progress.",
-        "Requests stay in Participate.",
-        "Planned work lives here. Shipped work moves to Changelog.",
+        "Planned work and current requests.",
     ):
         assert required in roadmap
 
@@ -1080,7 +1080,7 @@ def test_roadmap_pages_clean_dynamic_copy_before_rendering() -> None:
     assert 'canonicalHref: "/roadmap"' in controller
     assert 'assetProxyBasePath: "/roadmap/provider-assets"' in controller
     assert 'pageTitle: "Roadmap - Chummer.run"' in controller
-    assert 'return Redirect($"/roadmap{Request.QueryString}");' in controller
+    assert '=> await RoadmapBoardFallbackAsync(cancellationToken, "/roadmap").ConfigureAwait(false);' in controller
     for forbidden in (
         "Milestone-backed public direction",
         "current readiness",
@@ -2750,7 +2750,7 @@ def test_public_feature_action_labels_do_not_expose_packet_receipt_or_json_jargo
         '"Open bulletin summary"',
         '"Open bulletin data"',
         '"Open replay data"',
-        '"Open mobile app data"',
+        '"Open mobile"',
         '"Download player notes"',
         '"Open first runsite"',
         "Read the session board before using Run Control at the table.",
