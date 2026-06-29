@@ -7,6 +7,7 @@ Disallow: /campaigns/
 Disallow: /billing/
 Disallow: /api/
 Disallow: /support/private/
+Disallow: /proofs/
 Disallow: /alice
 Disallow: /ledger
 Disallow: /ledger/

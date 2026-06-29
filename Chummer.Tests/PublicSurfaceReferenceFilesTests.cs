@@ -41,9 +41,10 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/docs", llms, StringComparison.Ordinal);
         Assert.Contains("/docs/chummer6-quickstart", llms, StringComparison.Ordinal);
         Assert.Contains("/docs/chummer6-quickstart/download.pdf", llms, StringComparison.Ordinal);
-        Assert.Contains("/roadmap", llms, StringComparison.Ordinal);
-        Assert.Contains("/feedback", llms, StringComparison.Ordinal);
+        Assert.Contains("/participate", llms, StringComparison.Ordinal);
         Assert.Contains("/changelog", llms, StringComparison.Ordinal);
+        Assert.DoesNotContain("/roadmap", llms, StringComparison.Ordinal);
+        Assert.DoesNotContain("/feedback", llms, StringComparison.Ordinal);
         Assert.DoesNotContain("/horizons", llms, StringComparison.Ordinal);
         Assert.DoesNotContain("/ledger", llms, StringComparison.Ordinal);
         Assert.DoesNotContain("/ledger", ai, StringComparison.Ordinal);
@@ -56,9 +57,10 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.DoesNotContain("/participate/karma-forge", llms, StringComparison.Ordinal);
         Assert.Contains("/llms.txt", ai, StringComparison.Ordinal);
         Assert.Contains("/docs", ai, StringComparison.Ordinal);
-        Assert.Contains("/roadmap", ai, StringComparison.Ordinal);
+        Assert.Contains("/participate", ai, StringComparison.Ordinal);
+        Assert.DoesNotContain("/roadmap", ai, StringComparison.Ordinal);
         Assert.DoesNotContain("/horizons", ai, StringComparison.Ordinal);
-        Assert.Contains("/feedback", ai, StringComparison.Ordinal);
+        Assert.DoesNotContain("/feedback", ai, StringComparison.Ordinal);
         Assert.Contains("/contact", ai, StringComparison.Ordinal);
     }
 

@@ -3,14 +3,14 @@ Chummer route reference
 Full route guide: /llms.txt
 
 Fast split
-- Current release surfaces: /downloads, /status, /changelog
+- Install Chummer: /downloads
+- Current release reference: /status, /changelog
 - Help documents: /docs, /docs/chummer6-quickstart, /docs/chummer6-quickstart/download.pdf
-- Guided help: /downloads/concierge, /contact/concierge
-- Planned work: /roadmap
-- Public feedback: /feedback
-- Private help: /help, /contact
+- Guided help: /downloads/concierge
+- Public feedback and roadmap: /participate
+- Help: /help, /contact
 - Signed-in follow-through: /home, /account
 
 Guardrails
-- Treat /roadmap as planned work, not shipped status.
-- Use /feedback for safe public requests and /contact for private support.
+- Treat /participate as planned work and public feedback, not shipped status.
+- Use /participate for safe public requests and /contact when a human reply helps.

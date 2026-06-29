@@ -166,6 +166,7 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
             "scripts/verify_mobile_pwa_public_projection.py --base-url https://chummer.run",
             "tests/public/mobile-pwa-public.spec.ts",
             "tests/public/pwa-installability.spec.ts",
+            "tests/public/pwa-offline-cache.spec.ts",
             "not be described as a complete mobile character builder",
         ):
             self.assertIn(required, text)

@@ -2,8 +2,9 @@ Chummer public route guide
 
 Overview
 - Chummer is the public front door for the Shadowrun desktop character tools.
-- The main public routes are Downloads, Help, Status, and Contact.
-- Signed-in account pages exist for recovery and support history, but the public pages remain readable without an account.
+- The main public routes are Downloads, Help, and Contact.
+- Participate is the public feedback and roadmap surface.
+- Signed-in account pages exist for recovery and linked installs, but the public pages remain readable without an account.
 
 Primary routes
 - / : landing and product entry
@@ -13,26 +14,25 @@ Primary routes
 - /docs : help documents
 - /docs/chummer6-quickstart : quickstart guide
 - /docs/chummer6-quickstart/download.pdf : quickstart PDF
-- /status : current release
 
-Maintenance and feedback routes
-- /roadmap : planned work
-- /feedback : public feedback
+Release and participation routes
+- /status : current release reference
+- /participate : public feedback and roadmap
 - /changelog : shipped closeout and release-backed updates
 
 Help and account routes
 - /help : help entry
 - /faq : public FAQ
-- /contact : private support and follow-up
+- /contact : Chummer5 Discord contact
 - /home : signed-in return surface
 - /account : signed-in account, account return, and follow settings
 
 Reading rules
-- Treat /roadmap as planned work, not shipped status.
+- Treat /participate as public feedback and planned work, not shipped status.
 - Use /downloads, /status, and /changelog when the question is what is available now.
-- Use /feedback for public requests and safe public bugs.
-- Use /contact or /help when the issue is private, recovery-bound, or account-specific.
+- Use /participate for public requests and safe public bugs.
+- Use /contact or /help when the issue is recovery-bound, account-specific, or needs a human reply.
 
 Boundary notes
 - Downloads is the public install page.
-- Help and Contact are the public support paths.
+- Help and Contact are the public help paths.
