@@ -273,7 +273,7 @@ public sealed class SupportConciergePacketService
 
         if (presentation.NeedsInstallUpdate)
         {
-            return "Keep the previous installed copy available, update on the same linked install, and verify before reopening or closing.";
+            return "Keep the previous installed copy available, update on the same linked install, and try it before reopening or closing.";
         }
 
         return artifact is null
@@ -334,7 +334,7 @@ public sealed class SupportConciergePacketService
 
         if (presentation.NeedsInstallUpdate)
         {
-            blockers.Add("the reporter still needs an update before verification");
+            blockers.Add("the reporter still needs an update before trying the fix again");
         }
 
         return blockers.Count == 0
