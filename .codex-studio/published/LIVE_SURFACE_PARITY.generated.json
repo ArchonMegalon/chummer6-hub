@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-29T18:07:48Z",
+  "generated_at_utc": "2026-06-29T19:14:43Z",
   "base_url": "https://chummer.run",
   "require_brilliant_directories_checkout": true,
   "status": "pass",
@@ -58,8 +58,8 @@
       "redirect_chain": [],
       "required_texts": [
         "Downloads",
-        "The current installer is selected for this browser when available.",
-        "Main build for this browser",
+        "Chummer selects the best installer when it can.",
+        "Stable release",
         "Nightly",
         "Stable",
         "Build from source",
@@ -110,8 +110,8 @@
       ],
       "required_texts": [
         "Downloads",
-        "The current installer is selected for this browser when available.",
-        "Main build for this browser",
+        "Chummer selects the best installer when it can.",
+        "Stable release",
         "Build from source"
       ],
       "required_any_texts": [],
