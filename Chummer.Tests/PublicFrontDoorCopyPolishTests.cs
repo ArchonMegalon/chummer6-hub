@@ -1350,6 +1350,7 @@ public sealed partial class PublicFrontDoorCopyPolishTests
             "Last verified",
             "Last checked",
             "Open checks",
+            "verified paths remain blocked",
             "World turn check",
             "Turn checks",
             "Check the current release posture",

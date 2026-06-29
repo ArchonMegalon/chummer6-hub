@@ -13982,7 +13982,7 @@ Boundary:
 
         if (blockedJourneyCount > 0)
         {
-            segments.Add($"{blockedJourneyCount} verified paths remain blocked");
+            segments.Add($"{blockedJourneyCount} setup paths need attention");
         }
 
         return string.Join("; ", segments) + ".";
