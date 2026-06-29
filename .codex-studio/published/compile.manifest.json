@@ -1,5 +1,6 @@
 {
   "artifacts": [
+    "ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json",
     "BLACK_LEDGER_FACTION_VIDEO_CARD_PROOF.generated.json",
     "BLACK_LEDGER_FEATURE_COMPLETION_AUDIT.generated.json",
     "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
@@ -17,8 +18,11 @@
     "HUB_LOCAL_RELEASE_PROOF.generated.json",
     "ICANPRENEUR_DISCOVERY_LANE.generated.json",
     "LIVE_PUBLIC_WEB_RECRAWL.generated.json",
+    "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
     "LIVE_SURFACE_PARITY.generated.json",
     "LTD_OPTIMIZATION_STACK.generated.json",
+    "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json",
+    "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.md",
     "NEXT90_M113_HUB_ROSTER_OPS.generated.json",
     "NEXT90_M116_HUB_CREATOR_PUBLICATION.generated.json",
     "NEXT90_M121_HUB_RUNBOARD_CONTINUITY.generated.json",

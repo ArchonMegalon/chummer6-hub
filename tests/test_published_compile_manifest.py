@@ -29,6 +29,12 @@ class PublishedCompileManifestTests(unittest.TestCase):
             if path.parent == final_gold.PUBLISHED_ROOT
         }
         required.add("ICANPRENEUR_DISCOVERY_LANE.generated.json")
+        required.update(
+            {
+                "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json",
+                "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.md",
+            }
+        )
 
         missing = sorted(required - artifacts)
         self.assertFalse(missing, f"compile manifest is missing published proof artifacts: {missing}")
