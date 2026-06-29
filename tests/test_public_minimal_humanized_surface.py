@@ -979,6 +979,14 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Release freshness" not in downloads
 
 
+def test_status_surface_uses_plain_updated_label() -> None:
+    status = read("Chummer.Run.Api/Views/PublicLanding/Status.cshtml")
+
+    assert 'ViewData["Title"] = "Updated";' in status
+    assert "<h1>Updated</h1>" in status
+    assert 'ViewData["Title"] = "Status";' not in status
+
+
 def test_minimal_palette_stays_neutral_and_readable() -> None:
     site_css = read("Chummer.Run.Api/wwwroot/css/site.css")
 
