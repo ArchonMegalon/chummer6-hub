@@ -5732,32 +5732,13 @@ async Task VerifyPublicLandingProjectionAsync()
     authenticatedLandingController.ControllerContext.HttpContext.Request.QueryString = QueryString.Empty;
     var statusView = await controller.StatusPage(CancellationToken.None) as ViewResult;
     var statusModel = statusView?.Model as StatusPageViewModel;
-    Assert(statusModel?.TrustPulse is not null, "guest status page should surface the weekly public trust pulse.");
-    Assert(statusModel?.SignedInStatus is null, "guest status page should not project install-specific signed-in trust posture.");
-    Assert(statusModel?.CampaignOsProof is not null, "status page should surface the mirrored campaign-OS local proof.");
-    Assert(statusModel?.LaunchHealthRows?.Select(static row => row.Label).SequenceEqual(new[]
-    {
-        "Live",
-        "Preview",
-        "Fallback",
-        "Revoked",
-        "Fixed",
-        "Blocked",
-        "Proof recency",
-        "Support pulse",
-        "Adoption health",
-    }) == true, "status page should preserve the full public launch-health row order.");
-    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Preview", StringComparison.Ordinal) && row.Value.Contains("published", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface the current preview posture in launch-health rows.");
-    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Revoked", StringComparison.Ordinal) && row.Value.Contains("revoke", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface revoke posture in launch-health rows.");
-    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Fixed", StringComparison.Ordinal) && row.Value.Contains("fix", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface fixed-release follow-through in launch-health rows.");
-    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Blocked", StringComparison.Ordinal) && row.Value.Contains("blocked", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface blocked route or journey posture in launch-health rows.");
-    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Live", StringComparison.Ordinal) && row.Value.Contains("live install route", StringComparison.OrdinalIgnoreCase)) == true, "status page should compile the live install shelf posture into launch-health rows without claiming nothing is live while downloads remain available.");
-    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Support pulse", StringComparison.Ordinal) && row.Value.Contains("support", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface support closure posture in launch-health rows.");
-    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && ContainsLocalProofLabel(row.Value)) == true, "status page should surface adoption health directly inside the launch-health breakdown.");
+    Assert(statusModel is not null, "status page should return a compact release status model.");
+    Assert(statusModel.ReleaseExperience is not null, "status page should still carry current release availability.");
+    Assert(!string.IsNullOrWhiteSpace(statusModel.ReleaseSummary), "status page should keep a short release summary for route metadata and tests.");
+    Assert(!string.IsNullOrWhiteSpace(statusModel.CautionSummary), "status page should keep a short caution summary for route metadata and tests.");
     var authenticatedStatusView = await authenticatedLandingController.StatusPage(CancellationToken.None) as ViewResult;
     var authenticatedStatusModel = authenticatedStatusView?.Model as StatusPageViewModel;
-    Assert(authenticatedStatusModel?.TrustPulse is not null, "authenticated status page should keep the weekly public trust pulse visible.");
-    Assert(authenticatedStatusModel?.SignedInStatus is not null, "authenticated status page should project the shared signed-in trust status.");
+    Assert(authenticatedStatusModel is not null, "authenticated status page should use the same compact model as the guest route.");
     var horizonsView = await controller.HorizonsPage(CancellationToken.None) as ViewResult;
     var horizonsModel = horizonsView?.Model as HorizonsPageViewModel;
     Assert(horizonsModel?.TrustPulse is not null, "guest horizons page should surface the weekly public trust pulse.");
@@ -5851,8 +5832,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableStatusView = await unavailableLandingController.StatusPage(CancellationToken.None) as ViewResult;
     var unavailableStatusModel = unavailableStatusView?.Model as StatusPageViewModel;
     Assert(unavailableStatusModel?.Chrome.Authenticated == true, "status chrome should stay authenticated when identity is temporarily unavailable but the browser session cookie still exists.");
-    Assert(unavailableStatusModel?.SignedInStatus is null, "status should suppress install-specific trust status when identity is temporarily unavailable.");
-    Assert(unavailableStatusModel?.TrustPulse is not null, "status should keep the public trust pulse even when identity lookups are temporarily unavailable.");
+    Assert(unavailableStatusModel is not null, "status should stay available when identity lookups are temporarily unavailable.");
     var unavailableHomeResult = await unavailableLandingController.HomePage(null, CancellationToken.None);
     var unavailableHomeModel = (unavailableHomeResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableHomeModel?.Heading, "Home is unavailable right now", StringComparison.Ordinal), "home page should show an unavailable message when identity is down instead of redirecting to login.");

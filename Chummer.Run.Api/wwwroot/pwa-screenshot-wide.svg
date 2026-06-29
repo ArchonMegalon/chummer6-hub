@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1512" height="982" viewBox="0 0 1512 982" role="img" aria-labelledby="title desc">
-  <title id="title">Chummer wide PWA screenshot</title>
-  <desc id="desc">Illustrated wide shell view showing install panel, role entry, and continuity cards.</desc>
+  <title id="title">Chummer app screenshot</title>
+  <desc id="desc">Illustrated wide app view showing runner selection, play entry, and continuity cards.</desc>
   <defs>
     <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
       <stop offset="0%" stop-color="#09121a"/>
@@ -10,15 +10,15 @@
   <rect width="1512" height="982" fill="url(#bg)"/>
   <rect x="56" y="56" width="1400" height="870" rx="42" fill="#081118" opacity="0.95"/>
   <rect x="100" y="100" width="1312" height="220" rx="28" fill="#102434"/>
-  <text x="140" y="166" fill="#88e4ff" font-family="Space Grotesk, Arial, sans-serif" font-size="34">CHUMMER MOBILE</text>
-  <text x="140" y="236" fill="#f4fbff" font-family="Space Grotesk, Arial, sans-serif" font-size="64" font-weight="700">Installable shell with continuity and role entry</text>
-  <text x="140" y="290" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="24">The PWA keeps installs, reconnect status, and session return in one first-party workspace.</text>
+  <text x="140" y="166" fill="#88e4ff" font-family="Space Grotesk, Arial, sans-serif" font-size="34">CHUMMER</text>
+  <text x="140" y="236" fill="#f4fbff" font-family="Space Grotesk, Arial, sans-serif" font-size="64" font-weight="700">Runner roster with continuity and play entry</text>
+  <text x="140" y="290" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="24">Open a runner, return to a table, or get the current desktop build.</text>
   <rect x="100" y="364" width="380" height="500" rx="28" fill="#102434"/>
   <rect x="510" y="364" width="430" height="500" rx="28" fill="#102434"/>
   <rect x="970" y="364" width="442" height="500" rx="28" fill="#102434"/>
-  <text x="136" y="430" fill="#f4fbff" font-family="Space Grotesk, Arial, sans-serif" font-size="38" font-weight="700">Install panel</text>
-  <text x="136" y="488" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="23">Prompt readiness, online state, and manifest/service worker status.</text>
-  <text x="136" y="596" fill="#d2f36a" font-family="IBM Plex Mono, monospace" font-size="28">READY WHEN SUPPORTED</text>
+  <text x="136" y="430" fill="#f4fbff" font-family="Space Grotesk, Arial, sans-serif" font-size="38" font-weight="700">Runners</text>
+  <text x="136" y="488" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="23">Your characters and sample archetypes stay easy to open.</text>
+  <text x="136" y="596" fill="#d2f36a" font-family="IBM Plex Mono, monospace" font-size="28">OPEN RUNNER</text>
   <text x="546" y="430" fill="#f4fbff" font-family="Space Grotesk, Arial, sans-serif" font-size="38" font-weight="700">Role entry</text>
   <text x="546" y="488" fill="#c8d9e2" font-family="Instrument Sans, Arial, sans-serif" font-size="23">Player, GM, and observer entry stay in one clear shell.</text>
   <text x="1006" y="430" fill="#f4fbff" font-family="Space Grotesk, Arial, sans-serif" font-size="38" font-weight="700">Continuity</text>

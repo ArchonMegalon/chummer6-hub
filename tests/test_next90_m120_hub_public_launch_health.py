@@ -166,15 +166,15 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             status_text = status_path.read_text(encoding="utf-8")
             status_path.write_text(
                 status_text
-                .replace('data-status-surface="decision-surface"', "data-status-surface=\"missing\"", 1)
-                .replace("Caution.", "Quick release summary", 1),
+                .replace('aria-label="Status next actions"', 'aria-label="Missing status next actions"', 1)
+                .replace(">Downloads</a>", ">Get it</a>", 1),
                 encoding="utf-8",
             )
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('data-status-surface="decision-surface"', result.stderr)
+        self.assertIn('aria-label="Status next actions"', result.stderr)
 
     def test_verifier_fails_when_release_proof_drops_public_trust_surface_block(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-proof-surface-") as temp_dir:
@@ -208,21 +208,21 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("receipt id launch_health:public must appear exactly once in proof_receipts", result.stderr)
 
-    def test_verifier_fails_when_controller_loses_revoked_launch_health_row(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m120-revoked-row-") as temp_dir:
+    def test_verifier_fails_when_controller_loses_compact_status_summary(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="next90-m120-status-summary-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             controller_path = temp_root / "Chummer.Run.Api/Controllers/PublicLandingController.cs"
             controller_text = controller_path.read_text(encoding="utf-8")
             controller_path.write_text(
-                controller_text.replace('new("Revoked", BuildRevokedLaunchSummary(manifest)),', 'new("Recalled", BuildRevokedLaunchSummary(manifest)),', 1),
+                controller_text.replace("ReleaseSummary: releaseSummary,", "ReleaseSummary: string.Empty,", 1),
                 encoding="utf-8",
             )
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('new("Revoked", BuildRevokedLaunchSummary(manifest)),', result.stderr)
+        self.assertIn("ReleaseSummary: releaseSummary,", result.stderr)
 
     def test_verifier_fails_when_smoke_drops_status_decision_surface_assertion(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-status-surface-") as temp_dir:
@@ -230,7 +230,7 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             self.copy_sources(temp_root)
             smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
             smoke_text = smoke_path.read_text(encoding="utf-8")
-            fixed_assertion = 'Assert(statusSource.Contains("Open help", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");'
+            fixed_assertion = 'Assert(statusSource.Contains(">Help</a>", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");'
             smoke_path.write_text(
                 smoke_text.replace(fixed_assertion, "// status decision surface assertion removed", 1),
                 encoding="utf-8",
@@ -239,7 +239,7 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Open help", result.stderr)
+        self.assertIn(">Help</a>", result.stderr)
 
     def test_verifier_fails_when_release_proof_duplicates_package_receipt_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-proof-duplicate-") as temp_dir:

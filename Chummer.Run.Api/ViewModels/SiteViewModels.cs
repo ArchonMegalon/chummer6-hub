@@ -1174,12 +1174,7 @@ public sealed record StatusPageViewModel(
     ReleaseTruthDisplayViewModel ReleaseTruth,
     ReleaseExperienceViewModel ReleaseExperience,
     string ReleaseSummary,
-    string CautionSummary,
-    CampaignOsLocalProofSnapshot? CampaignOsProof = null,
-    IReadOnlyList<PublicTrustPulseRowViewModel>? LaunchHealthRows = null,
-    GoldReadinessStatusViewModel? GoldReadiness = null,
-    PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    string CautionSummary);
 
 public sealed record GoldReadinessStatusViewModel(
     string StatusLabel,

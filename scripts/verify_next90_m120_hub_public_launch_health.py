@@ -155,20 +155,9 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
 SOURCE_MARKERS = {
     "Chummer.Run.Api/Controllers/PublicLandingController.cs": [
         'Chrome: await BuildPublicOrAuthenticatedChromeAsync("Updated", "Current Chummer downloads and setup help.", "/status", cancellationToken),',
-        "LaunchHealthRows: BuildPublicLaunchHealthRows(manifest, releaseExperience, pulse),",
-        'new("Live", BuildLiveLaunchSummary(manifest)),',
-        'new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience, pulse)),',
-        'new("Fallback", BuildFallbackLaunchSummary(manifest)),',
-        'new("Revoked", BuildRevokedLaunchSummary(manifest)),',
-        'new("Fixed", BuildFixedLaunchSummary(manifest)),',
-        'new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),',
-        (
-            'new("Proof recency", BuildProofFreshnessSummary(manifest, pulse)),',
-            'new("Release checks", BuildProofFreshnessSummary(manifest, pulse)),',
-        ),
-        'new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),',
-        'new("Adoption health", pulse is null',
-        "private static IReadOnlyList<PublicTrustPulseRowViewModel> BuildPublicLaunchHealthRows(",
+        "ReleaseSummary: releaseSummary,",
+        "CautionSummary: cautionSummary);",
+        "ApplyNoStoreHeaders(Response.Headers);",
     ],
     "Chummer.Run.Api/Controllers/PublicProgressController.cs": [
         '[HttpGet("progress-poster.svg")]',
@@ -177,7 +166,8 @@ SOURCE_MARKERS = {
         '[HttpGet("/api/public/weekly-pulse")]',
     ],
     "Chummer.Run.Api/ViewModels/SiteViewModels.cs": [
-        "IReadOnlyList<PublicTrustPulseRowViewModel>? LaunchHealthRows = null,",
+        "public sealed record StatusPageViewModel(",
+        "string CautionSummary);",
     ],
     "Chummer.Run.Api/Views/PublicLanding/Status.cshtml": [
         "Status",

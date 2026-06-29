@@ -7494,12 +7494,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ReleaseTruth: BuildReleaseTruthDisplay(manifest),
             ReleaseExperience: releaseExperience,
             ReleaseSummary: releaseSummary,
-            CautionSummary: cautionSummary,
-            CampaignOsProof: _campaignOsProof.LoadProof(),
-            LaunchHealthRows: BuildPublicLaunchHealthRows(manifest, releaseExperience, pulse),
-            GoldReadiness: BuildGoldReadinessStatus(_goldReadiness.LoadSnapshot()),
-            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience, pulse),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+            CautionSummary: cautionSummary);
 
         ApplyNoStoreHeaders(Response.Headers);
         return View("~/Views/PublicLanding/Status.cshtml", model);
@@ -13574,68 +13569,6 @@ Boundary:
         }
 
         return HumanizeToken(channel, "Current release");
-    }
-
-    private static IReadOnlyList<PublicTrustPulseRowViewModel> BuildPublicLaunchHealthRows(
-        PublicReleaseManifestDto manifest,
-        ReleaseExperienceViewModel releaseExperience,
-        PublicTrustPulseSnapshot? pulse)
-    {
-        var rows = new List<PublicTrustPulseRowViewModel>
-        {
-            new("Live", BuildLiveLaunchSummary(manifest)),
-            new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience, pulse)),
-            new("Fallback", BuildFallbackLaunchSummary(manifest)),
-            new("Revoked", BuildRevokedLaunchSummary(manifest)),
-            new("Fixed", BuildFixedLaunchSummary(manifest)),
-            new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),
-            new("Release checks", BuildProofFreshnessSummary(manifest, pulse)),
-            new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),
-            new("Adoption health", pulse is null
-                ? BuildManifestAdoptionSummary(manifest)
-                : BuildTrustPulseAdoptionSummary(pulse))
-        };
-
-        return rows
-            .Select(SanitizePublicLaunchHealthRow)
-            .ToArray();
-    }
-
-    private static PublicTrustPulseRowViewModel SanitizePublicLaunchHealthRow(PublicTrustPulseRowViewModel row)
-    {
-        return new PublicTrustPulseRowViewModel(
-            NormalizePublicLaunchHealthText(row.Label),
-            NormalizePublicLaunchHealthText(row.Value));
-    }
-
-    private static string NormalizePublicLaunchHealthText(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-
-        return value
-            .Replace("proof\u00a0freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof freshness", "Release checks")
-            .Replace("proof-freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof-freshness", "Release checks")
-            .Replace("proof\u00a0recency", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("Proof recency", "Release checks")
-            .Replace("local edge proof", "current release status", StringComparison.OrdinalIgnoreCase)
-            .Replace("governor truth", "release status", StringComparison.OrdinalIgnoreCase)
-            .Replace("journey proofs", "tested journeys", StringComparison.OrdinalIgnoreCase)
-            .Replace("trust routes", "checked pages", StringComparison.OrdinalIgnoreCase)
-            .Replace("startup-smoke proof", "startup status", StringComparison.OrdinalIgnoreCase)
-            .Replace("startup-smoke", "startup status", StringComparison.OrdinalIgnoreCase)
-            .Replace("executable-gate proof", "executable status", StringComparison.OrdinalIgnoreCase)
-            .Replace("executable-gate", "executable status", StringComparison.OrdinalIgnoreCase)
-            .Replace("promoted flagship bytes", "promoted release packages", StringComparison.OrdinalIgnoreCase)
-            .Replace("Open demo", "Open launcher")
-            .Replace("Load Demo Runner", "Run example")
-            .Replace("Proof freshness", "Release checks");
     }
 
     private static GoldReadinessStatusViewModel? BuildGoldReadinessStatus(GoldReadinessSnapshot? snapshot)

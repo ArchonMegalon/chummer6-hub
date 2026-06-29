@@ -1040,23 +1040,23 @@ public_routes:
   placeholder_requirements: package follow intent route only
   verification_path: /packages/desktop-preview/follow
 - path: /mobile
-  title: Mobile and PWA
+  title: App alias
   audience: public
-  purpose: mobile_projection
+  purpose: app_entry_alias
   requires_auth: false
-  guest_fallback: /mobile
+  guest_fallback: /build
   must_exist: true
   placeholder_allowed: false
-  placeholder_requirements: public mobile and installability projection only
+  placeholder_requirements: redirect to the browser app entry
 - path: /pwa
-  title: PWA alias
+  title: App alias
   audience: public
-  purpose: mobile_projection
+  purpose: app_entry_alias
   requires_auth: false
-  guest_fallback: /pwa
+  guest_fallback: /build
   must_exist: true
   placeholder_allowed: false
-  placeholder_requirements: public alias into the mobile projection only
+  placeholder_requirements: redirect to the browser app entry
 - path: /play
   title: Play shell
   audience: public

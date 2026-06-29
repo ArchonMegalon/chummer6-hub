@@ -264,14 +264,17 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StatusPageControllerBuildsGoldReadinessSummaryFromPublishedJanitorTruth()
+    public void StatusPageControllerKeepsGoldReadinessOffThePublicStatusRoute()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
+        string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
+        string viewModel = File.ReadAllText(viewModelPath);
 
         Assert.Contains("_goldReadiness = new GoldReadinessArtifactService(configuration);", controller, StringComparison.Ordinal);
-        Assert.Contains("GoldReadiness: BuildGoldReadinessStatus(_goldReadiness.LoadSnapshot())", controller, StringComparison.Ordinal);
         Assert.Contains("private static GoldReadinessStatusViewModel? BuildGoldReadinessStatus", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("GoldReadiness: BuildGoldReadinessStatus(_goldReadiness.LoadSnapshot())", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("GoldReadinessStatusViewModel? GoldReadiness", viewModel, StringComparison.Ordinal);
         Assert.Contains("Gold support is still blocked.", controller, StringComparison.Ordinal);
         Assert.Contains("still needs these steps", controller, StringComparison.Ordinal);
         Assert.Contains("complete the rules coverage", controller, StringComparison.Ordinal);
@@ -312,15 +315,17 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StatusControllerSanitizesLaunchHealthRowsBeforeSurfaceRender()
+    public void StatusControllerDoesNotBuildLaunchHealthRowsForTheMinimalStatusRoute()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
+        string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
+        string viewModel = File.ReadAllText(viewModelPath);
 
-        Assert.Contains("Select(SanitizePublicLaunchHealthRow)", controller, StringComparison.Ordinal);
-        Assert.Contains("NormalizePublicLaunchHealthText(row.Label)", controller, StringComparison.Ordinal);
-        Assert.Contains("NormalizePublicLaunchHealthText(row.Value)", controller, StringComparison.Ordinal);
-        Assert.Contains("Release checks", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("LaunchHealthRows: BuildPublicLaunchHealthRows", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("private static IReadOnlyList<PublicTrustPulseRowViewModel> BuildPublicLaunchHealthRows", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("SanitizePublicLaunchHealthRow", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("LaunchHealthRows", viewModel, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -358,7 +363,7 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StatusPageUsesLaunchHealthRowsForShorterReleaseAndCautionSummaries()
+    public void StatusPageUsesShortReleaseAndCautionSummariesWithoutLaunchHealthRows()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
         string view = File.ReadAllText(viewPath);
@@ -369,6 +374,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("BuildPublicStatusCautionSummary", controller, StringComparison.Ordinal);
         Assert.Contains("<h1>Updated</h1>", view, StringComparison.Ordinal);
         Assert.Contains("publicPlatformSummary", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("LaunchHealthRows", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("LaunchHealthRows", view, StringComparison.Ordinal);
         Assert.DoesNotContain("updateSummary", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Updated {verifiedLabel}", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Chummer is available.", view, StringComparison.Ordinal);
