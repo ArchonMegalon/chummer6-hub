@@ -17,7 +17,13 @@ def test_windows_bootstrap_uses_resolved_temp_root_instead_of_raw_temp() -> None
 
     assert "Var BootstrapTempRoot" in text
     assert "Function EnsureBootstrapTempRoot" in text
-    assert 'StrCpy $EffectivePayloadPath "$BootstrapTempRoot\\${CHUMMER_PAYLOAD_FILE_NAME}"' in text
+    assert "Function NormalizePathToR9" in text
+    assert "Function TryUseBootstrapTempRootCandidate" in text
+    assert 'Push "$0\\Chummer6\\installer-temp"' in text
+    assert 'FileOpen $2 "$9\\bootstrap-root-probe.tmp" w' in text
+    assert 'Push "$BootstrapTempRoot\\${CHUMMER_PAYLOAD_FILE_NAME}"' in text
+    assert "Call NormalizePathToR9" in text
+    assert 'StrCpy $EffectivePayloadPath $9' in text
     assert '"$BootstrapTempRoot\\curl.exe"' in text
     assert '"$BootstrapTempRoot\\chummer-verify-size.cmd"' in text
     assert '"$BootstrapTempRoot\\chummer-verify-payload.cmd"' in text
