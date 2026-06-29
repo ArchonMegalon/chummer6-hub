@@ -1,11 +1,38 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Net.Http.Headers;
+using System.Net.WebSockets;
 
 namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
 public sealed class LegacySurfaceRedirectController : ControllerBase
 {
+    private static readonly HashSet<string> HopByHopRequestHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        HeaderNames.Connection,
+        HeaderNames.Host,
+        HeaderNames.KeepAlive,
+        HeaderNames.ProxyAuthenticate,
+        HeaderNames.ProxyAuthorization,
+        HeaderNames.TE,
+        HeaderNames.Trailer,
+        HeaderNames.TransferEncoding,
+        HeaderNames.Upgrade
+    };
+
+    private static readonly HashSet<string> HopByHopResponseHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        HeaderNames.Connection,
+        HeaderNames.KeepAlive,
+        HeaderNames.ProxyAuthenticate,
+        HeaderNames.ProxyAuthorization,
+        HeaderNames.TE,
+        HeaderNames.Trailer,
+        HeaderNames.TransferEncoding,
+        HeaderNames.Upgrade
+    };
+
     private readonly IHttpClientFactory? _httpClientFactory;
     private readonly Uri? _blazorUpstream;
     private readonly Uri? _avaloniaUpstream;
@@ -26,21 +53,24 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     public IActionResult Hub()
         => Redirect("/account");
 
-    [HttpGet("/blazor")]
-    [HttpGet("/blazor/{**path}")]
+    [AcceptVerbs("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")]
+    [Route("/blazor")]
+    [Route("/blazor/{**path}")]
     public async Task<IActionResult> Workbench(string? path, CancellationToken cancellationToken)
         => await ProxyBrowserSurfaceAsync(_blazorUpstream, "/blazor", path, cancellationToken).ConfigureAwait(false);
 
-    [HttpGet("/app")]
-    [HttpGet("/app/{**path}")]
+    [AcceptVerbs("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")]
+    [Route("/app")]
+    [Route("/app/{**path}")]
     public async Task<IActionResult> App(string? path, CancellationToken cancellationToken)
     {
         Uri? appUpstream = _blazorUpstream is null ? null : new Uri(_blazorUpstream, "app/");
         return await ProxyBrowserSurfaceAsync(appUpstream, "/app", path, cancellationToken).ConfigureAwait(false);
     }
 
-    [HttpGet("/avalonia")]
-    [HttpGet("/avalonia/{**path}")]
+    [AcceptVerbs("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")]
+    [Route("/avalonia")]
+    [Route("/avalonia/{**path}")]
     public async Task<IActionResult> Avalonia(string? path, CancellationToken cancellationToken)
         => await ProxyBrowserSurfaceAsync(_avaloniaUpstream, "/avalonia", path, cancellationToken).ConfigureAwait(false);
 
@@ -75,16 +105,25 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
             ? AppendQueryString(upstream, Request.QueryString.Value)
             : AppendQueryString(new Uri(upstream, relativePath), Request.QueryString.Value);
 
-        using HttpClient client = _httpClientFactory?.CreateClient() ?? new HttpClient();
-        using var outbound = new HttpRequestMessage(HttpMethod.Get, target);
-        outbound.Headers.TryAddWithoutValidation("User-Agent", Request.Headers.UserAgent.ToString());
-        outbound.Headers.TryAddWithoutValidation("Accept", Request.Headers.Accept.ToArray());
-        outbound.Headers.TryAddWithoutValidation("Accept-Language", Request.Headers.AcceptLanguage.ToArray());
-        if (Request.Headers.TryGetValue("Accept-Encoding", out var acceptEncoding))
+        if (HttpContext.WebSockets.IsWebSocketRequest)
         {
-            outbound.Headers.TryAddWithoutValidation("Accept-Encoding", acceptEncoding.ToArray());
+            bool proxied = await TryProxyWebSocketAsync(target, cancellationToken).ConfigureAwait(false);
+            if (!proxied)
+            {
+                Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            }
+
+            return new EmptyResult();
         }
-        outbound.Headers.Referrer = upstream;
+
+        using HttpClient client = CreateBrowserSurfaceClient();
+        using var outbound = new HttpRequestMessage(new HttpMethod(Request.Method), target);
+        if (RequestHasBody())
+        {
+            outbound.Content = new StreamContent(Request.Body);
+        }
+
+        CopyRequestHeaders(outbound);
 
         HttpResponseMessage response;
         try
@@ -168,7 +207,7 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     {
         foreach (var header in response.Headers)
         {
-            if (string.Equals(header.Key, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
+            if (HopByHopResponseHeaders.Contains(header.Key))
             {
                 continue;
             }
@@ -178,7 +217,7 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
 
         foreach (var header in response.Content.Headers)
         {
-            if (string.Equals(header.Key, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
+            if (HopByHopResponseHeaders.Contains(header.Key))
             {
                 continue;
             }
@@ -241,5 +280,156 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     {
         string text = string.IsNullOrWhiteSpace(raw) ? string.Empty : raw.Trim();
         return Uri.TryCreate(text, UriKind.Absolute, out Uri? uri) ? uri : null;
+    }
+
+    private HttpClient CreateBrowserSurfaceClient()
+    {
+        if (_httpClientFactory is not null)
+        {
+            return _httpClientFactory.CreateClient();
+        }
+
+        return new HttpClient(new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = false
+        });
+    }
+
+    private bool RequestHasBody()
+        => Request.ContentLength.GetValueOrDefault() > 0
+           || Request.Headers.ContainsKey(HeaderNames.TransferEncoding);
+
+    private void CopyRequestHeaders(HttpRequestMessage outbound)
+    {
+        foreach (var header in Request.Headers)
+        {
+            if (HopByHopRequestHeaders.Contains(header.Key))
+            {
+                continue;
+            }
+
+            if (!outbound.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
+            {
+                outbound.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+            }
+        }
+
+        outbound.Headers.Referrer = outbound.RequestUri is null
+            ? null
+            : new Uri($"{outbound.RequestUri.Scheme}://{outbound.RequestUri.Authority}/");
+    }
+
+    private async Task<bool> TryProxyWebSocketAsync(Uri target, CancellationToken cancellationToken)
+    {
+        Uri webSocketTarget = ConvertToWebSocketUri(target);
+        using var upstreamSocket = new ClientWebSocket();
+        upstreamSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
+        CopyWebSocketRequestHeaders(upstreamSocket.Options);
+
+        try
+        {
+            await upstreamSocket.ConnectAsync(webSocketTarget, cancellationToken).ConfigureAwait(false);
+        }
+        catch (WebSocketException)
+        {
+            return false;
+        }
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        using WebSocket downstreamSocket = await HttpContext.WebSockets.AcceptWebSocketAsync(
+            string.IsNullOrWhiteSpace(upstreamSocket.SubProtocol) ? null : upstreamSocket.SubProtocol).ConfigureAwait(false);
+
+        Task upstreamPump = RelayWebSocketAsync(downstreamSocket, upstreamSocket, cancellationToken);
+        Task downstreamPump = RelayWebSocketAsync(upstreamSocket, downstreamSocket, cancellationToken);
+        await Task.WhenAll(upstreamPump, downstreamPump).ConfigureAwait(false);
+        return true;
+    }
+
+    private void CopyWebSocketRequestHeaders(ClientWebSocketOptions options)
+    {
+        foreach (var header in Request.Headers)
+        {
+            if (HopByHopRequestHeaders.Contains(header.Key)
+                || header.Key.StartsWith("Sec-WebSocket-", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            options.SetRequestHeader(header.Key, header.Value.ToString());
+        }
+
+        if (Request.Headers.TryGetValue(HeaderNames.SecWebSocketProtocol, out var protocolValues))
+        {
+            IEnumerable<string> requestProtocols = protocolValues
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(static value => value!);
+            foreach (string protocol in requestProtocols
+                         .SelectMany(static value => value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                         .Distinct(StringComparer.Ordinal))
+            {
+                options.AddSubProtocol(protocol);
+            }
+        }
+    }
+
+    private static async Task RelayWebSocketAsync(WebSocket source, WebSocket destination, CancellationToken cancellationToken)
+    {
+        byte[] buffer = new byte[16 * 1024];
+
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested
+                   && source.State is WebSocketState.Open or WebSocketState.CloseReceived
+                   && destination.State is WebSocketState.Open or WebSocketState.CloseReceived)
+            {
+                WebSocketReceiveResult result = await source.ReceiveAsync(buffer, cancellationToken).ConfigureAwait(false);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    if (destination.State == WebSocketState.Open || destination.State == WebSocketState.CloseReceived)
+                    {
+                        await destination.CloseOutputAsync(
+                            result.CloseStatus ?? WebSocketCloseStatus.NormalClosure,
+                            result.CloseStatusDescription,
+                            CancellationToken.None).ConfigureAwait(false);
+                    }
+
+                    return;
+                }
+
+                await destination.SendAsync(
+                    buffer.AsMemory(0, result.Count),
+                    result.MessageType,
+                    result.EndOfMessage,
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (WebSocketException)
+        {
+            if (destination.State == WebSocketState.Open || destination.State == WebSocketState.CloseReceived)
+            {
+                await destination.CloseOutputAsync(
+                    WebSocketCloseStatus.InternalServerError,
+                    "browser surface proxy websocket relay failed",
+                    CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static Uri ConvertToWebSocketUri(Uri uri)
+    {
+        var builder = new UriBuilder(uri);
+        builder.Scheme = uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ? "wss" : "ws";
+        return builder.Uri;
     }
 }

@@ -203,6 +203,7 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 
+app.UseWebSockets();
 app.UseHubRequestObservability();
 app.UseHubApiRuntimeGuardrails();
 app.UseAuthorization();

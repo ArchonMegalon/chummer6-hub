@@ -88,6 +88,26 @@ public sealed class LegacySurfaceRedirectControllerTests
             handler.RequestUri?.ToString());
     }
 
+    [Fact]
+    public async Task WorkbenchRouteProxiesPostNegotiationRequestsForInteractiveBrowserSurface()
+    {
+        var handler = new RecordingHandler(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"connectionId\":\"abc\"}")
+        });
+        var controller = CreateBrowserController(new StaticHttpClientFactory(new HttpClient(handler)));
+        controller.ControllerContext.HttpContext.Request.Method = HttpMethods.Post;
+        controller.ControllerContext.HttpContext.Request.ContentType = "text/plain;charset=UTF-8";
+        controller.ControllerContext.HttpContext.Request.Body = new MemoryStream(Array.Empty<byte>());
+        controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?negotiateVersion=1");
+
+        IActionResult result = await controller.Workbench(path: "_blazor/negotiate", CancellationToken.None);
+
+        Assert.IsType<EmptyResult>(result);
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("https://browser.example/blazor/_blazor/negotiate?negotiateVersion=1", handler.RequestUri?.ToString());
+    }
+
     private static LegacySurfaceRedirectController CreateBrowserController(IHttpClientFactory factory)
     {
         var configuration = new ConfigurationBuilder()
@@ -104,6 +124,7 @@ public sealed class LegacySurfaceRedirectControllerTests
                 HttpContext = new DefaultHttpContext()
             }
         };
+        controller.ControllerContext.HttpContext.Request.Method = HttpMethods.Get;
         return controller;
     }
 
@@ -121,10 +142,12 @@ public sealed class LegacySurfaceRedirectControllerTests
     private sealed class RecordingHandler(HttpResponseMessage response) : HttpMessageHandler
     {
         public Uri? RequestUri { get; private set; }
+        public HttpMethod? Method { get; private set; }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             RequestUri = request.RequestUri;
+            Method = request.Method;
             return Task.FromResult(response);
         }
     }
