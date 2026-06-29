@@ -124,36 +124,36 @@ Owner: `chummer6-hub`
 Retention:
 
 * post-fix follow-up invites and answer summaries: retain for 365 days
-* raw free-text survey payloads: summarize or redact within 180 days unless still tied to open product work
+* raw free-text survey answers: summarize or redact within 180 days unless still tied to open product work
 
 Redaction baseline:
 
 * keep survey conclusions out of public guide copy until they are reviewed
 
-### Help and assistant service traces
+### Help-service logs and answer notes
 
 Owner: `chummer6-hub` plus the owning product surface
 
 Retention:
 
-* raw external-service request/response traces: retain for 30 days unless a narrower service contract says less
+* raw outside-service request and response logs: retain for 30 days unless a narrower service contract says less
 * help summaries and review notes: retain for 180 days
 
 Redaction baseline:
 
-* help summaries should prefer case IDs, release IDs, and rule explanation IDs over raw user text where possible
+* help summaries should prefer case numbers, release numbers, and calculation records over raw user text where possible
 
 ## Surface redaction rules
 
 ### Public surfaces
 
-* may expose support status, known issues, release status, compatibility, provenance, and channel-aware fix availability
-* may not expose private case notes, raw crash envelopes, external-service traces, or account-internal survey payloads
+* may expose support status, known issues, release status, compatibility, origin, and channel-aware fix availability
+* may not expose private case notes, raw crash reports, outside-service logs, or private survey text
 
 ### Signed-in user surfaces
 
 * may expose case timeline, install status, claimed-device state, and the user-safe slice of crash/support data
-* may not expose unrelated reporter data, maintainer-only deliberation, or private moderation notes
+* may not expose unrelated reporter data, maintainer-only notes, or private moderation notes
 
 ### Help and assistant surfaces
 
@@ -247,32 +247,32 @@ Redaction baseline:
 
 * keep survey truth out of public guide copy until synthesized into canon
 
-### Provider traces and assistant grounding packs
+### Help-service logs and answer notes
 
 Owner: `executive-assistant` plus the owning product surface
 
 Retention posture:
 
-* raw provider request/response traces: retain for 30 days unless a narrower provider contract says less
-* lane-level scorecards, challenger briefs, and grounding-pack summaries: retain for 180 days
+* raw outside-service request and response logs: retain for 30 days unless a narrower service contract says less
+* service comparison notes and answer summaries: retain for 180 days
 
 Redaction baseline:
 
-* grounding packs should prefer case IDs, release IDs, and rule receipt IDs over raw user text where possible
+* answer notes should prefer case numbers, release numbers, and calculation records over raw user text where possible
 
 ## Surface redaction rules
 
 ### Public surfaces
 
-* may expose support status, known issues, release posture, compatibility, provenance, and channel-aware fix availability
-* may not expose private case notes, raw crash envelopes, provider traces, or account-internal survey payloads
+* may expose support status, known issues, release posture, compatibility, origin, and channel-aware fix availability
+* may not expose private case notes, raw crash reports, outside-service logs, or private survey text
 
 ### Signed-in user surfaces
 
 * may expose case timeline, install posture, claimed-device state, and the user-safe slice of crash/support data
-* may not expose unrelated reporter data, operator-only packet deliberation, or private moderation notes
+* may not expose unrelated reporter data, maintainer-only notes, or private moderation notes
 
-### Provider-backed assistant surfaces
+### Help tool surfaces
 
 * must ground answers in curated canonical sources, registry truth, or support-case truth
 * must not become the system of record for support or release state

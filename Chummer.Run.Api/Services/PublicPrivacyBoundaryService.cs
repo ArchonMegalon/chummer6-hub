@@ -156,7 +156,7 @@ public sealed class PublicPrivacyBoundaryService
             AsOf = privacyPage.UpdatedDate ?? privacyPage.EffectiveDate ?? string.Empty,
             Eyebrow = "Privacy",
             Heading = "Support and feedback data expire on a clear schedule",
-            Summary = "Chummer keeps only the account, install, help, and feedback details needed to run the product, answer you, and retire raw traces on schedule.",
+            Summary = "Chummer keeps only the account, install, help, and feedback details needed to run the product, answer you, and retire temporary logs on schedule.",
             MicroProof = privacyPage.SummaryPoints ?? new List<string>(),
             Domains = BoundaryDomains
                 .Select(spec => BuildDomain(spec, retentionDomains))
@@ -395,10 +395,9 @@ public sealed class PublicPrivacyBoundaryService
         => heading switch
         {
             "Support cases" => ["Support-case truth"],
-            "Help tool traces" => ["Help and assistant service traces", "Provider traces and assistant grounding packs"],
-            "Help and assistant service traces" => ["Provider traces and assistant grounding packs"],
-            "Help tool surfaces" => ["Help and assistant surfaces", "Provider-backed assistant surfaces"],
-            "Help and assistant surfaces" => ["Provider-backed assistant surfaces"],
+            "Help tool traces" => ["Help and assistant service traces", "Help-service logs and answer notes"],
+            "Help and assistant service traces" => ["Help-service logs and answer notes"],
+            "Help tool surfaces" => ["Help and assistant surfaces"],
             _ => Array.Empty<string>()
         };
 

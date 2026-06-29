@@ -60,7 +60,7 @@ trust_pages:
     summary_points:
       - "The download file stays the same for everyone"
       - "Your account stores sign-in and help history"
-      - "Raw secret keys stay out of your account record"
+      - "Passwords and access keys stay out of your account record"
     actions:
       - label: "Open account"
         href: "/account"
@@ -82,8 +82,8 @@ trust_pages:
         body: "When Chummer publishes a download, everyone gets the same file. Chummer does not build a private installer just for your account. If account linking is available, the account step is a short-lived code that reconnects a local copy back to your account."
       - id: not-in-hub
         eyebrow: "What stays out"
-        heading: "Temporary sign-in tokens and raw secrets stay out of your account record"
-        body: "Short-lived third-party tokens stay on the machine or service using them. Your account keeps consent, help history, and access records, not raw secret keys."
+        heading: "Short-lived sign-in access stays out of your account record"
+        body: "Short-lived third-party access stays on the machine or service using it. Your account keeps consent, help history, and access records, not passwords or access keys."
       - id: recognition-privacy
         eyebrow: "Privacy and recognition"
         heading: "Recognition should not force publicity"
