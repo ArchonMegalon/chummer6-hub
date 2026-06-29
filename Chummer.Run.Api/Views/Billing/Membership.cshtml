@@ -24,6 +24,8 @@
         : showManageSupporterAction
             ? Model.ManageMembershipHref
             : null;
+    var secondaryActionLabel = hasUserId ? "Back to account" : "Back to downloads";
+    var secondaryActionHref = hasUserId ? "/account" : "/downloads";
 }
 <section class="minimal-page-hero">
     <div>
@@ -61,7 +63,7 @@
                     <a class="button-like button-like--primary" href="@primaryActionHref">@primaryActionLabel</a>
                 }
             }
-            <a class="button-like button-like--ghost" href="/account">Back to account</a>
+            <a class="button-like button-like--ghost" href="@secondaryActionHref">@secondaryActionLabel</a>
         </div>
     </div>
 </section>
@@ -86,7 +88,7 @@
         }
         else
         {
-            <p class="muted-copy">Email first. Supporter status attaches after sign-in.</p>
+            <p class="muted-copy">Email first. Supporter attaches after that step.</p>
         }
     </article>
 </section>

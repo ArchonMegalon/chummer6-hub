@@ -15,6 +15,13 @@ test('guest billing and account entry stay first-party', async ({ request }) => 
   const guestBillingLocation = guestBilling.headers()['location'] || '';
   expect(guestBillingLocation).toBe('/login?next=%2Faccount%2Fbilling');
 
+  const guestBillingLogin = await request.get(`${baseUrl}/login?next=%2Faccount%2Fbilling`);
+  expect(guestBillingLogin.status()).toBe(200);
+  const guestBillingLoginText = await guestBillingLogin.text();
+  expect(guestBillingLoginText).toContain('Supporter');
+  expect(guestBillingLoginText).toContain('Email first. Billing stays attached after this step.');
+  expect(guestBillingLoginText).toContain('After this step, Chummer returns to billing.');
+
   const guestAccount = await request.get(`${baseUrl}/account`, { maxRedirects: 0 });
   expect([302, 303, 307, 308]).toContain(guestAccount.status());
   const guestAccountLocation = guestAccount.headers()['location'] || '';

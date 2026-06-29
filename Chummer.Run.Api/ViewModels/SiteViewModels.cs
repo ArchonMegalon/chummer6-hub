@@ -2376,6 +2376,7 @@ public sealed record AccountDesktopLaunchPageViewModel(
 
 public sealed record AuthPageViewModel(
     SiteChromeViewModel Chrome,
+    string Eyebrow,
     string Heading,
     string SupportLine,
     string ReturnLine,

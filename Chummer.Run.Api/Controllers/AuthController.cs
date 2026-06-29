@@ -79,7 +79,6 @@ public sealed class AuthController : Controller
         }
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
-            heading: "Open Chummer",
             nextPath,
             createAccount: false));
     }
@@ -110,7 +109,6 @@ public sealed class AuthController : Controller
         }
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
-            heading: "Claim your copy",
             nextPath,
             createAccount: true));
     }
@@ -666,20 +664,19 @@ public sealed class AuthController : Controller
         _browserAuth.ClearCookie(Request, Response);
     }
 
-    private AuthPageViewModel BuildAuthModel(string heading, string nextPath, bool createAccount)
+    private AuthPageViewModel BuildAuthModel(string nextPath, bool createAccount)
     {
         _landing.LoadSurface();
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, Request.Headers.UserAgent.ToString(), authenticated: false);
+        var presentation = ResolveEntryPresentation(nextPath, createAccount);
         var nextTarget = DescribeNextTarget(nextPath);
-        var supportLine = createAccount
-            ? "Claim this copy when you want installs, support, and recovery together."
-            : "Email first. Google if you prefer.";
         var returnLine = $"After this step, Chummer returns to {nextTarget}.";
         return new AuthPageViewModel(
-            Chrome: _chrome.BuildPublicChrome(heading, supportLine, createAccount ? "/signup" : "/login"),
-            Heading: heading,
-            SupportLine: supportLine,
+            Chrome: _chrome.BuildPublicChrome(presentation.Heading, presentation.SupportLine, createAccount ? "/signup" : "/login"),
+            Eyebrow: presentation.Eyebrow,
+            Heading: presentation.Heading,
+            SupportLine: presentation.SupportLine,
             ReturnLine: returnLine,
             NextPath: nextPath,
             CreateAccount: createAccount,
@@ -689,13 +686,27 @@ public sealed class AuthController : Controller
             AccessPosture: accessPosture);
     }
 
-    private static string DescribeNextTarget(string nextPath)
+    internal static (string Eyebrow, string Heading, string SupportLine) ResolveEntryPresentation(string nextPath, bool createAccount)
+    {
+        if (nextPath.StartsWith("/account/billing", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("Supporter", "Supporter", "Email first. Billing stays attached after this step.");
+        }
+
+        return createAccount
+            ? ("Next", "Claim your copy", "Claim this copy when you want installs, support, and recovery together.")
+            : ("Next", "Open Chummer", "Email first. Google if you prefer.");
+    }
+
+    internal static string DescribeNextTarget(string nextPath)
         => nextPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
-            ? "Downloads"
+            ? "downloads"
+            : nextPath.StartsWith("/account/billing", StringComparison.OrdinalIgnoreCase)
+                ? "billing"
             : nextPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)
-                ? "Account"
+                ? "account"
                 : nextPath.StartsWith("/home", StringComparison.OrdinalIgnoreCase)
-                    ? "Home"
+                    ? "home"
                     : "the signed-in product";
 
     private enum AuthEntrySessionState

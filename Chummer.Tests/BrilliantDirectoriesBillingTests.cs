@@ -65,7 +65,7 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Contains("Continue with email", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Only the book limit changes</h2>", view, StringComparison.Ordinal);
         Assert.Contains("@Model.Summary", view, StringComparison.Ordinal);
-        Assert.Contains("Email first. Supporter status attaches after sign-in.", view, StringComparison.Ordinal);
+        Assert.Contains("Email first. Supporter attaches after that step.", view, StringComparison.Ordinal);
         Assert.Contains("Checkout stays attached to this account.", view, StringComparison.Ordinal);
         Assert.Contains("Supporter is already attached to this account.", view, StringComparison.Ordinal);
         Assert.Contains("Become supporter", view, StringComparison.Ordinal);
@@ -74,6 +74,7 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Contains("No extra app features today.", view, StringComparison.Ordinal);
         Assert.Contains("Manage supporter", view, StringComparison.Ordinal);
         Assert.Contains("Back to account", view, StringComparison.Ordinal);
+        Assert.Contains("Back to downloads", view, StringComparison.Ordinal);
         Assert.Contains("minimal-page-hero", view, StringComparison.Ordinal);
         Assert.Contains("minimal-section minimal-section--tight", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Layout = null;", view, StringComparison.Ordinal);
@@ -169,6 +170,24 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Contains(
             action!.GetCustomAttributes(inherit: true),
             static attribute => attribute is ValidateAntiForgeryTokenAttribute);
+    }
+
+    [Fact]
+    public void BillingAuthEntryUsesSupporterScopedCopy()
+    {
+        var signInCopy = AuthController.ResolveEntryPresentation("/account/billing", createAccount: false);
+        var signUpCopy = AuthController.ResolveEntryPresentation("/account/billing", createAccount: true);
+        var genericCopy = AuthController.ResolveEntryPresentation("/downloads", createAccount: false);
+
+        Assert.Equal("Supporter", signInCopy.Eyebrow);
+        Assert.Equal("Supporter", signInCopy.Heading);
+        Assert.Equal("Email first. Billing stays attached after this step.", signInCopy.SupportLine);
+        Assert.Equal(signInCopy, signUpCopy);
+        Assert.Equal("Next", genericCopy.Eyebrow);
+        Assert.Equal("Open Chummer", genericCopy.Heading);
+        Assert.Equal("Email first. Google if you prefer.", genericCopy.SupportLine);
+        Assert.Equal("billing", AuthController.DescribeNextTarget("/account/billing"));
+        Assert.Equal("downloads", AuthController.DescribeNextTarget("/downloads"));
     }
 
     [Fact]
