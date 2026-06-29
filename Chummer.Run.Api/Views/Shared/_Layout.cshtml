@@ -468,7 +468,7 @@
                                             <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
                                         </form>
                                     }
-                                    else if (isOpenChummerAction(action))
+                                    else if (isOpenChummerAction(action) && !minimalSurface)
                                     {
                                         <details class="site-account-menu site-open-chummer-menu">
                                             <summary class="site-account-menu__summary">
@@ -578,7 +578,7 @@
                                     <button class="action-pill action-pill--@action.Tone" type="submit">@renderedActionLabel</button>
                                 </form>
                             }
-                            else if (isOpenChummerAction(action))
+                            else if (isOpenChummerAction(action) && !minimalSurface)
                             {
                                 <details class="site-account-menu site-open-chummer-menu">
                                     <summary class="site-account-menu__summary">

@@ -138,6 +138,7 @@ public sealed class HubPageChromeServiceTests
         Assert.Contains("routeKey is not \"landing\"", layout, StringComparison.Ordinal);
         Assert.Contains("!normalizeHeaderActionPath(action.Href).StartsWith(\"/downloads\"", layout, StringComparison.Ordinal);
         Assert.Contains("@foreach (var action in visibleHeaderActions)", layout, StringComparison.Ordinal);
+        Assert.Contains("isOpenChummerAction(action) && !minimalSurface", layout, StringComparison.Ordinal);
         Assert.Contains("site-open-chummer-menu", layout, StringComparison.Ordinal);
         Assert.Contains("href=\"/build\"", layout, StringComparison.Ordinal);
         Assert.Contains("href=\"/play\"", layout, StringComparison.Ordinal);
