@@ -8,7 +8,11 @@
 @if (!string.IsNullOrWhiteSpace(Model.HostedBoardHref))
 {
     <section class="roadmap-board-frame route-anchor-target" aria-labelledby="roadmap-title">
-        <h1 id="roadmap-title" class="sr-only">Roadmap</h1>
+        <div class="minimal-section__lead roadmap-board-frame__lead">
+            <p class="eyebrow">Roadmap</p>
+            <h1 id="roadmap-title">Roadmap</h1>
+            <p>Planned work and current requests.</p>
+        </div>
         <iframe
             class="roadmap-board-frame__embed"
             src="@Model.HostedBoardHref"

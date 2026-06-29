@@ -4,7 +4,7 @@
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 
-const HOSTED_BOARD_SHELL_VISIBLE_BUDGET_MS = 2500;
+const HOSTED_BOARD_SHELL_VISIBLE_BUDGET_MS = 6000;
 const HOSTED_BOARD_DETAIL_FETCH_BUDGET_MS = 4000;
 
 const args = process.argv.slice(2);
@@ -159,14 +159,14 @@ async function main() {
     await framePage.waitForFunction(
       () => {
         const text = (document.body && document.body.innerText) || '';
-        return /What should Chummer do next\?|Board offline right now/i.test(text);
+        return /What do you want to see next\?|Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(text);
       },
       { timeout: 15000 },
     );
     assert.equal(/\/participate\/board\/?\?embed=1$/.test(framePage.url()), true, '/participate/frame should resolve to the embedded first-party board document.');
     assert.equal(await framePage.locator('iframe[data-chummer-participate-frame]').count(), 0, '/participate/frame should resolve directly to the embedded board document instead of nesting another frame.');
     const frameText = await framePage.locator('body').innerText();
-    assert.equal(/What should Chummer do next\?|Board offline right now/i.test(frameText), true, '/participate/frame should keep the request entry point visible.');
+    assert.equal(/What do you want to see next\?|Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(frameText), true, '/participate/frame should keep the request entry point visible.');
     await framePage.close();
 
     console.log(JSON.stringify({

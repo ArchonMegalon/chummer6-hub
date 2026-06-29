@@ -138,7 +138,7 @@ const checks = [
     url: `${baseUrl}/participate`,
     rendered: true,
     assert: text =>
-      text.includes('What should Chummer do next?')
+      text.includes('Participate')
       && text.includes('Public requests, clear bugs, useful ideas.')
       && text.includes('data-chummer-participate-frame')
       && !text.includes('data-chummer-board-skin')
@@ -159,19 +159,17 @@ const checks = [
     url: `${baseUrl}/roadmap`,
     assert: text =>
       text.includes('Roadmap')
-      && text.includes('In progress.')
-      && text.includes('Planned work lives here. Shipped work moves to Changelog.')
-      && (text.includes('Work opens below.') || text.includes('Requests stay in Participate.'))
-      && (text.includes('data-chummer-roadmap-frame') || text.includes('Requests stay in Participate.'))
+      && text.includes('Planned work and current requests.')
+      && text.includes('data-chummer-roadmap-frame')
       && !text.includes('ProductLift')
   },
   {
     url: `${baseUrl}/roadmap/board`,
     assert: (text, response) =>
       /\/roadmap\/?$/.test(response.url)
-      && text.includes('In progress.')
-      && text.includes('Planned work lives here. Shipped work moves to Changelog.')
-      && (text.includes('Work opens below.') || text.includes('Requests stay in Participate.'))
+      && text.includes('Roadmap')
+      && text.includes('Planned work and current requests.')
+      && text.includes('data-chummer-roadmap-frame')
       && !text.includes('ProductLift')
   },
   {
@@ -179,7 +177,7 @@ const checks = [
     rendered: true,
     assert: (text, response) =>
       /\/participate\/?$/.test(response.url)
-      && text.includes('What should Chummer do next?')
+      && text.includes('Participate')
       && text.includes('Public requests, clear bugs, useful ideas.')
       && text.includes('data-chummer-participate-frame')
       && !text.includes('data-chummer-board-skin')
@@ -287,10 +285,13 @@ async function runRenderedCheck(browser, check) {
       { timeout: 15000 },
     );
 
+    const bodyText = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim();
+    const hasParticipateFrame = await page.locator('iframe[data-chummer-participate-frame]').count() > 0;
+
     return {
       ok: true,
       status: response.status(),
-      text: (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim(),
+      text: `${bodyText}${hasParticipateFrame ? ' data-chummer-participate-frame' : ''}`.trim(),
       response: { url: page.url() },
     };
   } finally {
