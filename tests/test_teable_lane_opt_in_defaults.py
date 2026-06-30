@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,3 +71,33 @@ def test_chummer_teable_tables_do_not_fall_back_to_user_or_ea_base() -> None:
     for path in chummer_owned_services:
         text = path.read_text(encoding="utf-8")
         assert '?? Normalize(_configuration["CHUMMER_TEABLE_USERS_BASE_ID"])' not in text
+
+
+def test_important_work_uses_teable_supported_field_types() -> None:
+    source = (ROOT / "Chummer.Run.Api/Services/Community/TeableImportantWorkService.cs").read_text(encoding="utf-8")
+    accepted_types = {
+        "singleLineText",
+        "longText",
+        "user",
+        "attachment",
+        "checkbox",
+        "multipleSelect",
+        "singleSelect",
+        "date",
+        "number",
+        "rating",
+        "formula",
+        "rollup",
+        "count",
+        "createdTime",
+        "lastModifiedTime",
+        "createdBy",
+        "lastModifiedBy",
+        "autoNumber",
+        "button",
+    }
+
+    field_types = re.findall(r'new\("[^"]+",\s*"([^"]+)"', source)
+    assert field_types
+    assert set(field_types).issubset(accepted_types)
+    assert 'new("Link", "singleLineText"' in source
