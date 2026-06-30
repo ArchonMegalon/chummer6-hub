@@ -1,8 +1,4 @@
 @model FirstPartyParticipateBoardViewModel
-@functions {
-    private static string PublicParticipateText(string text) => text;
-}
-
 @{
     ViewData["Title"] = "Participate";
     ViewData["Chrome"] = Model.Chrome;
@@ -13,17 +9,10 @@
 
 <section class="participate-shell route-anchor-target" aria-labelledby="partizipate-title">
     <div class="participate-hosted">
-        <div class="participate-hosted__header">
-            <div class="participate-hosted__lead">
-                <p class="eyebrow">Board</p>
-                <h1 id="partizipate-title">@PublicParticipateText(Model.Heading)</h1>
-                <p>@PublicParticipateText(Model.Summary)</p>
-            </div>
-        </div>
+        <h1 id="partizipate-title" class="sr-only">Participate</h1>
         @if (hasHostedBoard)
         {
-            <div class="participate-hosted__frame-shell" aria-labelledby="partizipate-current-requests">
-                <h2 id="partizipate-current-requests" class="sr-only">Current requests</h2>
+            <div class="participate-hosted__frame-shell" aria-labelledby="partizipate-title">
                 <iframe
                     class="participate-hosted__frame"
                     src="@Model.EmbeddedBoardHref"

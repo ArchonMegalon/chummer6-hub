@@ -67,7 +67,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.Equal("~/Views/PublicLanding/Partizipate.cshtml", view.ViewName);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
         Assert.Equal("Participate", model.Heading);
-        Assert.Equal("Feedback and roadmap live on the board.", model.Summary);
+        Assert.Equal("Participate", model.Summary);
         Assert.True(model.EmbeddedBoardEnabled);
         Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
         Assert.Equal("/participate/board", model.DirectBoardHref);
@@ -164,7 +164,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         ViewResult view = Assert.IsType<ViewResult>(result);
         FirstPartyParticipateBoardViewModel model = Assert.IsType<FirstPartyParticipateBoardViewModel>(view.Model);
         Assert.Equal("Participate", model.Heading);
-        Assert.Equal("Feedback and roadmap live on the board.", model.Summary);
+        Assert.Equal("Participate", model.Summary);
         Assert.True(model.EmbeddedBoardEnabled);
         Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
     }
