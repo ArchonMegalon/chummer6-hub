@@ -1322,14 +1322,29 @@ public sealed class PublicLandingController : Controller
     public IActionResult PlayerProjectionAlias()
         => Redirect("/play?role=player");
 
+    [HttpGet("/mobile/player")]
+    [HttpHead("/mobile/player")]
+    public IActionResult MobilePlayerProjectionAlias()
+        => Redirect("/play?role=player");
+
     [HttpGet("/gm")]
     [HttpHead("/gm")]
     public IActionResult GmProjectionAlias()
         => Redirect("/play?role=gm");
 
+    [HttpGet("/mobile/gm")]
+    [HttpHead("/mobile/gm")]
+    public IActionResult MobileGmProjectionAlias()
+        => Redirect("/play?role=gm");
+
     [HttpGet("/observer")]
     [HttpHead("/observer")]
     public IActionResult ObserverProjectionAlias()
+        => Redirect("/play?role=observer");
+
+    [HttpGet("/mobile/observer")]
+    [HttpHead("/mobile/observer")]
+    public IActionResult MobileObserverProjectionAlias()
         => Redirect("/play?role=observer");
 
     [HttpGet("/anarchy")]
@@ -8544,9 +8559,9 @@ document.addEventListener('DOMContentLoaded', function () {
             InstallabilitySummary: $"This play entry explains reconnect behavior and role entry without pretending a preview shell replaces the app. Claimed installs currently tracked: {continuitySummary.ActiveInstallationCount}; pending recovery items: {continuitySummary.PendingClaimCount + continuitySummary.PendingBrowserCallbackCount}.",
             Roles:
             [
-                new MobileRoleCardViewModel("Player", "Resume the session, keep the dossier visible, and re-enter with reconnect behavior already named.", "/player", string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)),
-                new MobileRoleCardViewModel("GM", "Keep the next scene, continuity, and return status visible without dropping back to legacy aliases.", "/gm", string.Equals(currentRoleKey, "gm", StringComparison.OrdinalIgnoreCase)),
-                new MobileRoleCardViewModel("Observer", "Join the same play view in a read-mostly role when the table only needs visibility.", "/observer", string.Equals(currentRoleKey, "observer", StringComparison.OrdinalIgnoreCase))
+                new MobileRoleCardViewModel("Player", "Resume the session, keep the dossier visible, and re-enter with reconnect behavior already named.", "/play", string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)),
+                new MobileRoleCardViewModel("GM", "Keep the next scene, continuity, and return status visible without dropping back to legacy aliases.", "/play?role=gm", string.Equals(currentRoleKey, "gm", StringComparison.OrdinalIgnoreCase)),
+                new MobileRoleCardViewModel("Observer", "Join the same play view in a read-mostly role when the table only needs visibility.", "/play?role=observer", string.Equals(currentRoleKey, "observer", StringComparison.OrdinalIgnoreCase))
             ],
             Capabilities:
             [

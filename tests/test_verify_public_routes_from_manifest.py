@@ -34,6 +34,9 @@ class _RouteFixtureHandler(BaseHTTPRequestHandler):
         if self.path == "/public":
             self._send_text(200, "public")
             return
+        if self.path == "/public-required":
+            self._send_text(200, "public route with flagship marker")
+            return
         if self.path == "/contact/submitted/sample-case-id":
             self._send_text(200, "sample support receipt")
             return
@@ -204,6 +207,55 @@ class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
         self.assertEqual(report["summary"]["failed_count"], 1)
         self.assertEqual(report["summary"]["failed_paths"], ["/private"])
         self.assertIn("expected anonymous redirect", report["routes"][0]["detail"])
+
+    def test_verifier_checks_required_texts_against_response_body(self) -> None:
+        manifest = {
+            "surface": "chummer.run",
+            "version": 1,
+            "public_routes": [
+                {
+                    "path": "/public-required",
+                    "audience": "public",
+                    "purpose": "copy_contract",
+                    "requires_auth": False,
+                    "guest_fallback": "/public-required",
+                    "must_exist": True,
+                    "required_texts": ["flagship marker"],
+                }
+            ],
+        }
+
+        completed, report = self.run_script(manifest)
+
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["summary"]["failed_count"], 0)
+        self.assertEqual(report["routes"][0]["path"], "/public-required")
+
+    def test_verifier_reports_missing_required_text_without_internal_error(self) -> None:
+        manifest = {
+            "surface": "chummer.run",
+            "version": 1,
+            "public_routes": [
+                {
+                    "path": "/public-required",
+                    "audience": "public",
+                    "purpose": "copy_contract",
+                    "requires_auth": False,
+                    "guest_fallback": "/public-required",
+                    "must_exist": True,
+                    "required_texts": ["missing marker"],
+                }
+            ],
+        }
+
+        completed, report = self.run_script(manifest)
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["summary"]["failed_paths"], ["/public-required"])
+        self.assertIn("missing required text: missing marker", report["routes"][0]["detail"])
+        self.assertNotIn("NameError", completed.stderr + completed.stdout)
 
     def test_verifier_supports_controller_contract_routes_for_parameterized_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

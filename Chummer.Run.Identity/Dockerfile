@@ -1,19 +1,20 @@
 # syntax=docker/dockerfile:1.4
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG CHUMMER_BUILD_CONCURRENCY=1
+ARG CHUMMER_RUN_SERVICES_CONTEXT_DIR=chummer.run-services
 WORKDIR /src
-COPY chummer.run-services/Chummer.Run.Identity/Chummer.Run.Identity.csproj chummer.run-services/Chummer.Run.Identity/
-COPY chummer.run-services/Chummer.Control.Contracts/Chummer.Control.Contracts.csproj chummer.run-services/Chummer.Control.Contracts/
-COPY chummer.run-services/Chummer.Run.Contracts/Chummer.Run.Contracts.csproj chummer.run-services/Chummer.Run.Contracts/
-COPY chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj chummer.run-services/Chummer.Play.Contracts/
+COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Run.Identity/Chummer.Run.Identity.csproj chummer.run-services/Chummer.Run.Identity/
+COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Control.Contracts/Chummer.Control.Contracts.csproj chummer.run-services/Chummer.Control.Contracts/
+COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Run.Contracts/Chummer.Run.Contracts.csproj chummer.run-services/Chummer.Run.Contracts/
+COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj chummer.run-services/Chummer.Play.Contracts/
 COPY chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj chummer-core-engine/Chummer.Contracts/
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj chummer-hub-registry/Chummer.Hub.Registry.Contracts/
 COPY --from=fleet-media-factory-contracts Chummer.Media.Contracts.csproj fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 RUN dotnet restore chummer.run-services/Chummer.Run.Identity/Chummer.Run.Identity.csproj
-COPY chummer.run-services/Chummer.Run.Identity/ chummer.run-services/Chummer.Run.Identity/
-COPY chummer.run-services/Chummer.Control.Contracts/ chummer.run-services/Chummer.Control.Contracts/
-COPY chummer.run-services/Chummer.Run.Contracts/ chummer.run-services/Chummer.Run.Contracts/
-COPY chummer.run-services/Chummer.Play.Contracts/ chummer.run-services/Chummer.Play.Contracts/
+COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Run.Identity/ chummer.run-services/Chummer.Run.Identity/
+COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Control.Contracts/ chummer.run-services/Chummer.Control.Contracts/
+COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Run.Contracts/ chummer.run-services/Chummer.Run.Contracts/
+COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Play.Contracts/ chummer.run-services/Chummer.Play.Contracts/
 COPY chummer-core-engine/Chummer.Contracts/ chummer-core-engine/Chummer.Contracts/
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/ chummer-hub-registry/Chummer.Hub.Registry.Contracts/
 COPY --from=fleet-media-factory-contracts . fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/

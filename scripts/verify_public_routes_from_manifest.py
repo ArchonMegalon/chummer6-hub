@@ -537,7 +537,7 @@ def verify_route(
             max_retries=max_retries,
             retry_delay_seconds=retry_delay_seconds)
         redirect_location = headers.get("location")
-        missing_texts = [snippet for snippet in required_texts if snippet not in body]
+        missing_texts = [snippet for snippet in required_texts if snippet not in body_text]
         final_url_ok = (
             not required_final_url_prefix
             or final_url.startswith(f"{base_url.rstrip('/')}{required_final_url_prefix}")

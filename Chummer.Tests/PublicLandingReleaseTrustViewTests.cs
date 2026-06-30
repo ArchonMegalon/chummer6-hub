@@ -763,6 +763,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("=> Redirect(\"/app?command=character_roster\");", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/MobileProjection.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("=> Redirect(\"/mobile\");", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/mobile/player\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/mobile/gm\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/mobile/observer\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("new MobileRoleCardViewModel(\"Player\"", controller, StringComparison.Ordinal);
+        Assert.Contains("\"/play?role=gm\"", controller, StringComparison.Ordinal);
+        Assert.Contains("\"/play?role=observer\"", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("currentPath: \"/build\"", controller, StringComparison.Ordinal);
         Assert.Contains("chromeTitle: \"Mobile and PWA entry\"", controller, StringComparison.Ordinal);
         Assert.Contains("label: Build", navigation, StringComparison.Ordinal);

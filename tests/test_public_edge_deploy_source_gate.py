@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -35,6 +36,34 @@ def make_repo(root: Path) -> tuple[Path, str]:
     git(repo, "add", "README.md")
     git(repo, "commit", "-qm", "initial")
     return repo, git(repo, "rev-parse", "HEAD")
+
+
+def make_named_repo(path: Path) -> tuple[Path, str]:
+    path.mkdir(parents=True)
+    git(path, "init", "-q")
+    git(path, "config", "user.email", "tests@example.invalid")
+    git(path, "config", "user.name", "Chummer Tests")
+    (path / "README.md").write_text(f"clean deploy source at {path.name}\n", encoding="utf-8")
+    (path / "Chummer.Run.Api").mkdir()
+    (path / "Chummer.Run.Api" / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+    git(path, "add", "README.md", "Chummer.Run.Api/Dockerfile")
+    git(path, "commit", "-qm", "initial")
+    return path, git(path, "rev-parse", "HEAD")
+
+
+def write_compose(path: Path, context: Path, source_dir_name: str) -> Path:
+    compose_path = path / "docker-compose.public-edge.yml"
+    compose_path.write_text(
+        f"""
+services:
+  chummer-portal:
+    build:
+      context: {context}
+      dockerfile: {source_dir_name}/Chummer.Run.Api/Dockerfile
+""".lstrip(),
+        encoding="utf-8",
+    )
+    return compose_path
 
 
 def test_clean_source_at_expected_head_passes() -> None:
@@ -81,6 +110,85 @@ def test_wrong_expected_head_fails() -> None:
 
     assert receipt["status"] == "fail"
     assert any(finding["id"] == "wrong_head" for finding in receipt["findings"])
+
+
+def test_compose_build_source_matching_repo_passes() -> None:
+    with tempfile.TemporaryDirectory(prefix="chummer-edge-source-") as temp:
+        temp_root = Path(temp)
+        context = temp_root / "context"
+        repo, head = make_named_repo(context / "chummer.run-services")
+        compose = write_compose(temp_root, context, "chummer.run-services")
+
+        receipt = MODULE.verify(
+            repo,
+            expected_head=head,
+            compose_file=compose,
+            compose_service="chummer-portal",
+        )
+
+    assert receipt["status"] == "pass"
+    assert receipt["composeBuildSource"].endswith("chummer.run-services")
+
+
+def test_compose_build_source_mismatch_fails() -> None:
+    with tempfile.TemporaryDirectory(prefix="chummer-edge-source-") as temp:
+        temp_root = Path(temp)
+        context = temp_root / "context"
+        clean_repo, head = make_named_repo(context / "clean-worktree")
+        actual_repo, _actual_head = make_named_repo(context / "chummer.run-services")
+        compose = write_compose(temp_root, context, actual_repo.name)
+
+        receipt = MODULE.verify(
+            clean_repo,
+            expected_head=head,
+            compose_file=compose,
+            compose_service="chummer-portal",
+        )
+
+    assert receipt["status"] == "fail"
+    assert receipt["composeBuildSource"].endswith("chummer.run-services")
+    assert any(finding["id"] == "compose_build_source_mismatch" for finding in receipt["findings"])
+
+
+def test_compose_build_source_respects_environment_source_dir_override() -> None:
+    with tempfile.TemporaryDirectory(prefix="chummer-edge-source-") as temp:
+        temp_root = Path(temp)
+        context = temp_root / "context"
+        repo, head = make_named_repo(context / "clean-worktree")
+        compose_path = temp_root / "docker-compose.public-edge.yml"
+        compose_path.write_text(
+            f"""
+services:
+  chummer-portal:
+    build:
+      context: ${{CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-{context}}}
+      dockerfile: ${{CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}}/Chummer.Run.Api/Dockerfile
+""".lstrip(),
+            encoding="utf-8",
+        )
+        previous_context = os.environ.get("CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT")
+        previous_source = os.environ.get("CHUMMER_RUN_SERVICES_CONTEXT_DIR")
+        os.environ["CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT"] = str(context)
+        os.environ["CHUMMER_RUN_SERVICES_CONTEXT_DIR"] = repo.name
+        try:
+            receipt = MODULE.verify(
+                repo,
+                expected_head=head,
+                compose_file=compose_path,
+                compose_service="chummer-portal",
+            )
+        finally:
+            if previous_context is None:
+                os.environ.pop("CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT", None)
+            else:
+                os.environ["CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT"] = previous_context
+            if previous_source is None:
+                os.environ.pop("CHUMMER_RUN_SERVICES_CONTEXT_DIR", None)
+            else:
+                os.environ["CHUMMER_RUN_SERVICES_CONTEXT_DIR"] = previous_source
+
+    assert receipt["status"] == "pass"
+    assert receipt["composeBuildSource"].endswith("clean-worktree")
 
 
 def test_public_edge_rebuild_scripts_call_source_gate() -> None:

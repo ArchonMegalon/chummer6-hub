@@ -1048,6 +1048,33 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: redirect to the browser app entry
+- path: /mobile/player
+  title: Mobile player alias
+  audience: public
+  purpose: play_projection
+  requires_auth: false
+  guest_fallback: /mobile/player
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: bounded mobile player alias only
+- path: /mobile/gm
+  title: Mobile GM alias
+  audience: public
+  purpose: play_projection
+  requires_auth: false
+  guest_fallback: /mobile/gm
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: bounded mobile GM alias only
+- path: /mobile/observer
+  title: Mobile observer alias
+  audience: public
+  purpose: play_projection
+  requires_auth: false
+  guest_fallback: /mobile/observer
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: bounded mobile observer alias only
 - path: /pwa
   title: App alias
   audience: public
@@ -1343,7 +1370,7 @@ registered_routes:
   audience: registered
   purpose: signed_in_dashboard
   requires_auth: true
-  guest_fallback: /account/work
+  guest_fallback: /account/roster
   must_exist: true
   placeholder_allowed: true
   placeholder_requirements: signed-in work focus
@@ -1388,7 +1415,7 @@ registered_routes:
   audience: registered
   purpose: profile_and_preferences
   requires_auth: true
-  guest_fallback: /login?next=/account/work
+  guest_fallback: /login?next=/account/roster
   must_exist: true
   placeholder_allowed: true
   placeholder_requirements: campaign and operator route
