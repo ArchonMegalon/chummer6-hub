@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import html
 import re
+from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -51,10 +52,33 @@ def extract_registered_service_worker_path(markup: str) -> str | None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Verify the first-party mobile/PWA public projection.")
     parser.add_argument("--base-url", default="", help="Optional running Hub base URL. When omitted the script launches a temporary local Hub.")
+    parser.add_argument("--completion-dir", default="", help="Optional directory for default JSON and Markdown receipts.")
+    parser.add_argument("--output", default="", help="Optional JSON receipt path.")
+    parser.add_argument("--report", default="", help="Optional Markdown report path.")
     return parser.parse_args()
 
 
-def run(base_url: str) -> int:
+def resolve_output_paths(completion_dir: str = "", output: str = "", report: str = "") -> tuple[Path, Path]:
+    if output:
+        output_path = Path(output)
+    elif completion_dir:
+        output_path = Path(completion_dir) / "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"
+    else:
+        output_path = completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json")
+
+    if report:
+        report_path = Path(report)
+    elif completion_dir:
+        report_path = Path(completion_dir) / "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.md"
+    elif output:
+        report_path = output_path.with_suffix(".md")
+    else:
+        report_path = completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.md")
+
+    return output_path, report_path
+
+
+def run(base_url: str, *, output_path: Path | None = None, report_path: Path | None = None) -> int:
     session = requests.Session()
     route_results = []
     for route in ROUTES:
@@ -173,39 +197,55 @@ def run(base_url: str) -> int:
         result["final_route"] == result["expected_final_route"]
         for result in route_results
     )
+    route_mismatches = [
+        {
+            "route": result["route"],
+            "final_route": result["final_route"],
+            "expected_final_route": result["expected_final_route"],
+        }
+        for result in route_results
+        if result["final_route"] != result["expected_final_route"]
+    ]
     checks = [
-        has_manifest_link,
-        has_sw_registration,
-        has_install_button,
-        has_continuity_action,
-        has_manifest_id,
-        has_display_override,
-        has_expected_shortcuts,
-        screenshot_count >= 2,
-        has_expected_shell_cache_paths,
-        ledger_stream_not_precached,
-        ledger_stream_denied_by_service_worker,
-        ledger_stream_has_no_store_header,
-        ledger_stream_has_personalized_vary,
-        has_navigation_preload,
-        has_runtime_cache,
-        has_push_handler,
-        has_notification_click_handler,
-        has_notification_close_handler,
-        has_notification_route_bounds,
-        has_notification_asset_bounds,
-        continuity_receipt_count >= 3,
-        continuity_boundary_present,
-        mobile_json_has_routes,
-        ledger_stream_contract_holds,
-        role_routes_hold,
+        {"id": "mobile_page_links_manifest", "pass": has_manifest_link, "detail": "The /mobile page advertises /manifest.json."},
+        {"id": "mobile_page_registers_service_worker", "pass": has_sw_registration, "detail": "The /mobile page registers the scoped service worker."},
+        {"id": "mobile_page_shows_install_action", "pass": has_install_button, "detail": "The /mobile page exposes an install affordance."},
+        {"id": "mobile_page_links_continuity", "pass": has_continuity_action, "detail": "The /mobile page links to /play/continuity."},
+        {"id": "manifest_id_is_mobile", "pass": has_manifest_id, "detail": f"manifest.id is {manifest.get('id')!r}."},
+        {"id": "manifest_has_display_override", "pass": has_display_override, "detail": "display_override is present for richer install surfaces."},
+        {"id": "manifest_shortcuts_cover_mobile_play_continuity", "pass": has_expected_shortcuts, "detail": f"shortcut URLs: {sorted(shortcut_urls)}."},
+        {"id": "manifest_has_screenshots", "pass": screenshot_count >= 2, "detail": f"screenshot count: {screenshot_count}."},
+        {"id": "service_worker_precaches_shell_paths", "pass": has_expected_shell_cache_paths, "detail": f"precache URLs include {sorted(EXPECTED_SHELL_CACHE_PATHS)}."},
+        {"id": "ledger_stream_not_precached", "pass": ledger_stream_not_precached, "detail": "Personalized living-world data must not be in the static shell cache."},
+        {"id": "ledger_stream_denied_by_service_worker_cache", "pass": ledger_stream_denied_by_service_worker, "detail": "Service worker explicitly denies /mobile/pwa/ledger.json from caching."},
+        {"id": "ledger_stream_no_store", "pass": ledger_stream_has_no_store_header, "detail": f"Cache-Control: {ledger_stream_cache_control!r}."},
+        {"id": "ledger_stream_varies_by_identity", "pass": ledger_stream_has_personalized_vary, "detail": f"Vary: {ledger_stream_vary!r}."},
+        {"id": "service_worker_navigation_preload", "pass": has_navigation_preload, "detail": "Service worker includes navigation preload support."},
+        {"id": "service_worker_runtime_cache", "pass": has_runtime_cache, "detail": "Service worker declares the runtime cache."},
+        {"id": "service_worker_push_handler", "pass": has_push_handler, "detail": "Service worker handles push events."},
+        {"id": "service_worker_notification_click_handler", "pass": has_notification_click_handler, "detail": "Service worker handles notification clicks."},
+        {"id": "service_worker_notification_close_handler", "pass": has_notification_close_handler, "detail": "Service worker handles notification close events."},
+        {"id": "notification_routes_are_bounded", "pass": has_notification_route_bounds, "detail": "Notification navigation is limited to first-party allowed routes."},
+        {"id": "notification_assets_are_bounded", "pass": has_notification_asset_bounds, "detail": "Notification image assets are limited to safe local paths and suffixes."},
+        {"id": "continuity_has_receipts", "pass": continuity_receipt_count >= 3, "detail": f"continuity receipt count: {continuity_receipt_count}."},
+        {"id": "continuity_declares_boundary", "pass": continuity_boundary_present, "detail": "Continuity receipt index declares its privacy boundary."},
+        {"id": "mobile_json_routes_hold", "pass": mobile_json_has_routes, "detail": "The PWA JSON advertises install, continuity, and receipt-index routes."},
+        {"id": "ledger_stream_contract_holds", "pass": ledger_stream_contract_holds, "detail": f"ledger stream status={ledger_stream_status!r}, mode={ledger_stream_mode!r}."},
+        {"id": "role_routes_hold", "pass": role_routes_hold, "detail": f"route mismatches: {route_mismatches}."},
+    ]
+    failures = [
+        f"{check['id']}: {check['detail']}"
+        for check in checks
+        if not check["pass"]
     ]
 
     payload = {
         "contract_name": "chummer.mobile_pwa_public_projection",
-        "status": "pass" if all(checks) else "fail",
+        "status": "pass" if not failures else "fail",
         "generated_at_utc": now_iso(),
         "base_url": base_url,
+        "checks": checks,
+        "failures": failures,
         "route_results": route_results,
         "manifest": {
             "id": manifest.get("id"),
@@ -260,14 +300,17 @@ def run(base_url: str) -> int:
             "has_personalized_vary": ledger_stream_has_personalized_vary,
         },
     }
-    write_json(completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"), payload)
+    resolved_output_path = output_path or completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json")
+    resolved_report_path = report_path or completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.md")
+    write_json(resolved_output_path, payload)
     write_text(
-        completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.md"),
+        resolved_report_path,
         "\n".join(
             [
                 "# Mobile and PWA public projection audit",
                 "",
                 f"- Generated: {payload['generated_at_utc']}",
+                f"- Status: `{payload['status']}`",
                 f"- Manifest start URL: `{payload['manifest']['start_url']}`",
                 f"- Display mode: `{payload['manifest']['display']}`",
                 f"- Display override present: `{has_display_override}`",
@@ -291,21 +334,30 @@ def run(base_url: str) -> int:
                 f"- Role-route redirects hold: `{role_routes_hold}`",
                 f"- Continuity receipt count: `{continuity_receipt_count}`",
                 f"- Continuity boundary present: `{continuity_boundary_present}`",
+                "",
+                "## Failures",
+                "",
+                *(f"- {failure}" for failure in failures),
             ]
         ),
     )
     if payload["status"] == "pass":
-        print("mobile_pwa_public_projection:ok")
+        print(f"mobile_pwa_public_projection:ok {resolved_output_path}")
+    else:
+        print(f"mobile_pwa_public_projection:fail {resolved_output_path}")
+        for failure in failures:
+            print(f"- {failure}")
     return 0 if payload["status"] == "pass" else 1
 
 
 def main() -> int:
     args = parse_args()
+    output_path, report_path = resolve_output_paths(args.completion_dir, args.output, args.report)
     if args.base_url:
-        return run(args.base_url)
+        return run(args.base_url, output_path=output_path, report_path=report_path)
 
     with LocalHubApp() as app:
-        return run(app.base_url)
+        return run(app.base_url, output_path=output_path, report_path=report_path)
 
 
 if __name__ == "__main__":

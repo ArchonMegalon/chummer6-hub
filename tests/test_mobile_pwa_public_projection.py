@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -182,6 +183,14 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
         self.assertNotIn("preview shell", text)
         self.assertNotIn("Gate `gate-mobile-pwa` includes", text)
 
+    def test_public_role_aliases_converge_on_play_shell_not_mobile_subroutes(self) -> None:
+        controller = (REPO_ROOT / "Chummer.Run.Api/Controllers/PublicLandingController.cs").read_text(encoding="utf-8")
+
+        for role in ("player", "gm", "observer"):
+            expected = f'=> Redirect("/play?role={role}");'
+            self.assertIn(expected, controller)
+            self.assertNotIn(f'=> Redirect("/mobile/{role}");', controller)
+
     def test_verifier_prints_explicit_ok_line_on_pass(self) -> None:
         module = _load_module()
         stdout = io.StringIO()
@@ -208,11 +217,12 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
 
         module = _load_module()
         stdout = io.StringIO()
+        captured_payloads: list[dict] = []
 
         with (
             patch.object(module.requests, "Session", return_value=DriftedSession()),
             patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
-            patch.object(module, "write_json"),
+            patch.object(module, "write_json", side_effect=lambda _path, payload: captured_payloads.append(payload)),
             patch.object(module, "write_text"),
             patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
             redirect_stdout(stdout),
@@ -221,6 +231,32 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
 
         self.assertEqual(result, 1)
         self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+        self.assertIn("mobile_pwa_public_projection:fail", stdout.getvalue())
+        self.assertEqual(captured_payloads[0]["status"], "fail")
+        self.assertIn("checks", captured_payloads[0])
+        self.assertTrue(any(check["id"] == "role_routes_hold" and check["pass"] is False for check in captured_payloads[0]["checks"]))
+        self.assertTrue(any("role_routes_hold" in failure for failure in captured_payloads[0]["failures"]))
+
+    def test_verifier_supports_explicit_output_and_report_paths(self) -> None:
+        module = _load_module()
+        stdout = io.StringIO()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = Path(temp_dir) / "mobile-pwa.json"
+            report = Path(temp_dir) / "mobile-pwa.md"
+            with (
+                patch.object(module.requests, "Session", return_value=_FakeSession()),
+                patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
+                redirect_stdout(stdout),
+            ):
+                result = module.run("http://example.test", output_path=output, report_path=report)
+
+            self.assertEqual(result, 0)
+            self.assertTrue(output.is_file())
+            self.assertTrue(report.is_file())
+            self.assertIn(str(output), stdout.getvalue())
+            self.assertIn('"status": "pass"', output.read_text(encoding="utf-8"))
+            self.assertIn("- Status: `pass`", report.read_text(encoding="utf-8"))
 
     def test_verifier_fails_when_mobile_page_drops_service_worker_registration(self) -> None:
         class DriftedSession(_FakeSession):

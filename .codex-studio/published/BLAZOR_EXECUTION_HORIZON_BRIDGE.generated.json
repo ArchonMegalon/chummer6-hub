@@ -6,7 +6,7 @@
   },
   "contract_name": "chummer.blazor_execution_horizon_bridge",
   "failures": [],
-  "generated_at_utc": "2026-06-30T17:51:32Z",
+  "generated_at_utc": "2026-06-30T21:37:49Z",
   "notes": [
     "This Hub bridge keeps mobile/PWA readiness, Blazor PWA installability, and Blazor hosted execution horizons visible together.",
     "A passing bridge does not mean the full live Blazor public-edge execution matrix is proven unless mid_term_full_matrix_status is proven.",

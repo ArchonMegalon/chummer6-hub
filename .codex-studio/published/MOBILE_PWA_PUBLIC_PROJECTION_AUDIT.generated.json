@@ -1,8 +1,136 @@
 {
   "contract_name": "chummer.mobile_pwa_public_projection",
   "status": "pass",
-  "generated_at_utc": "2026-06-29T10:32:33.564668Z",
+  "generated_at_utc": "2026-06-30T21:37:28.404784Z",
   "base_url": "https://chummer.run",
+  "checks": [
+    {
+      "id": "mobile_page_links_manifest",
+      "pass": true,
+      "detail": "The /mobile page advertises /manifest.json."
+    },
+    {
+      "id": "mobile_page_registers_service_worker",
+      "pass": true,
+      "detail": "The /mobile page registers the scoped service worker."
+    },
+    {
+      "id": "mobile_page_shows_install_action",
+      "pass": true,
+      "detail": "The /mobile page exposes an install affordance."
+    },
+    {
+      "id": "mobile_page_links_continuity",
+      "pass": true,
+      "detail": "The /mobile page links to /play/continuity."
+    },
+    {
+      "id": "manifest_id_is_mobile",
+      "pass": true,
+      "detail": "manifest.id is '/mobile'."
+    },
+    {
+      "id": "manifest_has_display_override",
+      "pass": true,
+      "detail": "display_override is present for richer install surfaces."
+    },
+    {
+      "id": "manifest_shortcuts_cover_mobile_play_continuity",
+      "pass": true,
+      "detail": "shortcut URLs: ['/mobile', '/packages', '/play', '/play/continuity']."
+    },
+    {
+      "id": "manifest_has_screenshots",
+      "pass": true,
+      "detail": "screenshot count: 2."
+    },
+    {
+      "id": "service_worker_precaches_shell_paths",
+      "pass": true,
+      "detail": "precache URLs include ['/mobile', '/mobile/pwa.json', '/play', '/play/continuity', '/ready/handoff/mobile.json']."
+    },
+    {
+      "id": "ledger_stream_not_precached",
+      "pass": true,
+      "detail": "Personalized living-world data must not be in the static shell cache."
+    },
+    {
+      "id": "ledger_stream_denied_by_service_worker_cache",
+      "pass": true,
+      "detail": "Service worker explicitly denies /mobile/pwa/ledger.json from caching."
+    },
+    {
+      "id": "ledger_stream_no_store",
+      "pass": true,
+      "detail": "Cache-Control: 'private, no-store, no-cache, max-age=0'."
+    },
+    {
+      "id": "ledger_stream_varies_by_identity",
+      "pass": true,
+      "detail": "Vary: 'Cookie, Authorization'."
+    },
+    {
+      "id": "service_worker_navigation_preload",
+      "pass": true,
+      "detail": "Service worker includes navigation preload support."
+    },
+    {
+      "id": "service_worker_runtime_cache",
+      "pass": true,
+      "detail": "Service worker declares the runtime cache."
+    },
+    {
+      "id": "service_worker_push_handler",
+      "pass": true,
+      "detail": "Service worker handles push events."
+    },
+    {
+      "id": "service_worker_notification_click_handler",
+      "pass": true,
+      "detail": "Service worker handles notification clicks."
+    },
+    {
+      "id": "service_worker_notification_close_handler",
+      "pass": true,
+      "detail": "Service worker handles notification close events."
+    },
+    {
+      "id": "notification_routes_are_bounded",
+      "pass": true,
+      "detail": "Notification navigation is limited to first-party allowed routes."
+    },
+    {
+      "id": "notification_assets_are_bounded",
+      "pass": true,
+      "detail": "Notification image assets are limited to safe local paths and suffixes."
+    },
+    {
+      "id": "continuity_has_receipts",
+      "pass": true,
+      "detail": "continuity receipt count: 3."
+    },
+    {
+      "id": "continuity_declares_boundary",
+      "pass": true,
+      "detail": "Continuity receipt index declares its privacy boundary."
+    },
+    {
+      "id": "mobile_json_routes_hold",
+      "pass": true,
+      "detail": "The PWA JSON advertises install, continuity, and receipt-index routes."
+    },
+    {
+      "id": "ledger_stream_contract_holds",
+      "pass": true,
+      "detail": "ledger stream status='opt_in_required', mode='mobile_pwa_living_world'."
+    },
+    {
+      "id": "role_routes_hold",
+      "pass": true,
+      "detail": "route mismatches: []."
+    }
+  ],
+  "failures": [],
   "route_results": [
     {
       "route": "/mobile",
@@ -75,7 +203,7 @@
     ]
   },
   "service_worker": {
-    "path": "/service-worker.js?v=1782719395",
+    "path": "/service-worker.js?v=1782820780",
     "status_code": 200,
     "has_fetch_handler": true,
     "has_navigation_preload": true,

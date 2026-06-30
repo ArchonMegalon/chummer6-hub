@@ -1,6 +1,7 @@
 # Mobile and PWA public projection audit
 
-- Generated: 2026-06-29T10:32:33.564668Z
+- Generated: 2026-06-30T21:37:28.404784Z
+- Status: `pass`
 - Manifest start URL: `/mobile`
 - Display mode: `standalone`
 - Display override present: `True`
@@ -24,3 +25,5 @@
 - Role-route redirects hold: `True`
 - Continuity receipt count: `3`
 - Continuity boundary present: `True`
+
+## Failures
