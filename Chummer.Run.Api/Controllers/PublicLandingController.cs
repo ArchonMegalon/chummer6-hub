@@ -7071,13 +7071,13 @@ document.addEventListener('DOMContentLoaded', function () {
         string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_WEBHOOK_SECRET"]?.Trim();
         if (string.IsNullOrWhiteSpace(configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "productlift webhook adapter is not configured.");
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "feedback webhook adapter is not configured.");
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.WebhookSecretHeader].ToString();
         if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift webhook secret mismatch.");
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "feedback webhook secret mismatch.");
         }
 
         try

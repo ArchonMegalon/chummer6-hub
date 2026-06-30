@@ -40,11 +40,44 @@ def test_feedback_operations_runtime_messages_do_not_name_provider() -> None:
     assert "productlift operations replay is not configured" not in controller
     assert "productlift operations recovery is not configured" not in controller
     assert "productlift operations secret mismatch" not in controller
+    assert "productlift webhook adapter is not configured" not in controller
+    assert "productlift webhook secret mismatch" not in controller
     assert "feedback operations replay is not configured" in controller
     assert "feedback operations recovery is not configured" in controller
     assert "feedback operations secret mismatch" in controller
+    assert "feedback webhook adapter is not configured" in controller
+    assert "feedback webhook secret mismatch" in controller
     assert "delivery outcome secret mismatch" in controller
+    assert "productlift webhook payload must be a JSON object" not in service
+    assert "productlift webhook event id" not in service
+    assert "productlift webhook event type" not in service
+    assert "productlift webhook board label" not in service
+    assert "productlift webhook category label" not in service
+    assert "productlift webhook item reference" not in service
+    assert "productlift webhook status label" not in service
+    assert "productlift webhook action label" not in service
+    assert "Unable to deserialize ProductLift webhook receipt snapshot" not in service
+    assert "feedback webhook payload must be a JSON object" in service
+    assert "feedback webhook event id" in service
+    assert "feedback webhook event type" in service
+    assert "feedback webhook board label" in service
+    assert "feedback webhook category label" in service
+    assert "feedback webhook item reference" in service
+    assert "feedback webhook status label" in service
+    assert "feedback webhook action label" in service
+    assert "Unable to deserialize feedback webhook receipt snapshot" in service
     assert "stored ProductLift webhook receipts" not in service
     assert "bounded ProductLift webhook receipts" not in service
+    assert "ProductLift closeout" not in service
+    assert "ProductLift source" not in service
+    assert "bounded ProductLift closeout" not in service
+    assert "bounded ProductLift journey" not in service
+    assert "bounded ProductLift replay" not in service
     assert "stored feedback webhook receipts" in service
     assert "bounded feedback webhook receipts" in service
+    assert "bounded feedback closeout" in service
+    assert "bounded feedback journey" in service
+    assert "bounded feedback replay" in service
+    assert "ready feedback source" in service
+    assert "feedback source receipt" in service
+    assert "feedback closeout" in service
