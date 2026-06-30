@@ -19,6 +19,7 @@ LIVE_RECRAWL_PATH = PUBLISHED_ROOT / "LIVE_PUBLIC_WEB_RECRAWL.generated.json"
 PUBLIC_ROUTE_PROOF_PATH = PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
 LIVE_SURFACE_PARITY_PATH = PUBLISHED_ROOT / "LIVE_SURFACE_PARITY.generated.json"
 LTD_OPTIMIZATION_STACK_PATH = PUBLISHED_ROOT / "LTD_OPTIMIZATION_STACK.generated.json"
+PREMIUM_UI_DESIGN_EXIT_GATE_PATH = PUBLISHED_ROOT / "PREMIUM_UI_DESIGN_EXIT_GATE.generated.json"
 REQUIRED_VIEWPORTS = {"390x844", "412x915", "768x1024", "1366x768", "1440x900", "1920x1080"}
 SUPPORTING_SURFACE_VIEWPORTS = {"390x844", "1366x768"}
 REQUIRED_SUPPORTING_SURFACES = {"downloads", "status", "ledger-map"}
@@ -189,6 +190,19 @@ def build_payload() -> dict[str, Any]:
         "license_tier": icanpreneur_check.get("license_tier"),
         "runtime_ready": icanpreneur_check.get("runtime_ready"),
         "pass": icanpreneur_design_lane_pass,
+    }
+
+    premium_ui_design_exit_gate = load_json(PREMIUM_UI_DESIGN_EXIT_GATE_PATH)
+    premium_ui_design_exit_gate_pass = status_pass(premium_ui_design_exit_gate) and not premium_ui_design_exit_gate.get("failures")
+    if not premium_ui_design_exit_gate_pass:
+        failures.append("premium UI design exit gate is missing or failing")
+    checks["premium_ui_design_exit_gate"] = {
+        "path": str(PREMIUM_UI_DESIGN_EXIT_GATE_PATH),
+        "status": premium_ui_design_exit_gate.get("status", "missing"),
+        "verdict": premium_ui_design_exit_gate.get("verdict"),
+        "failure_count": len(premium_ui_design_exit_gate.get("failures") or []),
+        "reference_system_count": len(premium_ui_design_exit_gate.get("reference_systems") or []),
+        "pass": premium_ui_design_exit_gate_pass,
     }
 
     ui_frame_path = COMPLETION_ROOT / "UI_FRAME_INTEGRITY.generated.json"

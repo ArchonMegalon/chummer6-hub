@@ -73,9 +73,17 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
             return
 
         if path in {"/status", "/status/"}:
-            self.send_response(302)
-            self.send_header("Location", "/downloads/")
-            self.end_headers()
+            self._send_html(
+                """
+                <html><body>
+                <section class="minimal-page-hero minimal-status-pill">
+                <h1>Updated</h1>
+                <a href="/downloads">Downloads</a>
+                <a href="/help">Help</a>
+                </section>
+                </body></html>
+                """
+            )
             return
 
         if path == "/login":

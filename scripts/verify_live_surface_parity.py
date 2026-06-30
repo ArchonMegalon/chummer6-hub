@@ -106,12 +106,11 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
         },
         {
             "path": "/status",
-            "required_final_url_prefix": "/downloads",
+            "required_final_url_prefix": "/status",
             "required_texts": [
+                "Updated",
                 "Downloads",
-                "Chummer selects the best installer when it can.",
-                "Stable release",
-                "Build from source",
+                "Help",
             ],
             "forbidden_texts": [
                 "Current release",

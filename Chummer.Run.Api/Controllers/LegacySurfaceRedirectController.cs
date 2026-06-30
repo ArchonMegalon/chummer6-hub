@@ -87,7 +87,7 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     [HttpGet("/coach")]
     [HttpGet("/coach/{**path}")]
     public IActionResult Coach()
-        => Redirect("/status");
+        => Redirect("/downloads");
 
     private async Task<IActionResult> ProxyBrowserSurfaceAsync(
         Uri? upstream,

@@ -40,9 +40,14 @@ class FinalGoldJanitorTests(unittest.TestCase):
         commands = [" ".join(command) for command in module.MATERIALIZERS]
 
         minimal_index = next(index for index, command in enumerate(commands) if "scripts/verify_minimal_experience_gate.py" in command)
+        premium_index = commands.index("python3 scripts/verify_premium_ui_design_exit_gate.py --completion-dir /docker/chummercomplete/_completion/chummer_run_redesign_closure")
         design_index = commands.index("python3 scripts/materialize_design_quality_gate.py")
 
         self.assertLess(minimal_index, design_index)
+        self.assertLess(minimal_index, premium_index)
+        self.assertLess(premium_index, design_index)
+        self.assertIn("premium_ui_design_exit_gate", module.REQUIRED_RECEIPTS)
+        self.assertIn("premium_ui_design_exit_gate", module.FRESHNESS_REQUIRED_GATES)
 
     def test_public_route_materializer_uses_bounded_live_probe_settings(self) -> None:
         module = load_module()

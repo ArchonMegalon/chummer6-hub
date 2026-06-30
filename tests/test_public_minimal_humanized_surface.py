@@ -434,18 +434,20 @@ def test_participation_surface_renders_first_party_without_character_helper_copy
     assert "hostedHeadingReplacement: null," in controller
     assert "hostedSummaryReplacement: null," in controller
     assert 'Heading: "Participate"' in controller
-    assert 'Summary: "Public requests, clear bugs, useful ideas."' in controller
-    assert "Public requests, clear bugs, useful ideas." in controller
+    assert 'Summary: "Participate"' in controller
+    assert "Public requests, clear bugs, useful ideas." not in controller
     assert 'public IActionResult ParticipateBoardFrame(string? boardPath)' in controller
     assert ".text-primary," in controller
     assert ".dropdown-menu," in controller
     assert "var(--chummer-board-text)" in controller
-    assert "Current requests" in participate
+    assert "Current requests" not in participate
     assert "participate-preview-card" not in participate
     assert "data-chummer-participate-frame" in participate
+    assert "participate-hosted__frame" in participate
+    assert 'title="Chummer participation board"' in participate
     assert "Model.SupporterHref" not in participate
-    assert "@PublicParticipateText(Model.Heading)" in participate
-    assert "@PublicParticipateText(Model.Summary)" in participate
+    assert "@PublicParticipateText(" not in participate
+    assert "@Model.Summary" not in participate
     assert "Board offline right now" in participate
     assert "Use Contact for the Chummer5 Discord server." in participate
     assert "Private support" not in participate
@@ -531,11 +533,12 @@ def test_participation_redirect_avoids_public_decision_and_account_explanation_p
     assert '"/participate"' in controller
     assert "suppressHeaderActionsForPublicParticipate" in layout
     assert "var suppressHeaderActionsForPublicParticipate = false;" in layout
-    assert "@PublicParticipateText(Model.Heading)" in participate
-    assert "@PublicParticipateText(Model.Summary)" in participate
-    assert "Current requests" in participate
+    assert "@PublicParticipateText(" not in participate
+    assert "@Model.Summary" not in participate
+    assert "Current requests" not in participate
     assert "participate-preview-card" not in participate
     assert "data-chummer-participate-frame" in participate
+    assert 'title="Chummer participation board"' in participate
 
     for forbidden in (
         "Account-only programs stay below the fold",
@@ -991,9 +994,9 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
 def test_status_surface_uses_plain_updated_label() -> None:
     status = read("Chummer.Run.Api/Views/PublicLanding/Status.cshtml")
 
-    assert 'ViewData["Title"] = "Updated";' in status
+    assert 'ViewData["Title"] = "Status";' in status
     assert "<h1>Updated</h1>" in status
-    assert 'ViewData["Title"] = "Status";' not in status
+    assert 'ViewData["Title"] = "Updated";' not in status
 
 
 def test_minimal_palette_stays_neutral_and_readable() -> None:

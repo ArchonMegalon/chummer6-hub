@@ -138,10 +138,6 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             registry_path = temp_root / "successor-registry.yaml"
-            shutil.copyfile(
-                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml",
-                registry_path,
-            )
             registry_payload = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
             for milestone in registry_payload["milestones"]:
                 if milestone.get("id") != 120:
@@ -208,21 +204,21 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("receipt id launch_health:public must appear exactly once in proof_receipts", result.stderr)
 
-    def test_verifier_fails_when_controller_loses_minimal_status_redirect(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m120-status-redirect-") as temp_dir:
+    def test_verifier_fails_when_controller_loses_minimal_status_view(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="next90-m120-status-view-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
             controller_path = temp_root / "Chummer.Run.Api/Controllers/PublicLandingController.cs"
             controller_text = controller_path.read_text(encoding="utf-8")
             controller_path.write_text(
-                controller_text.replace('return Redirect("/downloads");', 'return Redirect("/now");', 1),
+                controller_text.replace('return View("~/Views/PublicLanding/Status.cshtml", model);', 'return Redirect("/downloads");', 1),
                 encoding="utf-8",
             )
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('return Redirect("/downloads");', result.stderr)
+        self.assertIn('return View("~/Views/PublicLanding/Status.cshtml", model);', result.stderr)
 
     def test_verifier_fails_when_smoke_drops_status_decision_surface_assertion(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-status-surface-") as temp_dir:

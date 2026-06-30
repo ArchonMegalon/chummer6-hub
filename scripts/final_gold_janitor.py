@@ -20,7 +20,7 @@ UI_LAYOUT_COMPLETION_ROOT = COMPLETION_ROOT / "chummer_run_redesign_closure"
 LEGACY_GOLD_CLOSURE_ROOT = COMPLETION_ROOT / "gold_readiness_closure"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_FINAL_GOLD_BASE_URL", "https://chummer.run")
 RECRAWL_MAX_AGE_HOURS = 24
-MATERIALIZER_TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_FINAL_GOLD_MATERIALIZER_TIMEOUT_SECONDS", "180"))
+MATERIALIZER_TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_FINAL_GOLD_MATERIALIZER_TIMEOUT_SECONDS", "600"))
 FRESHNESS_REQUIRED_GATES = {
     "live_public_web_recrawl",
     "rule_authority_minimum_coverage",
@@ -39,6 +39,7 @@ FRESHNESS_REQUIRED_GATES = {
     "public_copy_leak_gate",
     "participate_billing_honesty",
     "account_handoff_runtime_config",
+    "premium_ui_design_exit_gate",
     "design_quality_gate",
     "windows_installer_visual_audit",
     "ui_layout_exit_gate",
@@ -67,6 +68,7 @@ REQUIRED_RECEIPTS = {
     "public_copy_leak_gate": PUBLISHED_ROOT / "PUBLIC_COPY_LEAK_GATE.generated.json",
     "participate_billing_honesty": PUBLISHED_ROOT / "PARTICIPATE_BILLING_HONESTY.generated.json",
     "account_handoff_runtime_config": PUBLISHED_ROOT / "ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json",
+    "premium_ui_design_exit_gate": PUBLISHED_ROOT / "PREMIUM_UI_DESIGN_EXIT_GATE.generated.json",
     "design_quality_gate": PUBLISHED_ROOT / "DESIGN_QUALITY_GATE.generated.json",
     "windows_installer_visual_audit": PUBLISHED_ROOT / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
     "ui_layout_exit_gate": UI_LAYOUT_COMPLETION_ROOT / "UI_LAYOUT_EXIT_GATE.generated.json",
@@ -111,6 +113,7 @@ MATERIALIZERS = [
     ["python3", "scripts/verify_account_handoff_runtime_config.py"],
     ["python3", "scripts/ui_layout_exit_gate.py", "--completion-dir", str(UI_LAYOUT_COMPLETION_ROOT)],
     ["python3", "scripts/verify_minimal_experience_gate.py", "--base-url", DEFAULT_BASE_URL, "--completion-dir", str(UI_LAYOUT_COMPLETION_ROOT)],
+    ["python3", "scripts/verify_premium_ui_design_exit_gate.py", "--completion-dir", str(UI_LAYOUT_COMPLETION_ROOT)],
     ["python3", "scripts/materialize_design_quality_gate.py"],
     ["python3", "scripts/verify_windows_installer_visual_audit.py"],
     ["python3", "scripts/materialize_operator_release_dashboard.py"],

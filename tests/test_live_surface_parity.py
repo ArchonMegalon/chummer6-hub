@@ -51,9 +51,18 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
             return
 
         if self.path == "/status":
-            self.send_response(302)
-            self.send_header("Location", "/downloads")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
+            self.wfile.write(
+                b"<html><body>"
+                b"<section class=\"minimal-page-hero minimal-status-pill\">"
+                b"<h1>Updated</h1>"
+                b"<a href=\"/downloads\">Downloads</a>"
+                b"<a href=\"/help\">Help</a>"
+                b"</section>"
+                b"</body></html>"
+            )
             return
 
         if self.path.startswith("/login"):

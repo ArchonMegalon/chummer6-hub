@@ -1,0 +1,89 @@
+{
+  "contract_name": "chummer.premium_ui_design_exit_gate",
+  "generated_at_utc": "2026-06-30T21:26:15Z",
+  "status": "pass",
+  "verdict": "PREMIUM_UI_READY",
+  "reference_systems": [
+    {
+      "name": "Apple Human Interface Guidelines",
+      "url": "https://developer.apple.com/design/human-interface-guidelines/",
+      "gate_translation": "clarity, deference, depth, touch-safe controls, and direct task hierarchy"
+    },
+    {
+      "name": "Material Design 3 Foundations",
+      "url": "https://m3.material.io/foundations",
+      "gate_translation": "deliberate color, typography, motion, layout, and component affordance systems"
+    },
+    {
+      "name": "Microsoft Fluent 2",
+      "url": "https://fluent2.microsoft.design/",
+      "gate_translation": "coherent design tokens, elevation, spacing, and interaction states across platforms"
+    },
+    {
+      "name": "IBM Carbon Design System",
+      "url": "https://carbondesignsystem.com/",
+      "gate_translation": "2x-grid discipline, accessible structure, purposeful density, and production-ready consistency"
+    }
+  ],
+  "css_path": "/docker/chummercomplete/chummer.run-services-participate-main/Chummer.Run.Api/wwwroot/css/site.css",
+  "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
+  "published_root": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-studio/published",
+  "checks": {
+    "premium_typography": {
+      "standard": "HIG clarity + Material/Fluent/Carbon type-system discipline",
+      "display_font": "\"Fraunces\", \"Iowan Old Style\", \"Palatino Linotype\", Georgia, serif",
+      "body_font": "\"Aptos\", \"Avenir Next\", \"Trebuchet MS\", sans-serif",
+      "pass": true
+    },
+    "premium_elevation": {
+      "standard": "HIG depth + Fluent elevation",
+      "shadow_soft": "0 18px 45px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.045)",
+      "shadow_hero": "0 36px 100px rgba(0, 0, 0, 0.46), 0 0 0 1px rgba(244, 241, 232, 0.065), inset 0 1px 0 rgba(255, 255, 255, 0.07)",
+      "pass": true
+    },
+    "spatial_system": {
+      "standard": "Carbon 2x-grid + Material layout rhythm",
+      "spacing_token_count": 8,
+      "radius_tokens": {
+        "radius-xl": "30px",
+        "radius-lg": "22px",
+        "radius-md": "16px",
+        "radius-sm": "10px"
+      },
+      "distinct_radius_count": 4,
+      "pass": true
+    },
+    "art_direction": {
+      "standard": "HIG deference with purposeful visual depth",
+      "gradient_count": 183,
+      "has_minimal_hero_visual_css": true,
+      "has_landing_film_css": true,
+      "pass": true
+    },
+    "motion_governance": {
+      "standard": "Material motion + accessibility fallback",
+      "has_transitions": true,
+      "has_keyframes": true,
+      "has_reduced_motion": true,
+      "pass": true
+    },
+    "public_copy_quiet": {
+      "standard": "HIG clarity and Carbon production copy consistency",
+      "view_count": 5,
+      "leaked_terms": [],
+      "public_copy_leak_gate_status": "pass",
+      "pass": true
+    },
+    "production_basics": {
+      "standard": "accessible production polish before subjective taste",
+      "ui_frame_status": "pass",
+      "ui_frame_failure_count": 0,
+      "contrast_status": "pass",
+      "minimal_experience_status": "pass",
+      "minimal_experience_failure_count": 0,
+      "noise_budget_status": "pass",
+      "pass": true
+    }
+  },
+  "failures": []
+}

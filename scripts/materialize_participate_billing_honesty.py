@@ -57,7 +57,7 @@ def materialize(completion_dir: Path, node_runner: str) -> dict:
             "BRILLIANT_DIRECTORIES_CHECKOUT_USER_ID_PARAMETER": "external_user",
             "BRILLIANT_DIRECTORIES_CHECKOUT_PLAN_PARAMETER": "membership_plan",
         }
-        with LocalHubApp(identity_base_url=identity.base_url, extra_env=configured_env) as app:
+        with LocalHubApp(identity_base_url=identity.base_url, extra_env=configured_env, no_build=True) as app:
             env = dict(base_env)
             env.update(
                 {
@@ -72,7 +72,7 @@ def materialize(completion_dir: Path, node_runner: str) -> dict:
         unavailable_env = {
             "CHUMMER_PRODUCTLIFT_FEEDBACK_URL": board.base_url,
         }
-        with LocalHubApp(identity_base_url=identity.base_url, extra_env=unavailable_env) as app:
+        with LocalHubApp(identity_base_url=identity.base_url, extra_env=unavailable_env, no_build=True) as app:
             env = dict(base_env)
             env.update(
                 {

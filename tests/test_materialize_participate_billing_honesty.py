@@ -70,12 +70,14 @@ class MaterializeParticipateBillingHonestyTests(unittest.TestCase):
                     with mock.patch.object(module, "LocalHubApp", side_effect=[
                         _DummyContext(base_url="http://configured-app"),
                         _DummyContext(base_url="http://unavailable-app"),
-                    ]):
+                    ]) as local_hub_mock:
                         with mock.patch.object(module, "run_playwright", side_effect=fake_run_playwright) as run_mock:
                             payload = module.materialize(completion_dir, "npx")
 
             self.assertEqual(payload["status"], "pass")
             self.assertEqual(run_mock.call_count, 2)
+            self.assertEqual(local_hub_mock.call_count, 2)
+            self.assertTrue(all(call.kwargs.get("no_build") is True for call in local_hub_mock.call_args_list))
             self.assertTrue((completion_dir / "PARTICIPATE_BILLING_HONESTY.generated.json").is_file())
             self.assertTrue((completion_dir / "PARTICIPATE_BILLING_HONESTY.md").is_file())
 

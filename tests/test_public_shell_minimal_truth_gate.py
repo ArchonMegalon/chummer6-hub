@@ -50,7 +50,6 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                       </head>
                       <body>
                         <h1>Participate</h1>
-                        <p>Public requests, clear bugs, useful ideas.</p>
                         <p>Board offline right now.</p>
                         <p>Use Contact for the Chummer5 Discord server.</p>
                         <a href="/contact">Contact</a>
@@ -72,9 +71,7 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                   </head>
                   <body>
                     <h1>Participate</h1>
-                    <p>Public requests, clear bugs, useful ideas.</p>
-                    <h2>Current requests</h2>
-                    <iframe src="/participate/board?embed=1" data-chummer-participate-frame></iframe>
+                    <iframe src="/participate/board?embed=1" title="Chummer participation board" data-chummer-participate-frame></iframe>
                   </body>
                 </html>
                 """,
@@ -171,9 +168,24 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
             )
             return
         if path == "/status":
-            self.send_response(302)
-            self.send_header("Location", "/downloads")
-            self.end_headers()
+            self._send_html(
+                200,
+                """
+                <html>
+                  <head>
+                    <meta property="og:url" content="/status" />
+                    <meta name="twitter:url" content="/status" />
+                  </head>
+                  <body>
+                    <section class="minimal-page-hero minimal-status-pill">
+                      <h1>Updated</h1>
+                      <a href="/downloads">Downloads</a>
+                      <a href="/help">Help</a>
+                    </section>
+                  </body>
+                </html>
+                """,
+            )
             return
 
         self._send_html(404, "<html><body>missing</body></html>")

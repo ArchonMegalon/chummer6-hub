@@ -157,7 +157,7 @@ SOURCE_MARKERS = {
         '[HttpGet("/status")]',
         '[HttpHead("/status")]',
         "ApplyNoStoreHeaders(Response.Headers);",
-        'return Redirect("/downloads");',
+        'return View("~/Views/PublicLanding/Status.cshtml", model);',
     ],
     "Chummer.Run.Api/Controllers/PublicProgressController.cs": [
         '[HttpGet("progress-poster.svg")]',

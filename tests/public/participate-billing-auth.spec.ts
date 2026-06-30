@@ -45,12 +45,12 @@ test('billing and participate stay first-party for guests and signed-in users', 
   expect(guestParticipate.status()).toBe(200);
   const guestParticipateText = await guestParticipate.text();
   expect(guestParticipateText).toContain('Participate');
-  expect(guestParticipateText).toContain('Public requests, clear bugs, useful ideas.');
-  expect(guestParticipateText.includes('data-chummer-participate-frame') || guestParticipateText.includes('Board offline right now')).toBeTruthy();
+  expect(guestParticipateText).toContain('data-chummer-participate-frame');
+  expect(guestParticipateText).toContain('title="Chummer participation board"');
+  expect(guestParticipateText).not.toContain('Public requests, clear bugs, useful ideas.');
+  expect(guestParticipateText).not.toContain('participate-hosted__header');
   expect(guestParticipateText).not.toContain('ProductLift');
-  const guestParticipateSurface = guestParticipateText.includes('data-chummer-participate-frame')
-    ? 'first_party_productlift_proxy'
-    : 'first_party_proxy_offline_fallback';
+  const guestParticipateSurface = 'first_party_hosted_board_frame';
 
   const guestSupporterStart = await request.get(`${baseUrl}/account/billing/supporter/start`, { maxRedirects: 0 });
   expect([302, 303, 307, 308]).toContain(guestSupporterStart.status());
@@ -146,14 +146,14 @@ test('billing and participate stay first-party for guests and signed-in users', 
 
   await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Participate' })).toBeVisible();
-  await expect(page.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
-  await expect(page.locator('[data-chummer-participate-frame], .participate-board-fallback')).toHaveCount(1);
+  await expect(page.locator('body')).not.toContainText('Public requests, clear bugs, useful ideas.');
+  await expect(page.locator('.participate-hosted__header')).toHaveCount(0);
+  await expect(page.locator('iframe[data-chummer-participate-frame]')).toHaveCount(1);
+  await expect(page.locator('iframe[data-chummer-participate-frame]')).toHaveAttribute('title', 'Chummer participation board');
   await expect(page.locator('body')).not.toContainText('ProductLift');
   await expect(page.locator('body')).not.toContainText('Log in');
   await expect(page.locator('body')).not.toContainText('Sign up');
-  const signedInParticipateSurface = (await page.locator('[data-chummer-participate-frame]').count()) === 1
-    ? 'first_party_productlift_proxy'
-    : 'first_party_proxy_offline_fallback';
+  const signedInParticipateSurface = 'first_party_hosted_board_frame';
   await page.close();
   await context.close();
 

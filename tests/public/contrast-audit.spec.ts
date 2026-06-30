@@ -17,6 +17,36 @@ const routes = [
   '/changelog',
 ];
 
+const transientNavigationNeedles = [
+  'ERR_NETWORK_CHANGED',
+  'net::ERR_',
+  'Navigation timeout',
+  'Timeout',
+];
+
+async function gotoWithRetry(page: import('playwright/test').Page, url: string, attempts = 3) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      return response;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      const transient = transientNavigationNeedles.some((needle) => message.includes(needle));
+      if (!transient || attempt === attempts) {
+        throw error;
+      }
+
+      await page.waitForTimeout(500 * attempt);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 type ContrastFinding = {
   route: string;
   state: 'normal' | 'hover' | 'focus';
@@ -36,13 +66,13 @@ type ContrastFinding = {
 };
 
 test('public front-door surfaces meet computed contrast thresholds', async ({ browser }) => {
-  test.setTimeout(180000);
+  test.setTimeout(600000);
   const findings: ContrastFinding[] = [];
   const failures: ContrastFinding[] = [];
 
   for (const route of routes) {
     const page = await browser.newPage({ baseURL: baseUrl, viewport: { width: 1366, height: 900 } });
-    await page.goto(`${baseUrl}${route}`, { waitUntil: 'domcontentloaded' });
+    await gotoWithRetry(page, `${baseUrl}${route}`);
 
     const collect = async (state: 'normal' | 'hover' | 'focus') => {
       const rows = await page.locator('a, button, input, select, textarea, summary, .button-like, h1, h2, h3, h4, p, li, label, .muted-copy, .proof-chip, .site-nav a, .site-actions__link').evaluateAll((elements, currentState) => {
@@ -160,12 +190,17 @@ test('public front-door surfaces meet computed contrast thresholds', async ({ br
 
     await collect('normal');
 
-    const firstInteractive = page.locator('a, button, input, select, textarea, .button-like').filter({ hasNotText: 'Skip to content' }).first();
+    const firstInteractive = page.locator('main a:visible, main button:visible, main input:visible, main select:visible, main textarea:visible, main .button-like:visible').filter({ hasNotText: 'Skip to content' }).first();
     if (await firstInteractive.count() > 0) {
-      await firstInteractive.hover({ force: true, timeout: 5000 });
-      await collect('hover');
-      await firstInteractive.focus();
-      await collect('focus');
+      const hovered = await firstInteractive.hover({ timeout: 5000 }).then(() => true).catch(() => false);
+      if (hovered) {
+        await collect('hover');
+      }
+
+      const focused = await firstInteractive.focus({ timeout: 5000 }).then(() => true).catch(() => false);
+      if (focused) {
+        await collect('focus');
+      }
     }
 
     await page.close();

@@ -97,11 +97,9 @@ const checks = [
   {
     url: `${baseUrl}/status`,
     assert: (text, response) =>
-      /\/downloads\/?$/.test(response.url)
+      /\/status\/?$/.test(response.url)
+      && text.includes('Updated')
       && text.includes('Downloads')
-      && text.includes('Stable release')
-      && text.includes('Nightly')
-      && text.includes('Build from source')
       && text.includes('Help')
       && !text.includes('Checks passed')
       && !text.includes('Released')

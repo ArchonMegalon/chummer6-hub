@@ -35,9 +35,10 @@ test('downloads and status stay concise and point to the right next steps', asyn
   await downloadsPage.close();
 
   const statusPage = await openPublicPage(browser, '/status');
-  await expect(statusPage).toHaveURL(/\/downloads(?:[?#].*)?$/);
-  await expect(statusPage.getByRole('heading', { name: 'Downloads' })).toBeVisible();
-  await expect(statusPage.locator('body')).toContainText('Stable release.');
+  await expect(statusPage).toHaveURL(/\/status(?:[?#].*)?$/);
+  await expect(statusPage.getByRole('heading', { name: 'Updated' })).toBeVisible();
+  await expect(statusPage.locator('.minimal-page-hero.minimal-status-pill')).toBeVisible();
+  await expect(statusPage.getByRole('link', { name: 'Downloads' })).toBeVisible();
   await expect(statusPage.getByRole('link', { name: 'Help' })).toBeVisible();
   await expect(statusPage.getByRole('heading', { name: 'Platforms' })).toHaveCount(0);
   await statusPage.close();

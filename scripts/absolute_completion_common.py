@@ -262,14 +262,24 @@ class StaticHtmlStub(AbstractContextManager["StaticHtmlStub"]):
 
 
 class LocalHubApp(AbstractContextManager["LocalHubApp"]):
-    def __init__(self, *, identity_base_url: str | None = None, extra_env: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        identity_base_url: str | None = None,
+        extra_env: dict[str, str] | None = None,
+        no_build: bool = False,
+        startup_timeout_seconds: int | None = None,
+    ) -> None:
         self.identity_base_url = identity_base_url
         self.extra_env = dict(extra_env or {})
+        self.no_build = no_build
+        self.startup_timeout_seconds = startup_timeout_seconds or int(os.environ.get("CHUMMER_LOCAL_HUB_START_TIMEOUT_SECONDS", "180"))
         self.port = pick_free_port()
         self.base_url = f"http://127.0.0.1:{self.port}"
         self._process: subprocess.Popen[str] | None = None
         self._temp_root: tempfile.TemporaryDirectory[str] | None = None
         self._log_path: Path | None = None
+        self._log_handle: Any | None = None
 
     @property
     def log_path(self) -> Path | None:
@@ -297,16 +307,22 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
             "-nologo",
             "--no-launch-profile",
         ]
-        log_handle = self._log_path.open("w", encoding="utf-8")
+        if self.no_build:
+            command.append("--no-build")
+
+        self._log_handle = self._log_path.open("w", encoding="utf-8")
         self._process = subprocess.Popen(
             command,
             cwd=RUN_SERVICES_ROOT,
             env=env,
-            stdout=log_handle,
+            stdout=self._log_handle,
             stderr=subprocess.STDOUT,
             text=True,
         )
-        wait_for_http(self.base_url, "/login", accepted=(200,), timeout_seconds=90)
+        try:
+            wait_for_http(self.base_url, "/login", accepted=(200,), timeout_seconds=self.startup_timeout_seconds)
+        except Exception as exc:
+            raise RuntimeError(f"{exc}\nLocalHubApp log tail:\n{self._read_log_tail()}") from exc
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
@@ -317,5 +333,15 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
             except subprocess.TimeoutExpired:
                 self._process.kill()
                 self._process.wait(timeout=10)
+        if self._log_handle is not None:
+            self._log_handle.close()
         if self._temp_root is not None:
             self._temp_root.cleanup()
+
+    def _read_log_tail(self, line_count: int = 80) -> str:
+        if self._log_handle is not None:
+            self._log_handle.flush()
+        if self._log_path is None or not self._log_path.is_file():
+            return "(local hub log is unavailable)"
+        lines = self._log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        return "\n".join(lines[-line_count:]) or "(local hub log is empty)"

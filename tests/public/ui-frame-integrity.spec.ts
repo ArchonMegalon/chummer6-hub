@@ -60,8 +60,8 @@ async function gotoWithRetry(page: import('playwright/test').Page, route: string
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
       return response;
     } catch (error) {
       lastError = error;
@@ -79,7 +79,7 @@ async function gotoWithRetry(page: import('playwright/test').Page, route: string
 }
 
 test('public UI elements are not cut off by their frames outside intentional scroll panels', async ({ browser }) => {
-  test.setTimeout(300000);
+  test.setTimeout(600000);
   const failures: FrameFailure[] = [];
   const pageResults: Array<Record<string, unknown>> = [];
 

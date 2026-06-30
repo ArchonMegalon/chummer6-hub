@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 
-SCRIPT_PATH = Path("/docker/chummercomplete/chummer.run-services/scripts/materialize_design_quality_gate.py")
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_design_quality_gate.py"
 
 
 def load_module():
@@ -68,6 +68,10 @@ class DesignQualityGateTests(unittest.TestCase):
                         },
                     }
                 ),
+                encoding="utf-8",
+            )
+            (published / "PREMIUM_UI_DESIGN_EXIT_GATE.generated.json").write_text(
+                json.dumps({"status": "pass", "verdict": "PREMIUM_UI_READY", "failures": [], "reference_systems": [{}, {}, {}, {}]}),
                 encoding="utf-8",
             )
             (completion / "UI_FRAME_INTEGRITY.generated.json").write_text(
@@ -146,6 +150,7 @@ class DesignQualityGateTests(unittest.TestCase):
                 mock.patch.object(module, "PUBLIC_ROUTE_PROOF_PATH", published / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"), \
                 mock.patch.object(module, "LIVE_SURFACE_PARITY_PATH", published / "LIVE_SURFACE_PARITY.generated.json"), \
                 mock.patch.object(module, "LTD_OPTIMIZATION_STACK_PATH", published / "LTD_OPTIMIZATION_STACK.generated.json"), \
+                mock.patch.object(module, "PREMIUM_UI_DESIGN_EXIT_GATE_PATH", published / "PREMIUM_UI_DESIGN_EXIT_GATE.generated.json"), \
                 mock.patch.object(module, "MINIMAL_EXPERIENCE_GATE_PATH", completion / "MINIMAL_EXPERIENCE_GATE.generated.json"), \
                 mock.patch.object(module, "DESIGN_REVIEW_PATH", design_review):
                 payload = module.build_payload()
@@ -154,6 +159,7 @@ class DesignQualityGateTests(unittest.TestCase):
         self.assertTrue(payload["checks"]["ui_frame_integrity"]["pass"])
         self.assertTrue(payload["checks"]["screenshot_qa"]["pass"])
         self.assertTrue(payload["checks"]["minimal_experience_gate"]["pass"])
+        self.assertTrue(payload["checks"]["premium_ui_design_exit_gate"]["pass"])
 
 
 if __name__ == "__main__":
