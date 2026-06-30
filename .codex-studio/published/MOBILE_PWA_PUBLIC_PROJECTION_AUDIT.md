@@ -1,6 +1,6 @@
 # Mobile and PWA public projection audit
 
-- Generated: 2026-06-30T23:31:12.804884Z
+- Generated: 2026-06-30T23:46:52.801060Z
 - Status: `pass`
 - Manifest start URL: `/mobile`
 - Display mode: `standalone`
@@ -10,6 +10,9 @@
 - Service worker registration present on `/mobile`: `True`
 - Install action visible on `/mobile`: `True`
 - Continuity action visible on `/mobile`: `True`
+- Homepage Open Chummer dropdown routes Build and Play: `True`
+- `/build` opens character roster: `True`
+- `/play` opens PWA play shell: `True`
 - Service worker fetch handler present: `True`
 - Service worker navigation preload present: `True`
 - Service worker continuity cache paths present: `True`

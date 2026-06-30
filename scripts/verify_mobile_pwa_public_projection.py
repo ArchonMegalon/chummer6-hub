@@ -22,6 +22,25 @@ EXPECTED_FINAL_ROUTES = {
     "/observer": "/play?role=observer",
     "/session": "/play",
 }
+EXPECTED_BUILD_FINAL_ROUTE = "/app?command=character_roster"
+EXPECTED_HOME_OPEN_CHUMMER_MARKERS = {
+    "Open Chummer",
+    'site-open-chummer-menu',
+    'aria-label="Open Chummer options"',
+    'href="/build"',
+    'href="/play"',
+}
+EXPECTED_BUILD_SHELL_MARKERS = {
+    "browser-preview-shell",
+    "Character Roster",
+    "Chummer Online",
+}
+EXPECTED_PLAY_SHELL_MARKERS = {
+    "pwa-ledger-stream",
+    "data-pwa-install-state",
+    "data-pwa-ledger-status",
+    "data-pwa-ledger-heat-meter",
+}
 EXPECTED_SHORTCUTS = {"/mobile", "/play", "/play/continuity"}
 EXPECTED_SHELL_CACHE_PATHS = {"/mobile", "/play", "/play/continuity", "/mobile/pwa.json", "/ready/handoff/mobile.json"}
 EXPECTED_PWA_LEDGER_STATUSES = {"opt_in_required", "no_world_data", "live", "world_not_followed"}
@@ -99,6 +118,12 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
 
     mobile_html = session.get(f"{base_url}/mobile", timeout=30)
     mobile_html.raise_for_status()
+    home_html = session.get(f"{base_url}/", timeout=30)
+    home_html.raise_for_status()
+    build_html = session.get(f"{base_url}/build", timeout=30, allow_redirects=True)
+    build_html.raise_for_status()
+    play_shell_html = session.get(f"{base_url}/play", timeout=30, allow_redirects=True)
+    play_shell_html.raise_for_status()
     continuity_html = session.get(f"{base_url}/play/continuity", timeout=30)
     continuity_html.raise_for_status()
     mobile_json_response = session.get(f"{base_url}/mobile/pwa.json", timeout=30)
@@ -148,6 +173,22 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
     has_sw_registration = registered_service_worker_path is not None
     has_install_button = "Install this app" in mobile_html.text
     has_continuity_action = "/play/continuity" in mobile_html.text
+    home_open_chummer_missing_markers = sorted(
+        marker for marker in EXPECTED_HOME_OPEN_CHUMMER_MARKERS if marker not in home_html.text
+    )
+    home_open_chummer_dropdown_holds = not home_open_chummer_missing_markers
+    build_final_url = build_html.url
+    parsed_build_final = urlparse(build_final_url)
+    build_final_route = f"{parsed_build_final.path}{f'?{parsed_build_final.query}' if parsed_build_final.query else ''}"
+    build_missing_markers = sorted(marker for marker in EXPECTED_BUILD_SHELL_MARKERS if marker not in build_html.text)
+    build_route_holds = build_final_route == EXPECTED_BUILD_FINAL_ROUTE and not build_missing_markers
+    play_shell_missing_markers = sorted(
+        marker for marker in EXPECTED_PLAY_SHELL_MARKERS if marker not in play_shell_html.text
+    )
+    play_final_url = play_shell_html.url
+    parsed_play_final = urlparse(play_final_url)
+    play_final_route = f"{parsed_play_final.path}{f'?{parsed_play_final.query}' if parsed_play_final.query else ''}"
+    play_shell_holds = play_final_route == "/play" and not play_shell_missing_markers
     shortcut_urls = {shortcut.get("url") for shortcut in (manifest.get("shortcuts") or []) if isinstance(shortcut, dict)}
     screenshot_count = len(manifest.get("screenshots") or [])
     has_manifest_id = manifest.get("id") == "/mobile"
@@ -258,6 +299,24 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
         {"id": "mobile_page_registers_service_worker", "pass": has_sw_registration, "detail": "The /mobile page registers the scoped service worker."},
         {"id": "mobile_page_shows_install_action", "pass": has_install_button, "detail": "The /mobile page exposes an install affordance."},
         {"id": "mobile_page_links_continuity", "pass": has_continuity_action, "detail": "The /mobile page links to /play/continuity."},
+        {
+            "id": "home_open_chummer_dropdown_routes_build_and_play",
+            "pass": home_open_chummer_dropdown_holds,
+            "detail": f"Homepage Open Chummer dropdown missing markers: {home_open_chummer_missing_markers}.",
+        },
+        {
+            "id": "build_route_opens_character_roster",
+            "pass": build_route_holds,
+            "detail": (
+                f"/build final route={build_final_route!r}; expected={EXPECTED_BUILD_FINAL_ROUTE!r}; "
+                f"missing shell markers={build_missing_markers}."
+            ),
+        },
+        {
+            "id": "play_route_opens_pwa_play_shell",
+            "pass": play_shell_holds,
+            "detail": f"/play final route={play_final_route!r}; missing PWA markers={play_shell_missing_markers}.",
+        },
         {"id": "manifest_id_is_mobile", "pass": has_manifest_id, "detail": f"manifest.id is {manifest.get('id')!r}."},
         {"id": "manifest_has_display_override", "pass": has_display_override, "detail": "display_override is present for richer install surfaces."},
         {"id": "manifest_shortcuts_cover_mobile_play_continuity", "pass": has_expected_shortcuts, "detail": f"shortcut URLs: {sorted(shortcut_urls)}."},
@@ -350,7 +409,20 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
             "role_routes_hold": role_routes_hold,
             "continuity_page_status_code": continuity_html.status_code,
         },
-                "continuity": {
+        "public_entry": {
+            "home_open_chummer_dropdown_holds": home_open_chummer_dropdown_holds,
+            "home_open_chummer_missing_markers": home_open_chummer_missing_markers,
+            "build_final_url": build_final_url,
+            "build_final_route": build_final_route,
+            "expected_build_final_route": EXPECTED_BUILD_FINAL_ROUTE,
+            "build_route_holds": build_route_holds,
+            "build_missing_markers": build_missing_markers,
+            "play_final_url": play_final_url,
+            "play_final_route": play_final_route,
+            "play_shell_holds": play_shell_holds,
+            "play_shell_missing_markers": play_shell_missing_markers,
+        },
+        "continuity": {
             "receipt_count": continuity_receipt_count,
             "has_boundary": continuity_boundary_present,
             "mobile_json_has_routes": mobile_json_has_routes,
@@ -391,6 +463,9 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
                 f"- Service worker registration present on `/mobile`: `{has_sw_registration}`",
                 f"- Install action visible on `/mobile`: `{has_install_button}`",
                 f"- Continuity action visible on `/mobile`: `{has_continuity_action}`",
+                f"- Homepage Open Chummer dropdown routes Build and Play: `{home_open_chummer_dropdown_holds}`",
+                f"- `/build` opens character roster: `{build_route_holds}`",
+                f"- `/play` opens PWA play shell: `{play_shell_holds}`",
                 f"- Service worker fetch handler present: `{payload['service_worker']['has_fetch_handler']}`",
                 f"- Service worker navigation preload present: `{has_navigation_preload}`",
                 f"- Service worker continuity cache paths present: `{has_expected_shell_cache_paths}`",

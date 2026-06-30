@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.mobile_pwa_public_projection",
   "status": "pass",
-  "generated_at_utc": "2026-06-30T23:31:12.804884Z",
+  "generated_at_utc": "2026-06-30T23:46:52.801060Z",
   "base_url": "https://chummer.run",
   "checks": [
     {
@@ -23,6 +23,21 @@
       "id": "mobile_page_links_continuity",
       "pass": true,
       "detail": "The /mobile page links to /play/continuity."
+    },
+    {
+      "id": "home_open_chummer_dropdown_routes_build_and_play",
+      "pass": true,
+      "detail": "Homepage Open Chummer dropdown missing markers: []."
+    },
+    {
+      "id": "build_route_opens_character_roster",
+      "pass": true,
+      "detail": "/build final route='/app?command=character_roster'; expected='/app?command=character_roster'; missing shell markers=[]."
+    },
+    {
+      "id": "play_route_opens_pwa_play_shell",
+      "pass": true,
+      "detail": "/play final route='/play'; missing PWA markers=[]."
     },
     {
       "id": "manifest_id_is_mobile",
@@ -279,6 +294,19 @@
     "has_continuity_action": true,
     "role_routes_hold": true,
     "continuity_page_status_code": 200
+  },
+  "public_entry": {
+    "home_open_chummer_dropdown_holds": true,
+    "home_open_chummer_missing_markers": [],
+    "build_final_url": "https://chummer.run/app?command=character_roster",
+    "build_final_route": "/app?command=character_roster",
+    "expected_build_final_route": "/app?command=character_roster",
+    "build_route_holds": true,
+    "build_missing_markers": [],
+    "play_final_url": "https://chummer.run/play",
+    "play_final_route": "/play",
+    "play_shell_holds": true,
+    "play_shell_missing_markers": []
   },
   "continuity": {
     "receipt_count": 3,

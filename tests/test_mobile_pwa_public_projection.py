@@ -42,6 +42,23 @@ class _FakeResponse:
 class _FakeSession:
     def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
         del timeout, allow_redirects
+        if url.rstrip("/") == "http://example.test":
+            return _FakeResponse(
+                url,
+                text=(
+                    '<details class="site-account-menu site-open-chummer-menu">'
+                    '<summary><span>Open Chummer</span></summary>'
+                    '<div aria-label="Open Chummer options">'
+                    '<a class="site-open-chummer-menu__button" href="/build">Build</a>'
+                    '<a class="site-open-chummer-menu__button" href="/play">Play</a>'
+                    "</div></details>"
+                ),
+            )
+        if url.endswith("/build"):
+            return _FakeResponse(
+                "http://example.test/app?command=character_roster",
+                text="<main class=\"browser-preview-shell\"><h1>Character Roster</h1><p>Chummer Online</p></main>",
+            )
         if url.endswith("/mobile"):
             return _FakeResponse(
                 url,
@@ -54,7 +71,16 @@ class _FakeSession:
         if url.endswith("/pwa"):
             return _FakeResponse(f"{url[:-4]}/mobile")
         if url.endswith("/play"):
-            return _FakeResponse(url)
+            return _FakeResponse(
+                url,
+                text=(
+                    '<section id="pwa-ledger-stream">'
+                    '<p data-pwa-install-state>Installable app shell live</p>'
+                    '<p data-pwa-ledger-status>Checking</p>'
+                    '<meter data-pwa-ledger-heat-meter></meter>'
+                    "</section>"
+                ),
+            )
         if url.endswith("/player"):
             return _FakeResponse(f"{url[:-7]}/play?role=player")
         if url.endswith("/gm"):
@@ -209,6 +235,12 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("mobile_pwa_public_projection:ok", stdout.getvalue())
         self.assertTrue(any(check["id"] == "ledger_stream_opt_in_boundary_holds" and check["pass"] for check in captured_payloads[0]["checks"]))
+        self.assertTrue(any(check["id"] == "home_open_chummer_dropdown_routes_build_and_play" and check["pass"] for check in captured_payloads[0]["checks"]))
+        self.assertTrue(any(check["id"] == "build_route_opens_character_roster" and check["pass"] for check in captured_payloads[0]["checks"]))
+        self.assertTrue(any(check["id"] == "play_route_opens_pwa_play_shell" and check["pass"] for check in captured_payloads[0]["checks"]))
+        self.assertTrue(captured_payloads[0]["public_entry"]["home_open_chummer_dropdown_holds"])
+        self.assertTrue(captured_payloads[0]["public_entry"]["build_route_holds"])
+        self.assertTrue(captured_payloads[0]["public_entry"]["play_shell_holds"])
 
     def test_verifier_fails_when_role_route_redirect_drifts(self) -> None:
         class DriftedSession(_FakeSession):
@@ -238,6 +270,64 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
         self.assertIn("checks", captured_payloads[0])
         self.assertTrue(any(check["id"] == "role_routes_hold" and check["pass"] is False for check in captured_payloads[0]["checks"]))
         self.assertTrue(any("role_routes_hold" in failure for failure in captured_payloads[0]["failures"]))
+
+    def test_verifier_fails_when_home_open_chummer_drops_play_route(self) -> None:
+        class DriftedSession(_FakeSession):
+            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
+                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
+                if url.rstrip("/") == "http://example.test":
+                    return _FakeResponse(response.url, text=response.text.replace('href="/play"', 'href="/account"', 1))
+                return response
+
+        module = _load_module()
+        stdout = io.StringIO()
+        captured_payloads: list[dict] = []
+
+        with (
+            patch.object(module.requests, "Session", return_value=DriftedSession()),
+            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
+            patch.object(module, "write_json", side_effect=lambda _path, payload: captured_payloads.append(payload)),
+            patch.object(module, "write_text"),
+            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
+            redirect_stdout(stdout),
+        ):
+            result = module.run("http://example.test")
+
+        self.assertEqual(result, 1)
+        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+        self.assertTrue(
+            any(
+                check["id"] == "home_open_chummer_dropdown_routes_build_and_play" and check["pass"] is False
+                for check in captured_payloads[0]["checks"]
+            )
+        )
+        self.assertIn('href="/play"', captured_payloads[0]["public_entry"]["home_open_chummer_missing_markers"])
+
+    def test_verifier_fails_when_build_route_stops_opening_character_roster(self) -> None:
+        class DriftedSession(_FakeSession):
+            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
+                if url.endswith("/build"):
+                    return _FakeResponse("http://example.test/build", text="<main>Build unavailable</main>")
+                return super().get(url, timeout=timeout, allow_redirects=allow_redirects)
+
+        module = _load_module()
+        stdout = io.StringIO()
+        captured_payloads: list[dict] = []
+
+        with (
+            patch.object(module.requests, "Session", return_value=DriftedSession()),
+            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
+            patch.object(module, "write_json", side_effect=lambda _path, payload: captured_payloads.append(payload)),
+            patch.object(module, "write_text"),
+            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
+            redirect_stdout(stdout),
+        ):
+            result = module.run("http://example.test")
+
+        self.assertEqual(result, 1)
+        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+        self.assertTrue(any(check["id"] == "build_route_opens_character_roster" and check["pass"] is False for check in captured_payloads[0]["checks"]))
+        self.assertEqual(captured_payloads[0]["public_entry"]["build_final_route"], "/build")
 
     def test_verifier_supports_explicit_output_and_report_paths(self) -> None:
         module = _load_module()
