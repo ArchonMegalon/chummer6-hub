@@ -193,6 +193,53 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
         and ledger_stream_has_valid_status
         and ledger_stream_has_updates_route
     )
+    ledger_stream_opt_in_route = ledger_stream.get("opt_in_route")
+    ledger_stream_legal_posture = str(ledger_stream.get("legal_posture") or "")
+    opt_in_required_allowed_keys = {
+        "mode",
+        "status",
+        "status_label",
+        "summary",
+        "legal_posture",
+        "opt_in_route",
+        "updates_route",
+        "generated_at_utc",
+    }
+    opt_in_required_forbidden_keys = {
+        "world",
+        "summary_model",
+        "followed_worlds",
+        "top_districts",
+        "hot_district",
+        "move_district",
+        "tracker",
+        "continuity",
+    }
+    opt_in_required_extra_keys = sorted(set(ledger_stream) - opt_in_required_allowed_keys) if isinstance(ledger_stream, dict) else []
+    opt_in_required_leaked_keys = sorted(opt_in_required_forbidden_keys & set(ledger_stream)) if isinstance(ledger_stream, dict) else []
+    ledger_stream_opt_in_boundary_holds = ledger_stream_status != "opt_in_required" or (
+        ledger_stream_opt_in_route == "/account"
+        and "No private run table state is published." in ledger_stream_legal_posture
+        and not opt_in_required_extra_keys
+        and not opt_in_required_leaked_keys
+    )
+    ledger_stream_world_not_followed_boundary_holds = ledger_stream_status != "world_not_followed" or (
+        isinstance(ledger_stream.get("top_districts"), list)
+        and len(ledger_stream.get("top_districts") or []) == 0
+        and ledger_stream.get("hot_district") is None
+        and ledger_stream.get("move_district") is None
+        and ledger_stream.get("continuity") is None
+        and isinstance(ledger_stream.get("summary"), dict)
+        and bool(ledger_stream["summary"].get("follow_hint"))
+    )
+    ledger_stream_live_payload_has_heat = ledger_stream_status != "live" or (
+        isinstance(ledger_stream.get("world"), dict)
+        and isinstance(ledger_stream.get("top_districts"), list)
+        and len(ledger_stream.get("top_districts") or []) > 0
+        and isinstance(ledger_stream.get("tracker"), dict)
+        and ledger_stream["tracker"].get("turn_map_route") == "/ledger/map"
+        and isinstance(ledger_stream.get("continuity"), dict)
+    )
     role_routes_hold = all(
         result["final_route"] == result["expected_final_route"]
         for result in route_results
@@ -231,6 +278,25 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
         {"id": "continuity_declares_boundary", "pass": continuity_boundary_present, "detail": "Continuity receipt index declares its privacy boundary."},
         {"id": "mobile_json_routes_hold", "pass": mobile_json_has_routes, "detail": "The PWA JSON advertises install, continuity, and receipt-index routes."},
         {"id": "ledger_stream_contract_holds", "pass": ledger_stream_contract_holds, "detail": f"ledger stream status={ledger_stream_status!r}, mode={ledger_stream_mode!r}."},
+        {
+            "id": "ledger_stream_opt_in_boundary_holds",
+            "pass": ledger_stream_opt_in_boundary_holds,
+            "detail": (
+                "When opt-in is required, the ledger stream must expose only account opt-in guidance "
+                f"without world, heat, tracker, followed-world, or continuity payloads. "
+                f"opt_in_route={ledger_stream_opt_in_route!r}; extra_keys={opt_in_required_extra_keys}; leaked_keys={opt_in_required_leaked_keys}."
+            ),
+        },
+        {
+            "id": "ledger_stream_world_not_followed_boundary_holds",
+            "pass": ledger_stream_world_not_followed_boundary_holds,
+            "detail": "World-not-followed mode must hide heat, movement, turn routes, and continuity until the user follows the active world.",
+        },
+        {
+            "id": "ledger_stream_live_payload_has_heat",
+            "pass": ledger_stream_live_payload_has_heat,
+            "detail": "Live mode must include a world snapshot, heat list, map route, and continuity object.",
+        },
         {"id": "role_routes_hold", "pass": role_routes_hold, "detail": f"route mismatches: {route_mismatches}."},
     ]
     failures = [
@@ -294,6 +360,12 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
             "status": ledger_stream_status,
             "mode": ledger_stream_mode,
             "has_contract": ledger_stream_contract_holds,
+            "opt_in_route": ledger_stream_opt_in_route,
+            "opt_in_boundary_holds": ledger_stream_opt_in_boundary_holds,
+            "opt_in_required_extra_keys": opt_in_required_extra_keys,
+            "opt_in_required_leaked_keys": opt_in_required_leaked_keys,
+            "world_not_followed_boundary_holds": ledger_stream_world_not_followed_boundary_holds,
+            "live_payload_has_heat": ledger_stream_live_payload_has_heat,
             "cache_control": ledger_stream_cache_control,
             "vary": ledger_stream_vary,
             "has_no_store_header": ledger_stream_has_no_store_header,
@@ -326,6 +398,9 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
                 f"- Personalized ledger stream denied by service worker: `{ledger_stream_denied_by_service_worker}`",
                 f"- Personalized ledger stream has no-store header: `{ledger_stream_has_no_store_header}`",
                 f"- Personalized ledger stream varies by Cookie and Authorization: `{ledger_stream_has_personalized_vary}`",
+                f"- Ledger stream opt-in boundary holds: `{ledger_stream_opt_in_boundary_holds}`",
+                f"- Ledger stream world-not-followed boundary holds: `{ledger_stream_world_not_followed_boundary_holds}`",
+                f"- Ledger stream live payload has heat and continuity: `{ledger_stream_live_payload_has_heat}`",
                 f"- Service worker push handler present: `{has_push_handler}`",
                 f"- Service worker notification click handler present: `{has_notification_click_handler}`",
                 f"- Service worker notification close handler present: `{has_notification_close_handler}`",

@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.mobile_pwa_public_projection",
   "status": "pass",
-  "generated_at_utc": "2026-06-30T21:37:28.404784Z",
+  "generated_at_utc": "2026-06-30T23:31:12.804884Z",
   "base_url": "https://chummer.run",
   "checks": [
     {
@@ -123,6 +123,21 @@
       "id": "ledger_stream_contract_holds",
       "pass": true,
       "detail": "ledger stream status='opt_in_required', mode='mobile_pwa_living_world'."
+    },
+    {
+      "id": "ledger_stream_opt_in_boundary_holds",
+      "pass": true,
+      "detail": "When opt-in is required, the ledger stream must expose only account opt-in guidance without world, heat, tracker, followed-world, or continuity payloads. opt_in_route='/account'; extra_keys=[]; leaked_keys=[]."
+    },
+    {
+      "id": "ledger_stream_world_not_followed_boundary_holds",
+      "pass": true,
+      "detail": "World-not-followed mode must hide heat, movement, turn routes, and continuity until the user follows the active world."
+    },
+    {
+      "id": "ledger_stream_live_payload_has_heat",
+      "pass": true,
+      "detail": "Live mode must include a world snapshot, heat list, map route, and continuity object."
     },
     {
       "id": "role_routes_hold",
@@ -275,6 +290,12 @@
     "status": "opt_in_required",
     "mode": "mobile_pwa_living_world",
     "has_contract": true,
+    "opt_in_route": "/account",
+    "opt_in_boundary_holds": true,
+    "opt_in_required_extra_keys": [],
+    "opt_in_required_leaked_keys": [],
+    "world_not_followed_boundary_holds": true,
+    "live_payload_has_heat": true,
     "cache_control": "private, no-store, no-cache, max-age=0",
     "vary": "Cookie, Authorization",
     "has_no_store_header": true,

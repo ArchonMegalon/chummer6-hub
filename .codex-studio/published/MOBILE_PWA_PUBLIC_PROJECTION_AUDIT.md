@@ -1,6 +1,6 @@
 # Mobile and PWA public projection audit
 
-- Generated: 2026-06-30T21:37:28.404784Z
+- Generated: 2026-06-30T23:31:12.804884Z
 - Status: `pass`
 - Manifest start URL: `/mobile`
 - Display mode: `standalone`
@@ -17,6 +17,9 @@
 - Personalized ledger stream denied by service worker: `True`
 - Personalized ledger stream has no-store header: `True`
 - Personalized ledger stream varies by Cookie and Authorization: `True`
+- Ledger stream opt-in boundary holds: `True`
+- Ledger stream world-not-followed boundary holds: `True`
+- Ledger stream live payload has heat and continuity: `True`
 - Service worker push handler present: `True`
 - Service worker notification click handler present: `True`
 - Service worker notification close handler present: `True`

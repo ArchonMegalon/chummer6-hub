@@ -194,11 +194,12 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
     def test_verifier_prints_explicit_ok_line_on_pass(self) -> None:
         module = _load_module()
         stdout = io.StringIO()
+        captured_payloads: list[dict] = []
 
         with (
             patch.object(module.requests, "Session", return_value=_FakeSession()),
             patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
-            patch.object(module, "write_json"),
+            patch.object(module, "write_json", side_effect=lambda _path, payload: captured_payloads.append(payload)),
             patch.object(module, "write_text"),
             patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
             redirect_stdout(stdout),
@@ -207,6 +208,7 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
 
         self.assertEqual(result, 0)
         self.assertIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+        self.assertTrue(any(check["id"] == "ledger_stream_opt_in_boundary_holds" and check["pass"] for check in captured_payloads[0]["checks"]))
 
     def test_verifier_fails_when_role_route_redirect_drifts(self) -> None:
         class DriftedSession(_FakeSession):
@@ -415,6 +417,41 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
 
         self.assertEqual(result, 1)
         self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+
+    def test_verifier_fails_when_opt_in_required_ledger_stream_leaks_world_payload(self) -> None:
+        class DriftedSession(_FakeSession):
+            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
+                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
+                if url.endswith("/mobile/pwa/ledger.json"):
+                    payload = dict(response.json())
+                    payload["world"] = {"world_name": "Leaked world"}
+                    payload["top_districts"] = [{"name": "Leaked district", "heat": 71}]
+                    payload["continuity"] = {"turn": 7}
+                    return _FakeResponse(response.url, json_data=payload, headers=response.headers)
+                return response
+
+        module = _load_module()
+        stdout = io.StringIO()
+        captured_payloads: list[dict] = []
+
+        with (
+            patch.object(module.requests, "Session", return_value=DriftedSession()),
+            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
+            patch.object(module, "write_json", side_effect=lambda _path, payload: captured_payloads.append(payload)),
+            patch.object(module, "write_text"),
+            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
+            redirect_stdout(stdout),
+        ):
+            result = module.run("http://example.test")
+
+        self.assertEqual(result, 1)
+        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+        self.assertTrue(
+            any(check["id"] == "ledger_stream_opt_in_boundary_holds" and check["pass"] is False for check in captured_payloads[0]["checks"])
+        )
+        self.assertIn("continuity", captured_payloads[0]["ledger_stream"]["opt_in_required_leaked_keys"])
+        self.assertIn("top_districts", captured_payloads[0]["ledger_stream"]["opt_in_required_leaked_keys"])
+        self.assertIn("world", captured_payloads[0]["ledger_stream"]["opt_in_required_leaked_keys"])
 
 
 if __name__ == "__main__":
