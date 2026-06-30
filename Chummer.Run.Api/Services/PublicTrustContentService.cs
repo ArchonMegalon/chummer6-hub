@@ -7,6 +7,8 @@ public sealed class PublicTrustContentService
     private const string TrustContentRelativePath = ".codex-design/product/PUBLIC_TRUST_CONTENT.yaml";
     private readonly PublicCanonFileLoader _canon;
     private readonly PublicRouteCatalogService _routes;
+    private readonly object _documentLock = new();
+    private PublicTrustContentDocument? _cachedDocument;
 
     public PublicTrustContentService(PublicCanonFileLoader canon, PublicRouteCatalogService routes)
     {
@@ -93,7 +95,26 @@ public sealed class PublicTrustContentService
 
     private PublicTrustContentDocument LoadDocument()
     {
+        lock (_documentLock)
+        {
+            if (_cachedDocument is not null)
+            {
+                return _cachedDocument;
+            }
+        }
+
         var document = _canon.LoadRequiredYaml<PublicTrustContentDocument>(TrustContentRelativePath);
+        ValidateDocument(document);
+
+        lock (_documentLock)
+        {
+            _cachedDocument ??= document;
+            return _cachedDocument;
+        }
+    }
+
+    private void ValidateDocument(PublicTrustContentDocument document)
+    {
         foreach (var page in document.TrustPages ?? new List<PublicTrustPageDocument>())
         {
             BuildActions(page.Actions, authenticated: true);
@@ -103,8 +124,6 @@ public sealed class PublicTrustContentService
         {
             BuildActions(page.Actions, authenticated: true);
         }
-
-        return document;
     }
 
     private static string RequireText(string? value, string description)

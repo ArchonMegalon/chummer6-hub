@@ -1,9 +1,14 @@
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
 namespace Chummer.Run.Api.Services;
 
 public static partial class PublicFacingCopyHumanizer
 {
+    private const int MaxCachedInputLength = 4096;
+    private const int MaxCleanCacheEntries = 4096;
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(50);
+    private static readonly ConcurrentDictionary<string, string> CleanCache = new(StringComparer.Ordinal);
     private static readonly (string From, string To)[] Replacements =
     [
         ("Public Proof Shelf", "Public Files"),
@@ -160,6 +165,14 @@ public static partial class PublicFacingCopyHumanizer
         ("horizons", "maintenance"),
         ("horizon", "maintenance"),
     ];
+    private static readonly (Regex Pattern, string To)[] ReplacementRules = Replacements
+        .Select(static replacement => (
+            new Regex(
+                BuildPhrasePattern(replacement.From),
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+                RegexTimeout),
+            replacement.To))
+        .ToArray();
 
     public static string Clean(string? value)
     {
@@ -168,10 +181,16 @@ public static partial class PublicFacingCopyHumanizer
             return string.Empty;
         }
 
-        string cleaned = value.Trim();
-        foreach ((string from, string to) in Replacements)
+        string cacheKey = value.Trim();
+        if (cacheKey.Length <= MaxCachedInputLength && CleanCache.TryGetValue(cacheKey, out string? cached))
         {
-            cleaned = ReplacePhrase(cleaned, from, to);
+            return cached;
+        }
+
+        string cleaned = cacheKey;
+        foreach ((Regex pattern, string to) in ReplacementRules)
+        {
+            cleaned = pattern.Replace(cleaned, to);
         }
 
         cleaned = ArticleAiRegex().Replace(cleaned, "a");
@@ -190,20 +209,22 @@ public static partial class PublicFacingCopyHumanizer
         cleaned = SpaceBeforePunctuationRegex().Replace(cleaned, "$1");
         cleaned = cleaned.Trim();
 
-        char originalFirst = value.Trim()[0];
+        char originalFirst = cacheKey[0];
         if (char.IsUpper(originalFirst) && cleaned.Length > 0 && char.IsLower(cleaned[0]))
         {
             cleaned = char.ToUpperInvariant(cleaned[0]) + cleaned[1..];
         }
 
+        if (cacheKey.Length <= MaxCachedInputLength && CleanCache.Count < MaxCleanCacheEntries)
+        {
+            CleanCache.TryAdd(cacheKey, cleaned);
+        }
+
         return cleaned;
     }
 
-    private static string ReplacePhrase(string value, string from, string to)
-    {
-        string pattern = $@"(?<![A-Za-z0-9]){Regex.Escape(from)}(?![A-Za-z0-9])";
-        return Regex.Replace(value, pattern, to, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    }
+    private static string BuildPhrasePattern(string from)
+        => $@"(?<![A-Za-z0-9]){Regex.Escape(from)}(?![A-Za-z0-9])";
 
     public static IReadOnlyList<string> CleanLines(IEnumerable<string>? values)
         => values?

@@ -8,6 +8,10 @@ public sealed class PublicCanonFileLoader
     private const string DesignProductPrefix = "products/chummer/";
     private const string MirrorProductPrefix = ".codex-design/product/";
     private readonly IConfiguration _configuration;
+    private readonly object _cacheLock = new();
+    private readonly Dictionary<string, string> _resolvedPathCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, CachedTextDocument> _textCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, CachedYamlDocument> _yamlCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly IDeserializer Deserializer = new DeserializerBuilder()
         .WithNamingConvention(UnderscoredNamingConvention.Instance)
         .WithDuplicateKeyChecking()
@@ -52,12 +56,25 @@ public sealed class PublicCanonFileLoader
 
     public string ResolveRequiredPath(string relativePath)
     {
+        lock (_cacheLock)
+        {
+            if (_resolvedPathCache.TryGetValue(relativePath, out string? cachedPath) && File.Exists(cachedPath))
+            {
+                return cachedPath;
+            }
+        }
+
         string repoRoot = ResolveRepoRoot(relativePath);
         foreach (string relativePathCandidate in ExpandRelativePathCandidates(relativePath))
         {
             string fullPath = Path.Combine(repoRoot, relativePathCandidate.Replace('/', Path.DirectorySeparatorChar));
             if (File.Exists(fullPath))
             {
+                lock (_cacheLock)
+                {
+                    _resolvedPathCache[relativePath] = fullPath;
+                }
+
                 return fullPath;
             }
         }
@@ -68,16 +85,32 @@ public sealed class PublicCanonFileLoader
     public T LoadRequiredYaml<T>(string relativePath)
     {
         string path = ResolveRequiredPath(relativePath);
-        if (!File.Exists(path))
+        var info = new FileInfo(path);
+        if (!info.Exists)
         {
             throw new FileNotFoundException($"required canon file not found: {path}");
+        }
+
+        string cacheKey = $"{typeof(T).AssemblyQualifiedName}\0{path}";
+        lock (_cacheLock)
+        {
+            if (_yamlCache.TryGetValue(cacheKey, out CachedYamlDocument? cached) && cached.Matches(info))
+            {
+                return (T)cached.Document;
+            }
         }
 
         try
         {
             using var reader = File.OpenText(path);
-            return Deserializer.Deserialize<T>(reader)
-                   ?? throw new InvalidOperationException($"canon file '{relativePath}' could not be deserialized.");
+            T document = Deserializer.Deserialize<T>(reader)
+                         ?? throw new InvalidOperationException($"canon file '{relativePath}' could not be deserialized.");
+            lock (_cacheLock)
+            {
+                _yamlCache[cacheKey] = new CachedYamlDocument(info.LastWriteTimeUtc, info.Length, document);
+            }
+
+            return document;
         }
         catch (YamlDotNet.Core.YamlException ex)
         {
@@ -88,12 +121,27 @@ public sealed class PublicCanonFileLoader
     public string LoadRequiredText(string relativePath)
     {
         string path = ResolveRequiredPath(relativePath);
-        if (!File.Exists(path))
+        var info = new FileInfo(path);
+        if (!info.Exists)
         {
             throw new FileNotFoundException($"required canon file not found: {path}");
         }
 
-        return File.ReadAllText(path);
+        lock (_cacheLock)
+        {
+            if (_textCache.TryGetValue(path, out CachedTextDocument? cached) && cached.Matches(info))
+            {
+                return cached.Text;
+            }
+        }
+
+        string text = File.ReadAllText(path);
+        lock (_cacheLock)
+        {
+            _textCache[path] = new CachedTextDocument(info.LastWriteTimeUtc, info.Length, text);
+        }
+
+        return text;
     }
 
     private static IEnumerable<string> ExpandRelativePathCandidates(string relativePath)
@@ -105,5 +153,17 @@ public sealed class PublicCanonFileLoader
         {
             yield return MirrorProductPrefix + normalized[DesignProductPrefix.Length..];
         }
+    }
+
+    private sealed record CachedTextDocument(DateTime LastWriteUtc, long Length, string Text)
+    {
+        public bool Matches(FileInfo info)
+            => info.LastWriteTimeUtc == LastWriteUtc && info.Length == Length;
+    }
+
+    private sealed record CachedYamlDocument(DateTime LastWriteUtc, long Length, object Document)
+    {
+        public bool Matches(FileInfo info)
+            => info.LastWriteTimeUtc == LastWriteUtc && info.Length == Length;
     }
 }

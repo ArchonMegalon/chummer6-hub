@@ -49,6 +49,8 @@ public sealed class PublicPrivacyBoundaryService
 
     private readonly PublicCanonFileLoader _canon;
     private readonly PublicRouteCatalogService _routes;
+    private readonly object _documentLock = new();
+    private PublicPrivacyBoundariesDocument? _cachedDocument;
 
     public PublicPrivacyBoundaryService(PublicCanonFileLoader canon, PublicRouteCatalogService routes)
     {
@@ -138,6 +140,14 @@ public sealed class PublicPrivacyBoundaryService
 
     private PublicPrivacyBoundariesDocument LoadDocument()
     {
+        lock (_documentLock)
+        {
+            if (_cachedDocument is not null)
+            {
+                return _cachedDocument;
+            }
+        }
+
         var trust = _canon.LoadRequiredYaml<PublicTrustContentDocument>(TrustContentRelativePath);
         var privacyPage = (trust.TrustPages ?? new List<PublicTrustPageDocument>())
             .FirstOrDefault(static page => string.Equals(page.Id, "privacy", StringComparison.Ordinal))
@@ -147,7 +157,7 @@ public sealed class PublicPrivacyBoundaryService
         var retentionDomains = ParseRetentionDomains(markdown);
         var surfaceRules = ParseSurfaceRules(markdown);
 
-        return new PublicPrivacyBoundariesDocument
+        var document = new PublicPrivacyBoundariesDocument
         {
             Product = "chummer",
             Surface = "public_privacy_boundaries",
@@ -165,6 +175,12 @@ public sealed class PublicPrivacyBoundaryService
                 .Select(spec => BuildSurfaceRule(spec, surfaceRules))
                 .ToList()
         };
+
+        lock (_documentLock)
+        {
+            _cachedDocument ??= document;
+            return _cachedDocument;
+        }
     }
 
     private static PublicPrivacyBoundaryDomainDocument BuildDomain(
