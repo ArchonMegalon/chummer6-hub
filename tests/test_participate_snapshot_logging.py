@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 
@@ -19,3 +20,14 @@ def test_participate_snapshot_logs_do_not_name_the_hosted_board_provider() -> No
     assert "invalid ProductLift JSON" not in source
     assert "could not reach the hosted board" in source
     assert "invalid hosted-board JSON" in source
+
+
+def test_http_client_dependency_urls_are_not_info_logged_by_default() -> None:
+    for relative_path in (
+        "Chummer.Run.Api/appsettings.json",
+        "Chummer.Run.Api/appsettings.Development.json",
+    ):
+        config = json.loads((ROOT / relative_path).read_text(encoding="utf-8"))
+        levels = config["Logging"]["LogLevel"]
+
+        assert levels["System.Net.Http.HttpClient"] == "Warning"
