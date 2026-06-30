@@ -2604,7 +2604,7 @@ public sealed class PublicSignalOperationsService
         {
             if (!File.Exists(_storagePath))
             {
-                _logger.LogInformation("PublicSignalOperationsService starting without stored ProductLift webhook receipts at {StoragePath}.", _storagePath);
+                _logger.LogInformation("PublicSignalOperationsService starting without stored feedback webhook receipts.");
                 return;
             }
 
@@ -2614,9 +2614,8 @@ public sealed class PublicSignalOperationsService
 
             ApplySnapshotLocked(snapshot);
             _logger.LogInformation(
-                "PublicSignalOperationsService loaded {ReceiptCount} bounded ProductLift webhook receipts from {StoragePath}.",
-                _receipts.Count,
-                _storagePath);
+                "PublicSignalOperationsService loaded {ReceiptCount} bounded feedback webhook receipts.",
+                _receipts.Count);
         }
     }
 

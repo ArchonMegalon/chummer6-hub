@@ -7190,13 +7190,13 @@ document.addEventListener('DOMContentLoaded', function () {
         string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_OPERATIONS_SECRET"]?.Trim();
         if (string.IsNullOrWhiteSpace(configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "productlift operations replay is not configured.");
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "feedback operations replay is not configured.");
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
         if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "feedback operations secret mismatch.");
         }
 
         return Ok(_signalOperations.ReconcilePendingCloseouts());
@@ -7212,13 +7212,13 @@ document.addEventListener('DOMContentLoaded', function () {
         string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_OPERATIONS_SECRET"]?.Trim();
         if (string.IsNullOrWhiteSpace(configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "productlift operations recovery is not configured.");
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "feedback operations recovery is not configured.");
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
         if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "feedback operations secret mismatch.");
         }
 
         return Ok(_signalOperations.RecoverDispatchOutcomes());
@@ -7304,7 +7304,7 @@ document.addEventListener('DOMContentLoaded', function () {
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
         if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "delivery outcome secret mismatch.");
         }
 
         try

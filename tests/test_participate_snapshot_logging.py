@@ -31,3 +31,20 @@ def test_http_client_dependency_urls_are_not_info_logged_by_default() -> None:
         levels = config["Logging"]["LogLevel"]
 
         assert levels["System.Net.Http.HttpClient"] == "Warning"
+
+
+def test_feedback_operations_runtime_messages_do_not_name_provider() -> None:
+    controller = (ROOT / "Chummer.Run.Api/Controllers/PublicLandingController.cs").read_text(encoding="utf-8")
+    service = (ROOT / "Chummer.Run.Api/Services/PublicSignalOperationsService.cs").read_text(encoding="utf-8")
+
+    assert "productlift operations replay is not configured" not in controller
+    assert "productlift operations recovery is not configured" not in controller
+    assert "productlift operations secret mismatch" not in controller
+    assert "feedback operations replay is not configured" in controller
+    assert "feedback operations recovery is not configured" in controller
+    assert "feedback operations secret mismatch" in controller
+    assert "delivery outcome secret mismatch" in controller
+    assert "stored ProductLift webhook receipts" not in service
+    assert "bounded ProductLift webhook receipts" not in service
+    assert "stored feedback webhook receipts" in service
+    assert "bounded feedback webhook receipts" in service
