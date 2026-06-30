@@ -53,6 +53,13 @@ def horizon_by_id(horizon_payload: dict[str, Any], horizon_id: str) -> dict[str,
     return {}
 
 
+def check_by_id(payload: dict[str, Any], check_id: str) -> dict[str, Any]:
+    for row in payload.get("checks") or []:
+        if isinstance(row, dict) and str(row.get("id") or "").strip() == check_id:
+            return row
+    return {}
+
+
 def main() -> int:
     failures: list[str] = []
     mobile, mobile_error = load_json(MOBILE_PWA_PROOF)
@@ -64,6 +71,27 @@ def main() -> int:
             failures.append(error)
 
     mobile_pass = normalize_status(mobile) in {"pass", "passed", "ready"}
+    mobile_public_entry = mobile.get("public_entry") if isinstance(mobile.get("public_entry"), dict) else {}
+    mobile_public_entry_check_ids = [
+        "home_open_chummer_dropdown_routes_build_and_play",
+        "build_route_opens_character_roster",
+        "play_route_opens_pwa_play_shell",
+    ]
+    mobile_public_entry_checks = {
+        check_id: check_by_id(mobile, check_id)
+        for check_id in mobile_public_entry_check_ids
+    }
+    mobile_public_entry_checks_pass = all(
+        check.get("pass") is True for check in mobile_public_entry_checks.values()
+    )
+    mobile_public_entry_holds = (
+        mobile_public_entry.get("home_open_chummer_dropdown_holds") is True
+        and mobile_public_entry.get("build_route_holds") is True
+        and mobile_public_entry.get("play_shell_holds") is True
+        and str(mobile_public_entry.get("build_final_route") or "") == "/app?command=character_roster"
+        and str(mobile_public_entry.get("play_final_route") or "") == "/play"
+        and mobile_public_entry_checks_pass
+    )
     blazor_pwa_pass = normalize_status(blazor_pwa) in {"pass", "passed", "ready"}
     horizon_pass = normalize_status(horizon) in {"pass", "passed", "ready"}
     near_term = horizon_by_id(horizon, "near_term_hosted_smoke_execution")
@@ -76,6 +104,8 @@ def main() -> int:
 
     if not mobile_pass:
         failures.append("Hub mobile/PWA public projection proof is not passing.")
+    if not mobile_public_entry_holds:
+        failures.append("Hub mobile/PWA public-entry proof does not prove homepage Build/Play routing, /build roster entry, and /play PWA shell entry.")
     if not blazor_pwa_pass:
         failures.append("Blazor hosted PWA public-edge proof is not passing.")
     if not horizon_pass:
@@ -102,7 +132,23 @@ def main() -> int:
                 "path": str(MOBILE_PWA_PROOF),
                 "status": normalize_status(mobile) or "missing",
                 "contract_name": str(mobile.get("contract_name") or "").strip(),
-                "pass": mobile_pass,
+                "base_url": str(mobile.get("base_url") or "").strip(),
+                "public_entry": {
+                    "home_open_chummer_dropdown_holds": mobile_public_entry.get("home_open_chummer_dropdown_holds") is True,
+                    "build_route_holds": mobile_public_entry.get("build_route_holds") is True,
+                    "build_final_route": str(mobile_public_entry.get("build_final_route") or ""),
+                    "play_shell_holds": mobile_public_entry.get("play_shell_holds") is True,
+                    "play_final_route": str(mobile_public_entry.get("play_final_route") or ""),
+                    "checks_pass": mobile_public_entry_checks_pass,
+                    "checks": {
+                        check_id: {
+                            "present": bool(check),
+                            "pass": check.get("pass") is True,
+                        }
+                        for check_id, check in mobile_public_entry_checks.items()
+                    },
+                },
+                "pass": mobile_pass and mobile_public_entry_holds,
             },
             "blazor_hosted_pwa_public_edge": {
                 "path": str(BLAZOR_PWA_PROOF),

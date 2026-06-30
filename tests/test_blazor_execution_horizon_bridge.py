@@ -28,6 +28,10 @@ def test_blazor_execution_horizon_bridge_script_binds_hub_and_presentation_proof
     assert "BLAZOR_PUBLIC_EDGE_EXECUTION_HORIZON.generated.json" in source
     assert "near_term_hosted_smoke_execution" in source
     assert "mid_term_full_live_public_edge_execution_matrix" in source
+    assert "home_open_chummer_dropdown_routes_build_and_play" in source
+    assert "build_route_opens_character_roster" in source
+    assert "play_route_opens_pwa_play_shell" in source
+    assert "/app?command=character_roster" in source
     assert "does_not_upgrade_smoke_to_full" in source
     assert "full_scope_requires_current_passing_full_receipt" in source
 
@@ -48,6 +52,21 @@ def test_blazor_execution_horizon_bridge_receipt_is_honest_about_full_matrix() -
     assert payload["contract_name"] == "chummer.blazor_execution_horizon_bridge"
     assert payload["status"] == "pass"
     assert payload["proofs"]["hub_mobile_pwa_public_projection"]["pass"] is True
+    mobile_public_entry = payload["proofs"]["hub_mobile_pwa_public_projection"]["public_entry"]
+    assert payload["proofs"]["hub_mobile_pwa_public_projection"]["base_url"] == "https://chummer.run"
+    assert mobile_public_entry["home_open_chummer_dropdown_holds"] is True
+    assert mobile_public_entry["build_route_holds"] is True
+    assert mobile_public_entry["build_final_route"] == "/app?command=character_roster"
+    assert mobile_public_entry["play_shell_holds"] is True
+    assert mobile_public_entry["play_final_route"] == "/play"
+    assert mobile_public_entry["checks_pass"] is True
+    for check_id in (
+        "home_open_chummer_dropdown_routes_build_and_play",
+        "build_route_opens_character_roster",
+        "play_route_opens_pwa_play_shell",
+    ):
+        assert mobile_public_entry["checks"][check_id]["present"] is True
+        assert mobile_public_entry["checks"][check_id]["pass"] is True
     assert payload["proofs"]["blazor_hosted_pwa_public_edge"]["pass"] is True
     assert horizon["near_term_smoke_status"] == "proven"
     assert payload["boundaries"]["does_not_upgrade_smoke_to_full"] is True
