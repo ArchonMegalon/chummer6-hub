@@ -38,10 +38,48 @@ def write_supporting_artifacts(completion: Path, published: Path) -> None:
 
 def write_public_views(root: Path, *, leaked: bool = False) -> list[Path]:
     views = []
-    for name in ["Landing.cshtml", "Downloads.cshtml", "Status.cshtml", "Partizipate.cshtml", "MobileProjection.cshtml"]:
+    templates = {
+        "Landing.cshtml": """
+<section class="minimal-hero">
+  <h1>Chummer</h1>
+  <a class="button-like button-like--primary" href="/downloads">Download Chummer</a>
+</section>
+""",
+        "Downloads.cshtml": """
+<section>
+  <h1>Downloads</h1>
+  <article class="downloads-choice-card"><h2>Stable</h2><a href="/help">Help</a></article>
+  <article class="downloads-choice-card"><h2>Nightly</h2></article>
+</section>
+""",
+        "Status.cshtml": """
+<section class="minimal-status-pill">
+  <h1>Updated</h1>
+  <a href="/downloads">Downloads</a>
+  <a href="/help">Help</a>
+</section>
+""",
+        "Partizipate.cshtml": """
+<section>
+  <h1 class="sr-only">Participate</h1>
+  <div class="participate-hosted__frame-shell">
+    <iframe src="@Model.EmbeddedBoardHref" title="Chummer participation board"></iframe>
+  </div>
+</section>
+""",
+        "MobileProjection.cshtml": """
+<section id="pwa-ledger-stream">
+  <h1>Mobile</h1>
+  <p data-pwa-install-state>Installable app shell live</p>
+  <p data-pwa-ledger-status>Checking</p>
+  <a href="/help">Help</a>
+</section>
+""",
+    }
+    for name, template in templates.items():
         path = root / name
         path.write_text(
-            "<section><h1>Chummer</h1><a>Downloads</a></section>"
+            template
             + ("<p>operator proof provider</p>" if leaked else ""),
             encoding="utf-8",
         )
@@ -169,7 +207,9 @@ def test_premium_gate_passes_for_tokenized_premium_shell() -> None:
 
     assert payload["status"] == "pass", payload["failures"]
     assert payload["verdict"] == "PREMIUM_UI_READY"
-    assert len(payload["reference_systems"]) >= 6
+    assert len(payload["reference_systems"]) >= 8
+    assert len(payload["design_principles"]) >= 6
+    assert payload["design_principles"][0]["id"] == "five_second_first_impression"
     assert payload["checks"]["premium_typography"]["pass"]
     assert payload["checks"]["premium_elevation"]["pass"]
     assert payload["checks"]["spatial_system"]["pass"]
@@ -178,6 +218,7 @@ def test_premium_gate_passes_for_tokenized_premium_shell() -> None:
     assert payload["checks"]["responsive_layout"]["pass"]
     assert payload["checks"]["form_control_legibility"]["pass"]
     assert payload["checks"]["composition_hierarchy"]["pass"]
+    assert payload["checks"]["route_journey_contracts"]["pass"]
 
 
 def test_premium_gate_rejects_generic_flat_theme_and_internal_copy() -> None:
@@ -222,3 +263,15 @@ def test_premium_gate_rejects_generic_flat_theme_and_internal_copy() -> None:
     assert "responsive system is not flagship-grade; require mobile breakpoints, fluid type/spacing, minmax grids, and svh handling" in payload["failures"]
     assert "form controls are not fully dark-mode readable; textboxes, selects, placeholders, options, and focus states must be styled" in payload["failures"]
     assert "composition still reads like a template; require premium chrome, hero/media, editorial, navigation, and dense layout systems" in payload["failures"]
+
+
+def test_design_package_names_the_premium_exit_gate_and_sources() -> None:
+    doc = (SCRIPT_PATH.parents[1] / "docs" / "CHUMMER_RUN_FLAGSHIP_REDESIGN_PACKAGE.md").read_text(encoding="utf-8")
+
+    assert "## 5A. Premium UI Design Exit Gate" in doc
+    assert "Apple Human Interface Guidelines" in doc
+    assert "Material Design 3" in doc
+    assert "IBM Carbon Design System" in doc
+    assert "WCAG 2.2" in doc
+    assert "one visible job, one primary next action" in doc
+    assert "not a proof harness, provider adapter, internal roadmap, or operator console" in doc

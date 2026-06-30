@@ -44,6 +44,21 @@ REFERENCE_SYSTEMS = [
         "gate_translation": "2x-grid discipline, accessible structure, purposeful density, and production-ready consistency",
     },
     {
+        "name": "Atlassian Design System",
+        "url": "https://atlassian.design/",
+        "gate_translation": "clear product language, predictable navigation, humane density, and resilient component behavior",
+    },
+    {
+        "name": "Shopify Polaris",
+        "url": "https://polaris.shopify.com/",
+        "gate_translation": "commerce-grade task clarity, action hierarchy, content discipline, and usable empty/loading/error states",
+    },
+    {
+        "name": "GOV.UK Service Manual",
+        "url": "https://www.gov.uk/service-manual",
+        "gate_translation": "plain-language service journeys where the next action and user obligation are never ambiguous",
+    },
+    {
         "name": "WCAG 2.2",
         "url": "https://www.w3.org/TR/WCAG22/",
         "gate_translation": "visible focus, legible contrast, input readability, and touch target discipline",
@@ -54,6 +69,60 @@ REFERENCE_SYSTEMS = [
         "gate_translation": "status visibility, recognition over recall, consistency, and clear task feedback",
     },
 ]
+DESIGN_STANDARD_PRINCIPLES = [
+    {
+        "id": "five_second_first_impression",
+        "standard": "Apple HIG clarity plus Nielsen status visibility",
+        "exit_rule": "A new visitor must know what Chummer is, which build to use, and where help lives in one glance.",
+    },
+    {
+        "id": "editorial_identity",
+        "standard": "Material/Fluent/Carbon design-token discipline",
+        "exit_rule": "Typography, color, depth, spacing, and surface rhythm must be named systems, not incidental page styling.",
+    },
+    {
+        "id": "premium_depth_without_noise",
+        "standard": "Apple deference plus Fluent elevation",
+        "exit_rule": "Atmosphere may create depth, but it cannot compete with install, play, status, or recovery decisions.",
+    },
+    {
+        "id": "one_route_one_job",
+        "standard": "GOV.UK service design plus Shopify action hierarchy",
+        "exit_rule": "Each public route needs one visible job, one primary next action, and supporting choices that do not blur the job.",
+    },
+    {
+        "id": "accessibility_as_finish",
+        "standard": "WCAG 2.2 plus Carbon production consistency",
+        "exit_rule": "Contrast, focus, form controls, touch targets, reduced motion, and mobile layout are release criteria, not cleanup.",
+    },
+    {
+        "id": "quiet_public_language",
+        "standard": "Atlassian content discipline plus HIG clarity",
+        "exit_rule": "Public pages must read like a product, not like a proof harness, provider adapter, internal roadmap, or operator console.",
+    },
+]
+ROUTE_JOURNEY_REQUIREMENTS = {
+    "Landing.cshtml": {
+        "job": "Explain Chummer and make the first install/open action obvious.",
+        "required_markers": ["minimal-hero", "<h1", "href=\"/downloads\"", "button-like--primary"],
+    },
+    "Downloads.cshtml": {
+        "job": "Get the user onto the right build without crowding the decision.",
+        "required_markers": ["downloads-choice-card", "<h1", "Stable", "Nightly", "href=\"/help\""],
+    },
+    "Status.cshtml": {
+        "job": "Tell users whether they should install, wait, or ask for help.",
+        "required_markers": ["minimal-status-pill", "<h1", "href=\"/downloads\"", "href=\"/help\""],
+    },
+    "Partizipate.cshtml": {
+        "job": "Show the participation board as the product surface without extra wrapper noise.",
+        "required_markers": ["participate-hosted__frame-shell", "<iframe", "Model.EmbeddedBoardHref"],
+    },
+    "MobileProjection.cshtml": {
+        "job": "Expose the PWA playtime lane with install, live ledger, continuity, and help actions.",
+        "required_markers": ["pwa-ledger-stream", "data-pwa-install-state", "data-pwa-ledger-status", "href=\"/help\""],
+    },
+}
 BORING_FONT_MARKERS = {
     "arial",
     "blinkmacsystemfont",
@@ -138,6 +207,31 @@ def markdown_status(path: Path) -> str:
     text = read_text(path)
     match = re.search(r"^- Status:\s*`?([A-Za-z0-9_-]+)`?", text, flags=re.MULTILINE)
     return match.group(1).lower() if match else "missing"
+
+
+def route_requirement_result(path: Path) -> dict[str, Any]:
+    requirement = ROUTE_JOURNEY_REQUIREMENTS.get(path.name)
+    if requirement is None:
+        return {
+            "route": path.name,
+            "job": "No premium route contract is registered.",
+            "missing_markers": ["route contract"],
+            "pass": False,
+        }
+
+    text = read_text(path)
+    missing = [
+        marker
+        for marker in requirement["required_markers"]
+        if marker not in text
+    ]
+    return {
+        "route": path.name,
+        "job": requirement["job"],
+        "required_markers": requirement["required_markers"],
+        "missing_markers": missing,
+        "pass": not missing,
+    }
 
 
 def build_payload(
@@ -346,6 +440,17 @@ def build_payload(
         "pass": copy_pass,
     }
 
+    route_results = [route_requirement_result(path) for path in critical_public_views]
+    route_contract_pass = all(result["pass"] for result in route_results)
+    if not route_contract_pass:
+        failures.append("premium route contracts are incomplete; each critical route needs a visible job, primary action, and route-specific premium component")
+    checks["route_journey_contracts"] = {
+        "standard": "GOV.UK service journey clarity + Shopify action hierarchy + Nielsen recognition over recall",
+        "route_count": len(route_results),
+        "routes": route_results,
+        "pass": route_contract_pass,
+    }
+
     ui_frame = load_json(completion_root / "UI_FRAME_INTEGRITY.generated.json")
     frame_summary = ui_frame.get("summary") if isinstance(ui_frame.get("summary"), dict) else {}
     frame_pass = status_pass(ui_frame) and int(frame_summary.get("failure_count") or 0) == 0
@@ -372,6 +477,7 @@ def build_payload(
         "status": "pass" if not failures else "fail",
         "verdict": "PREMIUM_UI_READY" if not failures else "PREMIUM_UI_NOT_READY",
         "reference_systems": REFERENCE_SYSTEMS,
+        "design_principles": DESIGN_STANDARD_PRINCIPLES,
         "css_path": str(css_path),
         "completion_root": str(completion_root),
         "published_root": str(published_root),
@@ -395,6 +501,13 @@ def write_outputs(payload: dict[str, Any], output: Path, report: Path) -> None:
         *[
             f"- {item['name']}: {item['gate_translation']} ({item['url']})"
             for item in payload["reference_systems"]
+        ],
+        "",
+        "## Exit Principles",
+        "",
+        *[
+            f"- `{item['id']}`: {item['exit_rule']} Source posture: {item['standard']}."
+            for item in payload["design_principles"]
         ],
         "",
         "## Failures",

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.premium_ui_design_exit_gate",
-  "generated_at_utc": "2026-06-30T21:45:16Z",
+  "generated_at_utc": "2026-06-30T23:05:24Z",
   "status": "pass",
   "verdict": "PREMIUM_UI_READY",
   "reference_systems": [
@@ -25,6 +25,21 @@
       "gate_translation": "2x-grid discipline, accessible structure, purposeful density, and production-ready consistency"
     },
     {
+      "name": "Atlassian Design System",
+      "url": "https://atlassian.design/",
+      "gate_translation": "clear product language, predictable navigation, humane density, and resilient component behavior"
+    },
+    {
+      "name": "Shopify Polaris",
+      "url": "https://polaris.shopify.com/",
+      "gate_translation": "commerce-grade task clarity, action hierarchy, content discipline, and usable empty/loading/error states"
+    },
+    {
+      "name": "GOV.UK Service Manual",
+      "url": "https://www.gov.uk/service-manual",
+      "gate_translation": "plain-language service journeys where the next action and user obligation are never ambiguous"
+    },
+    {
       "name": "WCAG 2.2",
       "url": "https://www.w3.org/TR/WCAG22/",
       "gate_translation": "visible focus, legible contrast, input readability, and touch target discipline"
@@ -33,6 +48,38 @@
       "name": "Nielsen Norman Group Usability Heuristics",
       "url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
       "gate_translation": "status visibility, recognition over recall, consistency, and clear task feedback"
+    }
+  ],
+  "design_principles": [
+    {
+      "id": "five_second_first_impression",
+      "standard": "Apple HIG clarity plus Nielsen status visibility",
+      "exit_rule": "A new visitor must know what Chummer is, which build to use, and where help lives in one glance."
+    },
+    {
+      "id": "editorial_identity",
+      "standard": "Material/Fluent/Carbon design-token discipline",
+      "exit_rule": "Typography, color, depth, spacing, and surface rhythm must be named systems, not incidental page styling."
+    },
+    {
+      "id": "premium_depth_without_noise",
+      "standard": "Apple deference plus Fluent elevation",
+      "exit_rule": "Atmosphere may create depth, but it cannot compete with install, play, status, or recovery decisions."
+    },
+    {
+      "id": "one_route_one_job",
+      "standard": "GOV.UK service design plus Shopify action hierarchy",
+      "exit_rule": "Each public route needs one visible job, one primary next action, and supporting choices that do not blur the job."
+    },
+    {
+      "id": "accessibility_as_finish",
+      "standard": "WCAG 2.2 plus Carbon production consistency",
+      "exit_rule": "Contrast, focus, form controls, touch targets, reduced motion, and mobile layout are release criteria, not cleanup."
+    },
+    {
+      "id": "quiet_public_language",
+      "standard": "Atlassian content discipline plus HIG clarity",
+      "exit_rule": "Public pages must read like a product, not like a proof harness, provider adapter, internal roadmap, or operator console."
     }
   ],
   "css_path": "/docker/chummercomplete/chummer.run-services-participate-main/Chummer.Run.Api/wwwroot/css/site.css",
@@ -144,6 +191,73 @@
       "view_count": 5,
       "leaked_terms": [],
       "public_copy_leak_gate_status": "pass",
+      "pass": true
+    },
+    "route_journey_contracts": {
+      "standard": "GOV.UK service journey clarity + Shopify action hierarchy + Nielsen recognition over recall",
+      "route_count": 5,
+      "routes": [
+        {
+          "route": "Landing.cshtml",
+          "job": "Explain Chummer and make the first install/open action obvious.",
+          "required_markers": [
+            "minimal-hero",
+            "<h1",
+            "href=\"/downloads\"",
+            "button-like--primary"
+          ],
+          "missing_markers": [],
+          "pass": true
+        },
+        {
+          "route": "Downloads.cshtml",
+          "job": "Get the user onto the right build without crowding the decision.",
+          "required_markers": [
+            "downloads-choice-card",
+            "<h1",
+            "Stable",
+            "Nightly",
+            "href=\"/help\""
+          ],
+          "missing_markers": [],
+          "pass": true
+        },
+        {
+          "route": "Status.cshtml",
+          "job": "Tell users whether they should install, wait, or ask for help.",
+          "required_markers": [
+            "minimal-status-pill",
+            "<h1",
+            "href=\"/downloads\"",
+            "href=\"/help\""
+          ],
+          "missing_markers": [],
+          "pass": true
+        },
+        {
+          "route": "Partizipate.cshtml",
+          "job": "Show the participation board as the product surface without extra wrapper noise.",
+          "required_markers": [
+            "participate-hosted__frame-shell",
+            "<iframe",
+            "Model.EmbeddedBoardHref"
+          ],
+          "missing_markers": [],
+          "pass": true
+        },
+        {
+          "route": "MobileProjection.cshtml",
+          "job": "Expose the PWA playtime lane with install, live ledger, continuity, and help actions.",
+          "required_markers": [
+            "pwa-ledger-stream",
+            "data-pwa-install-state",
+            "data-pwa-ledger-status",
+            "href=\"/help\""
+          ],
+          "missing_markers": [],
+          "pass": true
+        }
+      ],
       "pass": true
     },
     "production_basics": {

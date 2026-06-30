@@ -112,6 +112,31 @@ Component families:
 - Support decision cards
 - Milestone drawer cards
 
+## 5A. Premium UI Design Exit Gate
+
+This is the exit gate for saying the public UI is premium, not merely clean. Use the strongest lessons from Apple Human Interface Guidelines, Material Design 3, Microsoft Fluent 2, IBM Carbon Design System, Atlassian Design System, Shopify Polaris, GOV.UK Service Manual, WCAG 2.2, and Nielsen Norman usability heuristics as calibration. Do not copy their visual language; translate their discipline into Chummer's campaign-command identity.
+
+The gate blocks release when the site looks like a generic dashboard. The public surface must read as a product, not a proof harness, provider adapter, internal roadmap, or operator console. Passing means the UI looks intentional before a user reads the fine print.
+
+Exit rules:
+
+- Five-second first impression: the visitor understands that Chummer is a Shadowrun character manager, sees the current install path, and can find help without scanning the whole page.
+- One route, one job: each critical route has one visible job, one primary next action, and supporting choices that do not blur the decision.
+- Premium editorial identity: display type, body type, spacing, radius, color roles, elevation, and media rhythm are named systems, not incidental styling.
+- Depth without noise: atmospheric media and glass treatment create hierarchy, but never outrank install, play, status, recovery, or opt-in decisions.
+- Service-grade clarity: buttons, links, empty states, unavailable states, and review-required states tell the user what they can do next in product language.
+- Accessibility as finish: contrast, focus, dark-mode form controls, select options, touch targets, reduced motion, and mobile breakpoints are release criteria.
+- Quiet public language: public pages must not expose proof-dashboard language, provider names, fleet/operator phrasing, raw status enum language, or internal process labels.
+- Mobile truth: mobile/PWA surfaces must work as compact playtime tools, not shrunken desktop dashboards.
+
+Executable gate:
+
+```bash
+python3 scripts/verify_premium_ui_design_exit_gate.py
+```
+
+The verifier fail-closes on the design-token system, depth, responsive layout, motion governance, form-control legibility, route journey contracts, public-copy quietness, frame integrity, contrast, minimal-experience, and noise-budget evidence. A route cannot pass only because CSS contains enough gradients or hover states; it must also keep its public job and primary action visible.
+
 ## 6. Route Family Strategy
 
 | Route | Primary job | Stop doing | Inherit | Visual density | Mobile simplification | CTA posture | Validation posture |
