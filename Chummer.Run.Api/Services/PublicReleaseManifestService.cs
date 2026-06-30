@@ -360,8 +360,15 @@ public sealed class PublicReleaseManifestService
             return existing;
         }
 
-        return $"{existing.Trim().TrimEnd('.')} {sentence}";
+        string trimmed = existing.Trim();
+        string separator = EndsWithSentencePunctuation(trimmed) ? " " : ". ";
+        return $"{trimmed}{separator}{sentence}";
     }
+
+    private static bool EndsWithSentencePunctuation(string value)
+        => value.EndsWith(".", StringComparison.Ordinal)
+           || value.EndsWith("!", StringComparison.Ordinal)
+           || value.EndsWith("?", StringComparison.Ordinal);
 
     public string? ResolveDownloadFilePath(string? path)
     {
@@ -999,30 +1006,34 @@ public sealed class PublicReleaseManifestService
     private PublicReleaseManifestDto ApplyFlagshipReadinessGuard(PublicReleaseManifestDto manifest)
     {
         FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
-        if (readiness is null || !readiness.MissingDesktopClientCoverage)
+        if (readiness is null || !readiness.RequiresReview)
         {
             return EnsureContractName(manifest);
         }
 
-        string gapSummary = readiness.DesktopClientGapSummary.Trim().TrimEnd('.');
+        string gapSummary = readiness.ReviewRequiredSummary.Trim().TrimEnd('.');
         return EnsureContractName(manifest with
         {
             RolloutState = string.Equals(NormalizeOptional(manifest.Status), "published", StringComparison.OrdinalIgnoreCase)
-                ? "desktop_polish_needed"
+                ? readiness.MissingDesktopClientCoverage ? "desktop_polish_needed" : "readiness_review_required"
                 : manifest.RolloutState,
             RolloutReason = AppendDistinctSentence(
                 manifest.RolloutReason,
-                $"The current release stays install-capable, but parity claims remain blocked because {gapSummary}."),
+                $"The current release stays install-capable, but broad ready claims remain review-required because {gapSummary}."),
             SupportabilityState = "review_required",
             SupportabilitySummary = AppendDistinctSentence(
                 manifest.SupportabilitySummary,
                 $"Treat the current release as limited because {gapSummary}."),
             KnownIssueSummary = AppendDistinctSentence(
                 manifest.KnownIssueSummary,
-                "Desktop polish is not current yet, so parity-sensitive routes stay with support."),
+                readiness.MissingDesktopClientCoverage
+                    ? "Desktop polish is not current yet, so parity-sensitive routes stay with support."
+                    : "Some flagship journeys are still blocked, so broad ready claims stay with support."),
             FixAvailabilitySummary = AppendDistinctSentence(
                 manifest.FixAvailabilitySummary,
-                "Use linked-install recovery and Chummer support until the desktop experience is ready again.")
+                readiness.MissingDesktopClientCoverage
+                    ? "Use linked-install recovery and Chummer support until the desktop experience is ready again."
+                    : "Use linked-install recovery and Chummer support until the blocked flagship journeys are cleared.")
         });
     }
 
@@ -1065,7 +1076,7 @@ public sealed class PublicReleaseManifestService
         FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
         if (readiness is not null
             && string.Equals(NormalizeOptional(readiness.Status), "pass", StringComparison.OrdinalIgnoreCase)
-            && !readiness.MissingDesktopClientCoverage)
+            && !readiness.RequiresReview)
         {
             return true;
         }

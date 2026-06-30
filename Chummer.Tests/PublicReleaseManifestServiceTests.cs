@@ -372,6 +372,25 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void LoadManifestFailsClosedWhenPassingReadinessStillCarriesBlockedJourneyEvidence()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifest(includeProof: false);
+        fixture.WriteLocalProof("passed", "http://127.0.0.1:8091");
+        fixture.WriteFlagshipReadiness(status: "pass", includeBlockedJourneyEvidence: true);
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.Equal("review_required", manifest.SupportabilityState);
+        Assert.Equal("readiness_review_required", manifest.RolloutState);
+        Assert.Contains("flagship journey blockers", manifest.SupportabilitySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("broad ready claims", manifest.RolloutReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("broad ready claims", manifest.KnownIssueSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("blocked flagship journeys", manifest.FixAvailabilitySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("passed", manifest.ProofStatus);
+    }
+
+    [Fact]
     public void LoadManifestDoesNotOverrideRegistryProof()
     {
         using var fixture = new PublicReleaseManifestFixture();
@@ -1564,31 +1583,59 @@ public sealed class PublicReleaseManifestServiceTests
         public void WriteFlagshipReadiness(
             string status,
             IReadOnlyList<string>? missingCoverageKeys = null,
-            IReadOnlyList<string>? warningCoverageKeys = null)
+            IReadOnlyList<string>? warningCoverageKeys = null,
+            bool includeBlockedJourneyEvidence = false)
         {
             string readinessDir = Path.Combine(_root, "fleet", ".codex-studio", "published");
             Directory.CreateDirectory(readinessDir);
             missingCoverageKeys ??= Array.Empty<string>();
             warningCoverageKeys ??= Array.Empty<string>();
+            var payload = new Dictionary<string, object?>
+            {
+                ["contract_name"] = "fleet.flagship_product_readiness",
+                ["status"] = status,
+                ["completion_audit"] = new Dictionary<string, object?>
+                {
+                    ["reason"] = "Flagship product readiness planes are not green."
+                },
+                ["flagship_readiness_audit"] = new Dictionary<string, object?>
+                {
+                    ["reason"] = "flagship product readiness proof is not green: missing coverage: desktop_client",
+                    ["warning_coverage_keys"] = warningCoverageKeys,
+                    ["scoped_warning_coverage_keys"] = warningCoverageKeys,
+                    ["missing_coverage_keys"] = missingCoverageKeys,
+                    ["scoped_missing_coverage_keys"] = missingCoverageKeys
+                }
+            };
+            if (includeBlockedJourneyEvidence)
+            {
+                payload["autofix_routing"] = new Dictionary<string, object?>
+                {
+                    ["routes"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["journey_id"] = "build_explain_publish",
+                            ["journey_state"] = "blocked",
+                            ["reason"] = "media publication proof is missing"
+                        }
+                    }
+                };
+                payload["coverage_details"] = new Dictionary<string, object?>
+                {
+                    ["desktop_client"] = new Dictionary<string, object?>
+                    {
+                        ["evidence"] = new Dictionary<string, object?>
+                        {
+                            ["install_claim_restore_continue"] = "blocked"
+                        }
+                    }
+                };
+            }
+
             File.WriteAllText(
                 Path.Combine(readinessDir, "FLAGSHIP_PRODUCT_READINESS.generated.json"),
-                JsonSerializer.Serialize(new Dictionary<string, object?>
-                {
-                    ["contract_name"] = "fleet.flagship_product_readiness",
-                    ["status"] = status,
-                    ["completion_audit"] = new Dictionary<string, object?>
-                    {
-                        ["reason"] = "Flagship product readiness planes are not green."
-                    },
-                    ["flagship_readiness_audit"] = new Dictionary<string, object?>
-                    {
-                        ["reason"] = "flagship product readiness proof is not green: missing coverage: desktop_client",
-                        ["warning_coverage_keys"] = warningCoverageKeys,
-                        ["scoped_warning_coverage_keys"] = warningCoverageKeys,
-                        ["missing_coverage_keys"] = missingCoverageKeys,
-                        ["scoped_missing_coverage_keys"] = missingCoverageKeys
-                    }
-                }));
+                JsonSerializer.Serialize(payload));
         }
 
         private static Dictionary<string, object?> BuildRegistryProof(string status)

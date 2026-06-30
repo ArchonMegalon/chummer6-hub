@@ -76,20 +76,21 @@ public sealed class PublicTrustPulseService
             ImportRouteParityProofGuardSnapshot importRouteGuard = localReleaseProof is null
                 ? new ImportRouteParityProofGuardSnapshot(true, null)
                 : _importRouteParityProofGuard.Evaluate();
-            string? readinessReason = readiness?.MissingDesktopClientCoverage == true
-                ? readiness.DesktopClientGapSummary
+            bool readinessReviewRequired = readiness?.RequiresReview == true;
+            string? readinessReason = readinessReviewRequired
+                ? readiness!.ReviewRequiredSummary
                 : readiness?.Reason;
             string summary = payload.Summary ?? string.Empty;
-            if (readiness?.MissingDesktopClientCoverage == true && !string.IsNullOrWhiteSpace(readinessReason))
+            if (readinessReviewRequired && !string.IsNullOrWhiteSpace(readinessReason))
             {
                 summary = AppendDistinctSentence(
                     summary,
-                    $"Flagship desktop parity claims stay review-required because {readinessReason!.Trim().TrimEnd('.')}.");
+                    $"Flagship claims stay review-required because {readinessReason!.Trim().TrimEnd('.')}.");
             }
             string? launchReadiness = payload.SupportingSignals?.LaunchReadiness;
-            if (readiness?.MissingDesktopClientCoverage == true && !string.IsNullOrWhiteSpace(readinessReason))
+            if (readinessReviewRequired && !string.IsNullOrWhiteSpace(readinessReason))
             {
-                launchReadiness = $"Hold parity claims on public routes and support surfaces because {readinessReason!.Trim().TrimEnd('.')}.";
+                launchReadiness = $"Hold broad ready claims on public routes and support surfaces because {readinessReason!.Trim().TrimEnd('.')}.";
             }
             if (!importRouteGuard.IsCurrent && !string.IsNullOrWhiteSpace(importRouteGuard.ReviewRequiredReason))
             {
@@ -100,7 +101,7 @@ public sealed class PublicTrustPulseService
             }
 
             string? localReleaseProofStatus = adoptionHealth?.LocalReleaseProofStatus ?? localReleaseProof?.Status;
-            bool parityClaimsReviewRequired = readiness?.MissingDesktopClientCoverage == true || !importRouteGuard.IsCurrent;
+            bool parityClaimsReviewRequired = readinessReviewRequired || !importRouteGuard.IsCurrent;
             if (parityClaimsReviewRequired)
             {
                 localReleaseProofStatus = "review_required";
@@ -151,6 +152,7 @@ public sealed class PublicTrustPulseService
                 FlagshipReadinessStatus: readiness?.Status,
                 FlagshipReadinessReason: readinessReason,
                 MissingDesktopClientCoverage: readiness?.MissingDesktopClientCoverage == true,
+                BlockedFlagshipJourneyEvidenceCount: readiness?.BlockedJourneyEvidenceCount ?? 0,
                 ParityClaimsReviewRequired: parityClaimsReviewRequired);
         }
         catch (FileNotFoundException ex)
@@ -177,8 +179,15 @@ public sealed class PublicTrustPulseService
             return existing;
         }
 
-        return $"{existing.Trim().TrimEnd('.')} {sentence}";
+        string trimmed = existing.Trim();
+        string separator = EndsWithSentencePunctuation(trimmed) ? " " : ". ";
+        return $"{trimmed}{separator}{sentence}";
     }
+
+    private static bool EndsWithSentencePunctuation(string value)
+        => value.EndsWith(".", StringComparison.Ordinal)
+           || value.EndsWith("!", StringComparison.Ordinal)
+           || value.EndsWith("?", StringComparison.Ordinal);
 
     private TPayload? LoadOptionalArtifact<TPayload>(
         string? path,
@@ -459,6 +468,7 @@ public sealed record PublicTrustPulseSnapshot(
     string? FlagshipReadinessStatus,
     string? FlagshipReadinessReason,
     bool MissingDesktopClientCoverage,
+    int BlockedFlagshipJourneyEvidenceCount,
     bool ParityClaimsReviewRequired);
 
 public sealed record ProgressHistoryTrendPoint(string AsOf, int OverallProgressPercent);

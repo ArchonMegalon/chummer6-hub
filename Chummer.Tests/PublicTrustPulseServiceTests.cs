@@ -135,6 +135,26 @@ public sealed class PublicTrustPulseServiceTests
         Assert.Contains("review-required", snapshot.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void LoadSnapshotFailsClosedWhenPassingReadinessStillCarriesBlockedJourneyEvidence()
+    {
+        using var fixture = new PublicTrustPulseFixture();
+        fixture.WritePulseWithSynthesizedSignals("chummer.weekly_product_pulse");
+        fixture.WriteFlagshipReadiness(status: "pass", missingCoverageKeys: [], includeBlockedJourneyEvidence: true);
+
+        var snapshot = fixture.CreateService().LoadSnapshot();
+
+        Assert.NotNull(snapshot);
+        Assert.False(snapshot!.MissingDesktopClientCoverage);
+        Assert.Equal("pass", snapshot.FlagshipReadinessStatus);
+        Assert.True(snapshot.ParityClaimsReviewRequired);
+        Assert.Equal("review_required", snapshot.LocalReleaseProofStatus);
+        Assert.Equal(2, snapshot.BlockedFlagshipJourneyEvidenceCount);
+        Assert.Contains("flagship journey blockers", snapshot.FlagshipReadinessReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("broad ready claims", snapshot.LaunchReadiness, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("review-required", snapshot.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class PublicTrustPulseFixture : IDisposable
     {
         private readonly string _root;
@@ -318,26 +338,56 @@ public sealed class PublicTrustPulseServiceTests
                 }));
         }
 
-        public void WriteFlagshipReadiness(string status, IReadOnlyList<string> missingCoverageKeys)
+        public void WriteFlagshipReadiness(
+            string status,
+            IReadOnlyList<string> missingCoverageKeys,
+            bool includeBlockedJourneyEvidence = false)
         {
             Directory.CreateDirectory(_fleetArtifactsRoot);
+            var payload = new Dictionary<string, object?>
+            {
+                ["contract_name"] = "fleet.flagship_product_readiness",
+                ["status"] = status,
+                ["completion_audit"] = new Dictionary<string, object?>
+                {
+                    ["reason"] = "Flagship product readiness planes are not green."
+                },
+                ["flagship_readiness_audit"] = new Dictionary<string, object?>
+                {
+                    ["reason"] = "flagship product readiness proof is not green: missing coverage: desktop_client",
+                    ["missing_coverage_keys"] = missingCoverageKeys,
+                    ["scoped_missing_coverage_keys"] = missingCoverageKeys
+                }
+            };
+            if (includeBlockedJourneyEvidence)
+            {
+                payload["autofix_routing"] = new Dictionary<string, object?>
+                {
+                    ["routes"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["journey_id"] = "build_explain_publish",
+                            ["journey_state"] = "blocked",
+                            ["reason"] = "media publication proof is missing"
+                        }
+                    }
+                };
+                payload["coverage_details"] = new Dictionary<string, object?>
+                {
+                    ["hub_and_registry"] = new Dictionary<string, object?>
+                    {
+                        ["evidence"] = new Dictionary<string, object?>
+                        {
+                            ["install_claim_restore_continue"] = "blocked"
+                        }
+                    }
+                };
+            }
+
             File.WriteAllText(
                 Path.Combine(_fleetArtifactsRoot, "FLAGSHIP_PRODUCT_READINESS.generated.json"),
-                JsonSerializer.Serialize(new Dictionary<string, object?>
-                {
-                    ["contract_name"] = "fleet.flagship_product_readiness",
-                    ["status"] = status,
-                    ["completion_audit"] = new Dictionary<string, object?>
-                    {
-                        ["reason"] = "Flagship product readiness planes are not green."
-                    },
-                    ["flagship_readiness_audit"] = new Dictionary<string, object?>
-                    {
-                        ["reason"] = "flagship product readiness proof is not green: missing coverage: desktop_client",
-                        ["missing_coverage_keys"] = missingCoverageKeys,
-                        ["scoped_missing_coverage_keys"] = missingCoverageKeys
-                    }
-                }));
+                JsonSerializer.Serialize(payload));
         }
 
         public void WriteProgressHistoryWithTwoPoints()

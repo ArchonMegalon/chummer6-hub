@@ -143,4 +143,74 @@ public sealed class FlagshipReadinessArtifactServiceTests
             }
         }
     }
+
+    [Fact]
+    public void LoadSnapshotRequiresReviewWhenPassArtifactStillContainsBlockedJourneyEvidence()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "flagship-readiness-artifact-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            string readinessPath = Path.Combine(tempRoot, "readiness.json");
+            File.WriteAllText(
+                readinessPath,
+                """
+                {
+                  "contract_name": "fleet.flagship_product_readiness",
+                  "generated_at": "2026-06-30T08:00:00Z",
+                  "status": "pass",
+                  "flagship_readiness_audit": {
+                    "reason": "top-level gate used routed-local overrides",
+                    "missing_coverage_keys": [],
+                    "scoped_missing_coverage_keys": []
+                  },
+                  "autofix_routing": {
+                    "routes": [
+                      {
+                        "journey_id": "build_explain_publish",
+                        "journey_state": "blocked",
+                        "reason": "media publication proof is missing"
+                      }
+                    ]
+                  },
+                  "coverage_details": {
+                    "desktop_client": {
+                      "evidence": {
+                        "install_claim_restore_continue": "blocked"
+                      }
+                    }
+                  }
+                }
+                """);
+
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_PUBLIC_FLAGSHIP_READINESS_FILE"] = readinessPath
+                })
+                .Build();
+
+            var service = new FlagshipReadinessArtifactService(configuration);
+            FlagshipReadinessSnapshot? snapshot = service.LoadSnapshot();
+
+            Assert.NotNull(snapshot);
+            Assert.Equal("pass", snapshot!.Status);
+            Assert.False(snapshot.MissingDesktopClientCoverage);
+            Assert.True(snapshot.HasBlockedJourneyEvidence);
+            Assert.True(snapshot.RequiresReview);
+            Assert.Equal(2, snapshot.BlockedJourneyEvidenceCount);
+            Assert.Contains("2 flagship journey blockers remain", snapshot.ReviewRequiredSummary, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+            catch
+            {
+            }
+        }
+    }
 }
