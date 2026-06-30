@@ -28,6 +28,14 @@ def expand_compose_value(value: str) -> str:
     return ENV_PATTERN.sub(replace, value)
 
 
+def resolve_path_value(value: str, base_dir: Path) -> Path:
+    expanded = expand_compose_value(value.strip())
+    candidate = Path(expanded)
+    if not candidate.is_absolute():
+        candidate = base_dir / candidate
+    return candidate.resolve()
+
+
 def run_git(repo_root: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", "-C", str(repo_root), *args],
@@ -56,6 +64,12 @@ def resolve_compose_build_source(compose_file: Path, service_name: str) -> Path:
     build = service.get("build")
     if not isinstance(build, dict):
         raise ValueError(f"{compose_file} service {service_name!r} does not use object-form build config")
+
+    additional_contexts = build.get("additional_contexts")
+    if isinstance(additional_contexts, dict):
+        run_services_source = additional_contexts.get("run-services-source")
+        if isinstance(run_services_source, str) and run_services_source.strip():
+            return resolve_path_value(run_services_source, compose_file.parent)
 
     context_value = expand_compose_value(str(build.get("context") or "").strip())
     dockerfile_value = expand_compose_value(str(build.get("dockerfile") or "").strip())

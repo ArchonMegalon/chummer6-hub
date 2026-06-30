@@ -70,10 +70,10 @@ services:
       context: ${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}
       dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Identity/Dockerfile
       additional_contexts:
+        run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
         fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
-        CHUMMER_RUN_SERVICES_CONTEXT_DIR: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}
     environment:
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
       IDENTITY_ENABLE_HTTPS_REDIRECTION: ${IDENTITY_ENABLE_HTTPS_REDIRECTION:-false}
@@ -112,11 +112,11 @@ services:
       context: ${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}
       dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
       additional_contexts:
+        run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
         fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
         design-product: /docker/chummercomplete/chummer-design
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
-        CHUMMER_RUN_SERVICES_CONTEXT_DIR: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}
     env_file:
       - /docker/fleet/secrets/codexliz-cf-access.env
     depends_on:

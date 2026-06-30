@@ -1,26 +1,25 @@
 # syntax=docker/dockerfile:1.4
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG CHUMMER_BUILD_CONCURRENCY=1
-ARG CHUMMER_RUN_SERVICES_CONTEXT_DIR=chummer.run-services
 WORKDIR /src
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Run.Api/Chummer.Run.Api.csproj chummer.run-services/Chummer.Run.Api/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj chummer.run-services/Chummer.Campaign.Contracts/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Control.Contracts/Chummer.Control.Contracts.csproj chummer.run-services/Chummer.Control.Contracts/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Run.Contracts/Chummer.Run.Contracts.csproj chummer.run-services/Chummer.Run.Contracts/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj chummer.run-services/Chummer.Play.Contracts/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.World.Contracts/Chummer.World.Contracts.csproj chummer.run-services/Chummer.World.Contracts/
+COPY --from=run-services-source Chummer.Run.Api/Chummer.Run.Api.csproj chummer.run-services/Chummer.Run.Api/
+COPY --from=run-services-source Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj chummer.run-services/Chummer.Campaign.Contracts/
+COPY --from=run-services-source Chummer.Control.Contracts/Chummer.Control.Contracts.csproj chummer.run-services/Chummer.Control.Contracts/
+COPY --from=run-services-source Chummer.Run.Contracts/Chummer.Run.Contracts.csproj chummer.run-services/Chummer.Run.Contracts/
+COPY --from=run-services-source Chummer.Play.Contracts/Chummer.Play.Contracts.csproj chummer.run-services/Chummer.Play.Contracts/
+COPY --from=run-services-source Chummer.World.Contracts/Chummer.World.Contracts.csproj chummer.run-services/Chummer.World.Contracts/
 COPY chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj chummer-core-engine/Chummer.Contracts/
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj chummer-hub-registry/Chummer.Hub.Registry.Contracts/
 COPY chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj chummer-hub-registry/Chummer.Run.Registry/
 COPY --from=fleet-media-factory-contracts Chummer.Media.Contracts.csproj fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 RUN dotnet restore chummer.run-services/Chummer.Run.Api/Chummer.Run.Api.csproj
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Run.Api/ chummer.run-services/Chummer.Run.Api/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Campaign.Contracts/ chummer.run-services/Chummer.Campaign.Contracts/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Control.Contracts/ chummer.run-services/Chummer.Control.Contracts/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Run.Contracts/ chummer.run-services/Chummer.Run.Contracts/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/.codex-design/ chummer.run-services/.codex-design/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.Play.Contracts/ chummer.run-services/Chummer.Play.Contracts/
-COPY ${CHUMMER_RUN_SERVICES_CONTEXT_DIR}/Chummer.World.Contracts/ chummer.run-services/Chummer.World.Contracts/
+COPY --from=run-services-source Chummer.Run.Api/ chummer.run-services/Chummer.Run.Api/
+COPY --from=run-services-source Chummer.Campaign.Contracts/ chummer.run-services/Chummer.Campaign.Contracts/
+COPY --from=run-services-source Chummer.Control.Contracts/ chummer.run-services/Chummer.Control.Contracts/
+COPY --from=run-services-source Chummer.Run.Contracts/ chummer.run-services/Chummer.Run.Contracts/
+COPY --from=run-services-source .codex-design/ chummer.run-services/.codex-design/
+COPY --from=run-services-source Chummer.Play.Contracts/ chummer.run-services/Chummer.Play.Contracts/
+COPY --from=run-services-source Chummer.World.Contracts/ chummer.run-services/Chummer.World.Contracts/
 COPY chummer-core-engine/Chummer.Contracts/ chummer-core-engine/Chummer.Contracts/
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/ chummer-hub-registry/Chummer.Hub.Registry.Contracts/
 COPY chummer-hub-registry/Chummer.Run.Registry/ chummer-hub-registry/Chummer.Run.Registry/
