@@ -30,6 +30,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddHostedService<PublicParticipateSnapshotWorker>();
         services.AddHostedService<PublicSignalRetryExpiryWorker>();
         services.AddHostedService<PublicSurfaceWarmupService>();
+        services.AddHostedService<PublicRouteWarmupService>();
         services.AddSingleton<PublicNavigationService>();
         services.AddSingleton<HubPageChromeService>();
         services.AddSingleton<ReadyForTonightService>();
