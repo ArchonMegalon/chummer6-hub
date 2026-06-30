@@ -36,6 +36,48 @@ def write_supporting_artifacts(completion: Path, published: Path) -> None:
     )
 
 
+def write_design_contract(path: Path) -> None:
+    path.write_text(
+        """
+# Premium UI Design Exit Gate
+
+Apple Human Interface Guidelines
+Material Design 3
+Microsoft Fluent 2
+IBM Carbon Design System
+Atlassian Design System
+Shopify Polaris
+GOV.UK Service Manual
+WCAG 2.2
+Nielsen Norman Group usability heuristics
+five-second verdict
+one-route-one-job
+premium visual scorecard
+zero-internal-language rule
+mobile playtime standard
+dark-mode form controls
+""",
+        encoding="utf-8",
+    )
+
+
+def write_layout(path: Path) -> None:
+    path.write_text(
+        """
+<details class="site-account-menu site-open-chummer-menu">
+  <summary class="site-account-menu__summary">
+    <span class="site-account-menu__label">Open Chummer</span>
+  </summary>
+  <div class="site-account-menu__panel" aria-label="Open Chummer options">
+    <a class="site-account-menu__link site-open-chummer-menu__button" href="/build">Build</a>
+    <a class="site-account-menu__link site-open-chummer-menu__button" href="/play">Play</a>
+  </div>
+</details>
+""",
+        encoding="utf-8",
+    )
+
+
 def write_public_views(root: Path, *, leaked: bool = False) -> list[Path]:
     views = []
     templates = {
@@ -43,35 +85,57 @@ def write_public_views(root: Path, *, leaked: bool = False) -> list[Path]:
 <section class="minimal-hero">
   <h1>Chummer</h1>
   <a class="button-like button-like--primary" href="/downloads">Download Chummer</a>
+  <details class="site-account-menu site-open-chummer-menu">
+    <summary class="site-account-menu__summary">
+      <span class="site-account-menu__label">Open Chummer</span>
+    </summary>
+    <div class="site-account-menu__panel" aria-label="Open Chummer options">
+      <a class="site-account-menu__link site-open-chummer-menu__button" href="/build">Build</a>
+      <a class="site-account-menu__link site-open-chummer-menu__button" href="/play">Play</a>
+    </div>
+  </details>
+  <a class="minimal-hero__visual minimal-hero__visual--screenshot" href="/media/promo/every-wonder-horizon-promo.mp4">Watch</a>
 </section>
 """,
         "Downloads.cshtml": """
 <section>
   <h1>Downloads</h1>
-  <article class="downloads-choice-card"><h2>Stable</h2><a href="/help">Help</a></article>
-  <article class="downloads-choice-card"><h2>Nightly</h2></article>
+  <p>Sign in later only if you want to attach this installed copy</p>
+  <div class="downloads-choice-list">
+    <article class="downloads-choice-card"><h2>Stable</h2><a href="/help" data-release-lane="stable">Help</a></article>
+    <article class="downloads-choice-card"><h2>Nightly</h2><a href="/nightly" data-release-lane="nightly">Nightly</a></article>
+  </div>
 </section>
 """,
         "Status.cshtml": """
 <section class="minimal-status-pill">
   <h1>Updated</h1>
-  <a href="/downloads">Downloads</a>
-  <a href="/help">Help</a>
+  <p>Current caution</p>
+  <div aria-label="Status next actions">
+    <a href="/downloads">Downloads</a>
+    <a href="/help">Help</a>
+  </div>
 </section>
 """,
         "Partizipate.cshtml": """
 <section>
   <h1 class="sr-only">Participate</h1>
   <div class="participate-hosted__frame-shell">
-    <iframe src="@Model.EmbeddedBoardHref" title="Chummer participation board"></iframe>
+    <iframe class="participate-hosted__frame" src="@Model.EmbeddedBoardHref" title="Chummer participation board" loading="lazy" referrerpolicy="same-origin" data-chummer-participate-frame></iframe>
   </div>
+  <article class="participate-board-fallback">Board offline right now.</article>
 </section>
 """,
         "MobileProjection.cshtml": """
 <section id="pwa-ledger-stream">
   <h1>Mobile</h1>
+  <button data-install-prompt-button>Install this app</button>
   <p data-pwa-install-state>Installable app shell live</p>
   <p data-pwa-ledger-status>Checking</p>
+  <meter data-pwa-ledger-heat-meter></meter>
+  <button data-pwa-ledger-follow-button></button>
+  <p data-pwa-continuity-summary>No continuity snapshot loaded yet.</p>
+  <a href="/play/continuity">Open continuity</a>
   <a href="/help">Help</a>
 </section>
 """,
@@ -122,10 +186,19 @@ def premium_css() -> str:
   color-scheme: dark;
 }}
 .site-header__inner {{ display: grid; grid-template-columns: minmax(9rem, auto) minmax(0, 1fr) auto; backdrop-filter: blur(12px); }}
+.button-like--primary {{ display: inline-flex; }}
+.button-like--secondary {{ display: inline-flex; }}
+.button-like--ghost {{ display: inline-flex; }}
+.site-open-chummer-menu {{ display: inline-grid; }}
 .minimal-hero__visual {{ display: grid; background: linear-gradient(#000, #111); }}
+.minimal-page-hero {{ display: grid; }}
 .landing-film {{ display: grid; background: radial-gradient(circle, #111, #000); min-height: 100svh; }}
 .editorial-strip {{ display: grid; }}
 .downloads-quicknav {{ display: flex; }}
+.downloads-choice-card {{ display: grid; }}
+.minimal-status-pill {{ display: grid; }}
+.minimal-facts article {{ display: grid; }}
+.participate-hosted__frame {{ display: block; }}
 .black-ledger-geoscape {{ display: grid; }}
 .grid-a {{ display: grid; }}
 .grid-b {{ display: grid; }}
@@ -194,15 +267,21 @@ def test_premium_gate_passes_for_tokenized_premium_shell() -> None:
         completion = root / "completion"
         published = root / "published"
         css = root / "site.css"
+        design_contract = root / "PREMIUM_UI_DESIGN_EXIT_GATE.md"
+        layout = root / "_Layout.cshtml"
         views = write_public_views(root)
+        write_design_contract(design_contract)
+        write_layout(layout)
         write_supporting_artifacts(completion, published)
         css.write_text(premium_css(), encoding="utf-8")
 
         payload = module.build_payload(
             css_path=css,
+            design_contract_path=design_contract,
             completion_root=completion,
             published_root=published,
             critical_public_views=views,
+            layout_view=layout,
         )
 
     assert payload["status"] == "pass", payload["failures"]
@@ -218,6 +297,9 @@ def test_premium_gate_passes_for_tokenized_premium_shell() -> None:
     assert payload["checks"]["responsive_layout"]["pass"]
     assert payload["checks"]["form_control_legibility"]["pass"]
     assert payload["checks"]["composition_hierarchy"]["pass"]
+    assert payload["checks"]["source_design_contract"]["pass"]
+    assert payload["checks"]["component_anatomy"]["pass"]
+    assert payload["checks"]["open_chummer_navigation"]["pass"]
     assert payload["checks"]["route_journey_contracts"]["pass"]
 
 
@@ -228,7 +310,11 @@ def test_premium_gate_rejects_generic_flat_theme_and_internal_copy() -> None:
         completion = root / "completion"
         published = root / "published"
         css = root / "site.css"
+        design_contract = root / "PREMIUM_UI_DESIGN_EXIT_GATE.md"
+        layout = root / "_Layout.cshtml"
         views = write_public_views(root, leaked=True)
+        write_design_contract(design_contract)
+        write_layout(layout)
         write_supporting_artifacts(completion, published)
         css.write_text(
             """
@@ -249,9 +335,11 @@ def test_premium_gate_rejects_generic_flat_theme_and_internal_copy() -> None:
 
         payload = module.build_payload(
             css_path=css,
+            design_contract_path=design_contract,
             completion_root=completion,
             published_root=published,
             critical_public_views=views,
+            layout_view=layout,
         )
 
     assert payload["status"] == "fail"
@@ -265,6 +353,32 @@ def test_premium_gate_rejects_generic_flat_theme_and_internal_copy() -> None:
     assert "composition still reads like a template; require premium chrome, hero/media, editorial, navigation, and dense layout systems" in payload["failures"]
 
 
+def test_premium_gate_rejects_missing_written_design_contract() -> None:
+    module = load_module()
+    with tempfile.TemporaryDirectory(prefix="premium-ui-gate-contract-fail-") as temp_dir:
+        root = Path(temp_dir)
+        completion = root / "completion"
+        published = root / "published"
+        css = root / "site.css"
+        layout = root / "_Layout.cshtml"
+        views = write_public_views(root)
+        write_layout(layout)
+        write_supporting_artifacts(completion, published)
+        css.write_text(premium_css(), encoding="utf-8")
+
+        payload = module.build_payload(
+            css_path=css,
+            design_contract_path=root / "missing.md",
+            completion_root=completion,
+            published_root=published,
+            critical_public_views=views,
+            layout_view=layout,
+        )
+
+    assert payload["status"] == "fail"
+    assert "premium design contract is incomplete; source-standard calibration, scorecard, mobile, forms, and language rules must be written" in payload["failures"]
+
+
 def test_design_package_names_the_premium_exit_gate_and_sources() -> None:
     doc = (SCRIPT_PATH.parents[1] / "docs" / "CHUMMER_RUN_FLAGSHIP_REDESIGN_PACKAGE.md").read_text(encoding="utf-8")
 
@@ -275,3 +389,5 @@ def test_design_package_names_the_premium_exit_gate_and_sources() -> None:
     assert "WCAG 2.2" in doc
     assert "one visible job, one primary next action" in doc
     assert "not a proof harness, provider adapter, internal roadmap, or operator console" in doc
+    assert "premium visual scorecard" in doc
+    assert "zero-internal-language" in doc

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.premium_ui_design_exit_gate",
-  "generated_at_utc": "2026-06-30T23:05:24Z",
+  "generated_at_utc": "2026-06-30T23:41:39Z",
   "status": "pass",
   "verdict": "PREMIUM_UI_READY",
   "reference_systems": [
@@ -83,9 +83,32 @@
     }
   ],
   "css_path": "/docker/chummercomplete/chummer.run-services-participate-main/Chummer.Run.Api/wwwroot/css/site.css",
+  "design_contract_path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE.md",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
   "published_root": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-studio/published",
   "checks": {
+    "source_design_contract": {
+      "standard": "written exit gate calibrated against named public design systems",
+      "path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE.md",
+      "markers": {
+        "Apple Human Interface Guidelines": true,
+        "Material Design 3": true,
+        "Microsoft Fluent 2": true,
+        "IBM Carbon Design System": true,
+        "Atlassian Design System": true,
+        "Shopify Polaris": true,
+        "GOV.UK Service Manual": true,
+        "WCAG 2.2": true,
+        "Nielsen Norman Group usability heuristics": true,
+        "five-second verdict": true,
+        "one-route-one-job": true,
+        "premium visual scorecard": true,
+        "zero-internal-language rule": true,
+        "mobile playtime standard": true,
+        "dark-mode form controls": true
+      },
+      "pass": true
+    },
     "premium_typography": {
       "standard": "HIG clarity + Material/Fluent/Carbon type-system discipline",
       "display_font": "\"Fraunces\", \"Iowan Old Style\", \"Palatino Linotype\", Georgia, serif",
@@ -186,6 +209,35 @@
       "has_glass_chrome": true,
       "pass": true
     },
+    "component_anatomy": {
+      "standard": "Fluent/Carbon component consistency + HIG direct manipulation",
+      "markers": {
+        "primary_action": true,
+        "secondary_action": true,
+        "ghost_action": true,
+        "sticky_shell_chrome": true,
+        "open_chummer_menu": true,
+        "hero_composition": true,
+        "page_hero": true,
+        "download_card": true,
+        "status_pill": true,
+        "mobile_fact_cards": true,
+        "participate_frame": true
+      },
+      "pass": true
+    },
+    "open_chummer_navigation": {
+      "standard": "Nielsen recognition over recall + GOV.UK explicit next action",
+      "layout_view": "/docker/chummercomplete/chummer.run-services-participate-main/Chummer.Run.Api/Views/Shared/_Layout.cshtml",
+      "markers": {
+        "open_chummer_dropdown": true,
+        "accessible_options_label": true,
+        "build_button": true,
+        "play_button": true,
+        "button_class": true
+      },
+      "pass": true
+    },
     "public_copy_quiet": {
       "standard": "HIG clarity and Carbon production copy consistency",
       "view_count": 5,
@@ -203,8 +255,14 @@
           "required_markers": [
             "minimal-hero",
             "<h1",
+            "Download Chummer",
             "href=\"/downloads\"",
-            "button-like--primary"
+            "button-like--primary",
+            "site-open-chummer-menu",
+            "aria-label=\"Open Chummer options\"",
+            "href=\"/build\"",
+            "href=\"/play\"",
+            "minimal-hero__visual--screenshot"
           ],
           "missing_markers": [],
           "pass": true
@@ -213,10 +271,14 @@
           "route": "Downloads.cshtml",
           "job": "Get the user onto the right build without crowding the decision.",
           "required_markers": [
+            "downloads-choice-list",
             "downloads-choice-card",
             "<h1",
             "Stable",
             "Nightly",
+            "data-release-lane=\"stable\"",
+            "data-release-lane=\"nightly\"",
+            "Sign in later only if you want to attach this installed copy",
             "href=\"/help\""
           ],
           "missing_markers": [],
@@ -228,6 +290,8 @@
           "required_markers": [
             "minimal-status-pill",
             "<h1",
+            "Current caution",
+            "aria-label=\"Status next actions\"",
             "href=\"/downloads\"",
             "href=\"/help\""
           ],
@@ -239,8 +303,13 @@
           "job": "Show the participation board as the product surface without extra wrapper noise.",
           "required_markers": [
             "participate-hosted__frame-shell",
+            "participate-hosted__frame",
             "<iframe",
-            "Model.EmbeddedBoardHref"
+            "Model.EmbeddedBoardHref",
+            "loading=\"lazy\"",
+            "referrerpolicy=\"same-origin\"",
+            "data-chummer-participate-frame",
+            "participate-board-fallback"
           ],
           "missing_markers": [],
           "pass": true
@@ -250,8 +319,13 @@
           "job": "Expose the PWA playtime lane with install, live ledger, continuity, and help actions.",
           "required_markers": [
             "pwa-ledger-stream",
+            "data-install-prompt-button",
             "data-pwa-install-state",
             "data-pwa-ledger-status",
+            "data-pwa-ledger-heat-meter",
+            "data-pwa-ledger-follow-button",
+            "data-pwa-continuity-summary",
+            "Open continuity",
             "href=\"/help\""
           ],
           "missing_markers": [],

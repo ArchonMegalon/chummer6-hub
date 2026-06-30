@@ -13,8 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED_ROOT = ROOT / ".codex-studio" / "published"
 COMPLETION_ROOT = Path("/docker/chummercomplete/_completion/chummer_run_redesign_closure")
 CSS_PATH = ROOT / "Chummer.Run.Api/wwwroot/css/site.css"
+DESIGN_CONTRACT_PATH = ROOT / ".codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE.md"
 OUTPUT = PUBLISHED_ROOT / "PREMIUM_UI_DESIGN_EXIT_GATE.generated.json"
 REPORT = PUBLISHED_ROOT / "PREMIUM_UI_DESIGN_EXIT_GATE.md"
+LAYOUT_VIEW = ROOT / "Chummer.Run.Api/Views/Shared/_Layout.cshtml"
 CRITICAL_PUBLIC_VIEWS = [
     ROOT / "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
     ROOT / "Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml",
@@ -69,6 +71,23 @@ REFERENCE_SYSTEMS = [
         "gate_translation": "status visibility, recognition over recall, consistency, and clear task feedback",
     },
 ]
+DESIGN_CONTRACT_MARKERS = [
+    "Apple Human Interface Guidelines",
+    "Material Design 3",
+    "Microsoft Fluent 2",
+    "IBM Carbon Design System",
+    "Atlassian Design System",
+    "Shopify Polaris",
+    "GOV.UK Service Manual",
+    "WCAG 2.2",
+    "Nielsen Norman Group usability heuristics",
+    "five-second verdict",
+    "one-route-one-job",
+    "premium visual scorecard",
+    "zero-internal-language rule",
+    "mobile playtime standard",
+    "dark-mode form controls",
+]
 DESIGN_STANDARD_PRINCIPLES = [
     {
         "id": "five_second_first_impression",
@@ -104,24 +123,91 @@ DESIGN_STANDARD_PRINCIPLES = [
 ROUTE_JOURNEY_REQUIREMENTS = {
     "Landing.cshtml": {
         "job": "Explain Chummer and make the first install/open action obvious.",
-        "required_markers": ["minimal-hero", "<h1", "href=\"/downloads\"", "button-like--primary"],
+        "required_markers": [
+            "minimal-hero",
+            "<h1",
+            "Download Chummer",
+            "href=\"/downloads\"",
+            "button-like--primary",
+            "site-open-chummer-menu",
+            "aria-label=\"Open Chummer options\"",
+            "href=\"/build\"",
+            "href=\"/play\"",
+            "minimal-hero__visual--screenshot",
+        ],
     },
     "Downloads.cshtml": {
         "job": "Get the user onto the right build without crowding the decision.",
-        "required_markers": ["downloads-choice-card", "<h1", "Stable", "Nightly", "href=\"/help\""],
+        "required_markers": [
+            "downloads-choice-list",
+            "downloads-choice-card",
+            "<h1",
+            "Stable",
+            "Nightly",
+            "data-release-lane=\"stable\"",
+            "data-release-lane=\"nightly\"",
+            "Sign in later only if you want to attach this installed copy",
+            "href=\"/help\"",
+        ],
     },
     "Status.cshtml": {
         "job": "Tell users whether they should install, wait, or ask for help.",
-        "required_markers": ["minimal-status-pill", "<h1", "href=\"/downloads\"", "href=\"/help\""],
+        "required_markers": [
+            "minimal-status-pill",
+            "<h1",
+            "Current caution",
+            "aria-label=\"Status next actions\"",
+            "href=\"/downloads\"",
+            "href=\"/help\"",
+        ],
     },
     "Partizipate.cshtml": {
         "job": "Show the participation board as the product surface without extra wrapper noise.",
-        "required_markers": ["participate-hosted__frame-shell", "<iframe", "Model.EmbeddedBoardHref"],
+        "required_markers": [
+            "participate-hosted__frame-shell",
+            "participate-hosted__frame",
+            "<iframe",
+            "Model.EmbeddedBoardHref",
+            "loading=\"lazy\"",
+            "referrerpolicy=\"same-origin\"",
+            "data-chummer-participate-frame",
+            "participate-board-fallback",
+        ],
     },
     "MobileProjection.cshtml": {
         "job": "Expose the PWA playtime lane with install, live ledger, continuity, and help actions.",
-        "required_markers": ["pwa-ledger-stream", "data-pwa-install-state", "data-pwa-ledger-status", "href=\"/help\""],
+        "required_markers": [
+            "pwa-ledger-stream",
+            "data-install-prompt-button",
+            "data-pwa-install-state",
+            "data-pwa-ledger-status",
+            "data-pwa-ledger-heat-meter",
+            "data-pwa-ledger-follow-button",
+            "data-pwa-continuity-summary",
+            "Open continuity",
+            "href=\"/help\"",
+        ],
     },
+}
+NAVIGATION_REQUIREMENTS = {
+    "open_chummer_dropdown": "site-open-chummer-menu",
+    "accessible_options_label": "aria-label=\"Open Chummer options\"",
+    "build_button": "href=\"/build\"",
+    "play_button": "href=\"/play\"",
+    "button_class": "site-open-chummer-menu__button",
+}
+COMPONENT_ANATOMY_REQUIREMENTS = {
+    "primary_action": ".button-like--primary",
+    "secondary_action": ".button-like--secondary",
+    "ghost_action": ".button-like--ghost",
+    "sticky_shell_chrome": ".site-header__inner",
+    "open_chummer_menu": ".site-open-chummer-menu",
+    "hero_composition": ".minimal-hero",
+    "page_hero": ".minimal-page-hero",
+    "download_card": ".downloads-choice-card",
+    "status_pill": ".minimal-status-pill",
+    "mobile_fact_cards": ".minimal-facts article",
+    "participate_frame": ".participate-hosted__frame",
 }
 BORING_FONT_MARKERS = {
     "arial",
@@ -234,17 +320,36 @@ def route_requirement_result(path: Path) -> dict[str, Any]:
     }
 
 
+def marker_presence(markers: list[str], text: str) -> dict[str, bool]:
+    normalized = text.lower()
+    return {marker: marker.lower() in normalized for marker in markers}
+
+
 def build_payload(
     *,
     css_path: Path = CSS_PATH,
+    design_contract_path: Path = DESIGN_CONTRACT_PATH,
     completion_root: Path = COMPLETION_ROOT,
     published_root: Path = PUBLISHED_ROOT,
     critical_public_views: list[Path] = CRITICAL_PUBLIC_VIEWS,
+    layout_view: Path = LAYOUT_VIEW,
 ) -> dict[str, Any]:
     failures: list[str] = []
     checks: dict[str, Any] = {}
     css = read_text(css_path)
     tokens = extract_css_tokens(css)
+
+    design_contract = read_text(design_contract_path)
+    design_contract_markers = marker_presence(DESIGN_CONTRACT_MARKERS, design_contract)
+    design_contract_pass = bool(design_contract.strip()) and all(design_contract_markers.values())
+    if not design_contract_pass:
+        failures.append("premium design contract is incomplete; source-standard calibration, scorecard, mobile, forms, and language rules must be written")
+    checks["source_design_contract"] = {
+        "standard": "written exit gate calibrated against named public design systems",
+        "path": str(design_contract_path),
+        "markers": design_contract_markers,
+        "pass": design_contract_pass,
+    }
 
     display_font = tokens.get("font-family-display", "")
     body_font = tokens.get("font-family-base", "")
@@ -426,6 +531,34 @@ def build_payload(
         "pass": composition_pass,
     }
 
+    component_markers = {
+        name: marker in css
+        for name, marker in COMPONENT_ANATOMY_REQUIREMENTS.items()
+    }
+    component_pass = all(component_markers.values())
+    if not component_pass:
+        failures.append("premium component anatomy is incomplete; shared actions, chrome, hero, cards, mobile facts, and iframe surfaces must all be styled")
+    checks["component_anatomy"] = {
+        "standard": "Fluent/Carbon component consistency + HIG direct manipulation",
+        "markers": component_markers,
+        "pass": component_pass,
+    }
+
+    navigation_text = read_text(layout_view) + "\n" + read_text(ROOT / "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
+    navigation_markers = {
+        name: marker in navigation_text
+        for name, marker in NAVIGATION_REQUIREMENTS.items()
+    }
+    navigation_pass = all(navigation_markers.values())
+    if not navigation_pass:
+        failures.append("premium navigation contract is broken; Open Chummer must be an accessible Build and Play dropdown")
+    checks["open_chummer_navigation"] = {
+        "standard": "Nielsen recognition over recall + GOV.UK explicit next action",
+        "layout_view": str(layout_view),
+        "markers": navigation_markers,
+        "pass": navigation_pass,
+    }
+
     view_text = "\n".join(read_text(path) for path in critical_public_views)
     leaked_terms = sorted({needle for needle in INTERNAL_LANGUAGE_NEEDLES if re.search(rf"\b{re.escape(needle)}\b", view_text, flags=re.IGNORECASE)})
     public_copy_gate = load_json(published_root / "PUBLIC_COPY_LEAK_GATE.generated.json")
@@ -479,6 +612,7 @@ def build_payload(
         "reference_systems": REFERENCE_SYSTEMS,
         "design_principles": DESIGN_STANDARD_PRINCIPLES,
         "css_path": str(css_path),
+        "design_contract_path": str(design_contract_path),
         "completion_root": str(completion_root),
         "published_root": str(published_root),
         "checks": checks,
@@ -509,6 +643,11 @@ def write_outputs(payload: dict[str, Any], output: Path, report: Path) -> None:
             f"- `{item['id']}`: {item['exit_rule']} Source posture: {item['standard']}."
             for item in payload["design_principles"]
         ],
+        "",
+        "## Source Design Contract",
+        "",
+        f"- Path: `{payload['design_contract_path']}`",
+        f"- Status: `{'pass' if payload['checks']['source_design_contract'].get('pass') else 'fail'}`",
         "",
         "## Failures",
         "",

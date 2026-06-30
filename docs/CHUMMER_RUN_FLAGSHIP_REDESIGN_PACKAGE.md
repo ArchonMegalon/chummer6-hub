@@ -114,7 +114,7 @@ Component families:
 
 ## 5A. Premium UI Design Exit Gate
 
-This is the exit gate for saying the public UI is premium, not merely clean. Use the strongest lessons from Apple Human Interface Guidelines, Material Design 3, Microsoft Fluent 2, IBM Carbon Design System, Atlassian Design System, Shopify Polaris, GOV.UK Service Manual, WCAG 2.2, and Nielsen Norman usability heuristics as calibration. Do not copy their visual language; translate their discipline into Chummer's campaign-command identity.
+This is the exit gate for saying the public UI is premium, not merely clean. Use the strongest lessons from Apple Human Interface Guidelines, Material Design 3, Microsoft Fluent 2, IBM Carbon Design System, Atlassian Design System, Shopify Polaris, GOV.UK Service Manual, WCAG 2.2, and Nielsen Norman usability heuristics as calibration. Do not copy their visual language; translate their discipline into Chummer's campaign-command identity. The canonical source contract is `.codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE.md`.
 
 The gate blocks release when the site looks like a generic dashboard. The public surface must read as a product, not a proof harness, provider adapter, internal roadmap, or operator console. Passing means the UI looks intentional before a user reads the fine print.
 
@@ -128,6 +128,9 @@ Exit rules:
 - Accessibility as finish: contrast, focus, dark-mode form controls, select options, touch targets, reduced motion, and mobile breakpoints are release criteria.
 - Quiet public language: public pages must not expose proof-dashboard language, provider names, fleet/operator phrasing, raw status enum language, or internal process labels.
 - Mobile truth: mobile/PWA surfaces must work as compact playtime tools, not shrunken desktop dashboards.
+- Open Chummer split: `Open Chummer` must stay an accessible dropdown with `Build` and `Play` buttons; flattening it back into one ambiguous action fails the gate.
+- premium visual scorecard: typography, semantic color, elevation, layout rhythm, component anatomy, dark-mode form controls, motion fallback, responsive behavior, and public-language discipline all pass together or the gate fails.
+- zero-internal-language rule: public UI cannot leak proof, receipt, operator, fleet, governor, provider, raw enum, or process wording unless the route is explicitly an internal/authenticated operations surface.
 
 Executable gate:
 
