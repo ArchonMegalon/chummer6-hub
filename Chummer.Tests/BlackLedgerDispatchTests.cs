@@ -90,6 +90,23 @@ public sealed class BlackLedgerDispatchTests
     }
 
     [Fact]
+    public void BlackLedgerDispatch_public_read_does_not_persist_seed_projection()
+    {
+        var configuration = BuildSeedConfiguration();
+        string storePath = configuration["CHUMMER_COMMUNITY_STORE_PATH"]
+            ?? throw new InvalidOperationException("test store path is required");
+        var service = new BlackLedgerDispatchService(
+            new CommunityStore(configuration, NullLogger<CommunityStore>.Instance),
+            new BlackLedgerPublicStatsService(configuration),
+            NullLogger<BlackLedgerDispatchService>.Instance);
+
+        var dispatches = service.ListPublishedDispatches(1);
+
+        Assert.NotEmpty(dispatches);
+        Assert.False(File.Exists(storePath));
+    }
+
+    [Fact]
     public void BlackLedgerDispatch_operator_workflow_creates_gate_and_publication_receipts()
     {
         var configuration = BuildSeedConfiguration();

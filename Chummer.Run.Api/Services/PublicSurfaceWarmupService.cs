@@ -24,7 +24,22 @@ public sealed class PublicSurfaceWarmupService : IHostedService
             _services.GetRequiredService<InstallLinkingStore>();
             _services.GetRequiredService<PublicLandingService>().LoadSurface();
             _services.GetRequiredService<PublicNavigationService>().LoadNavigation();
-            _services.GetRequiredService<PublicReleaseManifestService>().LoadManifest();
+            var releaseManifest = _services.GetRequiredService<PublicReleaseManifestService>().LoadManifest();
+            _services.GetRequiredService<PublicPackageCatalogService>().ListPackages();
+            var releaseSelection = _services.GetRequiredService<ReleaseSelectionService>();
+            releaseSelection.BuildExperience(
+                releaseSelection.ApplyAccessPolicy(releaseManifest),
+                userAgent: string.Empty,
+                authenticated: false);
+            var blackLedgerStats = _services.GetRequiredService<BlackLedgerPublicStatsService>();
+            blackLedgerStats.LoadSeedDocument();
+            blackLedgerStats.LoadWorldPreview();
+            blackLedgerStats.LoadCommandMap();
+            blackLedgerStats.ListPublicStats();
+            blackLedgerStats.ListDispatches();
+            _services.GetRequiredService<BlackLedgerDispatchService>().ListPublishedDispatches();
+            _services.GetRequiredService<BlackLedgerFactionOnboardingService>().ListFactionSummaries();
+            _services.GetRequiredService<BlackLedgerWorldTickBriefingService>().BuildWorldTurnBriefing(1);
             using CancellationTokenSource timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
             await _services.GetRequiredService<PublicParticipateSnapshotService>().RefreshAsync(timeoutCts.Token).ConfigureAwait(false);

@@ -183,10 +183,14 @@ public sealed class BlackLedgerPublicStatsService
                 new("glass tower compact", "public trust", -4, "License polish increased but public confidence fell after a quiet contract sweep."),
             ]));
     private readonly IConfiguration? _configuration;
+    private readonly Lazy<BlackLedgerWorldSeedDocument?> _seedDocument;
 
     public BlackLedgerPublicStatsService(IConfiguration? configuration = null)
     {
         _configuration = configuration;
+        _seedDocument = new Lazy<BlackLedgerWorldSeedDocument?>(
+            LoadSeedDocumentCore,
+            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public IReadOnlyList<BlackLedgerPublicStatViewModel> ListHomepageStats()
@@ -409,6 +413,9 @@ public sealed class BlackLedgerPublicStatsService
         => TryLoadSeed();
 
     private BlackLedgerWorldSeedDocument? TryLoadSeed()
+        => _seedDocument.Value;
+
+    private BlackLedgerWorldSeedDocument? LoadSeedDocumentCore()
     {
         foreach (string path in ResolveSeedPathCandidates())
         {

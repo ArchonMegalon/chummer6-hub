@@ -227,7 +227,6 @@ public sealed class BlackLedgerDispatchService
                     PublishedAtUtc: dispatch.CreatedAtUtc));
             }
 
-            _store.PersistLocked();
             _logger.LogInformation("Seeded {Count} Black Ledger dispatch records into CommunityStore.", _store.BlackLedgerDispatches.Count);
         }
     }
