@@ -2652,6 +2652,25 @@ public sealed class PublicLandingController : Controller
                     secondaryLabel: "Contact")
                 : await ParticipateBoardFallbackAsync(cancellationToken, fallbackPath, disableHostedBoard: true).ConfigureAwait(false);
         }
+        catch (RegexMatchTimeoutException ex)
+        {
+            _logger.LogWarning(ex, "Participate board proxy could not sanitize upstream board HTML.");
+            if (TryServeHostedBoardHtmlCache(cacheKey, allowStale: true, out ContentResult? staleHtml) && staleHtml is not null)
+            {
+                return staleHtml;
+            }
+
+            return embedded
+                ? BuildHostedBoardEmbedFallbackResult(
+                    "Participate",
+                    "Board offline right now",
+                    "Try again shortly. Use Contact for the Chummer5 Discord server.",
+                    primaryHref: "/participate",
+                    primaryLabel: "Retry",
+                    secondaryHref: "/contact",
+                    secondaryLabel: "Contact")
+                : await ParticipateBoardFallbackAsync(cancellationToken, fallbackPath, disableHostedBoard: true).ConfigureAwait(false);
+        }
     }
 
     [HttpGet("/participate/frame")]
@@ -3868,12 +3887,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        rewritten = Regex.Replace(
-            rewritten,
-            "<!--.*?ProductLift.*?-->",
-            string.Empty,
-            RegexOptions.IgnoreCase | RegexOptions.Singleline,
-            TimeSpan.FromMilliseconds(250));
+        rewritten = RemoveHostedBoardProviderComments(rewritten);
         rewritten = Regex.Replace(
             rewritten,
             "<meta[^>]+name=\"generator\"[^>]*>",
@@ -3904,6 +3918,50 @@ document.addEventListener('DOMContentLoaded', function () {
             string.Empty,
             RegexOptions.IgnoreCase | RegexOptions.Singleline,
             TimeSpan.FromMilliseconds(250));
+    }
+
+    private static string RemoveHostedBoardProviderComments(string html)
+    {
+        if (string.IsNullOrEmpty(html))
+        {
+            return string.Empty;
+        }
+
+        const string commentOpen = "<!--";
+        const string commentClose = "-->";
+        string providerName = string.Concat("Product", "Lift");
+        var rewritten = new StringBuilder(html.Length);
+        int cursor = 0;
+
+        while (cursor < html.Length)
+        {
+            int commentStart = html.IndexOf(commentOpen, cursor, StringComparison.Ordinal);
+            if (commentStart < 0)
+            {
+                rewritten.Append(html, cursor, html.Length - cursor);
+                break;
+            }
+
+            int commentEnd = html.IndexOf(commentClose, commentStart + commentOpen.Length, StringComparison.Ordinal);
+            if (commentEnd < 0)
+            {
+                rewritten.Append(html, cursor, html.Length - cursor);
+                break;
+            }
+
+            rewritten.Append(html, cursor, commentStart - cursor);
+            int afterComment = commentEnd + commentClose.Length;
+            int commentLength = afterComment - commentStart;
+            bool isProviderComment = html.IndexOf(providerName, commentStart, commentLength, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (!isProviderComment)
+            {
+                rewritten.Append(html, commentStart, commentLength);
+            }
+
+            cursor = afterComment;
+        }
+
+        return rewritten.ToString();
     }
 
     private static string ReplaceHostedBoardVisibleBrandText(string html)
@@ -7429,6 +7487,25 @@ document.addEventListener('DOMContentLoaded', function () {
             string normalizedCachePath = NormalizeParticipateBoardPath(boardPath);
             string staleCacheKey = BuildHostedBoardHtmlCacheKey("roadmap", localOrigin, localBaseHref, resolvedCanonicalHref, normalizedCachePath, embedded);
             if (TryServeHostedBoardHtmlCache(staleCacheKey, allowStale: true, out ContentResult? staleHtml) && staleHtml is not null)
+            {
+                return staleHtml;
+            }
+
+            return embedded
+                ? BuildHostedBoardEmbedFallbackResult(
+                    "Roadmap",
+                    "Board not loading right now",
+                    "Changelog has shipped work. Participate has requests.",
+                    primaryHref: "/roadmap",
+                    primaryLabel: "Retry",
+                    secondaryHref: "/changelog",
+                    secondaryLabel: "Changelog")
+                : await RoadmapBoardFallbackAsync(cancellationToken, fallbackPath, disableHostedBoard: true).ConfigureAwait(false);
+        }
+        catch (RegexMatchTimeoutException ex)
+        {
+            _logger.LogWarning(ex, "Roadmap board proxy could not sanitize upstream board HTML.");
+            if (TryServeHostedBoardHtmlCache(cacheKey, allowStale: true, out ContentResult? staleHtml) && staleHtml is not null)
             {
                 return staleHtml;
             }

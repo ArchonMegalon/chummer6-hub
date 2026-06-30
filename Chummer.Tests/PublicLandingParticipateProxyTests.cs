@@ -262,6 +262,24 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
     }
 
     [Fact]
+    public async Task ParticipateBoardProxyRemovesLargeProviderCommentsWithoutFailing()
+    {
+        var controller = CreatePublicLandingController(new LargeHostedBoardProviderCommentHttpClientFactory());
+        controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?embed=1");
+        controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
+        controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
+        controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
+
+        IActionResult result = await controller.ParticipateBoardProxy(null, CancellationToken.None);
+
+        ContentResult content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", content.ContentType);
+        Assert.Contains("What do you want to see next?", content.Content ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProductLift", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("productlift.dev", content.Content ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ParticipateBoardProxyReusesFreshHostedBoardHtmlCache()
     {
         using var cache = new MemoryCache(new MemoryCacheOptions());
@@ -750,6 +768,41 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
                     Content = new StringContent(html, Encoding.UTF8, "text/html")
                 };
                 return Task.FromResult(response);
+            }
+        }
+    }
+
+    private sealed class LargeHostedBoardProviderCommentHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name)
+            => new(new LargeHostedBoardProviderCommentHandler());
+
+        private sealed class LargeHostedBoardProviderCommentHandler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                string html = string.Concat(
+                    """
+<!doctype html>
+<html lang="en">
+<head>
+  <title>What do you want to see next?</title>
+""",
+                    "<!-- ProductLift ",
+                    new string('x', 768 * 1024),
+                    " -->",
+                    """
+  <script src="https://cdn.productlift.dev/js/all.js?id=370f0b336fe725b13230"></script>
+</head>
+<body>
+<main><h1>What do you want to see next?</h1></main>
+</body>
+</html>
+""");
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(html, Encoding.UTF8, "text/html")
+                });
             }
         }
     }
