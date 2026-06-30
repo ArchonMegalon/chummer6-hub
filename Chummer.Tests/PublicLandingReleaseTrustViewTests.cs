@@ -13,6 +13,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("<h1>Downloads</h1>", view, StringComparison.Ordinal);
         Assert.Contains("Download Chummer from the current release page.", view, StringComparison.Ordinal);
         Assert.Contains("Chummer selects the best installer when it can.", view, StringComparison.Ordinal);
+        Assert.Contains("var releaseNeedsReview = string.Equals(Model.Manifest.SupportabilityState, \"review_required\"", view, StringComparison.Ordinal);
+        Assert.Contains("Current installers remain available, but wider readiness is under review.", view, StringComparison.Ordinal);
+        Assert.Contains("Use Help if setup blocks your table.", view, StringComparison.Ordinal);
         Assert.Contains("attach this installed copy to your account", view, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
@@ -346,6 +349,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
 
+        Assert.Contains("ReleaseRequiresReview(manifest)", controller, StringComparison.Ordinal);
+        Assert.Contains("Current installers remain available, but wider readiness is under review.", controller, StringComparison.Ordinal);
+        Assert.Contains("Use Downloads for current installers and Help if setup blocks your table.", controller, StringComparison.Ordinal);
         Assert.Contains("current install routes are available on downloads right now", controller, StringComparison.Ordinal);
         Assert.Contains("optional sign-in and support attached", controller, StringComparison.Ordinal);
         Assert.Contains("No blocked public install path or tested path is active right now.", controller, StringComparison.Ordinal);
@@ -570,6 +576,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         string releaseSelectionService = File.ReadAllText(releaseSelectionServicePath);
         string packageCatalogService = File.ReadAllText(packageCatalogServicePath);
 
+        Assert.Contains("@PublicStatusText(Model.ReleaseSummary)", status, StringComparison.Ordinal);
+        Assert.Contains("@PublicStatusText(Model.CautionSummary)", status, StringComparison.Ordinal);
         Assert.Contains("href=\"/help\"", status, StringComparison.Ordinal);
         Assert.Contains(">Help</a>", status, StringComparison.Ordinal);
         Assert.DoesNotContain("href=\"/contact\"", status, StringComparison.Ordinal);

@@ -24,6 +24,8 @@
     var sourceScriptHref = "/downloads/build-chummer6-linux.sh";
     var showLinuxSourcePrimary = !string.IsNullOrWhiteSpace(sourceScriptHref);
     var hasOtherDownloads = showLinuxSourcePrimary || otherPlatformOptions.Length > 0;
+    var releaseNeedsReview = string.Equals(Model.Manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Model.Manifest.RolloutState, "readiness_review_required", StringComparison.OrdinalIgnoreCase);
     static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     static string PlatformId(ReleaseOptionViewModel? option)
@@ -85,6 +87,10 @@
     <div>
         <h1>Downloads</h1>
         <p>Download Chummer from the current release page. Chummer selects the best installer when it can. Other downloads stay below.</p>
+        @if (releaseNeedsReview)
+        {
+            <p class="muted-copy"><strong>Current note:</strong> Current installers remain available, but wider readiness is under review. Use Help if setup blocks your table.</p>
+        }
         <p class="muted-copy">Sign in later only if you want to attach this installed copy to your account.</p>
     </div>
 </section>

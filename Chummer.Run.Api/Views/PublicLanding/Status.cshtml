@@ -27,6 +27,8 @@
         <p class="eyebrow">Now</p>
         <h1>Updated</h1>
         <p>@PublicStatusText(statusLine)</p>
+        <p class="muted-copy">@PublicStatusText(Model.ReleaseSummary)</p>
+        <p class="muted-copy"><strong>Current caution:</strong> @PublicStatusText(Model.CautionSummary)</p>
         <div class="minimal-actions" aria-label="Status next actions">
             <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Downloads</a>
             <a class="button-like button-like--ghost" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Help">Help</a>

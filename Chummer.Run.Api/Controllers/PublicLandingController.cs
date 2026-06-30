@@ -13843,6 +13843,11 @@ Boundary:
         string updated = $"Updated {BuildLiveVerificationLabel(manifest)}.";
         string supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();
 
+        if (ReleaseRequiresReview(manifest) || pulse?.ParityClaimsReviewRequired == true)
+        {
+            return $"{updated} Current installers remain available, but wider readiness is under review.";
+        }
+
         bool checksPassing = string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
             || string.Equals(manifest.ProofStatus, "pass", StringComparison.OrdinalIgnoreCase);
         if (string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase)
@@ -13865,6 +13870,11 @@ Boundary:
         PublicReleaseManifestDto manifest,
         PublicTrustPulseSnapshot? pulse)
     {
+        if (ReleaseRequiresReview(manifest) || pulse?.ParityClaimsReviewRequired == true)
+        {
+            return "Use Downloads for current installers and Help if setup blocks your table.";
+        }
+
         string blockedSummary = BuildBlockedLaunchSummary(manifest, pulse);
         if (!blockedSummary.StartsWith("No blocked", StringComparison.OrdinalIgnoreCase))
         {
@@ -13873,6 +13883,10 @@ Boundary:
 
         return "Known issues stay on downloads.";
     }
+
+    private static bool ReleaseRequiresReview(PublicReleaseManifestDto manifest)
+        => string.Equals(manifest.SupportabilityState?.Trim(), "review_required", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(manifest.RolloutState?.Trim(), "readiness_review_required", StringComparison.OrdinalIgnoreCase);
 
     private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)
     {
