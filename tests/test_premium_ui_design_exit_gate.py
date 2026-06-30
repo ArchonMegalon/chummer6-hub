@@ -53,6 +53,25 @@ def premium_css() -> str:
     spacing = "\n".join(f"  --space-{index}: {index * 4}px;" for index in range(1, 7))
     return f"""
 :root {{
+  --color-background-canvas: #081018;
+  --color-background-panel: #111b27;
+  --color-border-subtle: #273545;
+  --color-text-primary: #f7f3eb;
+  --color-text-muted: #aeb8c4;
+  --color-accent-primary: #f3d28a;
+  --color-accent-secondary: #68d2ff;
+  --color-accent-danger: #d14b38;
+  --bg-canvas: var(--color-background-canvas);
+  --bg-surface: var(--color-background-panel);
+  --surface-quiet: #172232;
+  --surface-muted: #243247;
+  --surface-strong: #f7f3eb;
+  --ink-strong: var(--color-text-primary);
+  --ink-muted: var(--color-text-muted);
+  --line-subtle: var(--color-border-subtle);
+  --accent-cyan: var(--color-accent-secondary);
+  --accent-amber: var(--color-accent-primary);
+  --link-strong: #ffffff;
   --font-family-display: "Array Serif", "Fraunces", serif;
   --font-family-base: "Satoshi", "Aptos", sans-serif;
   --shadow-soft: 0 18px 42px rgba(0, 0, 0, 0.18);
@@ -61,12 +80,71 @@ def premium_css() -> str:
   --radius-md: 16px;
   --radius-lg: 28px;
 {spacing}
+  --site-max: 1240px;
+  color-scheme: dark;
 }}
-.minimal-hero__visual {{ background: linear-gradient(#000, #111); }}
-.landing-film {{ background: radial-gradient(circle, #111, #000); }}
+.site-header__inner {{ display: grid; grid-template-columns: minmax(9rem, auto) minmax(0, 1fr) auto; backdrop-filter: blur(12px); }}
+.minimal-hero__visual {{ display: grid; background: linear-gradient(#000, #111); }}
+.landing-film {{ display: grid; background: radial-gradient(circle, #111, #000); min-height: 100svh; }}
+.editorial-strip {{ display: grid; }}
+.downloads-quicknav {{ display: flex; }}
+.black-ledger-geoscape {{ display: grid; }}
+.grid-a {{ display: grid; }}
+.grid-b {{ display: grid; }}
+.grid-c {{ display: grid; }}
+.grid-d {{ display: grid; }}
+.grid-e {{ display: grid; }}
+.grid-f {{ display: grid; }}
+.grid-g {{ display: grid; }}
+.grid-h {{ display: grid; }}
+.grid-i {{ display: grid; }}
+.grid-j {{ display: grid; }}
+.grid-k {{ display: grid; }}
+.grid-l {{ display: grid; }}
+.grid-m {{ display: grid; }}
+.grid-n {{ display: grid; }}
+.grid-o {{ display: grid; }}
+.grid-p {{ display: grid; }}
+.grid-q {{ display: grid; }}
+.grid-r {{ display: grid; }}
+.grid-s {{ display: grid; }}
+.grid-t {{ display: grid; }}
+.flex-a {{ display: flex; }}
+.flex-b {{ display: flex; }}
+.flex-c {{ display: flex; }}
+.flex-d {{ display: flex; }}
+.flex-e {{ display: flex; }}
+.flex-f {{ display: flex; }}
+.flex-g {{ display: flex; }}
+.flex-h {{ display: flex; }}
+.flex-i {{ display: flex; }}
+.flex-j {{ display: flex; }}
+input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {{ background: var(--bg-surface); color: var(--ink-strong); color-scheme: dark; caret-color: var(--ink-strong); accent-color: var(--accent-cyan); }}
+input::placeholder,
+textarea::placeholder {{ color: var(--ink-muted); }}
+select option,
+select optgroup {{ background: var(--bg-surface); color: var(--ink-strong); }}
+select option:checked {{ background: var(--ink-strong); color: var(--bg-canvas); }}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {{ outline: 2px solid rgba(104, 210, 255, 0.36); outline-offset: 2px; }}
 @keyframes premium-rise {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
 @media (prefers-reduced-motion: reduce) {{ * {{ animation: none; transition: none; }} }}
+@media (max-width: 1200px) {{ .site-header__inner {{ grid-template-columns: minmax(0, 1fr); }} }}
+@media (max-width: 1024px) {{ .minimal-hero__visual {{ min-height: clamp(24rem, 72svh, 42rem); }} }}
+@media (max-width: 980px) {{ .landing-film {{ min-height: 82svh; }} }}
+@media (max-width: 860px) {{ .downloads-quicknav {{ flex-wrap: wrap; }} }}
+@media (max-width: 720px) {{ .site-header__inner {{ grid-template-columns: minmax(0, 1fr); }} }}
+@media (max-width: 520px) {{ .minimal-hero__visual {{ min-height: 48px; }} }}
 .hero {{ transition: transform 180ms ease; }}
+.touch-a {{ min-height: 44px; }}
+.touch-b {{ min-height: 48px; }}
+.touch-c {{ min-height: 52px; }}
+.touch-d {{ min-height: 60px; }}
+{chr(10).join(f".hover{index}:hover {{ transform: translateY(-1px); }}" for index in range(20))}
+{chr(10).join(f".focus{index}:focus-visible {{ outline: 2px solid rgba(104, 210, 255, 0.36); }}" for index in range(18))}
 {chr(10).join(f".g{index} {{ background: linear-gradient(#000, #111); }}" for index in range(20))}
 """
 
@@ -91,10 +169,15 @@ def test_premium_gate_passes_for_tokenized_premium_shell() -> None:
 
     assert payload["status"] == "pass", payload["failures"]
     assert payload["verdict"] == "PREMIUM_UI_READY"
-    assert len(payload["reference_systems"]) == 4
+    assert len(payload["reference_systems"]) >= 6
     assert payload["checks"]["premium_typography"]["pass"]
     assert payload["checks"]["premium_elevation"]["pass"]
     assert payload["checks"]["spatial_system"]["pass"]
+    assert payload["checks"]["premium_palette"]["pass"]
+    assert payload["checks"]["interaction_affordance"]["pass"]
+    assert payload["checks"]["responsive_layout"]["pass"]
+    assert payload["checks"]["form_control_legibility"]["pass"]
+    assert payload["checks"]["composition_hierarchy"]["pass"]
 
 
 def test_premium_gate_rejects_generic_flat_theme_and_internal_copy() -> None:
@@ -134,3 +217,8 @@ def test_premium_gate_rejects_generic_flat_theme_and_internal_copy() -> None:
     assert "premium typography is not distinctive; display/body stacks are generic or identical" in payload["failures"]
     assert "premium elevation is missing; shadow tokens must create distinct soft and hero depth" in payload["failures"]
     assert "premium public copy is not quiet enough; internal or provider-facing terms remain visible" in payload["failures"]
+    assert "premium palette is under-specified; require named semantic colors, dark scheme discipline, and enough tonal range" in payload["failures"]
+    assert "interaction affordance is too weak; premium UI needs visible focus, hover states, and touch-safe targets" in payload["failures"]
+    assert "responsive system is not flagship-grade; require mobile breakpoints, fluid type/spacing, minmax grids, and svh handling" in payload["failures"]
+    assert "form controls are not fully dark-mode readable; textboxes, selects, placeholders, options, and focus states must be styled" in payload["failures"]
+    assert "composition still reads like a template; require premium chrome, hero/media, editorial, navigation, and dense layout systems" in payload["failures"]

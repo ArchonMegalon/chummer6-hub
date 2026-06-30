@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.premium_ui_design_exit_gate",
-  "generated_at_utc": "2026-06-30T21:26:15Z",
+  "generated_at_utc": "2026-06-30T21:45:16Z",
   "status": "pass",
   "verdict": "PREMIUM_UI_READY",
   "reference_systems": [
@@ -23,6 +23,16 @@
       "name": "IBM Carbon Design System",
       "url": "https://carbondesignsystem.com/",
       "gate_translation": "2x-grid discipline, accessible structure, purposeful density, and production-ready consistency"
+    },
+    {
+      "name": "WCAG 2.2",
+      "url": "https://www.w3.org/TR/WCAG22/",
+      "gate_translation": "visible focus, legible contrast, input readability, and touch target discipline"
+    },
+    {
+      "name": "Nielsen Norman Group Usability Heuristics",
+      "url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+      "gate_translation": "status visibility, recognition over recall, consistency, and clear task feedback"
     }
   ],
   "css_path": "/docker/chummercomplete/chummer.run-services-participate-main/Chummer.Run.Api/wwwroot/css/site.css",
@@ -53,6 +63,22 @@
       "distinct_radius_count": 4,
       "pass": true
     },
+    "premium_palette": {
+      "standard": "Material color roles + Fluent/Carbon semantic tokens",
+      "color_token_count": 33,
+      "hex_palette_count": 69,
+      "required_semantic_tokens": {
+        "--color-background-canvas": true,
+        "--color-background-panel": true,
+        "--color-border-subtle": true,
+        "--color-text-primary": true,
+        "--color-text-muted": true,
+        "--color-accent-primary": true,
+        "--color-accent-danger": true
+      },
+      "has_dark_color_scheme": true,
+      "pass": true
+    },
     "art_direction": {
       "standard": "HIG deference with purposeful visual depth",
       "gradient_count": 183,
@@ -65,6 +91,52 @@
       "has_transitions": true,
       "has_keyframes": true,
       "has_reduced_motion": true,
+      "pass": true
+    },
+    "interaction_affordance": {
+      "standard": "HIG touch targets + WCAG focus visible + Fluent interaction states",
+      "hover_selector_count": 84,
+      "focus_visible_selector_count": 54,
+      "touch_safe_min_height_count": 10,
+      "has_focus_outline": true,
+      "pass": true
+    },
+    "responsive_layout": {
+      "standard": "HIG platform adaptation + Material responsive layout",
+      "media_query_count": 22,
+      "has_mobile_breakpoint_720": true,
+      "has_tablet_breakpoint": true,
+      "has_clamp": true,
+      "has_minmax": true,
+      "has_svh": true,
+      "pass": true
+    },
+    "form_control_legibility": {
+      "standard": "WCAG legibility + HIG direct manipulation for input surfaces",
+      "markers": {
+        "input_select_textarea_base": true,
+        "placeholder_legible": true,
+        "select_option_dark": true,
+        "selected_option_state": true,
+        "caret_and_accent": true,
+        "field_focus_state": true
+      },
+      "pass": true
+    },
+    "composition_hierarchy": {
+      "standard": "Nielsen consistency + Carbon structure + Fluent depth",
+      "markers": {
+        "site_header_chrome": true,
+        "hero_visual": true,
+        "cinematic_landing": true,
+        "editorial_strip": true,
+        "downloads_quicknav": true,
+        "ledger_geoscape": true,
+        "site_max_token": true
+      },
+      "grid_layout_count": 283,
+      "flex_layout_count": 68,
+      "has_glass_chrome": true,
       "pass": true
     },
     "public_copy_quiet": {

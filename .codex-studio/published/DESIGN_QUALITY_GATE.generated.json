@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.design_quality_gate",
-  "generated_at_utc": "2026-06-30T21:26:25Z",
+  "generated_at_utc": "2026-06-30T21:45:30Z",
   "status": "pass",
   "verdict": "DESIGN_READY",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
@@ -44,7 +44,7 @@
       "status": "pass",
       "verdict": "PREMIUM_UI_READY",
       "failure_count": 0,
-      "reference_system_count": 4,
+      "reference_system_count": 6,
       "pass": true
     },
     "ui_frame_integrity": {

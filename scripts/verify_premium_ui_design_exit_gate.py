@@ -43,6 +43,16 @@ REFERENCE_SYSTEMS = [
         "url": "https://carbondesignsystem.com/",
         "gate_translation": "2x-grid discipline, accessible structure, purposeful density, and production-ready consistency",
     },
+    {
+        "name": "WCAG 2.2",
+        "url": "https://www.w3.org/TR/WCAG22/",
+        "gate_translation": "visible focus, legible contrast, input readability, and touch target discipline",
+    },
+    {
+        "name": "Nielsen Norman Group Usability Heuristics",
+        "url": "https://www.nngroup.com/articles/ten-usability-heuristics/",
+        "gate_translation": "status visibility, recognition over recall, consistency, and clear task feedback",
+    },
 ]
 BORING_FONT_MARKERS = {
     "arial",
@@ -109,6 +119,11 @@ def font_stack_is_distinctive(value: str) -> bool:
 
 def parse_px_numbers(value: str) -> list[float]:
     return [float(match.group(1)) for match in re.finditer(r"(-?\d+(?:\.\d+)?)px", value)]
+
+
+def count_css(pattern: str, css: str, *, ignore_case: bool = False) -> int:
+    flags = re.IGNORECASE if ignore_case else 0
+    return len(re.findall(pattern, css, flags=flags))
 
 
 def shadow_has_depth(value: str) -> bool:
@@ -179,6 +194,38 @@ def build_payload(
         "pass": spacing_pass,
     }
 
+    color_tokens = sorted(
+        name
+        for name in tokens
+        if name.startswith(("color-", "bg-", "surface-", "ink-", "accent-", "line-", "text-", "link-"))
+    )
+    hex_palette = sorted({match.group(0).lower() for match in re.finditer(r"#[0-9a-fA-F]{3,8}\b", css)})
+    named_palette_requirements = {
+        "--color-background-canvas": "--color-background-canvas:" in css,
+        "--color-background-panel": "--color-background-panel:" in css,
+        "--color-border-subtle": "--color-border-subtle:" in css,
+        "--color-text-primary": "--color-text-primary:" in css,
+        "--color-text-muted": "--color-text-muted:" in css,
+        "--color-accent-primary": "--color-accent-primary:" in css,
+        "--color-accent-danger": "--color-accent-danger:" in css,
+    }
+    palette_pass = (
+        len(color_tokens) >= 10
+        and len(hex_palette) >= 8
+        and all(named_palette_requirements.values())
+        and "color-scheme: dark" in css
+    )
+    if not palette_pass:
+        failures.append("premium palette is under-specified; require named semantic colors, dark scheme discipline, and enough tonal range")
+    checks["premium_palette"] = {
+        "standard": "Material color roles + Fluent/Carbon semantic tokens",
+        "color_token_count": len(color_tokens),
+        "hex_palette_count": len(hex_palette),
+        "required_semantic_tokens": named_palette_requirements,
+        "has_dark_color_scheme": "color-scheme: dark" in css,
+        "pass": palette_pass,
+    }
+
     gradient_count = len(re.findall(r"(?:linear|radial)-gradient\(", css))
     art_direction_pass = gradient_count >= 20 and "minimal-hero__visual" in css and "landing-film" in css
     if not art_direction_pass:
@@ -200,6 +247,89 @@ def build_payload(
         "has_keyframes": "@keyframes" in css,
         "has_reduced_motion": "@media (prefers-reduced-motion: reduce)" in css,
         "pass": motion_pass,
+    }
+
+    hover_count = count_css(r":hover\b", css)
+    focus_visible_count = count_css(r":focus-visible\b", css)
+    touch_target_count = count_css(r"min-height:\s*(?:4[4-9]|[5-9]\d)px", css)
+    focus_outline_pass = "::focus-visible" in css or count_css(r"outline(?:-offset)?:", css) >= 4
+    interaction_pass = hover_count >= 20 and focus_visible_count >= 18 and touch_target_count >= 4 and focus_outline_pass
+    if not interaction_pass:
+        failures.append("interaction affordance is too weak; premium UI needs visible focus, hover states, and touch-safe targets")
+    checks["interaction_affordance"] = {
+        "standard": "HIG touch targets + WCAG focus visible + Fluent interaction states",
+        "hover_selector_count": hover_count,
+        "focus_visible_selector_count": focus_visible_count,
+        "touch_safe_min_height_count": touch_target_count,
+        "has_focus_outline": focus_outline_pass,
+        "pass": interaction_pass,
+    }
+
+    media_query_count = count_css(r"@media\s*\(", css)
+    responsive_pass = (
+        media_query_count >= 6
+        and "@media (max-width: 720px)" in css
+        and ("@media (max-width: 980px)" in css or "@media (max-width: 1024px)" in css)
+        and "clamp(" in css
+        and "minmax(" in css
+        and "svh" in css
+    )
+    if not responsive_pass:
+        failures.append("responsive system is not flagship-grade; require mobile breakpoints, fluid type/spacing, minmax grids, and svh handling")
+    checks["responsive_layout"] = {
+        "standard": "HIG platform adaptation + Material responsive layout",
+        "media_query_count": media_query_count,
+        "has_mobile_breakpoint_720": "@media (max-width: 720px)" in css,
+        "has_tablet_breakpoint": "@media (max-width: 980px)" in css or "@media (max-width: 1024px)" in css,
+        "has_clamp": "clamp(" in css,
+        "has_minmax": "minmax(" in css,
+        "has_svh": "svh" in css,
+        "pass": responsive_pass,
+    }
+
+    form_control_markers = {
+        "input_select_textarea_base": "input:not([type=\"hidden\"]):not([type=\"checkbox\"]):not([type=\"radio\"])" in css
+        and "select," in css
+        and "textarea" in css,
+        "placeholder_legible": "::placeholder" in css,
+        "select_option_dark": "select option" in css and "select optgroup" in css,
+        "selected_option_state": "select option:checked" in css,
+        "caret_and_accent": "caret-color:" in css and "accent-color:" in css,
+        "field_focus_state": ".field input:focus" in css and ".field select:focus" in css and ".field textarea:focus" in css,
+    }
+    form_control_pass = all(form_control_markers.values())
+    if not form_control_pass:
+        failures.append("form controls are not fully dark-mode readable; textboxes, selects, placeholders, options, and focus states must be styled")
+    checks["form_control_legibility"] = {
+        "standard": "WCAG legibility + HIG direct manipulation for input surfaces",
+        "markers": form_control_markers,
+        "pass": form_control_pass,
+    }
+
+    layout_markers = {
+        "site_header_chrome": ".site-header__inner" in css,
+        "hero_visual": ".minimal-hero__visual" in css,
+        "cinematic_landing": ".landing-film" in css,
+        "editorial_strip": ".editorial-strip" in css,
+        "downloads_quicknav": ".downloads-quicknav" in css,
+        "ledger_geoscape": ".black-ledger-geoscape" in css,
+        "site_max_token": "--site-max:" in css,
+    }
+    composition_pass = (
+        all(layout_markers.values())
+        and count_css(r"display:\s*grid", css) >= 20
+        and count_css(r"display:\s*flex", css) >= 10
+        and "backdrop-filter:" in css
+    )
+    if not composition_pass:
+        failures.append("composition still reads like a template; require premium chrome, hero/media, editorial, navigation, and dense layout systems")
+    checks["composition_hierarchy"] = {
+        "standard": "Nielsen consistency + Carbon structure + Fluent depth",
+        "markers": layout_markers,
+        "grid_layout_count": count_css(r"display:\s*grid", css),
+        "flex_layout_count": count_css(r"display:\s*flex", css),
+        "has_glass_chrome": "backdrop-filter:" in css,
+        "pass": composition_pass,
     }
 
     view_text = "\n".join(read_text(path) for path in critical_public_views)
