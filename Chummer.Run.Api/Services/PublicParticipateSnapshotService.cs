@@ -96,17 +96,17 @@ public sealed class PublicParticipateSnapshotService
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, "Participate snapshot refresh could not reach ProductLift.");
+            _logger.LogWarning(ex, "Participate snapshot refresh could not reach the hosted board.");
             return Snapshot;
         }
         catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "Participate snapshot refresh received invalid ProductLift JSON.");
+            _logger.LogWarning(ex, "Participate snapshot refresh received invalid hosted-board JSON.");
             return Snapshot;
         }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning(ex, "Participate snapshot refresh timed out.");
+            _logger.LogInformation("Participate snapshot refresh timed out; keeping cached Participate snapshot.");
             return Snapshot;
         }
     }
