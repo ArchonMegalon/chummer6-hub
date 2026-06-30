@@ -149,8 +149,9 @@ const checks = [
     rendered: true,
     assert: text =>
       text.includes('Participate')
-      && text.includes('Public requests, clear bugs, useful ideas.')
       && text.includes('data-chummer-participate-frame')
+      && !text.includes('Board')
+      && !text.includes('Public requests, clear bugs, useful ideas.')
       && !text.includes('data-chummer-board-skin')
       && !text.includes('ProductLift')
       && !text.includes('Something went wrong')
@@ -178,7 +179,9 @@ const checks = [
     assert: (text, response) =>
       /\/participate\/?$/.test(response.url)
       && text.includes('Participate')
-      && text.includes('Public requests, clear bugs, useful ideas.')
+      && text.includes('data-chummer-participate-frame')
+      && !text.includes('Board')
+      && !text.includes('Public requests, clear bugs, useful ideas.')
       && !text.includes('ProductLift')
   },
   {
@@ -187,8 +190,9 @@ const checks = [
     assert: (text, response) =>
       /\/participate\/?$/.test(response.url)
       && text.includes('Participate')
-      && text.includes('Public requests, clear bugs, useful ideas.')
       && text.includes('data-chummer-participate-frame')
+      && !text.includes('Board')
+      && !text.includes('Public requests, clear bugs, useful ideas.')
       && !text.includes('data-chummer-board-skin')
       && !text.includes('cdn.productlift.dev')
       && !text.includes('media.productlift.dev')
@@ -289,7 +293,8 @@ async function runRenderedCheck(browser, check) {
     await page.waitForFunction(
       () => {
         const text = (document.body && document.body.innerText) || '';
-        return /Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(text);
+        return Boolean(document.querySelector('iframe[data-chummer-participate-frame]'))
+          || /Board offline right now/i.test(text);
       },
       { timeout: 15000 },
     );
