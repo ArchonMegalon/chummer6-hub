@@ -4,7 +4,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import tempfile
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -57,6 +59,20 @@ EXPECTED_MANIFESTS = {
     "/site.webmanifest": "/mobile",
     "/manifest.player.webmanifest": "/mobile/player",
     "/manifest.gm.webmanifest": "/mobile/gm",
+}
+PLAYWRIGHT_REQUIREMENTS = {
+    "downloadsStatus": {
+        "spec": "tests/public/downloads-status.spec.ts",
+        "artifact": "DOWNLOADS_STATUS_E2E.generated.json",
+    },
+    "mobilePwaViewport": {
+        "spec": "tests/public/mobile-pwa-viewport-smoke.spec.ts",
+        "artifact": "MOBILE_PWA_VIEWPORT_SMOKE.generated.json",
+    },
+    "frontdoorNavigation": {
+        "spec": "tests/public/frontdoor-mobile-launch.spec.ts",
+        "artifact": "FRONTDOOR_MOBILE_LAUNCH.generated.json",
+    },
 }
 
 
@@ -406,7 +422,152 @@ def summarize_child(name: str, child: dict[str, Any], failures: list[str]) -> st
     return status
 
 
-def verify(base_url: str, timeout_seconds: float, skip_preflight: bool) -> dict[str, Any]:
+def run_playwright_browser_proofs(
+    base_url: str,
+    required_proofs: list[str],
+    timeout_seconds: float,
+    artifact_dir: Path | None,
+) -> dict[str, Any]:
+    if not required_proofs:
+        return {
+            "contractName": "chummer.public_edge_browser_playwright.v1",
+            "status": "pass",
+            "skipped": True,
+            "requiredProofs": [],
+            "artifacts": {},
+            "failures": [],
+        }
+
+    failures: list[str] = []
+    unknown = [item for item in required_proofs if item not in PLAYWRIGHT_REQUIREMENTS]
+    if unknown:
+        failures.append(f"unknown Playwright proof requirements: {', '.join(sorted(unknown))}")
+
+    proof_specs = [PLAYWRIGHT_REQUIREMENTS[item]["spec"] for item in required_proofs if item in PLAYWRIGHT_REQUIREMENTS]
+    if not proof_specs:
+        return {
+            "contractName": "chummer.public_edge_browser_playwright.v1",
+            "status": "fail",
+            "skipped": False,
+            "requiredProofs": required_proofs,
+            "specs": [],
+            "artifacts": {},
+            "failures": failures or ["no Playwright specs were selected"],
+        }
+
+    completion_dir = artifact_dir or Path(tempfile.mkdtemp(prefix="chummer-public-edge-browser-proof-"))
+    completion_dir.mkdir(parents=True, exist_ok=True)
+
+    playwright_bin = ROOT / "node_modules" / ".bin" / "playwright"
+    playwright_command = [str(playwright_bin)] if playwright_bin.is_file() else ["npx", "--no-install", "playwright"]
+    started = datetime.now(UTC)
+    runs: dict[str, Any] = {}
+    for proof_id in required_proofs:
+        if proof_id not in PLAYWRIGHT_REQUIREMENTS:
+            continue
+        spec = str(PLAYWRIGHT_REQUIREMENTS[proof_id]["spec"])
+        command = [
+            *playwright_command,
+            "test",
+            spec,
+            "--workers=1",
+            "--reporter=line",
+        ]
+        proof_started = datetime.now(UTC)
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=ROOT,
+                env={
+                    **os.environ,
+                    "BASE_URL": base_url,
+                    "CHUMMER_COMPLETION_DIR": str(completion_dir),
+                },
+                text=True,
+                capture_output=True,
+                timeout=timeout_seconds,
+                check=False,
+            )
+            proof_run = {
+                "spec": spec,
+                "startedAtUtc": proof_started.isoformat(),
+                "completedAtUtc": datetime.now(UTC).isoformat(),
+                "returnCode": completed.returncode,
+                "stdoutTail": "\n".join(completed.stdout.splitlines()[-80:]),
+                "stderrTail": "\n".join(completed.stderr.splitlines()[-80:]),
+            }
+            if completed.returncode != 0:
+                failures.append(f"{proof_id} Playwright proof exited {completed.returncode}")
+        except subprocess.TimeoutExpired as error:
+            proof_run = {
+                "spec": spec,
+                "startedAtUtc": proof_started.isoformat(),
+                "completedAtUtc": datetime.now(UTC).isoformat(),
+                "returnCode": None,
+                "stdoutTail": "\n".join((error.stdout or "").splitlines()[-80:]) if isinstance(error.stdout, str) else "",
+                "stderrTail": "\n".join((error.stderr or "").splitlines()[-80:]) if isinstance(error.stderr, str) else "",
+            }
+            failures.append(f"{proof_id} Playwright proof timed out after {timeout_seconds:.0f}s")
+        runs[proof_id] = proof_run
+
+    artifacts: dict[str, Any] = {}
+    for proof_id in required_proofs:
+        if proof_id not in PLAYWRIGHT_REQUIREMENTS:
+            continue
+        artifact_name = str(PLAYWRIGHT_REQUIREMENTS[proof_id]["artifact"])
+        path = completion_dir / artifact_name
+        if not path.is_file():
+            failures.append(f"{proof_id} did not write {artifact_name}")
+            artifacts[proof_id] = {
+                "path": str(path),
+                "exists": False,
+                "status": "missing",
+            }
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            failures.append(f"{proof_id} wrote invalid JSON: {error}")
+            artifacts[proof_id] = {
+                "path": str(path),
+                "exists": True,
+                "status": "invalid_json",
+            }
+            continue
+        status = str(payload.get("status") or "pass")
+        if status != "pass":
+            failures.append(f"{proof_id} artifact status is {status}")
+        artifacts[proof_id] = {
+            "path": str(path),
+            "exists": True,
+            "status": status,
+            "contractName": payload.get("contractName"),
+            "base_url": payload.get("base_url"),
+        }
+
+    return {
+        "contractName": "chummer.public_edge_browser_playwright.v1",
+        "status": "pass" if not failures else "fail",
+        "skipped": False,
+        "requiredProofs": required_proofs,
+        "specs": proof_specs,
+        "artifactDir": str(completion_dir),
+        "startedAtUtc": started.isoformat(),
+        "completedAtUtc": datetime.now(UTC).isoformat(),
+        "runs": runs,
+        "artifacts": artifacts,
+        "failures": failures,
+    }
+
+
+def verify(
+    base_url: str,
+    timeout_seconds: float,
+    skip_preflight: bool,
+    playwright_requirements: list[str] | None = None,
+    playwright_timeout_seconds: float = 420.0,
+    playwright_artifact_dir: Path | None = None,
+) -> dict[str, Any]:
     normalized_base_url = base_url.rstrip("/")
     child_receipts = {
         "downloads": verify_downloads(normalized_base_url, timeout_seconds),
@@ -417,6 +578,12 @@ def verify(base_url: str, timeout_seconds: float, skip_preflight: bool) -> dict[
         "mobilePwaServiceWorkerBoundary": verify_mobile_pwa_service_worker_boundary.verify(normalized_base_url, timeout_seconds),
         "participateIframeShell": verify_participate_iframe_shell.verify(normalized_base_url, timeout_seconds),
         "preflight": verify_preflight(skip_preflight),
+        "browserPlaywright": run_playwright_browser_proofs(
+            normalized_base_url,
+            playwright_requirements or [],
+            playwright_timeout_seconds,
+            playwright_artifact_dir,
+        ),
     }
 
     failures: list[str] = []
@@ -436,11 +603,13 @@ def verify(base_url: str, timeout_seconds: float, skip_preflight: bool) -> dict[
         "mobilePwaServiceWorkerBoundaryStatus": statuses["mobilePwaServiceWorkerBoundary"],
         "participateIframeShellStatus": statuses["participateIframeShell"],
         "preflightStatus": statuses["preflight"],
+        "browserPlaywrightStatus": statuses["browserPlaywright"],
         "readyMobileHandoffToolIds": child_receipts["readyMobileHandoff"].get("tool_ids", []),
         "readyMobileHandoffPacketRoles": child_receipts["readyMobileHandoff"].get("packet_roles", []),
         "mobileLedgerPayloadStatus": child_receipts["mobileLedger"].get("payload_status", ""),
         "mobileLedgerCacheControl": child_receipts["mobileLedger"].get("cache_control", ""),
         "mobilePwaServiceWorkerBoundaryMode": child_receipts["mobilePwaServiceWorkerBoundary"].get("mobileRuntime", {}).get("serviceWorkerBoundaryMode", ""),
+        "browserPlaywrightRequiredProofs": child_receipts["browserPlaywright"].get("requiredProofs", []),
         "participateIframeRouteCount": child_receipts["participateIframeShell"].get("iframe_route_count", 0),
         "visibleVersion": child_receipts["downloads"].get("visible_version", ""),
         "releaseManifestVersion": child_receipts["downloads"].get("release_version", ""),
@@ -454,10 +623,30 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-url", default="https://chummer.run")
     parser.add_argument("--timeout-seconds", type=float, default=25.0)
     parser.add_argument("--skip-preflight", action="store_true", help="Skip active-build process checks for post-fact live verification.")
+    parser.add_argument("--require-downloads-status-playwright", action="store_true", help="Run the downloads/status public browser proof and include its receipt.")
+    parser.add_argument("--require-mobile-pwa-viewport-playwright", action="store_true", help="Run the mobile PWA viewport browser proof and include its receipt.")
+    parser.add_argument("--require-frontdoor-navigation-playwright", action="store_true", help="Run the frontdoor Open Chummer mobile browser proof and include its receipt.")
+    parser.add_argument("--playwright-timeout-seconds", type=float, default=420.0)
+    parser.add_argument("--playwright-artifact-dir")
     parser.add_argument("--output")
     args = parser.parse_args(argv)
 
-    result = verify(args.base_url, args.timeout_seconds, args.skip_preflight)
+    playwright_requirements: list[str] = []
+    if args.require_downloads_status_playwright:
+        playwright_requirements.append("downloadsStatus")
+    if args.require_mobile_pwa_viewport_playwright:
+        playwright_requirements.append("mobilePwaViewport")
+    if args.require_frontdoor_navigation_playwright:
+        playwright_requirements.append("frontdoorNavigation")
+
+    result = verify(
+        args.base_url,
+        args.timeout_seconds,
+        args.skip_preflight,
+        playwright_requirements,
+        args.playwright_timeout_seconds,
+        Path(args.playwright_artifact_dir) if args.playwright_artifact_dir else None,
+    )
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         Path(args.output).write_text(rendered, encoding="utf-8")

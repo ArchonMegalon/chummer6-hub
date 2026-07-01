@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -62,3 +64,49 @@ def test_mobile_routes_use_structural_pwa_markers_not_legacy_copy() -> None:
     assert 'data-blazor-shell="interactive-server"' in module.EXPECTED_MOBILE_ROUTES["/mobile/player"]
     assert "manifest.player.webmanifest" in module.EXPECTED_MOBILE_ROUTES["/mobile/player"]
     assert "Player entry" not in module.EXPECTED_MOBILE_ROUTES["/mobile/player"]
+
+
+def test_playwright_browser_proofs_skip_when_not_required(tmp_path) -> None:
+    module = load_module()
+
+    result = module.run_playwright_browser_proofs("https://chummer.run", [], 1.0, tmp_path)
+
+    assert result["status"] == "pass"
+    assert result["skipped"] is True
+    assert result["requiredProofs"] == []
+
+
+def test_playwright_browser_proofs_reject_unknown_requirements(tmp_path) -> None:
+    module = load_module()
+
+    result = module.run_playwright_browser_proofs("https://chummer.run", ["unknown"], 1.0, tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["specs"] == []
+    assert "unknown Playwright proof requirements: unknown" in result["failures"]
+
+
+def test_playwright_browser_proofs_collect_artifact_status(monkeypatch, tmp_path) -> None:
+    module = load_module()
+
+    def fake_run(command, cwd, env, text, capture_output, timeout, check):
+        artifact_path = Path(env["CHUMMER_COMPLETION_DIR"]) / "DOWNLOADS_STATUS_E2E.generated.json"
+        artifact_path.write_text(
+            json.dumps(
+                {
+                    "contractName": "chummer.downloads_status_e2e.v1",
+                    "status": "pass",
+                    "base_url": env["BASE_URL"],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    result = module.run_playwright_browser_proofs("https://chummer.run", ["downloadsStatus"], 1.0, tmp_path)
+
+    assert result["status"] == "pass"
+    assert result["runs"]["downloadsStatus"]["returnCode"] == 0
+    assert result["artifacts"]["downloadsStatus"]["status"] == "pass"
