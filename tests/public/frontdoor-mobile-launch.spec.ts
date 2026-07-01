@@ -7,7 +7,7 @@ const ignoredConsoleErrorFragments = [
   'Failed to load resource: net::ERR_NETWORK_CHANGED',
 ];
 
-test('mobile homepage open-chummer menu gates Build and Play until sign-in', async ({ browser }) => {
+test('mobile homepage open-chummer menu gates Build and exposes Play', async ({ browser }) => {
   test.setTimeout(60000);
   const buildPage = await browser.newPage({ baseURL: baseUrl, viewport: mobileViewport });
   const pageErrors: string[] = [];
@@ -41,17 +41,17 @@ test('mobile homepage open-chummer menu gates Build and Play until sign-in', asy
   await expect(openMenu).toHaveAttribute('open', '');
 
   const buildButton = openMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Build' });
-  const playButton = openMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Play' });
+  const playButton = openMenu.locator('.site-open-chummer-menu__button[href="/mobile/player"]', { hasText: 'Play' });
   const accountLink = openMenu.getByRole('link', { name: 'Sign in first' });
 
   await expect(buildButton).toBeVisible();
   await expect(buildButton).toBeDisabled();
   await expect(playButton).toBeVisible();
-  await expect(playButton).toBeDisabled();
+  await expect(playButton).toHaveAttribute('href', '/mobile/player');
   await expect(accountLink).toBeVisible();
   const accountRoute = await accountLink.getAttribute('href');
   await expect(openMenu.locator('.site-open-chummer-menu__button[href="/build"]')).toHaveCount(0);
-  await expect(openMenu.locator('.site-open-chummer-menu__button[href="/mobile/player"]')).toHaveCount(0);
+  await expect(openMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Play' })).toHaveCount(0);
   await expect(openMenu.locator('.site-open-chummer-menu__button[href="/play"]')).toHaveCount(0);
 
   const playerUrl = `${baseUrl.replace(/\/$/, '')}/mobile/player`;
@@ -80,7 +80,7 @@ test('mobile homepage open-chummer menu gates Build and Play until sign-in', asy
     viewport: mobileViewport,
     homepage_overflow_x: homepageMetrics.overflowX,
     account_route: accountRoute,
-    play_route: null,
+    play_route: '/mobile/player',
     direct_player_route: '/mobile/player',
     direct_player_http_status: directPlayerStatus,
     direct_player_title: playerTitle,
@@ -88,8 +88,8 @@ test('mobile homepage open-chummer menu gates Build and Play until sign-in', asy
     pwa_role: role || 'Player',
     live_turn_companion_shell: liveTurnCompanionShell,
     pwa_manifest: manifestHref,
-    gated_targets: ['Build', 'Play'],
-    public_targets: [],
+    gated_targets: ['Build'],
+    public_targets: ['Play'],
     page_errors: pageErrors,
   });
 

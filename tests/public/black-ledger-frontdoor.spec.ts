@@ -27,9 +27,9 @@ test('homepage stays product-first while ledger remains off the primary path', a
   await openMenuSummary.click();
   await expect(openMenu).toHaveAttribute('open', '');
   await expect(openMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Build' })).toBeDisabled();
-  await expect(openMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Play' })).toBeDisabled();
+  await expect(openMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Play' })).toHaveCount(0);
   await expect(openMenu.locator('.site-open-chummer-menu__button[href="/build"]')).toHaveCount(0);
-  await expect(openMenu.locator('.site-open-chummer-menu__button[href="/mobile/player"]')).toHaveCount(0);
+  await expect(openMenu.locator('.site-open-chummer-menu__button[href="/mobile/player"]', { hasText: 'Play' })).toHaveCount(1);
   await expect(openMenu.locator('.site-open-chummer-menu__button[href="/play"]')).toHaveCount(0);
   await expect(openMenu.getByRole('link', { name: 'Sign in first' })).toHaveAttribute('href', '/login?next=%2Faccount%2Faccess');
 
@@ -40,9 +40,9 @@ test('homepage stays product-first while ledger remains off the primary path', a
     base_url: baseUrl,
     route: '/',
     cta_labels: await heroActionLinks.evaluateAll((items) => items.map((item) => (item as HTMLAnchorElement).textContent?.trim() ?? '')),
-    open_menu_targets: ['/login?next=%2Faccount%2Faccess'],
-    gated_targets: ['Build', 'Play'],
-    public_targets: [],
+    open_menu_targets: ['/mobile/player', '/login?next=%2Faccount%2Faccess'],
+    gated_targets: ['Build'],
+    public_targets: ['Play'],
     ledger_primary: false,
   });
 });
