@@ -110,7 +110,7 @@ else
             <div>
                 <span>Stable</span>
                 <h2>@(stable is null ? $"{release.RequestedPlatformLabel} unavailable" : stable.PlatformLabel)</h2>
-                <p>@(stable is null ? "No matching public installer yet." : "Stable release.")</p>
+                <p>@(stable is null ? "Stable release is not available for this platform yet." : "Stable release.")</p>
             </div>
             @if (stable is null)
             {

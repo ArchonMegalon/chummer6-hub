@@ -953,6 +953,7 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Chummer selects the best installer when it can. Other downloads stay below." in downloads
     assert "attach this installed copy to your account" in downloads
     assert "Stable release." in downloads
+    assert "Stable release is not available for this platform yet." in downloads
     assert "<summary>Other downloads</summary>" in downloads
     assert "showLinuxSourcePrimary" in downloads
     assert "No sudo. Updates default to notify." in downloads
