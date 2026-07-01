@@ -156,7 +156,7 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
                 """
                 <html><body>
                 <h1>Participate</h1>
-                <iframe src="/participate/board?embed=1" data-chummer-participate-frame></iframe>
+                <iframe src="https://chummer6.productlift.dev/" data-chummer-participate-frame></iframe>
                 </body></html>
                 """
             )

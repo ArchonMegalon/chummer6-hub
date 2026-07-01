@@ -308,12 +308,16 @@ async function runRenderedCheck(browser, check) {
     );
 
     const bodyText = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim();
-    const hasParticipateFrame = await page.locator('iframe[data-chummer-participate-frame]').count() > 0;
+    const participateFrame = page.locator('iframe[data-chummer-participate-frame]').first();
+    const hasParticipateFrame = await participateFrame.count() > 0;
+    const participateFrameHtml = hasParticipateFrame
+      ? await participateFrame.evaluate(frame => frame.outerHTML)
+      : '';
 
     return {
       ok: true,
       status: response.status(),
-      text: `${bodyText}${hasParticipateFrame ? ' data-chummer-participate-frame' : ''}`.trim(),
+      text: `${bodyText} ${participateFrameHtml}`.trim(),
       response: { url: page.url() },
     };
   } finally {
