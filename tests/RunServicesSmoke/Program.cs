@@ -2849,7 +2849,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicControllerSource.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", StringComparison.Ordinal), "participate should keep a deliberate board route for the full ProductLift queue.");
     Assert(publicControllerSource.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", StringComparison.Ordinal), "participate should keep the live board behind a first-party wrapper and frame handoff.");
     Assert(publicControllerSource.Contains("Heading: \"Participate\"", StringComparison.Ordinal), "participate should keep the public heading explicit and first-party.");
-    Assert(publicControllerSource.Contains("Summary: \"Public requests, clear bugs, useful ideas.\"", StringComparison.Ordinal), "participate should keep the public summary in restrained product language.");
+    Assert(publicControllerSource.Contains("Summary: \"Participate\"", StringComparison.Ordinal), "participate should keep the public summary minimal for the iframe-only shell.");
+    Assert(!publicControllerSource.Contains("Summary: \"Public requests, clear bugs, useful ideas.\"", StringComparison.Ordinal), "participate should not restore the removed public board wrapper summary.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
@@ -3262,7 +3263,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var participateModel = participateView?.Model as FirstPartyParticipateBoardViewModel;
     Assert(participateModel is not null, "participate page should render the Chummer-owned board shell.");
     Assert(string.Equals(participateModel!.Heading, "Participate", StringComparison.Ordinal), "participate page should keep the first-party heading.");
-    Assert(string.Equals(participateModel.Summary, "Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate page should keep the public board summary.");
+    Assert(string.Equals(participateModel.Summary, "Participate", StringComparison.Ordinal), "participate page should keep the iframe-only shell summary minimal.");
     Assert(participateModel.EmbeddedBoardEnabled && string.Equals(participateModel.EmbeddedBoardHref, "/participate/board?embed=1", StringComparison.Ordinal), "participate page should host the same-origin ProductLift board frame.");
     var authenticatedParticipateView = await authenticatedLandingController.ParticipatePage(CancellationToken.None) as ViewResult;
     var authenticatedParticipateModel = authenticatedParticipateView?.Model as FirstPartyParticipateBoardViewModel;
@@ -5750,7 +5751,8 @@ async Task VerifyPublicLandingProjectionAsync()
 
     var participateHtml = participateContent?.Content ?? string.Empty;
     Assert(participateHtml.Contains("Participate", StringComparison.Ordinal), "participate page should keep the first-party heading.");
-    Assert(participateHtml.Contains("Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate page should keep the public summary.");
+    Assert(!participateHtml.Contains("Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate page should not render the removed public summary.");
+    Assert(participateHtml.Contains("data-chummer-participate-frame", StringComparison.Ordinal), "participate page should render the board iframe shell.");
     Assert(!participateHtml.Contains("worker host", StringComparison.OrdinalIgnoreCase), "public participate copy should not leak worker-host jargon");
 
     var homeResult = await controller.HomePage(null, CancellationToken.None);

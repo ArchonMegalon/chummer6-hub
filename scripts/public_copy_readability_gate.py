@@ -10,17 +10,16 @@ from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completio
 
 ROUTE_REQUIREMENTS = {
     "/downloads": [
-        "Current public installer",
+        "Download Chummer",
         "Stable",
         "Nightly",
     ],
     "/feedback": [
         "Participate",
-        "Public requests, clear bugs, useful ideas.",
     ],
     "/participate": [
         "Participate",
-        "Public requests, clear bugs, useful ideas.",
+        "data-chummer-participate-frame",
     ],
 }
 PARTICIPATE_SOURCE_REQUIREMENTS = (
@@ -32,6 +31,7 @@ ROUTE_FORBIDDEN = (
     "Top voters decide roadmap",
     "Guaranteed implementation",
     "Public bug reports are support tickets",
+    "Public requests, clear bugs, useful ideas.",
 )
 ACCOUNT_SOURCE_REQUIREMENTS = (
     "Participation state",

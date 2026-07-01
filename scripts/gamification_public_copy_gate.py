@@ -10,7 +10,7 @@ from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completio
 
 REQUIRED_VISIBLE_PHRASES = [
     "Participate",
-    "Public requests, clear bugs, useful ideas.",
+    "data-chummer-participate-frame",
 ]
 
 REQUIRED_SOURCE_PHRASES = [
@@ -29,6 +29,7 @@ FORBIDDEN_PHRASES = [
     "Follow an item to hear when it changes.",
     "Good reports include context and reproduction steps.",
     "Private logs and account issues belong in Help, not public feedback.",
+    "Public requests, clear bugs, useful ideas.",
 ]
 
 ROUTES = [

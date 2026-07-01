@@ -991,11 +991,12 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Release freshness" not in downloads
 
 
-def test_status_surface_uses_plain_updated_label() -> None:
+def test_status_surface_uses_single_update_label() -> None:
     status = read("Chummer.Run.Api/Views/PublicLanding/Status.cshtml")
 
     assert 'ViewData["Title"] = "Status";' in status
-    assert "<h1>Updated</h1>" in status
+    assert "<h1>Current release</h1>" in status
+    assert "<h1>Updated</h1>" not in status
     assert 'ViewData["Title"] = "Updated";' not in status
 
 

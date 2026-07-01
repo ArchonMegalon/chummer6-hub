@@ -41,7 +41,7 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
         self.assertNotIn("participate-fallback", controller)
         self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', controller)
         participate = PARTICIPATE_VIEW.read_text(encoding="utf-8")
-        self.assertIn("Current requests", participate)
+        self.assertNotIn("Current requests", participate)
         self.assertNotIn("participate-preview-card", participate)
         self.assertIn("data-chummer-participate-frame", participate)
 

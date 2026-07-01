@@ -71,11 +71,10 @@ async function assertBoardShell(page, path) {
   assert(response, `${path} should return a response.`);
   assert.equal(response.status(), 200, `${path} should return 200.`);
   await page.getByRole('heading', { name: 'Participate' }).waitFor({ state: 'visible', timeout: 15000 });
-  await page.getByText('Public requests, clear bugs, useful ideas.', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
 
   const text = await page.locator('body').innerText();
   assert.equal(/Participate/i.test(text), true, `${path} should render the first-party heading.`);
-  assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), true, `${path} should render the first-party summary.`);
+  assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), false, `${path} should not restore the removed first-party summary.`);
   assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(text), false, `${path} must not show provider failure copy.`);
   assert.equal(/productlift\.dev/i.test(text), false, `${path} must not leak provider domains.`);
 

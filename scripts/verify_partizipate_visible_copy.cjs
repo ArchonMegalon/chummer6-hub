@@ -55,7 +55,6 @@ function extractVisibleText(html) {
   });
   const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.getByRole('heading', { name: 'Participate' }).waitFor({ state: 'visible', timeout: 15000 });
-  await page.getByText('Public requests, clear bugs, useful ideas.', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
 
   const html = await page.content();
   const text = ((await page.locator('body').innerText()).replace(/\s+/g, ' ').trim()) || extractVisibleText(html);
@@ -67,8 +66,8 @@ function extractVisibleText(html) {
   if (!text.includes('Participate')) {
     failures.push('missing-text:Participate');
   }
-  if (!text.includes('Public requests, clear bugs, useful ideas.')) {
-    failures.push('missing-text:Public requests, clear bugs, useful ideas.');
+  if (text.includes('Public requests, clear bugs, useful ideas.')) {
+    failures.push('forbidden-text:Public requests, clear bugs, useful ideas.');
   }
   const hasEmbeddedBoard = html.includes('data-chummer-participate-frame');
   const hasOfflineFallback = text.includes('Board offline right now');
