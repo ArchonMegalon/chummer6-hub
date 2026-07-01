@@ -54,3 +54,11 @@ def test_ready_handoff_contract_constants_cover_playtime_tools() -> None:
         "living_world",
     }.issubset(module.EXPECTED_PLAYTIME_TOOLS)
     assert {"player", "gm", "organizer"}.issubset(module.EXPECTED_READY_ROLES)
+
+
+def test_mobile_routes_use_structural_pwa_markers_not_legacy_copy() -> None:
+    module = load_module()
+
+    assert 'data-blazor-shell="interactive-server"' in module.EXPECTED_MOBILE_ROUTES["/mobile/player"]
+    assert "manifest.player.webmanifest" in module.EXPECTED_MOBILE_ROUTES["/mobile/player"]
+    assert "Player entry" not in module.EXPECTED_MOBILE_ROUTES["/mobile/player"]

@@ -22,6 +22,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import verify_participate_iframe_shell  # noqa: E402
+import verify_mobile_pwa_service_worker_boundary  # noqa: E402
 
 
 EXPECTED_PLAYTIME_TOOLS = {
@@ -34,11 +35,11 @@ EXPECTED_PLAYTIME_TOOLS = {
 }
 EXPECTED_READY_ROLES = {"player", "gm", "organizer"}
 EXPECTED_MOBILE_ROUTES = {
-    "/mobile": ("Mobile and PWA entry",),
-    "/mobile/player": ("Player entry",),
-    "/mobile/gm": ("GM entry",),
-    "/mobile/observer": ("Observer entry",),
-    "/play": ("Player entry", "Chummer Mobile Turn Companion", "LIVE-SESSION TURN COMPANION"),
+    "/mobile": ('data-blazor-shell="interactive-server"', 'data-role="Player"', "manifest.player.webmanifest"),
+    "/mobile/player": ('data-blazor-shell="interactive-server"', 'data-role="Player"', "manifest.player.webmanifest"),
+    "/mobile/gm": ('data-blazor-shell="interactive-server"', 'data-role="GameMaster"', "manifest.gm.webmanifest"),
+    "/mobile/observer": ('data-blazor-shell="interactive-server"', 'data-role="Observer"', "manifest.webmanifest"),
+    "/play": ("Player entry",),
     "/play/continuity": ("NEXUS-PAN continuity",),
 }
 EXPECTED_ASSETS = [
@@ -104,6 +105,59 @@ def parse_json(result: FetchResult, failures: list[str]) -> dict[str, Any]:
         failures.append(f"{result.path} returned invalid JSON: {error}")
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def extract_quoted_values(text: str, pattern: str) -> set[str]:
+    match = re.search(pattern, text, flags=re.DOTALL)
+    if not match:
+        return set()
+    return set(re.findall(r'"([^"]+)"', match.group(1)))
+
+
+def inspect_service_worker(body: str, failures: list[str]) -> dict[str, Any]:
+    cache_name_match = re.search(r'const CACHE_NAME = "([^"]+)";', body)
+    cache_version_match = re.search(r'const CACHE_VERSION = "([^"]+)";', body)
+    precache_urls = extract_quoted_values(body, r"const PRECACHE_URLS = \[(.*?)\];")
+    shell_assets = extract_quoted_values(body, r"const SHELL_ASSETS = \[(.*?)\];")
+    non_cacheable_paths = extract_quoted_values(body, r"const NON_CACHEABLE_PATHS = new Set\(\[(.*?)\]\);")
+    worker_kind = "play" if cache_version_match and "SHELL_ASSETS" in body else "portal"
+
+    if worker_kind == "play":
+        for listener in ['"install"', '"activate"', '"fetch"']:
+            require(f"self.addEventListener({listener}" in body, failures, f"service worker missing {listener} listener")
+        for path in [
+            "/mobile",
+            "/mobile/player",
+            "/mobile/player?role=Player",
+            "/mobile/gm",
+            "/mobile/gm?role=GameMaster",
+            "/mobile/observer",
+            "/_framework/blazor.web.js",
+            "/mobile.css",
+            "/mobile-turn-companion.js",
+            "/manifest.webmanifest",
+            "/manifest.player.webmanifest",
+            "/manifest.gm.webmanifest",
+        ]:
+            require(path in shell_assets, failures, f"service worker missing play shell asset {path}")
+        require("/mobile/pwa/ledger.json" in non_cacheable_paths, failures, "service worker must keep mobile ledger stream non-cacheable")
+        require("/mobile/pwa/ledger.json" not in shell_assets, failures, "service worker must not precache mobile ledger stream")
+        require('url.pathname.startsWith("/api/play/")' in body, failures, "service worker must keep private play API network-only")
+        require("play_public_route_network_unavailable" in body, failures, "service worker missing typed non-cacheable route offline failure")
+    else:
+        require(cache_name_match and cache_name_match.group(1) == "chummer-public-v4", failures, "service worker cache name is not chummer-public-v4")
+        for required_path in ["/mobile/player", "/mobile/gm", "/mobile/observer", "/ready/handoff/mobile.json"]:
+            require(required_path in body, failures, f"service worker missing {required_path}")
+        require('"/mobile/pwa/ledger.json"' in body and "NON_CACHEABLE_PATHS" in body, failures, "service worker does not mark mobile ledger stream non-cacheable")
+
+    return {
+        "worker_kind": worker_kind,
+        "cache_name": cache_name_match.group(1) if cache_name_match else "",
+        "cache_version": cache_version_match.group(1) if cache_version_match else "",
+        "ledger_stream_non_cacheable": "/mobile/pwa/ledger.json" in non_cacheable_paths,
+        "ledger_stream_precached": "/mobile/pwa/ledger.json" in (shell_assets if worker_kind == "play" else precache_urls),
+        "play_shell_asset_count": len(shell_assets),
+    }
 
 
 def extract_downloads_version_marker(html: str) -> str:
@@ -176,7 +230,7 @@ def verify_pwa_static(base_url: str, timeout_seconds: float) -> dict[str, Any]:
     route_results: list[dict[str, Any]] = []
     for path, expected_terms in EXPECTED_MOBILE_ROUTES.items():
         result = fetch(base_url, path, timeout_seconds)
-        has_expected = any(term in result.body for term in expected_terms)
+        has_expected = all(term in result.body for term in expected_terms)
         require(result.status_code == 200, failures, f"{path} expected 200, got {result.status_code}")
         require(has_expected, failures, f"{path} missing expected mobile shell text")
         route_results.append(
@@ -231,10 +285,7 @@ def verify_pwa_static(base_url: str, timeout_seconds: float) -> dict[str, Any]:
 
     service_worker = fetch(base_url, "/service-worker.js", timeout_seconds)
     require(service_worker.status_code == 200, failures, f"/service-worker.js expected 200, got {service_worker.status_code}")
-    require('CACHE_NAME = "chummer-public-v4"' in service_worker.body, failures, "service worker cache name is not chummer-public-v4")
-    for required_path in ["/mobile/player", "/mobile/gm", "/mobile/observer", "/ready/handoff/mobile.json"]:
-        require(required_path in service_worker.body, failures, f"service worker missing {required_path}")
-    require('"/mobile/pwa/ledger.json"' in service_worker.body and "NON_CACHEABLE_PATHS" in service_worker.body, failures, "service worker does not mark mobile ledger stream non-cacheable")
+    service_worker_result = inspect_service_worker(service_worker.body, failures)
 
     return {
         "contractName": "chummer.public_pwa_static_assets.v1",
@@ -248,8 +299,7 @@ def verify_pwa_static(base_url: str, timeout_seconds: float) -> dict[str, Any]:
         "service_worker": {
             "status_code": service_worker.status_code,
             "content_type": service_worker.content_type,
-            "cache_name": "chummer-public-v4" if 'CACHE_NAME = "chummer-public-v4"' in service_worker.body else "",
-            "ledger_stream_non_cacheable": '"/mobile/pwa/ledger.json"' in service_worker.body,
+            **service_worker_result,
             "sha256": service_worker.sha256,
         },
         "failures": failures,
@@ -364,6 +414,7 @@ def verify(base_url: str, timeout_seconds: float, skip_preflight: bool) -> dict[
         "pwaStatic": verify_pwa_static(normalized_base_url, timeout_seconds),
         "readyMobileHandoff": verify_ready_mobile_handoff(normalized_base_url, timeout_seconds),
         "mobileLedger": verify_mobile_ledger(normalized_base_url, timeout_seconds),
+        "mobilePwaServiceWorkerBoundary": verify_mobile_pwa_service_worker_boundary.verify(normalized_base_url, timeout_seconds),
         "participateIframeShell": verify_participate_iframe_shell.verify(normalized_base_url, timeout_seconds),
         "preflight": verify_preflight(skip_preflight),
     }
@@ -382,12 +433,14 @@ def verify(base_url: str, timeout_seconds: float, skip_preflight: bool) -> dict[
         "pwaStaticStatus": statuses["pwaStatic"],
         "readyMobileHandoffStatus": statuses["readyMobileHandoff"],
         "mobileLedgerStatus": statuses["mobileLedger"],
+        "mobilePwaServiceWorkerBoundaryStatus": statuses["mobilePwaServiceWorkerBoundary"],
         "participateIframeShellStatus": statuses["participateIframeShell"],
         "preflightStatus": statuses["preflight"],
         "readyMobileHandoffToolIds": child_receipts["readyMobileHandoff"].get("tool_ids", []),
         "readyMobileHandoffPacketRoles": child_receipts["readyMobileHandoff"].get("packet_roles", []),
         "mobileLedgerPayloadStatus": child_receipts["mobileLedger"].get("payload_status", ""),
         "mobileLedgerCacheControl": child_receipts["mobileLedger"].get("cache_control", ""),
+        "mobilePwaServiceWorkerBoundaryMode": child_receipts["mobilePwaServiceWorkerBoundary"].get("mobileRuntime", {}).get("serviceWorkerBoundaryMode", ""),
         "participateIframeRouteCount": child_receipts["participateIframeShell"].get("iframe_route_count", 0),
         "visibleVersion": child_receipts["downloads"].get("visible_version", ""),
         "releaseManifestVersion": child_receipts["downloads"].get("release_version", ""),
