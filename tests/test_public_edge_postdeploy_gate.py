@@ -91,6 +91,68 @@ def test_manifest_asset_paths_collects_local_manifest_assets() -> None:
     ]
 
 
+def test_service_worker_declared_fetchable_paths_excludes_non_cacheable_and_external() -> None:
+    module = load_module()
+    service_worker = {
+        "precache_urls": [
+            "/mobile",
+            "mobile/player?role=Player",
+            "https://cdn.example.invalid/app.js",
+            "data:application/json,{}",
+            "/mobile/pwa/ledger.json",
+        ],
+        "shell_assets": [
+            "/mobile",
+            "/mobile.css",
+            "//cdn.example.invalid/app.css",
+            "/mobile/pwa/ledger.json?scope=public",
+        ],
+        "non_cacheable_paths": ["/mobile/pwa/ledger.json"],
+    }
+
+    assert module.service_worker_declared_fetchable_paths(service_worker) == [
+        "/mobile",
+        "/mobile.css",
+        "/mobile/player?role=Player",
+    ]
+
+
+def test_pwa_static_fetches_service_worker_declared_paths(monkeypatch) -> None:
+    module = load_module()
+    service_worker_body = """
+const CACHE_NAME = "chummer-public-v4";
+const PRECACHE_URLS = ["/mobile/player", "/ready/handoff/mobile.json", "/declared-ok", "/declared-missing", "/mobile/pwa/ledger.json"];
+const NON_CACHEABLE_PATHS = new Set(["/mobile/pwa/ledger.json"]);
+"""
+
+    def fake_fetch(base_url, path, timeout_seconds):
+        if path == "/service-worker.js":
+            return module.FetchResult(path, 200, {"content-type": "text/javascript"}, service_worker_body, f"{base_url}{path}")
+        if path == "/declared-missing":
+            return module.FetchResult(path, 404, {"content-type": "text/plain"}, "", f"{base_url}{path}")
+        if path in module.EXPECTED_MOBILE_ROUTES:
+            return module.FetchResult(path, 200, {"content-type": "text/html"}, " ".join(module.EXPECTED_MOBILE_ROUTES[path]), f"{base_url}{path}")
+        if path in module.EXPECTED_MANIFESTS:
+            payload = {
+                "start_url": module.EXPECTED_MANIFESTS[path],
+                "display": "standalone",
+                "icons": [{"src": "/icon-a.svg"}, {"src": "/icon-b.svg"}],
+            }
+            return module.FetchResult(path, 200, {"content-type": "application/manifest+json"}, json.dumps(payload), f"{base_url}{path}")
+        return module.FetchResult(path, 200, {"content-type": "text/plain"}, "ok", f"{base_url}{path}")
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+
+    result = module.verify_pwa_static("https://chummer.run", 1.0)
+
+    assert result["status"] == "fail"
+    assert result["service_worker_declared_path_count"] >= 1
+    assert any(
+        "service-worker declared path /declared-missing expected 200, got 404" in failure
+        for failure in result["failures"]
+    )
+
+
 def test_ready_mobile_handoff_binds_living_world_tool_to_black_ledger_heat(monkeypatch) -> None:
     module = load_module()
     payload = {

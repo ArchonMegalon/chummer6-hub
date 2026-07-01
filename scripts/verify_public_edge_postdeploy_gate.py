@@ -224,6 +224,31 @@ def extract_quoted_values(text: str, pattern: str) -> set[str]:
     return set(re.findall(r'"([^"]+)"', match.group(1)))
 
 
+def service_worker_declared_fetchable_paths(service_worker: dict[str, Any]) -> list[str]:
+    raw_paths: list[Any] = []
+    for key in ("precache_urls", "shell_assets"):
+        values = service_worker.get(key)
+        if isinstance(values, list):
+            raw_paths.extend(values)
+
+    non_cacheable_paths: set[str] = set()
+    for value in service_worker.get("non_cacheable_paths", []):
+        normalized_path = normalize_manifest_asset_src(value)
+        if normalized_path:
+            non_cacheable_paths.add(normalized_path)
+    non_cacheable_bases = {path.split("?", 1)[0] for path in non_cacheable_paths}
+
+    paths: set[str] = set()
+    for raw_path in raw_paths:
+        path = normalize_manifest_asset_src(raw_path)
+        if not path:
+            continue
+        if path in non_cacheable_paths or path.split("?", 1)[0] in non_cacheable_bases:
+            continue
+        paths.add(path)
+    return sorted(paths)
+
+
 def inspect_service_worker(body: str, failures: list[str]) -> dict[str, Any]:
     cache_name_match = re.search(r'const CACHE_NAME = "([^"]+)";', body)
     cache_version_match = re.search(r'const CACHE_VERSION = "([^"]+)";', body)
@@ -264,6 +289,9 @@ def inspect_service_worker(body: str, failures: list[str]) -> dict[str, Any]:
         "worker_kind": worker_kind,
         "cache_name": cache_name_match.group(1) if cache_name_match else "",
         "cache_version": cache_version_match.group(1) if cache_version_match else "",
+        "precache_urls": sorted(precache_urls),
+        "shell_assets": sorted(shell_assets),
+        "non_cacheable_paths": sorted(non_cacheable_paths),
         "ledger_stream_non_cacheable": "/mobile/pwa/ledger.json" in non_cacheable_paths,
         "ledger_stream_precached": "/mobile/pwa/ledger.json" in (shell_assets if worker_kind == "play" else precache_urls),
         "play_shell_asset_count": len(shell_assets),
@@ -416,6 +444,21 @@ def verify_pwa_static(base_url: str, timeout_seconds: float) -> dict[str, Any]:
     service_worker = fetch(base_url, "/service-worker.js", timeout_seconds)
     require(service_worker.status_code == 200, failures, f"/service-worker.js expected 200, got {service_worker.status_code}")
     service_worker_result = inspect_service_worker(service_worker.body, failures)
+    service_worker_declared_paths = service_worker_declared_fetchable_paths(service_worker_result)
+    service_worker_declared_path_results: list[dict[str, Any]] = []
+    for path in service_worker_declared_paths:
+        result = fetch(base_url, path, timeout_seconds)
+        require(result.status_code == 200, failures, f"service-worker declared path {path} expected 200, got {result.status_code}")
+        require(len(result.body) > 0, failures, f"service-worker declared path {path} returned an empty body")
+        service_worker_declared_path_results.append(
+            {
+                "path": path,
+                "status_code": result.status_code,
+                "content_type": result.content_type,
+                "bytes": len(result.body.encode("utf-8")),
+                "sha256": result.sha256,
+            }
+        )
 
     return {
         "contractName": "chummer.public_pwa_static_assets.v1",
@@ -424,10 +467,12 @@ def verify_pwa_static(base_url: str, timeout_seconds: float) -> dict[str, Any]:
         "manifest_count": len(manifest_results),
         "asset_count": len(asset_results),
         "manifest_declared_asset_count": len(manifest_declared_asset_results),
+        "service_worker_declared_path_count": len(service_worker_declared_path_results),
         "routes": route_results,
         "manifests": manifest_results,
         "assets": asset_results,
         "manifest_declared_assets": manifest_declared_asset_results,
+        "service_worker_declared_paths": service_worker_declared_path_results,
         "service_worker": {
             "status_code": service_worker.status_code,
             "content_type": service_worker.content_type,
