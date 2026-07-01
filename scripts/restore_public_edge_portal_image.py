@@ -79,6 +79,33 @@ def inspect_image_id(image_ref: str, dry_run: bool = False) -> str:
     return normalize_image_id(result.stdout)
 
 
+def inspect_image_details(image_ref: str, dry_run: bool = False) -> dict[str, Any]:
+    if not image_ref:
+        return {}
+    if dry_run:
+        return {"imageId": normalize_image_id(image_ref), "dryRun": True}
+    result = run_checked(["docker", "image", "inspect", image_ref], dry_run=False)
+    payload = json.loads(result.stdout)
+    image = payload[0] if isinstance(payload, list) and payload else {}
+    config = image.get("Config") if isinstance(image.get("Config"), dict) else {}
+    return {
+        "imageId": normalize_image_id(str(image.get("Id") or image_ref)),
+        "created": image.get("Created") or "",
+        "repoTags": image.get("RepoTags") or [],
+        "repoDigests": image.get("RepoDigests") or [],
+        "labels": config.get("Labels") or {},
+    }
+
+
+def try_inspect_image_details(image_ref: str, dry_run: bool = False) -> dict[str, Any]:
+    if not image_ref:
+        return {}
+    try:
+        return inspect_image_details(image_ref, dry_run=dry_run)
+    except Exception as error:
+        return {"imageId": normalize_image_id(image_ref), "inspectError": str(error)}
+
+
 def inspect_container_image_id(container: str, dry_run: bool = False) -> tuple[str, str]:
     result = run_checked(["docker", "inspect", "--format", "{{.Image}} {{.Config.Image}}", container], dry_run=dry_run)
     parts = result.stdout.split(maxsplit=1)
@@ -142,6 +169,7 @@ def restore_portal_image(
         unique_tags = [DEFAULT_PORTAL_IMAGE_TAG]
 
     source_image_id = inspect_image_id(expected, dry_run=dry_run)
+    source_image_details = try_inspect_image_details(expected, dry_run=dry_run)
     if source_image_id and source_image_id != expected:
         raise RuntimeError(f"approved source image resolved to {source_image_id}, expected {expected}")
 
@@ -161,6 +189,7 @@ def restore_portal_image(
             {
                 "tag": tag,
                 "imageIdBefore": current_tag_id,
+                "imageDetailsBefore": try_inspect_image_details(current_tag_id, dry_run=dry_run),
                 "retagged": needs_retag,
             }
         )
@@ -179,9 +208,11 @@ def restore_portal_image(
     return {
         "expectedImageId": expected,
         "sourceImageId": source_image_id or expected,
+        "sourceImageDetails": source_image_details,
         "portalContainer": portal_container,
         "containerImageIdBefore": container_image_id,
         "containerImageRefBefore": container_image_ref,
+        "containerImageDetailsBefore": try_inspect_image_details(container_image_id, dry_run=dry_run),
         "containerRecreated": should_recreate,
         "imageTags": tag_states,
         "retagCommands": tag_commands,
@@ -204,7 +235,11 @@ def inspect_runtime_state(
             "portalContainer": portal_container,
             "containerImageId": expected,
             "containerImageRef": "",
-            "imageTags": [{"tag": tag, "imageId": expected} for tag in unique_tags],
+            "containerImageDetails": try_inspect_image_details(expected, dry_run=True),
+            "imageTags": [
+                {"tag": tag, "imageId": expected, "imageDetails": try_inspect_image_details(expected, dry_run=True)}
+                for tag in unique_tags
+            ],
             "drift": [],
             "dryRun": True,
         }
@@ -218,7 +253,7 @@ def inspect_runtime_state(
     if container_image_id and container_image_id != expected:
         drift.append(f"portal container points at {container_image_id}")
 
-    tag_states: list[dict[str, str]] = []
+    tag_states: list[dict[str, Any]] = []
     for tag in unique_tags:
         try:
             tag_image_id = inspect_image_id(tag, dry_run=False)
@@ -227,13 +262,14 @@ def inspect_runtime_state(
             drift.append(f"portal image tag {tag} inspect failed: {error}")
         if tag_image_id and tag_image_id != expected:
             drift.append(f"portal image tag {tag} points at {tag_image_id}")
-        tag_states.append({"tag": tag, "imageId": tag_image_id})
+        tag_states.append({"tag": tag, "imageId": tag_image_id, "imageDetails": try_inspect_image_details(tag_image_id)})
 
     return {
         "expectedImageId": expected,
         "portalContainer": portal_container,
         "containerImageId": container_image_id,
         "containerImageRef": container_image_ref,
+        "containerImageDetails": try_inspect_image_details(container_image_id),
         "imageTags": tag_states,
         "drift": drift,
         "dryRun": False,

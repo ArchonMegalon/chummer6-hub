@@ -341,5 +341,6 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "--stability-window-seconds 120" in runbook
     assert "--require-all-browser-proofs" in runbook
     assert "public-edge-browser-proofs" in runbook
+    assert "records Docker created time, tags, digests, and labels for any drifted image it replaces" in runbook
     assert "repairs bounded image drift during the optional stability window" in runbook
     assert "retries the runtime image guard plus the downloads/status, mobile viewport, and Open Chummer navigation browser proofs" in runbook

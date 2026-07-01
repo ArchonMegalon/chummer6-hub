@@ -103,6 +103,74 @@ def test_restore_skips_recreate_when_container_and_tag_match(monkeypatch, tmp_pa
     assert result["imageTags"][0]["retagged"] is False
 
 
+def test_restore_receipt_captures_drift_image_details(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    expected = "sha256:" + "1" * 64
+    dirty = "sha256:" + "2" * 64
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        if command == ["docker", "image", "inspect", "--format", "{{.Id}}", expected]:
+            return module.CommandResult(command, 0, expected, "")
+        if command == ["docker", "image", "inspect", "--format", "{{.Id}}", "chummer-run-api:local"]:
+            return module.CommandResult(command, 0, dirty, "")
+        if command == ["docker", "inspect", "--format", "{{.Image}} {{.Config.Image}}", "portal"]:
+            return module.CommandResult(command, 0, f"{dirty} chummer-run-api:local", "")
+        if command == ["docker", "image", "inspect", expected]:
+            return module.CommandResult(
+                command,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Id": expected,
+                            "Created": "2026-07-01T10:00:00Z",
+                            "RepoTags": ["chummer-run-api:protected-clean"],
+                            "RepoDigests": [],
+                            "Config": {"Labels": {"source": "approved"}},
+                        }
+                    ]
+                ),
+                "",
+            )
+        if command == ["docker", "image", "inspect", dirty]:
+            return module.CommandResult(
+                command,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Id": dirty,
+                            "Created": "2026-07-01T11:00:00Z",
+                            "RepoTags": ["chummer-run-api:local"],
+                            "RepoDigests": [],
+                            "Config": {"Labels": {"source": "dirty-build"}},
+                        }
+                    ]
+                ),
+                "",
+            )
+        return module.CommandResult(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+
+    result = module.restore_portal_image(
+        expected,
+        ["chummer-run-api:local"],
+        tmp_path / "docker-compose.public-edge.yml",
+        None,
+        "chummer6-hub",
+        "chummer-portal",
+        "portal",
+        False,
+        False,
+    )
+
+    assert result["sourceImageDetails"]["labels"] == {"source": "approved"}
+    assert result["containerImageDetailsBefore"]["created"] == "2026-07-01T11:00:00Z"
+    assert result["containerImageDetailsBefore"]["labels"] == {"source": "dirty-build"}
+    assert result["imageTags"][0]["imageDetailsBefore"]["repoTags"] == ["chummer-run-api:local"]
+
+
 def test_restore_rejects_non_digest_expected_image() -> None:
     module = load_module()
 
