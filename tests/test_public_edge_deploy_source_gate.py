@@ -332,3 +332,6 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "--require-mobile-pwa-viewport-playwright" in runbook
     assert "--require-frontdoor-navigation-playwright" in runbook
     assert "shared_portal_root_worker" in runbook
+    assert "--expected-portal-image-id" in runbook
+    assert "--portal-container chummer6-hub-chummer-portal-1" in runbook
+    assert "--portal-image-tag chummer-run-api:local" in runbook

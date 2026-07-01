@@ -110,3 +110,61 @@ def test_playwright_browser_proofs_collect_artifact_status(monkeypatch, tmp_path
     assert result["status"] == "pass"
     assert result["runs"]["downloadsStatus"]["returnCode"] == 0
     assert result["artifacts"]["downloadsStatus"]["status"] == "pass"
+
+
+def test_portal_runtime_image_guard_skips_without_expected_image() -> None:
+    module = load_module()
+
+    result = module.verify_portal_runtime_image("", "portal", "chummer-run-api:local")
+
+    assert result["status"] == "pass"
+    assert result["skipped"] is True
+
+
+def test_normalize_image_id_accepts_bare_sha() -> None:
+    module = load_module()
+
+    digest = "A" * 64
+
+    assert module.normalize_image_id(digest) == f"sha256:{digest.lower()}"
+    assert module.normalize_image_id(f"sha256:{digest}") == f"sha256:{digest.lower()}"
+
+
+def test_portal_runtime_image_guard_passes_matching_container_and_tag(monkeypatch) -> None:
+    module = load_module()
+    image_id = "sha256:" + "1" * 64
+
+    def fake_inspect(args):
+        if args == ["inspect", "--format", "{{.Image}} {{.Config.Image}}", "portal"]:
+            return 0, f"{image_id} chummer-run-api:local", ""
+        if args == ["image", "inspect", "--format", "{{.Id}}", "chummer-run-api:local"]:
+            return 0, image_id, ""
+        return 1, "", "unexpected command"
+
+    monkeypatch.setattr(module, "run_docker_inspect", fake_inspect)
+
+    result = module.verify_portal_runtime_image(image_id, "portal", "chummer-run-api:local")
+
+    assert result["status"] == "pass"
+    assert result["containerImageId"] == image_id
+    assert result["tagImageId"] == image_id
+
+
+def test_portal_runtime_image_guard_fails_on_mutable_tag_drift(monkeypatch) -> None:
+    module = load_module()
+    expected = "sha256:" + "1" * 64
+    actual = "sha256:" + "2" * 64
+
+    def fake_inspect(args):
+        if args == ["inspect", "--format", "{{.Image}} {{.Config.Image}}", "portal"]:
+            return 0, f"{expected} chummer-run-api:local", ""
+        if args == ["image", "inspect", "--format", "{{.Id}}", "chummer-run-api:local"]:
+            return 0, actual, ""
+        return 1, "", "unexpected command"
+
+    monkeypatch.setattr(module, "run_docker_inspect", fake_inspect)
+
+    result = module.verify_portal_runtime_image(expected, "portal", "chummer-run-api:local")
+
+    assert result["status"] == "fail"
+    assert any("portal image tag chummer-run-api:local points at" in failure for failure in result["failures"])

@@ -74,6 +74,8 @@ PLAYWRIGHT_REQUIREMENTS = {
         "artifact": "FRONTDOOR_MOBILE_LAUNCH.generated.json",
     },
 }
+DEFAULT_PORTAL_CONTAINER = "chummer6-hub-chummer-portal-1"
+DEFAULT_PORTAL_IMAGE_TAG = "chummer-run-api:local"
 
 
 @dataclass(frozen=True)
@@ -415,6 +417,95 @@ def verify_preflight(skip_preflight: bool) -> dict[str, Any]:
     }
 
 
+def normalize_image_id(value: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+    if re.fullmatch(r"[0-9a-fA-F]{64}", normalized):
+        return f"sha256:{normalized.lower()}"
+    if normalized.startswith("sha256:"):
+        prefix, digest = normalized.split(":", 1)
+        return f"{prefix}:{digest.lower()}"
+    return normalized
+
+
+def run_docker_inspect(args: list[str]) -> tuple[int, str, str]:
+    completed = subprocess.run(
+        ["docker", *args],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return completed.returncode, completed.stdout.strip(), completed.stderr.strip()
+
+
+def verify_portal_runtime_image(
+    expected_image_id: str,
+    portal_container: str,
+    portal_image_tag: str,
+) -> dict[str, Any]:
+    expected = normalize_image_id(expected_image_id)
+    if not expected:
+        return {
+            "contractName": "chummer.public_edge_portal_runtime_image.v1",
+            "status": "pass",
+            "skipped": True,
+            "portalContainer": portal_container,
+            "portalImageTag": portal_image_tag,
+            "expectedImageId": "",
+            "failures": [],
+        }
+
+    failures: list[str] = []
+    container_code, container_stdout, container_stderr = run_docker_inspect(
+        ["inspect", "--format", "{{.Image}} {{.Config.Image}}", portal_container]
+    )
+    image_code, image_stdout, image_stderr = run_docker_inspect(
+        ["image", "inspect", "--format", "{{.Id}}", portal_image_tag]
+    )
+
+    actual_container_image = ""
+    configured_image = ""
+    actual_tag_image = ""
+    if container_code != 0:
+        failures.append(f"docker inspect {portal_container} failed")
+    else:
+        parts = container_stdout.split(maxsplit=1)
+        actual_container_image = normalize_image_id(parts[0] if parts else "")
+        configured_image = parts[1] if len(parts) > 1 else ""
+        if actual_container_image != expected:
+            failures.append(
+                f"portal container image {actual_container_image or '<empty>'} does not match expected {expected}"
+            )
+
+    if image_code != 0:
+        failures.append(f"docker image inspect {portal_image_tag} failed")
+    else:
+        actual_tag_image = normalize_image_id(image_stdout)
+        if actual_tag_image != expected:
+            failures.append(
+                f"portal image tag {portal_image_tag} points at {actual_tag_image or '<empty>'}, expected {expected}"
+            )
+
+    return {
+        "contractName": "chummer.public_edge_portal_runtime_image.v1",
+        "status": "pass" if not failures else "fail",
+        "skipped": False,
+        "portalContainer": portal_container,
+        "portalImageTag": portal_image_tag,
+        "expectedImageId": expected,
+        "containerImageId": actual_container_image,
+        "configuredImage": configured_image,
+        "tagImageId": actual_tag_image,
+        "containerInspectExitCode": container_code,
+        "imageInspectExitCode": image_code,
+        "containerInspectStderr": container_stderr,
+        "imageInspectStderr": image_stderr,
+        "failures": failures,
+    }
+
+
 def summarize_child(name: str, child: dict[str, Any], failures: list[str]) -> str:
     status = str(child.get("status") or "fail")
     if status != "pass":
@@ -567,6 +658,9 @@ def verify(
     playwright_requirements: list[str] | None = None,
     playwright_timeout_seconds: float = 420.0,
     playwright_artifact_dir: Path | None = None,
+    expected_portal_image_id: str = "",
+    portal_container: str = DEFAULT_PORTAL_CONTAINER,
+    portal_image_tag: str = DEFAULT_PORTAL_IMAGE_TAG,
 ) -> dict[str, Any]:
     normalized_base_url = base_url.rstrip("/")
     child_receipts = {
@@ -578,6 +672,11 @@ def verify(
         "mobilePwaServiceWorkerBoundary": verify_mobile_pwa_service_worker_boundary.verify(normalized_base_url, timeout_seconds),
         "participateIframeShell": verify_participate_iframe_shell.verify(normalized_base_url, timeout_seconds),
         "preflight": verify_preflight(skip_preflight),
+        "portalRuntimeImage": verify_portal_runtime_image(
+            expected_portal_image_id,
+            portal_container,
+            portal_image_tag,
+        ),
         "browserPlaywright": run_playwright_browser_proofs(
             normalized_base_url,
             playwright_requirements or [],
@@ -603,6 +702,7 @@ def verify(
         "mobilePwaServiceWorkerBoundaryStatus": statuses["mobilePwaServiceWorkerBoundary"],
         "participateIframeShellStatus": statuses["participateIframeShell"],
         "preflightStatus": statuses["preflight"],
+        "portalRuntimeImageStatus": statuses["portalRuntimeImage"],
         "browserPlaywrightStatus": statuses["browserPlaywright"],
         "readyMobileHandoffToolIds": child_receipts["readyMobileHandoff"].get("tool_ids", []),
         "readyMobileHandoffPacketRoles": child_receipts["readyMobileHandoff"].get("packet_roles", []),
@@ -610,6 +710,8 @@ def verify(
         "mobileLedgerCacheControl": child_receipts["mobileLedger"].get("cache_control", ""),
         "mobilePwaServiceWorkerBoundaryMode": child_receipts["mobilePwaServiceWorkerBoundary"].get("mobileRuntime", {}).get("serviceWorkerBoundaryMode", ""),
         "browserPlaywrightRequiredProofs": child_receipts["browserPlaywright"].get("requiredProofs", []),
+        "portalRuntimeImageExpectedImageId": child_receipts["portalRuntimeImage"].get("expectedImageId", ""),
+        "portalRuntimeImageContainerImageId": child_receipts["portalRuntimeImage"].get("containerImageId", ""),
         "participateIframeRouteCount": child_receipts["participateIframeShell"].get("iframe_route_count", 0),
         "visibleVersion": child_receipts["downloads"].get("visible_version", ""),
         "releaseManifestVersion": child_receipts["downloads"].get("release_version", ""),
@@ -628,6 +730,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-frontdoor-navigation-playwright", action="store_true", help="Run the frontdoor Open Chummer mobile browser proof and include its receipt.")
     parser.add_argument("--playwright-timeout-seconds", type=float, default=420.0)
     parser.add_argument("--playwright-artifact-dir")
+    parser.add_argument("--expected-portal-image-id", default="", help="Optional Docker image id required for the live portal container and mutable local image tag.")
+    parser.add_argument("--portal-container", default=DEFAULT_PORTAL_CONTAINER)
+    parser.add_argument("--portal-image-tag", default=DEFAULT_PORTAL_IMAGE_TAG)
     parser.add_argument("--output")
     args = parser.parse_args(argv)
 
@@ -646,6 +751,9 @@ def main(argv: list[str] | None = None) -> int:
         playwright_requirements,
         args.playwright_timeout_seconds,
         Path(args.playwright_artifact_dir) if args.playwright_artifact_dir else None,
+        args.expected_portal_image_id,
+        args.portal_container,
+        args.portal_image_tag,
     )
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
