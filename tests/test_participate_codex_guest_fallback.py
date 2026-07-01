@@ -19,9 +19,9 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
 
     def test_participate_route_uses_whitelabeled_board_proxy_and_supporter_guard(self) -> None:
         controller = PUBLIC_CONTROLLER.read_text(encoding="utf-8")
-        self.assertIn('private static string BuildParticipateFrameHref(', controller)
-        self.assertIn('embeddedBoardHref = hostedBoardAvailable ? BuildParticipateFrameHref(normalizedBoardPath) : null;', controller)
-        self.assertIn('return $"{route}?embed=1";', controller)
+        self.assertIn('private static string BuildParticipateFrameHref(Uri upstream, string? boardPath = null)', controller)
+        self.assertIn('BuildParticipateFrameHref(hostedBoardUpstream, normalizedBoardPath)', controller)
+        self.assertIn('ResolveHostedBoardContentUri(upstream, normalizedBoardPath)', controller)
         self.assertIn('BuildParticipateBoardRouteHref(normalizedBoardPath)', controller)
         self.assertIn('ResolveParticipateSupporterHref()', controller)
         self.assertIn('return "/account/billing";', controller)
@@ -34,7 +34,7 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
     def test_feedback_public_view_stays_on_participation_surface(self) -> None:
         self.assertFalse(FEEDBACK_VIEW.exists())
         controller = PUBLIC_CONTROLLER.read_text(encoding="utf-8")
-        self.assertIn("private static string BuildParticipateFrameHref(", controller)
+        self.assertIn("private static string BuildParticipateFrameHref(Uri upstream, string? boardPath = null)", controller)
         self.assertIn("BuildParticipateBoardRouteHref(normalizedBoardPath)", controller)
         self.assertNotIn("participate-lane", controller)
         self.assertNotIn("participate-quick-form", controller)

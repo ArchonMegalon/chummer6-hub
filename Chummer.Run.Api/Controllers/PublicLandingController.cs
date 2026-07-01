@@ -2256,7 +2256,9 @@ public sealed class PublicLandingController : Controller
         string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
         bool loadedFromBoard = visiblePosts.Length > 0;
         string? boardShellHref = hostedBoardAvailable ? BuildParticipateBoardRouteHref(normalizedBoardPath) : null;
-        string? embeddedBoardHref = hostedBoardAvailable ? BuildParticipateFrameHref(normalizedBoardPath) : null;
+        string? embeddedBoardHref = hostedBoardAvailable && hostedBoardUpstream is not null
+            ? BuildParticipateFrameHref(hostedBoardUpstream, normalizedBoardPath)
+            : null;
         string? entryHref = subject is null
             ? BuildParticipateSignInHref("/participate")
             : "/account";
@@ -2870,13 +2872,13 @@ public sealed class PublicLandingController : Controller
             : $"/participate/board/{normalizedBoardPath}";
     }
 
-    private static string BuildParticipateFrameHref(string? boardPath = null)
+    private static string BuildParticipateFrameHref(Uri upstream, string? boardPath = null)
     {
         string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
-        string route = string.IsNullOrWhiteSpace(normalizedBoardPath)
-            ? "/participate/board"
-            : $"/participate/board/{normalizedBoardPath}";
-        return $"{route}?embed=1";
+        Uri target = string.IsNullOrWhiteSpace(normalizedBoardPath)
+            ? upstream
+            : ResolveHostedBoardContentUri(upstream, normalizedBoardPath);
+        return target.ToString();
     }
 
     private static string BuildRoadmapBoardEmbedHref(string? boardPath = null)
@@ -7330,8 +7332,9 @@ document.addEventListener('DOMContentLoaded', function () {
         string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
         bool embedded = IsEmbeddedHostedBoardRequest();
         await Task.CompletedTask.ConfigureAwait(false);
-        string target = embedded
-            ? BuildParticipateFrameHref(normalizedBoardPath)
+        Uri? upstream = ResolveProductLiftHostedRoadmapUri();
+        string target = embedded && upstream is not null && !ShouldShortCircuitHostedBoardUpstream(upstream)
+            ? BuildParticipateFrameHref(upstream, normalizedBoardPath)
             : BuildParticipateBoardRouteHref(normalizedBoardPath);
         return Redirect(target);
     }
@@ -13057,8 +13060,9 @@ Boundary:
         var syncedLabel = publicRequests.Posts.Count == 0
             ? "Fallback list"
             : FormatParticipateSyncedLabel(publicRequests.SyncedAtUtc);
-        string? hostedRoadmapHref = ResolveProductLiftHostedBoardUri() is not null
-            ? BuildParticipateFrameHref()
+        Uri? hostedRoadmapUri = ResolveProductLiftHostedRoadmapUri();
+        string? hostedRoadmapHref = hostedRoadmapUri is not null && !ShouldShortCircuitHostedBoardUpstream(hostedRoadmapUri)
+            ? BuildRoadmapBoardEmbedHref()
             : null;
         SiteChromeViewModel chrome = (_releases is null || _releaseSelection is null)
             ? _chrome.BuildPublicChrome("Roadmap", "Planned work and current requests.", currentPath)

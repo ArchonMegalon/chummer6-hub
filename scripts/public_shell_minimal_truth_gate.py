@@ -113,6 +113,10 @@ def normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().lower()
 
 
+def strip_iframe_tags(html: str) -> str:
+    return re.sub(r"<iframe\b[\s\S]*?(?:</iframe>|>)", " ", html, flags=re.IGNORECASE)
+
+
 def extract_meta_content(html: str, *, property_name: str | None = None, name: str | None = None) -> str:
     if property_name:
         match = re.search(
@@ -168,12 +172,13 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float, allow
     failures: list[str] = []
     body = response.text
     normalized_body = normalize_text(body)
+    normalized_forbidden_body = normalize_text(strip_iframe_tags(body))
 
     if response.status_code != 200:
         failures.append(f"route returned HTTP {response.status_code}")
 
     for token in GENERIC_FORBIDDEN_SUBSTRINGS + contract.forbidden:
-        if normalize_text(token) in normalized_body:
+        if normalize_text(token) in normalized_forbidden_body:
             failures.append(f"route contains forbidden copy: {token}")
 
     required_all = contract.required_all

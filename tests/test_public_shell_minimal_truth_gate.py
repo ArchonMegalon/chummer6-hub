@@ -71,7 +71,7 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                   </head>
                   <body>
                     <h1>Participate</h1>
-                    <iframe src="/participate/board?embed=1" title="Chummer participation board" data-chummer-participate-frame></iframe>
+                    <iframe src="https://chummer6.productlift.dev/" title="Chummer participation board" data-chummer-participate-frame></iframe>
                   </body>
                 </html>
                 """,

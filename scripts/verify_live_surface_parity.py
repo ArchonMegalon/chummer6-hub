@@ -152,7 +152,7 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
             "required_html_texts": [
                 "<title>Participate · Chummer</title>",
                 "data-chummer-participate-frame",
-                "/participate/board?embed=1",
+                "productlift.dev",
             ],
             "forbidden_texts": [
                 "ProductLift",
@@ -166,7 +166,6 @@ def build_surfaces(require_brilliant_directories_checkout: bool) -> list[dict[st
                 "Network error while loading tab configuration",
             ],
             "forbidden_html_texts": [
-                "chummer6.productlift.dev",
                 "data-chummer-board-skin",
                 "participate-preview-card",
             ],

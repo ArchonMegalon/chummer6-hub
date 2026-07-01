@@ -3,6 +3,14 @@ import { writeMarkdownArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
+function stripParticipateFrameTags(html: string) {
+  return html.replace(/<iframe\b[^>]*data-chummer-participate-frame[^>]*(?:><\/iframe>|\/?>)/gi, ' ');
+}
+
+function hasProductLiftParticipateFrame(html: string) {
+  return /<iframe\b(?=[^>]*data-chummer-participate-frame)(?=[^>]*\bsrc="https:\/\/[^"]*productlift\.dev\/?[^"]*")[^>]*>/i.test(html);
+}
+
 test('homepage stays within the pre-gold noise budget', async ({ page }) => {
   test.setTimeout(90_000);
 
@@ -119,10 +127,11 @@ test('public user pages do not expose AI or repo-process copy', async ({ page, r
   const participateText = await participateResponse.text();
   expect(participateText).toContain('Participate');
   expect(participateText).toContain('data-chummer-participate-frame');
+  expect(hasProductLiftParticipateFrame(participateText)).toBeTruthy();
   expect(participateText).not.toContain('Public requests, clear bugs, useful ideas.');
   expect(participateText).not.toContain('data-chummer-board-skin');
   expect(participateText).not.toContain('ProductLift');
-  expect(participateText).not.toContain('productlift.dev');
+  expect(stripParticipateFrameTags(participateText)).not.toContain('productlift.dev');
 
   for (const path of ['/', '/downloads', '/status', '/help', '/faq', '/contact', '/downloads/concierge', '/packages', '/alice', '/roadmap', '/changelog', '/horizons', '/now', '/what-is-chummer']) {
     await page.goto(`${baseUrl}${path}`, { waitUntil: 'domcontentloaded' });

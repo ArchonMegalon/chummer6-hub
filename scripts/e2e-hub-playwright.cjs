@@ -280,6 +280,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoPageErrors(page, pageErrors, path);
 }
 
+function stripParticipateFrameTags(html) {
+  return html.replace(/<iframe\b[^>]*data-chummer-participate-frame[^>]*(?:><\/iframe>|\/?>)/gi, ' ');
+}
+
+function hasProductLiftParticipateFrame(html) {
+  return /<iframe\b(?=[^>]*data-chummer-participate-frame)(?=[^>]*\bsrc="https:\/\/[^"]*productlift\.dev\/?[^"]*")[^>]*>/i.test(html);
+}
+
 (async () => {
   const browser = await chromium.launch({ headless: true });
   const extraHTTPHeaders = {};
@@ -362,10 +370,13 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     const participateHasEmbeddedBoard = participateHtml.includes('data-chummer-participate-frame');
     const participateHasOfflineFallback = participateHtml.includes('Board offline right now');
     assert.equal(participateHasEmbeddedBoard || participateHasOfflineFallback, true, '/participate should show the Chummer-owned board frame or the offline fallback.');
+    if (participateHasEmbeddedBoard) {
+      assert.equal(hasProductLiftParticipateFrame(participateHtml), true, '/participate should embed the full ProductLift board directly.');
+    }
     assert.equal(participateHtml.includes('Requests, votes, and shipped work.'), false, '/participate should not show wrapper marketing copy.');
     assert.equal(participateHtml.includes('participate-quick-form'), false, '/participate should not show the old quick form.');
     assert.equal(participateHtml.includes('id="participate-board"'), false, '/participate should not expose the legacy hosted board wrapper id.');
-    assert.equal(participateHtml.toLowerCase().includes('productlift.dev'), false, '/participate should not leak the ProductLift host.');
+    assert.equal(stripParticipateFrameTags(participateHtml).toLowerCase().includes('productlift.dev'), false, '/participate should only expose the ProductLift host inside the iframe src.');
   }
 
   await gotoAndAssert(page, pageErrors, '/faq', async () => {

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 
 import requests
 
@@ -16,7 +17,6 @@ PROJECTION_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "
 REQUIRED_HTML_PHRASES = (
     "Participate",
     "data-chummer-participate-frame",
-    "/participate/board?embed=1",
 )
 FORBIDDEN_HTML_PHRASES = (
     "Something went wrong on our side. Could not load posts.",
@@ -76,6 +76,10 @@ def scan_forbidden(text: str, phrases: tuple[str, ...], label: str, failures: li
             failures.append(f"{label} contains forbidden phrase: {phrase}")
 
 
+def strip_iframe_tags(html: str) -> str:
+    return re.sub(r"<iframe\b[\s\S]*?(?:</iframe>|>)", " ", html, flags=re.IGNORECASE)
+
+
 def run(base_url: str, route: str) -> int:
     failures: list[str] = []
     normalized_route = route if route.startswith("/") else f"/{route}"
@@ -84,7 +88,7 @@ def run(base_url: str, route: str) -> int:
     body = response.text
 
     scan_required(body, REQUIRED_HTML_PHRASES, normalized_route, failures)
-    scan_forbidden(body, FORBIDDEN_HTML_PHRASES, normalized_route, failures)
+    scan_forbidden(strip_iframe_tags(body), FORBIDDEN_HTML_PHRASES, normalized_route, failures)
 
     participate_source = PARTICIPATE_VIEW.read_text(encoding="utf-8")
     controller_source = PUBLIC_CONTROLLER.read_text(encoding="utf-8")

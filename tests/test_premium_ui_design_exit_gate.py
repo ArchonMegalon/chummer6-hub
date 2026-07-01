@@ -158,7 +158,7 @@ def write_public_views(root: Path, *, leaked: bool = False) -> list[Path]:
 <section>
   <h1 class="sr-only">Participate</h1>
   <div class="participate-hosted__frame-shell">
-    <iframe class="participate-hosted__frame" src="@Model.EmbeddedBoardHref" title="Chummer participation board" loading="lazy" referrerpolicy="same-origin" data-chummer-participate-frame></iframe>
+    <iframe class="participate-hosted__frame" src="@Model.EmbeddedBoardHref" title="Chummer participation board" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="clipboard-write; fullscreen" allowfullscreen data-chummer-participate-frame></iframe>
   </div>
   <article class="participate-board-fallback" role="status" aria-live="polite">Board offline right now. <a href="/participate">Retry</a> <a href="/contact">Contact</a></article>
 </section>
@@ -548,7 +548,7 @@ def test_premium_gate_rejects_missing_state_recovery_language() -> None:
 <section>
   <h1 class="sr-only">Participate</h1>
   <div class="participate-hosted__frame-shell">
-    <iframe class="participate-hosted__frame" src="@Model.EmbeddedBoardHref" title="Chummer participation board" loading="lazy" referrerpolicy="same-origin" data-chummer-participate-frame></iframe>
+    <iframe class="participate-hosted__frame" src="@Model.EmbeddedBoardHref" title="Chummer participation board" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="clipboard-write; fullscreen" allowfullscreen data-chummer-participate-frame></iframe>
   </div>
   <article class="participate-board-fallback">Board offline right now.</article>
 </section>

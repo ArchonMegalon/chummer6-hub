@@ -146,7 +146,9 @@ public sealed class ParticipateController : Controller
         bool hostedBoardAvailable = hostedBoardUpstream is not null && !ShouldShortCircuitHostedBoardUpstream(hostedBoardUpstream);
         bool boardRoute = currentPath.StartsWith("/participate/board", StringComparison.OrdinalIgnoreCase);
         string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
-        string? embeddedBoardHref = hostedBoardAvailable ? BuildParticipateFrameHref(normalizedBoardPath) : null;
+        string? embeddedBoardHref = hostedBoardAvailable && hostedBoardUpstream is not null
+            ? BuildParticipateFrameHref(hostedBoardUpstream, normalizedBoardPath)
+            : null;
         string? directBoardHref = hostedBoardAvailable ? BuildParticipateBoardRouteHref(normalizedBoardPath) : null;
         string? boardShellHref = hostedBoardAvailable && !boardRoute
             ? BuildParticipateBoardRouteHref(normalizedBoardPath)
@@ -436,13 +438,13 @@ public sealed class ParticipateController : Controller
             : $"/participate/board/{normalizedBoardPath}";
     }
 
-    private static string BuildParticipateFrameHref(string? boardPath = null)
+    private static string BuildParticipateFrameHref(Uri upstream, string? boardPath = null)
     {
         string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
-        string route = string.IsNullOrWhiteSpace(normalizedBoardPath)
-            ? "/participate/board"
-            : $"/participate/board/{normalizedBoardPath}";
-        return $"{route}?embed=1";
+        Uri target = string.IsNullOrWhiteSpace(normalizedBoardPath)
+            ? upstream
+            : ResolveHostedBoardContentUri(upstream, normalizedBoardPath);
+        return target.ToString();
     }
 
     private static Uri ResolveHostedBoardContentUri(Uri upstream, string relativePath)

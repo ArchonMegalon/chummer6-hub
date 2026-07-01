@@ -114,7 +114,7 @@ class _SurfaceHandler(BaseHTTPRequestHandler):
                 b"<title>Participate \xc2\xb7 Chummer</title>"
                 b"<meta name=\"description\" content=\"Public requests, clear bugs, useful ideas.\">"
                 b"<h1>Participate</h1>"
-                b"<iframe src=\"/participate/board?embed=1\" data-chummer-participate-frame></iframe>"
+                b"<iframe src=\"https://chummer6.productlift.dev/\" data-chummer-participate-frame></iframe>"
                 b"</body></html>"
             )
             return
@@ -260,7 +260,7 @@ class LiveSurfaceParityTests(unittest.TestCase):
         self.assertNotIn("Current requests", participate_surface["required_texts"])
         self.assertIn("<title>Participate · Chummer</title>", participate_surface["required_html_texts"])
         self.assertIn("data-chummer-participate-frame", participate_surface["required_html_texts"])
-        self.assertIn("/participate/board?embed=1", participate_surface["required_html_texts"])
+        self.assertIn("productlift.dev", participate_surface["required_html_texts"])
         self.assertNotIn("Board is live.", participate_surface["required_texts"])
         self.assertIn("participate-preview-card", participate_surface["forbidden_html_texts"])
         self.assertIn("data-chummer-board-skin", participate_surface["forbidden_html_texts"])

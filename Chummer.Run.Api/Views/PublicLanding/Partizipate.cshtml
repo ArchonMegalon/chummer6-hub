@@ -17,8 +17,10 @@
                     class="participate-hosted__frame"
                     src="@Model.EmbeddedBoardHref"
                     title="Chummer participation board"
-                    loading="lazy"
-                    referrerpolicy="same-origin"
+                    loading="eager"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                    allow="clipboard-write; fullscreen"
+                    allowfullscreen
                     data-chummer-participate-frame></iframe>
             </div>
         }

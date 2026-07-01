@@ -80,9 +80,9 @@ async function assertBoardShell(page, path) {
 
   const offline = /Board offline right now/i.test(text);
   const embeddedFrameCount = await page.locator('iframe[data-chummer-participate-frame]').count();
-  assert.equal(embeddedFrameCount === 1 || offline, true, `${path} should expose either the same-origin board frame or the first-party offline fallback.`);
+  assert.equal(embeddedFrameCount === 1 || offline, true, `${path} should expose either the ProductLift board frame or the first-party offline fallback.`);
   if (!offline) {
-    assert.equal(embeddedFrameCount, 1, `${path} should host the same-origin ProductLift board frame when the board is live.`);
+    assert.equal(embeddedFrameCount, 1, `${path} should host the ProductLift board frame when the board is live.`);
   }
 
   const detailLink = page.locator('a[href^="/participate/board/"]').first();

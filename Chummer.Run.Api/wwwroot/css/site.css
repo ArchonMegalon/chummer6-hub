@@ -10261,7 +10261,10 @@ body {
   overflow: hidden;
   border: 0;
   border-radius: 0;
-  background: var(--minimal-page);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0) 16rem),
+    var(--minimal-page);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .participate-hosted__frame {

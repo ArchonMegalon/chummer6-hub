@@ -64,6 +64,14 @@ function isGuestBillingSurface(text) {
   );
 }
 
+function stripParticipateFrameTags(html) {
+  return html.replace(/<iframe\b[^>]*data-chummer-participate-frame[^>]*(?:><\/iframe>|\/?>)/gi, ' ');
+}
+
+function hasProductLiftParticipateFrame(html) {
+  return /<iframe\b(?=[^>]*data-chummer-participate-frame)(?=[^>]*\bsrc="https:\/\/[^"]*productlift\.dev\/?[^"]*")[^>]*>/i.test(html);
+}
+
 const checks = [
   {
     url: `${baseUrl}/`,
@@ -148,6 +156,7 @@ const checks = [
     assert: text =>
       text.includes('Participate')
       && text.includes('data-chummer-participate-frame')
+      && hasProductLiftParticipateFrame(text)
       && !text.includes('Board')
       && !text.includes('Public requests, clear bugs, useful ideas.')
       && !text.includes('data-chummer-board-skin')
@@ -194,6 +203,7 @@ const checks = [
       && !text.includes('data-chummer-board-skin')
       && !text.includes('cdn.productlift.dev')
       && !text.includes('media.productlift.dev')
+      && !stripParticipateFrameTags(text).toLowerCase().includes('productlift.dev')
       && !text.includes('Use the right place')
       && !text.includes('Chummer Participate')
       && !text.includes('What do you want to see next?')

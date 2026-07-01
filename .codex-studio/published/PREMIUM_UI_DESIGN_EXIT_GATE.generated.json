@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.premium_ui_design_exit_gate",
-  "generated_at_utc": "2026-07-01T03:04:24Z",
+  "generated_at_utc": "2026-07-01T03:38:16Z",
   "status": "pass",
   "verdict": "PREMIUM_UI_READY",
   "reference_systems": [
@@ -161,7 +161,7 @@
     },
     "art_direction": {
       "standard": "HIG deference with purposeful visual depth",
-      "gradient_count": 188,
+      "gradient_count": 189,
       "has_minimal_hero_visual_css": true,
       "has_landing_film_css": true,
       "pass": true
@@ -423,8 +423,10 @@
             "participate-hosted__frame",
             "<iframe",
             "Model.EmbeddedBoardHref",
-            "loading=\"lazy\"",
-            "referrerpolicy=\"same-origin\"",
+            "loading=\"eager\"",
+            "referrerpolicy=\"strict-origin-when-cross-origin\"",
+            "allow=\"clipboard-write; fullscreen\"",
+            "allowfullscreen",
             "data-chummer-participate-frame",
             "participate-board-fallback"
           ],

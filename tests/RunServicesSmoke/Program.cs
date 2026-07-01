@@ -3264,7 +3264,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(participateModel is not null, "participate page should render the Chummer-owned board shell.");
     Assert(string.Equals(participateModel!.Heading, "Participate", StringComparison.Ordinal), "participate page should keep the first-party heading.");
     Assert(string.Equals(participateModel.Summary, "Participate", StringComparison.Ordinal), "participate page should keep the iframe-only shell summary minimal.");
-    Assert(participateModel.EmbeddedBoardEnabled && string.Equals(participateModel.EmbeddedBoardHref, "/participate/board?embed=1", StringComparison.Ordinal), "participate page should host the same-origin ProductLift board frame.");
+    Assert(participateModel.EmbeddedBoardEnabled
+        && participateModel.EmbeddedBoardHref is not null
+        && participateModel.EmbeddedBoardHref.StartsWith("https://", StringComparison.Ordinal)
+        && participateModel.EmbeddedBoardHref.Contains("productlift.dev", StringComparison.OrdinalIgnoreCase), "participate page should host the ProductLift board frame directly.");
     var authenticatedParticipateView = await authenticatedLandingController.ParticipatePage(CancellationToken.None) as ViewResult;
     var authenticatedParticipateModel = authenticatedParticipateView?.Model as FirstPartyParticipateBoardViewModel;
     Assert(authenticatedParticipateModel is not null, "authenticated participate page should use the same Chummer-owned board shell.");

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,6 +26,14 @@ def read_text(relative_path: str) -> str:
 def require(condition: bool, failures: list[str], message: str) -> None:
     if not condition:
         failures.append(message)
+
+
+def strip_iframe_tags(html: str) -> str:
+    return re.sub(r"<iframe\b[\s\S]*?(?:</iframe>|>)", " ", html, flags=re.IGNORECASE)
+
+
+def iframe_src_values(html: str) -> list[str]:
+    return re.findall(r"<iframe\b[^>]*\bsrc=\"([^\"]+)\"", html, flags=re.IGNORECASE)
 
 
 def build_participate_segment(controller_source: str) -> str:
@@ -49,10 +58,14 @@ def verify_source() -> dict[str, Any]:
         "view_has_real_iframe": "<iframe" in view and "data-chummer-participate-frame" in view,
         "view_has_offline_fallback": "participate-board-fallback" in view and "Board offline right now" in view,
         "view_uses_existing_embed_href": 'src="@Model.EmbeddedBoardHref"' in view,
+        "view_allows_full_provider_feature_set": 'allow="clipboard-write; fullscreen"' in view and "sandbox" not in view,
+        "view_uses_cross_origin_referrer_policy": 'referrerpolicy="strict-origin-when-cross-origin"' in view,
         "view_has_screen_reader_title": '<h1 id="partizipate-title" class="sr-only">Participate</h1>' in view,
         "view_removes_visible_header": "participate-hosted__header" not in view,
         "view_removes_board_eyebrow": REMOVED_BOARD_EYEBROW not in view,
         "view_removes_old_summary": REMOVED_SUMMARY not in view,
+        "public_builder_uses_hosted_upstream_iframe": "BuildParticipateFrameHref(hostedBoardUpstream, normalizedBoardPath)" in public_segment,
+        "legacy_builder_uses_hosted_upstream_iframe": "BuildParticipateFrameHref(hostedBoardUpstream, normalizedBoardPath)" in legacy_segment,
         "public_builder_summary_is_minimal": 'Summary: "Participate"' in public_segment and REMOVED_SUMMARY not in public_segment,
         "legacy_builder_summary_is_minimal": 'Summary: "Participate"' in legacy_segment and REMOVED_SUMMARY not in legacy_segment,
     }
@@ -86,16 +99,23 @@ def verify_live_route(base_url: str, path: str, timeout_seconds: float) -> dict[
     final_path = urlparse(final_url).path
     has_iframe = "data-chummer-participate-frame" in body and "<iframe" in body
     has_fallback = "participate-board-fallback" in body and "Board offline right now" in body
+    iframe_srcs = iframe_src_values(body)
+    body_without_iframes = strip_iframe_tags(body)
+    iframe_uses_productlift = any("productlift.dev" in source.lower() for source in iframe_srcs)
+    iframe_uses_old_proxy = any("/participate/board" in source and "embed=1" in source for source in iframe_srcs)
 
     require(status_code == 200, failures, f"{path} expected 200, got {status_code}")
     require(final_path == "/participate", failures, f"{path} final path expected /participate, got {final_path}")
     require("Participate" in body, failures, f"{path} missing Participate title")
     require(has_iframe or has_fallback, failures, f"{path} missing iframe or offline fallback")
+    if has_iframe:
+        require(iframe_uses_productlift, failures, f"{path} iframe does not point at ProductLift")
+        require(not iframe_uses_old_proxy, failures, f"{path} iframe still points at the same-origin board proxy")
     require(REMOVED_SUMMARY not in body, failures, f"{path} still renders removed summary")
     require(REMOVED_BOARD_EYEBROW not in body, failures, f"{path} still renders Board eyebrow")
     require("participate-hosted__header" not in body, failures, f"{path} still renders participate-hosted header")
-    require("ProductLift" not in body, failures, f"{path} leaks provider brand")
-    require("productlift.dev" not in body.lower(), failures, f"{path} leaks provider domain")
+    require("ProductLift" not in body_without_iframes, failures, f"{path} leaks provider brand outside the iframe")
+    require("productlift.dev" not in body_without_iframes.lower(), failures, f"{path} leaks provider domain outside the iframe")
 
     return {
         "status": "pass" if not failures else "fail",
@@ -105,7 +125,10 @@ def verify_live_route(base_url: str, path: str, timeout_seconds: float) -> dict[
         "final_path": final_path,
         "content_type": headers.get("content-type", ""),
         "has_iframe": has_iframe,
+        "iframe_srcs": iframe_srcs,
         "has_offline_fallback": has_fallback,
+        "iframe_uses_productlift": iframe_uses_productlift,
+        "iframe_uses_old_proxy": iframe_uses_old_proxy,
         "removed_summary_present": REMOVED_SUMMARY in body,
         "removed_board_eyebrow_present": REMOVED_BOARD_EYEBROW in body,
         "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
