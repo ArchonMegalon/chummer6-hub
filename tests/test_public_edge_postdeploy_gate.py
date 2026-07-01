@@ -91,6 +91,87 @@ def test_manifest_asset_paths_collects_local_manifest_assets() -> None:
     ]
 
 
+def test_ready_mobile_handoff_binds_living_world_tool_to_black_ledger_heat(monkeypatch) -> None:
+    module = load_module()
+    payload = {
+        "status": "ready",
+        "pwa_route": "/mobile",
+        "continuity_route": "/play/continuity",
+        "boundaries": [
+            "Character building stays before or after the session.",
+            "Living-world updates require account opt-in and followed-world selection.",
+            "GM remains final authority for table rulings, modifiers, and consequences.",
+        ],
+        "playtime_tools": [
+            {"id": "inventory"},
+            {"id": "health"},
+            {"id": "ammo"},
+            {"id": "modifiers"},
+            {"id": "quick_rolls"},
+            {
+                "id": "living_world",
+                "summary": "Show Black Ledger heat and followed-world updates only after account opt-in and followed-world selection.",
+            },
+        ],
+        "packet_routes": [
+            {"roleId": "player"},
+            {"roleId": "gm"},
+            {"roleId": "organizer"},
+        ],
+    }
+
+    def fake_fetch(base_url, path, timeout_seconds):
+        return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(payload), f"{base_url}{path}")
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+
+    result = module.verify_ready_mobile_handoff("https://chummer.run", 1.0)
+
+    assert result["status"] == "pass"
+    assert "black ledger" in result["living_world_summary"]
+    assert "heat" in result["living_world_summary"]
+
+
+def test_mobile_ledger_contract_binds_opt_in_to_heat_followed_world_and_session(monkeypatch) -> None:
+    module = load_module()
+    payload = {
+        "mode": "mobile_pwa_living_world",
+        "status": "opt_in_required",
+        "summary": "Black Ledger heat and session continuity updates are available only after account opt-in and followed-world selection.",
+        "legal_posture": "Public lane stays aggregate only. No private run table state, world heat, followed-world selection, or session continuity payload is published before opt-in.",
+        "opt_in_route": "/account",
+        "world_gate": "account_opt_in_and_followed_world_selection",
+        "heat_visibility": "hidden_until_opt_in",
+        "session_visibility": "hidden_until_opt_in",
+        "opt_in_required_for": ["black_ledger_heat", "followed_world_updates", "session_continuity"],
+        "updates_route": "/mobile/pwa/ledger.json",
+    }
+    headers = {
+        "cache-control": "private, no-store, no-cache, max-age=0",
+        "vary": "Cookie, Authorization",
+        "pragma": "no-cache",
+    }
+
+    def fake_fetch(base_url, path, timeout_seconds):
+        return module.FetchResult(path, 200, headers, json.dumps(payload), f"{base_url}{path}")
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+
+    result = module.verify_mobile_ledger("https://chummer.run", 1.0)
+
+    assert result["status"] == "pass"
+    assert result["black_ledger_bound"] is True
+    assert result["heat_bound"] is True
+    assert result["followed_world_bound"] is True
+    assert result["session_continuity_bound"] is True
+    assert result["private_table_state_hidden"] is True
+    assert set(result["opt_in_required_for"]) == {
+        "black_ledger_heat",
+        "followed_world_updates",
+        "session_continuity",
+    }
+
+
 def test_flagship_horizons_gate_maps_phases_to_deployed_evidence() -> None:
     module = load_module()
     child_receipts = {
@@ -115,6 +196,11 @@ def test_flagship_horizons_gate_maps_phases_to_deployed_evidence() -> None:
             "status": "pass",
             "payload_status": "opt_in_required",
             "cache_control": "private, no-store, no-cache",
+            "black_ledger_bound": True,
+            "heat_bound": True,
+            "followed_world_bound": True,
+            "session_continuity_bound": True,
+            "private_table_state_hidden": True,
         },
         "mobilePwaServiceWorkerBoundary": {
             "status": "pass",
@@ -161,6 +247,7 @@ def test_flagship_horizons_gate_fails_when_living_world_opt_in_boundary_regresse
 
     assert result["status"] == "fail"
     assert any("mobile ledger does not enforce opt-in-required status" in failure for failure in result["failures"])
+    assert any("mobile ledger does not bind hidden heat tracking" in failure for failure in result["failures"])
     assert any("mobile service-worker boundary is not shared_portal_root_worker" in failure for failure in result["failures"])
 
 

@@ -8639,9 +8639,18 @@ document.addEventListener('DOMContentLoaded', function () {
             mode = "mobile_pwa_living_world",
             status = "opt_in_required",
             status_label = "Opt in required",
-            summary = "Black Ledger live updates are available when you opt in via account preferences.",
-            legal_posture = "Public lane stays aggregate only. No private run table state is published.",
+            summary = "Black Ledger heat and session continuity updates are available only after account opt-in and followed-world selection in account preferences.",
+            legal_posture = "Public lane stays aggregate only. No private run table state, world heat, followed-world selection, or session continuity payload is published before opt-in.",
             opt_in_route = "/account",
+            world_gate = "account_opt_in_and_followed_world_selection",
+            heat_visibility = "hidden_until_opt_in",
+            session_visibility = "hidden_until_opt_in",
+            opt_in_required_for = new[]
+            {
+                "black_ledger_heat",
+                "followed_world_updates",
+                "session_continuity"
+            },
             updates_route = "/mobile/pwa/ledger.json",
             generated_at_utc = DateTimeOffset.UtcNow
         }, PublicJsonContentOptions);

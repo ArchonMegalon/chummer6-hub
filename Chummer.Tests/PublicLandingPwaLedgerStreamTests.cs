@@ -32,6 +32,28 @@ public sealed class PublicLandingPwaLedgerStreamTests
         Assert.Equal("mobile_pwa_living_world", payload.GetProperty("mode").GetString());
         Assert.Equal("opt_in_required", payload.GetProperty("status").GetString());
         Assert.Equal("/account", payload.GetProperty("opt_in_route").GetString());
+        Assert.Equal("account_opt_in_and_followed_world_selection", payload.GetProperty("world_gate").GetString());
+        Assert.Equal("hidden_until_opt_in", payload.GetProperty("heat_visibility").GetString());
+        Assert.Equal("hidden_until_opt_in", payload.GetProperty("session_visibility").GetString());
+        string summary = payload.GetProperty("summary").GetString() ?? string.Empty;
+        Assert.Contains("Black Ledger", summary, StringComparison.Ordinal);
+        Assert.Contains("heat", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("session continuity", summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("followed-world selection", summary, StringComparison.OrdinalIgnoreCase);
+        string legalPosture = payload.GetProperty("legal_posture").GetString() ?? string.Empty;
+        Assert.Contains("No private run table state", legalPosture, StringComparison.Ordinal);
+        Assert.Contains("world heat", legalPosture, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("session continuity", legalPosture, StringComparison.OrdinalIgnoreCase);
+        var requiredFor = payload.GetProperty("opt_in_required_for")
+            .EnumerateArray()
+            .Select(item => item.GetString())
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("black_ledger_heat", requiredFor);
+        Assert.Contains("followed_world_updates", requiredFor);
+        Assert.Contains("session_continuity", requiredFor);
+        Assert.False(payload.TryGetProperty("world", out _));
+        Assert.False(payload.TryGetProperty("top_districts", out _));
+        Assert.False(payload.TryGetProperty("continuity", out _));
     }
 
     [Fact]

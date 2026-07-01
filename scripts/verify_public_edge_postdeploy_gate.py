@@ -36,6 +36,11 @@ EXPECTED_PLAYTIME_TOOLS = {
     "quick_rolls",
     "living_world",
 }
+EXPECTED_LEDGER_OPT_IN_KEYS = {
+    "black_ledger_heat",
+    "followed_world_updates",
+    "session_continuity",
+}
 EXPECTED_READY_ROLES = {"player", "gm", "organizer"}
 EXPECTED_MOBILE_ROUTES = {
     "/mobile": ('data-blazor-shell="interactive-server"', 'data-role="Player"', "manifest.player.webmanifest"),
@@ -439,6 +444,11 @@ def verify_ready_mobile_handoff(base_url: str, timeout_seconds: float) -> dict[s
     payload = parse_json(result, failures) if result.status_code == 200 else {}
     tools = payload.get("playtime_tools") if isinstance(payload.get("playtime_tools"), list) else []
     tool_ids = {str(item.get("id") or "") for item in tools if isinstance(item, dict)}
+    living_world_tool = next(
+        (item for item in tools if isinstance(item, dict) and str(item.get("id") or "") == "living_world"),
+        {},
+    )
+    living_world_summary = str(living_world_tool.get("summary") or "").lower() if isinstance(living_world_tool, dict) else ""
     packet_routes = payload.get("packet_routes") if isinstance(payload.get("packet_routes"), list) else []
     roles = {str(item.get("roleId") or "") for item in packet_routes if isinstance(item, dict)}
     boundaries = payload.get("boundaries") if isinstance(payload.get("boundaries"), list) else []
@@ -453,6 +463,10 @@ def verify_ready_mobile_handoff(base_url: str, timeout_seconds: float) -> dict[s
     require("character building" in boundary_text and "before or after" in boundary_text, failures, "mobile handoff missing character-building boundary")
     require("opt-in" in boundary_text or "opt in" in boundary_text, failures, "mobile handoff missing living-world opt-in boundary")
     require("gm remains final authority" in boundary_text, failures, "mobile handoff missing GM authority boundary")
+    require("black ledger" in living_world_summary, failures, "living-world tool summary is not bound to Black Ledger")
+    require("heat" in living_world_summary, failures, "living-world tool summary is not bound to heat tracking")
+    require("followed-world" in living_world_summary or "followed world" in living_world_summary, failures, "living-world tool summary is not bound to followed-world selection")
+    require("opt-in" in living_world_summary or "opt in" in living_world_summary, failures, "living-world tool summary is not bound to account opt-in")
 
     return {
         "contractName": "chummer.ready_mobile_handoff_contract.v1",
@@ -461,6 +475,7 @@ def verify_ready_mobile_handoff(base_url: str, timeout_seconds: float) -> dict[s
         "pwa_route": payload.get("pwa_route"),
         "continuity_route": payload.get("continuity_route"),
         "tool_ids": sorted(tool_ids),
+        "living_world_summary": living_world_summary,
         "packet_roles": sorted(roles),
         "failures": failures,
     }
@@ -473,10 +488,40 @@ def verify_mobile_ledger(base_url: str, timeout_seconds: float) -> dict[str, Any
     cache_control = result.headers.get("cache-control", "")
     vary = result.headers.get("vary", "")
     pragma = result.headers.get("pragma", "")
+    summary = str(payload.get("summary") or "").lower()
+    legal_posture = str(payload.get("legal_posture") or "").lower()
+    opt_in_required_for = {
+        str(item or "").strip()
+        for item in (payload.get("opt_in_required_for") if isinstance(payload.get("opt_in_required_for"), list) else [])
+        if str(item or "").strip()
+    }
+    black_ledger_bound = "black ledger" in summary
+    heat_bound = "heat" in summary and payload.get("heat_visibility") == "hidden_until_opt_in"
+    followed_world_bound = (
+        ("followed-world" in summary or "followed world" in summary)
+        and payload.get("world_gate") == "account_opt_in_and_followed_world_selection"
+    )
+    session_continuity_bound = (
+        ("session continuity" in summary or "continuity" in summary)
+        and payload.get("session_visibility") == "hidden_until_opt_in"
+    )
+    private_table_state_hidden = (
+        "aggregate only" in legal_posture
+        and "no private run table state" in legal_posture
+        and "world heat" in legal_posture
+        and "session continuity" in legal_posture
+    )
 
     require(result.status_code == 200, failures, f"/mobile/pwa/ledger.json expected 200, got {result.status_code}")
     require(payload.get("mode") == "mobile_pwa_living_world", failures, "mobile ledger payload mode is wrong")
     require(payload.get("status") == "opt_in_required", failures, "mobile ledger should require opt-in for anonymous access")
+    require(payload.get("opt_in_route") == "/account", failures, "mobile ledger opt_in_route is not /account")
+    require(black_ledger_bound, failures, "mobile ledger opt-in boundary is not bound to Black Ledger")
+    require(heat_bound, failures, "mobile ledger opt-in boundary is not bound to hidden heat tracking")
+    require(followed_world_bound, failures, "mobile ledger opt-in boundary is not bound to followed-world selection")
+    require(session_continuity_bound, failures, "mobile ledger opt-in boundary is not bound to hidden session continuity")
+    require(EXPECTED_LEDGER_OPT_IN_KEYS.issubset(opt_in_required_for), failures, f"mobile ledger missing opt-in-required keys: {sorted(EXPECTED_LEDGER_OPT_IN_KEYS - opt_in_required_for)}")
+    require(private_table_state_hidden, failures, "mobile ledger legal posture does not hide private table state, world heat, and session continuity")
     require(payload.get("updates_route") == "/mobile/pwa/ledger.json", failures, "mobile ledger updates_route is wrong")
     require("private" in cache_control.lower(), failures, "mobile ledger response is not private")
     require("no-store" in cache_control.lower(), failures, "mobile ledger response is not no-store")
@@ -489,6 +534,16 @@ def verify_mobile_ledger(base_url: str, timeout_seconds: float) -> dict[str, Any
         "status": "pass" if not failures else "fail",
         "status_code": result.status_code,
         "payload_status": payload.get("status"),
+        "opt_in_route": payload.get("opt_in_route"),
+        "world_gate": payload.get("world_gate"),
+        "heat_visibility": payload.get("heat_visibility"),
+        "session_visibility": payload.get("session_visibility"),
+        "opt_in_required_for": sorted(opt_in_required_for),
+        "black_ledger_bound": black_ledger_bound,
+        "heat_bound": heat_bound,
+        "followed_world_bound": followed_world_bound,
+        "session_continuity_bound": session_continuity_bound,
+        "private_table_state_hidden": private_table_state_hidden,
         "cache_control": cache_control,
         "vary": vary,
         "pragma": pragma,
@@ -558,6 +613,15 @@ def verify_flagship_horizons(child_receipts: dict[str, dict[str, Any]]) -> dict[
             )
             if mobile_ledger.get("payload_status") != config.get("requiredLedgerStatus"):
                 row_failures.append("mobile ledger does not enforce opt-in-required status")
+            for key, label in [
+                ("black_ledger_bound", "Black Ledger heat"),
+                ("heat_bound", "hidden heat tracking"),
+                ("followed_world_bound", "followed-world selection"),
+                ("session_continuity_bound", "session continuity"),
+                ("private_table_state_hidden", "private table state"),
+            ]:
+                if not bool(mobile_ledger.get(key)):
+                    row_failures.append(f"mobile ledger does not bind {label}")
             if "private" not in cache_control or "no-store" not in cache_control:
                 row_failures.append("mobile ledger is not private/no-store")
             if service_worker_mode != "shared_portal_root_worker":
