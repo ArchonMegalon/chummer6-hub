@@ -1,0 +1,160 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_PATH = REPO_ROOT / "scripts" / "restore_public_edge_portal_image.py"
+
+
+def load_module():
+    spec = importlib.util.spec_from_file_location("restore_public_edge_portal_image", SCRIPT_PATH)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_restore_retages_and_recreates_when_container_or_tag_drift(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    expected = "sha256:" + "1" * 64
+    dirty = "sha256:" + "2" * 64
+    commands: list[list[str]] = []
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        commands.append(command)
+        if command == ["docker", "image", "inspect", "--format", "{{.Id}}", expected]:
+            return module.CommandResult(command, 0, expected, "")
+        if command == ["docker", "image", "inspect", "--format", "{{.Id}}", "chummer-run-api:local"]:
+            return module.CommandResult(command, 0, dirty, "")
+        if command == ["docker", "inspect", "--format", "{{.Image}} {{.Config.Image}}", "portal"]:
+            return module.CommandResult(command, 0, f"{dirty} chummer-run-api:local", "")
+        return module.CommandResult(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+
+    result = module.restore_portal_image(
+        expected,
+        ["chummer-run-api:local"],
+        tmp_path / "docker-compose.public-edge.yml",
+        tmp_path / ".env",
+        "chummer6-hub",
+        "chummer-portal",
+        "portal",
+        False,
+        False,
+    )
+
+    assert ["docker", "tag", expected, "chummer-run-api:local"] in commands
+    assert [
+        "docker",
+        "compose",
+        "--env-file",
+        str(tmp_path / ".env"),
+        "-p",
+        "chummer6-hub",
+        "-f",
+        str(tmp_path / "docker-compose.public-edge.yml"),
+        "up",
+        "-d",
+        "--no-build",
+        "--no-deps",
+        "--force-recreate",
+        "chummer-portal",
+    ] in commands
+    assert result["containerRecreated"] is True
+    assert result["imageTags"][0]["retagged"] is True
+
+
+def test_restore_skips_recreate_when_container_and_tag_match(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    expected = "sha256:" + "a" * 64
+    commands: list[list[str]] = []
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        commands.append(command)
+        if command[:4] == ["docker", "image", "inspect", "--format"]:
+            return module.CommandResult(command, 0, expected, "")
+        if command == ["docker", "inspect", "--format", "{{.Image}} {{.Config.Image}}", "portal"]:
+            return module.CommandResult(command, 0, f"{expected} chummer-run-api:local", "")
+        return module.CommandResult(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+
+    result = module.restore_portal_image(
+        expected,
+        ["chummer-run-api:local"],
+        tmp_path / "docker-compose.public-edge.yml",
+        None,
+        "chummer6-hub",
+        "chummer-portal",
+        "portal",
+        False,
+        False,
+    )
+
+    assert not any(command[:2] == ["docker", "tag"] for command in commands)
+    assert not any(command[:2] == ["docker", "compose"] for command in commands)
+    assert result["containerRecreated"] is False
+    assert result["imageTags"][0]["retagged"] is False
+
+
+def test_restore_rejects_non_digest_expected_image() -> None:
+    module = load_module()
+
+    try:
+        module.require_sha256_image_id("chummer-run-api:local")
+    except ValueError as error:
+        assert "expected a sha256:<64 hex> image id" in str(error)
+    else:
+        raise AssertionError("non-digest image id was accepted")
+
+
+def test_postdeploy_gate_retries_until_runtime_is_warm(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    expected = "sha256:" + "3" * 64
+    output_path = tmp_path / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
+    calls: list[list[str]] = []
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        calls.append(command)
+        if len(calls) == 1:
+            output_path.write_text(
+                json.dumps({"status": "fail", "portalRuntimeImageStatus": "pass"}),
+                encoding="utf-8",
+            )
+            return module.CommandResult(command, 1, "", "warming")
+        output_path.write_text(
+            json.dumps(
+                {
+                    "status": "pass",
+                    "portalRuntimeImageStatus": "pass",
+                    "releaseManifestVersion": "run-test",
+                }
+            ),
+            encoding="utf-8",
+        )
+        return module.CommandResult(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+    monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
+
+    result = module.run_postdeploy_gate(
+        expected,
+        "https://chummer.run",
+        "portal",
+        "chummer-run-api:local",
+        output_path,
+        2,
+        0,
+        False,
+    )
+
+    assert len(calls) == 2
+    assert result["status"] == "pass"
+    assert result["attempts"][0]["status"] == "fail"
+    assert result["attempts"][1]["status"] == "pass"

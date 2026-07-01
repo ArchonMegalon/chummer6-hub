@@ -335,3 +335,7 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "--expected-portal-image-id" in runbook
     assert "--portal-container chummer6-hub-chummer-portal-1" in runbook
     assert "--portal-image-tag chummer-run-api:local" in runbook
+    assert "scripts/restore_public_edge_portal_image.py" in runbook
+    assert "PUBLIC_EDGE_PORTAL_IMAGE_RESTORE.generated.json" in runbook
+    assert "docker compose up -d --no-build --no-deps --force-recreate" in runbook
+    assert "retries the runtime image guard" in runbook
