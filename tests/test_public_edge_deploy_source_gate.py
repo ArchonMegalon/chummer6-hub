@@ -315,3 +315,20 @@ def test_release_ready_script_calls_public_edge_deploy_source_gate() -> None:
     assert "--require-upstream" in script
     assert "run_function_gate verify_public_edge_deploy_source" in script
     assert script.index("run_function_gate verify_public_edge_deploy_source") < script.index("run_hub_gate verify_windows_installer_visual_audit")
+
+
+def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> None:
+    runbook = (ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md").read_text(encoding="utf-8")
+
+    assert "Public-edge source and browser proof gate" in runbook
+    assert "scripts/verify_public_edge_deploy_source.py" in runbook
+    assert "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" in runbook
+    assert "CHUMMER_RUN_SERVICES_CONTEXT_DIR" in runbook
+    assert "CHUMMER_RUN_SERVICES_SOURCE" in runbook
+    assert "--compose-service chummer-portal" in runbook
+    assert "--require-upstream" in runbook
+    assert "scripts/verify_public_edge_postdeploy_gate.py" in runbook
+    assert "--require-downloads-status-playwright" in runbook
+    assert "--require-mobile-pwa-viewport-playwright" in runbook
+    assert "--require-frontdoor-navigation-playwright" in runbook
+    assert "shared_portal_root_worker" in runbook
