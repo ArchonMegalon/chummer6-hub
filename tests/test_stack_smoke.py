@@ -374,8 +374,15 @@ class StackConfigSmokeTests(unittest.TestCase):
         script_path = REPO_ROOT.parent / "chummer-presentation" / "scripts" / "publish-latest-nightly-to-downloads.sh"
         script_text = script_path.read_text(encoding="utf-8")
 
-        self.assertIn('latest_stage/RELEASE_CHANNEL.generated.json', script_text)
-        self.assertIn('latest_stage/RELEASE_BUILD_HANDOFF.generated.json', script_text)
+        self.assertIn('PUBLIC_RELEASE_CHANNEL="${CHUMMER_PUBLIC_DEFAULT_RELEASE_CHANNEL:-preview}"', script_text)
+        self.assertIn('ALLOW_STABLE_CHANNEL_FROM_NIGHTLY_PUBLISH="${CHUMMER_ALLOW_STABLE_CHANNEL_FROM_NIGHTLY_PUBLISH:-0}"', script_text)
+        self.assertIn("Nightly publisher is the preview handoff lane.", script_text)
+        self.assertIn("CHUMMER_ALLOW_STABLE_CHANNEL_FROM_NIGHTLY_PUBLISH=true", script_text)
+        self.assertIn('release_channel_manifest="$stage_dir/RELEASE_CHANNEL.generated.json"', script_text)
+        self.assertIn('release_channel="$(python3 - "$release_channel_manifest" <<\'PY\'', script_text)
+        self.assertIn('if [[ "$release_channel" != "preview" ]]; then', script_text)
+        self.assertIn('refresh_release_build_handoff "$latest_stage"', script_text)
+        self.assertIn('RELEASE_BUILD_HANDOFF.generated.json', script_text)
         self.assertIn('Nightly stage is missing RELEASE_BUILD_HANDOFF.generated.json', script_text)
         self.assertIn('expected_version="$(', script_text)
         self.assertIn('Nightly stage manifest is missing a non-empty version.', script_text)
