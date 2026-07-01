@@ -34,6 +34,36 @@ def write_supporting_artifacts(completion: Path, published: Path) -> None:
         json.dumps({"status": "pass", "failures": []}),
         encoding="utf-8",
     )
+    (completion / "SCREENSHOT_QA.generated.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "base_url": "http://127.0.0.1:8091",
+                "homepage_results": [
+                    {
+                        "viewport": viewport,
+                        "overflow_px": 0,
+                        "hero_visible": True,
+                        "cta_visible": True,
+                        "hero_first_viewport_fit": True,
+                        "status": "pass",
+                    }
+                    for viewport in ["390x844", "412x915", "768x1024", "1366x768", "1440x900", "1920x1080"]
+                ],
+                "surface_results": [
+                    {
+                        "surface": surface,
+                        "viewport": viewport,
+                        "overflow_px": 0,
+                        "status": "pass",
+                    }
+                    for surface in ["downloads", "status", "ledger-map", "help", "contact"]
+                    for viewport in ["390x844", "1366x768"]
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def write_design_contract(path: Path) -> None:
@@ -59,6 +89,8 @@ dark-mode form controls
 44px action floor
 route visual anatomy
 public endpoint language ban
+visual evidence receipt
+state and recovery language
 """,
         encoding="utf-8",
     )
@@ -103,7 +135,9 @@ def write_public_views(root: Path, *, leaked: bool = False) -> list[Path]:
         "Downloads.cshtml": """
 <section>
   <h1>Downloads</h1>
+  <p>Current note: Use Help if setup blocks your table.</p>
   <p>Sign in later only if you want to attach this installed copy</p>
+  <section class="minimal-empty"><h2>No build is available right now</h2><a href="/help">Help</a></section>
   <div class="downloads-choice-list">
     <article class="downloads-choice-card"><h2>Stable</h2><a href="/help" data-release-lane="stable">Help</a></article>
     <article class="downloads-choice-card"><h2>Nightly</h2><a href="/nightly" data-release-lane="nightly">Nightly</a></article>
@@ -126,7 +160,7 @@ def write_public_views(root: Path, *, leaked: bool = False) -> list[Path]:
   <div class="participate-hosted__frame-shell">
     <iframe class="participate-hosted__frame" src="@Model.EmbeddedBoardHref" title="Chummer participation board" loading="lazy" referrerpolicy="same-origin" data-chummer-participate-frame></iframe>
   </div>
-  <article class="participate-board-fallback">Board offline right now.</article>
+  <article class="participate-board-fallback" role="status" aria-live="polite">Board offline right now. <a href="/participate">Retry</a> <a href="/contact">Contact</a></article>
 </section>
 """,
         "MobileProjection.cshtml": """
@@ -135,11 +169,18 @@ def write_public_views(root: Path, *, leaked: bool = False) -> list[Path]:
   <button data-install-prompt-button>Install this app</button>
   <p data-pwa-install-state>Installable app shell live</p>
   <p data-pwa-ledger-status>Checking</p>
+  <p data-pwa-ledger-summary>Waiting for live board stream data.</p>
   <meter data-pwa-ledger-heat-meter></meter>
   <button data-pwa-ledger-follow-button></button>
+  <p data-pwa-ledger-follow-state>Sign in to opt in and follow a living world.</p>
+  <p data-pwa-ledger-follow-hint></p>
   <p data-pwa-continuity-summary>No continuity snapshot loaded yet.</p>
+  <p>Continuity snapshot is not available in this lane.</p>
+  <a href="/account">Enable updates</a>
+  <a href="/help">Open setup help</a>
   <a href="/play/continuity">Open continuity</a>
   <a href="/help">Help</a>
+  <script>function renderLedgerUnavailable() {}</script>
 </section>
 """,
     }
@@ -313,6 +354,8 @@ def test_premium_gate_passes_for_tokenized_premium_shell() -> None:
     assert payload["checks"]["premium_surface_anatomy"]["pass"]
     assert payload["checks"]["open_chummer_navigation"]["pass"]
     assert payload["checks"]["route_journey_contracts"]["pass"]
+    assert payload["checks"]["state_and_recovery_language"]["pass"]
+    assert payload["checks"]["visual_evidence_receipt"]["pass"]
 
 
 def test_premium_gate_rejects_generic_flat_theme_and_internal_copy() -> None:
@@ -402,6 +445,102 @@ def test_premium_gate_rejects_visible_raw_endpoint_copy() -> None:
     assert "raw_route_label" in payload["checks"]["public_copy_quiet"]["leaked_terms"]
 
 
+def test_premium_gate_rejects_missing_visual_evidence() -> None:
+    module = load_module()
+    with tempfile.TemporaryDirectory(prefix="premium-ui-gate-screenshot-fail-") as temp_dir:
+        root = Path(temp_dir)
+        completion = root / "completion"
+        published = root / "published"
+        css = root / "site.css"
+        design_contract = root / "PREMIUM_UI_DESIGN_EXIT_GATE.md"
+        layout = root / "_Layout.cshtml"
+        views = write_public_views(root)
+        write_design_contract(design_contract)
+        write_layout(layout)
+        write_supporting_artifacts(completion, published)
+        (completion / "SCREENSHOT_QA.generated.json").write_text(
+            json.dumps(
+                {
+                    "status": "pass",
+                    "homepage_results": [
+                        {
+                            "viewport": "390x844",
+                            "overflow_px": 0,
+                            "hero_visible": True,
+                            "cta_visible": True,
+                            "hero_first_viewport_fit": True,
+                            "status": "pass",
+                        }
+                    ],
+                    "surface_results": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        css.write_text(premium_css(), encoding="utf-8")
+
+        payload = module.build_payload(
+            css_path=css,
+            design_contract_path=design_contract,
+            completion_root=completion,
+            published_root=published,
+            critical_public_views=views,
+            layout_view=layout,
+        )
+
+    assert payload["status"] == "fail"
+    assert "premium visual evidence is missing or failing; screenshot QA must cover home and supporting surfaces across mobile and desktop" in payload["failures"]
+    assert payload["checks"]["visual_evidence_receipt"]["missing_home_viewports"]
+    assert payload["checks"]["visual_evidence_receipt"]["missing_surfaces"]
+
+
+def test_premium_gate_rejects_missing_state_recovery_language() -> None:
+    module = load_module()
+    with tempfile.TemporaryDirectory(prefix="premium-ui-gate-state-fail-") as temp_dir:
+        root = Path(temp_dir)
+        completion = root / "completion"
+        published = root / "published"
+        css = root / "site.css"
+        design_contract = root / "PREMIUM_UI_DESIGN_EXIT_GATE.md"
+        layout = root / "_Layout.cshtml"
+        views = write_public_views(root)
+        partizipate = root / "Partizipate.cshtml"
+        partizipate.write_text(
+            """
+<section>
+  <h1 class="sr-only">Participate</h1>
+  <div class="participate-hosted__frame-shell">
+    <iframe class="participate-hosted__frame" src="@Model.EmbeddedBoardHref" title="Chummer participation board" loading="lazy" referrerpolicy="same-origin" data-chummer-participate-frame></iframe>
+  </div>
+  <article class="participate-board-fallback">Board offline right now.</article>
+</section>
+""",
+            encoding="utf-8",
+        )
+        write_design_contract(design_contract)
+        write_layout(layout)
+        write_supporting_artifacts(completion, published)
+        css.write_text(premium_css(), encoding="utf-8")
+
+        payload = module.build_payload(
+            css_path=css,
+            design_contract_path=design_contract,
+            completion_root=completion,
+            published_root=published,
+            critical_public_views=views,
+            layout_view=layout,
+        )
+
+    assert payload["status"] == "fail"
+    assert "state and recovery language is incomplete; loading, empty, unavailable, and fallback states must tell users what happens next" in payload["failures"]
+    partizipate_result = next(
+        route for route in payload["checks"]["state_and_recovery_language"]["routes"]
+        if route["route"] == "Partizipate.cshtml"
+    )
+    assert "role=\"status\"" in partizipate_result["missing_markers"]
+    assert "aria-live=\"polite\"" in partizipate_result["missing_markers"]
+
+
 def test_visible_copy_ignores_razor_setup_code_but_keeps_rendered_text() -> None:
     module = load_module()
     source = """
@@ -421,6 +560,25 @@ def test_visible_copy_ignores_razor_setup_code_but_keeps_rendered_text() -> None
     assert "review_required" not in visible
     assert "Current caution" in visible
     assert "Route: /mobile/pwa/ledger.json" in visible
+
+
+def test_visible_copy_strips_razor_model_noise_before_internal_language_scan() -> None:
+    module = load_module()
+    source = """
+@model DownloadsPageViewModel
+@{
+    var manifest = Model.Manifest;
+}
+<section>
+  <p>Downloads are available.</p>
+</section>
+"""
+
+    visible = module.visible_copy(source)
+
+    assert "Model.Manifest" not in visible
+    assert "manifest" not in visible.lower()
+    assert "Downloads are available." in visible
 
 
 def test_premium_gate_rejects_missing_written_design_contract() -> None:
@@ -463,3 +621,5 @@ def test_design_package_names_the_premium_exit_gate_and_sources() -> None:
     assert "zero-internal-language" in doc
     assert "44px action floor" in doc
     assert "route visual anatomy" in doc
+    assert "visual evidence receipt" in doc
+    assert "state and recovery language" in doc

@@ -1,6 +1,6 @@
 # Premium UI Design Exit Gate
 
-- Generated: 2026-07-01T01:14:49Z
+- Generated: 2026-07-01T02:28:06Z
 - Status: `pass`
 - Verdict: `PREMIUM_UI_READY`
 
@@ -24,6 +24,7 @@
 - `one_route_one_job`: Each public route needs one visible job, one primary next action, and supporting choices that do not blur the job. Source posture: GOV.UK service design plus Shopify action hierarchy.
 - `accessibility_as_finish`: Contrast, focus, form controls, touch targets, reduced motion, and mobile layout are release criteria, not cleanup. Source posture: WCAG 2.2 plus Carbon production consistency.
 - `quiet_public_language`: Public pages must read like a product, not like a proof harness, provider adapter, internal roadmap, or operator console. Source posture: Atlassian content discipline plus HIG clarity.
+- `state_and_recovery_design`: Loading, empty, unavailable, and recovery states must explain what is happening and what the user can do next. Source posture: Nielsen status visibility plus Polaris empty/loading/error state clarity.
 
 ## Source Design Contract
 
@@ -51,4 +52,6 @@
 - open_chummer_navigation: `pass`
 - public_copy_quiet: `pass`
 - route_journey_contracts: `pass`
+- state_and_recovery_language: `pass`
+- visual_evidence_receipt: `pass`
 - production_basics: `pass`

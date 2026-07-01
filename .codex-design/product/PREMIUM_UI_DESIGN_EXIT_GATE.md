@@ -15,6 +15,7 @@ Use famous design systems as calibration, not as visual skins to copy:
 - GOV.UK Service Manual: plain-language service journeys where the next step is never ambiguous.
 - WCAG 2.2: contrast, visible focus, input readability, keyboard use, and touch target discipline.
 - Nielsen Norman Group usability heuristics: status visibility, recognition over recall, consistency, feedback, and recovery.
+- These famous systems are calibration, not skins; Chummer keeps its own campaign-command identity.
 
 ## Exit Bar
 
@@ -38,6 +39,8 @@ The premium visual scorecard blocks release unless all items are true:
 - Responsive behavior is designed, not incidental: mobile breakpoints, fluid type/spacing, minmax grids, svh handling, and touch-safe actions are required.
 - Touch targets use a 44px action floor on public primary actions, dropdown summaries, and menu rows; compact desktop styling cannot shrink the actual hit area below the mobile play bar.
 - Route visual anatomy is inspected on the shared selectors themselves: hero panels, secondary route heroes, download cards, status panels, mobile facts, and iframe containers must carry deliberate background, depth, radius, spacing, and containment decisions.
+- Visual evidence receipt coverage is required. Home needs mobile, tablet, laptop, desktop, and wide desktop screenshot QA with the hero and primary CTA visible. Downloads, Status, Ledger map, Help, and Contact need mobile and desktop screenshot QA.
+- State and recovery language is part of the visual finish. Loading, empty, unavailable, and fallback states must explain what is happening and give the next useful action.
 
 ## Surface Contracts
 
@@ -61,6 +64,7 @@ Fail the gate when:
 
 - The UI can pass by having many gradients, shadows, hover states, or media queries but no route-specific job clarity.
 - The UI can pass by stuffing CSS tokens while the actual route surfaces stay flat, transparent, cramped, or below the 44px action floor.
+- The UI can pass by satisfying source heuristics while screenshot QA is missing, stale, overflowing, or not covering the routes users actually touch.
 - The landing page loses Build or Play.
 - Mobile/PWA loses ledger, heat, opt-in, continuity, install, or help affordances.
 - Mobile/PWA exposes raw endpoint paths, JSON URLs, route labels, raw enum states, or data plumbing as visible product copy.
@@ -80,3 +84,4 @@ python3 scripts/verify_premium_ui_design_exit_gate.py
 The generated receipt is `.codex-studio/published/PREMIUM_UI_DESIGN_EXIT_GATE.generated.json` with the human report at `.codex-studio/published/PREMIUM_UI_DESIGN_EXIT_GATE.md`.
 
 Canonical marker terms used by the executable gate: 44px action floor, route visual anatomy, public endpoint language ban.
+Additional marker terms used by the executable gate: visual evidence receipt, state and recovery language.

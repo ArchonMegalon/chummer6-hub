@@ -17,6 +17,10 @@ DESIGN_CONTRACT_PATH = ROOT / ".codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE
 OUTPUT = PUBLISHED_ROOT / "PREMIUM_UI_DESIGN_EXIT_GATE.generated.json"
 REPORT = PUBLISHED_ROOT / "PREMIUM_UI_DESIGN_EXIT_GATE.md"
 LAYOUT_VIEW = ROOT / "Chummer.Run.Api/Views/Shared/_Layout.cshtml"
+SCREENSHOT_QA_PATH_NAME = "SCREENSHOT_QA.generated.json"
+REQUIRED_SCREENSHOT_HOME_VIEWPORTS = {"390x844", "412x915", "768x1024", "1366x768", "1440x900", "1920x1080"}
+REQUIRED_SCREENSHOT_SURFACES = {"downloads", "status", "ledger-map", "help", "contact"}
+REQUIRED_SCREENSHOT_SURFACE_VIEWPORTS = {"390x844", "1366x768"}
 CRITICAL_PUBLIC_VIEWS = [
     ROOT / "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
     ROOT / "Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml",
@@ -90,6 +94,8 @@ DESIGN_CONTRACT_MARKERS = [
     "44px action floor",
     "route visual anatomy",
     "public endpoint language ban",
+    "visual evidence receipt",
+    "state and recovery language",
 ]
 DESIGN_STANDARD_PRINCIPLES = [
     {
@@ -121,6 +127,11 @@ DESIGN_STANDARD_PRINCIPLES = [
         "id": "quiet_public_language",
         "standard": "Atlassian content discipline plus HIG clarity",
         "exit_rule": "Public pages must read like a product, not like a proof harness, provider adapter, internal roadmap, or operator console.",
+    },
+    {
+        "id": "state_and_recovery_design",
+        "standard": "Nielsen status visibility plus Polaris empty/loading/error state clarity",
+        "exit_rule": "Loading, empty, unavailable, and recovery states must explain what is happening and what the user can do next.",
     },
 ]
 ROUTE_JOURNEY_REQUIREMENTS = {
@@ -192,6 +203,48 @@ ROUTE_JOURNEY_REQUIREMENTS = {
         ],
     },
 }
+STATE_AND_RECOVERY_REQUIREMENTS = {
+    "Downloads.cshtml": {
+        "job": "When a build is missing or under review, the user gets a useful next step.",
+        "required_markers": [
+            "minimal-empty",
+            "No build is available right now",
+            "href=\"/help\"",
+            "Current note",
+        ],
+    },
+    "Status.cshtml": {
+        "job": "Status gives a decision and recovery split instead of passive status text.",
+        "required_markers": [
+            "Current caution",
+            "aria-label=\"Status next actions\"",
+            "href=\"/downloads\"",
+            "href=\"/help\"",
+        ],
+    },
+    "Partizipate.cshtml": {
+        "job": "Iframe failure has a polite live fallback and recovery actions.",
+        "required_markers": [
+            "participate-board-fallback",
+            "role=\"status\"",
+            "aria-live=\"polite\"",
+            "Retry",
+            "Contact",
+        ],
+    },
+    "MobileProjection.cshtml": {
+        "job": "PWA/live-play failure states keep install, stream, follow, and continuity recovery readable.",
+        "required_markers": [
+            "data-pwa-ledger-summary",
+            "data-pwa-ledger-follow-state",
+            "data-pwa-ledger-follow-hint",
+            "renderLedgerUnavailable(",
+            "Continuity snapshot",
+            "Enable updates",
+            "Open setup help",
+        ],
+    },
+}
 NAVIGATION_REQUIREMENTS = {
     "open_chummer_dropdown": "site-open-chummer-menu",
     "accessible_options_label": "aria-label=\"Open Chummer options\"",
@@ -230,9 +283,19 @@ INTERNAL_LANGUAGE_NEEDLES = [
     "provider",
     "ProductLift",
     "fleet",
+    "debug",
+    "endpoint",
+    "internal",
+    "manifest",
+    "mock",
+    "pipeline",
+    "runtime",
+    "stub",
+    "webhook",
 ]
 VISIBLE_INTERNAL_COPY_PATTERNS = {
     "raw_json_endpoint": re.compile(r"/[A-Za-z0-9][A-Za-z0-9/_-]*\.json\b", flags=re.IGNORECASE),
+    "raw_api_endpoint": re.compile(r"/api/v\d+(?:/[A-Za-z0-9_.~-]+)+", flags=re.IGNORECASE),
     "raw_route_label": re.compile(r"\bRoute\s*:", flags=re.IGNORECASE),
     "internal_status_label": re.compile(r"\b(review_required|readiness_review_required|not_required)\b", flags=re.IGNORECASE),
 }
@@ -448,8 +511,52 @@ def strip_razor_code_blocks(text: str) -> str:
     return "".join(output)
 
 
+def strip_balanced_inline(text: str, marker: str, open_char: str, close_char: str) -> str:
+    output: list[str] = []
+    index = 0
+    while index < len(text):
+        start = text.find(marker, index)
+        if start < 0:
+            output.append(text[index:])
+            break
+
+        output.append(text[index:start])
+        cursor = start + len(marker)
+        depth = 1
+        while cursor < len(text):
+            char = text[cursor]
+            if char == open_char:
+                depth += 1
+            elif char == close_char:
+                depth -= 1
+                if depth == 0:
+                    cursor += 1
+                    break
+            cursor += 1
+        index = cursor
+    return "".join(output)
+
+
+def strip_razor_surface_noise(text: str) -> str:
+    without_blocks = strip_razor_code_blocks(text)
+    without_directives = re.sub(
+        r"(?im)^\s*@(model|inject|using|namespace|addTagHelper|removeTagHelper|inherits)\b[^\n]*",
+        " ",
+        without_blocks,
+    )
+    without_control = re.sub(
+        r"(?im)^\s*@(if|else|foreach|for|while|switch|case|default|try|catch|finally|functions|section)\b[^\n{]*(?:\{)?\s*$",
+        " ",
+        without_directives,
+    )
+    without_inline_groups = strip_balanced_inline(without_control, "@(", "(", ")")
+    without_inline_calls = re.sub(r"@[A-Za-z_][A-Za-z0-9_.]*\([^)]*\)", " ", without_inline_groups)
+    without_inline_names = re.sub(r"@[A-Za-z_][A-Za-z0-9_.]*(?:\[[^\]]+\])?", " ", without_inline_calls)
+    return re.sub(r"(?m)^\s*[{}]\s*$", " ", without_inline_names)
+
+
 def visible_copy(text: str) -> str:
-    without_razor = strip_razor_code_blocks(text)
+    without_razor = strip_razor_surface_noise(text)
     without_scripts = re.sub(r"(?is)<script\b.*?</script>", " ", without_razor)
     without_styles = re.sub(r"(?is)<style\b.*?</style>", " ", without_scripts)
     without_tags = re.sub(r"(?is)<[^>]+>", " ", without_styles)
@@ -492,6 +599,106 @@ def route_requirement_result(path: Path) -> dict[str, Any]:
         "required_markers": requirement["required_markers"],
         "missing_markers": missing,
         "pass": not missing,
+    }
+
+
+def state_recovery_result(path: Path) -> dict[str, Any]:
+    requirement = STATE_AND_RECOVERY_REQUIREMENTS.get(path.name)
+    if requirement is None:
+        return {
+            "route": path.name,
+            "job": "No state/recovery contract is required for this route.",
+            "required_markers": [],
+            "missing_markers": [],
+            "pass": True,
+        }
+
+    text = read_text(path)
+    missing = [
+        marker
+        for marker in requirement["required_markers"]
+        if marker not in text
+    ]
+    return {
+        "route": path.name,
+        "job": requirement["job"],
+        "required_markers": requirement["required_markers"],
+        "missing_markers": missing,
+        "pass": not missing,
+    }
+
+
+def screenshot_qa_result(path: Path) -> dict[str, Any]:
+    payload = load_json(path)
+    homepage_results = payload.get("homepage_results") if isinstance(payload.get("homepage_results"), list) else []
+    surface_results = payload.get("surface_results") if isinstance(payload.get("surface_results"), list) else []
+
+    homepage_by_viewport = {
+        str(item.get("viewport")): item
+        for item in homepage_results
+        if isinstance(item, dict)
+    }
+    missing_home_viewports = sorted(REQUIRED_SCREENSHOT_HOME_VIEWPORTS - set(homepage_by_viewport))
+    homepage_failures = [
+        str(item.get("viewport") or "unknown")
+        for item in homepage_results
+        if isinstance(item, dict)
+        and (
+            str(item.get("status") or "").lower() != "pass"
+            or int(item.get("overflow_px") or 0) != 0
+            or item.get("hero_visible") is not True
+            or item.get("cta_visible") is not True
+            or item.get("hero_first_viewport_fit") is not True
+        )
+    ]
+
+    surface_coverage: dict[str, set[str]] = {}
+    surface_failures: list[str] = []
+    for item in surface_results:
+        if not isinstance(item, dict):
+            continue
+        surface = str(item.get("surface") or "")
+        viewport = str(item.get("viewport") or "")
+        if surface:
+            surface_coverage.setdefault(surface, set()).add(viewport)
+        if (
+            surface in REQUIRED_SCREENSHOT_SURFACES
+            and (
+                str(item.get("status") or "").lower() != "pass"
+                or int(item.get("overflow_px") or 0) != 0
+            )
+        ):
+            surface_failures.append(f"{surface}:{viewport or 'unknown'}")
+
+    missing_surfaces = sorted(REQUIRED_SCREENSHOT_SURFACES - set(surface_coverage))
+    incomplete_surface_viewports = {
+        surface: sorted(REQUIRED_SCREENSHOT_SURFACE_VIEWPORTS - viewports)
+        for surface, viewports in sorted(surface_coverage.items())
+        if surface in REQUIRED_SCREENSHOT_SURFACES
+        and REQUIRED_SCREENSHOT_SURFACE_VIEWPORTS - viewports
+    }
+    passes = (
+        status_pass(payload)
+        and not missing_home_viewports
+        and not homepage_failures
+        and not missing_surfaces
+        and not incomplete_surface_viewports
+        and not surface_failures
+    )
+
+    return {
+        "path": str(path),
+        "status": payload.get("status", "missing"),
+        "base_url": payload.get("base_url"),
+        "required_home_viewports": sorted(REQUIRED_SCREENSHOT_HOME_VIEWPORTS),
+        "missing_home_viewports": missing_home_viewports,
+        "homepage_failures": homepage_failures,
+        "required_surface_viewports": sorted(REQUIRED_SCREENSHOT_SURFACE_VIEWPORTS),
+        "required_surfaces": sorted(REQUIRED_SCREENSHOT_SURFACES),
+        "missing_surfaces": missing_surfaces,
+        "incomplete_surface_viewports": incomplete_surface_viewports,
+        "surface_failures": surface_failures,
+        "pass": passes,
     }
 
 
@@ -812,6 +1019,25 @@ def build_payload(
         "route_count": len(route_results),
         "routes": route_results,
         "pass": route_contract_pass,
+    }
+
+    state_results = [state_recovery_result(path) for path in critical_public_views]
+    state_recovery_pass = all(result["pass"] for result in state_results)
+    if not state_recovery_pass:
+        failures.append("state and recovery language is incomplete; loading, empty, unavailable, and fallback states must tell users what happens next")
+    checks["state_and_recovery_language"] = {
+        "standard": "Nielsen status visibility + Polaris empty/loading/error state clarity + GOV.UK recovery action clarity",
+        "route_count": len(state_results),
+        "routes": state_results,
+        "pass": state_recovery_pass,
+    }
+
+    screenshot_qa = screenshot_qa_result(completion_root / SCREENSHOT_QA_PATH_NAME)
+    if not screenshot_qa["pass"]:
+        failures.append("premium visual evidence is missing or failing; screenshot QA must cover home and supporting surfaces across mobile and desktop")
+    checks["visual_evidence_receipt"] = {
+        "standard": "visual claims require viewport evidence, not just source heuristics",
+        **screenshot_qa,
     }
 
     ui_frame = load_json(completion_root / "UI_FRAME_INTEGRITY.generated.json")

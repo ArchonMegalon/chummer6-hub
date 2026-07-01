@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.premium_ui_design_exit_gate",
-  "generated_at_utc": "2026-07-01T01:14:49Z",
+  "generated_at_utc": "2026-07-01T02:28:06Z",
   "status": "pass",
   "verdict": "PREMIUM_UI_READY",
   "reference_systems": [
@@ -80,6 +80,11 @@
       "id": "quiet_public_language",
       "standard": "Atlassian content discipline plus HIG clarity",
       "exit_rule": "Public pages must read like a product, not like a proof harness, provider adapter, internal roadmap, or operator console."
+    },
+    {
+      "id": "state_and_recovery_design",
+      "standard": "Nielsen status visibility plus Polaris empty/loading/error state clarity",
+      "exit_rule": "Loading, empty, unavailable, and recovery states must explain what is happening and what the user can do next."
     }
   ],
   "css_path": "/docker/chummercomplete/chummer.run-services-participate-main/Chummer.Run.Api/wwwroot/css/site.css",
@@ -108,7 +113,9 @@
         "dark-mode form controls": true,
         "44px action floor": true,
         "route visual anatomy": true,
-        "public endpoint language ban": true
+        "public endpoint language ban": true,
+        "visual evidence receipt": true,
+        "state and recovery language": true
       },
       "pass": true
     },
@@ -436,6 +443,103 @@
           "pass": true
         }
       ],
+      "pass": true
+    },
+    "state_and_recovery_language": {
+      "standard": "Nielsen status visibility + Polaris empty/loading/error state clarity + GOV.UK recovery action clarity",
+      "route_count": 5,
+      "routes": [
+        {
+          "route": "Landing.cshtml",
+          "job": "No state/recovery contract is required for this route.",
+          "required_markers": [],
+          "missing_markers": [],
+          "pass": true
+        },
+        {
+          "route": "Downloads.cshtml",
+          "job": "When a build is missing or under review, the user gets a useful next step.",
+          "required_markers": [
+            "minimal-empty",
+            "No build is available right now",
+            "href=\"/help\"",
+            "Current note"
+          ],
+          "missing_markers": [],
+          "pass": true
+        },
+        {
+          "route": "Status.cshtml",
+          "job": "Status gives a decision and recovery split instead of passive status text.",
+          "required_markers": [
+            "Current caution",
+            "aria-label=\"Status next actions\"",
+            "href=\"/downloads\"",
+            "href=\"/help\""
+          ],
+          "missing_markers": [],
+          "pass": true
+        },
+        {
+          "route": "Partizipate.cshtml",
+          "job": "Iframe failure has a polite live fallback and recovery actions.",
+          "required_markers": [
+            "participate-board-fallback",
+            "role=\"status\"",
+            "aria-live=\"polite\"",
+            "Retry",
+            "Contact"
+          ],
+          "missing_markers": [],
+          "pass": true
+        },
+        {
+          "route": "MobileProjection.cshtml",
+          "job": "PWA/live-play failure states keep install, stream, follow, and continuity recovery readable.",
+          "required_markers": [
+            "data-pwa-ledger-summary",
+            "data-pwa-ledger-follow-state",
+            "data-pwa-ledger-follow-hint",
+            "renderLedgerUnavailable(",
+            "Continuity snapshot",
+            "Enable updates",
+            "Open setup help"
+          ],
+          "missing_markers": [],
+          "pass": true
+        }
+      ],
+      "pass": true
+    },
+    "visual_evidence_receipt": {
+      "standard": "visual claims require viewport evidence, not just source heuristics",
+      "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/SCREENSHOT_QA.generated.json",
+      "status": "pass",
+      "base_url": "http://127.0.0.1:8091",
+      "required_home_viewports": [
+        "1366x768",
+        "1440x900",
+        "1920x1080",
+        "390x844",
+        "412x915",
+        "768x1024"
+      ],
+      "missing_home_viewports": [],
+      "homepage_failures": [],
+      "required_surface_viewports": [
+        "1366x768",
+        "390x844"
+      ],
+      "required_surfaces": [
+        "contact",
+        "downloads",
+        "help",
+        "ledger-map",
+        "status"
+      ],
+      "missing_surfaces": [],
+      "incomplete_surface_viewports": {},
+      "surface_failures": [],
       "pass": true
     },
     "production_basics": {

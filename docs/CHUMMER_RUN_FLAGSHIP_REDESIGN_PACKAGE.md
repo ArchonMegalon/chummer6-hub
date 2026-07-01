@@ -125,12 +125,16 @@ Exit rules:
 - Premium editorial identity: display type, body type, spacing, radius, color roles, elevation, and media rhythm are named systems, not incidental styling.
 - Depth without noise: atmospheric media and glass treatment create hierarchy, but never outrank install, play, status, recovery, or opt-in decisions.
 - Service-grade clarity: buttons, links, empty states, unavailable states, and review-required states tell the user what they can do next in product language.
+- State and recovery language: loading, empty, unavailable, and fallback states must tell the user what is happening and what to do next.
 - Accessibility as finish: contrast, focus, dark-mode form controls, select options, touch targets, reduced motion, and mobile breakpoints are release criteria.
+- Visual evidence receipt: screenshot QA must prove the home page across mobile/tablet/desktop/wide desktop and prove Downloads, Status, Ledger map, Help, and Contact at mobile and desktop sizes.
 - Quiet public language: public pages must not expose proof-dashboard language, provider names, fleet/operator phrasing, raw status enum language, or internal process labels.
 - Mobile truth: mobile/PWA surfaces must work as compact playtime tools, not shrunken desktop dashboards.
 - Open Chummer split: `Open Chummer` must stay an accessible dropdown with `Build` and `Play` buttons; flattening it back into one ambiguous action fails the gate.
 - 44px action floor: primary actions, dropdown summaries, and menu rows must stay touch-safe even when the visual shell is minimal.
 - route visual anatomy: shared route selectors must carry deliberate panel depth, spacing, radius, and containment rather than passing through token counts alone.
+- visual evidence receipt: source heuristics are not enough; the gate requires screenshot QA with zero overflow and visible hero/CTA coverage on required viewports.
+- state and recovery language: empty, loading, unavailable, iframe fallback, and PWA stream failure states are product design, not afterthought copy.
 - premium visual scorecard: typography, semantic color, elevation, layout rhythm, component anatomy, dark-mode form controls, motion fallback, responsive behavior, and public-language discipline all pass together or the gate fails.
 - zero-internal-language rule: public UI cannot leak proof, receipt, operator, fleet, governor, provider, raw enum, raw endpoint, JSON route, or process wording unless the route is explicitly an internal/authenticated operations surface.
 
@@ -140,7 +144,7 @@ Executable gate:
 python3 scripts/verify_premium_ui_design_exit_gate.py
 ```
 
-The verifier fail-closes on the design-token system, depth, responsive layout, motion governance, form-control legibility, route journey contracts, public-copy quietness, frame integrity, contrast, minimal-experience, and noise-budget evidence. A route cannot pass only because CSS contains enough gradients or hover states; it must also keep its public job and primary action visible.
+The verifier fail-closes on the design-token system, depth, responsive layout, motion governance, form-control legibility, route journey contracts, state/recovery language, screenshot QA evidence, public-copy quietness, frame integrity, contrast, minimal-experience, and noise-budget evidence. A route cannot pass only because CSS contains enough gradients or hover states; it must also keep its public job and primary action visible.
 
 ## 6. Route Family Strategy
 
