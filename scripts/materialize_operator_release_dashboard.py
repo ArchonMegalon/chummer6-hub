@@ -8,8 +8,8 @@ from typing import Any
 from urllib.parse import urlparse
 
 
-ROOT = Path("/docker/chummercomplete")
-RUN_SERVICES_ROOT = ROOT / "chummer.run-services"
+RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+ROOT = RUN_SERVICES_ROOT.parent
 PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 COMPLETION_ROOT = ROOT / "_completion" / "chummer_run_redesign_closure"
 REGISTRY_ROOT = ROOT / "chummer-hub-registry" / ".codex-studio" / "published"

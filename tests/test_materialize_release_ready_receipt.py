@@ -20,6 +20,15 @@ def load_module():
 
 
 class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
+    def test_release_ready_receipt_materializes_into_current_repo(self) -> None:
+        module = load_module()
+
+        self.assertEqual(SCRIPT_PATH.parents[1], module.RUN_SERVICES_ROOT)
+        self.assertEqual(
+            SCRIPT_PATH.parents[1] / ".codex-studio" / "published" / "RELEASE_READY.generated.json",
+            module.OUTPUT_PATH,
+        )
+
     def test_main_writes_pass_receipt_from_successful_release_verifier(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="release-ready-receipt-") as temp_dir:

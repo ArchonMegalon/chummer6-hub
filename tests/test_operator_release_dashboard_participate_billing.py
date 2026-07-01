@@ -20,6 +20,12 @@ def load_module():
 
 
 class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
+    def test_dashboard_materializes_into_current_repo_published_root(self) -> None:
+        module = load_module()
+
+        self.assertEqual(SCRIPT_PATH.parents[1], module.RUN_SERVICES_ROOT)
+        self.assertEqual(SCRIPT_PATH.parents[1] / ".codex-studio" / "published", module.PUBLISHED_ROOT)
+
     def test_dashboard_surfaces_participate_billing_honesty_gate(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="operator-dashboard-") as temp_dir:

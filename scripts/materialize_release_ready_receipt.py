@@ -9,8 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 
-ROOT = Path("/docker/chummercomplete")
-RUN_SERVICES_ROOT = ROOT / "chummer.run-services"
+RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+ROOT = RUN_SERVICES_ROOT.parent
 OUTPUT_PATH = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "RELEASE_READY.generated.json"
 VERIFY_SCRIPT = ROOT / "scripts" / "release" / "verify_chummer6_release_ready.sh"
 TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_RELEASE_READY_TIMEOUT_SECONDS", "900"))
