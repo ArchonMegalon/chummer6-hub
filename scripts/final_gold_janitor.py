@@ -75,6 +75,11 @@ REQUIRED_RECEIPTS = {
     "operator_release_dashboard": PUBLISHED_ROOT / "OPERATOR_RELEASE_DASHBOARD.generated.json",
     "release_ready": PUBLISHED_ROOT / "RELEASE_READY.generated.json",
 }
+BLAZOR_PUBLIC_ENTRY_CHECK_IDS = (
+    "home_open_chummer_dropdown_routes_build_and_play",
+    "build_route_opens_character_roster",
+    "play_route_opens_pwa_play_shell",
+)
 
 MATERIALIZERS = [
     ["python3", "scripts/verify_live_public_web_recrawl.py", "--base-url", DEFAULT_BASE_URL],
@@ -154,6 +159,41 @@ def generated_at_is_fresh(value: str, max_age_hours: int) -> bool:
     return generated_at >= datetime.now(UTC) - timedelta(hours=max_age_hours)
 
 
+def blazor_bridge_public_entry_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    proof = (payload.get("proofs") or {}).get("hub_mobile_pwa_public_projection") or {}
+    public_entry = proof.get("public_entry") if isinstance(proof.get("public_entry"), dict) else {}
+    checks = public_entry.get("checks") if isinstance(public_entry.get("checks"), dict) else {}
+    check_summary = {
+        check_id: {
+            "present": isinstance(checks.get(check_id), dict),
+            "pass": (checks.get(check_id) or {}).get("pass") is True,
+        }
+        for check_id in BLAZOR_PUBLIC_ENTRY_CHECK_IDS
+    }
+    holds = (
+        proof.get("pass") is True
+        and proof.get("base_url") == DEFAULT_BASE_URL
+        and public_entry.get("home_open_chummer_dropdown_holds") is True
+        and public_entry.get("build_route_holds") is True
+        and public_entry.get("play_shell_holds") is True
+        and public_entry.get("build_final_route") == "/app?command=character_roster"
+        and public_entry.get("play_final_route") == "/play"
+        and public_entry.get("checks_pass") is True
+        and all(item["pass"] for item in check_summary.values())
+    )
+    return {
+        "pass": holds,
+        "base_url": proof.get("base_url"),
+        "home_open_chummer_dropdown_holds": public_entry.get("home_open_chummer_dropdown_holds") is True,
+        "build_route_holds": public_entry.get("build_route_holds") is True,
+        "build_final_route": public_entry.get("build_final_route"),
+        "play_shell_holds": public_entry.get("play_shell_holds") is True,
+        "play_final_route": public_entry.get("play_final_route"),
+        "checks_pass": public_entry.get("checks_pass") is True,
+        "checks": check_summary,
+    }
+
+
 def run_materializers() -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     for command in MATERIALIZERS:
@@ -203,6 +243,7 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
         structured_failures = payload.get("failures")
         has_structured_failures = isinstance(structured_failures, list) and len(structured_failures) > 0
         passed = path.is_file() and status_value in {"pass", "passed", "ready"} and is_fresh
+        gate_failure_reason: str | None = None
         if name == "public_route_proof" and path.is_file():
             summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
             passed = (
@@ -213,10 +254,16 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
                 and is_fresh
             )
             status_value = "pass" if passed else "fail"
+        if name == "blazor_execution_horizon_bridge" and path.is_file():
+            blazor_public_entry = blazor_bridge_public_entry_summary(payload)
+            if not blazor_public_entry["pass"]:
+                passed = False
+                status_value = "fail"
+                gate_failure_reason = "blazor_execution_horizon_bridge missing live Build/Play public-entry proof"
         if passed and has_structured_failures:
             passed = False
         if not passed:
-            reason = f"{name} missing" if not path.is_file() else f"{name} failed"
+            reason = gate_failure_reason or (f"{name} missing" if not path.is_file() else f"{name} failed")
             if path.is_file() and name in FRESHNESS_REQUIRED_GATES and not is_fresh:
                 reason = f"{name} stale"
             elif path.is_file() and status_value in {"pass", "passed", "ready"} and has_structured_failures:
@@ -264,6 +311,8 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
             required_gates[name]["rulesets"] = payload.get("rulesets", {})
         if name == "public_route_proof" and path.is_file():
             required_gates[name]["summary"] = payload.get("summary", {})
+        if name == "blazor_execution_horizon_bridge" and path.is_file():
+            required_gates[name]["public_entry"] = blazor_bridge_public_entry_summary(payload)
         if name == "external_distribution_mirror_proof" and path.is_file():
             required_gates[name]["external_required"] = payload.get("external_required")
             required_gates[name]["distribution_resilience_status"] = payload.get("distribution_resilience_status")

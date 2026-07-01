@@ -21,6 +21,42 @@ def load_module():
     return module
 
 
+def valid_blazor_bridge_payload(module):
+    return {
+        "status": "pass",
+        "generated_at_utc": module.now_iso(),
+        "proofs": {
+            "hub_mobile_pwa_public_projection": {
+                "base_url": module.DEFAULT_BASE_URL,
+                "pass": True,
+                "public_entry": {
+                    "home_open_chummer_dropdown_holds": True,
+                    "build_route_holds": True,
+                    "build_final_route": "/app?command=character_roster",
+                    "play_shell_holds": True,
+                    "play_final_route": "/play",
+                    "checks_pass": True,
+                    "checks": {
+                        "home_open_chummer_dropdown_routes_build_and_play": {"present": True, "pass": True},
+                        "build_route_opens_character_roster": {"present": True, "pass": True},
+                        "play_route_opens_pwa_play_shell": {"present": True, "pass": True},
+                    },
+                },
+            },
+        },
+    }
+
+
+def write_required_receipt(module, published: Path, key: str, path: Path, payload: dict) -> None:
+    if (
+        key == "blazor_execution_horizon_bridge"
+        and payload.get("status") == "pass"
+        and not isinstance(payload.get("proofs"), dict)
+    ):
+        payload = valid_blazor_bridge_payload(module)
+    (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+
+
 class FinalGoldJanitorTests(unittest.TestCase):
     def test_materializers_build_provider_receipts_before_ltd_stack(self) -> None:
         module = load_module()
@@ -85,10 +121,13 @@ class FinalGoldJanitorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="gold-janitor-") as temp_dir:
             published = Path(temp_dir) / "published"
             published.mkdir(parents=True, exist_ok=True)
-            for name in module.REQUIRED_RECEIPTS.values():
-                (published / name.name).write_text(
-                    json.dumps({"status": "pass", "generated_at_utc": module.now_iso()}),
-                    encoding="utf-8",
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                write_required_receipt(
+                    module,
+                    published,
+                    key,
+                    path,
+                    {"status": "pass", "generated_at_utc": module.now_iso()},
                 )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
@@ -96,6 +135,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
 
         self.assertEqual(payload["artifact_root"], "_completion/full_product_reaudit_v20")
         self.assertEqual(payload["scope"], "full_estate_v20")
+        self.assertTrue(payload["required_gates"]["blazor_execution_horizon_bridge"]["public_entry"]["pass"])
 
     def test_payload_fails_on_stale_recrawl(self) -> None:
         module = load_module()
@@ -105,9 +145,12 @@ class FinalGoldJanitorTests(unittest.TestCase):
             stale_time = "2020-01-01T00:00:00Z"
             for key, path in module.REQUIRED_RECEIPTS.items():
                 generated_at = stale_time if key == "live_public_web_recrawl" else module.now_iso()
-                (published / path.name).write_text(
-                    json.dumps({"status": "pass", "generated_at_utc": generated_at}),
-                    encoding="utf-8",
+                write_required_receipt(
+                    module,
+                    published,
+                    key,
+                    path,
+                    {"status": "pass", "generated_at_utc": generated_at},
                 )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
@@ -134,7 +177,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+                write_required_receipt(module, published, key, path, payload)
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -142,6 +185,42 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual("fail", payload["status"])
         self.assertIn("public_route_proof failed", payload["failures"])
         self.assertFalse(payload["required_gates"]["public_route_proof"]["pass"])
+
+    def test_payload_fails_when_blazor_bridge_lacks_live_build_play_public_entry(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-blazor-public-entry-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "blazor_execution_horizon_bridge":
+                    payload = valid_blazor_bridge_payload(module)
+                    payload["proofs"]["hub_mobile_pwa_public_projection"]["public_entry"]["build_final_route"] = "/build"
+                write_required_receipt(module, published, key, path, payload)
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["blazor_execution_horizon_bridge"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn(
+            "blazor_execution_horizon_bridge missing live Build/Play public-entry proof",
+            payload["failures"],
+        )
+        self.assertFalse(gate["pass"])
+        self.assertFalse(gate["public_entry"]["pass"])
+        self.assertEqual("/build", gate["public_entry"]["build_final_route"])
 
     def test_payload_fails_required_receipts_that_report_structured_failures(self) -> None:
         module = load_module()
@@ -166,7 +245,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+                write_required_receipt(module, published, key, path, payload)
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -197,7 +276,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+                write_required_receipt(module, published, key, path, payload)
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             stdout = io.StringIO()
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
@@ -228,9 +307,12 @@ class FinalGoldJanitorTests(unittest.TestCase):
             stale_time = "2020-01-01T00:00:00Z"
             for key, path in module.REQUIRED_RECEIPTS.items():
                 generated_at = stale_time if key == "rule_authority_minimum_coverage" else module.now_iso()
-                (published / path.name).write_text(
-                    json.dumps({"status": "pass", "generated_at_utc": generated_at}),
-                    encoding="utf-8",
+                write_required_receipt(
+                    module,
+                    published,
+                    key,
+                    path,
+                    {"status": "pass", "generated_at_utc": generated_at},
                 )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
@@ -261,7 +343,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                         },
                         "failures": ["sr4 final_verdict is not ready"],
                     }
-                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+                write_required_receipt(module, published, key, path, payload)
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -300,7 +382,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "exists": False,
                         },
                     }
-                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+                write_required_receipt(module, published, key, path, payload)
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -333,7 +415,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                         },
                         "failures": ["sr4 final_verdict is not ready"],
                     }
-                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+                write_required_receipt(module, published, key, path, payload)
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             stderr = io.StringIO()
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
@@ -376,7 +458,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+                write_required_receipt(module, published, key, path, payload)
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -431,7 +513,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+                write_required_receipt(module, published, key, path, payload)
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -469,7 +551,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+                write_required_receipt(module, published, key, path, payload)
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
