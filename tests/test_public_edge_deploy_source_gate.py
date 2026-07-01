@@ -298,3 +298,20 @@ def test_public_edge_rebuild_scripts_call_source_gate() -> None:
         assert "chummer-run-identity" in script
         assert "chummer-portal" in script
         assert "docker compose" in script
+
+
+def test_release_ready_script_calls_public_edge_deploy_source_gate() -> None:
+    script = (ROOT / "scripts" / "verify_chummer6_release_ready.sh").read_text(encoding="utf-8")
+
+    assert "verify_public_edge_deploy_source()" in script
+    assert "CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE" in script
+    assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD" in script
+    assert "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" in script
+    assert "CHUMMER_RUN_SERVICES_CONTEXT_DIR" in script
+    assert "CHUMMER_RUN_SERVICES_SOURCE" in script
+    assert "scripts/verify_public_edge_deploy_source.py" in script
+    assert "--compose-file" in script
+    assert "--compose-service chummer-portal" in script
+    assert "--require-upstream" in script
+    assert "run_function_gate verify_public_edge_deploy_source" in script
+    assert script.index("run_function_gate verify_public_edge_deploy_source") < script.index("run_hub_gate verify_windows_installer_visual_audit")

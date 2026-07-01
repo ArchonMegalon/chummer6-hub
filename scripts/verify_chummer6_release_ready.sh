@@ -96,6 +96,29 @@ verify_public_ui_frame_integrity() {
   done
 }
 
+verify_public_edge_deploy_source() {
+  if [[ "${CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE:-1}" =~ ^(0|false|no|off)$ ]]; then
+    echo "public edge deploy source gate skipped"
+    return 0
+  fi
+
+  local gate_args=(
+    --repo-root "$run_services_root"
+    --compose-file "$run_services_root/docker-compose.public-edge.yml"
+    --compose-service chummer-portal
+    --require-upstream
+    --json
+  )
+  if [[ -n "${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}" ]]; then
+    gate_args+=(--expected-head "$CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD")
+  fi
+
+  CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT="$workspace_root" \
+  CHUMMER_RUN_SERVICES_CONTEXT_DIR="$(basename "$run_services_root")" \
+  CHUMMER_RUN_SERVICES_SOURCE="$run_services_root" \
+    python3 "$run_services_root/scripts/verify_public_edge_deploy_source.py" "${gate_args[@]}"
+}
+
 verify_no_public_internal_dependencies() {
   CHUMMER_RUN_SERVICES_ROOT="$run_services_root" CHUMMER_WORKSPACE_ROOT="$workspace_root" python3 - <<'PY'
 import os
@@ -165,6 +188,7 @@ print("repo release posture ok")
 PY
 }
 
+run_function_gate verify_public_edge_deploy_source verify_public_edge_deploy_source
 run_hub_gate verify_windows_installer_visual_audit python3 scripts/verify_windows_installer_visual_audit.py
 if ((${#failures[@]})) && [[ "${CHUMMER_RELEASE_READY_STOP_ON_PRECHECK_FAILURE:-1}" =~ ^(1|true|yes|on)$ ]]; then
   echo "NOT RELEASE READY"
