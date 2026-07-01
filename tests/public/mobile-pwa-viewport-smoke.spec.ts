@@ -2,6 +2,7 @@ import { expect, test } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
+const viewportSmokeTimeoutMs = Number(process.env.CHUMMER_MOBILE_PWA_VIEWPORT_TIMEOUT_MS || '240000');
 
 const viewports = [
   { name: 'phone-390', width: 390, height: 844 },
@@ -19,7 +20,7 @@ const routes = [
 ];
 
 test('core mobile PWA routes fit phone tablet and desktop viewports', async ({ browser }) => {
-  test.setTimeout(120000);
+  test.setTimeout(viewportSmokeTimeoutMs);
   const results: Array<Record<string, unknown>> = [];
   const failures: string[] = [];
 

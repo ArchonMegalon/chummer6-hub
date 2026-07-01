@@ -50,7 +50,7 @@ def run_git(repo_root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def resolve_compose_source_paths(compose_file: Path, service_name: str) -> tuple[Path, Path]:
+def resolve_compose_source_paths(compose_file: Path, service_name: str) -> tuple[Path, Path, Path]:
     compose_file = compose_file.resolve()
     payload = yaml.safe_load(compose_file.read_text(encoding="utf-8")) or {}
     services = payload.get("services") if isinstance(payload, dict) else None
@@ -91,9 +91,18 @@ def resolve_compose_source_paths(compose_file: Path, service_name: str) -> tuple
     if isinstance(additional_contexts, dict):
         run_services_source = additional_contexts.get("run-services-source")
         if isinstance(run_services_source, str) and run_services_source.strip():
-            return resolve_path_value(run_services_source, compose_file.parent), dockerfile_source
+            return resolve_path_value(run_services_source, compose_file.parent), dockerfile_source, dockerfile_path
 
-    return dockerfile_source, dockerfile_source
+    return dockerfile_source, dockerfile_source, dockerfile_path
+
+
+def dockerfile_has_portal_service_worker_guard(dockerfile_path: Path) -> bool:
+    text = dockerfile_path.read_text(encoding="utf-8")
+    return (
+        "/app/publish/wwwroot/service-worker.js" in text
+        and 'const CACHE_NAME = "chummer-public-v4";' in text
+        and "play-shell-v" in text
+    )
 
 
 def verify(
@@ -117,13 +126,15 @@ def verify(
     findings: list[dict[str, str]] = []
     compose_build_source = ""
     compose_dockerfile_source = ""
+    compose_dockerfile_path = ""
     if compose_file is not None or compose_service:
         if compose_file is None or not compose_service:
             raise ValueError("--compose-file and --compose-service must be supplied together")
 
-        build_source, dockerfile_source = resolve_compose_source_paths(compose_file, compose_service)
+        build_source, dockerfile_source, dockerfile_path = resolve_compose_source_paths(compose_file, compose_service)
         compose_build_source = str(build_source)
         compose_dockerfile_source = str(dockerfile_source)
+        compose_dockerfile_path = str(dockerfile_path)
         if build_source != top_level:
             findings.append(
                 {
@@ -132,6 +143,17 @@ def verify(
                     "detail": (
                         f"compose service {compose_service} builds from {build_source}, "
                         f"but deploy source gate was run against {top_level}"
+                    ),
+                }
+            )
+        if not dockerfile_has_portal_service_worker_guard(dockerfile_path):
+            findings.append(
+                {
+                    "id": "missing_portal_service_worker_publish_guard",
+                    "severity": "blocker",
+                    "detail": (
+                        f"compose service {compose_service} Dockerfile {dockerfile_path} does not fail closed "
+                        "when the published root service worker is not the portal public worker"
                     ),
                 }
             )
@@ -204,6 +226,7 @@ def verify(
         "composeService": compose_service or "",
         "composeBuildSource": compose_build_source,
         "composeDockerfileSource": compose_dockerfile_source,
+        "composeDockerfilePath": compose_dockerfile_path,
         "dirtyLineCount": len(dirty_lines),
         "dirtyLines": dirty_lines[:50],
         "findings": findings,

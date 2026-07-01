@@ -14,6 +14,13 @@ assert SPEC and SPEC.loader
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
+GUARDED_DOCKERFILE = """
+FROM scratch
+RUN test -f /app/publish/wwwroot/service-worker.js \
+ && grep -q 'const CACHE_NAME = "chummer-public-v4";' /app/publish/wwwroot/service-worker.js \
+ && ! grep -q 'play-shell-v' /app/publish/wwwroot/service-worker.js
+""".lstrip()
+
 
 def git(repo: Path, *args: str) -> str:
     result = subprocess.run(
@@ -45,7 +52,7 @@ def make_named_repo(path: Path) -> tuple[Path, str]:
     git(path, "config", "user.name", "Chummer Tests")
     (path / "README.md").write_text(f"clean deploy source at {path.name}\n", encoding="utf-8")
     (path / "Chummer.Run.Api").mkdir()
-    (path / "Chummer.Run.Api" / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+    (path / "Chummer.Run.Api" / "Dockerfile").write_text(GUARDED_DOCKERFILE, encoding="utf-8")
     git(path, "add", "README.md", "Chummer.Run.Api/Dockerfile")
     git(path, "commit", "-qm", "initial")
     return path, git(path, "rev-parse", "HEAD")
@@ -191,6 +198,29 @@ services:
     assert receipt["status"] == "pass"
     assert receipt["composeBuildSource"].endswith("clean-worktree")
     assert receipt["composeDockerfileSource"].endswith("clean-worktree")
+    assert receipt["composeDockerfilePath"].endswith("clean-worktree/Chummer.Run.Api/Dockerfile")
+
+
+def test_compose_build_source_requires_portal_service_worker_publish_guard() -> None:
+    with tempfile.TemporaryDirectory(prefix="chummer-edge-source-") as temp:
+        temp_root = Path(temp)
+        context = temp_root / "context"
+        repo, head = make_named_repo(context / "clean-worktree")
+        (repo / "Chummer.Run.Api" / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+        git(repo, "add", "Chummer.Run.Api/Dockerfile")
+        git(repo, "commit", "-qm", "remove portal service worker guard")
+        head = git(repo, "rev-parse", "HEAD")
+        compose = write_compose(temp_root, context, repo.name)
+
+        receipt = MODULE.verify(
+            repo,
+            expected_head=head,
+            compose_file=compose,
+            compose_service="chummer-portal",
+        )
+
+    assert receipt["status"] == "fail"
+    assert any(finding["id"] == "missing_portal_service_worker_publish_guard" for finding in receipt["findings"])
 
 
 def test_compose_build_source_rejects_split_additional_context_and_dockerfile_source() -> None:
