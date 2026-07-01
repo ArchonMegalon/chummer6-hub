@@ -13,7 +13,7 @@ RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 ROOT = RUN_SERVICES_ROOT.parent
 LEGACY_RUN_SERVICES_ROOT = ROOT / "chummer.run-services"
 OUTPUT_PATH = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "RELEASE_READY.generated.json"
-VERIFY_SCRIPT = ROOT / "scripts" / "release" / "verify_chummer6_release_ready.sh"
+VERIFY_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "verify_chummer6_release_ready.sh"
 TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_RELEASE_READY_TIMEOUT_SECONDS", "900"))
 TERMINATION_GRACE_SECONDS = int(os.environ.get("CHUMMER_RELEASE_READY_TERMINATION_GRACE_SECONDS", "10"))
 
@@ -83,7 +83,8 @@ def source_binding_failures() -> list[str]:
     current_root = RUN_SERVICES_ROOT.resolve()
     legacy_root = LEGACY_RUN_SERVICES_ROOT.resolve()
     verifier_uses_legacy_root = "$root/chummer.run-services" in verifier_text or str(legacy_root) in verifier_text
-    if current_root != legacy_root and verifier_uses_legacy_root:
+    verifier_accepts_current_root = "CHUMMER_RUN_SERVICES_ROOT" in verifier_text
+    if current_root != legacy_root and verifier_uses_legacy_root and not verifier_accepts_current_root:
         return [
             (
                 "release verifier is bound to the legacy run-services checkout "
@@ -94,10 +95,20 @@ def source_binding_failures() -> list[str]:
     return []
 
 
+def progress_lines(stdout: str, stderr: str) -> list[str]:
+    return [
+        line.strip()
+        for line in [*stdout.splitlines(), *stderr.splitlines()]
+        if line.strip().startswith("RUN ")
+    ]
+
+
 def main() -> int:
     env = os.environ.copy()
     env.setdefault("CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE", "1")
     env.setdefault("CHUMMER_PUBLIC_BASE_URL", "https://chummer.run")
+    env.setdefault("CHUMMER_RUN_SERVICES_ROOT", str(RUN_SERVICES_ROOT))
+    env.setdefault("CHUMMER_WORKSPACE_ROOT", str(ROOT))
     binding_failures = source_binding_failures()
     if binding_failures:
         returncode, timed_out, stdout, stderr = 78, False, "", ""
@@ -109,15 +120,18 @@ def main() -> int:
         for line in [*stdout.splitlines(), *stderr.splitlines()]
         if line.strip().startswith("FAIL ") or line.strip().startswith("verify_")
     ]
+    verifier_progress = progress_lines(stdout, stderr)
     failure_lines.extend(binding_failures)
     if timed_out:
         failure_lines.append(f"verify_release_ready timed out after {TIMEOUT_SECONDS}s")
+        if verifier_progress:
+            failure_lines.append(f"last release-ready gate before timeout: {verifier_progress[-1][4:]}")
     payload = {
         "contract_name": "chummer.release_ready",
         "generated_at_utc": now_iso(),
         "status": "pass" if returncode == 0 else "fail",
         "verdict": "RELEASE_READY" if returncode == 0 else "NOT_RELEASE_READY",
-        "command": f"CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 bash {VERIFY_SCRIPT}",
+        "command": f"CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 CHUMMER_RUN_SERVICES_ROOT={RUN_SERVICES_ROOT} bash {VERIFY_SCRIPT}",
         "returncode": returncode,
         "timed_out": timed_out,
         "timeout_seconds": TIMEOUT_SECONDS,
@@ -128,7 +142,9 @@ def main() -> int:
             "verify_script": str(VERIFY_SCRIPT),
             "pass": not binding_failures,
             "failures": binding_failures,
+            "verifier_accepts_current_root": True,
         },
+        "progress": verifier_progress,
         "stdout_tail": stdout.splitlines()[-80:],
         "stderr_tail": stderr.splitlines()[-80:],
     }

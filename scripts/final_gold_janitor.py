@@ -449,13 +449,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    prior_payload = load_json(PUBLISHED_ROOT / "FINAL_GOLD_JANITOR.generated.json")
     command_results = [] if args.skip_materializers else run_materializers()
     payload = build_payload(command_results)
-    if args.skip_materializers and not payload.get("materializers"):
-        prior_materializers = prior_payload.get("materializers")
-        if isinstance(prior_materializers, list):
-            payload["materializers"] = prior_materializers
     legacy_payload = dict(payload)
     legacy_payload["mirrors"] = {
         "authoritative_artifact_root": payload["artifact_root"],

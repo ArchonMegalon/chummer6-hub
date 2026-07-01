@@ -1,24 +1,34 @@
 {
   "contract_name": "chummer.release_ready",
-  "generated_at_utc": "2026-07-01T01:04:04Z",
+  "generated_at_utc": "2026-07-01T02:08:54Z",
   "status": "fail",
   "verdict": "NOT_RELEASE_READY",
-  "command": "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 bash /docker/chummercomplete/scripts/release/verify_chummer6_release_ready.sh",
-  "returncode": 78,
+  "command": "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 CHUMMER_RUN_SERVICES_ROOT=/docker/chummercomplete/chummer.run-services-participate-main bash /docker/chummercomplete/chummer.run-services-participate-main/scripts/verify_chummer6_release_ready.sh",
+  "returncode": 1,
   "timed_out": false,
   "timeout_seconds": 900,
   "failures": [
-    "release verifier is bound to the legacy run-services checkout /docker/chummercomplete/chummer.run-services, not the current repo /docker/chummercomplete/chummer.run-services-participate-main"
+    "FAIL verify_windows_installer_visual_audit",
+    "verify_windows_installer_visual_audit"
   ],
   "source_binding": {
     "current_repo": "/docker/chummercomplete/chummer.run-services-participate-main",
     "legacy_run_services_root": "/docker/chummercomplete/chummer.run-services",
-    "verify_script": "/docker/chummercomplete/scripts/release/verify_chummer6_release_ready.sh",
-    "pass": false,
-    "failures": [
-      "release verifier is bound to the legacy run-services checkout /docker/chummercomplete/chummer.run-services, not the current repo /docker/chummercomplete/chummer.run-services-participate-main"
-    ]
+    "verify_script": "/docker/chummercomplete/chummer.run-services-participate-main/scripts/verify_chummer6_release_ready.sh",
+    "pass": true,
+    "failures": [],
+    "verifier_accepts_current_root": true
   },
-  "stdout_tail": [],
+  "progress": [
+    "RUN verify_windows_installer_visual_audit"
+  ],
+  "stdout_tail": [
+    "RUN verify_windows_installer_visual_audit",
+    "FAIL verify_windows_installer_visual_audit",
+    "windows_installer_visual_audit:fail",
+    "",
+    "NOT RELEASE READY",
+    "verify_windows_installer_visual_audit"
+  ],
   "stderr_tail": []
 }

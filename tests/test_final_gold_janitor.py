@@ -299,6 +299,55 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual("GOLD_READY", durable_payload["verdict"])
         self.assertEqual("_completion/full_product_reaudit_v20", legacy_payload["mirrors"]["authoritative_artifact_root"])
 
+    def test_skip_materializers_does_not_preserve_stale_failed_materializer_rows(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-skip-materializers-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            artifact_root = Path(temp_dir) / "full_product_reaudit_v20"
+            legacy_root = Path(temp_dir) / "gold_readiness_closure"
+            published.mkdir(parents=True, exist_ok=True)
+            (published / "FINAL_GOLD_JANITOR.generated.json").write_text(
+                json.dumps(
+                    {
+                        "status": "fail",
+                        "materializers": [
+                            {
+                                "command": "python3 old_broken_materializer.py",
+                                "returncode": 1,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                write_required_receipt(module, published, key, path, payload)
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with (
+                mock.patch.object(module, "PUBLISHED_ROOT", published),
+                mock.patch.object(module, "ARTIFACT_ROOT", artifact_root),
+                mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root),
+                mock.patch.object(module, "REQUIRED_RECEIPTS", required),
+                mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]),
+            ):
+                self.assertEqual(0, module.main())
+
+            payload = json.loads((published / "FINAL_GOLD_JANITOR.generated.json").read_text(encoding="utf-8"))
+
+        self.assertEqual([], payload["materializers"])
+
     def test_payload_fails_on_stale_rule_authority_receipt(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-stale-rules-") as temp_dir:
