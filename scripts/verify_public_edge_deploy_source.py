@@ -50,7 +50,7 @@ def run_git(repo_root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def resolve_compose_build_source(compose_file: Path, service_name: str) -> Path:
+def resolve_compose_source_paths(compose_file: Path, service_name: str) -> tuple[Path, Path]:
     compose_file = compose_file.resolve()
     payload = yaml.safe_load(compose_file.read_text(encoding="utf-8")) or {}
     services = payload.get("services") if isinstance(payload, dict) else None
@@ -64,12 +64,6 @@ def resolve_compose_build_source(compose_file: Path, service_name: str) -> Path:
     build = service.get("build")
     if not isinstance(build, dict):
         raise ValueError(f"{compose_file} service {service_name!r} does not use object-form build config")
-
-    additional_contexts = build.get("additional_contexts")
-    if isinstance(additional_contexts, dict):
-        run_services_source = additional_contexts.get("run-services-source")
-        if isinstance(run_services_source, str) and run_services_source.strip():
-            return resolve_path_value(run_services_source, compose_file.parent)
 
     context_value = expand_compose_value(str(build.get("context") or "").strip())
     dockerfile_value = expand_compose_value(str(build.get("dockerfile") or "").strip())
@@ -86,18 +80,20 @@ def resolve_compose_build_source(compose_file: Path, service_name: str) -> Path:
         dockerfile_path = context_path / dockerfile_path
     dockerfile_path = dockerfile_path.resolve()
 
-    try:
-        relative_dockerfile = dockerfile_path.relative_to(context_path)
-    except ValueError as exc:
-        raise ValueError(f"{dockerfile_path} is outside build context {context_path}") from exc
-
-    if len(relative_dockerfile.parts) < 2:
+    if dockerfile_path.name != "Dockerfile" or not dockerfile_path.parent.name.startswith("Chummer.Run."):
         raise ValueError(
             f"{compose_file} service {service_name!r} dockerfile {dockerfile_value!r} "
-            "does not identify a source directory under the build context"
+            "does not identify a Chummer.Run service Dockerfile"
         )
+    dockerfile_source = dockerfile_path.parent.parent.resolve()
 
-    return (context_path / relative_dockerfile.parts[0]).resolve()
+    additional_contexts = build.get("additional_contexts")
+    if isinstance(additional_contexts, dict):
+        run_services_source = additional_contexts.get("run-services-source")
+        if isinstance(run_services_source, str) and run_services_source.strip():
+            return resolve_path_value(run_services_source, compose_file.parent), dockerfile_source
+
+    return dockerfile_source, dockerfile_source
 
 
 def verify(
@@ -120,12 +116,14 @@ def verify(
 
     findings: list[dict[str, str]] = []
     compose_build_source = ""
+    compose_dockerfile_source = ""
     if compose_file is not None or compose_service:
         if compose_file is None or not compose_service:
             raise ValueError("--compose-file and --compose-service must be supplied together")
 
-        build_source = resolve_compose_build_source(compose_file, compose_service)
+        build_source, dockerfile_source = resolve_compose_source_paths(compose_file, compose_service)
         compose_build_source = str(build_source)
+        compose_dockerfile_source = str(dockerfile_source)
         if build_source != top_level:
             findings.append(
                 {
@@ -134,6 +132,28 @@ def verify(
                     "detail": (
                         f"compose service {compose_service} builds from {build_source}, "
                         f"but deploy source gate was run against {top_level}"
+                    ),
+                }
+            )
+        if dockerfile_source != top_level:
+            findings.append(
+                {
+                    "id": "compose_dockerfile_source_mismatch",
+                    "severity": "blocker",
+                    "detail": (
+                        f"compose service {compose_service} reads Dockerfile from {dockerfile_source}, "
+                        f"but deploy source gate was run against {top_level}"
+                    ),
+                }
+            )
+        if build_source != dockerfile_source:
+            findings.append(
+                {
+                    "id": "compose_split_source_mismatch",
+                    "severity": "blocker",
+                    "detail": (
+                        f"compose service {compose_service} builds content from {build_source} "
+                        f"but reads Dockerfile from {dockerfile_source}"
                     ),
                 }
             )
@@ -183,6 +203,7 @@ def verify(
         "composeFile": str(compose_file.resolve()) if compose_file is not None else "",
         "composeService": compose_service or "",
         "composeBuildSource": compose_build_source,
+        "composeDockerfileSource": compose_dockerfile_source,
         "dirtyLineCount": len(dirty_lines),
         "dirtyLines": dirty_lines[:50],
         "findings": findings,

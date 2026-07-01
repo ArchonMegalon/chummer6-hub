@@ -128,6 +128,7 @@ def test_compose_build_source_matching_repo_passes() -> None:
 
     assert receipt["status"] == "pass"
     assert receipt["composeBuildSource"].endswith("chummer.run-services")
+    assert receipt["composeDockerfileSource"].endswith("chummer.run-services")
 
 
 def test_compose_build_source_mismatch_fails() -> None:
@@ -189,13 +190,15 @@ services:
 
     assert receipt["status"] == "pass"
     assert receipt["composeBuildSource"].endswith("clean-worktree")
+    assert receipt["composeDockerfileSource"].endswith("clean-worktree")
 
 
-def test_compose_build_source_prefers_named_run_services_context() -> None:
+def test_compose_build_source_rejects_split_additional_context_and_dockerfile_source() -> None:
     with tempfile.TemporaryDirectory(prefix="chummer-edge-source-") as temp:
         temp_root = Path(temp)
         context = temp_root / "context"
         repo, head = make_named_repo(context / "clean-worktree")
+        make_named_repo(context / "chummer.run-services")
         compose_path = temp_root / "docker-compose.public-edge.yml"
         compose_path.write_text(
             f"""
@@ -224,8 +227,56 @@ services:
             else:
                 os.environ["CHUMMER_RUN_SERVICES_SOURCE"] = previous_source
 
+    assert receipt["status"] == "fail"
+    assert receipt["composeBuildSource"].endswith("clean-worktree")
+    assert receipt["composeDockerfileSource"].endswith("chummer.run-services")
+    assert any(finding["id"] == "compose_dockerfile_source_mismatch" for finding in receipt["findings"])
+    assert any(finding["id"] == "compose_split_source_mismatch" for finding in receipt["findings"])
+
+
+def test_compose_build_source_accepts_matching_run_services_source_and_context_dir() -> None:
+    with tempfile.TemporaryDirectory(prefix="chummer-edge-source-") as temp:
+        temp_root = Path(temp)
+        context = temp_root / "context"
+        repo, head = make_named_repo(context / "clean-worktree")
+        make_named_repo(context / "chummer.run-services")
+        compose_path = temp_root / "docker-compose.public-edge.yml"
+        compose_path.write_text(
+            f"""
+services:
+  chummer-portal:
+    build:
+      context: {context}
+      dockerfile: ${{CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}}/Chummer.Run.Api/Dockerfile
+      additional_contexts:
+        run-services-source: ${{CHUMMER_RUN_SERVICES_SOURCE:-{context / "chummer.run-services"}}}
+""".lstrip(),
+            encoding="utf-8",
+        )
+        previous_context_dir = os.environ.get("CHUMMER_RUN_SERVICES_CONTEXT_DIR")
+        previous_source = os.environ.get("CHUMMER_RUN_SERVICES_SOURCE")
+        os.environ["CHUMMER_RUN_SERVICES_CONTEXT_DIR"] = repo.name
+        os.environ["CHUMMER_RUN_SERVICES_SOURCE"] = str(repo)
+        try:
+            receipt = MODULE.verify(
+                repo,
+                expected_head=head,
+                compose_file=compose_path,
+                compose_service="chummer-portal",
+            )
+        finally:
+            if previous_context_dir is None:
+                os.environ.pop("CHUMMER_RUN_SERVICES_CONTEXT_DIR", None)
+            else:
+                os.environ["CHUMMER_RUN_SERVICES_CONTEXT_DIR"] = previous_context_dir
+            if previous_source is None:
+                os.environ.pop("CHUMMER_RUN_SERVICES_SOURCE", None)
+            else:
+                os.environ["CHUMMER_RUN_SERVICES_SOURCE"] = previous_source
+
     assert receipt["status"] == "pass"
     assert receipt["composeBuildSource"].endswith("clean-worktree")
+    assert receipt["composeDockerfileSource"].endswith("clean-worktree")
 
 
 def test_public_edge_rebuild_scripts_call_source_gate() -> None:
@@ -239,6 +290,11 @@ def test_public_edge_rebuild_scripts_call_source_gate() -> None:
         script = script_path.read_text(encoding="utf-8")
         assert "CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE" in script
         assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD" in script
+        assert "CHUMMER_PUBLIC_EDGE_DEPLOY_REPO_ROOT" in script
         assert "scripts/verify_public_edge_deploy_source.py" in script
         assert "--expected-head" in script
+        assert "--compose-file" in script
+        assert "--compose-service" in script
+        assert "chummer-run-identity" in script
+        assert "chummer-portal" in script
         assert "docker compose" in script

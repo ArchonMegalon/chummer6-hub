@@ -17,6 +17,7 @@ HUB_CLOSEOUT_INCLUDE_BLAZOR="${HUB_CLOSEOUT_INCLUDE_BLAZOR:-0}"
 HUB_ENV_FILE="${CHUMMER_HUB_ENV_FILE:-}"
 PUBLIC_EDGE_DEPLOY_SOURCE_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE:-1}"
 PUBLIC_EDGE_EXPECTED_HEAD="${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}"
+PUBLIC_EDGE_DEPLOY_REPO_ROOT="${CHUMMER_PUBLIC_EDGE_DEPLOY_REPO_ROOT:-${CHUMMER_RUN_SERVICES_SOURCE:-$ROOT_DIR}}"
 
 if [[ -z "$HUB_ENV_FILE" ]]; then
   if [[ -f "$ROOT_DIR/.env" ]]; then
@@ -61,13 +62,24 @@ fi
 if [[ "$HUB_CLOSEOUT_BUILD" == "1" || "$HUB_CLOSEOUT_BUILD" == "true" || "$HUB_CLOSEOUT_BUILD" == "TRUE" ]]; then
   echo
   echo "== rebuild local public edge =="
-  if [[ "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "0" && "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "false" && "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "FALSE" ]]; then
-    gate_args=(--repo-root "$ROOT_DIR")
+  verify_public_edge_deploy_source() {
+    local compose_service="$1"
+    if [[ "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" == "0" || "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" == "false" || "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" == "FALSE" ]]; then
+      return 0
+    fi
+
+    local gate_args=(
+      --repo-root "$PUBLIC_EDGE_DEPLOY_REPO_ROOT"
+      --compose-file "$HUB_EDGE_COMPOSE_FILE"
+      --compose-service "$compose_service"
+    )
     if [[ -n "$PUBLIC_EDGE_EXPECTED_HEAD" ]]; then
       gate_args+=(--expected-head "$PUBLIC_EDGE_EXPECTED_HEAD")
     fi
     python3 scripts/verify_public_edge_deploy_source.py "${gate_args[@]}"
-  fi
+  }
+  verify_public_edge_deploy_source chummer-run-identity
+  verify_public_edge_deploy_source chummer-portal
   public_edge_services=(chummer-run-identity chummer-portal)
   if [[ "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "1" || "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "true" || "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "TRUE" ]]; then
     public_edge_services+=(chummer-public-blazor)

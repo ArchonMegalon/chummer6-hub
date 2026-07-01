@@ -12,6 +12,7 @@ HUB_PUBLIC_HOST="${CHUMMER_HUB_PUBLIC_HOST:-chummer.run}"
 HUB_SKIP_EDGE_REBUILD="${CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD:-0}"
 PUBLIC_EDGE_DEPLOY_SOURCE_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE:-1}"
 PUBLIC_EDGE_EXPECTED_HEAD="${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}"
+PUBLIC_EDGE_DEPLOY_REPO_ROOT="${CHUMMER_PUBLIC_EDGE_DEPLOY_REPO_ROOT:-${CHUMMER_RUN_SERVICES_SOURCE:-$ROOT_DIR}}"
 HUB_LOCAL_PROOF_PATH="${CHUMMER_HUB_LOCAL_PROOF_PATH:-.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
 HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT="${CHUMMER_HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT:-scripts/cleanup_synthetic_support_cases.py}"
 
@@ -84,6 +85,23 @@ cleanup_synthetic_support_cases() {
     --token "$token"
 }
 
+verify_public_edge_deploy_source() {
+  local compose_service="$1"
+  if [[ "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" == "0" || "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" == "false" || "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" == "FALSE" ]]; then
+    return 0
+  fi
+
+  local gate_args=(
+    --repo-root "$PUBLIC_EDGE_DEPLOY_REPO_ROOT"
+    --compose-file "$HUB_EDGE_COMPOSE_FILE"
+    --compose-service "$compose_service"
+  )
+  if [[ -n "$PUBLIC_EDGE_EXPECTED_HEAD" ]]; then
+    gate_args+=(--expected-head "$PUBLIC_EDGE_EXPECTED_HEAD")
+  fi
+  python3 scripts/verify_public_edge_deploy_source.py "${gate_args[@]}"
+}
+
 resolve_hub_proof_base_url() {
   if [[ "$HUB_BASE_URL" == http://* ]]; then
     printf 'https://%s\n' "$HUB_PUBLIC_HOST"
@@ -96,13 +114,8 @@ resolve_hub_proof_base_url() {
 if [[ "$HUB_SKIP_EDGE_REBUILD" == "1" || "$HUB_SKIP_EDGE_REBUILD" == "true" || "$HUB_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
   echo "reusing current hub edge containers for playwright e2e"
 else
-  if [[ "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "0" && "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "false" && "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" != "FALSE" ]]; then
-    gate_args=(--repo-root "$ROOT_DIR")
-    if [[ -n "$PUBLIC_EDGE_EXPECTED_HEAD" ]]; then
-      gate_args+=(--expected-head "$PUBLIC_EDGE_EXPECTED_HEAD")
-    fi
-    python3 scripts/verify_public_edge_deploy_source.py "${gate_args[@]}"
-  fi
+  verify_public_edge_deploy_source chummer-run-identity
+  verify_public_edge_deploy_source chummer-portal
 
   compose_up_log="$(mktemp)"
   set +e
