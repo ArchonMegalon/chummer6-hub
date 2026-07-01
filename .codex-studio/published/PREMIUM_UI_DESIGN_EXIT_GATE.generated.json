@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.premium_ui_design_exit_gate",
-  "generated_at_utc": "2026-07-01T02:28:06Z",
+  "generated_at_utc": "2026-07-01T03:04:24Z",
   "status": "pass",
   "verdict": "PREMIUM_UI_READY",
   "reference_systems": [
@@ -354,6 +354,12 @@
       "view_count": 5,
       "leaked_terms": [],
       "public_copy_leak_gate_status": "pass",
+      "pass": true
+    },
+    "public_action_endpoint_language": {
+      "standard": "GOV.UK plain service journeys + HIG clarity: public actions point at product pages, not data endpoints",
+      "view_count": 5,
+      "findings": [],
       "pass": true
     },
     "route_journey_contracts": {

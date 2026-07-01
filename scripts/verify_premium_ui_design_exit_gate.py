@@ -299,6 +299,18 @@ VISIBLE_INTERNAL_COPY_PATTERNS = {
     "raw_route_label": re.compile(r"\bRoute\s*:", flags=re.IGNORECASE),
     "internal_status_label": re.compile(r"\b(review_required|readiness_review_required|not_required)\b", flags=re.IGNORECASE),
 }
+ACTIONABLE_ENDPOINT_ATTR_RE = re.compile(
+    r"\b(?P<attribute>href|action|formaction)\s*=\s*(?P<quote>[\"'])(?P<value>.*?)(?P=quote)",
+    flags=re.IGNORECASE | re.DOTALL,
+)
+ACTIONABLE_ENDPOINT_VALUE_PATTERNS = {
+    "json_action": re.compile(r"/[A-Za-z0-9][A-Za-z0-9/_~.-]*\.json(?:[?#][^\"'\s<>]*)?$", flags=re.IGNORECASE),
+    "api_action": re.compile(r"^/api/v\d+(?:/[A-Za-z0-9_.~-]+)+", flags=re.IGNORECASE),
+}
+ACTIONABLE_ENDPOINT_JS_PATTERNS = {
+    "json_set_action_link": re.compile(r"setActionLink\([^;]*\.json(?:[?#][^\"'\s<>]*)?[^;]*\)", flags=re.IGNORECASE | re.DOTALL),
+    "api_set_action_link": re.compile(r"setActionLink\([^;]*/api/v\d+(?:/[A-Za-z0-9_.~-]+)+[^;]*\)", flags=re.IGNORECASE | re.DOTALL),
+}
 PREMIUM_SURFACE_REQUIREMENTS = {
     "primary_action_touch_floor": {
         "selector": ".surface-minimal .button-like",
@@ -561,6 +573,43 @@ def visible_copy(text: str) -> str:
     without_styles = re.sub(r"(?is)<style\b.*?</style>", " ", without_scripts)
     without_tags = re.sub(r"(?is)<[^>]+>", " ", without_styles)
     return re.sub(r"\s+", " ", without_tags).strip()
+
+
+def line_number_for_offset(text: str, offset: int) -> int:
+    return text.count("\n", 0, max(0, offset)) + 1
+
+
+def actionable_endpoint_findings(path: Path) -> list[dict[str, Any]]:
+    text = read_text(path)
+    findings: list[dict[str, Any]] = []
+
+    for match in ACTIONABLE_ENDPOINT_ATTR_RE.finditer(text):
+        value = match.group("value").strip()
+        for pattern_name, pattern in ACTIONABLE_ENDPOINT_VALUE_PATTERNS.items():
+            if pattern.search(value):
+                findings.append(
+                    {
+                        "route": path.name,
+                        "kind": pattern_name,
+                        "attribute": match.group("attribute").lower(),
+                        "value": value,
+                        "line": line_number_for_offset(text, match.start()),
+                    }
+                )
+
+    for pattern_name, pattern in ACTIONABLE_ENDPOINT_JS_PATTERNS.items():
+        for match in pattern.finditer(text):
+            findings.append(
+                {
+                    "route": path.name,
+                    "kind": pattern_name,
+                    "attribute": "setActionLink",
+                    "value": re.sub(r"\s+", " ", match.group(0)).strip(),
+                    "line": line_number_for_offset(text, match.start()),
+                }
+            )
+
+    return findings
 
 
 def shadow_has_depth(value: str) -> bool:
@@ -1008,6 +1057,21 @@ def build_payload(
         "leaked_terms": leaked_terms,
         "public_copy_leak_gate_status": public_copy_gate.get("status", "missing"),
         "pass": copy_pass,
+    }
+
+    actionable_endpoint_results = [
+        finding
+        for path in critical_public_views
+        for finding in actionable_endpoint_findings(path)
+    ]
+    actionable_endpoint_pass = not actionable_endpoint_results
+    if not actionable_endpoint_pass:
+        failures.append("premium public actions expose raw endpoints; links and forms must route to product pages, not JSON or API URLs")
+    checks["public_action_endpoint_language"] = {
+        "standard": "GOV.UK plain service journeys + HIG clarity: public actions point at product pages, not data endpoints",
+        "view_count": len(critical_public_views),
+        "findings": actionable_endpoint_results,
+        "pass": actionable_endpoint_pass,
     }
 
     route_results = [route_requirement_result(path) for path in critical_public_views]

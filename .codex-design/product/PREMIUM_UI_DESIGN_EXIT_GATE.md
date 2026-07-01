@@ -41,6 +41,7 @@ The premium visual scorecard blocks release unless all items are true:
 - Route visual anatomy is inspected on the shared selectors themselves: hero panels, secondary route heroes, download cards, status panels, mobile facts, and iframe containers must carry deliberate background, depth, radius, spacing, and containment decisions.
 - Visual evidence receipt coverage is required. Home needs mobile, tablet, laptop, desktop, and wide desktop screenshot QA with the hero and primary CTA visible. Downloads, Status, Ledger map, Help, and Contact need mobile and desktop screenshot QA.
 - State and recovery language is part of the visual finish. Loading, empty, unavailable, and fallback states must explain what is happening and give the next useful action.
+- Actionable public links must point to product pages, not raw JSON/API endpoints. Background `fetch()` calls can use data routes; user-clickable links, forms, and JS action links cannot expose those routes as the next step.
 
 ## Surface Contracts
 
@@ -68,6 +69,7 @@ Fail the gate when:
 - The landing page loses Build or Play.
 - Mobile/PWA loses ledger, heat, opt-in, continuity, install, or help affordances.
 - Mobile/PWA exposes raw endpoint paths, JSON URLs, route labels, raw enum states, or data plumbing as visible product copy.
+- Mobile/PWA turns a JSON/API route into a clickable user action instead of routing to a product page.
 - Participate stops being a real iframe surface.
 - Form controls become unreadable in dark mode.
 - Navigation, buttons, cards, or focus states are styled on one route but absent on sibling routes.

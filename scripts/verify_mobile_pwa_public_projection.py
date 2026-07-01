@@ -68,6 +68,15 @@ def extract_registered_service_worker_path(markup: str) -> str | None:
     return html.unescape(match.group(1))
 
 
+def is_public_product_route(value: object) -> bool:
+    route = str(value or "").strip()
+    return (
+        route.startswith("/")
+        and ".json" not in route.lower()
+        and not route.lower().startswith("/api/")
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Verify the first-party mobile/PWA public projection.")
     parser.add_argument("--base-url", default="", help="Optional running Hub base URL. When omitted the script launches a temporary local Hub.")
@@ -281,6 +290,15 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
         and ledger_stream["tracker"].get("turn_map_route") == "/ledger/map"
         and isinstance(ledger_stream.get("continuity"), dict)
     )
+    live_tracker = ledger_stream.get("tracker") if isinstance(ledger_stream.get("tracker"), dict) else {}
+    ledger_stream_live_actions_are_product_routes = ledger_stream_status != "live" or (
+        is_public_product_route(live_tracker.get("turn_map_route"))
+        and is_public_product_route(live_tracker.get("turn_route"))
+        and (
+            live_tracker.get("newsreel_route") is None
+            or is_public_product_route(live_tracker.get("newsreel_route"))
+        )
+    )
     role_routes_hold = all(
         result["final_route"] == result["expected_final_route"]
         for result in route_results
@@ -355,6 +373,11 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
             "id": "ledger_stream_live_payload_has_heat",
             "pass": ledger_stream_live_payload_has_heat,
             "detail": "Live mode must include a world snapshot, heat list, map route, and continuity object.",
+        },
+        {
+            "id": "ledger_stream_live_actions_are_product_routes",
+            "pass": ledger_stream_live_actions_are_product_routes,
+            "detail": f"Live tracker actions must be public product routes, not raw data endpoints. tracker={live_tracker}.",
         },
         {"id": "role_routes_hold", "pass": role_routes_hold, "detail": f"route mismatches: {route_mismatches}."},
     ]

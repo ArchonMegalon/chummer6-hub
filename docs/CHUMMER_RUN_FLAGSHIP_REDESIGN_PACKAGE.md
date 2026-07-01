@@ -137,6 +137,7 @@ Exit rules:
 - state and recovery language: empty, loading, unavailable, iframe fallback, and PWA stream failure states are product design, not afterthought copy.
 - premium visual scorecard: typography, semantic color, elevation, layout rhythm, component anatomy, dark-mode form controls, motion fallback, responsive behavior, and public-language discipline all pass together or the gate fails.
 - zero-internal-language rule: public UI cannot leak proof, receipt, operator, fleet, governor, provider, raw enum, raw endpoint, JSON route, or process wording unless the route is explicitly an internal/authenticated operations surface.
+- actionable endpoint rule: background data routes may exist, but public links/forms/JS action links must send users to product pages rather than `.json` or `/api` endpoints.
 
 Executable gate:
 

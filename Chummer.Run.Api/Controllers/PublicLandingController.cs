@@ -8724,7 +8724,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 update_interval_seconds = 30,
                 turn_map_route = "/ledger/map",
                 turn_route = (string?)$"/ledger/turns/{world.CurrentTurn}",
-                newsreel_route = (string?)$"/ledger/turns/{world.CurrentTurn}/newsreel.json",
+                newsreel_route = (string?)$"/ledger/turns/{world.CurrentTurn}",
                 world_status = world.Status
             }
             : new

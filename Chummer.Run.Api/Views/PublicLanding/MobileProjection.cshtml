@@ -108,7 +108,7 @@
             </p>
             <p class="muted-copy">
                 <span>Turn update:</span>
-                <a class="editorial-strip__action" data-pwa-ledger-newsreel-route href="/ledger/turns/1/newsreel.json">Open live update</a>
+                <a class="editorial-strip__action" data-pwa-ledger-newsreel-route href="/ledger/turns/1">Open live update</a>
             </p>
             <p class="muted-copy">
                 <span>Last update:</span>
@@ -637,7 +637,7 @@
                     }
                     if (ledgerNewsreelRoute && payload.continuity.turn_route) {
                         var newsreelRoute = (payload.tracker && payload.tracker.newsreel_route) || (typeof payload.continuity.turn === "number"
-                            ? "/ledger/turns/" + payload.continuity.turn + "/newsreel.json"
+                            ? "/ledger/turns/" + payload.continuity.turn
                             : null);
                         if (newsreelRoute) {
                             setActionLink(ledgerNewsreelRoute, newsreelRoute, ledgerNewsreelRouteLabel, "Newsreel unavailable");

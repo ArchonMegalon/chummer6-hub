@@ -217,6 +217,16 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
             self.assertIn(expected, controller)
             self.assertNotIn(f'=> Redirect("/mobile/{role}");', controller)
 
+    def test_live_update_actions_use_product_routes_not_json_endpoints(self) -> None:
+        controller = (REPO_ROOT / "Chummer.Run.Api/Controllers/PublicLandingController.cs").read_text(encoding="utf-8")
+        mobile_view = (REPO_ROOT / "Chummer.Run.Api/Views/PublicLanding/MobileProjection.cshtml").read_text(encoding="utf-8")
+
+        self.assertIn('href="/ledger/turns/1">Open live update</a>', mobile_view)
+        self.assertIn('newsreel_route = (string?)$"/ledger/turns/{world.CurrentTurn}"', controller)
+        self.assertNotIn('data-pwa-ledger-newsreel-route href="/ledger/turns/1/newsreel.json"', mobile_view)
+        self.assertNotIn('"/ledger/turns/" + payload.continuity.turn + "/newsreel.json"', mobile_view)
+        self.assertNotIn('newsreel_route = (string?)$"/ledger/turns/{world.CurrentTurn}/newsreel.json"', controller)
+
     def test_verifier_prints_explicit_ok_line_on_pass(self) -> None:
         module = _load_module()
         stdout = io.StringIO()

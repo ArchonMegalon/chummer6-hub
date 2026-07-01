@@ -445,6 +445,44 @@ def test_premium_gate_rejects_visible_raw_endpoint_copy() -> None:
     assert "raw_route_label" in payload["checks"]["public_copy_quiet"]["leaked_terms"]
 
 
+def test_premium_gate_rejects_actionable_json_links() -> None:
+    module = load_module()
+    with tempfile.TemporaryDirectory(prefix="premium-ui-gate-link-fail-") as temp_dir:
+        root = Path(temp_dir)
+        completion = root / "completion"
+        published = root / "published"
+        css = root / "site.css"
+        design_contract = root / "PREMIUM_UI_DESIGN_EXIT_GATE.md"
+        layout = root / "_Layout.cshtml"
+        views = write_public_views(root)
+        mobile = root / "MobileProjection.cshtml"
+        mobile.write_text(
+            mobile.read_text(encoding="utf-8")
+            + '<a data-pwa-ledger-newsreel-route href="/ledger/turns/1/newsreel.json">Open live update</a>'
+            + '<script>setActionLink(ledgerNewsreelRoute, "/api/v1/ledger/worlds/main/turns/1", "Open", "Unavailable");</script>',
+            encoding="utf-8",
+        )
+        write_design_contract(design_contract)
+        write_layout(layout)
+        write_supporting_artifacts(completion, published)
+        css.write_text(premium_css(), encoding="utf-8")
+
+        payload = module.build_payload(
+            css_path=css,
+            design_contract_path=design_contract,
+            completion_root=completion,
+            published_root=published,
+            critical_public_views=views,
+            layout_view=layout,
+        )
+
+    assert payload["status"] == "fail"
+    assert "premium public actions expose raw endpoints; links and forms must route to product pages, not JSON or API URLs" in payload["failures"]
+    findings = payload["checks"]["public_action_endpoint_language"]["findings"]
+    assert any(finding["kind"] == "json_action" for finding in findings)
+    assert any(finding["kind"] == "api_set_action_link" for finding in findings)
+
+
 def test_premium_gate_rejects_missing_visual_evidence() -> None:
     module = load_module()
     with tempfile.TemporaryDirectory(prefix="premium-ui-gate-screenshot-fail-") as temp_dir:
