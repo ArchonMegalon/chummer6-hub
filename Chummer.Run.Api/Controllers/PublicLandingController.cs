@@ -1282,7 +1282,7 @@ public sealed class PublicLandingController : Controller
             heading: "Mobile and PWA entry",
             intro: "Track the essentials during play, install the shell when the browser allows it, and keep living-world updates behind explicit opt-in.",
             currentRoleKey: "player",
-            primaryAction: new TrustPageActionViewModel("Open play", "/play", "primary"),
+            primaryAction: new TrustPageActionViewModel("Open play", "/mobile/player", "primary"),
             secondaryAction: new TrustPageActionViewModel("Desktop downloads", "/downloads", "secondary"),
             cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
@@ -1324,8 +1324,22 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/mobile/player")]
     [HttpHead("/mobile/player")]
-    public IActionResult MobilePlayerProjectionAlias()
-        => Redirect("/play?role=player");
+    [Produces("text/html")]
+    public async Task<IActionResult> MobilePlayerProjectionPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildMobileProjectionPageModel(
+            currentPath: "/mobile/player",
+            chromeTitle: "Player play shell",
+            chromeDescription: "Player play entry with reconnect and continuity inside Chummer.",
+            eyebrow: "Play shell",
+            heading: "Player entry",
+            intro: "The play shell keeps role entry, reconnect expectations, and current continuity visible without pretending a preview route is the product.",
+            currentRoleKey: "player",
+            primaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
+            cancellationToken: cancellationToken);
+        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
+    }
 
     [HttpGet("/gm")]
     [HttpHead("/gm")]
@@ -1334,8 +1348,22 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/mobile/gm")]
     [HttpHead("/mobile/gm")]
-    public IActionResult MobileGmProjectionAlias()
-        => Redirect("/play?role=gm");
+    [Produces("text/html")]
+    public async Task<IActionResult> MobileGmProjectionPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildMobileProjectionPageModel(
+            currentPath: "/mobile/gm",
+            chromeTitle: "GM play shell",
+            chromeDescription: "GM play entry with reconnect and continuity inside Chummer.",
+            eyebrow: "Play shell",
+            heading: "GM entry",
+            intro: "The play shell keeps role entry, reconnect expectations, and current continuity visible without pretending a preview route is the product.",
+            currentRoleKey: "gm",
+            primaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
+            cancellationToken: cancellationToken);
+        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
+    }
 
     [HttpGet("/observer")]
     [HttpHead("/observer")]
@@ -1344,8 +1372,22 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/mobile/observer")]
     [HttpHead("/mobile/observer")]
-    public IActionResult MobileObserverProjectionAlias()
-        => Redirect("/play?role=observer");
+    [Produces("text/html")]
+    public async Task<IActionResult> MobileObserverProjectionPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildMobileProjectionPageModel(
+            currentPath: "/mobile/observer",
+            chromeTitle: "Observer play shell",
+            chromeDescription: "Observer play entry with reconnect and continuity inside Chummer.",
+            eyebrow: "Play shell",
+            heading: "Observer entry",
+            intro: "The play shell keeps role entry, reconnect expectations, and current continuity visible without pretending a preview route is the product.",
+            currentRoleKey: "observer",
+            primaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
+            cancellationToken: cancellationToken);
+        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
+    }
 
     [HttpGet("/anarchy")]
     [Produces("text/html")]
@@ -8572,9 +8614,9 @@ document.addEventListener('DOMContentLoaded', function () {
             InstallabilitySummary: $"This play entry explains reconnect behavior and role entry without pretending a preview shell replaces the app. Claimed installs currently tracked: {continuitySummary.ActiveInstallationCount}; pending recovery items: {continuitySummary.PendingClaimCount + continuitySummary.PendingBrowserCallbackCount}.",
             Roles:
             [
-                new MobileRoleCardViewModel("Player", "Resume the session, keep the dossier visible, and re-enter with reconnect behavior already named.", "/play", string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)),
-                new MobileRoleCardViewModel("GM", "Keep the next scene, continuity, and return status visible without dropping back to legacy aliases.", "/play?role=gm", string.Equals(currentRoleKey, "gm", StringComparison.OrdinalIgnoreCase)),
-                new MobileRoleCardViewModel("Observer", "Join the same play view in a read-mostly role when the table only needs visibility.", "/play?role=observer", string.Equals(currentRoleKey, "observer", StringComparison.OrdinalIgnoreCase))
+                new MobileRoleCardViewModel("Player", "Resume the session, keep the dossier visible, and re-enter with reconnect behavior already named.", "/mobile/player", string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)),
+                new MobileRoleCardViewModel("GM", "Keep the next scene, continuity, and return status visible without dropping back to legacy aliases.", "/mobile/gm", string.Equals(currentRoleKey, "gm", StringComparison.OrdinalIgnoreCase)),
+                new MobileRoleCardViewModel("Observer", "Join the same play view in a read-mostly role when the table only needs visibility.", "/mobile/observer", string.Equals(currentRoleKey, "observer", StringComparison.OrdinalIgnoreCase))
             ],
             Capabilities:
             [

@@ -1048,6 +1048,19 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: redirect to the browser app entry
+- path: /ready/handoff/mobile.json
+  title: Ready mobile handoff
+  audience: public
+  purpose: ready_mobile_handoff
+  requires_auth: false
+  guest_fallback: /ready/handoff/mobile.json
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: session companion handoff only
+  contract_terms:
+  - playtime_tools
+  - account opt-in
+  - followed-world selection
 - path: /mobile/player
   title: Mobile player alias
   audience: public

@@ -223,10 +223,56 @@ public sealed class ReadyForTonightService
             {
                 mode = "ready_for_tonight",
                 status = "ready",
-                summary = "Use the same first-party handoff on mobile so the starter packet, join rail, and recovery/support routes stay attached.",
+                summary = "Use the same first-party handoff on mobile so the starter packet, playtime tools, and recovery/support routes stay attached. Character building stays before or after the session.",
                 next_best_screen = "/mobile",
+                pwa_route = "/mobile",
                 install_route = "/downloads",
                 continuity_route = "/play/continuity",
+                boundaries = new[]
+                {
+                    "Character building stays before or after the session.",
+                    "Living-world updates require account opt-in and followed-world selection.",
+                    "GM remains final authority for table rulings, modifiers, and consequences."
+                },
+                playtime_tools = new[]
+                {
+                    new
+                    {
+                        id = "inventory",
+                        label = "Inventory",
+                        summary = "Track carried gear, consumables, and session-use notes without opening the full builder."
+                    },
+                    new
+                    {
+                        id = "health",
+                        label = "Health",
+                        summary = "Keep physical, stun, edge-case damage notes, and recovery prompts visible during play."
+                    },
+                    new
+                    {
+                        id = "ammo",
+                        label = "Ammo",
+                        summary = "Count ammo, reloads, and expendable charges at the table."
+                    },
+                    new
+                    {
+                        id = "modifiers",
+                        label = "Modifiers",
+                        summary = "Show active wounds, recoil, environmental penalties, and GM-applied modifiers before rolling."
+                    },
+                    new
+                    {
+                        id = "quick_rolls",
+                        label = "Quick rolls",
+                        summary = "Roll dice or preview the chance band before committing to a check."
+                    },
+                    new
+                    {
+                        id = "living_world",
+                        label = "Living world",
+                        summary = "Show Black Ledger heat and followed-world updates only after account opt-in and followed-world selection."
+                    }
+                },
                 packet_routes = PacketAssets.Select(item => new { item.RoleId, markdown = item.MarkdownHref, json = item.JsonHref }).ToArray(),
                 generated_at_utc = DateTimeOffset.UtcNow
             },

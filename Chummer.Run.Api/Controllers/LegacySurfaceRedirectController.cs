@@ -36,6 +36,7 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     private readonly IHttpClientFactory? _httpClientFactory;
     private readonly Uri? _blazorUpstream;
     private readonly Uri? _avaloniaUpstream;
+    private readonly Uri? _playUpstream;
 
     public LegacySurfaceRedirectController(IHttpClientFactory? httpClientFactory = null, IConfiguration? configuration = null)
     {
@@ -46,6 +47,9 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
         _avaloniaUpstream = ResolveAbsoluteUri(
             configuration?["CHUMMER_PUBLIC_AVALONIA_PROXY_URL"]
             ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_AVALONIA_PROXY_URL"));
+        _playUpstream = ResolveAbsoluteUri(
+            configuration?["CHUMMER_PUBLIC_PLAY_PROXY_URL"]
+            ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_PLAY_PROXY_URL"));
     }
 
     [HttpGet("/hub")]
@@ -73,6 +77,16 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     [Route("/avalonia/{**path}")]
     public async Task<IActionResult> Avalonia(string? path, CancellationToken cancellationToken)
         => await ProxyBrowserSurfaceAsync(_avaloniaUpstream, "/avalonia", path, cancellationToken).ConfigureAwait(false);
+
+    [AcceptVerbs("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")]
+    [Route("/_blazor")]
+    [Route("/_blazor/{**path}")]
+    public async Task<IActionResult> PlayBlazorCircuit(string? path, CancellationToken cancellationToken)
+        => await ProxyBrowserSurfaceAsync(
+            _playUpstream,
+            "/_blazor",
+            string.IsNullOrWhiteSpace(path) ? "_blazor" : $"_blazor/{path.TrimStart('/')}",
+            cancellationToken).ConfigureAwait(false);
 
     [HttpGet("/session")]
     [HttpGet("/session/{**path}")]

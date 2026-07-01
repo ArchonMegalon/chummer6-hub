@@ -105,7 +105,7 @@ def write_layout(path: Path) -> None:
   </summary>
   <div class="site-account-menu__panel" aria-label="Open Chummer options">
     <a class="site-account-menu__link site-open-chummer-menu__button" href="/build">Build</a>
-    <a class="site-account-menu__link site-open-chummer-menu__button" href="/play">Play</a>
+    <a class="site-account-menu__link site-open-chummer-menu__button" href="/mobile/player">Play</a>
   </div>
 </details>
 """,
@@ -126,10 +126,10 @@ def write_public_views(root: Path, *, leaked: bool = False) -> list[Path]:
     </summary>
     <div class="site-account-menu__panel" aria-label="Open Chummer options">
       <a class="site-account-menu__link site-open-chummer-menu__button" href="/build">Build</a>
-      <a class="site-account-menu__link site-open-chummer-menu__button" href="/play">Play</a>
+      <a class="site-account-menu__link site-open-chummer-menu__button" href="/mobile/player">Play</a>
     </div>
   </details>
-  <a class="minimal-hero__visual minimal-hero__visual--screenshot" href="/media/promo/every-wonder-horizon-promo.mp4">Watch</a>
+  <a class="minimal-hero__visual minimal-hero__visual--preview" href="/media/promo/every-wonder-horizon-promo.mp4">Watch</a>
 </section>
 """,
         "Downloads.cshtml": """

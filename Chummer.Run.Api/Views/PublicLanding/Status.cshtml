@@ -18,6 +18,9 @@
     var statusLine = Model.ReleaseExperience.Recommended is null
         ? "Downloads are paused."
         : publicPlatformSummary;
+    var releaseVersionText = string.IsNullOrWhiteSpace(Model.Manifest.Version)
+        ? "Version unpublished"
+        : $"Version {Model.Manifest.Version}";
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 }
@@ -27,6 +30,7 @@
         <p class="eyebrow">Now</p>
         <h1>Updated</h1>
         <p>@PublicStatusText(statusLine)</p>
+        <p class="downloads-release-version" data-downloads-release-version>@releaseVersionText</p>
         <p class="muted-copy">@PublicStatusText(Model.ReleaseSummary)</p>
         <p class="muted-copy"><strong>Current caution:</strong> @PublicStatusText(Model.CautionSummary)</p>
         <div class="minimal-actions" aria-label="Status next actions">

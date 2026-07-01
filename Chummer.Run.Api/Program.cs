@@ -173,6 +173,21 @@ app.Use(async (context, next) =>
 
     await next();
 });
+Uri? playPwaProxyBaseUri = ResolvePlayPwaProxyBaseUri(app.Configuration);
+string playPwaProxyApiKey = (app.Configuration["CHUMMER_PUBLIC_PLAY_PROXY_API_KEY"]
+    ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_PLAY_PROXY_API_KEY")
+    ?? string.Empty).Trim();
+app.Use(async (context, next) =>
+{
+    if (ShouldProxyPlayPwaRequest(context.Request.Path)
+        && playPwaProxyBaseUri is not null
+        && await TryProxyPlayPwaRequestAsync(context, playPwaProxyBaseUri, playPwaProxyApiKey))
+    {
+        return;
+    }
+
+    await next();
+});
 FileExtensionContentTypeProvider contentTypeProvider = new();
 contentTypeProvider.Mappings[".vtt"] = "text/vtt";
 HorizonArtifactAccessTokenService horizonArtifactAccessTokens = app.Services.GetRequiredService<HorizonArtifactAccessTokenService>();
@@ -365,6 +380,202 @@ static bool IsIndexablePublicPath(PathString path)
 static bool IsLegacyMacReleaseBootstrapArtifactPath(PathString path)
 {
     return path.Equals("/artifacts/mac-codex-release-pipeline/bootstrap.sh", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool ShouldProxyPlayPwaRequest(PathString path)
+{
+    string value = path.Value ?? string.Empty;
+    return value.Equals("/mobile", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile/player", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile/gm", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile/observer", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/manifest.player.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/manifest.gm.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile.css", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile-turn-companion.js", StringComparison.OrdinalIgnoreCase)
+        || value.StartsWith("/icons/", StringComparison.OrdinalIgnoreCase)
+        || value.StartsWith("/_framework/", StringComparison.OrdinalIgnoreCase)
+        || value.StartsWith("/api/play/", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/api/play", StringComparison.OrdinalIgnoreCase);
+}
+
+static Uri? ResolvePlayPwaProxyBaseUri(IConfiguration configuration)
+{
+    string enabled = (configuration["CHUMMER_PUBLIC_PLAY_PROXY_ENABLED"]
+        ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_PLAY_PROXY_ENABLED")
+        ?? "false").Trim();
+    if (!string.Equals(enabled, "true", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(enabled, "1", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(enabled, "yes", StringComparison.OrdinalIgnoreCase))
+    {
+        return null;
+    }
+
+    string configured = (configuration["CHUMMER_PUBLIC_PLAY_PROXY_URL"]
+        ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_PLAY_PROXY_URL")
+        ?? string.Empty).Trim();
+    if (!Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri))
+    {
+        return null;
+    }
+
+    string normalized = uri.AbsoluteUri.EndsWith("/", StringComparison.Ordinal)
+        ? uri.AbsoluteUri
+        : $"{uri.AbsoluteUri}/";
+    return new Uri(normalized);
+}
+
+static async Task<bool> TryProxyPlayPwaRequestAsync(HttpContext context, Uri upstream, string playApiKey)
+{
+    Uri target = BuildPlayPwaProxyTarget(upstream, context.Request.Path, context.Request.QueryString);
+    using HttpClient client = context.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
+    bool proxyHeadAsGet = HttpMethods.IsHead(context.Request.Method);
+    using var outbound = new HttpRequestMessage(proxyHeadAsGet ? HttpMethod.Get : new HttpMethod(context.Request.Method), target);
+    bool requestHasBody = context.Request.ContentLength.GetValueOrDefault() > 0
+        || context.Request.Headers.ContainsKey("Transfer-Encoding");
+    if (requestHasBody)
+    {
+        outbound.Content = new StreamContent(context.Request.Body);
+    }
+
+    CopyPlayPwaProxyRequestHeaders(context, outbound);
+    if (!string.IsNullOrWhiteSpace(playApiKey)
+        && (context.Request.Path.StartsWithSegments("/api/play", StringComparison.OrdinalIgnoreCase)
+            || context.Request.Path.StartsWithSegments("/mobile", StringComparison.OrdinalIgnoreCase)))
+    {
+        outbound.Headers.Remove("X-Chummer-Play-Api-Key");
+        outbound.Headers.TryAddWithoutValidation("X-Chummer-Play-Api-Key", playApiKey);
+    }
+
+    HttpResponseMessage response;
+    try
+    {
+        response = await client.SendAsync(
+            outbound,
+            HttpCompletionOption.ResponseHeadersRead,
+            context.RequestAborted);
+    }
+    catch (HttpRequestException)
+    {
+        return false;
+    }
+    catch (TaskCanceledException) when (!context.RequestAborted.IsCancellationRequested)
+    {
+        return false;
+    }
+
+    using (response)
+    {
+        if ((int)response.StatusCode >= 500)
+        {
+            return false;
+        }
+
+        if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
+        {
+            context.Response.Redirect(RewritePlayPwaProxyLocation(response.Headers.Location, upstream), permanent: false);
+            return true;
+        }
+
+        context.Response.StatusCode = (int)response.StatusCode;
+        CopyPlayPwaProxyResponseHeaders(context, response);
+        if (proxyHeadAsGet)
+        {
+            return true;
+        }
+
+        await using Stream stream = await response.Content.ReadAsStreamAsync(context.RequestAborted);
+        await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
+        return true;
+    }
+}
+
+static Uri BuildPlayPwaProxyTarget(Uri upstream, PathString path, QueryString queryString)
+{
+    string relativePath = (path.Value ?? string.Empty).TrimStart('/');
+    var builder = new UriBuilder(string.IsNullOrWhiteSpace(relativePath) ? upstream : new Uri(upstream, relativePath));
+    if (queryString.HasValue)
+    {
+        builder.Query = queryString.Value!.TrimStart('?');
+    }
+
+    return builder.Uri;
+}
+
+static void CopyPlayPwaProxyRequestHeaders(HttpContext context, HttpRequestMessage outbound)
+{
+    foreach (var header in context.Request.Headers)
+    {
+        if (IsHopByHopHeader(header.Key))
+        {
+            continue;
+        }
+
+        if (!outbound.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
+        {
+            outbound.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
+        }
+    }
+
+    outbound.Headers.TryAddWithoutValidation("X-Forwarded-Host", context.Request.Host.Value);
+    outbound.Headers.TryAddWithoutValidation("X-Forwarded-Proto", context.Request.Scheme);
+}
+
+static void CopyPlayPwaProxyResponseHeaders(HttpContext context, HttpResponseMessage response)
+{
+    foreach (var header in response.Headers)
+    {
+        if (IsHopByHopHeader(header.Key) || string.Equals(header.Key, "Location", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        context.Response.Headers[header.Key] = header.Value.ToArray();
+    }
+
+    foreach (var header in response.Content.Headers)
+    {
+        if (IsHopByHopHeader(header.Key))
+        {
+            continue;
+        }
+
+        context.Response.Headers[header.Key] = header.Value.ToArray();
+    }
+
+    context.Response.Headers.Remove("transfer-encoding");
+}
+
+static bool IsHopByHopHeader(string headerName)
+    => string.Equals(headerName, "Connection", StringComparison.OrdinalIgnoreCase)
+       || string.Equals(headerName, "Host", StringComparison.OrdinalIgnoreCase)
+       || string.Equals(headerName, "Keep-Alive", StringComparison.OrdinalIgnoreCase)
+       || string.Equals(headerName, "Proxy-Authenticate", StringComparison.OrdinalIgnoreCase)
+       || string.Equals(headerName, "Proxy-Authorization", StringComparison.OrdinalIgnoreCase)
+       || string.Equals(headerName, "TE", StringComparison.OrdinalIgnoreCase)
+       || string.Equals(headerName, "Trailer", StringComparison.OrdinalIgnoreCase)
+       || string.Equals(headerName, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
+       || string.Equals(headerName, "Upgrade", StringComparison.OrdinalIgnoreCase);
+
+static string RewritePlayPwaProxyLocation(Uri location, Uri upstream)
+{
+    if (location.IsAbsoluteUri)
+    {
+        if (!Uri.Compare(location, upstream, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase).Equals(0))
+        {
+            return location.ToString();
+        }
+
+        return string.IsNullOrWhiteSpace(location.PathAndQuery) ? "/mobile" : location.PathAndQuery;
+    }
+
+    string candidate = location.OriginalString;
+    if (string.IsNullOrWhiteSpace(candidate) || candidate == "/")
+    {
+        return "/mobile";
+    }
+
+    return candidate.StartsWith("/", StringComparison.Ordinal) ? candidate : $"/{candidate}";
 }
 
 static string ResolveHubContentRoot()

@@ -1,4 +1,4 @@
-const CACHE_NAME = "chummer-public-v3";
+const CACHE_NAME = "chummer-public-v4";
 const SHELL_CACHE = `${CACHE_NAME}-shell`;
 const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;
 const NAVIGATION_FALLBACK = "/mobile";
@@ -55,6 +55,9 @@ const NOTIFICATION_ASSET_SUFFIXES = [
 const PRECACHE_URLS = [
   "/",
   "/mobile",
+  "/mobile/player",
+  "/mobile/gm",
+  "/mobile/observer",
   "/play",
   "/play/continuity",
   "/packages",
@@ -64,6 +67,8 @@ const PRECACHE_URLS = [
   "/manifest.webmanifest",
   "/site.webmanifest",
   "/manifest.json",
+  "/manifest.player.webmanifest",
+  "/manifest.gm.webmanifest",
   "/css/site.css",
   "/js/site.js",
   "/mobile/pwa.json",
@@ -79,6 +84,9 @@ const PRECACHE_URLS = [
 const PUBLIC_NAVIGATION_CACHE_PATHS = new Set([
   "/",
   "/mobile",
+  "/mobile/player",
+  "/mobile/gm",
+  "/mobile/observer",
   "/play",
   "/play/continuity",
   "/packages",

@@ -16,13 +16,7 @@
         _ => $"Current public installers: {string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]}."
     };
     var entryHref = Model.Chrome.Authenticated ? "/account" : "/login?next=%2Faccount%2Faccess";
-    var entryLabel = Model.Chrome.Authenticated ? "Account" : "Sign in";
-    var exampleRunners = new[]
-    {
-        new { Name = "Kestrel", Archetype = "decker", Href = "/account/open/example/decker" },
-        new { Name = "Brick", Archetype = "street samurai", Href = "/account/open/example/street-samurai" },
-        new { Name = "Whisper", Archetype = "face", Href = "/account/open/example/face" }
-    };
+    var entryLabel = Model.Chrome.Authenticated ? "Account" : "Sign in first";
 }
 
 <section class="minimal-hero" data-homepage-section="hero">
@@ -36,8 +30,16 @@
                     <span class="site-account-menu__label">Open Chummer</span>
                 </summary>
                 <div class="site-account-menu__panel" aria-label="Open Chummer options">
-                    <a class="site-account-menu__link site-open-chummer-menu__button" href="/build" data-analytics-event="homepage_open_build" data-analytics-surface="minimal_home" data-analytics-label="Build">Build</a>
-                    <a class="site-account-menu__link site-open-chummer-menu__button" href="/play" data-analytics-event="homepage_open_play" data-analytics-surface="minimal_home" data-analytics-label="Play">Play</a>
+                    @if (Model.Chrome.Authenticated)
+                    {
+                        <a class="site-account-menu__link site-open-chummer-menu__button" href="/build" data-analytics-event="homepage_open_build" data-analytics-surface="minimal_home" data-analytics-label="Build">Build</a>
+                        <a class="site-account-menu__link site-open-chummer-menu__button" href="/mobile/player" data-analytics-event="homepage_open_play" data-analytics-surface="minimal_home" data-analytics-label="Play">Play</a>
+                    }
+                    else
+                    {
+                        <button class="site-account-menu__button site-open-chummer-menu__button site-open-chummer-menu__button--disabled" type="button" disabled aria-disabled="true" data-analytics-surface="minimal_home" data-analytics-label="Build">Build</button>
+                        <button class="site-account-menu__button site-open-chummer-menu__button site-open-chummer-menu__button--disabled" type="button" disabled aria-disabled="true" data-analytics-surface="minimal_home" data-analytics-label="Play">Play</button>
+                    }
                     <a class="site-account-menu__link" href="@entryHref" data-analytics-event="homepage_open_account" data-analytics-surface="minimal_home" data-analytics-label="@entryLabel">@entryLabel</a>
                 </div>
             </details>
@@ -52,30 +54,13 @@
             }
         </p>
     </div>
-    <a class="minimal-hero__visual minimal-hero__visual--screenshot" href="/media/promo/every-wonder-horizon-promo.mp4" aria-label="Watch the Chummer promo video" data-analytics-event="homepage_open_promo_video" data-analytics-surface="minimal_home" data-analytics-label="Watch promo video">
-        <img src="/media/product/chummer-desktop-runner.png" alt="Chummer desktop preview" />
-        <span class="minimal-hero__visual-badge">Watch 90 sec</span>
-    </a>
-    <div class="minimal-runner-rail" aria-label="Example runners">
-        @if (Model.Chrome.Authenticated)
-        {
-            @foreach (var runner in exampleRunners)
-            {
-                <a href="@runner.Href" aria-label="Open runner @runner.Name">
-                    <span>@runner.Name</span>
-                    <small>@runner.Archetype</small>
-                </a>
-            }
-        }
-        else
-        {
-            @foreach (var runner in exampleRunners)
-            {
-                <article class="minimal-runner-card" aria-label="Example runner @runner.Name">
-                    <span>@runner.Name</span>
-                    <small>@runner.Archetype</small>
-                </article>
-            }
-        }
+    <div class="minimal-hero__visual minimal-hero__visual--preview" aria-label="Current Chummer play packet">
+        <p class="minimal-hero__preview-kicker">At the table</p>
+        <h2>Desktop build. Mobile play packet.</h2>
+        <p class="minimal-hero__preview-copy">Track health, ammo, inventory, and modifiers.</p>
+        <ul class="minimal-hero__preview-points">
+            <li>Open player, GM, or observer views.</li>
+            <li>Opt in before living-world updates appear.</li>
+        </ul>
     </div>
 </section>

@@ -146,8 +146,8 @@ ROUTE_JOURNEY_REQUIREMENTS = {
             "site-open-chummer-menu",
             "aria-label=\"Open Chummer options\"",
             "href=\"/build\"",
-            "href=\"/play\"",
-            "minimal-hero__visual--screenshot",
+            "href=\"/mobile/player\"",
+            "minimal-hero__visual--preview",
         ],
     },
     "Downloads.cshtml": {
@@ -251,7 +251,7 @@ NAVIGATION_REQUIREMENTS = {
     "open_chummer_dropdown": "site-open-chummer-menu",
     "accessible_options_label": "aria-label=\"Open Chummer options\"",
     "build_button": "href=\"/build\"",
-    "play_button": "href=\"/play\"",
+    "play_button": "href=\"/mobile/player\"",
     "button_class": "site-open-chummer-menu__button",
 }
 COMPONENT_ANATOMY_REQUIREMENTS = {

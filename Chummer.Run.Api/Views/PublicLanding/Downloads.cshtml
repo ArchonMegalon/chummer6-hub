@@ -26,6 +26,10 @@
     var hasOtherDownloads = showLinuxSourcePrimary || otherPlatformOptions.Length > 0;
     var releaseNeedsReview = string.Equals(Model.Manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Model.Manifest.RolloutState, "readiness_review_required", StringComparison.OrdinalIgnoreCase);
+    var releaseVersionText = string.IsNullOrWhiteSpace(Model.Manifest.Version)
+        ? "Version unpublished"
+        : $"Version {Model.Manifest.Version}";
+    var ManifestVersionText = releaseVersionText;
     static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     static string PlatformId(ReleaseOptionViewModel? option)
@@ -87,6 +91,7 @@
     <div>
         <h1>Downloads</h1>
         <p>Download Chummer from the current release page. Chummer selects the best installer when it can. Other downloads stay below.</p>
+        <p class="downloads-release-version" data-downloads-release-version>@ManifestVersionText</p>
         @if (releaseNeedsReview)
         {
             <p class="muted-copy"><strong>Current note:</strong> Current installers remain available, but wider readiness is under review. Use Help if setup blocks your table.</p>

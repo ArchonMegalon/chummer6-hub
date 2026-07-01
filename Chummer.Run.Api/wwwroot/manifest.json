@@ -2,7 +2,7 @@
   "name": "Chummer",
   "short_name": "Chummer",
   "id": "/mobile",
-  "description": "Shadowrun character manager for desktop character work.",
+  "description": "Mobile play companion for Shadowrun sessions: track continuity, heat, roles, reconnects, and safe Black Ledger updates.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "/mobile",

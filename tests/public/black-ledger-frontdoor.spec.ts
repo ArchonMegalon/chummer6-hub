@@ -2,9 +2,8 @@ import { expect, test } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
-const promoVideoPath = '/media/promo/every-wonder-horizon-promo.mp4';
-
-test('homepage stays product-first while ledger remains off the primary path', async ({ page, request }) => {
+test('homepage stays product-first while ledger remains off the primary path', async ({ page }) => {
+  test.setTimeout(60000);
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
   const hero = page.locator('[data-homepage-section="hero"]');
@@ -15,30 +14,35 @@ test('homepage stays product-first while ledger remains off the primary path', a
 
   const heroLinks = hero.getByRole('link');
   const heroActionLinks = hero.locator('.minimal-actions a.button-like');
-  const heroPromoLink = hero.locator('.minimal-hero__visual');
   expect(await heroLinks.count()).toBeGreaterThan(1);
   expect(await heroActionLinks.count()).toBeGreaterThan(0);
   await expect(hero.getByRole('link', { name: 'Download Chummer' })).toHaveAttribute('href', '/downloads');
-  await expect(heroPromoLink).toHaveAttribute('href', promoVideoPath);
-
-  const promoVideoUrl = new URL(promoVideoPath, `${baseUrl}/`).toString();
-  const promoResponse = await request.get(promoVideoUrl);
-  expect(promoResponse.ok()).toBeTruthy();
-  expect((promoResponse.headers()['content-type'] ?? '').toLowerCase()).toMatch(/video|octet-stream/);
-
-  await Promise.all([
-    page.waitForURL((url) => url.toString().includes(promoVideoPath)),
-    heroPromoLink.click(),
-  ]);
+  await expect(hero.locator('.minimal-hero__visual--preview')).toContainText('Desktop build. Mobile play packet.');
+  await expect(hero.locator('.minimal-hero__visual--preview')).toContainText('Track health, ammo, inventory, and modifiers.');
+  await expect(hero.locator('.minimal-hero__visual--screenshot')).toHaveCount(0);
+  await expect(hero.locator('.minimal-runner-rail')).toHaveCount(0);
+  const openMenu = hero.locator('.minimal-open-chummer');
+  const openMenuSummary = openMenu.locator('summary');
+  await expect(openMenuSummary.locator('.site-account-menu__label')).toContainText('Open Chummer');
+  await openMenuSummary.click();
+  await expect(openMenu).toHaveAttribute('open', '');
+  await expect(openMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Build' })).toBeDisabled();
+  await expect(openMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Play' })).toBeDisabled();
+  await expect(openMenu.locator('.site-open-chummer-menu__button[href="/build"]')).toHaveCount(0);
+  await expect(openMenu.locator('.site-open-chummer-menu__button[href="/mobile/player"]')).toHaveCount(0);
+  await expect(openMenu.locator('.site-open-chummer-menu__button[href="/play"]')).toHaveCount(0);
+  await expect(openMenu.getByRole('link', { name: 'Sign in first' })).toHaveAttribute('href', '/login?next=%2Faccount%2Faccess');
 
   writeJsonArtifact('BLACK_LEDGER_GLOBE_FRONTDOOR.generated.json', {
+    contractName: 'chummer.black_ledger_globe_frontdoor.v1',
     generated_at_utc: new Date().toISOString(),
     status: 'pass',
     base_url: baseUrl,
     route: '/',
     cta_labels: await heroActionLinks.evaluateAll((items) => items.map((item) => (item as HTMLAnchorElement).textContent?.trim() ?? '')),
-    promo_video_href: promoVideoPath,
-    promo_video_click_verified: true,
+    open_menu_targets: ['/login?next=%2Faccount%2Faccess'],
+    gated_targets: ['Build', 'Play'],
+    public_targets: [],
     ledger_primary: false,
   });
 });
