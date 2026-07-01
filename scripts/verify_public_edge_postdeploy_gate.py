@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import posixpath
 import re
 import tempfile
 import subprocess
@@ -14,7 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 
@@ -165,6 +166,52 @@ def parse_json(result: FetchResult, failures: list[str]) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def normalize_manifest_asset_src(src: Any) -> str:
+    value = str(src or "").strip().replace("\\", "/")
+    if not value:
+        return ""
+
+    parsed = urlparse(value)
+    if parsed.scheme or parsed.netloc:
+        return ""
+
+    path = parsed.path.strip()
+    if not path:
+        return ""
+
+    normalized_path = posixpath.normpath(path if path.startswith("/") else f"/{path}")
+    if normalized_path == "/.":
+        return ""
+    if not normalized_path.startswith("/"):
+        normalized_path = f"/{normalized_path}"
+    if parsed.query:
+        return f"{normalized_path}?{parsed.query}"
+    return normalized_path
+
+
+def manifest_asset_paths(payload: dict[str, Any]) -> list[str]:
+    paths: set[str] = set()
+
+    def collect_icon_sources(rows: Any) -> None:
+        if not isinstance(rows, list):
+            return
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            path = normalize_manifest_asset_src(item.get("src"))
+            if path:
+                paths.add(path)
+
+    collect_icon_sources(payload.get("icons"))
+    collect_icon_sources(payload.get("screenshots"))
+    shortcuts = payload.get("shortcuts") if isinstance(payload.get("shortcuts"), list) else []
+    for shortcut in shortcuts:
+        if isinstance(shortcut, dict):
+            collect_icon_sources(shortcut.get("icons"))
+
+    return sorted(paths)
+
+
 def extract_quoted_values(text: str, pattern: str) -> set[str]:
     match = re.search(pattern, text, flags=re.DOTALL)
     if not match:
@@ -302,6 +349,7 @@ def verify_pwa_static(base_url: str, timeout_seconds: float) -> dict[str, Any]:
         )
 
     manifest_results: list[dict[str, Any]] = []
+    manifest_declared_asset_paths: list[str] = []
     for path, expected_start_prefix in EXPECTED_MANIFESTS.items():
         result = fetch(base_url, path, timeout_seconds)
         manifest_failures: list[str] = []
@@ -309,6 +357,8 @@ def verify_pwa_static(base_url: str, timeout_seconds: float) -> dict[str, Any]:
         start_url = str(payload.get("start_url") or "")
         display = str(payload.get("display") or "")
         icons = payload.get("icons") if isinstance(payload.get("icons"), list) else []
+        declared_asset_paths = manifest_asset_paths(payload)
+        manifest_declared_asset_paths.extend(declared_asset_paths)
         require(result.status_code == 200, failures, f"{path} expected 200, got {result.status_code}")
         require(start_url.startswith(expected_start_prefix), failures, f"{path} start_url expected {expected_start_prefix}, got {start_url or '<empty>'}")
         require(display == "standalone", failures, f"{path} display expected standalone, got {display or '<empty>'}")
@@ -322,6 +372,8 @@ def verify_pwa_static(base_url: str, timeout_seconds: float) -> dict[str, Any]:
                 "start_url": start_url,
                 "display": display,
                 "icon_count": len(icons),
+                "manifest_declared_asset_count": len(declared_asset_paths),
+                "manifest_declared_assets": declared_asset_paths,
                 "sha256": result.sha256,
             }
         )
@@ -341,6 +393,21 @@ def verify_pwa_static(base_url: str, timeout_seconds: float) -> dict[str, Any]:
             }
         )
 
+    manifest_declared_asset_results: list[dict[str, Any]] = []
+    for path in sorted(set(manifest_declared_asset_paths)):
+        result = fetch(base_url, path, timeout_seconds)
+        require(result.status_code == 200, failures, f"manifest-declared asset {path} expected 200, got {result.status_code}")
+        require(len(result.body) > 0, failures, f"manifest-declared asset {path} returned an empty body")
+        manifest_declared_asset_results.append(
+            {
+                "path": path,
+                "status_code": result.status_code,
+                "content_type": result.content_type,
+                "bytes": len(result.body.encode("utf-8")),
+                "sha256": result.sha256,
+            }
+        )
+
     service_worker = fetch(base_url, "/service-worker.js", timeout_seconds)
     require(service_worker.status_code == 200, failures, f"/service-worker.js expected 200, got {service_worker.status_code}")
     service_worker_result = inspect_service_worker(service_worker.body, failures)
@@ -351,9 +418,11 @@ def verify_pwa_static(base_url: str, timeout_seconds: float) -> dict[str, Any]:
         "route_count": len(route_results),
         "manifest_count": len(manifest_results),
         "asset_count": len(asset_results),
+        "manifest_declared_asset_count": len(manifest_declared_asset_results),
         "routes": route_results,
         "manifests": manifest_results,
         "assets": asset_results,
+        "manifest_declared_assets": manifest_declared_asset_results,
         "service_worker": {
             "status_code": service_worker.status_code,
             "content_type": service_worker.content_type,

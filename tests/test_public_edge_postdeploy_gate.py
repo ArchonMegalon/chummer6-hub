@@ -58,6 +58,39 @@ def test_ready_handoff_contract_constants_cover_playtime_tools() -> None:
     assert {"player", "gm", "organizer"}.issubset(module.EXPECTED_READY_ROLES)
 
 
+def test_manifest_asset_paths_collects_local_manifest_assets() -> None:
+    module = load_module()
+    payload = {
+        "icons": [
+            {"src": "/pwa-icon.svg"},
+            {"src": "relative.png"},
+            {"src": "https://cdn.example.invalid/external.png"},
+            {"src": "data:image/png;base64,abc"},
+        ],
+        "screenshots": [
+            {"src": "./shots/mobile.svg"},
+        ],
+        "shortcuts": [
+            {
+                "name": "Roll dice",
+                "icons": [
+                    {"src": "/shortcut.svg"},
+                    {"src": "icons/shortcut.svg?v=1#ignored"},
+                    {"src": "//cdn.example.invalid/protocol-relative.svg"},
+                ],
+            }
+        ],
+    }
+
+    assert module.manifest_asset_paths(payload) == [
+        "/icons/shortcut.svg?v=1",
+        "/pwa-icon.svg",
+        "/relative.png",
+        "/shortcut.svg",
+        "/shots/mobile.svg",
+    ]
+
+
 def test_flagship_horizons_gate_maps_phases_to_deployed_evidence() -> None:
     module = load_module()
     child_receipts = {
