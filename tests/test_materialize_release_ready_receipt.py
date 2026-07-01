@@ -37,7 +37,11 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             process = mock.Mock(pid=1234, returncode=0)
             process.communicate.return_value = ("RELEASE READY\n", "")
 
-            with mock.patch.object(module, "OUTPUT_PATH", output_path), mock.patch.object(module.subprocess, "Popen", return_value=process):
+            with (
+                mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(module, "source_binding_failures", return_value=[]),
+                mock.patch.object(module.subprocess, "Popen", return_value=process),
+            ):
                 result = module.main()
 
             self.assertEqual(0, result)
@@ -67,6 +71,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
 
             with (
                 mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(module, "source_binding_failures", return_value=[]),
                 mock.patch.object(module.subprocess, "Popen", return_value=process),
                 mock.patch.object(module.os, "killpg") as killpg,
             ):
@@ -81,6 +86,29 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             self.assertTrue(payload["timed_out"])
             self.assertIn(f"verify_release_ready timed out after {module.TIMEOUT_SECONDS}s", payload["failures"])
             self.assertIn("FAIL verify_live_surface_parity", payload["failures"])
+
+    def test_main_writes_fail_receipt_when_verifier_targets_wrong_repo(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-ready-source-binding-") as temp_dir:
+            output_path = Path(temp_dir) / "RELEASE_READY.generated.json"
+            failure = "release verifier is bound to a different checkout"
+
+            with (
+                mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(module, "source_binding_failures", return_value=[failure]),
+                mock.patch.object(module.subprocess, "Popen") as popen,
+            ):
+                result = module.main()
+
+            self.assertEqual(0, result)
+            popen.assert_not_called()
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual("fail", payload["status"])
+            self.assertEqual("NOT_RELEASE_READY", payload["verdict"])
+            self.assertEqual(78, payload["returncode"])
+            self.assertFalse(payload["timed_out"])
+            self.assertIn(failure, payload["failures"])
+            self.assertFalse(payload["source_binding"]["pass"])
 
 
 if __name__ == "__main__":

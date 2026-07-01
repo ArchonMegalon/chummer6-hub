@@ -11,6 +11,7 @@ from pathlib import Path
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 ROOT = RUN_SERVICES_ROOT.parent
+LEGACY_RUN_SERVICES_ROOT = ROOT / "chummer.run-services"
 OUTPUT_PATH = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "RELEASE_READY.generated.json"
 VERIFY_SCRIPT = ROOT / "scripts" / "release" / "verify_chummer6_release_ready.sh"
 TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_RELEASE_READY_TIMEOUT_SECONDS", "900"))
@@ -70,17 +71,45 @@ def run_release_verifier(env: dict[str, str]) -> tuple[int, bool, str, str]:
         return 124, True, stdout, stderr
 
 
+def source_binding_failures() -> list[str]:
+    if not VERIFY_SCRIPT.is_file():
+        return [f"release verifier script is missing: {VERIFY_SCRIPT}"]
+
+    try:
+        verifier_text = VERIFY_SCRIPT.read_text(encoding="utf-8")
+    except OSError as exc:
+        return [f"release verifier script is unreadable: {exc}"]
+
+    current_root = RUN_SERVICES_ROOT.resolve()
+    legacy_root = LEGACY_RUN_SERVICES_ROOT.resolve()
+    verifier_uses_legacy_root = "$root/chummer.run-services" in verifier_text or str(legacy_root) in verifier_text
+    if current_root != legacy_root and verifier_uses_legacy_root:
+        return [
+            (
+                "release verifier is bound to the legacy run-services checkout "
+                f"{legacy_root}, not the current repo {current_root}"
+            )
+        ]
+
+    return []
+
+
 def main() -> int:
     env = os.environ.copy()
     env.setdefault("CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE", "1")
     env.setdefault("CHUMMER_PUBLIC_BASE_URL", "https://chummer.run")
-    returncode, timed_out, stdout, stderr = run_release_verifier(env)
+    binding_failures = source_binding_failures()
+    if binding_failures:
+        returncode, timed_out, stdout, stderr = 78, False, "", ""
+    else:
+        returncode, timed_out, stdout, stderr = run_release_verifier(env)
 
     failure_lines = [
         line.strip()
         for line in [*stdout.splitlines(), *stderr.splitlines()]
         if line.strip().startswith("FAIL ") or line.strip().startswith("verify_")
     ]
+    failure_lines.extend(binding_failures)
     if timed_out:
         failure_lines.append(f"verify_release_ready timed out after {TIMEOUT_SECONDS}s")
     payload = {
@@ -93,6 +122,13 @@ def main() -> int:
         "timed_out": timed_out,
         "timeout_seconds": TIMEOUT_SECONDS,
         "failures": failure_lines,
+        "source_binding": {
+            "current_repo": str(RUN_SERVICES_ROOT),
+            "legacy_run_services_root": str(LEGACY_RUN_SERVICES_ROOT),
+            "verify_script": str(VERIFY_SCRIPT),
+            "pass": not binding_failures,
+            "failures": binding_failures,
+        },
         "stdout_tail": stdout.splitlines()[-80:],
         "stderr_tail": stderr.splitlines()[-80:],
     }

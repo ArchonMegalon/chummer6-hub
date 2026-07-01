@@ -1,13 +1,24 @@
 {
   "contract_name": "chummer.release_ready",
-  "generated_at_utc": "2026-06-19T23:41:30Z",
-  "status": "pass",
-  "verdict": "RELEASE_READY",
+  "generated_at_utc": "2026-07-01T01:04:04Z",
+  "status": "fail",
+  "verdict": "NOT_RELEASE_READY",
   "command": "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 bash /docker/chummercomplete/scripts/release/verify_chummer6_release_ready.sh",
-  "returncode": 0,
-  "failures": [],
-  "stdout_tail": [
-    "RELEASE READY"
+  "returncode": 78,
+  "timed_out": false,
+  "timeout_seconds": 900,
+  "failures": [
+    "release verifier is bound to the legacy run-services checkout /docker/chummercomplete/chummer.run-services, not the current repo /docker/chummercomplete/chummer.run-services-participate-main"
   ],
+  "source_binding": {
+    "current_repo": "/docker/chummercomplete/chummer.run-services-participate-main",
+    "legacy_run_services_root": "/docker/chummercomplete/chummer.run-services",
+    "verify_script": "/docker/chummercomplete/scripts/release/verify_chummer6_release_ready.sh",
+    "pass": false,
+    "failures": [
+      "release verifier is bound to the legacy run-services checkout /docker/chummercomplete/chummer.run-services, not the current repo /docker/chummercomplete/chummer.run-services-participate-main"
+    ]
+  },
+  "stdout_tail": [],
   "stderr_tail": []
 }
