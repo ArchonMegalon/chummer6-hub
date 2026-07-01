@@ -114,13 +114,20 @@ def test_ready_mobile_handoff_binds_living_world_tool_to_black_ledger_heat(monke
             },
         ],
         "packet_routes": [
-            {"roleId": "player"},
-            {"roleId": "gm"},
-            {"roleId": "organizer"},
+            {"roleId": "player", "markdown": "/ready/packet/player.md", "json": "/ready/packet/player.json"},
+            {"roleId": "gm", "markdown": "/ready/packet/gm.md", "json": "/ready/packet/gm.json"},
+            {"roleId": "organizer", "markdown": "/ready/packet/organizer.md", "json": "/ready/packet/organizer.json"},
         ],
     }
 
     def fake_fetch(base_url, path, timeout_seconds):
+        if path.endswith(".md"):
+            role = path.rsplit("/", 1)[-1].removesuffix(".md")
+            return module.FetchResult(path, 200, {"content-type": "text/markdown"}, f"# {role} packet\n\nReady.", f"{base_url}{path}")
+        if path.endswith(".json") and path != "/ready/handoff/mobile.json":
+            role = path.rsplit("/", 1)[-1].removesuffix(".json")
+            packet_payload = {"verdict": {"roleId": role}, "packet": {"roleId": role}}
+            return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(packet_payload), f"{base_url}{path}")
         return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(payload), f"{base_url}{path}")
 
     monkeypatch.setattr(module, "fetch", fake_fetch)
@@ -130,6 +137,56 @@ def test_ready_mobile_handoff_binds_living_world_tool_to_black_ledger_heat(monke
     assert result["status"] == "pass"
     assert "black ledger" in result["living_world_summary"]
     assert "heat" in result["living_world_summary"]
+    assert result["packet_route_count"] == 3
+    assert {row["roleId"] for row in result["packet_routes"]} == {"player", "gm", "organizer"}
+
+
+def test_ready_mobile_handoff_fails_when_packet_json_role_mismatches(monkeypatch) -> None:
+    module = load_module()
+    payload = {
+        "status": "ready",
+        "pwa_route": "/mobile",
+        "continuity_route": "/play/continuity",
+        "boundaries": [
+            "Character building stays before or after the session.",
+            "Living-world updates require account opt-in and followed-world selection.",
+            "GM remains final authority for table rulings, modifiers, and consequences.",
+        ],
+        "playtime_tools": [
+            {"id": "inventory"},
+            {"id": "health"},
+            {"id": "ammo"},
+            {"id": "modifiers"},
+            {"id": "quick_rolls"},
+            {
+                "id": "living_world",
+                "summary": "Show Black Ledger heat and followed-world updates only after account opt-in and followed-world selection.",
+            },
+        ],
+        "packet_routes": [
+            {"roleId": "player", "markdown": "/ready/packet/player.md", "json": "/ready/packet/player.json"},
+        ],
+    }
+
+    def fake_fetch(base_url, path, timeout_seconds):
+        if path.endswith(".md"):
+            return module.FetchResult(path, 200, {"content-type": "text/markdown"}, "# Player packet\n\nReady.", f"{base_url}{path}")
+        if path.endswith(".json") and path != "/ready/handoff/mobile.json":
+            return module.FetchResult(
+                path,
+                200,
+                {"content-type": "application/json"},
+                json.dumps({"verdict": {"roleId": "gm"}, "packet": {"roleId": "player"}}),
+                f"{base_url}{path}",
+            )
+        return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(payload), f"{base_url}{path}")
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+
+    result = module.verify_ready_mobile_handoff("https://chummer.run", 1.0)
+
+    assert result["status"] == "fail"
+    assert any("verdict roleId expected player, got gm" in failure for failure in result["failures"])
 
 
 def test_mobile_ledger_contract_binds_opt_in_to_heat_followed_world_and_session(monkeypatch) -> None:
@@ -191,6 +248,7 @@ def test_flagship_horizons_gate_maps_phases_to_deployed_evidence() -> None:
             "status": "pass",
             "tool_ids": ["inventory", "health", "ammo", "modifiers", "quick_rolls", "living_world"],
             "packet_roles": ["player", "gm", "organizer"],
+            "packet_route_count": 3,
         },
         "mobileLedger": {
             "status": "pass",

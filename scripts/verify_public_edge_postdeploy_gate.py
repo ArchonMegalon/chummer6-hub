@@ -453,6 +453,7 @@ def verify_ready_mobile_handoff(base_url: str, timeout_seconds: float) -> dict[s
     roles = {str(item.get("roleId") or "") for item in packet_routes if isinstance(item, dict)}
     boundaries = payload.get("boundaries") if isinstance(payload.get("boundaries"), list) else []
     boundary_text = " ".join(str(item) for item in boundaries).lower()
+    packet_route_results: list[dict[str, Any]] = []
 
     require(result.status_code == 200, failures, f"/ready/handoff/mobile.json expected 200, got {result.status_code}")
     require(payload.get("status") == "ready", failures, "mobile handoff status is not ready")
@@ -468,6 +469,61 @@ def verify_ready_mobile_handoff(base_url: str, timeout_seconds: float) -> dict[s
     require("followed-world" in living_world_summary or "followed world" in living_world_summary, failures, "living-world tool summary is not bound to followed-world selection")
     require("opt-in" in living_world_summary or "opt in" in living_world_summary, failures, "living-world tool summary is not bound to account opt-in")
 
+    for packet_route in packet_routes:
+        if not isinstance(packet_route, dict):
+            failures.append("mobile handoff packet route row is not an object")
+            continue
+
+        role_id = str(packet_route.get("roleId") or "").strip()
+        markdown_path = str(packet_route.get("markdown") or "").strip()
+        json_path = str(packet_route.get("json") or "").strip()
+        require(bool(role_id), failures, "mobile handoff packet route is missing roleId")
+        require(markdown_path.startswith("/ready/packet/"), failures, f"mobile handoff packet route for {role_id or '<empty>'} has invalid markdown path")
+        require(json_path.startswith("/ready/packet/"), failures, f"mobile handoff packet route for {role_id or '<empty>'} has invalid json path")
+
+        markdown_result = fetch(base_url, markdown_path, timeout_seconds) if markdown_path.startswith("/") else None
+        json_result = fetch(base_url, json_path, timeout_seconds) if json_path.startswith("/") else None
+        packet_failures: list[str] = []
+        packet_payload = parse_json(json_result, packet_failures) if json_result is not None and json_result.status_code == 200 else {}
+        verdict = packet_payload.get("verdict") if isinstance(packet_payload.get("verdict"), dict) else {}
+        packet = packet_payload.get("packet") if isinstance(packet_payload.get("packet"), dict) else {}
+        verdict_role_id = str(verdict.get("roleId") or "")
+        packet_role_id = str(packet.get("roleId") or "")
+
+        if markdown_result is None:
+            require(False, failures, f"{role_id or '<empty>'} markdown packet route was not fetched")
+        else:
+            require(markdown_result.status_code == 200, failures, f"{markdown_path} expected 200, got {markdown_result.status_code}")
+            require(len(markdown_result.body.strip()) > 0, failures, f"{markdown_path} returned an empty body")
+            require("markdown" in markdown_result.content_type.lower() or "text/plain" in markdown_result.content_type.lower(), failures, f"{markdown_path} is not markdown/text")
+            require(f"# {role_id}".lower() in markdown_result.body.lower(), failures, f"{markdown_path} does not identify role {role_id}")
+
+        if json_result is None:
+            require(False, failures, f"{role_id or '<empty>'} json packet route was not fetched")
+        else:
+            require(json_result.status_code == 200, failures, f"{json_path} expected 200, got {json_result.status_code}")
+            require("json" in json_result.content_type.lower(), failures, f"{json_path} is not JSON")
+            require(len(json_result.body.strip()) > 0, failures, f"{json_path} returned an empty body")
+            require(verdict_role_id == role_id, failures, f"{json_path} verdict roleId expected {role_id}, got {verdict_role_id or '<empty>'}")
+            require(packet_role_id == role_id, failures, f"{json_path} packet roleId expected {role_id}, got {packet_role_id or '<empty>'}")
+            failures.extend(f"{json_path}: {item}" for item in packet_failures)
+
+        packet_route_results.append(
+            {
+                "roleId": role_id,
+                "markdown": markdown_path,
+                "markdown_status": markdown_result.status_code if markdown_result else 0,
+                "markdown_content_type": markdown_result.content_type if markdown_result else "",
+                "markdown_bytes": len(markdown_result.body.encode("utf-8")) if markdown_result else 0,
+                "json": json_path,
+                "json_status": json_result.status_code if json_result else 0,
+                "json_content_type": json_result.content_type if json_result else "",
+                "json_bytes": len(json_result.body.encode("utf-8")) if json_result else 0,
+                "json_verdict_role_id": verdict_role_id,
+                "json_packet_role_id": packet_role_id,
+            }
+        )
+
     return {
         "contractName": "chummer.ready_mobile_handoff_contract.v1",
         "status": "pass" if not failures else "fail",
@@ -477,6 +533,8 @@ def verify_ready_mobile_handoff(base_url: str, timeout_seconds: float) -> dict[s
         "tool_ids": sorted(tool_ids),
         "living_world_summary": living_world_summary,
         "packet_roles": sorted(roles),
+        "packet_route_count": len(packet_route_results),
+        "packet_routes": packet_route_results,
         "failures": failures,
     }
 
@@ -567,6 +625,7 @@ def verify_flagship_horizons(child_receipts: dict[str, dict[str, Any]]) -> dict[
     } if isinstance(route_rows, list) else {}
     tool_ids = set(child_receipts.get("readyMobileHandoff", {}).get("tool_ids") or [])
     packet_roles = set(child_receipts.get("readyMobileHandoff", {}).get("packet_roles") or [])
+    packet_route_count = int(child_receipts.get("readyMobileHandoff", {}).get("packet_route_count") or 0)
     browser_receipt = child_receipts.get("browserPlaywright", {})
     browser_required_proofs = set(browser_receipt.get("requiredProofs") or [])
     browser_skipped = bool(browser_receipt.get("skipped"))
@@ -600,6 +659,8 @@ def verify_flagship_horizons(child_receipts: dict[str, dict[str, Any]]) -> dict[
         if horizon_id == "mid_term_pwa_session_utility":
             if not {"player", "gm", "organizer"}.issubset(packet_roles):
                 row_failures.append("ready handoff is missing player/gm/organizer packet roles")
+            if packet_route_count < len(EXPECTED_READY_ROLES):
+                row_failures.append("ready handoff packet routes are not fully verified")
             if browser_status not in {"pass", ""}:
                 row_failures.append("browser proof receipt is not pass")
 
@@ -650,6 +711,7 @@ def verify_flagship_horizons(child_receipts: dict[str, dict[str, Any]]) -> dict[
         "browserProofsPresent": sorted(browser_required_proofs),
         "toolIds": sorted(tool_ids),
         "packetRoles": sorted(packet_roles),
+        "packetRouteCount": packet_route_count,
         "routeStatuses": route_statuses,
         "failures": failures,
     }

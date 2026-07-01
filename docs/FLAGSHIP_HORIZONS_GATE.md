@@ -5,7 +5,7 @@ This gate keeps the public roadmap tied to deployed proof instead of aspirationa
 ## Horizons
 
 1. `near_term_stabilization`: downloads, navigation, PWA static assets, ready mobile handoff, service-worker boundary, ProductLift iframe shell, and portal runtime image guard must pass.
-2. `mid_term_pwa_session_utility`: `/mobile`, `/mobile/player`, `/mobile/gm`, `/mobile/observer`, and `/play/continuity` must be deployed; playtime tools must include inventory, health, ammo, modifiers, and quick rolls; player/gm/organizer packet roles must be present.
+2. `mid_term_pwa_session_utility`: `/mobile`, `/mobile/player`, `/mobile/gm`, `/mobile/observer`, and `/play/continuity` must be deployed; playtime tools must include inventory, health, ammo, modifiers, and quick rolls; player/gm/organizer packet roles must be present and their advertised markdown/json packet routes must load with matching role IDs.
 3. `long_term_living_world_expansion`: living-world must stay opt-in by default through `/mobile/pwa/ledger.json`, private/no-store cache headers, `living_world` playtime tooling, the `shared_portal_root_worker` service-worker boundary, and an anonymous ledger payload that explicitly keeps Black Ledger heat, followed-world updates, session continuity, and private table state hidden until account opt-in.
 
 ## Release Evidence
