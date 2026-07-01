@@ -7,6 +7,7 @@ from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "verify_minimal_experience_gate.py"
+STATUS_VIEW_PATH = Path(__file__).resolve().parents[1] / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Status.cshtml"
 
 
 def load_module():
@@ -18,6 +19,12 @@ def load_module():
 
 
 class MinimalExperienceGateTests(unittest.TestCase):
+    def test_status_view_uses_one_update_label(self) -> None:
+        view = STATUS_VIEW_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("<h1>Current release</h1>", view)
+        self.assertEqual(0, view.count("<h1>Updated</h1>"))
+
     def test_payload_passes_for_minimal_public_surfaces(self) -> None:
         module = load_module()
         pages = {
