@@ -95,7 +95,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   const statusHero = desktop.locator('.minimal-page-hero.minimal-status-pill');
   const nextActions = statusHero.locator('.minimal-actions a.button-like');
   await expect(statusHero).toBeVisible();
-  await expect(statusHero).toContainText('Current release');
+  await expect(statusHero).toContainText('Updated');
   await expect(statusHero.getByRole('link', { name: 'Downloads' })).toBeVisible();
   await expect(statusHero.getByRole('link', { name: 'Help' })).toBeVisible();
   const nextActionCount = await nextActions.count();

@@ -26,7 +26,7 @@ const supportingSurfaces = [
     id: 'status',
     route: '/status',
     screenshotPrefix: 'status',
-    requiredText: ['Current release', 'Downloads', 'Help'],
+    requiredText: ['Updated', 'Downloads', 'Help'],
   },
   {
     id: 'ledger-map',

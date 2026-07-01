@@ -995,8 +995,8 @@ def test_status_surface_uses_single_update_label() -> None:
     status = read("Chummer.Run.Api/Views/PublicLanding/Status.cshtml")
 
     assert 'ViewData["Title"] = "Status";' in status
-    assert "<h1>Current release</h1>" in status
-    assert "<h1>Updated</h1>" not in status
+    assert "<h1>Updated</h1>" in status
+    assert "<h1>Current release</h1>" not in status
     assert 'ViewData["Title"] = "Updated";' not in status
 
 

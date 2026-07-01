@@ -22,8 +22,8 @@ class MinimalExperienceGateTests(unittest.TestCase):
     def test_status_view_uses_one_update_label(self) -> None:
         view = STATUS_VIEW_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("<h1>Current release</h1>", view)
-        self.assertEqual(0, view.count("<h1>Updated</h1>"))
+        self.assertIn("<h1>Updated</h1>", view)
+        self.assertNotIn("<h1>Current release</h1>", view)
 
     def test_payload_passes_for_minimal_public_surfaces(self) -> None:
         module = load_module()
