@@ -333,6 +333,9 @@ def run_postdeploy_gate(
     output_path: Path,
     attempts: int,
     retry_delay_seconds: float,
+    browser_proofs: list[str],
+    playwright_timeout_seconds: float,
+    playwright_artifact_dir: Path | None,
     dry_run: bool,
 ) -> dict[str, Any]:
     if not dry_run:
@@ -352,6 +355,17 @@ def run_postdeploy_gate(
         "--output",
         str(output_path),
     ]
+    browser_flag_by_name = {
+        "downloadsStatus": "--require-downloads-status-playwright",
+        "mobilePwaViewport": "--require-mobile-pwa-viewport-playwright",
+        "frontdoorNavigation": "--require-frontdoor-navigation-playwright",
+    }
+    for proof_name in browser_proofs:
+        command.append(browser_flag_by_name[proof_name])
+    if browser_proofs:
+        command.extend(["--playwright-timeout-seconds", str(playwright_timeout_seconds)])
+        if playwright_artifact_dir is not None:
+            command.extend(["--playwright-artifact-dir", str(playwright_artifact_dir)])
     max_attempts = max(1, attempts)
     run_records: list[dict[str, Any]] = []
     last_result = CommandResult(command, 1, "", "postdeploy gate did not run")
@@ -370,6 +384,8 @@ def run_postdeploy_gate(
                 "returncode": last_result.returncode,
                 "status": status,
                 "portalRuntimeImageStatus": last_payload.get("portalRuntimeImageStatus", ""),
+                "browserPlaywrightStatus": last_payload.get("browserPlaywrightStatus", ""),
+                "browserPlaywrightRequiredProofs": last_payload.get("browserPlaywrightRequiredProofs", []),
                 "releaseManifestVersion": last_payload.get("releaseManifestVersion", ""),
             }
         )
@@ -380,6 +396,8 @@ def run_postdeploy_gate(
                 "outputPath": str(output_path),
                 "status": status,
                 "portalRuntimeImageStatus": last_payload.get("portalRuntimeImageStatus", ""),
+                "browserPlaywrightStatus": last_payload.get("browserPlaywrightStatus", ""),
+                "browserPlaywrightRequiredProofs": last_payload.get("browserPlaywrightRequiredProofs", []),
                 "releaseManifestVersion": last_payload.get("releaseManifestVersion", ""),
                 "attempts": run_records,
             }
@@ -404,6 +422,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--postdeploy-output", default=str(ROOT / ".codex-studio" / "published" / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"))
     parser.add_argument("--postdeploy-attempts", type=int, default=3)
     parser.add_argument("--postdeploy-retry-delay-seconds", type=float, default=5.0)
+    parser.add_argument("--require-downloads-status-playwright", action="store_true")
+    parser.add_argument("--require-mobile-pwa-viewport-playwright", action="store_true")
+    parser.add_argument("--require-frontdoor-navigation-playwright", action="store_true")
+    parser.add_argument("--require-all-browser-proofs", action="store_true")
+    parser.add_argument("--playwright-timeout-seconds", type=float, default=420.0)
+    parser.add_argument("--playwright-artifact-dir")
     parser.add_argument("--stability-window-seconds", type=float, default=0.0)
     parser.add_argument("--stability-poll-seconds", type=float, default=5.0)
     parser.add_argument("--max-stability-restores", type=int, default=3)
@@ -428,6 +452,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         env_file = resolve_env_file(args.env_file, repo_root)
         expected = require_sha256_image_id(args.expected_portal_image_id)
+        browser_proofs: list[str] = []
+        if args.require_all_browser_proofs or args.require_downloads_status_playwright:
+            browser_proofs.append("downloadsStatus")
+        if args.require_all_browser_proofs or args.require_mobile_pwa_viewport_playwright:
+            browser_proofs.append("mobilePwaViewport")
+        if args.require_all_browser_proofs or args.require_frontdoor_navigation_playwright:
+            browser_proofs.append("frontdoorNavigation")
         restore_receipt = restore_portal_image(
             expected,
             args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
@@ -462,6 +493,9 @@ def main(argv: list[str] | None = None) -> int:
                 Path(args.postdeploy_output).expanduser(),
                 args.postdeploy_attempts,
                 args.postdeploy_retry_delay_seconds,
+                browser_proofs,
+                args.playwright_timeout_seconds,
+                Path(args.playwright_artifact_dir).expanduser() if args.playwright_artifact_dir else None,
                 args.dry_run,
             )
     except Exception as error:
@@ -475,6 +509,7 @@ def main(argv: list[str] | None = None) -> int:
         "restore": restore_receipt,
         "stability": stability_receipt,
         "postdeploy": postdeploy_receipt,
+        "browserProofRequirements": browser_proofs,
     }
     rendered = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
     if args.output:

@@ -151,6 +151,9 @@ def test_postdeploy_gate_retries_until_runtime_is_warm(monkeypatch, tmp_path) ->
         output_path,
         2,
         0,
+        [],
+        420,
+        None,
         False,
     )
 
@@ -158,6 +161,62 @@ def test_postdeploy_gate_retries_until_runtime_is_warm(monkeypatch, tmp_path) ->
     assert result["status"] == "pass"
     assert result["attempts"][0]["status"] == "fail"
     assert result["attempts"][1]["status"] == "pass"
+
+
+def test_postdeploy_gate_forwards_browser_proof_requirements(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    expected = "sha256:" + "6" * 64
+    output_path = tmp_path / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
+    artifact_dir = tmp_path / "browser-artifacts"
+    calls: list[list[str]] = []
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        calls.append(command)
+        output_path.write_text(
+            json.dumps(
+                {
+                    "status": "pass",
+                    "portalRuntimeImageStatus": "pass",
+                    "browserPlaywrightStatus": "pass",
+                    "browserPlaywrightRequiredProofs": [
+                        "downloadsStatus",
+                        "mobilePwaViewport",
+                        "frontdoorNavigation",
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return module.CommandResult(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+
+    result = module.run_postdeploy_gate(
+        expected,
+        "https://chummer.run",
+        "portal",
+        "chummer-run-api:local",
+        output_path,
+        1,
+        0,
+        ["downloadsStatus", "mobilePwaViewport", "frontdoorNavigation"],
+        180,
+        artifact_dir,
+        False,
+    )
+
+    command = calls[0]
+    assert "--require-downloads-status-playwright" in command
+    assert "--require-mobile-pwa-viewport-playwright" in command
+    assert "--require-frontdoor-navigation-playwright" in command
+    assert command[command.index("--playwright-timeout-seconds") + 1] == "180"
+    assert command[command.index("--playwright-artifact-dir") + 1] == str(artifact_dir)
+    assert result["browserPlaywrightStatus"] == "pass"
+    assert result["browserPlaywrightRequiredProofs"] == [
+        "downloadsStatus",
+        "mobilePwaViewport",
+        "frontdoorNavigation",
+    ]
 
 
 def test_stability_watch_repairs_drift_before_postdeploy(monkeypatch, tmp_path) -> None:
