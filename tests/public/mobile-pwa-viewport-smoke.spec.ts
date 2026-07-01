@@ -11,9 +11,9 @@ const viewports = [
 
 const routes = [
   { path: '/mobile', expected: 'Mobile and PWA entry' },
-  { path: '/mobile/player', expected: 'Chummer Mobile Turn Companion' },
-  { path: '/mobile/gm', expected: 'Chummer Mobile Turn Companion' },
-  { path: '/mobile/observer', expected: 'Chummer Mobile Turn Companion' },
+  { path: '/mobile/player', expected: 'Player entry' },
+  { path: '/mobile/gm', expected: 'GM entry' },
+  { path: '/mobile/observer', expected: 'Observer entry' },
   { path: '/play', expected: 'Player entry' },
   { path: '/play/continuity', expected: 'NEXUS-PAN continuity' },
 ];
