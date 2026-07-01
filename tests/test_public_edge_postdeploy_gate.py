@@ -58,6 +58,79 @@ def test_ready_handoff_contract_constants_cover_playtime_tools() -> None:
     assert {"player", "gm", "organizer"}.issubset(module.EXPECTED_READY_ROLES)
 
 
+def test_flagship_horizons_gate_maps_phases_to_deployed_evidence() -> None:
+    module = load_module()
+    child_receipts = {
+        "downloads": {"status": "pass"},
+        "navigation": {"status": "pass"},
+        "pwaStatic": {
+            "status": "pass",
+            "routes": [
+                {"path": "/mobile", "status_code": 200},
+                {"path": "/mobile/player", "status_code": 200},
+                {"path": "/mobile/gm", "status_code": 200},
+                {"path": "/mobile/observer", "status_code": 200},
+                {"path": "/play/continuity", "status_code": 200},
+            ],
+        },
+        "readyMobileHandoff": {
+            "status": "pass",
+            "tool_ids": ["inventory", "health", "ammo", "modifiers", "quick_rolls", "living_world"],
+            "packet_roles": ["player", "gm", "organizer"],
+        },
+        "mobileLedger": {
+            "status": "pass",
+            "payload_status": "opt_in_required",
+            "cache_control": "private, no-store, no-cache",
+        },
+        "mobilePwaServiceWorkerBoundary": {
+            "status": "pass",
+            "mobileRuntime": {"serviceWorkerBoundaryMode": "shared_portal_root_worker"},
+        },
+        "participateIframeShell": {"status": "pass"},
+        "portalRuntimeImage": {"status": "pass"},
+        "browserPlaywright": {
+            "status": "pass",
+            "requiredProofs": ["downloadsStatus", "mobilePwaViewport", "frontdoorNavigation"],
+        },
+    }
+
+    result = module.verify_flagship_horizons(child_receipts)
+
+    assert result["status"] == "pass"
+    assert result["horizonCount"] == 3
+    assert result["browserProofCoverage"] == "full"
+    assert {row["id"] for row in result["horizons"]} == {
+        "near_term_stabilization",
+        "mid_term_pwa_session_utility",
+        "long_term_living_world_expansion",
+    }
+
+
+def test_flagship_horizons_gate_fails_when_living_world_opt_in_boundary_regresses() -> None:
+    module = load_module()
+    child_receipts = {
+        "downloads": {"status": "pass"},
+        "navigation": {"status": "pass"},
+        "pwaStatic": {"status": "pass", "routes": []},
+        "readyMobileHandoff": {"status": "pass", "tool_ids": ["living_world"], "packet_roles": []},
+        "mobileLedger": {"status": "pass", "payload_status": "open", "cache_control": "public"},
+        "mobilePwaServiceWorkerBoundary": {
+            "status": "pass",
+            "mobileRuntime": {"serviceWorkerBoundaryMode": "play_root_worker"},
+        },
+        "participateIframeShell": {"status": "pass"},
+        "portalRuntimeImage": {"status": "pass"},
+        "browserPlaywright": {"status": "pass", "skipped": True, "requiredProofs": []},
+    }
+
+    result = module.verify_flagship_horizons(child_receipts)
+
+    assert result["status"] == "fail"
+    assert any("mobile ledger does not enforce opt-in-required status" in failure for failure in result["failures"])
+    assert any("mobile service-worker boundary is not shared_portal_root_worker" in failure for failure in result["failures"])
+
+
 def test_mobile_routes_use_structural_pwa_markers_not_legacy_copy() -> None:
     module = load_module()
 

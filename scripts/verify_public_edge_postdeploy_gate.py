@@ -74,6 +74,46 @@ PLAYWRIGHT_REQUIREMENTS = {
         "artifact": "FRONTDOOR_MOBILE_LAUNCH.generated.json",
     },
 }
+EXPECTED_FLAGSHIP_HORIZONS = {
+    "near_term_stabilization": {
+        "title": "Near-term stabilization",
+        "requiredReceipts": [
+            "downloads",
+            "navigation",
+            "pwaStatic",
+            "readyMobileHandoff",
+            "mobilePwaServiceWorkerBoundary",
+            "participateIframeShell",
+            "portalRuntimeImage",
+        ],
+    },
+    "mid_term_pwa_session_utility": {
+        "title": "Mid-term PWA/session utility",
+        "requiredReceipts": [
+            "pwaStatic",
+            "readyMobileHandoff",
+            "browserPlaywright",
+        ],
+        "requiredRoutes": [
+            "/mobile",
+            "/mobile/player",
+            "/mobile/gm",
+            "/mobile/observer",
+            "/play/continuity",
+        ],
+        "requiredTools": sorted(EXPECTED_PLAYTIME_TOOLS - {"living_world"}),
+    },
+    "long_term_living_world_expansion": {
+        "title": "Long-term living-world expansion",
+        "requiredReceipts": [
+            "readyMobileHandoff",
+            "mobileLedger",
+            "mobilePwaServiceWorkerBoundary",
+        ],
+        "requiredTools": ["living_world"],
+        "requiredLedgerStatus": "opt_in_required",
+    },
+}
 DEFAULT_PORTAL_CONTAINER = "chummer6-hub-chummer-portal-1"
 DEFAULT_PORTAL_IMAGE_TAG = "chummer-run-api:local"
 
@@ -387,6 +427,101 @@ def verify_mobile_ledger(base_url: str, timeout_seconds: float) -> dict[str, Any
     }
 
 
+def receipt_is_pass(receipt: dict[str, Any] | None) -> bool:
+    return isinstance(receipt, dict) and str(receipt.get("status") or "") == "pass"
+
+
+def verify_flagship_horizons(child_receipts: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    failures: list[str] = []
+    horizon_rows: list[dict[str, Any]] = []
+
+    route_rows = child_receipts.get("pwaStatic", {}).get("routes")
+    route_statuses = {
+        str(row.get("path") or ""): str(row.get("status_code") or "")
+        for row in route_rows
+        if isinstance(row, dict)
+    } if isinstance(route_rows, list) else {}
+    tool_ids = set(child_receipts.get("readyMobileHandoff", {}).get("tool_ids") or [])
+    packet_roles = set(child_receipts.get("readyMobileHandoff", {}).get("packet_roles") or [])
+    browser_receipt = child_receipts.get("browserPlaywright", {})
+    browser_required_proofs = set(browser_receipt.get("requiredProofs") or [])
+    browser_skipped = bool(browser_receipt.get("skipped"))
+    browser_status = str(browser_receipt.get("status") or "")
+    required_browser_proofs = set(PLAYWRIGHT_REQUIREMENTS)
+    browser_proof_coverage = (
+        "full"
+        if browser_status == "pass" and required_browser_proofs.issubset(browser_required_proofs)
+        else "skipped"
+        if browser_skipped
+        else "partial"
+    )
+
+    for horizon_id, config in EXPECTED_FLAGSHIP_HORIZONS.items():
+        row_failures: list[str] = []
+        required_receipts = list(config.get("requiredReceipts") or [])
+        for receipt_name in required_receipts:
+            if not receipt_is_pass(child_receipts.get(receipt_name)):
+                row_failures.append(f"{receipt_name} receipt is not pass")
+
+        required_routes = set(config.get("requiredRoutes") or [])
+        missing_routes = sorted(path for path in required_routes if route_statuses.get(path) != "200")
+        if missing_routes:
+            row_failures.append(f"missing deployed routes: {', '.join(missing_routes)}")
+
+        required_tools = set(config.get("requiredTools") or [])
+        missing_tools = sorted(required_tools - tool_ids)
+        if missing_tools:
+            row_failures.append(f"missing playtime tools: {', '.join(missing_tools)}")
+
+        if horizon_id == "mid_term_pwa_session_utility":
+            if not {"player", "gm", "organizer"}.issubset(packet_roles):
+                row_failures.append("ready handoff is missing player/gm/organizer packet roles")
+            if browser_status not in {"pass", ""}:
+                row_failures.append("browser proof receipt is not pass")
+
+        if horizon_id == "long_term_living_world_expansion":
+            mobile_ledger = child_receipts.get("mobileLedger", {})
+            cache_control = str(mobile_ledger.get("cache_control") or "").lower()
+            service_worker_mode = (
+                child_receipts.get("mobilePwaServiceWorkerBoundary", {})
+                .get("mobileRuntime", {})
+                .get("serviceWorkerBoundaryMode", "")
+            )
+            if mobile_ledger.get("payload_status") != config.get("requiredLedgerStatus"):
+                row_failures.append("mobile ledger does not enforce opt-in-required status")
+            if "private" not in cache_control or "no-store" not in cache_control:
+                row_failures.append("mobile ledger is not private/no-store")
+            if service_worker_mode != "shared_portal_root_worker":
+                row_failures.append("mobile service-worker boundary is not shared_portal_root_worker")
+
+        horizon_rows.append(
+            {
+                "id": horizon_id,
+                "title": config.get("title", horizon_id),
+                "status": "pass" if not row_failures else "fail",
+                "requiredReceipts": required_receipts,
+                "requiredRoutes": sorted(required_routes),
+                "requiredTools": sorted(required_tools),
+                "failures": row_failures,
+            }
+        )
+        failures.extend(f"{horizon_id}: {failure}" for failure in row_failures)
+
+    return {
+        "contractName": "chummer.flagship_horizons_gate.v1",
+        "status": "pass" if not failures else "fail",
+        "horizonCount": len(horizon_rows),
+        "horizons": horizon_rows,
+        "browserProofCoverage": browser_proof_coverage,
+        "browserProofsRequiredForReleaseClaims": sorted(required_browser_proofs),
+        "browserProofsPresent": sorted(browser_required_proofs),
+        "toolIds": sorted(tool_ids),
+        "packetRoles": sorted(packet_roles),
+        "routeStatuses": route_statuses,
+        "failures": failures,
+    }
+
+
 def verify_preflight(skip_preflight: bool) -> dict[str, Any]:
     if skip_preflight:
         return {
@@ -684,6 +819,7 @@ def verify(
             playwright_artifact_dir,
         ),
     }
+    child_receipts["flagshipHorizons"] = verify_flagship_horizons(child_receipts)
 
     failures: list[str] = []
     statuses = {name: summarize_child(name, child, failures) for name, child in child_receipts.items()}
@@ -704,12 +840,15 @@ def verify(
         "preflightStatus": statuses["preflight"],
         "portalRuntimeImageStatus": statuses["portalRuntimeImage"],
         "browserPlaywrightStatus": statuses["browserPlaywright"],
+        "flagshipHorizonsStatus": statuses["flagshipHorizons"],
         "readyMobileHandoffToolIds": child_receipts["readyMobileHandoff"].get("tool_ids", []),
         "readyMobileHandoffPacketRoles": child_receipts["readyMobileHandoff"].get("packet_roles", []),
         "mobileLedgerPayloadStatus": child_receipts["mobileLedger"].get("payload_status", ""),
         "mobileLedgerCacheControl": child_receipts["mobileLedger"].get("cache_control", ""),
         "mobilePwaServiceWorkerBoundaryMode": child_receipts["mobilePwaServiceWorkerBoundary"].get("mobileRuntime", {}).get("serviceWorkerBoundaryMode", ""),
         "browserPlaywrightRequiredProofs": child_receipts["browserPlaywright"].get("requiredProofs", []),
+        "flagshipHorizonIds": [row.get("id") for row in child_receipts["flagshipHorizons"].get("horizons", [])],
+        "flagshipHorizonsBrowserProofCoverage": child_receipts["flagshipHorizons"].get("browserProofCoverage", ""),
         "portalRuntimeImageExpectedImageId": child_receipts["portalRuntimeImage"].get("expectedImageId", ""),
         "portalRuntimeImageContainerImageId": child_receipts["portalRuntimeImage"].get("containerImageId", ""),
         "participateIframeRouteCount": child_receipts["participateIframeShell"].get("iframe_route_count", 0),

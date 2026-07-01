@@ -331,6 +331,9 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "--require-downloads-status-playwright" in runbook
     assert "--require-mobile-pwa-viewport-playwright" in runbook
     assert "--require-frontdoor-navigation-playwright" in runbook
+    assert "docs/FLAGSHIP_HORIZONS_GATE.md" in runbook
+    assert "flagshipHorizonsStatus=pass" in runbook
+    assert "flagshipHorizonsBrowserProofCoverage=full" in runbook
     assert "shared_portal_root_worker" in runbook
     assert "--expected-portal-image-id" in runbook
     assert "--portal-container chummer6-hub-chummer-portal-1" in runbook
@@ -344,3 +347,15 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "records Docker created time, tags, digests, and labels for any drifted image it replaces" in runbook
     assert "repairs bounded image drift during the optional stability window" in runbook
     assert "retries the runtime image guard plus the downloads/status, mobile viewport, and Open Chummer navigation browser proofs" in runbook
+
+
+def test_flagship_horizons_gate_doc_names_the_release_horizons() -> None:
+    doc = (ROOT / "docs" / "FLAGSHIP_HORIZONS_GATE.md").read_text(encoding="utf-8")
+
+    assert "near_term_stabilization" in doc
+    assert "mid_term_pwa_session_utility" in doc
+    assert "long_term_living_world_expansion" in doc
+    assert "flagshipHorizonsStatus=pass" in doc
+    assert "flagshipHorizonsBrowserProofCoverage=full" in doc
+    assert "/mobile/pwa/ledger.json" in doc
+    assert "shared_portal_root_worker" in doc
