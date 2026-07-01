@@ -254,7 +254,7 @@ select option:checked {
   display: inline-flex;
   align-items: center;
   gap: 0.65rem;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0.58rem 0.82rem;
   border: 1px solid var(--line-subtle);
   border-radius: 999px;
@@ -321,8 +321,10 @@ select option:checked {
 .site-account-menu__link,
 .site-account-menu__button,
 .site-account-menu__current {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
+  min-height: 44px;
   padding: 0.62rem 0.72rem;
   border-radius: 9px;
   text-align: left;
@@ -8894,9 +8896,9 @@ body {
 
 .surface-minimal .button-like,
 .surface-minimal .action-pill {
-  min-height: 36px;
+  min-height: 44px;
   border-radius: 999px;
-  padding: 0.55rem 0.85rem;
+  padding: 0.64rem 1rem;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
   font-weight: 600;
   letter-spacing: 0;
@@ -8935,8 +8937,8 @@ body {
 }
 
 .surface-minimal .site-open-chummer-menu .site-account-menu__summary {
-  min-height: 36px;
-  padding: 0.55rem 0.85rem;
+  min-height: 44px;
+  padding: 0.64rem 1rem;
   border-color: var(--minimal-line);
   background: linear-gradient(180deg, rgba(247, 240, 223, 0.075), rgba(247, 240, 223, 0.04));
   color: var(--minimal-ink);
@@ -9059,17 +9061,19 @@ body {
   gap: clamp(0.7rem, 2vw, 1.05rem);
   align-items: center;
   min-height: auto;
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
+  border: 1px solid color-mix(in srgb, var(--minimal-line) 86%, transparent);
+  border-radius: var(--radius-lg);
+  padding: clamp(0.9rem, 2vw, 1.35rem);
+  background:
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--minimal-accent) 13%, transparent), transparent 19rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--minimal-surface) 96%, black), color-mix(in srgb, var(--minimal-panel) 88%, transparent));
+  box-shadow: var(--minimal-shadow-hero);
 }
 
 .route-landing [data-homepage-section="hero"] {
-  border-bottom: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--minimal-line) 70%, transparent);
   min-height: 0;
-  padding: 0;
+  padding: clamp(0.78rem, 2vw, 1.15rem);
 }
 
 .route-landing [data-homepage-section="help"] {
@@ -9564,7 +9568,10 @@ body {
   padding: 0.85rem 0.95rem;
   border: 1px solid var(--minimal-line);
   border-radius: 12px;
-  background: var(--minimal-surface);
+  background:
+    linear-gradient(180deg, rgba(247, 240, 223, 0.055), rgba(247, 240, 223, 0.018)),
+    var(--minimal-surface);
+  box-shadow: var(--minimal-shadow-soft);
 }
 
 .minimal-status-pill {
@@ -9574,7 +9581,10 @@ body {
   padding: 0.72rem 0.85rem;
   border: 1px solid var(--minimal-line);
   border-radius: 12px;
-  background: var(--minimal-surface);
+  background:
+    linear-gradient(180deg, rgba(247, 240, 223, 0.05), rgba(247, 240, 223, 0.015)),
+    var(--minimal-surface);
+  box-shadow: var(--minimal-shadow-soft);
 }
 
 .minimal-status-pill strong {
@@ -9627,7 +9637,18 @@ body {
   padding: 0.78rem 0.86rem;
   border: 1px solid var(--minimal-line);
   border-radius: 10px;
-  background: var(--minimal-surface);
+  background:
+    linear-gradient(180deg, rgba(247, 240, 223, 0.05), rgba(247, 240, 223, 0.015)),
+    var(--minimal-surface);
+  box-shadow: var(--minimal-shadow-soft);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.downloads-choice-card:hover,
+.downloads-choice-card:focus-within {
+  border-color: color-mix(in srgb, var(--minimal-accent) 34%, var(--minimal-line));
+  box-shadow: var(--minimal-shadow-hero);
+  transform: translateY(-1px);
 }
 
 .downloads-choice-card span {

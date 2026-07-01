@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.premium_ui_design_exit_gate",
-  "generated_at_utc": "2026-06-30T23:41:39Z",
+  "generated_at_utc": "2026-07-01T01:14:49Z",
   "status": "pass",
   "verdict": "PREMIUM_UI_READY",
   "reference_systems": [
@@ -105,7 +105,10 @@
         "premium visual scorecard": true,
         "zero-internal-language rule": true,
         "mobile playtime standard": true,
-        "dark-mode form controls": true
+        "dark-mode form controls": true,
+        "44px action floor": true,
+        "route visual anatomy": true,
+        "public endpoint language ban": true
       },
       "pass": true
     },
@@ -151,7 +154,7 @@
     },
     "art_direction": {
       "standard": "HIG deference with purposeful visual depth",
-      "gradient_count": 183,
+      "gradient_count": 188,
       "has_minimal_hero_visual_css": true,
       "has_landing_film_css": true,
       "pass": true
@@ -165,9 +168,9 @@
     },
     "interaction_affordance": {
       "standard": "HIG touch targets + WCAG focus visible + Fluent interaction states",
-      "hover_selector_count": 84,
+      "hover_selector_count": 85,
       "focus_visible_selector_count": 54,
-      "touch_safe_min_height_count": 10,
+      "touch_safe_min_height_count": 14,
       "has_focus_outline": true,
       "pass": true
     },
@@ -205,7 +208,7 @@
         "site_max_token": true
       },
       "grid_layout_count": 283,
-      "flex_layout_count": 68,
+      "flex_layout_count": 69,
       "has_glass_chrome": true,
       "pass": true
     },
@@ -223,6 +226,107 @@
         "status_pill": true,
         "mobile_fact_cards": true,
         "participate_frame": true
+      },
+      "pass": true
+    },
+    "premium_surface_anatomy": {
+      "standard": "HIG touch comfort + Fluent depth + Material/Carbon component structure, verified on actual shared selectors",
+      "surfaces": {
+        "primary_action_touch_floor": {
+          "selector": ".surface-minimal .button-like",
+          "standard": "Apple HIG touch comfort translated into a 44px minimum action floor",
+          "checks": {
+            "min_height_at_least_44": true
+          },
+          "pass": true
+        },
+        "open_chummer_touch_floor": {
+          "selector": ".surface-minimal .site-open-chummer-menu .site-account-menu__summary",
+          "standard": "Open Chummer must remain touch-safe and visually equivalent to sibling actions",
+          "checks": {
+            "min_height_at_least_44": true
+          },
+          "pass": true
+        },
+        "account_menu_item_touch_floor": {
+          "selector": ".site-account-menu__link",
+          "standard": "Menu rows must be finger-readable, not desktop-only micro rows",
+          "checks": {
+            "min_height_at_least_44": true
+          },
+          "pass": true
+        },
+        "landing_hero_depth": {
+          "selector": ".minimal-hero",
+          "standard": "Landing hero needs a composed premium surface, not a flat text block",
+          "checks": {
+            "has_background": true,
+            "has_non_flat_background": true,
+            "has_depth": true,
+            "has_radius": true,
+            "has_padding": true
+          },
+          "pass": true
+        },
+        "page_hero_depth": {
+          "selector": ".minimal-page-hero",
+          "standard": "Secondary route heroes need a consistent premium panel treatment",
+          "checks": {
+            "has_background": true,
+            "has_non_flat_background": true,
+            "has_depth": true,
+            "has_radius": true,
+            "has_padding": true
+          },
+          "pass": true
+        },
+        "download_card_depth": {
+          "selector": ".downloads-choice-card",
+          "standard": "Download decisions must read as deliberate cards, not table rows",
+          "checks": {
+            "has_background": true,
+            "has_non_flat_background": true,
+            "has_depth": true,
+            "has_radius": true,
+            "has_padding": true
+          },
+          "pass": true
+        },
+        "status_panel_depth": {
+          "selector": ".minimal-status-pill",
+          "standard": "Current status must feel like a high-signal decision panel",
+          "checks": {
+            "has_background": true,
+            "has_non_flat_background": true,
+            "has_depth": true,
+            "has_radius": true,
+            "has_padding": true
+          },
+          "pass": true
+        },
+        "mobile_fact_card_depth": {
+          "selector": ".minimal-facts article",
+          "standard": "Mobile playtime cards need visible separation under table pressure",
+          "checks": {
+            "has_background": true,
+            "has_non_flat_background": true,
+            "has_depth": true,
+            "has_radius": true,
+            "has_padding": true
+          },
+          "pass": true
+        },
+        "participate_iframe_deference": {
+          "selector": ".participate-hosted__frame-shell",
+          "standard": "Participate must honor the iframe-only product decision while keeping safe containment",
+          "checks": {
+            "has_background": true,
+            "has_overflow": true,
+            "has_height": true,
+            "has_no_border": true
+          },
+          "pass": true
+        }
       },
       "pass": true
     },

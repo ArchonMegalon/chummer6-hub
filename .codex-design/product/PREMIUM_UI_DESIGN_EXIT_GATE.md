@@ -36,6 +36,8 @@ The premium visual scorecard blocks release unless all items are true:
 - Component anatomy is complete: primary, secondary, and ghost actions; header chrome; Open Chummer dropdown; hero; downloads cards; status pill; mobile facts; and participate iframe.
 - Dark-mode form controls are fully readable: textboxes, selects, textareas, placeholders, selected options, caret, accent, disabled, hover, and focus states.
 - Responsive behavior is designed, not incidental: mobile breakpoints, fluid type/spacing, minmax grids, svh handling, and touch-safe actions are required.
+- Touch targets use a 44px action floor on public primary actions, dropdown summaries, and menu rows; compact desktop styling cannot shrink the actual hit area below the mobile play bar.
+- Route visual anatomy is inspected on the shared selectors themselves: hero panels, secondary route heroes, download cards, status panels, mobile facts, and iframe containers must carry deliberate background, depth, radius, spacing, and containment decisions.
 
 ## Surface Contracts
 
@@ -58,8 +60,10 @@ The zero-internal-language rule is release blocking. Public UI must not show pro
 Fail the gate when:
 
 - The UI can pass by having many gradients, shadows, hover states, or media queries but no route-specific job clarity.
+- The UI can pass by stuffing CSS tokens while the actual route surfaces stay flat, transparent, cramped, or below the 44px action floor.
 - The landing page loses Build or Play.
 - Mobile/PWA loses ledger, heat, opt-in, continuity, install, or help affordances.
+- Mobile/PWA exposes raw endpoint paths, JSON URLs, route labels, raw enum states, or data plumbing as visible product copy.
 - Participate stops being a real iframe surface.
 - Form controls become unreadable in dark mode.
 - Navigation, buttons, cards, or focus states are styled on one route but absent on sibling routes.
@@ -74,3 +78,5 @@ python3 scripts/verify_premium_ui_design_exit_gate.py
 ```
 
 The generated receipt is `.codex-studio/published/PREMIUM_UI_DESIGN_EXIT_GATE.generated.json` with the human report at `.codex-studio/published/PREMIUM_UI_DESIGN_EXIT_GATE.md`.
+
+Canonical marker terms used by the executable gate: 44px action floor, route visual anatomy, public endpoint language ban.

@@ -129,8 +129,10 @@ Exit rules:
 - Quiet public language: public pages must not expose proof-dashboard language, provider names, fleet/operator phrasing, raw status enum language, or internal process labels.
 - Mobile truth: mobile/PWA surfaces must work as compact playtime tools, not shrunken desktop dashboards.
 - Open Chummer split: `Open Chummer` must stay an accessible dropdown with `Build` and `Play` buttons; flattening it back into one ambiguous action fails the gate.
+- 44px action floor: primary actions, dropdown summaries, and menu rows must stay touch-safe even when the visual shell is minimal.
+- route visual anatomy: shared route selectors must carry deliberate panel depth, spacing, radius, and containment rather than passing through token counts alone.
 - premium visual scorecard: typography, semantic color, elevation, layout rhythm, component anatomy, dark-mode form controls, motion fallback, responsive behavior, and public-language discipline all pass together or the gate fails.
-- zero-internal-language rule: public UI cannot leak proof, receipt, operator, fleet, governor, provider, raw enum, or process wording unless the route is explicitly an internal/authenticated operations surface.
+- zero-internal-language rule: public UI cannot leak proof, receipt, operator, fleet, governor, provider, raw enum, raw endpoint, JSON route, or process wording unless the route is explicitly an internal/authenticated operations surface.
 
 Executable gate:
 

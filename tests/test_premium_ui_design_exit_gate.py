@@ -56,6 +56,9 @@ premium visual scorecard
 zero-internal-language rule
 mobile playtime standard
 dark-mode form controls
+44px action floor
+route visual anatomy
+public endpoint language ban
 """,
         encoding="utf-8",
     )
@@ -186,18 +189,26 @@ def premium_css() -> str:
   color-scheme: dark;
 }}
 .site-header__inner {{ display: grid; grid-template-columns: minmax(9rem, auto) minmax(0, 1fr) auto; backdrop-filter: blur(12px); }}
+.button-like,
+.surface-minimal .button-like,
+.site-account-menu__summary,
+.site-account-menu__link,
+.editorial-strip__action {{ min-height: 44px; }}
 .button-like--primary {{ display: inline-flex; }}
 .button-like--secondary {{ display: inline-flex; }}
 .button-like--ghost {{ display: inline-flex; }}
 .site-open-chummer-menu {{ display: inline-grid; }}
+.surface-minimal .site-open-chummer-menu .site-account-menu__summary {{ min-height: 44px; }}
+.minimal-hero {{ display: grid; padding: 24px; border-radius: 24px; background: linear-gradient(#111, #000); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28); }}
 .minimal-hero__visual {{ display: grid; background: linear-gradient(#000, #111); }}
-.minimal-page-hero {{ display: grid; }}
+.minimal-page-hero {{ display: grid; padding: 24px; border-radius: 20px; background: linear-gradient(#111, #000); box-shadow: 0 22px 52px rgba(0, 0, 0, 0.24); }}
 .landing-film {{ display: grid; background: radial-gradient(circle, #111, #000); min-height: 100svh; }}
 .editorial-strip {{ display: grid; }}
 .downloads-quicknav {{ display: flex; }}
-.downloads-choice-card {{ display: grid; }}
-.minimal-status-pill {{ display: grid; }}
-.minimal-facts article {{ display: grid; }}
+.downloads-choice-card {{ display: grid; padding: 20px; border-radius: 18px; background: linear-gradient(#111, #000); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.22); }}
+.minimal-status-pill {{ display: grid; padding: 18px; border-radius: 18px; background: linear-gradient(#111, #000); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.2); }}
+.minimal-facts article {{ display: grid; padding: 18px; border-radius: 18px; background: linear-gradient(#111, #000); box-shadow: 0 18px 44px rgba(0, 0, 0, 0.2); }}
+.participate-hosted__frame-shell {{ height: 80svh; overflow: hidden; border: 0; background: var(--bg-canvas); }}
 .participate-hosted__frame {{ display: block; }}
 .black-ledger-geoscape {{ display: grid; }}
 .grid-a {{ display: grid; }}
@@ -299,6 +310,7 @@ def test_premium_gate_passes_for_tokenized_premium_shell() -> None:
     assert payload["checks"]["composition_hierarchy"]["pass"]
     assert payload["checks"]["source_design_contract"]["pass"]
     assert payload["checks"]["component_anatomy"]["pass"]
+    assert payload["checks"]["premium_surface_anatomy"]["pass"]
     assert payload["checks"]["open_chummer_navigation"]["pass"]
     assert payload["checks"]["route_journey_contracts"]["pass"]
 
@@ -345,12 +357,70 @@ def test_premium_gate_rejects_generic_flat_theme_and_internal_copy() -> None:
     assert payload["status"] == "fail"
     assert "premium typography is not distinctive; display/body stacks are generic or identical" in payload["failures"]
     assert "premium elevation is missing; shadow tokens must create distinct soft and hero depth" in payload["failures"]
-    assert "premium public copy is not quiet enough; internal or provider-facing terms remain visible" in payload["failures"]
+    assert "premium public copy is not quiet enough; internal terms, raw endpoints, or provider-facing language remain visible" in payload["failures"]
     assert "premium palette is under-specified; require named semantic colors, dark scheme discipline, and enough tonal range" in payload["failures"]
     assert "interaction affordance is too weak; premium UI needs visible focus, hover states, and touch-safe targets" in payload["failures"]
     assert "responsive system is not flagship-grade; require mobile breakpoints, fluid type/spacing, minmax grids, and svh handling" in payload["failures"]
     assert "form controls are not fully dark-mode readable; textboxes, selects, placeholders, options, and focus states must be styled" in payload["failures"]
     assert "composition still reads like a template; require premium chrome, hero/media, editorial, navigation, and dense layout systems" in payload["failures"]
+    assert "premium surface anatomy is not strong enough; touch targets, hero depth, route cards, status panels, mobile cards, and iframe containment must all meet the exit bar" in payload["failures"]
+
+
+def test_premium_gate_rejects_visible_raw_endpoint_copy() -> None:
+    module = load_module()
+    with tempfile.TemporaryDirectory(prefix="premium-ui-gate-endpoint-fail-") as temp_dir:
+        root = Path(temp_dir)
+        completion = root / "completion"
+        published = root / "published"
+        css = root / "site.css"
+        design_contract = root / "PREMIUM_UI_DESIGN_EXIT_GATE.md"
+        layout = root / "_Layout.cshtml"
+        views = write_public_views(root)
+        mobile = root / "MobileProjection.cshtml"
+        mobile.write_text(
+            mobile.read_text(encoding="utf-8")
+            + '<p><span>Route:</span><span>/mobile/pwa/ledger.json</span></p>',
+            encoding="utf-8",
+        )
+        write_design_contract(design_contract)
+        write_layout(layout)
+        write_supporting_artifacts(completion, published)
+        css.write_text(premium_css(), encoding="utf-8")
+
+        payload = module.build_payload(
+            css_path=css,
+            design_contract_path=design_contract,
+            completion_root=completion,
+            published_root=published,
+            critical_public_views=views,
+            layout_view=layout,
+        )
+
+    assert payload["status"] == "fail"
+    assert "premium public copy is not quiet enough; internal terms, raw endpoints, or provider-facing language remain visible" in payload["failures"]
+    assert "raw_json_endpoint" in payload["checks"]["public_copy_quiet"]["leaked_terms"]
+    assert "raw_route_label" in payload["checks"]["public_copy_quiet"]["leaked_terms"]
+
+
+def test_visible_copy_ignores_razor_setup_code_but_keeps_rendered_text() -> None:
+    module = load_module()
+    source = """
+@{
+    var releaseNeedsReview = string.Equals(Model.Manifest.RolloutState, "readiness_review_required", StringComparison.OrdinalIgnoreCase);
+    var nested = new { Label = "review_required" };
+}
+<section>
+  <p>Current caution</p>
+  <p>Route: /mobile/pwa/ledger.json</p>
+</section>
+"""
+
+    visible = module.visible_copy(source)
+
+    assert "readiness_review_required" not in visible
+    assert "review_required" not in visible
+    assert "Current caution" in visible
+    assert "Route: /mobile/pwa/ledger.json" in visible
 
 
 def test_premium_gate_rejects_missing_written_design_contract() -> None:
@@ -391,3 +461,5 @@ def test_design_package_names_the_premium_exit_gate_and_sources() -> None:
     assert "not a proof harness, provider adapter, internal roadmap, or operator console" in doc
     assert "premium visual scorecard" in doc
     assert "zero-internal-language" in doc
+    assert "44px action floor" in doc
+    assert "route visual anatomy" in doc

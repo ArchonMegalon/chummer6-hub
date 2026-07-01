@@ -87,6 +87,9 @@ DESIGN_CONTRACT_MARKERS = [
     "zero-internal-language rule",
     "mobile playtime standard",
     "dark-mode form controls",
+    "44px action floor",
+    "route visual anatomy",
+    "public endpoint language ban",
 ]
 DESIGN_STANDARD_PRINCIPLES = [
     {
@@ -228,6 +231,93 @@ INTERNAL_LANGUAGE_NEEDLES = [
     "ProductLift",
     "fleet",
 ]
+VISIBLE_INTERNAL_COPY_PATTERNS = {
+    "raw_json_endpoint": re.compile(r"/[A-Za-z0-9][A-Za-z0-9/_-]*\.json\b", flags=re.IGNORECASE),
+    "raw_route_label": re.compile(r"\bRoute\s*:", flags=re.IGNORECASE),
+    "internal_status_label": re.compile(r"\b(review_required|readiness_review_required|not_required)\b", flags=re.IGNORECASE),
+}
+PREMIUM_SURFACE_REQUIREMENTS = {
+    "primary_action_touch_floor": {
+        "selector": ".surface-minimal .button-like",
+        "standard": "Apple HIG touch comfort translated into a 44px minimum action floor",
+        "required": {"min_height_at_least": 44},
+    },
+    "open_chummer_touch_floor": {
+        "selector": ".surface-minimal .site-open-chummer-menu .site-account-menu__summary",
+        "standard": "Open Chummer must remain touch-safe and visually equivalent to sibling actions",
+        "required": {"min_height_at_least": 44},
+    },
+    "account_menu_item_touch_floor": {
+        "selector": ".site-account-menu__link",
+        "standard": "Menu rows must be finger-readable, not desktop-only micro rows",
+        "required": {"min_height_at_least": 44},
+    },
+    "landing_hero_depth": {
+        "selector": ".minimal-hero",
+        "standard": "Landing hero needs a composed premium surface, not a flat text block",
+        "required": {
+            "background": True,
+            "non_flat_background": True,
+            "depth": True,
+            "radius": True,
+            "padding": True,
+        },
+    },
+    "page_hero_depth": {
+        "selector": ".minimal-page-hero",
+        "standard": "Secondary route heroes need a consistent premium panel treatment",
+        "required": {
+            "background": True,
+            "non_flat_background": True,
+            "depth": True,
+            "radius": True,
+            "padding": True,
+        },
+    },
+    "download_card_depth": {
+        "selector": ".downloads-choice-card",
+        "standard": "Download decisions must read as deliberate cards, not table rows",
+        "required": {
+            "background": True,
+            "non_flat_background": True,
+            "depth": True,
+            "radius": True,
+            "padding": True,
+        },
+    },
+    "status_panel_depth": {
+        "selector": ".minimal-status-pill",
+        "standard": "Current status must feel like a high-signal decision panel",
+        "required": {
+            "background": True,
+            "non_flat_background": True,
+            "depth": True,
+            "radius": True,
+            "padding": True,
+        },
+    },
+    "mobile_fact_card_depth": {
+        "selector": ".minimal-facts article",
+        "standard": "Mobile playtime cards need visible separation under table pressure",
+        "required": {
+            "background": True,
+            "non_flat_background": True,
+            "depth": True,
+            "radius": True,
+            "padding": True,
+        },
+    },
+    "participate_iframe_deference": {
+        "selector": ".participate-hosted__frame-shell",
+        "standard": "Participate must honor the iframe-only product decision while keeping safe containment",
+        "required": {
+            "background": True,
+            "overflow": True,
+            "height": True,
+            "no_border": True,
+        },
+    },
+}
 
 
 def now_iso() -> str:
@@ -281,6 +371,91 @@ def count_css(pattern: str, css: str, *, ignore_case: bool = False) -> int:
     return len(re.findall(pattern, css, flags=flags))
 
 
+def css_rule_bodies(css: str, selector_fragment: str) -> list[str]:
+    bodies: list[str] = []
+    for match in re.finditer(r"(?s)([^{}]+)\{([^{}]*)\}", css):
+        selector = match.group(1).strip()
+        if selector_fragment in selector:
+            bodies.append(match.group(2))
+    return bodies
+
+
+def combined_rule_body(css: str, selector_fragment: str) -> str:
+    return "\n".join(css_rule_bodies(css, selector_fragment))
+
+
+def has_declaration(body: str, property_name: str) -> bool:
+    return re.search(rf"\b{re.escape(property_name)}\s*:", body, flags=re.IGNORECASE) is not None
+
+
+def declaration_values(body: str, property_name: str) -> list[str]:
+    return [
+        match.group(1).strip()
+        for match in re.finditer(rf"\b{re.escape(property_name)}\s*:\s*([^;]+);", body, flags=re.IGNORECASE)
+    ]
+
+
+def max_px_for_declaration(body: str, property_name: str) -> float:
+    values = declaration_values(body, property_name)
+    numbers: list[float] = []
+    for value in values:
+        numbers.extend(parse_px_numbers(value))
+    return max(numbers) if numbers else 0
+
+
+def has_non_flat_background(body: str) -> bool:
+    values = declaration_values(body, "background") + declaration_values(body, "background-color")
+    if not values:
+        return False
+    for value in values:
+        normalized = value.strip().lower()
+        if normalized in {"transparent", "none"}:
+            continue
+        if "transparent" in normalized and not any(token in normalized for token in ("gradient(", "color-mix(", "rgba(", "var(", "#")):
+            continue
+        return True
+    return False
+
+
+def has_depth(body: str) -> bool:
+    values = declaration_values(body, "box-shadow")
+    return any(value.strip().lower() != "none" for value in values)
+
+
+def strip_razor_code_blocks(text: str) -> str:
+    output: list[str] = []
+    index = 0
+    while index < len(text):
+        start = text.find("@{", index)
+        if start < 0:
+            output.append(text[index:])
+            break
+
+        output.append(text[index:start])
+        cursor = start + 1
+        depth = 0
+        while cursor < len(text):
+            char = text[cursor]
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    cursor += 1
+                    break
+            cursor += 1
+        index = cursor
+    return "".join(output)
+
+
+def visible_copy(text: str) -> str:
+    without_razor = strip_razor_code_blocks(text)
+    without_scripts = re.sub(r"(?is)<script\b.*?</script>", " ", without_razor)
+    without_styles = re.sub(r"(?is)<style\b.*?</style>", " ", without_scripts)
+    without_tags = re.sub(r"(?is)<[^>]+>", " ", without_styles)
+    return re.sub(r"\s+", " ", without_tags).strip()
+
+
 def shadow_has_depth(value: str) -> bool:
     normalized = value.strip().lower()
     if not normalized or normalized == "none":
@@ -323,6 +498,40 @@ def route_requirement_result(path: Path) -> dict[str, Any]:
 def marker_presence(markers: list[str], text: str) -> dict[str, bool]:
     normalized = text.lower()
     return {marker: marker.lower() in normalized for marker in markers}
+
+
+def premium_surface_result(css: str, name: str, config: dict[str, Any]) -> dict[str, Any]:
+    selector = str(config["selector"])
+    body = combined_rule_body(css, selector)
+    required = config.get("required") if isinstance(config.get("required"), dict) else {}
+    checks: dict[str, bool] = {}
+
+    if required.get("min_height_at_least") is not None:
+        minimum = float(required["min_height_at_least"])
+        checks[f"min_height_at_least_{int(minimum)}"] = max_px_for_declaration(body, "min-height") >= minimum
+    if required.get("background"):
+        checks["has_background"] = has_declaration(body, "background") or has_declaration(body, "background-color")
+    if required.get("non_flat_background"):
+        checks["has_non_flat_background"] = has_non_flat_background(body)
+    if required.get("depth"):
+        checks["has_depth"] = has_depth(body)
+    if required.get("radius"):
+        checks["has_radius"] = has_declaration(body, "border-radius")
+    if required.get("padding"):
+        checks["has_padding"] = has_declaration(body, "padding")
+    if required.get("overflow"):
+        checks["has_overflow"] = has_declaration(body, "overflow")
+    if required.get("height"):
+        checks["has_height"] = has_declaration(body, "height") or has_declaration(body, "min-height")
+    if required.get("no_border"):
+        checks["has_no_border"] = any(value.strip().lower() == "0" for value in declaration_values(body, "border"))
+
+    return {
+        "selector": selector,
+        "standard": config["standard"],
+        "checks": checks,
+        "pass": bool(body.strip()) and all(checks.values()),
+    }
 
 
 def build_payload(
@@ -544,6 +753,19 @@ def build_payload(
         "pass": component_pass,
     }
 
+    premium_surface_results = {
+        name: premium_surface_result(css, name, config)
+        for name, config in PREMIUM_SURFACE_REQUIREMENTS.items()
+    }
+    premium_surface_pass = all(result["pass"] for result in premium_surface_results.values())
+    if not premium_surface_pass:
+        failures.append("premium surface anatomy is not strong enough; touch targets, hero depth, route cards, status panels, mobile cards, and iframe containment must all meet the exit bar")
+    checks["premium_surface_anatomy"] = {
+        "standard": "HIG touch comfort + Fluent depth + Material/Carbon component structure, verified on actual shared selectors",
+        "surfaces": premium_surface_results,
+        "pass": premium_surface_pass,
+    }
+
     navigation_text = read_text(layout_view) + "\n" + read_text(ROOT / "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
     navigation_markers = {
         name: marker in navigation_text
@@ -559,12 +781,20 @@ def build_payload(
         "pass": navigation_pass,
     }
 
-    view_text = "\n".join(read_text(path) for path in critical_public_views)
+    raw_view_text = "\n".join(read_text(path) for path in critical_public_views)
+    view_text = visible_copy(raw_view_text)
     leaked_terms = sorted({needle for needle in INTERNAL_LANGUAGE_NEEDLES if re.search(rf"\b{re.escape(needle)}\b", view_text, flags=re.IGNORECASE)})
+    leaked_terms.extend(
+        sorted(
+            name
+            for name, pattern in VISIBLE_INTERNAL_COPY_PATTERNS.items()
+            if pattern.search(view_text)
+        )
+    )
     public_copy_gate = load_json(published_root / "PUBLIC_COPY_LEAK_GATE.generated.json")
     copy_pass = not leaked_terms and status_pass(public_copy_gate)
     if not copy_pass:
-        failures.append("premium public copy is not quiet enough; internal or provider-facing terms remain visible")
+        failures.append("premium public copy is not quiet enough; internal terms, raw endpoints, or provider-facing language remain visible")
     checks["public_copy_quiet"] = {
         "standard": "HIG clarity and Carbon production copy consistency",
         "view_count": len(critical_public_views),
