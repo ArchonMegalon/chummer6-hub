@@ -9955,6 +9955,10 @@ body {
   max-width: none;
   min-height: 100svh;
   padding: 0;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(214, 183, 99, 0.18), transparent 24rem),
+    radial-gradient(circle at 88% 10%, rgba(137, 207, 186, 0.12), transparent 28rem),
+    linear-gradient(180deg, #14140f 0%, #0e100d 52%, #0a0b09 100%);
 }
 
 .surface-participate:not(.route-participate) .site-main {
@@ -9996,8 +10000,10 @@ body {
   height: 100svh;
   border: 0;
   border-radius: 0;
-  padding: 0;
-  background: transparent;
+  padding: clamp(0.45rem, 1vw, 0.85rem);
+  background:
+    linear-gradient(135deg, rgba(247, 240, 223, 0.055), rgba(247, 240, 223, 0) 31%),
+    radial-gradient(circle at 50% -8rem, rgba(214, 183, 99, 0.08), transparent 28rem);
 }
 
 .participate-shell__header {
@@ -10114,9 +10120,135 @@ body {
 
 .participate-hosted {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(0.42rem, 0.9vw, 0.7rem);
   min-height: 0;
-  --participate-frame-visible-height: 100svh;
+  height: 100%;
+  --participate-frame-visible-height: 100%;
   --participate-frame-crop: 0rem;
+}
+
+.participate-hosted__chrome {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3.35rem;
+  padding: 0.52rem clamp(0.62rem, 1.2vw, 1rem);
+  border: 1px solid rgba(247, 240, 223, 0.14);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(247, 240, 223, 0.105), rgba(247, 240, 223, 0.035)),
+    rgba(17, 18, 16, 0.84);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(247, 240, 223, 0.07);
+  backdrop-filter: blur(16px);
+}
+
+.participate-hosted__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.62rem;
+  min-width: 0;
+}
+
+.participate-hosted__mark {
+  position: relative;
+  width: 0.84rem;
+  height: 0.84rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--minimal-accent);
+  box-shadow:
+    0 0 0 5px rgba(214, 183, 99, 0.12),
+    0 0 30px rgba(214, 183, 99, 0.38);
+}
+
+.participate-hosted__mark::after {
+  content: "";
+  position: absolute;
+  inset: 0.23rem;
+  border-radius: inherit;
+  background: #111210;
+}
+
+.participate-hosted__eyebrow {
+  margin: 0 0 0.08rem;
+  color: var(--minimal-muted);
+  font-family: var(--font-family-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.participate-hosted__brand h1,
+.participate-hosted__title {
+  margin: 0;
+  color: var(--minimal-ink);
+  font-size: clamp(1rem, 1.25vw, 1.22rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.participate-hosted__title {
+  display: block;
+  font-weight: 800;
+}
+
+.participate-hosted__tools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.participate-hosted__status,
+.participate-hosted__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.participate-hosted__status {
+  gap: 0.38rem;
+  padding: 0 0.72rem;
+  border: 1px solid rgba(137, 207, 186, 0.24);
+  background: rgba(137, 207, 186, 0.09);
+  color: #bce6d8;
+}
+
+.participate-hosted__status::before {
+  content: "";
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: var(--minimal-accent-cool);
+  box-shadow: 0 0 16px rgba(137, 207, 186, 0.55);
+}
+
+.participate-hosted__link {
+  padding: 0 0.78rem;
+  border: 1px solid rgba(247, 240, 223, 0.13);
+  background: rgba(247, 240, 223, 0.055);
+  color: var(--minimal-ink);
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.participate-hosted__link:hover,
+.participate-hosted__link:focus-visible {
+  border-color: rgba(214, 183, 99, 0.46);
+  background: rgba(214, 183, 99, 0.12);
+  transform: translateY(-1px);
 }
 
 .participate-hosted__loading {
@@ -10257,14 +10389,17 @@ body {
 
 .participate-hosted__frame-shell {
   width: 100%;
+  min-height: 0;
   height: var(--participate-frame-visible-height);
   overflow: hidden;
-  border: 0;
-  border-radius: 0;
+  border: 1px solid rgba(247, 240, 223, 0.16);
+  border-radius: 20px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0) 16rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0) 16rem),
     var(--minimal-page);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow:
+    0 24px 76px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
 .participate-hosted__frame {
@@ -10274,6 +10409,7 @@ body {
   margin-top: calc(var(--participate-frame-crop) * -1);
   border: 0;
   background: var(--minimal-page);
+  color-scheme: light dark;
 }
 
 .participate-hosted__frame[hidden] {
@@ -10300,8 +10436,11 @@ body {
   margin: 1rem auto;
   padding: 1rem;
   border: 1px solid var(--minimal-line);
-  border-radius: 8px;
-  background: var(--minimal-page);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(247, 240, 223, 0.07), rgba(247, 240, 223, 0.025)),
+    var(--minimal-page);
+  box-shadow: var(--minimal-shadow-soft);
 }
 
 .surface-partizipate:not(.route-participate) .site-main {
@@ -10750,8 +10889,30 @@ body {
   }
 
   .route-participate.surface-participate .participate-hosted {
-    --participate-frame-visible-height: 100svh;
+    --participate-frame-visible-height: 100%;
     --participate-frame-crop: 0rem;
+  }
+
+  .route-participate.surface-participate .participate-shell {
+    padding: 0.4rem;
+  }
+
+  .route-participate.surface-participate .participate-hosted__chrome {
+    min-height: 3rem;
+    border-radius: 14px;
+  }
+
+  .route-participate.surface-participate .participate-hosted__eyebrow {
+    display: none;
+  }
+
+  .route-participate.surface-participate .participate-hosted__frame-shell {
+    border-radius: 14px;
+  }
+
+  .route-participate.surface-participate .participate-hosted__link {
+    min-height: 1.85rem;
+    padding-inline: 0.65rem;
   }
 
   .minimal-hero {
