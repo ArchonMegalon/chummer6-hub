@@ -2182,7 +2182,7 @@ async Task VerifyPublicLandingProjectionAsync()
             ["CHUMMER_HORIZON_ARTIFACT_USAGE_STORE_PATH"] = Path.Combine(tempRoot, "horizon-artifact-usage-store.json"),
             ["CHUMMER_HORIZON_ARTIFACT_REQUEST_RECEIPT_STORE_PATH"] = Path.Combine(tempRoot, "horizon-artifact-request-receipts.json"),
             ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
-            ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = "https://participate.example.invalid",
+            ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = "https://chummer6.productlift.dev/feedback",
             ["FLEET_INTERNAL_API_TOKEN"] = "smoke-token",
             ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "true",
             ["CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_BASE_URL"] = "http://ea-smoke:8090",

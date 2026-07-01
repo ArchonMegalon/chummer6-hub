@@ -20,6 +20,8 @@ namespace Chummer.Tests;
 public sealed class PublicLandingParticipateProxyTests : IDisposable
 {
     private static readonly string ParticipateSnapshotStorePath = Path.Combine(Path.GetTempPath(), "public-landing-participate-snapshot-store.json");
+    private const string HostedFeedbackUrl = "https://chummer6.productlift.dev/feedback";
+    private const string HostedRoadmapUrl = "https://chummer6.productlift.dev/roadmap";
 
     public PublicLandingParticipateProxyTests()
         => CleanupDurableState();
@@ -69,9 +71,9 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.Equal("Participate", model.Heading);
         Assert.Equal("Participate", model.Summary);
         Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
+        Assert.Equal(HostedFeedbackUrl, model.EmbeddedBoardHref);
         Assert.Equal("/participate/board", model.DirectBoardHref);
-        Assert.DoesNotContain("productlift.dev", model.EmbeddedBoardHref ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("productlift.dev", model.EmbeddedBoardHref ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -108,7 +110,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.True(model.EmbeddedBoardEnabled);
         Assert.Equal("Open", model.StatusLabel);
         Assert.Equal("Board is live.", model.SyncedLabel);
-        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
+        Assert.Equal(HostedFeedbackUrl, model.EmbeddedBoardHref);
     }
 
     [Fact]
@@ -166,7 +168,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.Equal("Participate", model.Heading);
         Assert.Equal("Participate", model.Summary);
         Assert.True(model.EmbeddedBoardEnabled);
-        Assert.Equal("/participate/board?embed=1", model.EmbeddedBoardHref);
+        Assert.Equal(HostedFeedbackUrl, model.EmbeddedBoardHref);
     }
 
     [Fact]
@@ -182,7 +184,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.Equal("~/Views/PublicLanding/Roadmap.cshtml", view.ViewName);
         RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
+        Assert.Equal("/roadmap/board?embed=1", model.HostedBoardHref);
     }
 
     [Fact]
@@ -209,7 +211,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         ViewResult view = Assert.IsType<ViewResult>(result);
         Assert.Equal("~/Views/PublicLanding/Roadmap.cshtml", view.ViewName);
         RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
+        Assert.Equal("/roadmap/board?embed=1", model.HostedBoardHref);
         Assert.True(model.Milestones.Count >= 0);
         Assert.False(string.IsNullOrWhiteSpace(model.PublicRequestSyncedLabel));
     }
@@ -226,13 +228,13 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
+        Assert.Equal("/roadmap/board?embed=1", model.HostedBoardHref);
     }
 
     [Fact]
     public async Task RoadmapPageStillUsesHostedBoardWhenRoadmapUrlMatchesFeedbackUrl()
     {
-        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), roadmapUrl: "https://ideas.example.test/feedback", seedParticipateSnapshot: true);
+        var controller = CreatePublicLandingController(new HostedBoardChromeHttpClientFactory(), roadmapUrl: HostedFeedbackUrl, seedParticipateSnapshot: true);
         controller.ControllerContext.HttpContext.Request.Headers.UserAgent = "xunit";
         controller.ControllerContext.HttpContext.Request.Headers.Accept = "text/html";
         controller.ControllerContext.HttpContext.Request.Headers.AcceptLanguage = "en";
@@ -241,7 +243,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
         ViewResult view = Assert.IsType<ViewResult>(result);
         RoadmapPageViewModel model = Assert.IsType<RoadmapPageViewModel>(view.Model);
-        Assert.Equal("/participate/board?embed=1", model.HostedBoardHref);
+        Assert.Equal("/roadmap/board?embed=1", model.HostedBoardHref);
     }
 
     [Fact]
@@ -347,7 +349,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         IActionResult result = await controller.RoadmapBoardProxy(null, CancellationToken.None);
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/participate/board?embed=1", redirect.Url);
+        Assert.Equal(HostedRoadmapUrl, redirect.Url);
     }
 
     [Fact]
@@ -359,7 +361,7 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         IActionResult result = await controller.RoadmapBoardProxy("posts/mobile-companion", CancellationToken.None);
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/participate/board/posts/mobile-companion?embed=1", redirect.Url);
+        Assert.Equal($"{HostedRoadmapUrl}/posts/mobile-companion", redirect.Url);
     }
 
     [Fact]
@@ -443,12 +445,12 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
         Assert.False(controller.Response.Headers.ContainsKey("Set-Cookie"));
     }
 
-    private static ParticipateController CreateParticipateController(IHttpClientFactory httpClientFactory, string? roadmapUrl = "https://ideas.example.test/roadmap")
+    private static ParticipateController CreateParticipateController(IHttpClientFactory httpClientFactory, string? roadmapUrl = HostedRoadmapUrl)
     {
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = "https://ideas.example.test/feedback",
+                ["CHUMMER_PRODUCTLIFT_FEEDBACK_URL"] = HostedFeedbackUrl,
                 ["CHUMMER_PRODUCTLIFT_ROADMAP_URL"] = roadmapUrl,
                 ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
                 ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
@@ -486,8 +488,8 @@ public sealed class PublicLandingParticipateProxyTests : IDisposable
 
     private static PublicLandingController CreatePublicLandingController(
         IHttpClientFactory httpClientFactory,
-        string? roadmapUrl = "https://ideas.example.test/roadmap",
-        string feedbackUrl = "https://ideas.example.test/feedback",
+        string? roadmapUrl = HostedRoadmapUrl,
+        string feedbackUrl = HostedFeedbackUrl,
         IWebHostEnvironment? webHostEnvironment = null,
         bool seedParticipateSnapshot = false,
         IMemoryCache? hostedBoardHtmlCache = null)
