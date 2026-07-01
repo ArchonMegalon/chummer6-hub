@@ -158,3 +158,69 @@ def test_postdeploy_gate_retries_until_runtime_is_warm(monkeypatch, tmp_path) ->
     assert result["status"] == "pass"
     assert result["attempts"][0]["status"] == "fail"
     assert result["attempts"][1]["status"] == "pass"
+
+
+def test_stability_watch_repairs_drift_before_postdeploy(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    expected = "sha256:" + "4" * 64
+    dirty = "sha256:" + "5" * 64
+    states = [
+        {
+            "expectedImageId": expected,
+            "containerImageId": expected,
+            "imageTags": [{"tag": "chummer-run-api:local", "imageId": expected}],
+            "drift": [],
+        },
+        {
+            "expectedImageId": expected,
+            "containerImageId": dirty,
+            "imageTags": [{"tag": "chummer-run-api:local", "imageId": dirty}],
+            "drift": [f"portal container points at {dirty}", f"portal image tag chummer-run-api:local points at {dirty}"],
+        },
+        {
+            "expectedImageId": expected,
+            "containerImageId": expected,
+            "imageTags": [{"tag": "chummer-run-api:local", "imageId": expected}],
+            "drift": [],
+        },
+    ]
+    repairs: list[dict[str, object]] = []
+    monotonic_values = iter([0.0, 0.1, 0.2, 2.0])
+
+    def fake_inspect_runtime_state(*_args, **_kwargs):
+        return states.pop(0) if states else {
+            "expectedImageId": expected,
+            "containerImageId": expected,
+            "imageTags": [{"tag": "chummer-run-api:local", "imageId": expected}],
+            "drift": [],
+        }
+
+    def fake_restore_portal_image(*_args, **_kwargs):
+        repair = {"expectedImageId": expected, "containerRecreated": True}
+        repairs.append(repair)
+        return repair
+
+    monkeypatch.setattr(module, "inspect_runtime_state", fake_inspect_runtime_state)
+    monkeypatch.setattr(module, "restore_portal_image", fake_restore_portal_image)
+    monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(module.time, "monotonic", lambda: next(monotonic_values))
+
+    result = module.watch_runtime_stability(
+        expected,
+        ["chummer-run-api:local"],
+        tmp_path / "docker-compose.public-edge.yml",
+        None,
+        "chummer6-hub",
+        "chummer-portal",
+        "portal",
+        1.0,
+        0.0,
+        2,
+        False,
+    )
+
+    assert result["status"] == "pass"
+    assert result["skipped"] is False
+    assert result["repairCount"] == 1
+    assert len(result["driftEvents"]) == 1
+    assert repairs == [{"expectedImageId": expected, "containerRecreated": True}]

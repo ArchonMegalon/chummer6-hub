@@ -190,6 +190,141 @@ def restore_portal_image(
     }
 
 
+def inspect_runtime_state(
+    expected_image_id: str,
+    image_tags: list[str],
+    portal_container: str,
+    dry_run: bool,
+) -> dict[str, Any]:
+    expected = require_sha256_image_id(expected_image_id)
+    unique_tags = list(dict.fromkeys(tag for tag in image_tags if tag.strip())) or [DEFAULT_PORTAL_IMAGE_TAG]
+    if dry_run:
+        return {
+            "expectedImageId": expected,
+            "portalContainer": portal_container,
+            "containerImageId": expected,
+            "containerImageRef": "",
+            "imageTags": [{"tag": tag, "imageId": expected} for tag in unique_tags],
+            "drift": [],
+            "dryRun": True,
+        }
+
+    drift: list[str] = []
+    try:
+        container_image_id, container_image_ref = inspect_container_image_id(portal_container, dry_run=False)
+    except RuntimeError as error:
+        container_image_id, container_image_ref = "", ""
+        drift.append(f"portal container inspect failed: {error}")
+    if container_image_id and container_image_id != expected:
+        drift.append(f"portal container points at {container_image_id}")
+
+    tag_states: list[dict[str, str]] = []
+    for tag in unique_tags:
+        try:
+            tag_image_id = inspect_image_id(tag, dry_run=False)
+        except RuntimeError as error:
+            tag_image_id = ""
+            drift.append(f"portal image tag {tag} inspect failed: {error}")
+        if tag_image_id and tag_image_id != expected:
+            drift.append(f"portal image tag {tag} points at {tag_image_id}")
+        tag_states.append({"tag": tag, "imageId": tag_image_id})
+
+    return {
+        "expectedImageId": expected,
+        "portalContainer": portal_container,
+        "containerImageId": container_image_id,
+        "containerImageRef": container_image_ref,
+        "imageTags": tag_states,
+        "drift": drift,
+        "dryRun": False,
+    }
+
+
+def watch_runtime_stability(
+    expected_image_id: str,
+    image_tags: list[str],
+    compose_file: Path,
+    env_file: Path | None,
+    project_name: str,
+    service: str,
+    portal_container: str,
+    window_seconds: float,
+    poll_seconds: float,
+    max_restores: int,
+    dry_run: bool,
+) -> dict[str, Any]:
+    expected = require_sha256_image_id(expected_image_id)
+    if window_seconds <= 0:
+        return {
+            "status": "pass",
+            "skipped": True,
+            "windowSeconds": window_seconds,
+            "pollSeconds": poll_seconds,
+            "repairCount": 0,
+            "driftEvents": [],
+        }
+    if dry_run:
+        return {
+            "status": "pass",
+            "skipped": True,
+            "dryRun": True,
+            "windowSeconds": window_seconds,
+            "pollSeconds": poll_seconds,
+            "repairCount": 0,
+            "driftEvents": [],
+        }
+
+    stable_started_at = datetime.now(UTC)
+    stable_until = time.monotonic() + window_seconds
+    repair_count = 0
+    drift_events: list[dict[str, Any]] = []
+    last_state = inspect_runtime_state(expected, image_tags, portal_container, dry_run=False)
+
+    while time.monotonic() < stable_until:
+        time.sleep(max(0.0, poll_seconds))
+        last_state = inspect_runtime_state(expected, image_tags, portal_container, dry_run=False)
+        drift = last_state.get("drift", [])
+        if not drift:
+            continue
+        if repair_count >= max_restores:
+            raise RuntimeError(f"public edge runtime image drift persisted after {repair_count} repairs: {drift}")
+        repair = restore_portal_image(
+            expected,
+            image_tags,
+            compose_file,
+            env_file,
+            project_name,
+            service,
+            portal_container,
+            False,
+            False,
+        )
+        repair_count += 1
+        drift_events.append(
+            {
+                "detectedAtUtc": datetime.now(UTC).isoformat(),
+                "drift": drift,
+                "state": last_state,
+                "repair": repair,
+            }
+        )
+        stable_started_at = datetime.now(UTC)
+        stable_until = time.monotonic() + window_seconds
+
+    return {
+        "status": "pass",
+        "skipped": False,
+        "windowSeconds": window_seconds,
+        "pollSeconds": poll_seconds,
+        "maxRestores": max_restores,
+        "repairCount": repair_count,
+        "stableStartedAtUtc": stable_started_at.isoformat(),
+        "completedAtUtc": datetime.now(UTC).isoformat(),
+        "lastState": last_state,
+        "driftEvents": drift_events,
+    }
+
+
 def run_postdeploy_gate(
     expected_image_id: str,
     base_url: str,
@@ -269,6 +404,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--postdeploy-output", default=str(ROOT / ".codex-studio" / "published" / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"))
     parser.add_argument("--postdeploy-attempts", type=int, default=3)
     parser.add_argument("--postdeploy-retry-delay-seconds", type=float, default=5.0)
+    parser.add_argument("--stability-window-seconds", type=float, default=0.0)
+    parser.add_argument("--stability-poll-seconds", type=float, default=5.0)
+    parser.add_argument("--max-stability-restores", type=int, default=3)
     parser.add_argument("--skip-postdeploy", action="store_true")
     parser.add_argument("--force-recreate", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -301,6 +439,19 @@ def main(argv: list[str] | None = None) -> int:
             args.force_recreate,
             args.dry_run,
         )
+        stability_receipt = watch_runtime_stability(
+            expected,
+            args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
+            compose_file,
+            env_file,
+            args.project_name,
+            args.service,
+            args.portal_container,
+            args.stability_window_seconds,
+            args.stability_poll_seconds,
+            args.max_stability_restores,
+            args.dry_run,
+        )
         postdeploy_receipt = None
         if not args.skip_postdeploy:
             postdeploy_receipt = run_postdeploy_gate(
@@ -322,6 +473,7 @@ def main(argv: list[str] | None = None) -> int:
         "status": "pass",
         "generatedAtUtc": datetime.now(UTC).isoformat(),
         "restore": restore_receipt,
+        "stability": stability_receipt,
         "postdeploy": postdeploy_receipt,
     }
     rendered = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
