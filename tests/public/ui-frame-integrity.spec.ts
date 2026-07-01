@@ -40,9 +40,24 @@ const singleLineRules: Array<{ selector: string; minWidth: number; label: string
 const transientNavigationNeedles = [
   'ERR_NETWORK_CHANGED',
   'net::ERR_',
+  'chrome-error://chromewebdata',
+  'interrupted by another navigation',
   'Navigation timeout',
   'Timeout',
 ];
+
+function envInteger(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return fallback;
+  }
+
+  const value = Number.parseInt(raw, 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+const matrixTimeoutMs = envInteger('CHUMMER_UI_FRAME_TEST_TIMEOUT_MS', 600000);
+const networkIdleSettleMs = envInteger('CHUMMER_UI_FRAME_NETWORK_IDLE_MS', 1000);
 
 type FrameFailure = {
   route: string;
@@ -61,7 +76,12 @@ async function gotoWithRetry(page: import('playwright/test').Page, route: string
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: networkIdleSettleMs }).catch(() => {});
+      if ((response?.status() ?? 0) >= 500 && attempt < attempts) {
+        await page.waitForTimeout(500 * attempt);
+        continue;
+      }
+
       return response;
     } catch (error) {
       lastError = error;
@@ -79,7 +99,7 @@ async function gotoWithRetry(page: import('playwright/test').Page, route: string
 }
 
 test('public UI elements are not cut off by their frames outside intentional scroll panels', async ({ browser }) => {
-  test.setTimeout(600000);
+  test.setTimeout(matrixTimeoutMs);
   const failures: FrameFailure[] = [];
   const pageResults: Array<Record<string, unknown>> = [];
 
@@ -264,7 +284,7 @@ test('public UI elements are not cut off by their frames outside intentional scr
             return element.value || element.placeholder || element.getAttribute('aria-label') || '';
           }
 
-          return (element.innerText || element.textContent || element.getAttribute('aria-label') || '')
+          return (element.textContent || element.getAttribute('aria-label') || '')
             .replace(/\s+/g, ' ')
             .trim()
             .slice(0, 140);

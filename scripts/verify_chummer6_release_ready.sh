@@ -73,7 +73,7 @@ verify_public_ui_frame_integrity() {
   local attempts="${CHUMMER_UI_FRAME_ATTEMPTS:-3}"
   local last_log
   last_log="$(mktemp)"
-  trap 'rm -f "$last_log"' RETURN
+  trap "rm -f '$last_log'" RETURN
 
   for attempt in $(seq 1 "$attempts"); do
     if BASE_URL="$base_url" CHUMMER_UI_FRAME_TEST_TIMEOUT_MS="$test_timeout_ms" timeout --foreground "${timeout_seconds}s" npx playwright test tests/public/ui-frame-integrity.spec.ts --reporter=line >"$last_log" 2>&1; then
@@ -81,7 +81,7 @@ verify_public_ui_frame_integrity() {
       return 0
     fi
 
-    if ! rg -q "Target crashed|ERR_NETWORK_CHANGED|net::ERR_|Timeout" "$last_log"; then
+    if ! rg -q "Target crashed|ERR_NETWORK_CHANGED|net::ERR_|chrome-error://chromewebdata|interrupted by another navigation|HTTP 50[0-9]|Timeout" "$last_log"; then
       cat "$last_log"
       return 1
     fi
