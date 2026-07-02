@@ -54,6 +54,20 @@ def write_required_receipt(module, published: Path, key: str, path: Path, payloa
         and not isinstance(payload.get("proofs"), dict)
     ):
         payload = valid_blazor_bridge_payload(module)
+    if (
+        key == "operator_release_dashboard"
+        and payload.get("status") == "pass"
+        and not isinstance(payload.get("release_readiness"), dict)
+    ):
+        payload = {
+            **payload,
+            "verdict": "OPERABLE_RELEASE_READY",
+            "release_readiness": {
+                "full_release_ready": True,
+                "nightly_handoff_ready": True,
+                "full_release_blockers": [],
+            },
+        }
     (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
 
 
@@ -273,6 +287,48 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("design_quality_gate has structured failures", payload["failures"])
         self.assertEqual(1, gate["structured_failures_count"])
         self.assertFalse(gate["pass"])
+
+    def test_payload_fails_when_operator_dashboard_is_only_nightly_handoff_ready(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-nightly-dashboard-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "operator_release_dashboard":
+                    payload = {
+                        "status": "pass",
+                        "verdict": "NIGHTLY_HANDOFF_READY",
+                        "generated_at_utc": module.now_iso(),
+                        "release_readiness": {
+                            "full_release_ready": False,
+                            "nightly_handoff_ready": True,
+                            "full_release_blockers": ["windows_installer_visual_audit"],
+                        },
+                    }
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                write_required_receipt(module, published, key, path, payload)
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["operator_release_dashboard"]
+        self.assertEqual("fail", payload["status"])
+        self.assertEqual("fail", gate["status"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("NIGHTLY_HANDOFF_READY", gate["verdict"])
+        self.assertFalse(gate["release_readiness"]["full_release_ready"])
+        self.assertIn("operator_release_dashboard is not full release ready", payload["failures"])
 
     def test_main_writes_identical_published_and_durable_v20_janitor_artifacts(self) -> None:
         module = load_module()

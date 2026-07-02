@@ -281,6 +281,12 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
                 passed = False
                 status_value = "fail"
                 gate_failure_reason = "blazor_execution_horizon_bridge missing live Build/Play public-entry proof"
+        if name == "operator_release_dashboard" and path.is_file():
+            release_readiness = payload.get("release_readiness") if isinstance(payload.get("release_readiness"), dict) else {}
+            if payload.get("verdict") != "OPERABLE_RELEASE_READY" or release_readiness.get("full_release_ready") is not True:
+                passed = False
+                status_value = "fail"
+                gate_failure_reason = "operator_release_dashboard is not full release ready"
         if passed and has_structured_failures:
             passed = False
         if not passed:
@@ -371,6 +377,7 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
         if name == "operator_release_dashboard" and path.is_file():
             required_gates[name]["verdict"] = payload.get("verdict")
             required_gates[name]["failures"] = payload.get("failures", [])
+            required_gates[name]["release_readiness"] = payload.get("release_readiness", {})
             required_gates[name]["release"] = payload.get("release", {})
         if name == "windows_installer_visual_audit" and path.is_file():
             required_gates[name]["failures"] = payload.get("failures", [])
@@ -455,6 +462,15 @@ def build_verdict_markdown(payload: dict[str, Any]) -> str:
         if name == "operator_release_dashboard" and isinstance(gate.get("release"), dict):
             release = gate["release"]
             lines.append(f"  - release: {release.get('version')} on {release.get('channel')}")
+        if name == "operator_release_dashboard" and isinstance(gate.get("release_readiness"), dict):
+            release_readiness = gate["release_readiness"]
+            lines.append(
+                f"  - readiness: full_release_ready={release_readiness.get('full_release_ready')}, "
+                f"nightly_handoff_ready={release_readiness.get('nightly_handoff_ready')}"
+            )
+            blockers = release_readiness.get("full_release_blockers")
+            if isinstance(blockers, list) and blockers:
+                lines.append(f"  - full release blockers: {', '.join(str(item) for item in blockers)}")
         if name == "operator_release_dashboard" and gate.get("failures"):
             lines.append(f"  - dashboard failures: {', '.join(str(item) for item in gate['failures'])}")
         if name == "windows_installer_visual_audit" and gate.get("failures"):
