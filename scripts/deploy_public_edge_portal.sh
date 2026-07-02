@@ -88,9 +88,7 @@ python3 "$SOURCE_ROOT/scripts/verify_public_edge_postdeploy_gate.py" \
   --require-downloads-status-playwright \
   --require-mobile-pwa-viewport-playwright \
   --require-frontdoor-navigation-playwright \
-  --playwright-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR/downloads-status" \
-  --mobile-pwa-viewport-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR/mobile-pwa-viewport" \
-  --frontdoor-navigation-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR/frontdoor-navigation" \
+  --playwright-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR" \
   --output "$POSTDEPLOY_OUTPUT"
 
 printf 'public_edge_portal_deployed %s\n' "$image_id"

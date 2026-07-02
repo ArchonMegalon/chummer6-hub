@@ -407,6 +407,9 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "--require-downloads-status-playwright" in script
     assert "--require-mobile-pwa-viewport-playwright" in script
     assert "--require-frontdoor-navigation-playwright" in script
+    assert "--playwright-artifact-dir \"$PLAYWRIGHT_ARTIFACT_DIR\"" in script
+    assert "--mobile-pwa-viewport-artifact-dir" not in script
+    assert "--frontdoor-navigation-artifact-dir" not in script
 
 
 def test_release_ready_script_calls_public_edge_deploy_source_gate() -> None:
