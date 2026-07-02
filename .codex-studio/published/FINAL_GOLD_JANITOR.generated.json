@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-07-02T05:06:30Z",
+  "generated_at_utc": "2026-07-02T07:06:36Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -14,19 +14,19 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T01:00:03Z",
+      "generated_at_utc": "2026-07-02T05:08:26Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "rule_authority_minimum_coverage": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T11:55:31Z",
+      "generated_at_utc": "2026-07-02T05:08:52Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false,
+      "pass": true,
       "rulesets": {
         "sr4": {
           "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR4_RULEFACT_REGISTRY.generated.json",
@@ -436,10 +436,10 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RULESET_READINESS.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T11:55:31.144794Z",
+      "generated_at_utc": "2026-07-02T05:19:03.952993Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false,
+      "pass": true,
       "workflow_assumed_rulesets": [],
       "authority_approved_rulesets": [
         "sr4",
@@ -470,7 +470,7 @@
           "readiness": "full",
           "readiness_basis": "flagship_ui_release_gate",
           "authority_receipts": [
-            "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
+            "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
           ],
           "flagship_ui_status": "pass",
           "rule_authority_status": "pass",
@@ -508,43 +508,43 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T12:22:14Z",
+      "generated_at_utc": "2026-07-02T05:08:52Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "desktop_native_model_depth": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/DESKTOP_NATIVE_MODEL_DEPTH.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T11:55:31Z",
+      "generated_at_utc": "2026-07-02T05:08:52Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "black_ledger_live_media_proof": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T11:55:48Z",
+      "generated_at_utc": "2026-07-02T05:10:05Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "table_pulse_scenario_replay": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/TABLE_PULSE_SCENARIO_REPLAY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T11:59:56Z",
+      "generated_at_utc": "2026-07-02T05:10:09Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "public_route_proof": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-07-02T04:09:04.506194Z",
+      "generated_at_utc": "2026-07-02T05:08:39.317535Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
       "pass": true,
@@ -552,31 +552,18 @@
         "route_count": 188,
         "passed_count": 188,
         "failed_count": 0,
-        "positive_proof_count": 187,
+        "positive_proof_count": 188,
         "public_route_count": 135,
         "auth_operation_count": 4,
         "registered_route_count": 47,
         "controller_contract_count": 2,
-        "controller_contract_only_count": 1,
+        "controller_contract_only_count": 0,
         "negative_path_count": 2,
         "negative_path_failed_count": 0,
         "seeded_receipt_count": 0,
         "seed_required_count": 0,
-        "timeout_recovered_count": 12,
-        "timeout_recovered_paths": [
-          "/ledger",
-          "/ledger/map",
-          "/ledger/factions",
-          "/ledger/factions/{factionId}",
-          "/ledger/newsroom",
-          "/ledger/newsroom/turn-1-newsreel",
-          "/roadmap/karma-forge",
-          "/roadmap/jackpoint",
-          "/roadmap/runsite",
-          "/roadmap/onramp",
-          "/roadmap/edition-studio",
-          "/roadmap/community-hub"
-        ],
+        "timeout_recovered_count": 0,
+        "timeout_recovered_paths": [],
         "failed_paths": []
       }
     },
@@ -584,28 +571,44 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T20:10:06Z",
+      "generated_at_utc": "2026-07-02T06:48:29Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "live_public_windows_installer": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T19:13:51Z",
+      "generated_at_utc": "2026-07-02T05:52:31Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
+    },
+    "public_edge_postdeploy_gate": {
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-07-02T07:01:46.200405+00:00",
+      "fresh_within_hours": 24,
+      "structured_failures_count": 0,
+      "pass": true,
+      "releaseManifestVersion": "run-20260701-124648",
+      "visibleVersion": "Version run-20260701-124648",
+      "browserPlaywrightStatus": "pass",
+      "flagshipHorizonsBrowserProofCoverage": "full",
+      "mobileLedgerPayloadStatus": "opt_in_required",
+      "readyMobileHandoffStatus": "pass",
+      "participateIframeShellStatus": "pass"
     },
     "blazor_execution_horizon_bridge": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/BLAZOR_EXECUTION_HORIZON_BRIDGE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-30T23:49:35Z",
+      "generated_at_utc": "2026-07-02T05:43:35Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false,
+      "pass": true,
       "public_entry": {
         "pass": true,
         "base_url": "https://chummer.run",
@@ -635,28 +638,28 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/ICANPRENEUR_DISCOVERY_LANE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T12:23:26Z",
+      "generated_at_utc": "2026-07-02T05:08:52Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "ltd_optimization_stack": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T12:00:36Z",
+      "generated_at_utc": "2026-07-02T05:08:52Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "external_distribution_mirror_proof": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T12:23:35Z",
+      "generated_at_utc": "2026-07-02T05:10:21Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false,
+      "pass": true,
       "external_required": false,
       "distribution_resilience_status": "optional_external_mirrors_degraded",
       "advisory_external_failures": [
@@ -674,52 +677,52 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T20:10:33Z",
+      "generated_at_utc": "2026-07-02T05:10:23Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "participate_billing_honesty": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PARTICIPATE_BILLING_HONESTY.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T11:56:26.206863Z",
+      "generated_at_utc": "2026-07-02T05:32:00.388087Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "account_handoff_runtime_config": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T18:23:13Z",
+      "generated_at_utc": "2026-07-02T05:13:24Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "premium_ui_design_exit_gate": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PREMIUM_UI_DESIGN_EXIT_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-07-01T03:38:16Z",
+      "generated_at_utc": "2026-07-02T06:48:30Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "design_quality_gate": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-07-01T03:04:24Z",
+      "generated_at_utc": "2026-07-02T06:48:30Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false
+      "pass": true
     },
     "windows_installer_visual_audit": {
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
       "exists": true,
       "status": "fail",
-      "generated_at_utc": "2026-07-02T05:05:38Z",
+      "generated_at_utc": "2026-07-02T06:52:17Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 1,
       "pass": false,
@@ -764,7 +767,7 @@
       "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_LAYOUT_EXIT_GATE.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-07-02T04:45:53Z",
+      "generated_at_utc": "2026-07-02T05:13:24Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
       "pass": true
@@ -773,7 +776,7 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-07-02T05:06:30Z",
+      "generated_at_utc": "2026-07-02T07:02:34Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
       "pass": true,
@@ -792,13 +795,15 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RELEASE_READY.generated.json",
       "exists": true,
       "status": "fail",
-      "generated_at_utc": "2026-07-02T05:05:38Z",
+      "generated_at_utc": "2026-07-02T05:13:25Z",
       "fresh_within_hours": 24,
-      "structured_failures_count": 2,
+      "structured_failures_count": 4,
       "pass": false,
       "verdict": "NOT_RELEASE_READY",
       "failures": [
+        "FAIL verify_public_edge_deploy_source",
         "FAIL verify_windows_installer_visual_audit",
+        "verify_public_edge_deploy_source",
         "verify_windows_installer_visual_audit"
       ]
     }
@@ -816,24 +821,6 @@
     }
   ],
   "failures": [
-    "live_public_web_recrawl stale",
-    "rule_authority_minimum_coverage stale",
-    "ruleset_readiness stale",
-    "provider_proof_discoverability stale",
-    "desktop_native_model_depth stale",
-    "black_ledger_live_media_proof stale",
-    "table_pulse_scenario_replay stale",
-    "live_surface_parity stale",
-    "live_public_windows_installer stale",
-    "blazor_execution_horizon_bridge stale",
-    "icanpreneur_discovery_lane stale",
-    "ltd_optimization_stack stale",
-    "external_distribution_mirror_proof stale",
-    "public_copy_leak_gate stale",
-    "participate_billing_honesty stale",
-    "account_handoff_runtime_config stale",
-    "premium_ui_design_exit_gate stale",
-    "design_quality_gate stale",
     "windows_installer_visual_audit failed",
     "release_ready failed"
   ]

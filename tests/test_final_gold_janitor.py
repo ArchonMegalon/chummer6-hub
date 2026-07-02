@@ -71,6 +71,24 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("icanpreneur_discovery_lane", module.REQUIRED_RECEIPTS)
         self.assertIn("icanpreneur_discovery_lane", module.FRESHNESS_REQUIRED_GATES)
 
+    def test_materializers_require_full_public_edge_postdeploy_gate(self) -> None:
+        module = load_module()
+        commands = [" ".join(command) for command in module.MATERIALIZERS]
+        public_edge_command = next(command for command in commands if "scripts/verify_public_edge_postdeploy_gate.py" in command)
+
+        live_windows_index = commands.index("python3 scripts/verify_live_public_windows_installer.py --base-url https://chummer.run")
+        public_edge_index = commands.index(public_edge_command)
+        blazor_index = commands.index("python3 scripts/verify_blazor_execution_horizon_bridge.py")
+
+        self.assertLess(live_windows_index, public_edge_index)
+        self.assertLess(public_edge_index, blazor_index)
+        self.assertIn("--expected-release-channel nightly", public_edge_command)
+        self.assertIn("--require-downloads-status-playwright", public_edge_command)
+        self.assertIn("--require-mobile-pwa-viewport-playwright", public_edge_command)
+        self.assertIn("--require-frontdoor-navigation-playwright", public_edge_command)
+        self.assertIn("public_edge_postdeploy_gate", module.REQUIRED_RECEIPTS)
+        self.assertIn("public_edge_postdeploy_gate", module.FRESHNESS_REQUIRED_GATES)
+
     def test_materializers_build_minimal_experience_before_design_gate(self) -> None:
         module = load_module()
         commands = [" ".join(command) for command in module.MATERIALIZERS]
@@ -369,6 +387,70 @@ class FinalGoldJanitorTests(unittest.TestCase):
 
         self.assertEqual(payload["status"], "fail")
         self.assertIn("rule_authority_minimum_coverage stale", payload["failures"])
+
+    def test_payload_accepts_generated_at_utc_camel_case_for_public_edge_gate(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-fresh-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "public_edge_postdeploy_gate":
+                    payload = {
+                        "status": "pass",
+                        "generatedAtUtc": module.now_iso(),
+                        "releaseManifestVersion": "run-20260701-124648",
+                        "visibleVersion": "Version run-20260701-124648",
+                        "browserPlaywrightStatus": "pass",
+                        "flagshipHorizonsBrowserProofCoverage": "full",
+                        "mobileLedgerPayloadStatus": "opt_in_required",
+                    }
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                write_required_receipt(module, published, key, path, payload)
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        self.assertEqual("pass", payload["status"])
+        self.assertEqual("Version run-20260701-124648", gate["visibleVersion"])
+        self.assertEqual("full", gate["flagshipHorizonsBrowserProofCoverage"])
+
+    def test_payload_fails_when_public_edge_postdeploy_gate_is_missing(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-missing-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                if key == "public_edge_postdeploy_gate":
+                    continue
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                write_required_receipt(module, published, key, path, payload)
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("public_edge_postdeploy_gate missing", payload["failures"])
 
     def test_payload_surfaces_rule_authority_blocker_details(self) -> None:
         module = load_module()

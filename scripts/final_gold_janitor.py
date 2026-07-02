@@ -19,6 +19,7 @@ ARTIFACT_ROOT = COMPLETION_ROOT / ARTIFACT_ROOT_NAME
 UI_LAYOUT_COMPLETION_ROOT = COMPLETION_ROOT / "chummer_run_redesign_closure"
 LEGACY_GOLD_CLOSURE_ROOT = COMPLETION_ROOT / "gold_readiness_closure"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_FINAL_GOLD_BASE_URL", "https://chummer.run")
+EXPECTED_PUBLIC_EDGE_RELEASE_CHANNEL = os.environ.get("CHUMMER_FINAL_GOLD_EXPECTED_RELEASE_CHANNEL", "nightly")
 RECRAWL_MAX_AGE_HOURS = 24
 MATERIALIZER_TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_FINAL_GOLD_MATERIALIZER_TIMEOUT_SECONDS", "600"))
 FRESHNESS_REQUIRED_GATES = {
@@ -33,6 +34,7 @@ FRESHNESS_REQUIRED_GATES = {
     "table_pulse_scenario_replay",
     "live_surface_parity",
     "live_public_windows_installer",
+    "public_edge_postdeploy_gate",
     "blazor_execution_horizon_bridge",
     "ltd_optimization_stack",
     "external_distribution_mirror_proof",
@@ -61,6 +63,7 @@ REQUIRED_RECEIPTS = {
     "public_route_proof": PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
     "live_surface_parity": PUBLISHED_ROOT / "LIVE_SURFACE_PARITY.generated.json",
     "live_public_windows_installer": PUBLISHED_ROOT / "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+    "public_edge_postdeploy_gate": PUBLISHED_ROOT / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
     "blazor_execution_horizon_bridge": PUBLISHED_ROOT / "BLAZOR_EXECUTION_HORIZON_BRIDGE.generated.json",
     "icanpreneur_discovery_lane": PUBLISHED_ROOT / "ICANPRENEUR_DISCOVERY_LANE.generated.json",
     "ltd_optimization_stack": PUBLISHED_ROOT / "LTD_OPTIMIZATION_STACK.generated.json",
@@ -103,6 +106,19 @@ MATERIALIZERS = [
     ],
     ["python3", "scripts/verify_live_surface_parity.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/verify_live_public_windows_installer.py", "--base-url", DEFAULT_BASE_URL],
+    [
+        "python3",
+        "scripts/verify_public_edge_postdeploy_gate.py",
+        "--base-url",
+        DEFAULT_BASE_URL,
+        "--expected-release-channel",
+        EXPECTED_PUBLIC_EDGE_RELEASE_CHANNEL,
+        "--require-downloads-status-playwright",
+        "--require-mobile-pwa-viewport-playwright",
+        "--require-frontdoor-navigation-playwright",
+        "--output",
+        str(PUBLISHED_ROOT / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"),
+    ],
     ["python3", "scripts/verify_blazor_execution_horizon_bridge.py"],
     ["python3", "scripts/verify_icanpreneur_discovery_lane.py"],
     ["python3", "scripts/verify_provider_proof_discoverability.py"],
@@ -237,7 +253,12 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
     caveats: list[dict[str, Any]] = []
     for name, path in REQUIRED_RECEIPTS.items():
         payload = load_json(path)
-        generated_at = str(payload.get("generated_at_utc") or payload.get("generatedAt") or "")
+        generated_at = str(
+            payload.get("generated_at_utc")
+            or payload.get("generatedAtUtc")
+            or payload.get("generatedAt")
+            or ""
+        )
         is_fresh = generated_at_is_fresh(generated_at, RECRAWL_MAX_AGE_HOURS) if name in FRESHNESS_REQUIRED_GATES else True
         status_value = str(payload.get("status") or "").strip().lower()
         structured_failures = payload.get("failures")
@@ -311,6 +332,14 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
             required_gates[name]["rulesets"] = payload.get("rulesets", {})
         if name == "public_route_proof" and path.is_file():
             required_gates[name]["summary"] = payload.get("summary", {})
+        if name == "public_edge_postdeploy_gate" and path.is_file():
+            required_gates[name]["releaseManifestVersion"] = payload.get("releaseManifestVersion")
+            required_gates[name]["visibleVersion"] = payload.get("visibleVersion")
+            required_gates[name]["browserPlaywrightStatus"] = payload.get("browserPlaywrightStatus")
+            required_gates[name]["flagshipHorizonsBrowserProofCoverage"] = payload.get("flagshipHorizonsBrowserProofCoverage")
+            required_gates[name]["mobileLedgerPayloadStatus"] = payload.get("mobileLedgerPayloadStatus")
+            required_gates[name]["readyMobileHandoffStatus"] = payload.get("readyMobileHandoffStatus")
+            required_gates[name]["participateIframeShellStatus"] = payload.get("participateIframeShellStatus")
         if name == "blazor_execution_horizon_bridge" and path.is_file():
             required_gates[name]["public_entry"] = blazor_bridge_public_entry_summary(payload)
         if name == "external_distribution_mirror_proof" and path.is_file():
@@ -406,6 +435,14 @@ def build_verdict_markdown(payload: dict[str, Any]) -> str:
         if name == "external_distribution_mirror_proof" and isinstance(gate.get("providers"), dict):
             provider_summary = ", ".join(f"{provider}={status}" for provider, status in sorted(gate["providers"].items()))
             lines.append(f"  - mirrors: {provider_summary}; external_required={gate.get('external_required')}")
+        if name == "public_edge_postdeploy_gate":
+            lines.append(
+                f"  - public edge: {gate.get('visibleVersion')} "
+                f"with browser proof `{gate.get('browserPlaywrightStatus')}` "
+                f"and horizons `{gate.get('flagshipHorizonsBrowserProofCoverage')}`"
+            )
+            if gate.get("mobileLedgerPayloadStatus"):
+                lines.append(f"  - mobile ledger: {gate.get('mobileLedgerPayloadStatus')}")
         if name == "ruleset_readiness":
             workflow_assumed = gate.get("workflow_assumed_rulesets") or []
             authority_approved = gate.get("authority_approved_rulesets") or []
