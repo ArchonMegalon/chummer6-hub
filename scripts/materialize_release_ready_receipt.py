@@ -71,6 +71,19 @@ def run_release_verifier(env: dict[str, str]) -> tuple[int, bool, str, str]:
         return 124, True, stdout, stderr
 
 
+def current_git_head() -> str:
+    result = subprocess.run(
+        ["git", "-C", str(RUN_SERVICES_ROOT), "rev-parse", "HEAD"],
+        check=False,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
 def source_binding_failures() -> list[str]:
     if not VERIFY_SCRIPT.is_file():
         return [f"release verifier script is missing: {VERIFY_SCRIPT}"]
@@ -109,6 +122,7 @@ def main() -> int:
     env.setdefault("CHUMMER_PUBLIC_BASE_URL", "https://chummer.run")
     env.setdefault("CHUMMER_RUN_SERVICES_ROOT", str(RUN_SERVICES_ROOT))
     env.setdefault("CHUMMER_WORKSPACE_ROOT", str(ROOT))
+    expected_head = env.setdefault("CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD", current_git_head())
     binding_failures = source_binding_failures()
     if binding_failures:
         returncode, timed_out, stdout, stderr = 78, False, "", ""
@@ -131,7 +145,7 @@ def main() -> int:
         "generated_at_utc": now_iso(),
         "status": "pass" if returncode == 0 else "fail",
         "verdict": "RELEASE_READY" if returncode == 0 else "NOT_RELEASE_READY",
-        "command": f"CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 CHUMMER_RUN_SERVICES_ROOT={RUN_SERVICES_ROOT} bash {VERIFY_SCRIPT}",
+        "command": f"CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD={expected_head} CHUMMER_RUN_SERVICES_ROOT={RUN_SERVICES_ROOT} bash {VERIFY_SCRIPT}",
         "returncode": returncode,
         "timed_out": timed_out,
         "timeout_seconds": TIMEOUT_SECONDS,

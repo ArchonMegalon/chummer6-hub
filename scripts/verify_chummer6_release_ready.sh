@@ -106,12 +106,21 @@ verify_public_edge_deploy_source() {
     --repo-root "$run_services_root"
     --compose-file "$run_services_root/docker-compose.public-edge.yml"
     --compose-service chummer-portal
-    --require-upstream
     --ignore-generated-proof-drift
     --json
   )
   if [[ -n "${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}" ]]; then
     gate_args+=(--expected-head "$CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD")
+  fi
+  local require_upstream="${CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM:-auto}"
+  if [[ "$require_upstream" =~ ^(1|true|yes|on)$ ]]; then
+    gate_args+=(--require-upstream)
+  elif [[ "$require_upstream" == "auto" ]]; then
+    local branch_name
+    branch_name="$(git -C "$run_services_root" branch --show-current 2>/dev/null || true)"
+    if [[ -n "$branch_name" ]] && git -C "$run_services_root" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+      gate_args+=(--require-upstream)
+    fi
   fi
 
   CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT="$workspace_root" \

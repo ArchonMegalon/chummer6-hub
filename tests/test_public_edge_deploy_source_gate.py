@@ -393,6 +393,7 @@ def test_release_ready_script_calls_public_edge_deploy_source_gate() -> None:
     assert "verify_public_edge_deploy_source()" in script
     assert "CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE" in script
     assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD" in script
+    assert "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM" in script
     assert "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" in script
     assert "CHUMMER_RUN_SERVICES_CONTEXT_DIR" in script
     assert "CHUMMER_RUN_SERVICES_SOURCE" in script
@@ -400,6 +401,7 @@ def test_release_ready_script_calls_public_edge_deploy_source_gate() -> None:
     assert "--compose-file" in script
     assert "--compose-service chummer-portal" in script
     assert "--require-upstream" in script
+    assert "branch --show-current" in script
     assert "--ignore-generated-proof-drift" in script
     assert "run_function_gate verify_public_edge_deploy_source" in script
     assert script.index("run_function_gate verify_public_edge_deploy_source") < script.index("run_hub_gate verify_windows_installer_visual_audit")

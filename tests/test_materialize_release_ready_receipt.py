@@ -38,6 +38,8 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         text = module.VERIFY_SCRIPT.read_text(encoding="utf-8")
 
         self.assertIn("CHUMMER_RELEASE_READY_STOP_ON_PRECHECK_FAILURE", text)
+        self.assertTrue((module.RUN_SERVICES_ROOT / "scripts" / "verify_flagship_product_readiness_gate.py").is_file())
+        self.assertIn("verify_flagship_product_readiness_gate.py", text)
         self.assertLess(
             text.index("verify_windows_installer_visual_audit"),
             text.index("verify_chummer6_desktop_gold"),
@@ -54,6 +56,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             with (
                 mock.patch.object(module, "OUTPUT_PATH", output_path),
                 mock.patch.object(module, "source_binding_failures", return_value=[]),
+                mock.patch.object(module, "current_git_head", return_value="abc123"),
                 mock.patch.object(module.subprocess, "Popen", return_value=process) as popen,
             ):
                 result = module.main()
@@ -62,6 +65,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             popen_env = popen.call_args.kwargs["env"]
             self.assertEqual(str(module.RUN_SERVICES_ROOT), popen_env["CHUMMER_RUN_SERVICES_ROOT"])
             self.assertEqual(str(module.ROOT), popen_env["CHUMMER_WORKSPACE_ROOT"])
+            self.assertTrue(popen_env["CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD"])
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual("pass", payload["status"])
             self.assertEqual("RELEASE_READY", payload["verdict"])
@@ -70,6 +74,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             self.assertEqual(module.TIMEOUT_SECONDS, payload["timeout_seconds"])
             self.assertTrue(payload["source_binding"]["pass"])
             self.assertTrue(payload["source_binding"]["verifier_accepts_current_root"])
+            self.assertIn("CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD=", payload["command"])
 
     def test_main_writes_fail_receipt_when_release_verifier_times_out(self) -> None:
         module = load_module()
@@ -91,6 +96,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             with (
                 mock.patch.object(module, "OUTPUT_PATH", output_path),
                 mock.patch.object(module, "source_binding_failures", return_value=[]),
+                mock.patch.object(module, "current_git_head", return_value="abc123"),
                 mock.patch.object(module.subprocess, "Popen", return_value=process),
                 mock.patch.object(module.os, "killpg") as killpg,
             ):
@@ -117,6 +123,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             with (
                 mock.patch.object(module, "OUTPUT_PATH", output_path),
                 mock.patch.object(module, "source_binding_failures", return_value=[failure]),
+                mock.patch.object(module, "current_git_head", return_value="abc123"),
                 mock.patch.object(module.subprocess, "Popen") as popen,
             ):
                 result = module.main()
