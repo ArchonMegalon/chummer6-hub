@@ -57,10 +57,16 @@ def test_verify_downloads_accepts_explicit_preview_posture(monkeypatch) -> None:
         "rolloutState": "promoted_preview",
         "supportabilityState": "preview_supported",
     }
+    compatibility_payload = {
+        **release_payload,
+        "downloads": [{"id": "avalonia-win-x64-installer"}],
+    }
 
     def fake_fetch(base_url, path, timeout_seconds):
         if path == "/downloads/RELEASE_CHANNEL.generated.json":
             return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(release_payload), f"{base_url}{path}")
+        if path == "/downloads/releases.json":
+            return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(compatibility_payload), f"{base_url}{path}")
         return module.FetchResult(
             path,
             200,
@@ -76,6 +82,49 @@ def test_verify_downloads_accepts_explicit_preview_posture(monkeypatch) -> None:
     assert result["status"] == "pass"
     assert result["expected_release_rollout_state"] == "promoted_preview"
     assert result["expected_release_supportability_state"] == "preview_supported"
+    assert result["compatibility_manifest_guarded_preview"] is False
+
+
+def test_verify_downloads_accepts_guarded_preview_compatibility_manifest(monkeypatch) -> None:
+    module = load_module()
+    release_payload = {
+        "version": "run-20260701-124648",
+        "releaseVersion": "run-20260701-124648",
+        "status": "published",
+        "channel": "preview",
+        "rolloutState": "promoted_preview",
+        "supportabilityState": "preview_supported",
+    }
+    compatibility_payload = {
+        "version": "run-20260701-124648",
+        "status": "published",
+        "channel": "preview",
+        "rolloutState": "desktop_polish_needed",
+        "supportabilityState": "review_required",
+        "downloads": [{"id": "avalonia-win-x64-installer"}],
+    }
+
+    def fake_fetch(base_url, path, timeout_seconds):
+        if path == "/downloads/RELEASE_CHANNEL.generated.json":
+            return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(release_payload), f"{base_url}{path}")
+        if path == "/downloads/releases.json":
+            return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(compatibility_payload), f"{base_url}{path}")
+        return module.FetchResult(
+            path,
+            200,
+            {"content-type": "text/html"},
+            '<p data-downloads-release-version>Version run-20260701-124648</p>',
+            f"{base_url}{path}",
+        )
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+
+    result = module.verify_downloads("https://chummer.run", 1.0, expected_release_channel="preview")
+
+    assert result["status"] == "pass"
+    assert result["compatibility_manifest_guarded_preview"] is True
+    assert result["compatibility_manifest_supportability_state"] == "review_required"
+    assert result["compatibility_manifest_rollout_state"] == "desktop_polish_needed"
 
 
 def test_verify_downloads_still_rejects_preview_when_stable_expected(monkeypatch) -> None:
@@ -87,10 +136,16 @@ def test_verify_downloads_still_rejects_preview_when_stable_expected(monkeypatch
         "rolloutState": "promoted_preview",
         "supportabilityState": "preview_supported",
     }
+    compatibility_payload = {
+        **release_payload,
+        "downloads": [{"id": "avalonia-win-x64-installer"}],
+    }
 
     def fake_fetch(base_url, path, timeout_seconds):
         if path == "/downloads/RELEASE_CHANNEL.generated.json":
             return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(release_payload), f"{base_url}{path}")
+        if path == "/downloads/releases.json":
+            return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(compatibility_payload), f"{base_url}{path}")
         return module.FetchResult(
             path,
             200,

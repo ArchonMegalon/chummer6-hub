@@ -352,7 +352,9 @@ def verify_downloads(base_url: str, timeout_seconds: float, expected_release_cha
     downloads = fetch(base_url, "/downloads", timeout_seconds)
     status = fetch(base_url, "/status", timeout_seconds)
     release = fetch(base_url, "/downloads/RELEASE_CHANNEL.generated.json", timeout_seconds)
+    compatibility = fetch(base_url, "/downloads/releases.json", timeout_seconds)
     release_payload = parse_json(release, failures) if release.status_code == 200 else {}
+    compatibility_payload = parse_json(compatibility, failures) if compatibility.status_code == 200 else {}
 
     downloads_version = extract_downloads_version_marker(downloads.body)
     status_version = extract_downloads_version_marker(status.body)
@@ -361,20 +363,40 @@ def verify_downloads(base_url: str, timeout_seconds: float, expected_release_cha
     release_channel = str(release_payload.get("channel") or release_payload.get("channelId") or "")
     release_rollout = str(release_payload.get("rolloutState") or "")
     release_supportability = str(release_payload.get("supportabilityState") or "")
+    compatibility_version = str(compatibility_payload.get("releaseVersion") or compatibility_payload.get("version") or "")
+    compatibility_status = str(compatibility_payload.get("status") or "")
+    compatibility_channel = str(compatibility_payload.get("channel") or compatibility_payload.get("channelId") or "")
+    compatibility_rollout = str(compatibility_payload.get("rolloutState") or "")
+    compatibility_supportability = str(compatibility_payload.get("supportabilityState") or "")
+    compatibility_download_count = len(compatibility_payload.get("downloads") or [])
+    compatibility_guarded_preview = (
+        expected_posture["channel"] == "preview"
+        and normalize_token(compatibility_supportability) == "review_required"
+        and normalize_token(compatibility_rollout) in {"desktop_polish_needed", "readiness_review_required"}
+    )
 
     require(downloads.status_code == 200, failures, f"/downloads expected 200, got {downloads.status_code}")
     require(status.status_code == 200, failures, f"/status expected 200, got {status.status_code}")
     require(release.status_code == 200, failures, f"/downloads/RELEASE_CHANNEL.generated.json expected 200, got {release.status_code}")
+    require(compatibility.status_code == 200, failures, f"/downloads/releases.json expected 200, got {compatibility.status_code}")
     require(bool(downloads_version), failures, "/downloads missing data-downloads-release-version marker")
     require(bool(status_version), failures, "/status missing data-downloads-release-version marker")
     if release_version:
         require(downloads_version.endswith(release_version), failures, "/downloads version marker does not match release channel version")
         require(status_version.endswith(release_version), failures, "/status version marker does not match release channel version")
+        require(compatibility_version == release_version, failures, "/downloads/releases.json version does not match release channel version")
     require(release_status == "published", failures, f"release status expected published, got {release_status or '<empty>'}")
+    require(compatibility_status == "published", failures, f"compatibility manifest status expected published, got {compatibility_status or '<empty>'}")
+    require(compatibility_download_count > 0, failures, "compatibility manifest exposes no downloads")
     require(
         normalize_token(release_channel) == expected_posture["channel"],
         failures,
         f"release channel expected {expected_posture['channel']}, got {release_channel or '<empty>'}",
+    )
+    require(
+        normalize_token(compatibility_channel) == expected_posture["channel"],
+        failures,
+        f"compatibility manifest channel expected {expected_posture['channel']}, got {compatibility_channel or '<empty>'}",
     )
     require(
         normalize_token(release_rollout) == expected_posture["rollout"],
@@ -386,6 +408,17 @@ def verify_downloads(base_url: str, timeout_seconds: float, expected_release_cha
         failures,
         f"release supportability expected {expected_posture['supportability']}, got {release_supportability or '<empty>'}",
     )
+    if not compatibility_guarded_preview:
+        require(
+            normalize_token(compatibility_rollout) == expected_posture["rollout"],
+            failures,
+            f"compatibility manifest rollout expected {expected_posture['rollout']}, got {compatibility_rollout or '<empty>'}",
+        )
+        require(
+            normalize_token(compatibility_supportability) == expected_posture["supportability"],
+            failures,
+            f"compatibility manifest supportability expected {expected_posture['supportability']}, got {compatibility_supportability or '<empty>'}",
+        )
 
     return {
         "contractName": "chummer.downloads_version_marker.v1",
@@ -393,16 +426,23 @@ def verify_downloads(base_url: str, timeout_seconds: float, expected_release_cha
         "downloads_status": downloads.status_code,
         "status_status": status.status_code,
         "release_manifest_status": release.status_code,
+        "compatibility_manifest_status": compatibility.status_code,
         "visible_version": downloads_version,
         "status_redirect_version": status_version,
         "release_version": release_version,
+        "compatibility_manifest_version": compatibility_version,
         "release_channel": release_channel,
+        "compatibility_manifest_channel": compatibility_channel,
         "expected_release_channel": expected_posture["channel"],
         "expected_release_rollout_state": expected_posture["rollout"],
         "expected_release_supportability_state": expected_posture["supportability"],
         "release_rollout_state": release_rollout,
         "release_status": release_status,
         "release_supportability_state": release_supportability,
+        "compatibility_manifest_rollout_state": compatibility_rollout,
+        "compatibility_manifest_supportability_state": compatibility_supportability,
+        "compatibility_manifest_download_count": compatibility_download_count,
+        "compatibility_manifest_guarded_preview": compatibility_guarded_preview,
         "failures": failures,
     }
 
