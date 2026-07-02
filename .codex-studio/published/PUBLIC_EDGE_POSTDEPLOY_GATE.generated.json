@@ -1,14 +1,78 @@
 {
   "baseUrl": "https://chummer.run",
-  "browserPlaywrightRequiredProofs": [],
+  "browserPlaywrightRequiredProofs": [
+    "downloadsStatus",
+    "mobilePwaViewport",
+    "frontdoorNavigation"
+  ],
   "browserPlaywrightStatus": "pass",
   "childReceipts": {
     "browserPlaywright": {
-      "artifacts": {},
+      "artifactDir": ".codex-studio/published/public-edge-browser-required",
+      "artifacts": {
+        "downloadsStatus": {
+          "base_url": "https://chummer.run",
+          "contractName": "chummer.downloads_status_e2e.v1",
+          "exists": true,
+          "path": ".codex-studio/published/public-edge-browser-required/DOWNLOADS_STATUS_E2E.generated.json",
+          "status": "pass"
+        },
+        "frontdoorNavigation": {
+          "base_url": "https://chummer.run",
+          "contractName": "chummer.frontdoor_mobile_launch.v1",
+          "exists": true,
+          "path": ".codex-studio/published/public-edge-browser-required/FRONTDOOR_MOBILE_LAUNCH.generated.json",
+          "status": "pass"
+        },
+        "mobilePwaViewport": {
+          "base_url": "https://chummer.run",
+          "contractName": "chummer.mobile_pwa_viewport_smoke.v1",
+          "exists": true,
+          "path": ".codex-studio/published/public-edge-browser-required/MOBILE_PWA_VIEWPORT_SMOKE.generated.json",
+          "status": "pass"
+        }
+      },
+      "completedAtUtc": "2026-07-02T04:47:23.897735+00:00",
       "contractName": "chummer.public_edge_browser_playwright.v1",
       "failures": [],
-      "requiredProofs": [],
-      "skipped": true,
+      "requiredProofs": [
+        "downloadsStatus",
+        "mobilePwaViewport",
+        "frontdoorNavigation"
+      ],
+      "runs": {
+        "downloadsStatus": {
+          "completedAtUtc": "2026-07-02T04:45:38.259411+00:00",
+          "returnCode": 0,
+          "spec": "tests/public/downloads-status.spec.ts",
+          "startedAtUtc": "2026-07-02T04:45:26.600713+00:00",
+          "stderrTail": "",
+          "stdoutTail": "\nRunning 1 test using 1 worker\n\n[1/1] tests/public/downloads-status.spec.ts:12:5 \u203a downloads and status stay concise and point to the right next steps\n  1 passed (9.4s)"
+        },
+        "frontdoorNavigation": {
+          "completedAtUtc": "2026-07-02T04:47:23.897450+00:00",
+          "returnCode": 0,
+          "spec": "tests/public/frontdoor-mobile-launch.spec.ts",
+          "startedAtUtc": "2026-07-02T04:47:16.697811+00:00",
+          "stderrTail": "",
+          "stdoutTail": "\nRunning 1 test using 1 worker\n\n[1/1] tests/public/frontdoor-mobile-launch.spec.ts:10:5 \u203a mobile homepage open-chummer menu gates Build and exposes Play\n  1 passed (5.5s)"
+        },
+        "mobilePwaViewport": {
+          "completedAtUtc": "2026-07-02T04:47:16.697767+00:00",
+          "returnCode": 0,
+          "spec": "tests/public/mobile-pwa-viewport-smoke.spec.ts",
+          "startedAtUtc": "2026-07-02T04:45:38.259453+00:00",
+          "stderrTail": "",
+          "stdoutTail": "\nRunning 1 test using 1 worker\n\n[1/1] tests/public/mobile-pwa-viewport-smoke.spec.ts:22:5 \u203a core mobile PWA routes fit phone tablet and desktop viewports\n  1 passed (1.6m)"
+        }
+      },
+      "skipped": false,
+      "specs": [
+        "tests/public/downloads-status.spec.ts",
+        "tests/public/mobile-pwa-viewport-smoke.spec.ts",
+        "tests/public/frontdoor-mobile-launch.spec.ts"
+      ],
+      "startedAtUtc": "2026-07-02T04:45:26.600710+00:00",
       "status": "pass"
     },
     "downloads": {
@@ -30,8 +94,12 @@
       "visible_version": "Version run-20260701-124648"
     },
     "flagshipHorizons": {
-      "browserProofCoverage": "skipped",
-      "browserProofsPresent": [],
+      "browserProofCoverage": "full",
+      "browserProofsPresent": [
+        "downloadsStatus",
+        "frontdoorNavigation",
+        "mobilePwaViewport"
+      ],
       "browserProofsRequiredForReleaseClaims": [
         "downloadsStatus",
         "frontdoorNavigation",
@@ -151,7 +219,7 @@
       "baseUrl": "https://chummer.run",
       "contractName": "chummer.mobile_pwa_service_worker_boundary.v1",
       "failures": [],
-      "generatedAtUtc": "2026-07-02T04:35:20.799400+00:00",
+      "generatedAtUtc": "2026-07-02T04:45:26.399987+00:00",
       "ledgerBoundary": {
         "cache_control": "private, no-store, no-cache, max-age=0",
         "path": "/mobile/pwa/ledger.json",
@@ -193,7 +261,7 @@
       "base_url": "https://chummer.run",
       "contractName": "chummer.participate_iframe_shell.v1",
       "failures": [],
-      "generatedAtUtc": "2026-07-02T04:35:21.101632+00:00",
+      "generatedAtUtc": "2026-07-02T04:45:26.600406+00:00",
       "iframe_route_count": 2,
       "live": [
         {
@@ -477,35 +545,35 @@
           "content_type": "text/html; charset=utf-8",
           "expected_text_found": true,
           "path": "/mobile",
-          "sha256": "e27690fb40c83451d0251f7f5a7ec9c2e0e1757e32d350a0aaa4e40ba69b4232",
+          "sha256": "d458514b059e3575abaea8e2400466d117ad32ad9c888638c568164c3ef69e9b",
           "status_code": 200
         },
         {
           "content_type": "text/html; charset=utf-8",
           "expected_text_found": true,
           "path": "/mobile/player",
-          "sha256": "15b770b0e7164a2afe68a8e99ba04b93b93b3b06e1c3991dab30b650f5c21e12",
+          "sha256": "5a9cb2c2629de11d4fff91bf1442652bcc3ae6ebf3f4d24c2901cd7417b7eb23",
           "status_code": 200
         },
         {
           "content_type": "text/html; charset=utf-8",
           "expected_text_found": true,
           "path": "/mobile/gm",
-          "sha256": "64860531a4ee69a466426ebfaaf1474144e11eeed5ebffb100f0e7e3cd743cfb",
+          "sha256": "babb333c63e7eda4630bb26dfe0167d6201e40b8f1743a7c6241b0268f9acc41",
           "status_code": 200
         },
         {
           "content_type": "text/html; charset=utf-8",
           "expected_text_found": true,
           "path": "/mobile/observer",
-          "sha256": "e9c896dd8453ea1c9b0b9c99d86510865fa5c41fb4f60d8a5c9963b6d21b7a06",
+          "sha256": "2a758280252b5f6adffeb809354066e696bd59188f0ad3ad77eb079ea4519345",
           "status_code": 200
         },
         {
           "content_type": "text/html; charset=utf-8",
           "expected_text_found": true,
           "path": "/play",
-          "sha256": "5606c0ca008200073605e94fe5c79a7c822983b4e2f69645336adcaa4847d4d2",
+          "sha256": "1e60374dbb1b0b477abe4d18d75454fd0d6070d926b1c4d02368b717eb39b597",
           "status_code": 200
         },
         {
@@ -647,38 +715,38 @@
           "status_code": 200
         },
         {
-          "bytes": 34662,
+          "bytes": 34668,
           "content_type": "text/html; charset=utf-8",
           "path": "/mobile",
-          "sha256": "a0c94db2c0bd8589679f64b16c719abc89e855745d51001a8b8deda9b34d13c9",
+          "sha256": "343f56838ee74f46bc1c17c938c47dbc0718a5eb0b120784d16026f237fb8971",
           "status_code": 200
         },
         {
-          "bytes": 34670,
+          "bytes": 34685,
           "content_type": "text/html; charset=utf-8",
           "path": "/mobile/gm",
-          "sha256": "fd51602491e86fc33f805fb52974c344d9ba5a47a58cd86ce9c73ca1f87c83d1",
+          "sha256": "facf9b0e095c561615ccbf42b732002c2cd9918f5df79786c08f07f4992f0fec",
           "status_code": 200
         },
         {
-          "bytes": 31672,
+          "bytes": 31647,
           "content_type": "text/html; charset=utf-8",
           "path": "/mobile/observer",
-          "sha256": "77056815fd284d1e596b2402b4ce5dcdca68090eced1e231870d47e4194afe6c",
+          "sha256": "9f2efe6cf38abce5f8fba8ed137f83d1e9056e4be580ca2c596d587cb6c591a1",
           "status_code": 200
         },
         {
-          "bytes": 34703,
+          "bytes": 34708,
           "content_type": "text/html; charset=utf-8",
           "path": "/mobile/player",
-          "sha256": "82fb8cfebc0f26a1afb0bcd68d12b58de814b8f6581e1996f3c92e9a1acb0d6c",
+          "sha256": "77dbda57045180074004f426829572a24b47f95abc5439228f3a98a36a73179a",
           "status_code": 200
         },
         {
           "bytes": 1121,
           "content_type": "application/json",
           "path": "/mobile/pwa.json",
-          "sha256": "a0a1eac54806062248af623317b058a6527ae3f78edcd2369a42023a6c441c8e",
+          "sha256": "159b9a5c45ae4cee06bfb5e907cc846fd71ec2f86e686ca26a047955ae987ac0",
           "status_code": 200
         },
         {
@@ -692,7 +760,7 @@
           "bytes": 50477,
           "content_type": "text/html; charset=utf-8",
           "path": "/play",
-          "sha256": "8e8126fb393718990b99aa3b14a7d824bd20563c975a87cab164f7c5f651a248",
+          "sha256": "af94021d987720b836be610f28c322a60f2c955ffeb963977d4550af9d1ee8b4",
           "status_code": 200
         },
         {
@@ -734,7 +802,7 @@
           "bytes": 2119,
           "content_type": "application/json",
           "path": "/ready/handoff/mobile.json",
-          "sha256": "e3600ddddf4d4f10e6ba19828301d94381d73f43f5afac8ce2cb88dd3407469a",
+          "sha256": "28a2f57e22b1ac5785025bf663186d0a8b6ac21c940d5ed089e8d2d4793f5fba",
           "status_code": 200
         },
         {
@@ -840,9 +908,9 @@
     "mid_term_pwa_session_utility",
     "long_term_living_world_expansion"
   ],
-  "flagshipHorizonsBrowserProofCoverage": "skipped",
+  "flagshipHorizonsBrowserProofCoverage": "full",
   "flagshipHorizonsStatus": "pass",
-  "generatedAtUtc": "2026-07-02T04:35:21.102252+00:00",
+  "generatedAtUtc": "2026-07-02T04:47:23.897848+00:00",
   "mobileLedgerCacheControl": "private, no-store, no-cache, max-age=0",
   "mobileLedgerPayloadStatus": "opt_in_required",
   "mobileLedgerStatus": "pass",

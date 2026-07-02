@@ -36,6 +36,17 @@ def test_extract_downloads_version_marker() -> None:
     assert module.extract_downloads_version_marker("<p>No marker</p>") == ""
 
 
+def test_process_tail_strips_ansi_control_sequences() -> None:
+    module = load_module()
+
+    assert module.tail_lines("\x1b[1A\x1b[2K  1 passed\nok") == "  1 passed\nok"
+    assert module.tail_lines(
+        "(node:1) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.\n"
+        "(Use `node --trace-warnings ...` to show where the warning was created)\n"
+        "  1 passed"
+    ) == "  1 passed"
+
+
 def test_verify_downloads_accepts_explicit_preview_posture(monkeypatch) -> None:
     module = load_module()
     release_payload = {

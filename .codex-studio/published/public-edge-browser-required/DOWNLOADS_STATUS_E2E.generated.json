@@ -1,0 +1,14 @@
+{
+  "contractName": "chummer.downloads_status_e2e.v1",
+  "generated_at_utc": "2026-07-02T04:45:37.656Z",
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "downloads_status": 200,
+  "status_status": 200,
+  "downloads_robots": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
+  "status_robots": "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
+  "downloads_version_marker": true,
+  "status_redirect_version_marker": true,
+  "downloads_version_text": "Version run-20260701-124648",
+  "status_redirect_version_text": "Version run-20260701-124648"
+}

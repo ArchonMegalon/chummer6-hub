@@ -80,6 +80,7 @@ PLAYWRIGHT_REQUIREMENTS = {
         "artifact": "FRONTDOOR_MOBILE_LAUNCH.generated.json",
     },
 }
+ANSI_CONTROL_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 EXPECTED_FLAGSHIP_HORIZONS = {
     "near_term_stabilization": {
         "title": "Near-term stabilization",
@@ -144,6 +145,29 @@ class FetchResult:
 def require(condition: bool, failures: list[str], message: str) -> None:
     if not condition:
         failures.append(message)
+
+
+def clean_process_text(value: Any) -> str:
+    if isinstance(value, bytes):
+        text = value.decode("utf-8", errors="replace")
+    else:
+        text = str(value or "")
+    return ANSI_CONTROL_RE.sub("", text)
+
+
+def tail_lines(value: Any, max_lines: int = 80) -> str:
+    lines = []
+    skip_next_trace_hint = False
+    for line in clean_process_text(value).splitlines():
+        if "Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set." in line:
+            skip_next_trace_hint = True
+            continue
+        if skip_next_trace_hint and line.startswith("(Use `node --trace-warnings"):
+            skip_next_trace_hint = False
+            continue
+        skip_next_trace_hint = False
+        lines.append(line)
+    return "\n".join(lines[-max_lines:])
 
 
 def normalize_token(value: Any) -> str:
@@ -963,6 +987,11 @@ def run_playwright_browser_proofs(
 
     playwright_bin = ROOT / "node_modules" / ".bin" / "playwright"
     playwright_command = [str(playwright_bin)] if playwright_bin.is_file() else ["npx", "--no-install", "playwright"]
+    playwright_env = {**os.environ}
+    playwright_env.pop("FORCE_COLOR", None)
+    playwright_env.pop("NO_COLOR", None)
+    playwright_env["BASE_URL"] = base_url
+    playwright_env["CHUMMER_COMPLETION_DIR"] = str(completion_dir)
     started = datetime.now(UTC)
     runs: dict[str, Any] = {}
     for proof_id in required_proofs:
@@ -981,11 +1010,7 @@ def run_playwright_browser_proofs(
             completed = subprocess.run(
                 command,
                 cwd=ROOT,
-                env={
-                    **os.environ,
-                    "BASE_URL": base_url,
-                    "CHUMMER_COMPLETION_DIR": str(completion_dir),
-                },
+                env=playwright_env,
                 text=True,
                 capture_output=True,
                 timeout=timeout_seconds,
@@ -996,8 +1021,8 @@ def run_playwright_browser_proofs(
                 "startedAtUtc": proof_started.isoformat(),
                 "completedAtUtc": datetime.now(UTC).isoformat(),
                 "returnCode": completed.returncode,
-                "stdoutTail": "\n".join(completed.stdout.splitlines()[-80:]),
-                "stderrTail": "\n".join(completed.stderr.splitlines()[-80:]),
+                "stdoutTail": tail_lines(completed.stdout),
+                "stderrTail": tail_lines(completed.stderr),
             }
             if completed.returncode != 0:
                 failures.append(f"{proof_id} Playwright proof exited {completed.returncode}")
@@ -1007,8 +1032,8 @@ def run_playwright_browser_proofs(
                 "startedAtUtc": proof_started.isoformat(),
                 "completedAtUtc": datetime.now(UTC).isoformat(),
                 "returnCode": None,
-                "stdoutTail": "\n".join((error.stdout or "").splitlines()[-80:]) if isinstance(error.stdout, str) else "",
-                "stderrTail": "\n".join((error.stderr or "").splitlines()[-80:]) if isinstance(error.stderr, str) else "",
+                "stdoutTail": tail_lines(error.stdout),
+                "stderrTail": tail_lines(error.stderr),
             }
             failures.append(f"{proof_id} Playwright proof timed out after {timeout_seconds:.0f}s")
         runs[proof_id] = proof_run
