@@ -364,6 +364,7 @@ def watch_runtime_stability(
 def run_postdeploy_gate(
     expected_image_id: str,
     base_url: str,
+    expected_release_channel: str,
     portal_container: str,
     portal_image_tag: str,
     output_path: Path,
@@ -382,6 +383,8 @@ def run_postdeploy_gate(
         "--base-url",
         base_url,
         "--skip-preflight",
+        "--expected-release-channel",
+        expected_release_channel,
         "--expected-portal-image-id",
         expected_image_id,
         "--portal-container",
@@ -455,6 +458,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--service", default=DEFAULT_PORTAL_SERVICE)
     parser.add_argument("--portal-container", default=DEFAULT_PORTAL_CONTAINER)
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    parser.add_argument(
+        "--expected-release-channel",
+        default="public_stable",
+        choices=["public_stable", "stable", "preview", "nightly"],
+        help="Expected downloads release posture. Use preview/nightly for a nightly handoff without promoting stable.",
+    )
     parser.add_argument("--postdeploy-output", default=str(ROOT / ".codex-studio" / "published" / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"))
     parser.add_argument("--postdeploy-attempts", type=int, default=3)
     parser.add_argument("--postdeploy-retry-delay-seconds", type=float, default=5.0)
@@ -524,6 +533,7 @@ def main(argv: list[str] | None = None) -> int:
             postdeploy_receipt = run_postdeploy_gate(
                 expected,
                 args.base_url,
+                args.expected_release_channel,
                 args.portal_container,
                 (args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG])[0],
                 Path(args.postdeploy_output).expanduser(),

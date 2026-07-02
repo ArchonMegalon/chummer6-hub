@@ -1,0 +1,181 @@
+{
+  "contractName": "chummer.mobile_pwa_viewport_smoke.v1",
+  "generated_at_utc": "2026-07-02T09:44:28.163Z",
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "routes": [
+    "/mobile",
+    "/mobile/player",
+    "/mobile/gm",
+    "/mobile/observer",
+    "/play",
+    "/play/continuity"
+  ],
+  "route_count": 6,
+  "viewport_count": 3,
+  "results": [
+    {
+      "route": "/mobile",
+      "viewport": "phone-390",
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile/player",
+      "viewport": "phone-390",
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile/gm",
+      "viewport": "phone-390",
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile/observer",
+      "viewport": "phone-390",
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/play",
+      "viewport": "phone-390",
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/play/continuity",
+      "viewport": "phone-390",
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile/player",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile/gm",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile/observer",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/play",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/play/continuity",
+      "viewport": "tablet",
+      "width": 768,
+      "height": 1024,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile",
+      "viewport": "desktop-1366",
+      "width": 1366,
+      "height": 768,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile/player",
+      "viewport": "desktop-1366",
+      "width": 1366,
+      "height": 768,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile/gm",
+      "viewport": "desktop-1366",
+      "width": 1366,
+      "height": 768,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/mobile/observer",
+      "viewport": "desktop-1366",
+      "width": 1366,
+      "height": 768,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/play",
+      "viewport": "desktop-1366",
+      "width": 1366,
+      "height": 768,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    },
+    {
+      "route": "/play/continuity",
+      "viewport": "desktop-1366",
+      "width": 1366,
+      "height": 768,
+      "status": 200,
+      "overflow_x": 0,
+      "navigation_error": ""
+    }
+  ],
+  "failures": []
+}

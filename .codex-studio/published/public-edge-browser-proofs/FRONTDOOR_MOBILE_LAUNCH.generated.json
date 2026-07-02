@@ -1,0 +1,27 @@
+{
+  "contractName": "chummer.frontdoor_mobile_launch.v1",
+  "generated_at_utc": "2026-07-02T09:44:33.767Z",
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "homepage_overflow_x": 0,
+  "account_route": "/login?next=%2Faccount%2Faccess",
+  "play_route": "/mobile/player",
+  "direct_player_route": "/mobile/player",
+  "direct_player_http_status": 200,
+  "direct_player_title": "Chummer Mobile Turn Companion",
+  "final_url": "https://chummer.run/mobile/player",
+  "pwa_role": "Player",
+  "live_turn_companion_shell": true,
+  "pwa_manifest": "/manifest.player.webmanifest",
+  "gated_targets": [
+    "Build"
+  ],
+  "public_targets": [
+    "Play"
+  ],
+  "page_errors": []
+}

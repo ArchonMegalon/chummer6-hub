@@ -1,0 +1,180 @@
+{
+  "browserProofRequirements": [
+    "downloadsStatus",
+    "mobilePwaViewport",
+    "frontdoorNavigation"
+  ],
+  "contractName": "chummer.public_edge_portal_image_restore.v1",
+  "generatedAtUtc": "2026-07-02T09:44:46.367702+00:00",
+  "postdeploy": {
+    "attempts": [
+      {
+        "attempt": 1,
+        "browserPlaywrightRequiredProofs": [
+          "downloadsStatus",
+          "mobilePwaViewport",
+          "frontdoorNavigation"
+        ],
+        "browserPlaywrightStatus": "pass",
+        "portalRuntimeImageStatus": "pass",
+        "releaseManifestVersion": "run-20260701-124648",
+        "returncode": 0,
+        "status": "pass"
+      }
+    ],
+    "browserPlaywrightRequiredProofs": [
+      "downloadsStatus",
+      "mobilePwaViewport",
+      "frontdoorNavigation"
+    ],
+    "browserPlaywrightStatus": "pass",
+    "command": [
+      "/usr/bin/python3",
+      "/tmp/chummer-run-services-flagship-f023/scripts/verify_public_edge_postdeploy_gate.py",
+      "--base-url",
+      "https://chummer.run",
+      "--skip-preflight",
+      "--expected-release-channel",
+      "preview",
+      "--expected-portal-image-id",
+      "sha256:4cc7f4fae78966969d93f83791b1654af0cc227c8b9513a54dfc2e579e8fb710",
+      "--portal-container",
+      "chummer6-hub-chummer-portal-1",
+      "--portal-image-tag",
+      "chummer-run-api:local",
+      "--output",
+      ".codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
+      "--require-downloads-status-playwright",
+      "--require-mobile-pwa-viewport-playwright",
+      "--require-frontdoor-navigation-playwright",
+      "--playwright-timeout-seconds",
+      "420.0",
+      "--playwright-artifact-dir",
+      ".codex-studio/published/public-edge-browser-proofs"
+    ],
+    "outputPath": ".codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
+    "portalRuntimeImageStatus": "pass",
+    "releaseManifestVersion": "run-20260701-124648",
+    "returncode": 0,
+    "status": "pass"
+  },
+  "restore": {
+    "composeCommand": [
+      "docker",
+      "compose",
+      "--env-file",
+      "/docker/chummercomplete/chummer.run-services/.env",
+      "-p",
+      "chummer6-hub",
+      "-f",
+      "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml",
+      "up",
+      "-d",
+      "--no-build",
+      "--no-deps",
+      "--force-recreate",
+      "chummer-portal"
+    ],
+    "containerImageDetailsBefore": {
+      "created": "2026-07-02T11:33:16.230558939+02:00",
+      "imageId": "sha256:cba57ef29e50180637b21360d64f7ef1ddad24d569b34e9d09c3cd9b727d43ab",
+      "labels": {
+        "org.opencontainers.image.version": "24.04"
+      },
+      "repoDigests": [],
+      "repoTags": [
+        "chummer-run-api:pwa-direct-20260702-0925"
+      ]
+    },
+    "containerImageIdBefore": "sha256:cba57ef29e50180637b21360d64f7ef1ddad24d569b34e9d09c3cd9b727d43ab",
+    "containerImageRefBefore": "chummer-run-api:local",
+    "containerRecreated": true,
+    "dryRun": false,
+    "expectedImageId": "sha256:4cc7f4fae78966969d93f83791b1654af0cc227c8b9513a54dfc2e579e8fb710",
+    "imageTags": [
+      {
+        "imageDetailsBefore": {
+          "created": "2026-07-02T11:33:16.230558939+02:00",
+          "imageId": "sha256:cba57ef29e50180637b21360d64f7ef1ddad24d569b34e9d09c3cd9b727d43ab",
+          "labels": {
+            "org.opencontainers.image.version": "24.04"
+          },
+          "repoDigests": [],
+          "repoTags": [
+            "chummer-run-api:pwa-direct-20260702-0925"
+          ]
+        },
+        "imageIdBefore": "sha256:cba57ef29e50180637b21360d64f7ef1ddad24d569b34e9d09c3cd9b727d43ab",
+        "retagged": true,
+        "tag": "chummer-run-api:local"
+      }
+    ],
+    "portalContainer": "chummer6-hub-chummer-portal-1",
+    "retagCommands": [
+      [
+        "docker",
+        "tag",
+        "sha256:4cc7f4fae78966969d93f83791b1654af0cc227c8b9513a54dfc2e579e8fb710",
+        "chummer-run-api:local"
+      ]
+    ],
+    "sourceImageDetails": {
+      "created": "2026-07-02T11:06:00.905176872+02:00",
+      "imageId": "sha256:4cc7f4fae78966969d93f83791b1654af0cc227c8b9513a54dfc2e579e8fb710",
+      "labels": {
+        "org.opencontainers.image.version": "24.04"
+      },
+      "repoDigests": [],
+      "repoTags": []
+    },
+    "sourceImageId": "sha256:4cc7f4fae78966969d93f83791b1654af0cc227c8b9513a54dfc2e579e8fb710"
+  },
+  "stability": {
+    "completedAtUtc": "2026-07-02T09:44:06.310272+00:00",
+    "driftEvents": [],
+    "lastState": {
+      "containerImageDetails": {
+        "created": "2026-07-02T11:06:00.905176872+02:00",
+        "imageId": "sha256:4cc7f4fae78966969d93f83791b1654af0cc227c8b9513a54dfc2e579e8fb710",
+        "labels": {
+          "org.opencontainers.image.version": "24.04"
+        },
+        "repoDigests": [],
+        "repoTags": [
+          "chummer-run-api:local"
+        ]
+      },
+      "containerImageId": "sha256:4cc7f4fae78966969d93f83791b1654af0cc227c8b9513a54dfc2e579e8fb710",
+      "containerImageRef": "chummer-run-api:local",
+      "drift": [],
+      "dryRun": false,
+      "expectedImageId": "sha256:4cc7f4fae78966969d93f83791b1654af0cc227c8b9513a54dfc2e579e8fb710",
+      "imageTags": [
+        {
+          "imageDetails": {
+            "created": "2026-07-02T11:06:00.905176872+02:00",
+            "imageId": "sha256:4cc7f4fae78966969d93f83791b1654af0cc227c8b9513a54dfc2e579e8fb710",
+            "labels": {
+              "org.opencontainers.image.version": "24.04"
+            },
+            "repoDigests": [],
+            "repoTags": [
+              "chummer-run-api:local"
+            ]
+          },
+          "imageId": "sha256:4cc7f4fae78966969d93f83791b1654af0cc227c8b9513a54dfc2e579e8fb710",
+          "tag": "chummer-run-api:local"
+        }
+      ],
+      "portalContainer": "chummer6-hub-chummer-portal-1"
+    },
+    "maxRestores": 3,
+    "pollSeconds": 10.0,
+    "repairCount": 0,
+    "skipped": false,
+    "stableStartedAtUtc": "2026-07-02T09:42:04.598922+00:00",
+    "status": "pass",
+    "windowSeconds": 120.0
+  },
+  "status": "pass"
+}

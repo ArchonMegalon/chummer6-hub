@@ -214,6 +214,7 @@ def test_postdeploy_gate_retries_until_runtime_is_warm(monkeypatch, tmp_path) ->
     result = module.run_postdeploy_gate(
         expected,
         "https://chummer.run",
+        "public_stable",
         "portal",
         "chummer-run-api:local",
         output_path,
@@ -262,6 +263,7 @@ def test_postdeploy_gate_forwards_browser_proof_requirements(monkeypatch, tmp_pa
     result = module.run_postdeploy_gate(
         expected,
         "https://chummer.run",
+        "preview",
         "portal",
         "chummer-run-api:local",
         output_path,
@@ -274,6 +276,7 @@ def test_postdeploy_gate_forwards_browser_proof_requirements(monkeypatch, tmp_pa
     )
 
     command = calls[0]
+    assert command[command.index("--expected-release-channel") + 1] == "preview"
     assert "--require-downloads-status-playwright" in command
     assert "--require-mobile-pwa-viewport-playwright" in command
     assert "--require-frontdoor-navigation-playwright" in command
