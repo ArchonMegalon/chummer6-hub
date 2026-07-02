@@ -1,9 +1,9 @@
 {
   "contract_name": "chummer.release_ready",
-  "generated_at_utc": "2026-07-02T07:11:03Z",
+  "generated_at_utc": "2026-07-02T07:57:06Z",
   "status": "fail",
   "verdict": "NOT_RELEASE_READY",
-  "command": "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 CHUMMER_RUN_SERVICES_ROOT=/tmp/chummer-run-services-nightly.VsudjQ bash /tmp/chummer-run-services-nightly.VsudjQ/scripts/verify_chummer6_release_ready.sh",
+  "command": "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD=ad4f73f1942820c414155017d85b42eab3e3ca3a CHUMMER_RUN_SERVICES_ROOT=/tmp/chummer-run-services-flagship-f023 bash /tmp/chummer-run-services-flagship-f023/scripts/verify_chummer6_release_ready.sh",
   "returncode": 1,
   "timed_out": false,
   "timeout_seconds": 900,
@@ -12,9 +12,9 @@
     "verify_windows_installer_visual_audit"
   ],
   "source_binding": {
-    "current_repo": "/tmp/chummer-run-services-nightly.VsudjQ",
+    "current_repo": "/tmp/chummer-run-services-flagship-f023",
     "legacy_run_services_root": "/tmp/chummer.run-services",
-    "verify_script": "/tmp/chummer-run-services-nightly.VsudjQ/scripts/verify_chummer6_release_ready.sh",
+    "verify_script": "/tmp/chummer-run-services-flagship-f023/scripts/verify_chummer6_release_ready.sh",
     "pass": true,
     "failures": [],
     "verifier_accepts_current_root": true

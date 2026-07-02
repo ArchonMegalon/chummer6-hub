@@ -1,0 +1,43 @@
+{
+  "contract_name": "chummer.flagship_product_readiness_gate.v1",
+  "generated_at_utc": "2026-07-02T07:57:05Z",
+  "status": "pass",
+  "input_path": "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json",
+  "max_age_hours": 168,
+  "source_candidates": [
+    {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json",
+      "exists": true,
+      "status": "pass",
+      "scoped_status": "pass",
+      "generated_at_utc": "2026-06-27T20:04:25Z"
+    },
+    {
+      "path": "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json",
+      "exists": true,
+      "status": "pass",
+      "scoped_status": "pass",
+      "generated_at_utc": "2026-07-02T04:53:26Z"
+    }
+  ],
+  "readiness": {
+    "contract_name": "fleet.flagship_product_readiness",
+    "status": "pass",
+    "scoped_status": "pass",
+    "generated_at_utc": "2026-07-02T04:53:26Z",
+    "ready_keys": [
+      "desktop_client",
+      "fleet_and_operator_loop",
+      "horizons_and_public_surface",
+      "hub_and_registry",
+      "media_artifacts",
+      "mobile_play_shell",
+      "rules_engine_and_import",
+      "ui_kit_and_flagship_polish"
+    ],
+    "completion_audit_status": "pass",
+    "flagship_readiness_audit_status": "pass",
+    "external_host_proof_status": "pass"
+  },
+  "failures": []
+}
