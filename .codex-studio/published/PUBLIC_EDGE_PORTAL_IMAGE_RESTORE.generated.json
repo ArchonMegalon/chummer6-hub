@@ -5,7 +5,7 @@
     "frontdoorNavigation"
   ],
   "contractName": "chummer.public_edge_portal_image_restore.v1",
-  "generatedAtUtc": "2026-07-02T09:55:29.213739+00:00",
+  "generatedAtUtc": "2026-07-02T10:02:43.969136+00:00",
   "postdeploy": {
     "attempts": [
       {
@@ -59,43 +59,83 @@
     "status": "pass"
   },
   "restore": {
-    "composeCommand": [],
+    "composeCommand": [
+      "docker",
+      "compose",
+      "--env-file",
+      "/docker/chummercomplete/chummer.run-services/.env",
+      "-p",
+      "chummer6-hub",
+      "-f",
+      "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml",
+      "up",
+      "-d",
+      "--no-build",
+      "--no-deps",
+      "--force-recreate",
+      "chummer-portal"
+    ],
     "containerImageDetailsBefore": {
-      "created": "2026-07-02T11:49:46.525604243+02:00",
-      "imageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+      "created": "2026-07-02T11:33:16.230558939+02:00",
+      "imageId": "sha256:cba57ef29e50180637b21360d64f7ef1ddad24d569b34e9d09c3cd9b727d43ab",
       "labels": {
         "org.opencontainers.image.version": "24.04"
       },
       "repoDigests": [],
-      "repoTags": [
-        "chummer-run-api:local"
-      ]
+      "repoTags": []
     },
-    "containerImageIdBefore": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+    "containerImageIdBefore": "sha256:cba57ef29e50180637b21360d64f7ef1ddad24d569b34e9d09c3cd9b727d43ab",
     "containerImageRefBefore": "chummer-run-api:local",
-    "containerRecreated": false,
+    "containerRecreated": true,
     "dryRun": false,
     "expectedImageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
     "imageTags": [
       {
         "imageDetailsBefore": {
-          "created": "2026-07-02T11:49:46.525604243+02:00",
-          "imageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+          "created": "2026-07-02T11:33:16.230558939+02:00",
+          "imageId": "sha256:cba57ef29e50180637b21360d64f7ef1ddad24d569b34e9d09c3cd9b727d43ab",
           "labels": {
             "org.opencontainers.image.version": "24.04"
           },
           "repoDigests": [],
           "repoTags": [
-            "chummer-run-api:local"
+            "chummer-run-api:pwa-direct-20260702-0925"
           ]
         },
-        "imageIdBefore": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
-        "retagged": false,
+        "imageIdBefore": "sha256:cba57ef29e50180637b21360d64f7ef1ddad24d569b34e9d09c3cd9b727d43ab",
+        "retagged": true,
         "tag": "chummer-run-api:local"
+      },
+      {
+        "imageDetailsBefore": {
+          "created": "2026-07-02T11:33:16.230558939+02:00",
+          "imageId": "sha256:cba57ef29e50180637b21360d64f7ef1ddad24d569b34e9d09c3cd9b727d43ab",
+          "labels": {
+            "org.opencontainers.image.version": "24.04"
+          },
+          "repoDigests": [],
+          "repoTags": []
+        },
+        "imageIdBefore": "sha256:cba57ef29e50180637b21360d64f7ef1ddad24d569b34e9d09c3cd9b727d43ab",
+        "retagged": true,
+        "tag": "chummer-run-api:pwa-direct-20260702-0925"
       }
     ],
     "portalContainer": "chummer6-hub-chummer-portal-1",
-    "retagCommands": [],
+    "retagCommands": [
+      [
+        "docker",
+        "tag",
+        "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+        "chummer-run-api:local"
+      ],
+      [
+        "docker",
+        "tag",
+        "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+        "chummer-run-api:pwa-direct-20260702-0925"
+      ]
+    ],
     "sourceImageDetails": {
       "created": "2026-07-02T11:49:46.525604243+02:00",
       "imageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
@@ -103,14 +143,12 @@
         "org.opencontainers.image.version": "24.04"
       },
       "repoDigests": [],
-      "repoTags": [
-        "chummer-run-api:local"
-      ]
+      "repoTags": []
     },
     "sourceImageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9"
   },
   "stability": {
-    "completedAtUtc": "2026-07-02T09:54:57.346152+00:00",
+    "completedAtUtc": "2026-07-02T10:02:17.511723+00:00",
     "driftEvents": [],
     "lastState": {
       "containerImageDetails": {
@@ -121,7 +159,8 @@
         },
         "repoDigests": [],
         "repoTags": [
-          "chummer-run-api:local"
+          "chummer-run-api:local",
+          "chummer-run-api:pwa-direct-20260702-0925"
         ]
       },
       "containerImageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
@@ -139,22 +178,39 @@
             },
             "repoDigests": [],
             "repoTags": [
-              "chummer-run-api:local"
+              "chummer-run-api:local",
+              "chummer-run-api:pwa-direct-20260702-0925"
             ]
           },
           "imageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
           "tag": "chummer-run-api:local"
+        },
+        {
+          "imageDetails": {
+            "created": "2026-07-02T11:49:46.525604243+02:00",
+            "imageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+            "labels": {
+              "org.opencontainers.image.version": "24.04"
+            },
+            "repoDigests": [],
+            "repoTags": [
+              "chummer-run-api:local",
+              "chummer-run-api:pwa-direct-20260702-0925"
+            ]
+          },
+          "imageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+          "tag": "chummer-run-api:pwa-direct-20260702-0925"
         }
       ],
       "portalContainer": "chummer6-hub-chummer-portal-1"
     },
-    "maxRestores": 3,
+    "maxRestores": 5,
     "pollSeconds": 10.0,
     "repairCount": 0,
     "skipped": false,
-    "stableStartedAtUtc": "2026-07-02T09:51:55.163187+00:00",
+    "stableStartedAtUtc": "2026-07-02T09:57:10.294318+00:00",
     "status": "pass",
-    "windowSeconds": 180.0
+    "windowSeconds": 300.0
   },
   "status": "pass"
 }
