@@ -2,21 +2,21 @@
 
   <ItemGroup>
     <Reference Include="Chummer.Hub.Registry.Contracts">
-      <HintPath>..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\bin\$(Configuration)\net10.0\Chummer.Hub.Registry.Contracts.dll</HintPath>
+      <HintPath>$(ChummerHubRegistryRoot)\Chummer.Hub.Registry.Contracts\bin\$(Configuration)\net10.0\Chummer.Hub.Registry.Contracts.dll</HintPath>
     </Reference>
     <Reference Include="Chummer.Play.Contracts">
       <HintPath>..\Chummer.Play.Contracts\bin\$(Configuration)\net10.0\Chummer.Play.Contracts.dll</HintPath>
     </Reference>
     <Reference Include="Chummer.Media.Contracts">
-      <HintPath>..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll</HintPath>
+      <HintPath>$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll</HintPath>
     </Reference>
     <Reference Include="Chummer.Media.Factory.Runtime">
-      <HintPath>..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Factory.Runtime\bin\$(Configuration)\net10.0\Chummer.Media.Factory.Runtime.dll</HintPath>
+      <HintPath>$(ChummerMediaFactoryRoot)\src\Chummer.Media.Factory.Runtime\bin\$(Configuration)\net10.0\Chummer.Media.Factory.Runtime.dll</HintPath>
     </Reference>
     <ProjectReference Include="..\Chummer.Control.Contracts\Chummer.Control.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj" ReferenceOutputAssembly="false" Condition="Exists('..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj')" />
-    <ProjectReference Include="..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Factory.Runtime\Chummer.Media.Factory.Runtime.csproj" ReferenceOutputAssembly="false" Condition="Exists('..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Factory.Runtime\Chummer.Media.Factory.Runtime.csproj')" />
+    <ProjectReference Include="$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj" ReferenceOutputAssembly="false" Condition="Exists('$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj')" />
+    <ProjectReference Include="$(ChummerMediaFactoryRoot)\src\Chummer.Media.Factory.Runtime\Chummer.Media.Factory.Runtime.csproj" ReferenceOutputAssembly="false" Condition="Exists('$(ChummerMediaFactoryRoot)\src\Chummer.Media.Factory.Runtime\Chummer.Media.Factory.Runtime.csproj')" />
   </ItemGroup>
 
   <PropertyGroup>

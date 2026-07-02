@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\chummer-core-engine\Chummer.Contracts\Chummer.Contracts.csproj" />
-    <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
-    <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Run.Registry\Chummer.Run.Registry.csproj">
+    <ProjectReference Include="$(ChummerCoreEngineRoot)\Chummer.Contracts\Chummer.Contracts.csproj" />
+    <ProjectReference Include="$(ChummerHubRegistryRoot)\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
+    <ProjectReference Include="$(ChummerHubRegistryRoot)\Chummer.Run.Registry\Chummer.Run.Registry.csproj">
       <ExcludeAssets>contentFiles</ExcludeAssets>
     </ProjectReference>
     <ProjectReference Include="..\Chummer.Campaign.Contracts\Chummer.Campaign.Contracts.csproj" />

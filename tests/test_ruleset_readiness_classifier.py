@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -25,6 +26,19 @@ def write_receipt(path: Path, payload: dict) -> None:
 
 
 class RulesetReadinessClassifierTests(unittest.TestCase):
+    def test_workspace_root_override_binds_external_estate_receipts(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ruleset-readiness-workspace-") as temp_dir:
+            workspace = Path(temp_dir)
+            (workspace / "chummer-presentation").mkdir()
+            (workspace / "chummer-core-engine").mkdir()
+
+            with mock.patch.dict(os.environ, {"CHUMMER_WORKSPACE_ROOT": str(workspace)}):
+                module = load_module()
+
+            self.assertEqual(workspace, module.WORKSPACE_ROOT)
+            self.assertEqual(workspace / "chummer-presentation" / ".codex-studio" / "published", module.PRESENTATION_PUBLISHED)
+            self.assertEqual(workspace / "chummer-core-engine" / ".codex-studio" / "published", module.CORE_PUBLISHED)
+
     def test_sr5_uses_authoritative_minimum_coverage_when_ui_gate_is_failing(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="ruleset-readiness-") as temp_dir:

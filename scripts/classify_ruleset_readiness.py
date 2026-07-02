@@ -2,13 +2,31 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 from absolute_completion_common import now_iso, read_json, write_json
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_ROOT = RUN_SERVICES_ROOT.parent
+
+
+def resolve_workspace_root() -> Path:
+    raw = os.environ.get("CHUMMER_WORKSPACE_ROOT", "").strip()
+    if raw:
+        return Path(raw).expanduser()
+
+    candidates = [
+        RUN_SERVICES_ROOT.parent,
+        Path("/docker/chummercomplete"),
+    ]
+    for candidate in candidates:
+        if (candidate / "chummer-presentation").is_dir() and (candidate / "chummer-core-engine").is_dir():
+            return candidate
+    return candidates[0]
+
+
+WORKSPACE_ROOT = resolve_workspace_root()
 PRESENTATION_PUBLISHED = WORKSPACE_ROOT / "chummer-presentation" / ".codex-studio" / "published"
 CORE_PUBLISHED = WORKSPACE_ROOT / "chummer-core-engine" / ".codex-studio" / "published"
 FLEET_PUBLISHED = WORKSPACE_ROOT.parent / "fleet" / ".codex-studio" / "published"

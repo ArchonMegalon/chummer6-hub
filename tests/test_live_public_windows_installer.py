@@ -9,6 +9,7 @@ import unittest
 import zipfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "verify_live_public_windows_installer.py"
@@ -217,6 +218,19 @@ class LivePublicWindowsInstallerTests(unittest.TestCase):
         self.assertIn('"live_public_windows_installer"', final_gold)
         self.assertIn('PUBLISHED_ROOT / "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json"', final_gold)
         self.assertIn('["python3", "scripts/verify_live_public_windows_installer.py", "--base-url", DEFAULT_BASE_URL]', final_gold)
+
+    def test_default_verify_script_honors_explicit_override(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="chummer-live-public-windows-script-") as temp_dir:
+            script_path = Path(temp_dir) / "verify-windows-installer-payloads.py"
+            script_path.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+
+            with mock.patch.dict(
+                "os.environ",
+                {"CHUMMER_WINDOWS_INSTALLER_PAYLOAD_VERIFY_SCRIPT": str(script_path)},
+            ):
+                module = load_module()
+
+            self.assertEqual(script_path, module.DEFAULT_VERIFY_SCRIPT)
 
 
 if __name__ == "__main__":

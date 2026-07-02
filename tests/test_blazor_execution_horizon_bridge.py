@@ -34,6 +34,8 @@ def test_blazor_execution_horizon_bridge_script_binds_hub_and_presentation_proof
     assert "/app?command=character_roster" in source
     assert "does_not_upgrade_smoke_to_full" in source
     assert "full_scope_requires_current_passing_full_receipt" in source
+    assert "CHUMMER_WORKSPACE_ROOT" in source
+    assert "/docker/chummercomplete" in source
 
 
 def test_blazor_execution_horizon_bridge_receipt_is_honest_about_full_matrix() -> None:

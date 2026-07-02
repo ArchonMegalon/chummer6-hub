@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-06-29T11:56:25.373Z",
+  "generated_at_utc": "2026-07-02T05:31:59.354Z",
   "status": "pass",
-  "base_url": "http://127.0.0.1:44629",
-  "board_state": "first_party_productlift_proxy",
+  "base_url": "http://127.0.0.1:51441",
+  "board_state": "first_party_hosted_board_frame",
   "supporter_link_count": 0,
   "supporter_copy_visible": false,
   "billing_state": "unavailable"

@@ -77,6 +77,7 @@ internal sealed class PublicLandingRouteDocument
     public string? VerificationPath { get; init; }
     public string? RequiredFinalUrlPrefix { get; init; }
     public List<string>? RequiredTexts { get; init; }
+    public List<string>? ContractTerms { get; init; }
     public string? CloseoutProofBinding { get; init; }
     public string? HeroPathCloseoutProofBinding { get; init; }
 }

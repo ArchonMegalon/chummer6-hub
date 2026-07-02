@@ -20,7 +20,24 @@ import yaml
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_ROOT = RUN_SERVICES_ROOT.parent
+
+
+def resolve_workspace_root() -> Path:
+    raw = os.environ.get("CHUMMER_WORKSPACE_ROOT", "").strip()
+    if raw:
+        return Path(raw).expanduser()
+
+    candidates = [
+        RUN_SERVICES_ROOT.parent,
+        Path("/docker/chummercomplete"),
+    ]
+    for candidate in candidates:
+        if (candidate / "chummer-presentation").is_dir() and (candidate / "chummer-core-engine").is_dir():
+            return candidate
+    return candidates[0]
+
+
+WORKSPACE_ROOT = resolve_workspace_root()
 CHUMMER6_ROOT = WORKSPACE_ROOT / "Chummer6"
 DEFAULT_COMPLETION_ROOT = WORKSPACE_ROOT / "_completion" / "chummer6_absolute_completion"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_COMPLETION_BASE_URL", "http://127.0.0.1:5099").rstrip("/")
@@ -285,6 +302,23 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
     def log_path(self) -> Path | None:
         return self._log_path
 
+    @staticmethod
+    def _debug_binary_available() -> bool:
+        project_root = RUN_SERVICES_ROOT / "Chummer.Run.Api"
+        candidates = [
+            project_root / "bin" / "Debug" / "net10.0" / "Chummer.Run.Api",
+            project_root / "bin" / "Debug" / "net10.0" / "Chummer.Run.Api.exe",
+        ]
+        return any(candidate.is_file() for candidate in candidates)
+
+    def _should_skip_build(self) -> bool:
+        if not self.no_build:
+            return False
+        strict = os.environ.get("CHUMMER_LOCAL_HUB_STRICT_NO_BUILD", "").strip().lower()
+        if strict in {"1", "true", "yes", "on"}:
+            return True
+        return self._debug_binary_available()
+
     def __enter__(self) -> "LocalHubApp":
         self._temp_root = tempfile.TemporaryDirectory(prefix="chummer-local-hub-")
         temp_root = Path(self._temp_root.name)
@@ -307,7 +341,7 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
             "-nologo",
             "--no-launch-profile",
         ]
-        if self.no_build:
+        if self._should_skip_build():
             command.append("--no-build")
 
         self._log_handle = self._log_path.open("w", encoding="utf-8")

@@ -1,5 +1,12 @@
 <Project>
   <PropertyGroup>
     <RestorePackagesPath Condition="'$(RestorePackagesPath)' == ''">$(MSBuildThisFileDirectory).tmp/nuget/packages</RestorePackagesPath>
+    <ChummerWorkspaceRoot Condition="'$(ChummerWorkspaceRoot)' == '' and '$(CHUMMER_WORKSPACE_ROOT)' != ''">$(CHUMMER_WORKSPACE_ROOT)</ChummerWorkspaceRoot>
+    <ChummerWorkspaceRoot Condition="'$(ChummerWorkspaceRoot)' == ''">$(MSBuildThisFileDirectory)..</ChummerWorkspaceRoot>
+    <ChummerCoreEngineRoot Condition="'$(ChummerCoreEngineRoot)' == ''">$(ChummerWorkspaceRoot)/chummer-core-engine</ChummerCoreEngineRoot>
+    <ChummerHubRegistryRoot Condition="'$(ChummerHubRegistryRoot)' == ''">$(ChummerWorkspaceRoot)/chummer-hub-registry</ChummerHubRegistryRoot>
+    <ChummerFleetRoot Condition="'$(ChummerFleetRoot)' == '' and '$(CHUMMER_FLEET_ROOT)' != ''">$(CHUMMER_FLEET_ROOT)</ChummerFleetRoot>
+    <ChummerFleetRoot Condition="'$(ChummerFleetRoot)' == ''">$(ChummerWorkspaceRoot)/../fleet</ChummerFleetRoot>
+    <ChummerMediaFactoryRoot Condition="'$(ChummerMediaFactoryRoot)' == ''">$(ChummerFleetRoot)/repos/chummer-media-factory</ChummerMediaFactoryRoot>
   </PropertyGroup>
 </Project>

@@ -7,14 +7,15 @@
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
     <PreferBundledChummerMediaContracts Condition="'$(PreferBundledChummerMediaContracts)' == ''">false</PreferBundledChummerMediaContracts>
+    <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(ChummerMediaFactoryRoot)/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(ChummerMediaFactoryRoot)/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
     <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
     <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
     <ChummerMediaContractsAssembly Condition="'$(ChummerMediaContractsAssembly)' == '' and Exists('$(MSBuildThisFileDirectory)../compat/Chummer.Media.Contracts.dll')">$(MSBuildThisFileDirectory)../compat/Chummer.Media.Contracts.dll</ChummerMediaContractsAssembly>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\chummer-core-engine\Chummer.Contracts\Chummer.Contracts.csproj" />
-    <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
+    <ProjectReference Include="$(ChummerCoreEngineRoot)\Chummer.Contracts\Chummer.Contracts.csproj" />
+    <ProjectReference Include="$(ChummerHubRegistryRoot)\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Play.Contracts\Chummer.Play.Contracts.csproj" />
     <ProjectReference Include="$(ChummerMediaContractsProject)" Condition="'$(ChummerMediaContractsProject)' != ''" />
     <Reference Include="Chummer.Media.Contracts" Condition="'$(ChummerMediaContractsProject)' == '' and '$(ChummerMediaContractsAssembly)' != ''">

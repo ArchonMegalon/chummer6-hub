@@ -9,8 +9,25 @@ from typing import Any
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_ROOT = RUN_SERVICES_ROOT.parent
 PUBLISHED = RUN_SERVICES_ROOT / ".codex-studio" / "published"
+
+
+def resolve_workspace_root() -> Path:
+    raw = os.environ.get("CHUMMER_WORKSPACE_ROOT", "").strip()
+    if raw:
+        return Path(raw).expanduser()
+
+    candidates = [
+        RUN_SERVICES_ROOT.parent,
+        Path("/docker/chummercomplete"),
+    ]
+    for candidate in candidates:
+        if (candidate / "chummer-presentation").is_dir():
+            return candidate
+    return candidates[0]
+
+
+WORKSPACE_ROOT = resolve_workspace_root()
 PRESENTATION_PUBLISHED = Path(
     os.environ.get(
         "CHUMMER_PRESENTATION_PUBLISHED_ROOT",

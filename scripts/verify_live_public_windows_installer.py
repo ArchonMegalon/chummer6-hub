@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import tempfile
 import urllib.error
@@ -18,7 +19,30 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED_ROOT = ROOT / ".codex-studio" / "published"
 OUTPUT_PATH = PUBLISHED_ROOT / "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json"
 DEFAULT_BASE_URL = "https://chummer.run"
-DEFAULT_VERIFY_SCRIPT = ROOT.parent / "chummer-presentation" / "scripts" / "verify-windows-installer-payloads.py"
+
+
+def resolve_default_verify_script() -> Path:
+    raw_script = os.environ.get("CHUMMER_WINDOWS_INSTALLER_PAYLOAD_VERIFY_SCRIPT", "").strip()
+    if raw_script:
+        return Path(raw_script).expanduser()
+
+    raw_presentation = os.environ.get("CHUMMER_PRESENTATION_ROOT", "").strip()
+    candidates = []
+    if raw_presentation:
+        candidates.append(Path(raw_presentation).expanduser() / "scripts" / "verify-windows-installer-payloads.py")
+    candidates.extend(
+        [
+            ROOT.parent / "chummer-presentation" / "scripts" / "verify-windows-installer-payloads.py",
+            Path("/docker/chummercomplete/chummer-presentation/scripts/verify-windows-installer-payloads.py"),
+        ]
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[0]
+
+
+DEFAULT_VERIFY_SCRIPT = resolve_default_verify_script()
 
 
 def now_iso() -> str:

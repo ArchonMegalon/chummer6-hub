@@ -6,7 +6,7 @@
   },
   "contract_name": "chummer.blazor_execution_horizon_bridge",
   "failures": [],
-  "generated_at_utc": "2026-06-30T23:49:35Z",
+  "generated_at_utc": "2026-07-02T05:19:03Z",
   "notes": [
     "This Hub bridge keeps mobile/PWA readiness, Blazor PWA installability, and Blazor hosted execution horizons visible together.",
     "A passing bridge does not mean the full live Blazor public-edge execution matrix is proven unless mid_term_full_matrix_status is proven.",
@@ -34,7 +34,7 @@
       "base_url": "https://chummer.run",
       "contract_name": "chummer.mobile_pwa_public_projection",
       "pass": true,
-      "path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-studio/published/MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json",
       "public_entry": {
         "build_final_route": "/app?command=character_roster",
         "build_route_holds": true,
