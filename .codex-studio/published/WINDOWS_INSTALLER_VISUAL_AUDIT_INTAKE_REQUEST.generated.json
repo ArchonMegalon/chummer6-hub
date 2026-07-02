@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.windows_installer_visual_audit_intake_request.v1",
-  "generated_at_utc": "2026-07-02T07:16:41Z",
+  "generated_at_utc": "2026-07-02T09:24:39Z",
   "status": "external_artifact_required",
   "provider": "native_windows_operator",
   "artifact_kind": "windows_installer_gold_proof_bundle",
@@ -11,7 +11,7 @@
     "actual_sha256": "4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3"
   },
   "current_blocker": {
-    "receipt": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
+    "receipt": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
     "failure": "Windows installer visual audit source digest does not match promoted installer",
     "current_visual_source_artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
     "current_visual_source_matches_promoted": false,
@@ -43,6 +43,7 @@
     "*WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
   ],
   "drop_roots_checked": [
+    "/tmp",
     "/docker/chummercomplete",
     "/home/tibor/Downloads",
     "/home/tibor/pCloud Drive/EA"
@@ -55,9 +56,51 @@
     },
     "visual_sources": {
       "status": "found",
-      "count": 16,
+      "count": 33,
       "matching_promoted_count": 0,
       "files": [
+        {
+          "path": "/tmp/chummer-run-services-flagship-f023/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "size_bytes": 2903,
+          "mtime_utc": "2026-07-02T07:46:14Z",
+          "status": "pass",
+          "platform": "windows",
+          "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
+          "artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+          "matches_promoted_installer": false,
+          "screenshot_count": 4,
+          "source_sha256": "98ca66f3a2c95898fd46e9951683b6cd0440a001b7cc1926f08e96f40f30bd22",
+          "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
+        },
+        {
+          "path": "/docker/chummercomplete/chummer-run-services-deploy-6f32e4a3/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "size_bytes": 2903,
+          "mtime_utc": "2026-07-02T07:27:11Z",
+          "status": "pass",
+          "platform": "windows",
+          "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
+          "artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+          "matches_promoted_installer": false,
+          "screenshot_count": 4,
+          "source_sha256": "98ca66f3a2c95898fd46e9951683b6cd0440a001b7cc1926f08e96f40f30bd22",
+          "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
+        },
+        {
+          "path": "/tmp/chummer-run-services-nightly.VsudjQ/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "size_bytes": 2903,
+          "mtime_utc": "2026-07-02T03:43:50Z",
+          "status": "pass",
+          "platform": "windows",
+          "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
+          "artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+          "matches_promoted_installer": false,
+          "screenshot_count": 4,
+          "source_sha256": "98ca66f3a2c95898fd46e9951683b6cd0440a001b7cc1926f08e96f40f30bd22",
+          "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
+        },
         {
           "path": "/docker/chummercomplete/_work/chummer-run-services-service-worker-paths/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
           "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
@@ -77,6 +120,20 @@
           "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
           "size_bytes": 2903,
           "mtime_utc": "2026-07-01T18:20:23Z",
+          "status": "pass",
+          "platform": "windows",
+          "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
+          "artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+          "matches_promoted_installer": false,
+          "screenshot_count": 4,
+          "source_sha256": "98ca66f3a2c95898fd46e9951683b6cd0440a001b7cc1926f08e96f40f30bd22",
+          "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
+        },
+        {
+          "path": "/tmp/chummer-run-services-clean-6ea19ec0/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "size_bytes": 2903,
+          "mtime_utc": "2026-07-01T12:41:33Z",
           "status": "pass",
           "platform": "windows",
           "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
@@ -171,6 +228,20 @@
           "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
         },
         {
+          "path": "/tmp/chummer6-linux-source-gate.1MZg1f/base/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "size_bytes": 2903,
+          "mtime_utc": "2026-07-01T00:57:48Z",
+          "status": "pass",
+          "platform": "windows",
+          "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
+          "artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+          "matches_promoted_installer": false,
+          "screenshot_count": 4,
+          "source_sha256": "98ca66f3a2c95898fd46e9951683b6cd0440a001b7cc1926f08e96f40f30bd22",
+          "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
+        },
+        {
           "path": "/docker/chummercomplete/chummer.run-services-public-edge-main/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
           "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
           "size_bytes": 2903,
@@ -213,6 +284,34 @@
           "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
         },
         {
+          "path": "/tmp/chummer6-linux-source-gate.5ZQ4Ge/base/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "size_bytes": 2903,
+          "mtime_utc": "2026-06-30T06:54:49Z",
+          "status": "pass",
+          "platform": "windows",
+          "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
+          "artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+          "matches_promoted_installer": false,
+          "screenshot_count": 4,
+          "source_sha256": "98ca66f3a2c95898fd46e9951683b6cd0440a001b7cc1926f08e96f40f30bd22",
+          "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
+        },
+        {
+          "path": "/tmp/chummer6-linux-source-gate.TdKZpL/base/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
+          "size_bytes": 2903,
+          "mtime_utc": "2026-06-29T17:58:59Z",
+          "status": "pass",
+          "platform": "windows",
+          "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
+          "artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+          "matches_promoted_installer": false,
+          "screenshot_count": 4,
+          "source_sha256": "98ca66f3a2c95898fd46e9951683b6cd0440a001b7cc1926f08e96f40f30bd22",
+          "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
+        },
+        {
           "path": "/docker/chummercomplete/_scratch/chummer6-source-build-local-nosudo/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
           "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
           "size_bytes": 2903,
@@ -231,48 +330,6 @@
           "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
           "size_bytes": 2903,
           "mtime_utc": "2026-06-22T18:37:32Z",
-          "status": "pass",
-          "platform": "windows",
-          "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
-          "artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
-          "matches_promoted_installer": false,
-          "screenshot_count": 4,
-          "source_sha256": "98ca66f3a2c95898fd46e9951683b6cd0440a001b7cc1926f08e96f40f30bd22",
-          "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
-        },
-        {
-          "path": "/docker/chummercomplete/_scratch/chummer6-source-build-e2e-fresh/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
-          "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
-          "size_bytes": 2903,
-          "mtime_utc": "2026-06-22T18:32:46Z",
-          "status": "pass",
-          "platform": "windows",
-          "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
-          "artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
-          "matches_promoted_installer": false,
-          "screenshot_count": 4,
-          "source_sha256": "98ca66f3a2c95898fd46e9951683b6cd0440a001b7cc1926f08e96f40f30bd22",
-          "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
-        },
-        {
-          "path": "/docker/chummercomplete/_scratch/chummer6-source-build-e2e/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
-          "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
-          "size_bytes": 2903,
-          "mtime_utc": "2026-06-22T18:26:47Z",
-          "status": "pass",
-          "platform": "windows",
-          "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
-          "artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
-          "matches_promoted_installer": false,
-          "screenshot_count": 4,
-          "source_sha256": "98ca66f3a2c95898fd46e9951683b6cd0440a001b7cc1926f08e96f40f30bd22",
-          "source_updated_at_utc": "2026-06-21T17:44:15.3027652Z"
-        },
-        {
-          "path": "/docker/chummercomplete/_scratch/chummer6-source-build/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
-          "name": "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
-          "size_bytes": 2903,
-          "mtime_utc": "2026-06-22T18:13:09Z",
           "status": "pass",
           "platform": "windows",
           "host_class": "native-windows-Microsoft Windows Server 2025 Datacenter",
