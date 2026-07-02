@@ -1,38 +1,38 @@
 {
   "contract_name": "chummer.design_quality_gate",
-  "generated_at_utc": "2026-07-01T03:04:24Z",
+  "generated_at_utc": "2026-07-02T06:48:30Z",
   "status": "pass",
   "verdict": "DESIGN_READY",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
   "checks": {
     "live_public_web_recrawl": {
-      "path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
       "status": "pass",
       "result_count": 7,
       "pass": true
     },
     "public_route_proof": {
-      "path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
       "status": "pass",
-      "route_count": 187,
+      "route_count": 188,
       "failed_count": 0,
       "pass": true
     },
     "live_surface_parity": {
-      "path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json",
       "status": "pass",
       "failure_count": 0,
       "pass": true
     },
     "ltd_optimization_stack": {
-      "path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
       "status": "pass",
       "verdict": "LTD_OPTIMIZATION_STACK_READY",
       "failure_count": 0,
       "pass": true
     },
     "icanpreneur_design_lane": {
-      "path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json",
       "status": "tracked",
       "lane_status": "pass",
       "license_tier": "Tier 3",
@@ -40,7 +40,7 @@
       "pass": true
     },
     "premium_ui_design_exit_gate": {
-      "path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-studio/published/PREMIUM_UI_DESIGN_EXIT_GATE.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PREMIUM_UI_DESIGN_EXIT_GATE.generated.json",
       "status": "pass",
       "verdict": "PREMIUM_UI_READY",
       "failure_count": 0,

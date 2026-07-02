@@ -147,7 +147,7 @@ ROUTE_JOURNEY_REQUIREMENTS = {
             "aria-label=\"Open Chummer options\"",
             "href=\"/build\"",
             "href=\"/mobile/player\"",
-            "minimal-hero__visual--preview",
+            "minimal-hero__visual",
         ],
     },
     "Downloads.cshtml": {

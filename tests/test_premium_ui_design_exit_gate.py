@@ -129,7 +129,7 @@ def write_public_views(root: Path, *, leaked: bool = False) -> list[Path]:
       <a class="site-account-menu__link site-open-chummer-menu__button" href="/mobile/player">Play</a>
     </div>
   </details>
-  <a class="minimal-hero__visual minimal-hero__visual--preview" href="/media/promo/every-wonder-horizon-promo.mp4">Watch</a>
+  <a class="minimal-hero__visual minimal-hero__visual--screenshot" href="/media/promo/every-wonder-horizon-promo.mp4">Watch</a>
 </section>
 """,
         "Downloads.cshtml": """

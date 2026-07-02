@@ -1,6 +1,6 @@
 # Premium UI Design Exit Gate
 
-- Generated: 2026-07-01T03:38:16Z
+- Generated: 2026-07-02T06:48:30Z
 - Status: `pass`
 - Verdict: `PREMIUM_UI_READY`
 
@@ -28,7 +28,7 @@
 
 ## Source Design Contract
 
-- Path: `/docker/chummercomplete/chummer.run-services-participate-main/.codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE.md`
+- Path: `/tmp/chummer-run-services-nightly.VsudjQ/.codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE.md`
 - Status: `pass`
 
 ## Failures

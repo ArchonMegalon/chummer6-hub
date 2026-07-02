@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.premium_ui_design_exit_gate",
-  "generated_at_utc": "2026-07-01T03:38:16Z",
+  "generated_at_utc": "2026-07-02T06:48:30Z",
   "status": "pass",
   "verdict": "PREMIUM_UI_READY",
   "reference_systems": [
@@ -87,14 +87,14 @@
       "exit_rule": "Loading, empty, unavailable, and recovery states must explain what is happening and what the user can do next."
     }
   ],
-  "css_path": "/docker/chummercomplete/chummer.run-services-participate-main/Chummer.Run.Api/wwwroot/css/site.css",
-  "design_contract_path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE.md",
+  "css_path": "/tmp/chummer-run-services-nightly.VsudjQ/Chummer.Run.Api/wwwroot/css/site.css",
+  "design_contract_path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE.md",
   "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
-  "published_root": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-studio/published",
+  "published_root": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published",
   "checks": {
     "source_design_contract": {
       "standard": "written exit gate calibrated against named public design systems",
-      "path": "/docker/chummercomplete/chummer.run-services-participate-main/.codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE.md",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-design/product/PREMIUM_UI_DESIGN_EXIT_GATE.md",
       "markers": {
         "Apple Human Interface Guidelines": true,
         "Material Design 3": true,
@@ -146,7 +146,7 @@
     "premium_palette": {
       "standard": "Material color roles + Fluent/Carbon semantic tokens",
       "color_token_count": 33,
-      "hex_palette_count": 69,
+      "hex_palette_count": 73,
       "required_semantic_tokens": {
         "--color-background-canvas": true,
         "--color-background-panel": true,
@@ -161,7 +161,7 @@
     },
     "art_direction": {
       "standard": "HIG deference with purposeful visual depth",
-      "gradient_count": 189,
+      "gradient_count": 196,
       "has_minimal_hero_visual_css": true,
       "has_landing_film_css": true,
       "pass": true
@@ -175,8 +175,8 @@
     },
     "interaction_affordance": {
       "standard": "HIG touch targets + WCAG focus visible + Fluent interaction states",
-      "hover_selector_count": 85,
-      "focus_visible_selector_count": 54,
+      "hover_selector_count": 86,
+      "focus_visible_selector_count": 55,
       "touch_safe_min_height_count": 14,
       "has_focus_outline": true,
       "pass": true
@@ -215,7 +215,7 @@
         "site_max_token": true
       },
       "grid_layout_count": 283,
-      "flex_layout_count": 69,
+      "flex_layout_count": 70,
       "has_glass_chrome": true,
       "pass": true
     },
@@ -339,7 +339,7 @@
     },
     "open_chummer_navigation": {
       "standard": "Nielsen recognition over recall + GOV.UK explicit next action",
-      "layout_view": "/docker/chummercomplete/chummer.run-services-participate-main/Chummer.Run.Api/Views/Shared/_Layout.cshtml",
+      "layout_view": "/tmp/chummer-run-services-nightly.VsudjQ/Chummer.Run.Api/Views/Shared/_Layout.cshtml",
       "markers": {
         "open_chummer_dropdown": true,
         "accessible_options_label": true,
@@ -378,8 +378,8 @@
             "site-open-chummer-menu",
             "aria-label=\"Open Chummer options\"",
             "href=\"/build\"",
-            "href=\"/play\"",
-            "minimal-hero__visual--screenshot"
+            "href=\"/mobile/player\"",
+            "minimal-hero__visual"
           ],
           "missing_markers": [],
           "pass": true
