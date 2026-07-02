@@ -20,6 +20,8 @@ BUILD_CONCURRENCY="${CHUMMER_BUILD_CONCURRENCY:-1}"
 POSTDEPLOY_OUTPUT="${CHUMMER_PUBLIC_EDGE_POSTDEPLOY_OUTPUT:-$SOURCE_ROOT/.codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json}"
 PLAYWRIGHT_ARTIFACT_DIR="${CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_ARTIFACT_DIR:-$SOURCE_ROOT/.codex-studio/published/public-edge-browser-proofs}"
 PROGRESS="${CHUMMER_PUBLIC_EDGE_BUILD_PROGRESS:-auto}"
+POSTDEPLOY_ATTEMPTS="${CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS:-3}"
+POSTDEPLOY_RETRY_DELAY_SECONDS="${CHUMMER_PUBLIC_EDGE_POSTDEPLOY_RETRY_DELAY_SECONDS:-10}"
 
 if [[ ! -d "$BUILD_CONTEXT" ]]; then
   echo "public edge build context does not exist: $BUILD_CONTEXT" >&2
@@ -81,14 +83,26 @@ fi
 
 docker compose "${compose_args[@]}" up -d --no-build --no-deps --force-recreate chummer-portal
 
-python3 "$SOURCE_ROOT/scripts/verify_public_edge_postdeploy_gate.py" \
-  --base-url "$BASE_URL" \
-  --expected-release-channel "$RELEASE_CHANNEL" \
-  --expected-portal-image-id "$image_id" \
-  --require-downloads-status-playwright \
-  --require-mobile-pwa-viewport-playwright \
-  --require-frontdoor-navigation-playwright \
-  --playwright-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR" \
+postdeploy_command=(
+  python3 "$SOURCE_ROOT/scripts/verify_public_edge_postdeploy_gate.py"
+  --base-url "$BASE_URL"
+  --expected-release-channel "$RELEASE_CHANNEL"
+  --expected-portal-image-id "$image_id"
+  --require-downloads-status-playwright
+  --require-mobile-pwa-viewport-playwright
+  --require-frontdoor-navigation-playwright
+  --playwright-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR"
   --output "$POSTDEPLOY_OUTPUT"
+)
+
+for ((attempt = 1; attempt <= POSTDEPLOY_ATTEMPTS; attempt++)); do
+  if "${postdeploy_command[@]}"; then
+    break
+  fi
+  if ((attempt == POSTDEPLOY_ATTEMPTS)); then
+    exit 1
+  fi
+  sleep "$POSTDEPLOY_RETRY_DELAY_SECONDS"
+done
 
 printf 'public_edge_portal_deployed %s\n' "$image_id"

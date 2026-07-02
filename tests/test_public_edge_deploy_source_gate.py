@@ -394,6 +394,8 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD" in script
     assert "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM" in script
     assert "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" in script
+    assert "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS" in script
+    assert "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_RETRY_DELAY_SECONDS" in script
     assert "CHUMMER_RUN_SERVICES_CONTEXT_DIR" in script
     assert "CHUMMER_RUN_SERVICES_SOURCE" in script
     assert "docker buildx build" in script
@@ -410,6 +412,8 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "--playwright-artifact-dir \"$PLAYWRIGHT_ARTIFACT_DIR\"" in script
     assert "--mobile-pwa-viewport-artifact-dir" not in script
     assert "--frontdoor-navigation-artifact-dir" not in script
+    assert "for ((attempt = 1; attempt <= POSTDEPLOY_ATTEMPTS; attempt++))" in script
+    assert "sleep \"$POSTDEPLOY_RETRY_DELAY_SECONDS\"" in script
 
 
 def test_release_ready_script_calls_public_edge_deploy_source_gate() -> None:
