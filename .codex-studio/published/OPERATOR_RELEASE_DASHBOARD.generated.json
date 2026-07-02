@@ -1,14 +1,14 @@
 {
   "contract_name": "chummer.operator_release_dashboard",
-  "generated_at_utc": "2026-06-29T17:40:00Z",
+  "generated_at_utc": "2026-07-02T05:06:30Z",
   "status": "pass",
   "verdict": "OPERABLE_RELEASE_READY",
   "release": {
-    "version": "run-20260627-005402",
-    "published_at": "2026-06-27T07:51:47Z",
-    "channel": "public_stable",
-    "rollout_state": "public_stable",
-    "supportability_state": "gold_supported",
+    "version": "run-20260701-124648",
+    "published_at": "2026-07-01T14:29:35Z",
+    "channel": "preview",
+    "rollout_state": "promoted_preview",
+    "supportability_state": "preview_supported",
     "known_issue_summary": "Current release checks are clear, and the downloads page has recent install, account return, release updates, community wrap-up, bounded offline prefetch, and current support follow-up coverage."
   },
   "mirrors": {
@@ -53,15 +53,15 @@
   },
   "checks": {
     "release_channel": {
-      "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json",
+      "path": "/tmp/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json",
       "exists": true,
       "status": "published",
       "verdict": null,
-      "generated_at_utc": "2026-06-27T07:51:47Z",
+      "generated_at_utc": "2026-07-01T14:29:35Z",
       "pass": true
     },
     "external_distribution_mirror_proof": {
-      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": null,
@@ -69,7 +69,7 @@
       "pass": true
     },
     "ruleset_readiness": {
-      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RULESET_READINESS.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": null,
@@ -81,27 +81,27 @@
       "exists": true,
       "status": "pass",
       "verdict": "READY",
-      "generated_at_utc": "2026-06-29T12:07:56.541Z",
+      "generated_at_utc": "2026-07-02T03:45:17.715Z",
       "pass": true
     },
     "design_quality_gate": {
-      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": "DESIGN_READY",
-      "generated_at_utc": "2026-06-29T12:23:26Z",
+      "generated_at_utc": "2026-07-01T03:04:24Z",
       "pass": true
     },
     "public_copy_leak_gate": {
-      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-29T12:16:30Z",
+      "generated_at_utc": "2026-06-29T20:10:33Z",
       "pass": true
     },
     "participate_billing_honesty": {
-      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PARTICIPATE_BILLING_HONESTY.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PARTICIPATE_BILLING_HONESTY.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": "READY",
@@ -109,33 +109,33 @@
       "pass": true
     },
     "account_handoff_runtime_config": {
-      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": "READY",
-      "generated_at_utc": "2026-06-29T17:39:53Z",
+      "generated_at_utc": "2026-06-29T18:23:13Z",
       "pass": true
     },
     "release_ready": {
-      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RELEASE_READY.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RELEASE_READY.generated.json",
       "exists": true,
-      "status": "pass",
-      "verdict": "RELEASE_READY",
-      "generated_at_utc": "2026-06-19T23:41:30Z",
-      "pass": true,
+      "status": "fail",
+      "verdict": "NOT_RELEASE_READY",
+      "generated_at_utc": "2026-07-02T05:05:38Z",
+      "pass": false,
       "release_blocking": false
     },
     "final_gold_janitor": {
-      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json",
       "exists": true,
       "status": "fail",
       "verdict": "NOT_GOLD",
-      "generated_at_utc": "2026-06-28T14:41:52Z",
+      "generated_at_utc": "2026-07-02T05:05:38Z",
       "pass": false,
       "release_blocking": false
     },
     "google_oauth_linking_proof": {
-      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": null,

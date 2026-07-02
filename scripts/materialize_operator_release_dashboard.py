@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -11,10 +12,29 @@ from urllib.parse import urlparse
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 ROOT = RUN_SERVICES_ROOT.parent
 PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
-COMPLETION_ROOT = ROOT / "_completion" / "chummer_run_redesign_closure"
 REGISTRY_ROOT = ROOT / "chummer-hub-registry" / ".codex-studio" / "published"
 OUTPUT_JSON = PUBLISHED_ROOT / "OPERATOR_RELEASE_DASHBOARD.generated.json"
 OUTPUT_MD = PUBLISHED_ROOT / "OPERATOR_RELEASE_DASHBOARD.md"
+
+
+def resolve_completion_root() -> Path:
+    explicit = os.environ.get("CHUMMER_OPERATOR_COMPLETION_ROOT") or os.environ.get("CHUMMER_UI_COMPLETION_ROOT")
+    if explicit:
+        return Path(explicit).expanduser()
+    candidates = [
+        ROOT / "_completion" / "chummer_run_redesign_closure",
+        Path("/docker/chummercomplete/_completion/chummer_run_redesign_closure"),
+    ]
+    for candidate in candidates:
+        if (candidate / "UI_FRAME_INTEGRITY.generated.json").is_file():
+            return candidate
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    return candidates[0]
+
+
+COMPLETION_ROOT = resolve_completion_root()
 
 
 def now_iso() -> str:

@@ -1,10 +1,10 @@
 # OPERABLE_RELEASE_READY
 
-- Generated: 2026-06-29T17:40:00Z
-- Version: `run-20260627-005402`
-- Channel: `public_stable`
-- Published: `2026-06-27T07:51:47Z`
-- Supportability: `gold_supported`
+- Generated: 2026-07-02T05:06:30Z
+- Version: `run-20260701-124648`
+- Channel: `preview`
+- Published: `2026-07-01T14:29:35Z`
+- Supportability: `preview_supported`
 - Mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass
 - Billing mode: `unavailable`
 - Release-upload mode: `default_single_operator`
@@ -23,6 +23,6 @@
 - PASS `participate_billing_honesty`: `pass`
 - PASS `public_copy_leak_gate`: `pass`
 - PASS `release_channel`: `published`
-- PASS `release_ready`: `pass` (operator context, not release-blocking)
+- INFO `release_ready`: `fail` (operator context, not release-blocking)
 - PASS `ruleset_readiness`: `pass`
 - PASS `ui_frame_integrity`: `pass`

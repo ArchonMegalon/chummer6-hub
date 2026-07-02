@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-07-02T05:04:15Z",
+  "generated_at_utc": "2026-07-02T05:06:30Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -719,7 +719,7 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
       "exists": true,
       "status": "fail",
-      "generated_at_utc": "2026-07-02T05:03:51Z",
+      "generated_at_utc": "2026-07-02T05:05:38Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 1,
       "pass": false,
@@ -773,18 +773,18 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-29T17:40:00Z",
+      "generated_at_utc": "2026-07-02T05:06:30Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 0,
-      "pass": false,
+      "pass": true,
       "verdict": "OPERABLE_RELEASE_READY",
       "failures": [],
       "release": {
-        "version": "run-20260627-005402",
-        "published_at": "2026-06-27T07:51:47Z",
-        "channel": "public_stable",
-        "rollout_state": "public_stable",
-        "supportability_state": "gold_supported",
+        "version": "run-20260701-124648",
+        "published_at": "2026-07-01T14:29:35Z",
+        "channel": "preview",
+        "rollout_state": "promoted_preview",
+        "supportability_state": "preview_supported",
         "known_issue_summary": "Current release checks are clear, and the downloads page has recent install, account return, release updates, community wrap-up, bounded offline prefetch, and current support follow-up coverage."
       }
     },
@@ -792,15 +792,13 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RELEASE_READY.generated.json",
       "exists": true,
       "status": "fail",
-      "generated_at_utc": "2026-07-02T05:03:51Z",
+      "generated_at_utc": "2026-07-02T05:05:38Z",
       "fresh_within_hours": 24,
-      "structured_failures_count": 4,
+      "structured_failures_count": 2,
       "pass": false,
       "verdict": "NOT_RELEASE_READY",
       "failures": [
-        "FAIL verify_public_edge_deploy_source",
         "FAIL verify_windows_installer_visual_audit",
-        "verify_public_edge_deploy_source",
         "verify_windows_installer_visual_audit"
       ]
     }
@@ -837,7 +835,6 @@
     "premium_ui_design_exit_gate stale",
     "design_quality_gate stale",
     "windows_installer_visual_audit failed",
-    "operator_release_dashboard stale",
     "release_ready failed"
   ]
 }

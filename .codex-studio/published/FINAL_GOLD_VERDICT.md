@@ -1,6 +1,6 @@
 # NOT_GOLD
 
-Generated: 2026-07-02T05:04:15Z
+Generated: 2026-07-02T05:06:30Z
 Scope: full_estate_v20
 Accepted boundaries: yes
 
@@ -17,8 +17,8 @@ Accepted boundaries: yes
 - FAIL `live_public_windows_installer`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json`
 - FAIL `live_surface_parity`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LIVE_SURFACE_PARITY.generated.json`
 - FAIL `ltd_optimization_stack`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/LTD_OPTIMIZATION_STACK.generated.json`
-- FAIL `operator_release_dashboard`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json`
-  - release: run-20260627-005402 on public_stable
+- PASS `operator_release_dashboard`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json`
+  - release: run-20260701-124648 on preview
 - FAIL `participate_billing_honesty`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PARTICIPATE_BILLING_HONESTY.generated.json`
 - FAIL `premium_ui_design_exit_gate`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PREMIUM_UI_DESIGN_EXIT_GATE.generated.json`
 - FAIL `provider_proof_discoverability`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json`
@@ -26,7 +26,7 @@ Accepted boundaries: yes
 - PASS `public_route_proof`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json`
   - routes 188/188, failed 0, negative-path failures 0
 - FAIL `release_ready`: `fail` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RELEASE_READY.generated.json`
-  - release failures: FAIL verify_public_edge_deploy_source, FAIL verify_windows_installer_visual_audit, verify_public_edge_deploy_source, verify_windows_installer_visual_audit
+  - release failures: FAIL verify_windows_installer_visual_audit, verify_windows_installer_visual_audit
 - FAIL `rule_authority_minimum_coverage`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json`
 - FAIL `ruleset_readiness`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RULESET_READINESS.generated.json`
   - authority approved: sr4, sr6
@@ -68,5 +68,4 @@ Accepted boundaries: yes
 - premium_ui_design_exit_gate stale
 - design_quality_gate stale
 - windows_installer_visual_audit failed
-- operator_release_dashboard stale
 - release_ready failed
