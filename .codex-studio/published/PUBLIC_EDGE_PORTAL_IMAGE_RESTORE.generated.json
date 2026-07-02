@@ -5,17 +5,19 @@
     "frontdoorNavigation"
   ],
   "contractName": "chummer.public_edge_portal_image_restore.v1",
-  "generatedAtUtc": "2026-07-02T10:42:33.173276+00:00",
+  "generatedAtUtc": "2026-07-02T10:50:36.849051+00:00",
   "imageTagDiscovery": {
     "explicitImageTags": [
       "chummer-run-api:local"
     ],
     "includeImageTagsMatching": [
       "^chummer-run-api:pwa-direct",
-      "^chummer-run-api:current-source"
+      "^chummer-run-api:current-source",
+      "^chummer-run-api:fixed-alias"
     ],
     "resolvedImageTags": [
       "chummer-run-api:local",
+      "chummer-run-api:fixed-alias-07d1060-20260702",
       "chummer-run-api:current-source-mobile-alias-20260702",
       "chummer-run-api:pwa-direct-20260702-0925",
       "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -123,7 +125,7 @@
           },
           "repoDigests": [],
           "repoTags": [
-            "chummer-run-api:current-source-mobile-alias-20260702"
+            "chummer-run-api:fixed-alias-07d1060-20260702"
           ]
         },
         "imageIdBefore": "sha256:07d1060f26f45e0c912a1362fc7549df12aa039592687eb2355c7249999607ab",
@@ -145,6 +147,29 @@
         },
         "imageIdBefore": "sha256:07d1060f26f45e0c912a1362fc7549df12aa039592687eb2355c7249999607ab",
         "retagged": true,
+        "tag": "chummer-run-api:fixed-alias-07d1060-20260702"
+      },
+      {
+        "imageDetailsBefore": {
+          "created": "2026-07-02T11:49:46.525604243+02:00",
+          "imageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+          "labels": {
+            "org.opencontainers.image.version": "24.04"
+          },
+          "repoDigests": [],
+          "repoTags": [
+            "chummer-run-api:current-source-mobile-alias-20260702",
+            "chummer-run-api:fixed-alias-07d1060-20260702",
+            "chummer-run-api:local",
+            "chummer-run-api:pwa-direct-20260702-0925",
+            "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
+            "chummer-run-api:pwa-direct-mobile-alias-20260702-preflight72b",
+            "chummer-run-api:pwa-direct-mobile-alias-3062-preflight72b-preserve",
+            "chummer-run-api:pwa-direct-mobile-alias-cba57"
+          ]
+        },
+        "imageIdBefore": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+        "retagged": false,
         "tag": "chummer-run-api:current-source-mobile-alias-20260702"
       },
       {
@@ -157,6 +182,7 @@
           "repoDigests": [],
           "repoTags": [
             "chummer-run-api:current-source-mobile-alias-20260702",
+            "chummer-run-api:fixed-alias-07d1060-20260702",
             "chummer-run-api:local",
             "chummer-run-api:pwa-direct-20260702-0925",
             "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -179,6 +205,7 @@
           "repoDigests": [],
           "repoTags": [
             "chummer-run-api:current-source-mobile-alias-20260702",
+            "chummer-run-api:fixed-alias-07d1060-20260702",
             "chummer-run-api:local",
             "chummer-run-api:pwa-direct-20260702-0925",
             "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -201,6 +228,7 @@
           "repoDigests": [],
           "repoTags": [
             "chummer-run-api:current-source-mobile-alias-20260702",
+            "chummer-run-api:fixed-alias-07d1060-20260702",
             "chummer-run-api:local",
             "chummer-run-api:pwa-direct-20260702-0925",
             "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -223,6 +251,7 @@
           "repoDigests": [],
           "repoTags": [
             "chummer-run-api:current-source-mobile-alias-20260702",
+            "chummer-run-api:fixed-alias-07d1060-20260702",
             "chummer-run-api:local",
             "chummer-run-api:pwa-direct-20260702-0925",
             "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -245,6 +274,7 @@
           "repoDigests": [],
           "repoTags": [
             "chummer-run-api:current-source-mobile-alias-20260702",
+            "chummer-run-api:fixed-alias-07d1060-20260702",
             "chummer-run-api:local",
             "chummer-run-api:pwa-direct-20260702-0925",
             "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -270,7 +300,7 @@
         "docker",
         "tag",
         "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
-        "chummer-run-api:current-source-mobile-alias-20260702"
+        "chummer-run-api:fixed-alias-07d1060-20260702"
       ]
     ],
     "sourceImageDetails": {
@@ -281,6 +311,7 @@
       },
       "repoDigests": [],
       "repoTags": [
+        "chummer-run-api:current-source-mobile-alias-20260702",
         "chummer-run-api:pwa-direct-20260702-0925",
         "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
         "chummer-run-api:pwa-direct-mobile-alias-20260702-preflight72b",
@@ -291,7 +322,7 @@
     "sourceImageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9"
   },
   "stability": {
-    "completedAtUtc": "2026-07-02T10:41:51.570124+00:00",
+    "completedAtUtc": "2026-07-02T10:49:58.359297+00:00",
     "driftEvents": [],
     "lastState": {
       "containerImageDetails": {
@@ -303,6 +334,7 @@
         "repoDigests": [],
         "repoTags": [
           "chummer-run-api:current-source-mobile-alias-20260702",
+          "chummer-run-api:fixed-alias-07d1060-20260702",
           "chummer-run-api:local",
           "chummer-run-api:pwa-direct-20260702-0925",
           "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -327,6 +359,7 @@
             "repoDigests": [],
             "repoTags": [
               "chummer-run-api:current-source-mobile-alias-20260702",
+              "chummer-run-api:fixed-alias-07d1060-20260702",
               "chummer-run-api:local",
               "chummer-run-api:pwa-direct-20260702-0925",
               "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -348,6 +381,29 @@
             "repoDigests": [],
             "repoTags": [
               "chummer-run-api:current-source-mobile-alias-20260702",
+              "chummer-run-api:fixed-alias-07d1060-20260702",
+              "chummer-run-api:local",
+              "chummer-run-api:pwa-direct-20260702-0925",
+              "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
+              "chummer-run-api:pwa-direct-mobile-alias-20260702-preflight72b",
+              "chummer-run-api:pwa-direct-mobile-alias-3062-preflight72b-preserve",
+              "chummer-run-api:pwa-direct-mobile-alias-cba57"
+            ]
+          },
+          "imageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+          "tag": "chummer-run-api:fixed-alias-07d1060-20260702"
+        },
+        {
+          "imageDetails": {
+            "created": "2026-07-02T11:49:46.525604243+02:00",
+            "imageId": "sha256:e91dbb8866a2f8d0e68c1418927cd8676cad7f9e13bec17bb1d71e7b865655a9",
+            "labels": {
+              "org.opencontainers.image.version": "24.04"
+            },
+            "repoDigests": [],
+            "repoTags": [
+              "chummer-run-api:current-source-mobile-alias-20260702",
+              "chummer-run-api:fixed-alias-07d1060-20260702",
               "chummer-run-api:local",
               "chummer-run-api:pwa-direct-20260702-0925",
               "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -369,6 +425,7 @@
             "repoDigests": [],
             "repoTags": [
               "chummer-run-api:current-source-mobile-alias-20260702",
+              "chummer-run-api:fixed-alias-07d1060-20260702",
               "chummer-run-api:local",
               "chummer-run-api:pwa-direct-20260702-0925",
               "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -390,6 +447,7 @@
             "repoDigests": [],
             "repoTags": [
               "chummer-run-api:current-source-mobile-alias-20260702",
+              "chummer-run-api:fixed-alias-07d1060-20260702",
               "chummer-run-api:local",
               "chummer-run-api:pwa-direct-20260702-0925",
               "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -411,6 +469,7 @@
             "repoDigests": [],
             "repoTags": [
               "chummer-run-api:current-source-mobile-alias-20260702",
+              "chummer-run-api:fixed-alias-07d1060-20260702",
               "chummer-run-api:local",
               "chummer-run-api:pwa-direct-20260702-0925",
               "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -432,6 +491,7 @@
             "repoDigests": [],
             "repoTags": [
               "chummer-run-api:current-source-mobile-alias-20260702",
+              "chummer-run-api:fixed-alias-07d1060-20260702",
               "chummer-run-api:local",
               "chummer-run-api:pwa-direct-20260702-0925",
               "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -453,6 +513,7 @@
             "repoDigests": [],
             "repoTags": [
               "chummer-run-api:current-source-mobile-alias-20260702",
+              "chummer-run-api:fixed-alias-07d1060-20260702",
               "chummer-run-api:local",
               "chummer-run-api:pwa-direct-20260702-0925",
               "chummer-run-api:pwa-direct-mobile-alias-20260702-guarded-play",
@@ -471,7 +532,7 @@
     "pollSeconds": 10.0,
     "repairCount": 0,
     "skipped": false,
-    "stableStartedAtUtc": "2026-07-02T10:37:47.542109+00:00",
+    "stableStartedAtUtc": "2026-07-02T10:45:54.444994+00:00",
     "status": "pass",
     "windowSeconds": 240.0
   },

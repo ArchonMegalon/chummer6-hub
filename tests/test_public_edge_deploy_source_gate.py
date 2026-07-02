@@ -462,6 +462,7 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "scripts/restore_public_edge_portal_image.py" in runbook
     assert "--include-image-tags-matching '^chummer-run-api:pwa-direct'" in runbook
     assert "--include-image-tags-matching '^chummer-run-api:current-source'" in runbook
+    assert "--include-image-tags-matching '^chummer-run-api:fixed-alias'" in runbook
     assert "PUBLIC_EDGE_PORTAL_IMAGE_RESTORE.generated.json" in runbook
     assert "docker compose up -d --no-build --no-deps --force-recreate" in runbook
     assert "--stability-window-seconds 120" in runbook

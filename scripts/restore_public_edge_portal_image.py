@@ -483,7 +483,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--include-image-tags-matching",
         action="append",
         default=[],
-        help="Regex for additional local image tags to repoint at the approved image id, for example '^chummer-run-api:pwa-direct' or '^chummer-run-api:current-source'. Repeatable.",
+        help="Regex for additional local image tags to repoint at the approved image id, for example '^chummer-run-api:pwa-direct', '^chummer-run-api:current-source', or '^chummer-run-api:fixed-alias'. Repeatable.",
     )
     parser.add_argument("--compose-file", default=str(ROOT / "docker-compose.public-edge.yml"))
     parser.add_argument("--env-file", default="", help="Compose env file. Defaults to .env when it exists; omit when absent.")
