@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.operator_release_dashboard",
-  "generated_at_utc": "2026-07-02T07:02:34Z",
+  "generated_at_utc": "2026-07-02T08:42:40Z",
   "status": "pass",
   "verdict": "OPERABLE_RELEASE_READY",
   "release": {
@@ -59,6 +59,30 @@
     "participate_iframe_shell_status": "pass",
     "flagship_horizons_status": "pass"
   },
+  "windows_installer_visual_audit": {
+    "status": "fail",
+    "failures": [
+      "Windows installer visual audit source digest does not match promoted installer"
+    ],
+    "artifact_file_name": "chummer-avalonia-win-x64-installer.exe",
+    "artifact_sha256": "4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3",
+    "visual_source_status": "pass",
+    "visual_source_artifact_sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
+    "visual_source_matches_promoted": false,
+    "intake_status": "external_artifact_required",
+    "intake_promoted_sha256": "4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3",
+    "matching_promoted_visual_source_count": 0,
+    "gold_proof_zip_status": "not_found",
+    "operator_request_summary": "Run the promoted Windows installer on a native Windows host and provide the gold proof bundle.",
+    "import_command": "python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
+    "post_import_gates": [
+      "python3 scripts/verify_windows_installer_visual_audit.py --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
+      "python3 scripts/materialize_operator_release_dashboard.py",
+      "python3 scripts/materialize_release_ready_receipt.py",
+      "python3 scripts/final_gold_janitor.py",
+      "python3 scripts/verify_flagship_product_readiness_gate.py --summary-output .codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
+    ]
+  },
   "account_handoffs": {
     "billing_mode": "unavailable",
     "release_upload_mode": "default_single_operator"
@@ -73,19 +97,19 @@
       "pass": true
     },
     "external_distribution_mirror_proof": {
-      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-07-02T05:10:21Z",
+      "generated_at_utc": "2026-07-02T07:50:11Z",
       "pass": true
     },
     "ruleset_readiness": {
-      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RULESET_READINESS.generated.json",
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/RULESET_READINESS.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-07-02T05:19:03.952993Z",
+      "generated_at_utc": "2026-07-02T07:48:45.819680Z",
       "pass": true
     },
     "ui_frame_integrity": {
@@ -97,7 +121,7 @@
       "pass": true
     },
     "design_quality_gate": {
-      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": "DESIGN_READY",
@@ -105,15 +129,15 @@
       "pass": true
     },
     "public_copy_leak_gate": {
-      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-07-02T05:10:23Z",
+      "generated_at_utc": "2026-07-02T08:42:00Z",
       "pass": true
     },
     "participate_billing_honesty": {
-      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PARTICIPATE_BILLING_HONESTY.generated.json",
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/PARTICIPATE_BILLING_HONESTY.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": "READY",
@@ -121,45 +145,63 @@
       "pass": true
     },
     "account_handoff_runtime_config": {
-      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json",
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": "READY",
-      "generated_at_utc": "2026-07-02T05:13:24Z",
+      "generated_at_utc": "2026-06-29T18:23:13Z",
       "pass": true
     },
     "public_edge_postdeploy_gate": {
-      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-07-02T07:01:46.200405+00:00",
+      "generated_at_utc": "2026-07-02T08:42:28.202459+00:00",
       "pass": true
     },
     "release_ready": {
-      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RELEASE_READY.generated.json",
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/RELEASE_READY.generated.json",
       "exists": true,
       "status": "fail",
       "verdict": "NOT_RELEASE_READY",
-      "generated_at_utc": "2026-07-02T05:13:25Z",
+      "generated_at_utc": "2026-07-02T08:21:37Z",
       "pass": false,
       "release_blocking": false
     },
     "final_gold_janitor": {
-      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json",
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json",
       "exists": true,
       "status": "fail",
       "verdict": "NOT_GOLD",
-      "generated_at_utc": "2026-07-02T05:13:25Z",
+      "generated_at_utc": "2026-07-02T07:11:12Z",
       "pass": false,
       "release_blocking": false
     },
     "google_oauth_linking_proof": {
-      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
       "exists": true,
       "status": "pass",
       "verdict": null,
       "generated_at_utc": "2026-05-08T20:02:00.000000Z",
+      "pass": true,
+      "release_blocking": false
+    },
+    "windows_installer_visual_audit": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
+      "exists": true,
+      "status": "fail",
+      "verdict": null,
+      "generated_at_utc": "2026-07-02T08:21:37Z",
+      "pass": false,
+      "release_blocking": false
+    },
+    "windows_installer_visual_audit_intake_request": {
+      "path": "/tmp/chummer-run-services-flagship-f023/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json",
+      "exists": true,
+      "status": "external_artifact_required",
+      "verdict": null,
+      "generated_at_utc": "2026-07-02T07:16:41Z",
       "pass": true,
       "release_blocking": false
     }
