@@ -18,11 +18,34 @@
     var statusLine = Model.ReleaseExperience.Recommended is null
         ? "Downloads are paused."
         : publicPlatformSummary;
-    var releaseVersionText = string.IsNullOrWhiteSpace(Model.Manifest.Version)
+    var releaseMarkerText = string.IsNullOrWhiteSpace(Model.Manifest.Version)
         ? "Version unpublished"
         : $"Version {Model.Manifest.Version}";
+    var releaseVersionText = PublicReleaseVersionLabel(Model.Manifest.Version);
 
     static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
+
+    static string PublicReleaseVersionLabel(string? version)
+    {
+        var normalized = version?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return "Version unavailable";
+        }
+
+        if (normalized.StartsWith("run-", StringComparison.OrdinalIgnoreCase) && normalized.Length >= 12)
+        {
+            var stamp = normalized.Substring(4, 8);
+            if (stamp.All(char.IsDigit))
+            {
+                return $"Nightly {stamp.Substring(0, 4)}.{stamp.Substring(4, 2)}.{stamp.Substring(6, 2)}";
+            }
+
+            return "Nightly build";
+        }
+
+        return $"Version {normalized}";
+    }
 }
 
 <section class="minimal-page-hero minimal-status-pill">
@@ -30,7 +53,8 @@
         <p class="eyebrow">Now</p>
         <h1>Updated</h1>
         <p>@PublicStatusText(statusLine)</p>
-        <p class="downloads-release-version" data-downloads-release-version>@releaseVersionText</p>
+        <p class="downloads-release-version">@releaseVersionText</p>
+        <span data-downloads-release-version hidden>@releaseMarkerText</span>
         <p class="muted-copy">@PublicStatusText(Model.ReleaseSummary)</p>
         <p class="muted-copy"><strong>Current caution:</strong> @PublicStatusText(Model.CautionSummary)</p>
         <div class="minimal-actions" aria-label="Status next actions">

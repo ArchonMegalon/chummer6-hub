@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_surface_parity",
-  "generated_at_utc": "2026-06-29T20:10:06Z",
+  "generated_at_utc": "2026-07-02T06:23:38Z",
   "base_url": "https://chummer.run",
   "require_brilliant_directories_checkout": true,
   "status": "pass",
@@ -100,19 +100,16 @@
     {
       "path": "/status",
       "url": "https://chummer.run/status",
-      "final_url": "https://chummer.run/downloads",
+      "final_url": "https://chummer.run/status",
       "redirect_location": null,
       "redirect_target_url": null,
       "cross_origin_redirect": false,
       "status_code": 200,
-      "redirect_chain": [
-        "https://chummer.run/downloads"
-      ],
+      "redirect_chain": [],
       "required_texts": [
+        "Updated",
         "Downloads",
-        "Chummer selects the best installer when it can.",
-        "Stable release",
-        "Build from source"
+        "Help"
       ],
       "required_any_texts": [],
       "required_html_texts": [],
@@ -152,7 +149,7 @@
       "forbidden_html_texts": [],
       "forbidden_hits": [],
       "forbidden_html_hits": [],
-      "required_final_url_prefix": "/downloads",
+      "required_final_url_prefix": "/status",
       "final_url_matches": true,
       "status": "pass"
     },
@@ -207,7 +204,7 @@
       "required_html_texts": [
         "<title>Participate \u00b7 Chummer</title>",
         "data-chummer-participate-frame",
-        "/participate/board?embed=1"
+        "productlift.dev"
       ],
       "missing_required_texts": [],
       "missing_required_any_texts": [],
@@ -224,7 +221,6 @@
         "Network error while loading tab configuration"
       ],
       "forbidden_html_texts": [
-        "chummer6.productlift.dev",
         "data-chummer-board-skin",
         "participate-preview-card"
       ],

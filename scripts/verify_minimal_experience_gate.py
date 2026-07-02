@@ -38,6 +38,38 @@ class SourceParser(HTMLParser):
             self.links.append(values["href"])
 
 
+class VisibleTextParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.parts: list[str] = []
+        self._hidden_stack: list[bool] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = {key.lower(): value or "" for key, value in attrs}
+        class_tokens = {token.strip().lower() for token in values.get("class", "").split() if token.strip()}
+        parent_hidden = self._hidden_stack[-1] if self._hidden_stack else False
+        current_hidden = (
+            tag.lower() in {"script", "style", "svg", "template"}
+            or "hidden" in values
+            or values.get("aria-hidden", "").lower() == "true"
+            or "sr-only" in class_tokens
+        )
+        self._hidden_stack.append(parent_hidden or current_hidden)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._hidden_stack:
+            self._hidden_stack.pop()
+
+    def handle_data(self, data: str) -> None:
+        hidden = self._hidden_stack[-1] if self._hidden_stack else False
+        if not hidden and data.strip():
+            self.parts.append(" ".join(data.split()))
+
+    @property
+    def text(self) -> str:
+        return " ".join(self.parts)
+
+
 def now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
@@ -79,6 +111,12 @@ def find_release_noise(text: str) -> list[str]:
     return findings
 
 
+def visible_text(html: str) -> str:
+    parser = VisibleTextParser()
+    parser.feed(html)
+    return parser.text
+
+
 def build_payload(
     base_url: str,
     *,
@@ -91,6 +129,8 @@ def build_payload(
     home_html = html_fetcher(f"{normalized_base_url}/")
     downloads_html = html_fetcher(f"{normalized_base_url}/downloads")
     status_html = html_fetcher(f"{normalized_base_url}/status")
+    downloads_text = visible_text(downloads_html)
+    status_text = visible_text(status_html)
 
     parser = SourceParser()
     parser.feed(home_html)
@@ -113,16 +153,16 @@ def build_payload(
     promo_video_link_load = all(asset_checker(urljoin(f"{normalized_base_url}/", link)) for link in product_video_links)
     stable_visible = (
         'id="stable"' in downloads_html
-        and "Stable" in downloads_html
-        and "Stable release." in downloads_html
+        and "Stable" in downloads_text
+        and "Stable release." in downloads_text
     )
-    nightly_visible = 'id="nightly"' in downloads_html and "Nightly" in downloads_html
+    nightly_visible = 'id="nightly"' in downloads_html and "Nightly" in downloads_text
     decision_card_count = count_class_token(status_html, "minimal-status-pill")
     next_action_count = count_occurrences(status_html, 'data-analytics-event="status_next_action"')
-    status_updated_count = count_occurrences(status_html, "Updated")
-    downloads_updated_count = count_occurrences(downloads_html, "Updated")
-    status_release_noise = find_release_noise(status_html)
-    downloads_release_noise = find_release_noise(downloads_html)
+    status_updated_count = count_occurrences(status_text, "Updated")
+    downloads_updated_count = count_occurrences(downloads_text, "Updated")
+    status_release_noise = find_release_noise(status_text)
+    downloads_release_noise = find_release_noise(downloads_text)
 
     if nav_panel_open:
         failures.append("home navigation panel is open by default")

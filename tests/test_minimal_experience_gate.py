@@ -36,11 +36,13 @@ class MinimalExperienceGateTests(unittest.TestCase):
                 </body>
             """,
             "https://example.invalid/downloads": """
+                <span hidden data-downloads-release-version>Version run-20260701-124648</span>
                 <span>Updated</span>
                 <article id="stable"><span>Stable</span><p>Stable release.</p></article>
                 <article id="nightly"><span>Nightly</span><h2>No newer build</h2></article>
             """,
             "https://example.invalid/status": """
+                <span hidden data-downloads-release-version>Version run-20260701-124648</span>
                 <div class="minimal-page-hero minimal-status-pill"></div>
                 <a data-analytics-event="status_next_action">Downloads</a>
                 <a data-analytics-event="status_next_action">Support</a>

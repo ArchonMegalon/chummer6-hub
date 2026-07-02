@@ -13895,12 +13895,12 @@ Boundary:
         ReleaseExperienceViewModel releaseExperience,
         PublicTrustPulseSnapshot? pulse)
     {
-        string updated = $"Updated {BuildLiveVerificationLabel(manifest)}.";
+        string checkedAt = $"Checked {BuildLiveVerificationLabel(manifest)}.";
         string supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();
 
         if (ReleaseRequiresReview(manifest) || pulse?.ParityClaimsReviewRequired == true)
         {
-            return $"{updated} Current installers remain available, but wider readiness is under review.";
+            return $"{checkedAt} Current installers remain available, but wider readiness is under review.";
         }
 
         bool checksPassing = string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
@@ -13909,10 +13909,10 @@ Boundary:
             || checksPassing
             || pulse?.ParityClaimsReviewRequired == false)
         {
-            return updated;
+            return checkedAt;
         }
 
-        return $"{updated} Open help before wider rollouts.";
+        return $"{checkedAt} Open help before wider rollouts.";
     }
 
     private static string BuildPublicStatusReleaseSummary(
