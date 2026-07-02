@@ -19,6 +19,7 @@ import verify_windows_installer_visual_audit as visual_audit  # noqa: E402
 PUBLISHED_ROOT = ROOT / ".codex-studio" / "published"
 DEFAULT_OUTPUT = PUBLISHED_ROOT / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
 DEFAULT_DISCOVERY_ROOTS = (
+    Path("/docker/chummercomplete/_staging"),
     Path("/tmp"),
     Path.home() / "Downloads",
     Path.home() / "pCloud Drive" / "EA",

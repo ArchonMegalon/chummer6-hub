@@ -741,6 +741,11 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertEqual(list(verifier.REQUIRED_SURFACES), payload["operator_request"]["required_surfaces"])
         self.assertFalse(payload["direct_telegram_sent"])
 
+    def test_visual_audit_intake_defaults_watch_nightly_staging_root(self) -> None:
+        intake = load_intake_module()
+
+        self.assertIn(Path("/docker/chummercomplete/_staging"), intake.DEFAULT_DISCOVERY_ROOTS)
+
     def test_downloads_runbook_documents_windows_gold_proof_loop(self) -> None:
         runbook = REPO_ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
         text = runbook.read_text(encoding="utf-8")
