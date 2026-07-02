@@ -835,7 +835,7 @@ def main() -> int:
             "/home/access",
             "/home/work",
             "/account/access",
-            "/account/roster",
+            "/account/work",
             "/account/support",
             "/contact",
             "/downloads",
@@ -1123,7 +1123,7 @@ def main() -> int:
                 "routes": [
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/campaign-memory",
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/consequence-truth",
-                    "/account/roster#campaign-consequences",
+                    "/account/work#campaign-consequences",
                 ],
                 "surfaces": [
                     "campaign_memory:consequence_truth",
@@ -1140,7 +1140,7 @@ def main() -> int:
                 "routes": [
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages",
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/downtime-aftermath",
-                    "/account/roster#aftermath-packages",
+                    "/account/work#aftermath-packages",
                 ],
                 "surfaces": [
                     "downtime_aftermath:api",
@@ -1376,6 +1376,7 @@ def main() -> int:
                 "routes": [
                     "/home",
                     "/home/work",
+                    "/account/work",
                     "/account/roster",
                     "/api/v1/campaign-spine/me",
                     "/api/v1/campaign-spine/me/workspaces/starter",
@@ -1399,6 +1400,7 @@ def main() -> int:
                 "summary": "The hub-owned first-session path gives signed-in users one calmer route from linked install into first-session detail, build next steps, campaign-primer return, and install support without hiding the next safe action behind deeper admin-only pages.",
                 "routes": [
                     "/home/work",
+                    "/account/work",
                     "/account/roster",
                     "/account/access",
                     "/contact",

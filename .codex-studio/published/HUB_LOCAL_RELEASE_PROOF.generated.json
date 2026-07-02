@@ -3,14 +3,16 @@
   "package_repo": "chummer6-hub",
   "status": "passed",
   "desktop_client_readiness": {
-    "status": "pass",
-    "scoped_status": "pass",
-    "generated_at": "2026-06-27T20:04:25Z",
-    "missing_coverage_keys": [],
-    "desktop_client_missing": false,
-    "reason": "Flagship product readiness proof is green.",
-    "completion_audit_status": "pass",
-    "completion_audit_reason": "Flagship product readiness proof is green.",
+    "status": "fail",
+    "scoped_status": "fail",
+    "generated_at": "2026-07-01T15:07:43Z",
+    "missing_coverage_keys": [
+      "desktop_client"
+    ],
+    "desktop_client_missing": true,
+    "reason": "flagship product readiness proof is not green: fail; missing coverage: desktop_client; readiness plane gaps: flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready",
+    "completion_audit_status": "fail",
+    "completion_audit_reason": "Flagship product readiness planes are not green: flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready.",
     "source_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
   },
   "publicTrustSurface": {
@@ -894,7 +896,7 @@
     "/home/access",
     "/home/work",
     "/account/access",
-    "/account/roster",
+    "/account/work",
     "/account/support",
     "/contact",
     "/downloads",
@@ -1194,7 +1196,7 @@
       "routes": [
         "/api/v1/campaign-spine/me/workspaces/{workspaceId}/campaign-memory",
         "/api/v1/campaign-spine/me/workspaces/{workspaceId}/consequence-truth",
-        "/account/roster#campaign-consequences"
+        "/account/work#campaign-consequences"
       ],
       "surfaces": [
         "campaign_memory:consequence_truth",
@@ -1211,7 +1213,7 @@
       "routes": [
         "/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages",
         "/api/v1/campaign-spine/me/workspaces/{workspaceId}/downtime-aftermath",
-        "/account/roster#aftermath-packages"
+        "/account/work#aftermath-packages"
       ],
       "surfaces": [
         "downtime_aftermath:api",
@@ -1447,6 +1449,7 @@
       "routes": [
         "/home",
         "/home/work",
+        "/account/work",
         "/account/roster",
         "/api/v1/campaign-spine/me",
         "/api/v1/campaign-spine/me/workspaces/starter"
@@ -1470,6 +1473,7 @@
       "summary": "The hub-owned first-session path gives signed-in users one calmer route from linked install into first-session detail, build next steps, campaign-primer return, and install support without hiding the next safe action behind deeper admin-only pages.",
       "routes": [
         "/home/work",
+        "/account/work",
         "/account/roster",
         "/account/access",
         "/contact"
@@ -1638,6 +1642,6 @@
       ]
     }
   ],
-  "generated_at": "2026-07-02T03:46:08Z",
-  "generatedAt": "2026-07-02T03:46:08Z"
+  "generated_at": "2026-07-02T04:23:03Z",
+  "generatedAt": "2026-07-02T04:23:03Z"
 }

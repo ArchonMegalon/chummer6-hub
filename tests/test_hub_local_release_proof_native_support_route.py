@@ -13,6 +13,53 @@ NATIVE_SUPPORT_ROUTE = "/api/v1/install-linking/continuation/support"
 
 
 class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
+    def test_materialized_proof_routes_match_release_channel_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(MATERIALIZER),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            [
+                "/downloads/install/avalonia-linux-x64-installer",
+                "/home/access",
+                "/home/work",
+                "/account/access",
+                "/account/work",
+                "/account/support",
+                "/contact",
+                "/downloads",
+                "/downloads/install/avalonia-osx-arm64-installer",
+                "/downloads/install/avalonia-win-x64-installer",
+            ],
+            proof["proof_routes"],
+        )
+        receipts = {receipt.get("receipt_id"): receipt for receipt in proof["proof_receipts"]}
+        self.assertIn(
+            "/account/work#campaign-consequences",
+            receipts["campaign_memory:consequence_truth"]["routes"],
+        )
+        self.assertIn(
+            "/account/work#aftermath-packages",
+            receipts["downtime_aftermath:api"]["routes"],
+        )
+
     def test_materialized_m141_proof_includes_direct_import_route_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
