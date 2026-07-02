@@ -182,6 +182,56 @@ def test_restore_rejects_non_digest_expected_image() -> None:
         raise AssertionError("non-digest image id was accepted")
 
 
+def test_resolve_image_tags_includes_matching_public_edge_aliases(monkeypatch) -> None:
+    module = load_module()
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        if command == ["docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}"]:
+            return module.CommandResult(
+                command,
+                0,
+                "\n".join(
+                    [
+                        "chummer-run-api:local",
+                        "chummer-run-api:pwa-direct-20260702-0925",
+                        "chummer-run-api:pwa-direct-mobile-alias-cba57",
+                        "chummer-run-api:<none>",
+                        "other-service:pwa-direct-ignore",
+                    ]
+                ),
+                "",
+            )
+        return module.CommandResult(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+
+    result = module.resolve_image_tags(
+        ["chummer-run-api:local"],
+        [r"^chummer-run-api:pwa-direct"],
+        False,
+    )
+
+    assert result == [
+        "chummer-run-api:local",
+        "chummer-run-api:pwa-direct-20260702-0925",
+        "chummer-run-api:pwa-direct-mobile-alias-cba57",
+    ]
+
+
+def test_resolve_image_tags_defaults_to_local_without_patterns(monkeypatch) -> None:
+    module = load_module()
+    calls: list[list[str]] = []
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        calls.append(command)
+        return module.CommandResult(command, 0, "chummer-run-api:pwa-direct-dirty", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+
+    assert module.resolve_image_tags([], [], False) == ["chummer-run-api:local"]
+    assert calls == []
+
+
 def test_postdeploy_gate_retries_until_runtime_is_warm(monkeypatch, tmp_path) -> None:
     module = load_module()
     expected = "sha256:" + "3" * 64

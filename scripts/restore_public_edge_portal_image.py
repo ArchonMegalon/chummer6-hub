@@ -114,6 +114,33 @@ def inspect_container_image_id(container: str, dry_run: bool = False) -> tuple[s
     return image_id, image_ref
 
 
+def list_local_image_tags(dry_run: bool = False) -> list[str]:
+    if dry_run:
+        return []
+    result = run_checked(["docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}"], dry_run=False)
+    tags: list[str] = []
+    for line in result.stdout.splitlines():
+        tag = line.strip()
+        if not tag or "<none>" in tag:
+            continue
+        tags.append(tag)
+    return tags
+
+
+def resolve_image_tags(image_tags: list[str], include_patterns: list[str], dry_run: bool = False) -> list[str]:
+    resolved = list(dict.fromkeys(tag.strip() for tag in image_tags if tag.strip()))
+    if not resolved:
+        resolved = [DEFAULT_PORTAL_IMAGE_TAG]
+
+    compiled_patterns = [re.compile(pattern) for pattern in include_patterns if pattern.strip()]
+    if compiled_patterns:
+        for tag in list_local_image_tags(dry_run=dry_run):
+            if any(pattern.search(tag) for pattern in compiled_patterns):
+                resolved.append(tag)
+
+    return list(dict.fromkeys(resolved))
+
+
 def compose_command(
     compose_file: Path,
     env_file: Path | None,
@@ -452,6 +479,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Restore the public-edge portal container to an approved image id without rebuilding it.")
     parser.add_argument("--expected-portal-image-id", required=True)
     parser.add_argument("--image-tag", action="append", default=[], help="Mutable tag to repoint at the approved image id. Repeatable.")
+    parser.add_argument(
+        "--include-image-tags-matching",
+        action="append",
+        default=[],
+        help="Regex for additional local image tags to repoint at the approved image id, for example '^chummer-run-api:pwa-direct'. Repeatable.",
+    )
     parser.add_argument("--compose-file", default=str(ROOT / "docker-compose.public-edge.yml"))
     parser.add_argument("--env-file", default="", help="Compose env file. Defaults to .env when it exists; omit when absent.")
     parser.add_argument("--project-name", default=DEFAULT_PROJECT_NAME)
@@ -504,9 +537,14 @@ def main(argv: list[str] | None = None) -> int:
             browser_proofs.append("mobilePwaViewport")
         if args.require_all_browser_proofs or args.require_frontdoor_navigation_playwright:
             browser_proofs.append("frontdoorNavigation")
+        image_tags = resolve_image_tags(
+            args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
+            args.include_image_tags_matching,
+            args.dry_run,
+        )
         restore_receipt = restore_portal_image(
             expected,
-            args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
+            image_tags,
             compose_file,
             env_file,
             args.project_name,
@@ -517,7 +555,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         stability_receipt = watch_runtime_stability(
             expected,
-            args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
+            image_tags,
             compose_file,
             env_file,
             args.project_name,
@@ -535,7 +573,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.base_url,
                 args.expected_release_channel,
                 args.portal_container,
-                (args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG])[0],
+                image_tags[0],
                 Path(args.postdeploy_output).expanduser(),
                 args.postdeploy_attempts,
                 args.postdeploy_retry_delay_seconds,
@@ -556,6 +594,11 @@ def main(argv: list[str] | None = None) -> int:
         "stability": stability_receipt,
         "postdeploy": postdeploy_receipt,
         "browserProofRequirements": browser_proofs,
+        "imageTagDiscovery": {
+            "explicitImageTags": args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
+            "includeImageTagsMatching": args.include_image_tags_matching,
+            "resolvedImageTags": image_tags,
+        },
     }
     rendered = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
     if args.output:
