@@ -195,6 +195,7 @@ def test_resolve_image_tags_includes_matching_public_edge_aliases(monkeypatch) -
                         "chummer-run-api:local",
                         "chummer-run-api:pwa-direct-20260702-0925",
                         "chummer-run-api:pwa-direct-mobile-alias-cba57",
+                        "chummer-run-api:current-source-mobile-alias-20260702",
                         "chummer-run-api:<none>",
                         "other-service:pwa-direct-ignore",
                     ]
@@ -207,7 +208,7 @@ def test_resolve_image_tags_includes_matching_public_edge_aliases(monkeypatch) -
 
     result = module.resolve_image_tags(
         ["chummer-run-api:local"],
-        [r"^chummer-run-api:pwa-direct"],
+        [r"^chummer-run-api:pwa-direct", r"^chummer-run-api:current-source"],
         False,
     )
 
@@ -215,6 +216,7 @@ def test_resolve_image_tags_includes_matching_public_edge_aliases(monkeypatch) -
         "chummer-run-api:local",
         "chummer-run-api:pwa-direct-20260702-0925",
         "chummer-run-api:pwa-direct-mobile-alias-cba57",
+        "chummer-run-api:current-source-mobile-alias-20260702",
     ]
 
 
