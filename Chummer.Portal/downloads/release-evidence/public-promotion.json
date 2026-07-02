@@ -1,6 +1,6 @@
 {
   "contractName": "chummer.run.desktop_release_publication",
-  "generatedAt": "2026-06-27T07:51:47Z",
+  "generatedAt": "2026-07-01T14:29:35Z",
   "artifacts": [
     {
       "artifactId": "avalonia-linux-x64-installer",
@@ -9,27 +9,27 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.qOhChl1BvP/startup-smoke-avalonia-linux-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.dKvNDCZAjK/startup-smoke-avalonia-linux-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "ce931a759101e507780b62c6203a3b59572646050aaaea51e168b002c472e655",
-      "artifactSizeBytes": 36999590,
+      "artifactSha256": "1b04ab0a4a2310749861f17a4ecdebeaed415a890462407ea7a39293fde52eb6",
+      "artifactSizeBytes": 37014374,
       "kind": "installer"
     },
     {
       "artifactId": "avalonia-win-x64-installer",
       "fileName": "chummer-avalonia-win-x64-installer.exe",
       "platform": "windows",
-      "promotionStatus": "fail",
+      "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.qOhChl1BvP/startup-smoke-avalonia-win-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.dKvNDCZAjK/startup-smoke-avalonia-win-x64.receipt.json",
       "signingReceiptPath": "",
-      "signingStatus": "fail",
+      "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "04ae1f160e299b8d5613bde3f166cb7b6214e8514927e88af61131ad95eccba4",
-      "artifactSizeBytes": 892036,
+      "artifactSha256": "4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3",
+      "artifactSizeBytes": 2735125,
       "kind": "installer"
     }
   ]

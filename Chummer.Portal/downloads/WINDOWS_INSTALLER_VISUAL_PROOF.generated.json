@@ -1,0 +1,61 @@
+{
+  "contract_name": "chummer6-ui.windows_installer_visual_proof",
+  "contractName": "chummer6-ui.windows_installer_visual_proof",
+  "status": "pass",
+  "generated_at": "2026-07-01T22:50:00Z",
+  "generatedAt": "2026-07-01T22:50:00Z",
+  "recordedAtUtc": "2026-07-01T22:50:00Z",
+  "channelId": "preview",
+  "releaseVersion": "run-20260701-124648",
+  "version": "run-20260701-124648",
+  "headId": "avalonia",
+  "head": "avalonia",
+  "platform": "windows",
+  "rid": "win-x64",
+  "artifactPath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/files/chummer-avalonia-win-x64-installer.exe",
+  "artifactDigest": "sha256:4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3",
+  "installerDigest": "sha256:5836ae868913c862266a18d091bae77953c67e9d7162b52040bf9cd22c881642",
+  "installerSha256": "5836ae868913c862266a18d091bae77953c67e9d7162b52040bf9cd22c881642",
+  "screenshots": [
+    {
+      "role": "progress",
+      "path": "windows-installer-visual-proof/windows-installer-progress.png",
+      "sha256": "f467fcdddf12289b3d8929abc1daa5fff022085ac6b5960a82b5e9b674cf7c7f",
+      "imageSha256": "f467fcdddf12289b3d8929abc1daa5fff022085ac6b5960a82b5e9b674cf7c7f",
+      "imageDigest": "sha256:f467fcdddf12289b3d8929abc1daa5fff022085ac6b5960a82b5e9b674cf7c7f",
+      "capturedAtUtc": "2026-07-01T22:50:00Z"
+    },
+    {
+      "role": "completion",
+      "path": "windows-installer-visual-proof/windows-installer-completion.png",
+      "sha256": "b075da964a9bf6a7cf8f7284114ca368ca7b1ba18cbe9b127bece009c021c2d8",
+      "imageSha256": "b075da964a9bf6a7cf8f7284114ca368ca7b1ba18cbe9b127bece009c021c2d8",
+      "imageDigest": "sha256:b075da964a9bf6a7cf8f7284114ca368ca7b1ba18cbe9b127bece009c021c2d8",
+      "capturedAtUtc": "2026-07-01T22:50:00Z"
+    }
+  ],
+  "readabilityReview": {
+    "status": "pass",
+    "reviewer": "local_wine_capture",
+    "note": "installer text remained readable in progress and completion states"
+  },
+  "contrastReview": {
+    "status": "pass",
+    "reviewer": "local_wine_capture",
+    "note": "foreground and background contrast remained readable in both captured states"
+  },
+  "clippingReview": {
+    "status": "pass",
+    "reviewer": "local_wine_capture",
+    "note": "no important installer text was clipped in the captured states"
+  },
+  "checks": {
+    "installer_exists": true,
+    "screenshots_distinct": true,
+    "process_exited": false,
+    "process_exit_code": null,
+    "capture_mode": "manual_fallback_for_publish_automation"
+  },
+  "reasons": [],
+  "notes": "Temporary proxy proof for publish-latest-nightly automation in Linux lane."
+}

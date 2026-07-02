@@ -1,0 +1,91 @@
+{
+  "artifact_count": 2,
+  "artifacts": [
+    {
+      "artifact_id": "avalonia-linux-x64-installer",
+      "file_name": "chummer-avalonia-linux-x64-installer.deb",
+      "platform": "linux",
+      "rid": "linux-x64",
+      "version": "run-20260701-124648"
+    },
+    {
+      "artifact_id": "avalonia-win-x64-installer",
+      "file_name": "chummer-avalonia-win-x64-installer.exe",
+      "platform": "windows",
+      "rid": "win-x64",
+      "version": "run-20260701-124648"
+    }
+  ],
+  "blockers": [
+    "Windows visual-proof handoff is not ready; inspect the staged handoff packet before asking a Windows operator to continue."
+  ],
+  "channel": "preview",
+  "contract_name": "chummer.release_build_handoff",
+  "generated_at": "2026-07-01T23:20:48Z",
+  "handoff_only": true,
+  "handoff_scope": "staged_nightly",
+  "missing_required_heads": [],
+  "missing_required_platforms": [],
+  "next_actions": [
+    "Inspect the Windows visual-proof handoff packet and fix the staged shelf mismatch before the nightly handoff continues: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.json",
+    "Keep the live downloads shelf and stable channel unchanged while this staged nightly handoff is still incomplete."
+  ],
+  "promoted_tuples": [
+    "avalonia:linux-x64:linux",
+    "avalonia:win-x64:windows"
+  ],
+  "promotion_ready": false,
+  "requires_separate_publish_lane": true,
+  "stable_release_unchanged": true,
+  "stage_dir": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads",
+  "stage_proof_complete": false,
+  "startup_smoke_receipts": {
+    "avalonia:linux:linux-x64": {
+      "artifact_digest": "sha256:1b04ab0a4a2310749861f17a4ecdebeaed415a890462407ea7a39293fde52eb6",
+      "host_class": "local-linux-x64",
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-linux-x64.receipt.json",
+      "ready_checkpoint": "pre_ui_event_loop",
+      "skip_reason": "",
+      "status": "pass"
+    },
+    "avalonia:windows:win-x64": {
+      "artifact_digest": "sha256:4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3",
+      "host_class": "local-win-x64",
+      "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+      "ready_checkpoint": "pre_ui_event_loop",
+      "skip_reason": "",
+      "status": "pass"
+    }
+  },
+  "version": "run-20260701-124648",
+  "windows_exit_gate_refresh": {
+    "blocking_mode": "none",
+    "json_path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/UI_WINDOWS_DESKTOP_EXIT_GATE.generated.json",
+    "return_code": 0,
+    "script_path": "/docker/chummercomplete/chummer-presentation/scripts/materialize-windows-desktop-exit-gate.sh",
+    "status": "passed",
+    "stderr": "",
+    "stdout": "[windows-exit-gate] PASS",
+    "summary": "Windows desktop exit gate passed."
+  },
+  "windows_visual_proof_handoff": {
+    "blockers": [],
+    "command": "/usr/bin/python3 /docker/chummercomplete/chummer-presentation/scripts/materialize_windows_visual_proof_handoff.py --manifest /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json --windows-gate /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/UI_WINDOWS_DESKTOP_EXIT_GATE.generated.json --startup-smoke /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json --visual-proof /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/WINDOWS_INSTALLER_VISUAL_PROOF.generated.json --json-output /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.json --md-output /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.md",
+    "json_path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.json",
+    "md_path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.md",
+    "next_actions": [
+      "Refresh the existing Windows visual-proof receipt at `/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/WINDOWS_INSTALLER_VISUAL_PROOF.generated.json` against the staged candidate before the nightly handoff continues.",
+      "On a real Windows host, open the repo checkout that contains the capture script and run `powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\capture-windows-installer-visual-proof.ps1 -ReleaseChannelPath \"/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json\" -OutputPath \"/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/WINDOWS_INSTALLER_VISUAL_PROOF.generated.json\"`.",
+      "Confirm `windows-installer-progress.png` and `windows-installer-completion.png` are written under `/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/windows-installer-visual-proof`.",
+      "Confirm `WINDOWS_INSTALLER_VISUAL_PROOF.generated.json` is written under `/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads`.",
+      "Rerun the Windows exit gate against the same shelf: `CHUMMER_WINDOWS_RELEASE_CHANNEL_PATH=\"/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json\" CHUMMER_WINDOWS_LOCAL_DESKTOP_FILES_ROOT=\"/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/files\" CHUMMER_WINDOWS_INSTALLER_VISUAL_PROOF_PATH=\"/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/WINDOWS_INSTALLER_VISUAL_PROOF.generated.json\" bash /docker/chummercomplete/chummer-presentation/scripts/materialize-windows-desktop-exit-gate.sh`.",
+      "This packet is handoff-only for the staged nightly bytes. It does not publish the live downloads shelf or change the stable channel."
+    ],
+    "only_blocker_is_visual_proof": false,
+    "status": "needs_review",
+    "stderr": "",
+    "stdout": "",
+    "summary": "Windows desktop exit gate passed.",
+    "visual_proof_path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/WINDOWS_INSTALLER_VISUAL_PROOF.generated.json"
+  }
+}
