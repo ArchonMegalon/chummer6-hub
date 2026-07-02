@@ -1,10 +1,12 @@
 # OPERABLE_RELEASE_READY
 
-- Generated: 2026-07-02T05:06:30Z
+- Generated: 2026-07-02T07:02:34Z
 - Version: `run-20260701-124648`
 - Channel: `preview`
 - Published: `2026-07-01T14:29:35Z`
 - Supportability: `preview_supported`
+- Public edge: `pass` / `Version run-20260701-124648`
+- Mobile PWA: `pass`, ledger `opt_in_required`
 - Mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass
 - Billing mode: `unavailable`
 - Release-upload mode: `default_single_operator`
@@ -22,6 +24,7 @@
 - PASS `google_oauth_linking_proof`: `pass` (operator context, not release-blocking)
 - PASS `participate_billing_honesty`: `pass`
 - PASS `public_copy_leak_gate`: `pass`
+- PASS `public_edge_postdeploy_gate`: `pass`
 - PASS `release_channel`: `published`
 - INFO `release_ready`: `fail` (operator context, not release-blocking)
 - PASS `ruleset_readiness`: `pass`

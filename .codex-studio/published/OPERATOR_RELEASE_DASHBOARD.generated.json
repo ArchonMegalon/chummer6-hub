@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.operator_release_dashboard",
-  "generated_at_utc": "2026-07-02T05:06:30Z",
+  "generated_at_utc": "2026-07-02T07:02:34Z",
   "status": "pass",
   "verdict": "OPERABLE_RELEASE_READY",
   "release": {
@@ -47,6 +47,18 @@
     "frame_failure_count": 0,
     "design_verdict": "DESIGN_READY"
   },
+  "public_edge": {
+    "status": "pass",
+    "release_manifest_version": "run-20260701-124648",
+    "visible_version": "Version run-20260701-124648",
+    "navigation_status": "pass",
+    "pwa_static_status": "pass",
+    "mobile_ledger_status": "pass",
+    "mobile_ledger_payload_status": "opt_in_required",
+    "ready_mobile_handoff_status": "pass",
+    "participate_iframe_shell_status": "pass",
+    "flagship_horizons_status": "pass"
+  },
   "account_handoffs": {
     "billing_mode": "unavailable",
     "release_upload_mode": "default_single_operator"
@@ -65,7 +77,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-29T12:23:35Z",
+      "generated_at_utc": "2026-07-02T05:10:21Z",
       "pass": true
     },
     "ruleset_readiness": {
@@ -73,7 +85,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-29T11:55:31.144794Z",
+      "generated_at_utc": "2026-07-02T05:19:03.952993Z",
       "pass": true
     },
     "ui_frame_integrity": {
@@ -89,7 +101,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "DESIGN_READY",
-      "generated_at_utc": "2026-07-01T03:04:24Z",
+      "generated_at_utc": "2026-07-02T06:48:30Z",
       "pass": true
     },
     "public_copy_leak_gate": {
@@ -97,7 +109,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-06-29T20:10:33Z",
+      "generated_at_utc": "2026-07-02T05:10:23Z",
       "pass": true
     },
     "participate_billing_honesty": {
@@ -105,7 +117,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "READY",
-      "generated_at_utc": "2026-06-29T11:56:26.206863Z",
+      "generated_at_utc": "2026-07-02T05:32:00.388087Z",
       "pass": true
     },
     "account_handoff_runtime_config": {
@@ -113,7 +125,15 @@
       "exists": true,
       "status": "pass",
       "verdict": "READY",
-      "generated_at_utc": "2026-06-29T18:23:13Z",
+      "generated_at_utc": "2026-07-02T05:13:24Z",
+      "pass": true
+    },
+    "public_edge_postdeploy_gate": {
+      "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": null,
+      "generated_at_utc": "2026-07-02T07:01:46.200405+00:00",
       "pass": true
     },
     "release_ready": {
@@ -121,7 +141,7 @@
       "exists": true,
       "status": "fail",
       "verdict": "NOT_RELEASE_READY",
-      "generated_at_utc": "2026-07-02T05:05:38Z",
+      "generated_at_utc": "2026-07-02T05:13:25Z",
       "pass": false,
       "release_blocking": false
     },
@@ -130,7 +150,7 @@
       "exists": true,
       "status": "fail",
       "verdict": "NOT_GOLD",
-      "generated_at_utc": "2026-07-02T05:05:38Z",
+      "generated_at_utc": "2026-07-02T05:13:25Z",
       "pass": false,
       "release_blocking": false
     },
