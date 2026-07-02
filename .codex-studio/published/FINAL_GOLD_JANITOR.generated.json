@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-07-02T07:06:36Z",
+  "generated_at_utc": "2026-07-02T07:11:12Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
@@ -722,7 +722,7 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json",
       "exists": true,
       "status": "fail",
-      "generated_at_utc": "2026-07-02T06:52:17Z",
+      "generated_at_utc": "2026-07-02T07:11:03Z",
       "fresh_within_hours": 24,
       "structured_failures_count": 1,
       "pass": false,
@@ -795,15 +795,13 @@
       "path": "/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RELEASE_READY.generated.json",
       "exists": true,
       "status": "fail",
-      "generated_at_utc": "2026-07-02T05:13:25Z",
+      "generated_at_utc": "2026-07-02T07:11:03Z",
       "fresh_within_hours": 24,
-      "structured_failures_count": 4,
+      "structured_failures_count": 2,
       "pass": false,
       "verdict": "NOT_RELEASE_READY",
       "failures": [
-        "FAIL verify_public_edge_deploy_source",
         "FAIL verify_windows_installer_visual_audit",
-        "verify_public_edge_deploy_source",
         "verify_windows_installer_visual_audit"
       ]
     }

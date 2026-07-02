@@ -1,6 +1,6 @@
 # NOT_GOLD
 
-Generated: 2026-07-02T07:06:36Z
+Generated: 2026-07-02T07:11:12Z
 Scope: full_estate_v20
 Accepted boundaries: yes
 
@@ -29,7 +29,7 @@ Accepted boundaries: yes
 - PASS `public_route_proof`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json`
   - routes 188/188, failed 0, negative-path failures 0
 - FAIL `release_ready`: `fail` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RELEASE_READY.generated.json`
-  - release failures: FAIL verify_public_edge_deploy_source, FAIL verify_windows_installer_visual_audit, verify_public_edge_deploy_source, verify_windows_installer_visual_audit
+  - release failures: FAIL verify_windows_installer_visual_audit, verify_windows_installer_visual_audit
 - PASS `rule_authority_minimum_coverage`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json`
 - PASS `ruleset_readiness`: `pass` at `/tmp/chummer-run-services-nightly.VsudjQ/.codex-studio/published/RULESET_READINESS.generated.json`
   - authority approved: sr4, sr6

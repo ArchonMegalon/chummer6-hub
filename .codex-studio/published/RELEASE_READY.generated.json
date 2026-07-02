@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.release_ready",
-  "generated_at_utc": "2026-07-02T05:05:38Z",
+  "generated_at_utc": "2026-07-02T07:11:03Z",
   "status": "fail",
   "verdict": "NOT_RELEASE_READY",
   "command": "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 CHUMMER_RUN_SERVICES_ROOT=/tmp/chummer-run-services-nightly.VsudjQ bash /tmp/chummer-run-services-nightly.VsudjQ/scripts/verify_chummer6_release_ready.sh",
