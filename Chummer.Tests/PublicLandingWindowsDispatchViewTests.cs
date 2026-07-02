@@ -48,6 +48,8 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.Contains("data-release-lane=\"stable\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"nightly\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Stable release.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Stable release is unchanged while this nightly handoff is under review.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Nightly handoff. Stable release is unchanged.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Newer than Stable.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<summary>Other downloads</summary>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("No sudo. Updates default to notify.", downloadsView, StringComparison.Ordinal);

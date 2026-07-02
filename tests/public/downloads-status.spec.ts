@@ -32,9 +32,10 @@ test('downloads and status stay concise and point to the right next steps', asyn
   const downloadsVersionMarker = downloadsMain.locator('[data-downloads-release-version]');
   await expect(downloadsVersionMarker).toContainText(/^Version \S+/);
   const downloadsVersionText = (await downloadsVersionMarker.textContent())?.trim() || '';
-  await expect(downloadsPage.locator('body')).toContainText('Stable release.');
+  await expect(downloadsPage.locator('body')).toContainText(/Stable release/);
+  await expect(downloadsPage.locator('body')).toContainText('Nightly handoff');
   await expect(downloadsPage.locator('body')).toContainText('Build from source');
-  await expect(downloadsMain.getByRole('link', { name: /Download for|Download script|Use Stable/ })).toHaveCount(2);
+  await expect(downloadsMain.getByRole('link', { name: /Download for|Download script|Use Nightly|Use Stable/ })).toHaveCount(2);
   await downloadsPage.close();
 
   const statusPage = await openPublicPage(browser, '/status');

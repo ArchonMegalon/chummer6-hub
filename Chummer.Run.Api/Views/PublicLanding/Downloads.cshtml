@@ -8,8 +8,9 @@
     var recommended = release.Recommended;
     var requestedPlatformUnavailable = !release.RequestedPlatformHasPublicDownload
         && !string.IsNullOrWhiteSpace(release.RequestedPlatformLabel);
-    var stable = requestedPlatformUnavailable ? null : recommended;
-    var nightly = release.Alternatives
+    var currentReleaseIsNightlyHandoff = IsNightlyHandoff(Model.Manifest.Channel, Model.Manifest.Version, Model.Manifest.RolloutState);
+    var stable = requestedPlatformUnavailable || currentReleaseIsNightlyHandoff ? null : recommended;
+    var nightly = currentReleaseIsNightlyHandoff && !requestedPlatformUnavailable ? recommended : release.Alternatives
         .Where(option => stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase))
         .FirstOrDefault(IsNightly);
     var stableAndNightlyMatch = stable is not null
@@ -30,6 +31,20 @@
         ? "Version unpublished"
         : $"Version {Model.Manifest.Version}";
     var releaseVersionText = PublicReleaseVersionLabel(Model.Manifest.Version);
+    var stableHeading = stable is null
+        ? currentReleaseIsNightlyHandoff && !requestedPlatformUnavailable ? "Not promoted here" : $"{release.RequestedPlatformLabel} unavailable"
+        : stable.PlatformLabel;
+    var stableSummary = stable is null
+        ? currentReleaseIsNightlyHandoff && !requestedPlatformUnavailable
+            ? "Stable release is unchanged while this nightly handoff is under review."
+            : "Stable release is not available for this platform yet."
+        : "Stable release.";
+    var stableFallbackHref = currentReleaseIsNightlyHandoff && nightly is not null ? "#nightly" : "#other-downloads";
+    var stableFallbackLabel = currentReleaseIsNightlyHandoff && nightly is not null ? "Use Nightly" : "Other downloads";
+    var nightlyHeading = nightly is null || stableAndNightlyMatch ? "No newer build" : nightly.PlatformLabel;
+    var nightlySummary = nightly is null || stableAndNightlyMatch
+        ? "No newer Nightly right now."
+        : currentReleaseIsNightlyHandoff ? "Nightly handoff. Stable release is unchanged." : "Newer than Stable.";
     static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
     static string PublicReleaseVersionLabel(string? version)
@@ -107,6 +122,18 @@
 
         return false;
     }
+
+    static bool IsNightlyHandoff(string? channel, string? version, string? rolloutState)
+    {
+        var normalizedChannel = channel?.Trim();
+        var normalizedVersion = version?.Trim();
+        var normalizedRollout = rolloutState?.Trim();
+        return string.Equals(normalizedChannel, "nightly", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedChannel, "preview", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedRollout, "promoted_preview", StringComparison.OrdinalIgnoreCase)
+            || (!string.IsNullOrWhiteSpace(normalizedVersion)
+                && normalizedVersion.StartsWith("run-", StringComparison.OrdinalIgnoreCase));
+    }
 }
 
 <section class="minimal-page-hero downloads-simple-hero">
@@ -137,12 +164,12 @@ else
         <article class="downloads-choice-card" id="stable">
             <div>
                 <span>Stable</span>
-                <h2>@(stable is null ? $"{release.RequestedPlatformLabel} unavailable" : stable.PlatformLabel)</h2>
-                <p>@(stable is null ? "Stable release is not available for this platform yet." : "Stable release.")</p>
+                <h2>@stableHeading</h2>
+                <p>@stableSummary</p>
             </div>
             @if (stable is null)
             {
-                <a class="button-like button-like--primary" href="#other-downloads">Other downloads</a>
+                <a class="button-like button-like--primary" href="@stableFallbackHref">@stableFallbackLabel</a>
             }
             else
             {
@@ -165,8 +192,8 @@ else
         <article class="downloads-choice-card" id="nightly">
             <div>
                 <span>Nightly</span>
-                <h2>@(nightly is null || stableAndNightlyMatch ? "No newer build" : nightly.PlatformLabel)</h2>
-                <p>@(nightly is null || stableAndNightlyMatch ? "No newer Nightly right now." : "Newer than Stable.")</p>
+                <h2>@nightlyHeading</h2>
+                <p>@nightlySummary</p>
             </div>
             @if (nightly is null || stableAndNightlyMatch)
             {

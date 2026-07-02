@@ -473,7 +473,8 @@ function hasProductLiftParticipateFrame(html) {
     await expectVisible(page, 'text=Downloads');
     await expectVisible(page, 'text=Nightly');
     await expectVisible(page, 'text=Stable');
-    await expectVisible(page, 'text=Stable release.');
+    await expectVisible(page, 'text=Stable release');
+    await expectVisible(page, 'text=Nightly handoff');
     await expectVisible(page, 'text=Other downloads');
     await page.locator('summary:has-text("Other downloads")').click();
     await expectVisible(page, 'text=Build from source');
@@ -766,7 +767,8 @@ function hasProductLiftParticipateFrame(html) {
     await expectVisible(page, 'text=Downloads');
     await expectVisible(page, 'text=Stable');
     await expectVisible(page, 'text=Nightly');
-    await expectVisible(page, 'text=Stable release.');
+    await expectVisible(page, 'text=Stable release');
+    await expectVisible(page, 'text=Nightly handoff');
     await assertNoBannedCopy(page, 'Signed-in /downloads');
   });
 

@@ -2,6 +2,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+import unittest.mock
 import zipfile
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_windows_installer_visual_audit.py"
 IMPORT_SCRIPT_PATH = REPO_ROOT / "scripts" / "import_windows_installer_gold_proof_artifact.py"
+INTAKE_SCRIPT_PATH = REPO_ROOT / "scripts" / "materialize_windows_installer_visual_audit_intake_request.py"
 
 
 def load_module():
@@ -21,6 +23,14 @@ def load_module():
 
 def load_import_module():
     spec = importlib.util.spec_from_file_location("import_windows_installer_gold_proof_artifact", IMPORT_SCRIPT_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_intake_module():
+    spec = importlib.util.spec_from_file_location("materialize_windows_installer_visual_audit_intake_request", INTAKE_SCRIPT_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -383,7 +393,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         )
 
     def test_windows_capture_helper_updates_source_receipt_without_manual_json_editing(self) -> None:
-        script = Path("/docker/chummercomplete/chummer.run-services/scripts/capture_windows_installer_visual_audit.ps1")
+        script = REPO_ROOT / "scripts" / "capture_windows_installer_visual_audit.ps1"
         text = script.read_text(encoding="utf-8")
 
         self.assertIn("WINDOWS_INSTALLER_VISUAL_AUDIT.source.json", text)
@@ -486,7 +496,7 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn("surfaceCoverage", text)
 
     def test_windows_gold_proof_helper_writes_startup_receipt_and_delegates_visual_capture(self) -> None:
-        script = Path("/docker/chummercomplete/chummer.run-services/scripts/capture_windows_installer_gold_proof.ps1")
+        script = REPO_ROOT / "scripts" / "capture_windows_installer_gold_proof.ps1"
         text = script.read_text(encoding="utf-8")
 
         self.assertIn("startup-smoke-$HeadId-$Rid.receipt.json", text)
@@ -652,8 +662,87 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 module.extracted_or_directory(zip_path, root / "extract")
 
+    def test_materialize_windows_installer_visual_audit_intake_request_keeps_external_blocker_honest(self) -> None:
+        intake = load_intake_module()
+        verifier = load_module()
+        with tempfile.TemporaryDirectory(prefix="windows-visual-intake-") as temp_dir:
+            root = Path(temp_dir)
+            downloads_root, release_channel, promoted_sha = self._write_release_fixture(root)
+            startup = downloads_root / "startup-smoke" / "startup-smoke-avalonia-win-x64.receipt.json"
+            startup.parent.mkdir()
+            startup.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "artifactDigest": f"sha256:{promoted_sha}",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            stale_source = downloads_root / "visual-audit" / "windows-installer" / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+            stale_source.parent.mkdir(parents=True)
+            (stale_source.parent / "completion.png").write_bytes(b"stale")
+            stale_source.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "platform": "windows",
+                        "hostClass": "native-windows-11",
+                        "artifactSha256": "0" * 64,
+                        "screenshots": [
+                            {
+                                "path": "completion.png",
+                                "dpiScale": 1.0,
+                                "surface": "completion",
+                                "clippingStatus": "pass",
+                                "readabilityStatus": "pass",
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            drop_root = root / "operator-drop"
+            drop_root.mkdir()
+            matching_candidate = drop_root / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+            matching_candidate.write_text(
+                json.dumps(
+                    {
+                        "status": "pass",
+                        "platform": "windows",
+                        "hostClass": "native-windows-11",
+                        "artifactSha256": promoted_sha,
+                        "screenshots": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            payload = intake.build_request(
+                release_channel=release_channel,
+                downloads_root=downloads_root,
+                startup_receipt=startup,
+                source=stale_source,
+                discovery_roots=[drop_root],
+                nightly_root=root / "missing-nightlies",
+            )
+
+        self.assertEqual("external_artifact_required", payload["status"])
+        self.assertEqual(promoted_sha, payload["promoted_installer"]["sha256"])
+        self.assertFalse(payload["current_blocker"]["current_visual_source_matches_promoted"])
+        self.assertIn(
+            "Windows installer visual audit source digest does not match promoted installer",
+            payload["current_blocker"]["failure"],
+        )
+        self.assertEqual(1, payload["last_discovery"]["visual_sources"]["matching_promoted_count"])
+        self.assertIn("capture_windows_installer_gold_proof.ps1", payload["operator_request"]["powershell_commands"][0])
+        self.assertIn("-CaptureVisualAudit", payload["operator_request"]["powershell_commands"][0])
+        self.assertIn(promoted_sha[:12], payload["operator_request"]["powershell_commands"][1])
+        self.assertEqual(list(verifier.REQUIRED_SURFACES), payload["operator_request"]["required_surfaces"])
+        self.assertFalse(payload["direct_telegram_sent"])
+
     def test_downloads_runbook_documents_windows_gold_proof_loop(self) -> None:
-        runbook = Path("/docker/chummercomplete/chummer.run-services/docs/SELF_HOSTED_DOWNLOADS_RUNBOOK.md")
+        runbook = REPO_ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
         text = runbook.read_text(encoding="utf-8")
 
         self.assertIn("Windows installer gold proof", text)

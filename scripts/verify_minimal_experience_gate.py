@@ -154,7 +154,7 @@ def build_payload(
     stable_visible = (
         'id="stable"' in downloads_html
         and "Stable" in downloads_text
-        and "Stable release." in downloads_text
+        and "Stable release" in downloads_text
     )
     nightly_visible = 'id="nightly"' in downloads_html and "Nightly" in downloads_text
     decision_card_count = count_class_token(status_html, "minimal-status-pill")

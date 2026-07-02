@@ -167,6 +167,7 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
         "@PublicDownloadText(Model.Manifest.Message)",
         "stableAndNightlyMatch",
         "No newer Nightly right now.",
+        "static bool IsNightlyHandoff(string? channel, string? version, string? rolloutState)",
         "static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "var statusLine = Model.ReleaseExperience.Recommended is null",
         ": publicPlatformSummary;",
@@ -953,15 +954,19 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Chummer selects the best installer when it can. Other downloads stay below." in downloads
     assert "attach this installed copy to your account" in downloads
     assert "Stable release." in downloads
+    assert "Stable release is unchanged while this nightly handoff is under review." in downloads
+    assert "Nightly handoff. Stable release is unchanged." in downloads
     assert "Stable release is not available for this platform yet." in downloads
     assert "<summary>Other downloads</summary>" in downloads
     assert "showLinuxSourcePrimary" in downloads
     assert "No sudo. Updates default to notify." in downloads
     assert "/downloads/build-chummer6-linux.sh" in downloads
     assert "stableAndNightlyMatch" in downloads
+    assert "currentReleaseIsNightlyHandoff" in downloads
     assert "release.Alternatives.Concat(release.OtherPlatforms)" not in downloads
     assert "FirstOrDefault(IsNightly)" in downloads
     assert "static bool IsNightly(ReleaseOptionViewModel option)" in downloads
+    assert "static bool IsNightlyHandoff(string? channel, string? version, string? rolloutState)" in downloads
     assert 'value.Contains("nightly", StringComparison.OrdinalIgnoreCase)' in downloads
     assert "No newer Nightly right now." in downloads
     assert "Pick one." not in downloads
