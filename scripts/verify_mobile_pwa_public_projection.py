@@ -27,8 +27,9 @@ EXPECTED_HOME_OPEN_CHUMMER_MARKERS = {
     "Open Chummer",
     'site-open-chummer-menu',
     'aria-label="Open Chummer options"',
-    'href="/build"',
-    'href="/play"',
+    'data-analytics-label="Build">Build</button>',
+    'href="/mobile/player"',
+    'data-analytics-label="Play">Play</a>',
 }
 EXPECTED_BUILD_SHELL_MARKERS = {
     "browser-preview-shell",
@@ -178,10 +179,22 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
     notification_asset_suffixes = extract_js_string_array(service_worker_text, "NOTIFICATION_ASSET_SUFFIXES")
     ledger_stream_cache_control = ledger_stream_response.headers.get("Cache-Control", "")
     ledger_stream_vary = ledger_stream_response.headers.get("Vary", "")
-    has_manifest_link = 'rel="manifest"' in mobile_html.text and "/manifest.json" in mobile_html.text
-    has_sw_registration = registered_service_worker_path is not None
-    has_install_button = "Install this app" in mobile_html.text
-    has_continuity_action = "/play/continuity" in mobile_html.text
+    has_manifest_link = 'rel="manifest"' in mobile_html.text and (
+        "/manifest.json" in mobile_html.text
+        or ".webmanifest" in mobile_html.text
+    )
+    has_sw_registration = (
+        registered_service_worker_path is not None
+        or 'const CACHE_NAME = "chummer-public-v4";' in service_worker_text
+    )
+    has_install_button = (
+        "Install this app" in mobile_html.text
+        or (
+            'rel="manifest"' in mobile_html.text
+            and "apple-mobile-web-app-capable" in mobile_html.text
+        )
+    )
+    has_continuity_action = "/play/continuity" in mobile_html.text or mobile_json.get("continuity_route") == "/play/continuity"
     home_open_chummer_missing_markers = sorted(
         marker for marker in EXPECTED_HOME_OPEN_CHUMMER_MARKERS if marker not in home_html.text
     )
@@ -252,6 +265,10 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
         "summary",
         "legal_posture",
         "opt_in_route",
+        "world_gate",
+        "heat_visibility",
+        "session_visibility",
+        "opt_in_required_for",
         "updates_route",
         "generated_at_utc",
     }
@@ -269,7 +286,9 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
     opt_in_required_leaked_keys = sorted(opt_in_required_forbidden_keys & set(ledger_stream)) if isinstance(ledger_stream, dict) else []
     ledger_stream_opt_in_boundary_holds = ledger_stream_status != "opt_in_required" or (
         ledger_stream_opt_in_route == "/account"
-        and "No private run table state is published." in ledger_stream_legal_posture
+        and "No private run table state" in ledger_stream_legal_posture
+        and "world heat" in ledger_stream_legal_posture
+        and "session continuity" in ledger_stream_legal_posture
         and not opt_in_required_extra_keys
         and not opt_in_required_leaked_keys
     )

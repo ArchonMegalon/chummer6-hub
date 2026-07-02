@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.mobile_pwa_public_projection",
   "status": "pass",
-  "generated_at_utc": "2026-06-30T23:46:52.801060Z",
+  "generated_at_utc": "2026-07-02T04:35:25.805371Z",
   "base_url": "https://chummer.run",
   "checks": [
     {
@@ -155,6 +155,11 @@
       "detail": "Live mode must include a world snapshot, heat list, map route, and continuity object."
     },
     {
+      "id": "ledger_stream_live_actions_are_product_routes",
+      "pass": true,
+      "detail": "Live tracker actions must be public product routes, not raw data endpoints. tracker={}."
+    },
+    {
       "id": "role_routes_hold",
       "pass": true,
       "detail": "route mismatches: []."
@@ -233,7 +238,7 @@
     ]
   },
   "service_worker": {
-    "path": "/service-worker.js?v=1782820780",
+    "path": "/service-worker.js",
     "status_code": 200,
     "has_fetch_handler": true,
     "has_navigation_preload": true,

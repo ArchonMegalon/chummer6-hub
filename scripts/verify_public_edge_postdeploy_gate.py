@@ -146,6 +146,25 @@ def require(condition: bool, failures: list[str], message: str) -> None:
         failures.append(message)
 
 
+def normalize_token(value: Any) -> str:
+    return str(value or "").strip().casefold()
+
+
+def expected_release_posture(expected_release_channel: str) -> dict[str, str]:
+    normalized = normalize_token(expected_release_channel) or "public_stable"
+    if normalized in {"preview", "nightly", "promoted_preview"}:
+        return {
+            "channel": "preview",
+            "rollout": "promoted_preview",
+            "supportability": "preview_supported",
+        }
+    return {
+        "channel": "public_stable",
+        "rollout": "public_stable",
+        "supportability": "gold_supported",
+    }
+
+
 def fetch(base_url: str, path: str, timeout_seconds: float) -> FetchResult:
     url = urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
     request = Request(url, headers={"User-Agent": "ChummerPublicEdgePostdeployGate/1.0"})
@@ -303,8 +322,9 @@ def extract_downloads_version_marker(html: str) -> str:
     return match.group(1).strip() if match else ""
 
 
-def verify_downloads(base_url: str, timeout_seconds: float) -> dict[str, Any]:
+def verify_downloads(base_url: str, timeout_seconds: float, expected_release_channel: str = "public_stable") -> dict[str, Any]:
     failures: list[str] = []
+    expected_posture = expected_release_posture(expected_release_channel)
     downloads = fetch(base_url, "/downloads", timeout_seconds)
     status = fetch(base_url, "/status", timeout_seconds)
     release = fetch(base_url, "/downloads/RELEASE_CHANNEL.generated.json", timeout_seconds)
@@ -314,6 +334,7 @@ def verify_downloads(base_url: str, timeout_seconds: float) -> dict[str, Any]:
     status_version = extract_downloads_version_marker(status.body)
     release_version = str(release_payload.get("releaseVersion") or release_payload.get("version") or "")
     release_status = str(release_payload.get("status") or "")
+    release_channel = str(release_payload.get("channel") or release_payload.get("channelId") or "")
     release_rollout = str(release_payload.get("rolloutState") or "")
     release_supportability = str(release_payload.get("supportabilityState") or "")
 
@@ -326,8 +347,21 @@ def verify_downloads(base_url: str, timeout_seconds: float) -> dict[str, Any]:
         require(downloads_version.endswith(release_version), failures, "/downloads version marker does not match release channel version")
         require(status_version.endswith(release_version), failures, "/status version marker does not match release channel version")
     require(release_status == "published", failures, f"release status expected published, got {release_status or '<empty>'}")
-    require(release_rollout == "public_stable", failures, f"release rollout expected public_stable, got {release_rollout or '<empty>'}")
-    require(release_supportability == "gold_supported", failures, f"release supportability expected gold_supported, got {release_supportability or '<empty>'}")
+    require(
+        normalize_token(release_channel) == expected_posture["channel"],
+        failures,
+        f"release channel expected {expected_posture['channel']}, got {release_channel or '<empty>'}",
+    )
+    require(
+        normalize_token(release_rollout) == expected_posture["rollout"],
+        failures,
+        f"release rollout expected {expected_posture['rollout']}, got {release_rollout or '<empty>'}",
+    )
+    require(
+        normalize_token(release_supportability) == expected_posture["supportability"],
+        failures,
+        f"release supportability expected {expected_posture['supportability']}, got {release_supportability or '<empty>'}",
+    )
 
     return {
         "contractName": "chummer.downloads_version_marker.v1",
@@ -338,7 +372,10 @@ def verify_downloads(base_url: str, timeout_seconds: float) -> dict[str, Any]:
         "visible_version": downloads_version,
         "status_redirect_version": status_version,
         "release_version": release_version,
-        "release_channel": release_payload.get("channel") or release_payload.get("channelId"),
+        "release_channel": release_channel,
+        "expected_release_channel": expected_posture["channel"],
+        "expected_release_rollout_state": expected_posture["rollout"],
+        "expected_release_supportability_state": expected_posture["supportability"],
         "release_rollout_state": release_rollout,
         "release_status": release_status,
         "release_supportability_state": release_supportability,
@@ -1030,6 +1067,7 @@ def verify(
     base_url: str,
     timeout_seconds: float,
     skip_preflight: bool,
+    expected_release_channel: str = "public_stable",
     playwright_requirements: list[str] | None = None,
     playwright_timeout_seconds: float = 420.0,
     playwright_artifact_dir: Path | None = None,
@@ -1039,7 +1077,7 @@ def verify(
 ) -> dict[str, Any]:
     normalized_base_url = base_url.rstrip("/")
     child_receipts = {
-        "downloads": verify_downloads(normalized_base_url, timeout_seconds),
+        "downloads": verify_downloads(normalized_base_url, timeout_seconds, expected_release_channel),
         "navigation": verify_navigation(normalized_base_url, timeout_seconds),
         "pwaStatic": verify_pwa_static(normalized_base_url, timeout_seconds),
         "readyMobileHandoff": verify_ready_mobile_handoff(normalized_base_url, timeout_seconds),
@@ -1104,6 +1142,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-url", default="https://chummer.run")
     parser.add_argument("--timeout-seconds", type=float, default=25.0)
     parser.add_argument("--skip-preflight", action="store_true", help="Skip active-build process checks for post-fact live verification.")
+    parser.add_argument(
+        "--expected-release-channel",
+        default="public_stable",
+        choices=["public_stable", "stable", "preview", "nightly"],
+        help="Expected published release posture. Stable remains the default; nightly handoff verification must opt into preview.",
+    )
     parser.add_argument("--require-downloads-status-playwright", action="store_true", help="Run the downloads/status public browser proof and include its receipt.")
     parser.add_argument("--require-mobile-pwa-viewport-playwright", action="store_true", help="Run the mobile PWA viewport browser proof and include its receipt.")
     parser.add_argument("--require-frontdoor-navigation-playwright", action="store_true", help="Run the frontdoor Open Chummer mobile browser proof and include its receipt.")
@@ -1127,6 +1171,7 @@ def main(argv: list[str] | None = None) -> int:
         args.base_url,
         args.timeout_seconds,
         args.skip_preflight,
+        args.expected_release_channel,
         playwright_requirements,
         args.playwright_timeout_seconds,
         Path(args.playwright_artifact_dir) if args.playwright_artifact_dir else None,

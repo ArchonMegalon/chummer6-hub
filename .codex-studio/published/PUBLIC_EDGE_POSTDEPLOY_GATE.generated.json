@@ -1,0 +1,876 @@
+{
+  "baseUrl": "https://chummer.run",
+  "browserPlaywrightRequiredProofs": [],
+  "browserPlaywrightStatus": "pass",
+  "childReceipts": {
+    "browserPlaywright": {
+      "artifacts": {},
+      "contractName": "chummer.public_edge_browser_playwright.v1",
+      "failures": [],
+      "requiredProofs": [],
+      "skipped": true,
+      "status": "pass"
+    },
+    "downloads": {
+      "contractName": "chummer.downloads_version_marker.v1",
+      "downloads_status": 200,
+      "expected_release_channel": "preview",
+      "expected_release_rollout_state": "promoted_preview",
+      "expected_release_supportability_state": "preview_supported",
+      "failures": [],
+      "release_channel": "preview",
+      "release_manifest_status": 200,
+      "release_rollout_state": "promoted_preview",
+      "release_status": "published",
+      "release_supportability_state": "preview_supported",
+      "release_version": "run-20260701-124648",
+      "status": "pass",
+      "status_redirect_version": "Version run-20260701-124648",
+      "status_status": 200,
+      "visible_version": "Version run-20260701-124648"
+    },
+    "flagshipHorizons": {
+      "browserProofCoverage": "skipped",
+      "browserProofsPresent": [],
+      "browserProofsRequiredForReleaseClaims": [
+        "downloadsStatus",
+        "frontdoorNavigation",
+        "mobilePwaViewport"
+      ],
+      "contractName": "chummer.flagship_horizons_gate.v1",
+      "failures": [],
+      "horizonCount": 3,
+      "horizons": [
+        {
+          "failures": [],
+          "id": "near_term_stabilization",
+          "requiredReceipts": [
+            "downloads",
+            "navigation",
+            "pwaStatic",
+            "readyMobileHandoff",
+            "mobilePwaServiceWorkerBoundary",
+            "participateIframeShell",
+            "portalRuntimeImage"
+          ],
+          "requiredRoutes": [],
+          "requiredTools": [],
+          "status": "pass",
+          "title": "Near-term stabilization"
+        },
+        {
+          "failures": [],
+          "id": "mid_term_pwa_session_utility",
+          "requiredReceipts": [
+            "pwaStatic",
+            "readyMobileHandoff",
+            "browserPlaywright"
+          ],
+          "requiredRoutes": [
+            "/mobile",
+            "/mobile/gm",
+            "/mobile/observer",
+            "/mobile/player",
+            "/play/continuity"
+          ],
+          "requiredTools": [
+            "ammo",
+            "health",
+            "inventory",
+            "modifiers",
+            "quick_rolls"
+          ],
+          "status": "pass",
+          "title": "Mid-term PWA/session utility"
+        },
+        {
+          "failures": [],
+          "id": "long_term_living_world_expansion",
+          "requiredReceipts": [
+            "readyMobileHandoff",
+            "mobileLedger",
+            "mobilePwaServiceWorkerBoundary"
+          ],
+          "requiredRoutes": [],
+          "requiredTools": [
+            "living_world"
+          ],
+          "status": "pass",
+          "title": "Long-term living-world expansion"
+        }
+      ],
+      "packetRoles": [
+        "gm",
+        "organizer",
+        "player"
+      ],
+      "packetRouteCount": 3,
+      "routeStatuses": {
+        "/mobile": "200",
+        "/mobile/gm": "200",
+        "/mobile/observer": "200",
+        "/mobile/player": "200",
+        "/play": "200",
+        "/play/continuity": "200"
+      },
+      "status": "pass",
+      "toolIds": [
+        "ammo",
+        "health",
+        "inventory",
+        "living_world",
+        "modifiers",
+        "quick_rolls"
+      ]
+    },
+    "mobileLedger": {
+      "black_ledger_bound": true,
+      "cache_control": "private, no-store, no-cache, max-age=0",
+      "contractName": "chummer.mobile_pwa_ledger_boundary.v1",
+      "failures": [],
+      "followed_world_bound": true,
+      "heat_bound": true,
+      "heat_visibility": "hidden_until_opt_in",
+      "opt_in_required_for": [
+        "black_ledger_heat",
+        "followed_world_updates",
+        "session_continuity"
+      ],
+      "opt_in_route": "/account",
+      "payload_status": "opt_in_required",
+      "pragma": "no-cache",
+      "private_table_state_hidden": true,
+      "session_continuity_bound": true,
+      "session_visibility": "hidden_until_opt_in",
+      "status": "pass",
+      "status_code": 200,
+      "vary": "Cookie, Authorization",
+      "world_gate": "account_opt_in_and_followed_world_selection"
+    },
+    "mobilePwaServiceWorkerBoundary": {
+      "baseUrl": "https://chummer.run",
+      "contractName": "chummer.mobile_pwa_service_worker_boundary.v1",
+      "failures": [],
+      "generatedAtUtc": "2026-07-02T04:35:20.799400+00:00",
+      "ledgerBoundary": {
+        "cache_control": "private, no-store, no-cache, max-age=0",
+        "path": "/mobile/pwa/ledger.json",
+        "payload_status": "opt_in_required",
+        "pragma": "no-cache",
+        "status_code": 200,
+        "vary": "Cookie, Authorization"
+      },
+      "mobileRuntime": {
+        "content_type": "text/javascript",
+        "path": "/mobile-turn-companion.js",
+        "registrations": [
+          {
+            "scope": "/",
+            "script": "/service-worker.js"
+          }
+        ],
+        "serviceWorkerBoundaryMode": "shared_portal_root_worker",
+        "sha256": "e3b8e06aa053ff8a5b58b64ae80460607c2070685e712086031180dd4f49b1cf",
+        "status_code": 200
+      },
+      "rootWorker": {
+        "content_type": "text/javascript",
+        "kind": "portal_public_root_worker",
+        "path": "/service-worker.js",
+        "sha256": "a33646e610745157163e2fd94b5f97e6ed57578f7ec57379063574e77d845e6f",
+        "status_code": 200
+      },
+      "status": "pass"
+    },
+    "navigation": {
+      "contractName": "chummer.public_navigation_open_chummer.v1",
+      "failures": [],
+      "sha256": "7178e1869f33a88ac5838c49702981f28e153576f4ec574d3d5d604fdb35e40f",
+      "status": "pass",
+      "status_code": 200
+    },
+    "participateIframeShell": {
+      "base_url": "https://chummer.run",
+      "contractName": "chummer.participate_iframe_shell.v1",
+      "failures": [],
+      "generatedAtUtc": "2026-07-02T04:35:21.101632+00:00",
+      "iframe_route_count": 2,
+      "live": [
+        {
+          "content_type": "text/html; charset=utf-8",
+          "failures": [],
+          "final_path": "/participate",
+          "final_url": "https://chummer.run/participate",
+          "has_iframe": true,
+          "has_offline_fallback": false,
+          "iframe_srcs": [
+            "https://chummer6.productlift.dev/"
+          ],
+          "iframe_uses_old_proxy": false,
+          "iframe_uses_productlift": true,
+          "removed_board_eyebrow_present": false,
+          "removed_summary_present": false,
+          "route": "/participate",
+          "sha256": "056ba6367e8597a523d243416394cccb9248654b3f9f5e2546cdc292347692db",
+          "status": "pass",
+          "status_code": 200
+        },
+        {
+          "content_type": "text/html; charset=utf-8",
+          "failures": [],
+          "final_path": "/participate",
+          "final_url": "https://chummer.run/participate",
+          "has_iframe": true,
+          "has_offline_fallback": false,
+          "iframe_srcs": [
+            "https://chummer6.productlift.dev/"
+          ],
+          "iframe_uses_old_proxy": false,
+          "iframe_uses_productlift": true,
+          "removed_board_eyebrow_present": false,
+          "removed_summary_present": false,
+          "route": "/partizipate",
+          "sha256": "056ba6367e8597a523d243416394cccb9248654b3f9f5e2546cdc292347692db",
+          "status": "pass",
+          "status_code": 200
+        }
+      ],
+      "offline_fallback_route_count": 0,
+      "route_count": 2,
+      "source": {
+        "failures": [],
+        "required": {
+          "legacy_builder_summary_is_minimal": true,
+          "legacy_builder_uses_hosted_upstream_iframe": true,
+          "public_builder_summary_is_minimal": true,
+          "public_builder_uses_hosted_upstream_iframe": true,
+          "view_allows_full_provider_feature_set": true,
+          "view_has_offline_fallback": true,
+          "view_has_real_iframe": true,
+          "view_has_screen_reader_title": true,
+          "view_removes_board_eyebrow": true,
+          "view_removes_old_summary": true,
+          "view_removes_visible_header": true,
+          "view_uses_cross_origin_referrer_policy": true,
+          "view_uses_existing_embed_href": true
+        },
+        "status": "pass"
+      },
+      "status": "pass"
+    },
+    "portalRuntimeImage": {
+      "contractName": "chummer.public_edge_portal_runtime_image.v1",
+      "expectedImageId": "",
+      "failures": [],
+      "portalContainer": "chummer6-hub-chummer-portal-1",
+      "portalImageTag": "chummer-run-api:local",
+      "skipped": true,
+      "status": "pass"
+    },
+    "preflight": {
+      "activePortalBuildProcesses": [],
+      "contractName": "chummer.public_edge_deploy_preflight.v1",
+      "failures": [],
+      "skipped": true,
+      "status": "pass"
+    },
+    "pwaStatic": {
+      "asset_count": 7,
+      "assets": [
+        {
+          "bytes": 584,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-icon.svg",
+          "sha256": "cf764fa25a929641611c325ac6f8a23caa817611bcb6ccfc604490eced5a4111",
+          "status_code": 200
+        },
+        {
+          "bytes": 680,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-maskable.svg",
+          "sha256": "6ea67fd6e7dd490aa91bd0afd3f748c8339da7e5f6f2a5898c014807fd713b15",
+          "status_code": 200
+        },
+        {
+          "bytes": 4670,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-screenshot-mobile.svg",
+          "sha256": "d1ca5771e49923454d69477e92a46a700b9776bc5eeec361f73f876beb10afaf",
+          "status_code": 200
+        },
+        {
+          "bytes": 2434,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-screenshot-wide.svg",
+          "sha256": "e935b9ae93d4af7fc5ba37a44a709518d19d95d9115cad1fdbdae126be2268e4",
+          "status_code": 200
+        },
+        {
+          "bytes": 24000,
+          "content_type": "image/png",
+          "path": "/apple-touch-icon.png",
+          "sha256": "749fe84fe351fbda8b91311c8e680e03173c737dd1928e554d5ff350e3057037",
+          "status_code": 200
+        },
+        {
+          "bytes": 27212,
+          "content_type": "image/x-icon",
+          "path": "/favicon.ico",
+          "sha256": "bce6476443a26a5cfa12be2c26b7addea18f9247d77ea372b69fe2ce4e2e86ab",
+          "status_code": 200
+        },
+        {
+          "bytes": 589,
+          "content_type": "image/svg+xml",
+          "path": "/favicon.svg",
+          "sha256": "2314fdcc85173e7ee8c13fc1841cd094c253f9101e3716d999d1f5e400563beb",
+          "status_code": 200
+        }
+      ],
+      "contractName": "chummer.public_pwa_static_assets.v1",
+      "failures": [],
+      "manifest_count": 5,
+      "manifest_declared_asset_count": 8,
+      "manifest_declared_assets": [
+        {
+          "bytes": 11800,
+          "content_type": "image/png",
+          "path": "/icons/icon-192.png",
+          "sha256": "16c929fde789f4bc4d57f09cc4b4dc787d8a08a634bcb62892e84849dad77ac5",
+          "status_code": 200
+        },
+        {
+          "bytes": 271,
+          "content_type": "image/svg+xml",
+          "path": "/icons/icon-192.svg",
+          "sha256": "0d7b9fe1d527ceca3291e5025e6de00988a4f077d26570b9eb794f9a942f810e",
+          "status_code": 200
+        },
+        {
+          "bytes": 35168,
+          "content_type": "image/png",
+          "path": "/icons/icon-512.png",
+          "sha256": "9edf752bd6e0e1964a4666d2f4b8bb79b4079d2f94291b5afd86ec861c7d7b1d",
+          "status_code": 200
+        },
+        {
+          "bytes": 281,
+          "content_type": "image/svg+xml",
+          "path": "/icons/icon-512.svg",
+          "sha256": "1e0134a8c2dcc849934c62c856fa65c63acf8e7f43e07e82be85fc42296c6dde",
+          "status_code": 200
+        },
+        {
+          "bytes": 584,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-icon.svg",
+          "sha256": "cf764fa25a929641611c325ac6f8a23caa817611bcb6ccfc604490eced5a4111",
+          "status_code": 200
+        },
+        {
+          "bytes": 680,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-maskable.svg",
+          "sha256": "6ea67fd6e7dd490aa91bd0afd3f748c8339da7e5f6f2a5898c014807fd713b15",
+          "status_code": 200
+        },
+        {
+          "bytes": 4670,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-screenshot-mobile.svg",
+          "sha256": "d1ca5771e49923454d69477e92a46a700b9776bc5eeec361f73f876beb10afaf",
+          "status_code": 200
+        },
+        {
+          "bytes": 2434,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-screenshot-wide.svg",
+          "sha256": "e935b9ae93d4af7fc5ba37a44a709518d19d95d9115cad1fdbdae126be2268e4",
+          "status_code": 200
+        }
+      ],
+      "manifests": [
+        {
+          "content_type": "application/json",
+          "display": "standalone",
+          "icon_count": 2,
+          "manifest_declared_asset_count": 4,
+          "manifest_declared_assets": [
+            "/pwa-icon.svg",
+            "/pwa-maskable.svg",
+            "/pwa-screenshot-mobile.svg",
+            "/pwa-screenshot-wide.svg"
+          ],
+          "path": "/manifest.json",
+          "sha256": "ecc52d060a121e89f9193716ceb53c8b34d7742fd3cd64d3c231d76ae3e4734c",
+          "start_url": "/mobile",
+          "status_code": 200
+        },
+        {
+          "content_type": "application/manifest+json",
+          "display": "standalone",
+          "icon_count": 2,
+          "manifest_declared_asset_count": 4,
+          "manifest_declared_assets": [
+            "/pwa-icon.svg",
+            "/pwa-maskable.svg",
+            "/pwa-screenshot-mobile.svg",
+            "/pwa-screenshot-wide.svg"
+          ],
+          "path": "/manifest.webmanifest",
+          "sha256": "007a65e4fb4396671a314c35be3018b95ad1a331895809eb97a2aa8f7a56b236",
+          "start_url": "/mobile",
+          "status_code": 200
+        },
+        {
+          "content_type": "application/manifest+json",
+          "display": "standalone",
+          "icon_count": 2,
+          "manifest_declared_asset_count": 4,
+          "manifest_declared_assets": [
+            "/pwa-icon.svg",
+            "/pwa-maskable.svg",
+            "/pwa-screenshot-mobile.svg",
+            "/pwa-screenshot-wide.svg"
+          ],
+          "path": "/site.webmanifest",
+          "sha256": "007a65e4fb4396671a314c35be3018b95ad1a331895809eb97a2aa8f7a56b236",
+          "start_url": "/mobile",
+          "status_code": 200
+        },
+        {
+          "content_type": "application/manifest+json",
+          "display": "standalone",
+          "icon_count": 4,
+          "manifest_declared_asset_count": 4,
+          "manifest_declared_assets": [
+            "/icons/icon-192.png",
+            "/icons/icon-192.svg",
+            "/icons/icon-512.png",
+            "/icons/icon-512.svg"
+          ],
+          "path": "/manifest.player.webmanifest",
+          "sha256": "92ac7e75aef1f1250cb0e43b044c096d2a652739dfd9fd6377b8d387e38df542",
+          "start_url": "/mobile/player?role=Player",
+          "status_code": 200
+        },
+        {
+          "content_type": "application/manifest+json",
+          "display": "standalone",
+          "icon_count": 4,
+          "manifest_declared_asset_count": 4,
+          "manifest_declared_assets": [
+            "/icons/icon-192.png",
+            "/icons/icon-192.svg",
+            "/icons/icon-512.png",
+            "/icons/icon-512.svg"
+          ],
+          "path": "/manifest.gm.webmanifest",
+          "sha256": "1f6b921f0ae9ace8763cd9c51f1667df3c34bfd666e2bb0f960aa2839996aa4d",
+          "start_url": "/mobile/gm?role=GameMaster",
+          "status_code": 200
+        }
+      ],
+      "route_count": 6,
+      "routes": [
+        {
+          "content_type": "text/html; charset=utf-8",
+          "expected_text_found": true,
+          "path": "/mobile",
+          "sha256": "e27690fb40c83451d0251f7f5a7ec9c2e0e1757e32d350a0aaa4e40ba69b4232",
+          "status_code": 200
+        },
+        {
+          "content_type": "text/html; charset=utf-8",
+          "expected_text_found": true,
+          "path": "/mobile/player",
+          "sha256": "15b770b0e7164a2afe68a8e99ba04b93b93b3b06e1c3991dab30b650f5c21e12",
+          "status_code": 200
+        },
+        {
+          "content_type": "text/html; charset=utf-8",
+          "expected_text_found": true,
+          "path": "/mobile/gm",
+          "sha256": "64860531a4ee69a466426ebfaaf1474144e11eeed5ebffb100f0e7e3cd743cfb",
+          "status_code": 200
+        },
+        {
+          "content_type": "text/html; charset=utf-8",
+          "expected_text_found": true,
+          "path": "/mobile/observer",
+          "sha256": "e9c896dd8453ea1c9b0b9c99d86510865fa5c41fb4f60d8a5c9963b6d21b7a06",
+          "status_code": 200
+        },
+        {
+          "content_type": "text/html; charset=utf-8",
+          "expected_text_found": true,
+          "path": "/play",
+          "sha256": "5606c0ca008200073605e94fe5c79a7c822983b4e2f69645336adcaa4847d4d2",
+          "status_code": 200
+        },
+        {
+          "content_type": "text/html; charset=utf-8",
+          "expected_text_found": true,
+          "path": "/play/continuity",
+          "sha256": "c392effb0f51f66a8164454605428cefa6e5f23ec808288cf260409ba8157544",
+          "status_code": 200
+        }
+      ],
+      "service_worker": {
+        "cache_name": "chummer-public-v4",
+        "cache_version": "",
+        "content_type": "text/javascript",
+        "ledger_stream_non_cacheable": true,
+        "ledger_stream_precached": false,
+        "non_cacheable_paths": [
+          "/mobile/pwa/ledger.json"
+        ],
+        "play_shell_asset_count": 0,
+        "precache_urls": [
+          "/",
+          "/apple-touch-icon.png",
+          "/css/site.css",
+          "/downloads",
+          "/favicon.ico",
+          "/favicon.svg",
+          "/help",
+          "/js/site.js",
+          "/manifest.gm.webmanifest",
+          "/manifest.json",
+          "/manifest.player.webmanifest",
+          "/manifest.webmanifest",
+          "/mobile",
+          "/mobile/gm",
+          "/mobile/observer",
+          "/mobile/player",
+          "/mobile/pwa.json",
+          "/packages",
+          "/play",
+          "/play/continuity",
+          "/pwa-icon.svg",
+          "/pwa-maskable.svg",
+          "/pwa-screenshot-mobile.svg",
+          "/pwa-screenshot-wide.svg",
+          "/ready/handoff/mobile.json",
+          "/site.webmanifest",
+          "/status"
+        ],
+        "sha256": "a33646e610745157163e2fd94b5f97e6ed57578f7ec57379063574e77d845e6f",
+        "shell_assets": [],
+        "status_code": 200,
+        "worker_kind": "portal"
+      },
+      "service_worker_declared_path_count": 27,
+      "service_worker_declared_paths": [
+        {
+          "bytes": 10741,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/",
+          "sha256": "7178e1869f33a88ac5838c49702981f28e153576f4ec574d3d5d604fdb35e40f",
+          "status_code": 200
+        },
+        {
+          "bytes": 24000,
+          "content_type": "image/png",
+          "path": "/apple-touch-icon.png",
+          "sha256": "749fe84fe351fbda8b91311c8e680e03173c737dd1928e554d5ff350e3057037",
+          "status_code": 200
+        },
+        {
+          "bytes": 239603,
+          "content_type": "text/css",
+          "path": "/css/site.css",
+          "sha256": "04ba6d1511a9c12daecb4842e170088c3d7de5c600687c9c9d5306ac462846e7",
+          "status_code": 200
+        },
+        {
+          "bytes": 12485,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/downloads",
+          "sha256": "a00eccabac439ab5b5d2a6e228977e84d148f4dfc9e2ec423a1fe22d9d2ef14c",
+          "status_code": 200
+        },
+        {
+          "bytes": 27212,
+          "content_type": "image/x-icon",
+          "path": "/favicon.ico",
+          "sha256": "bce6476443a26a5cfa12be2c26b7addea18f9247d77ea372b69fe2ce4e2e86ab",
+          "status_code": 200
+        },
+        {
+          "bytes": 589,
+          "content_type": "image/svg+xml",
+          "path": "/favicon.svg",
+          "sha256": "2314fdcc85173e7ee8c13fc1841cd094c253f9101e3716d999d1f5e400563beb",
+          "status_code": 200
+        },
+        {
+          "bytes": 9742,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/help",
+          "sha256": "8fac1b0fddd580763eaf40413d3f5c1ac0f0066a669c278de2a0e9ef281d3185",
+          "status_code": 200
+        },
+        {
+          "bytes": 12577,
+          "content_type": "text/javascript",
+          "path": "/js/site.js",
+          "sha256": "9603d99e5a0a0733e155e5791d85bb6a3c566d9c9d8a3ecc16e00df4f0145098",
+          "status_code": 200
+        },
+        {
+          "bytes": 1365,
+          "content_type": "application/manifest+json",
+          "path": "/manifest.gm.webmanifest",
+          "sha256": "1f6b921f0ae9ace8763cd9c51f1667df3c34bfd666e2bb0f960aa2839996aa4d",
+          "status_code": 200
+        },
+        {
+          "bytes": 1770,
+          "content_type": "application/json",
+          "path": "/manifest.json",
+          "sha256": "ecc52d060a121e89f9193716ceb53c8b34d7742fd3cd64d3c231d76ae3e4734c",
+          "status_code": 200
+        },
+        {
+          "bytes": 1368,
+          "content_type": "application/manifest+json",
+          "path": "/manifest.player.webmanifest",
+          "sha256": "92ac7e75aef1f1250cb0e43b044c096d2a652739dfd9fd6377b8d387e38df542",
+          "status_code": 200
+        },
+        {
+          "bytes": 1786,
+          "content_type": "application/manifest+json",
+          "path": "/manifest.webmanifest",
+          "sha256": "007a65e4fb4396671a314c35be3018b95ad1a331895809eb97a2aa8f7a56b236",
+          "status_code": 200
+        },
+        {
+          "bytes": 34662,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/mobile",
+          "sha256": "a0c94db2c0bd8589679f64b16c719abc89e855745d51001a8b8deda9b34d13c9",
+          "status_code": 200
+        },
+        {
+          "bytes": 34670,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/mobile/gm",
+          "sha256": "fd51602491e86fc33f805fb52974c344d9ba5a47a58cd86ce9c73ca1f87c83d1",
+          "status_code": 200
+        },
+        {
+          "bytes": 31672,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/mobile/observer",
+          "sha256": "77056815fd284d1e596b2402b4ce5dcdca68090eced1e231870d47e4194afe6c",
+          "status_code": 200
+        },
+        {
+          "bytes": 34703,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/mobile/player",
+          "sha256": "82fb8cfebc0f26a1afb0bcd68d12b58de814b8f6581e1996f3c92e9a1acb0d6c",
+          "status_code": 200
+        },
+        {
+          "bytes": 1121,
+          "content_type": "application/json",
+          "path": "/mobile/pwa.json",
+          "sha256": "a0a1eac54806062248af623317b058a6527ae3f78edcd2369a42023a6c441c8e",
+          "status_code": 200
+        },
+        {
+          "bytes": 16431,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/packages",
+          "sha256": "7465e3ad9528e7d6d103e531f95adbcd9d716f57aba2fcc61907550c001901e6",
+          "status_code": 200
+        },
+        {
+          "bytes": 50477,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/play",
+          "sha256": "8e8126fb393718990b99aa3b14a7d824bd20563c975a87cab164f7c5f651a248",
+          "status_code": 200
+        },
+        {
+          "bytes": 20076,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/play/continuity",
+          "sha256": "c392effb0f51f66a8164454605428cefa6e5f23ec808288cf260409ba8157544",
+          "status_code": 200
+        },
+        {
+          "bytes": 584,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-icon.svg",
+          "sha256": "cf764fa25a929641611c325ac6f8a23caa817611bcb6ccfc604490eced5a4111",
+          "status_code": 200
+        },
+        {
+          "bytes": 680,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-maskable.svg",
+          "sha256": "6ea67fd6e7dd490aa91bd0afd3f748c8339da7e5f6f2a5898c014807fd713b15",
+          "status_code": 200
+        },
+        {
+          "bytes": 4670,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-screenshot-mobile.svg",
+          "sha256": "d1ca5771e49923454d69477e92a46a700b9776bc5eeec361f73f876beb10afaf",
+          "status_code": 200
+        },
+        {
+          "bytes": 2434,
+          "content_type": "image/svg+xml",
+          "path": "/pwa-screenshot-wide.svg",
+          "sha256": "e935b9ae93d4af7fc5ba37a44a709518d19d95d9115cad1fdbdae126be2268e4",
+          "status_code": 200
+        },
+        {
+          "bytes": 2119,
+          "content_type": "application/json",
+          "path": "/ready/handoff/mobile.json",
+          "sha256": "e3600ddddf4d4f10e6ba19828301d94381d73f43f5afac8ce2cb88dd3407469a",
+          "status_code": 200
+        },
+        {
+          "bytes": 1786,
+          "content_type": "application/manifest+json",
+          "path": "/site.webmanifest",
+          "sha256": "007a65e4fb4396671a314c35be3018b95ad1a331895809eb97a2aa8f7a56b236",
+          "status_code": 200
+        },
+        {
+          "bytes": 8861,
+          "content_type": "text/html; charset=utf-8",
+          "path": "/status",
+          "sha256": "b3b856703c22f0fa081ea747b3fb48ea979773236170c4b3f0c4fd350b166a7e",
+          "status_code": 200
+        }
+      ],
+      "status": "pass"
+    },
+    "readyMobileHandoff": {
+      "continuity_route": "/play/continuity",
+      "contractName": "chummer.ready_mobile_handoff_contract.v1",
+      "failures": [],
+      "living_world_summary": "show black ledger heat and followed-world updates only after account opt-in and followed-world selection.",
+      "packet_roles": [
+        "gm",
+        "organizer",
+        "player"
+      ],
+      "packet_route_count": 3,
+      "packet_routes": [
+        {
+          "json": "/ready/packet/player.json",
+          "json_bytes": 1552,
+          "json_content_type": "application/json",
+          "json_packet_role_id": "player",
+          "json_status": 200,
+          "json_verdict_role_id": "player",
+          "markdown": "/ready/packet/player.md",
+          "markdown_bytes": 725,
+          "markdown_content_type": "text/markdown; charset=utf-8",
+          "markdown_status": 200,
+          "roleId": "player"
+        },
+        {
+          "json": "/ready/packet/gm.json",
+          "json_bytes": 1440,
+          "json_content_type": "application/json",
+          "json_packet_role_id": "gm",
+          "json_status": 200,
+          "json_verdict_role_id": "gm",
+          "markdown": "/ready/packet/gm.md",
+          "markdown_bytes": 658,
+          "markdown_content_type": "text/markdown; charset=utf-8",
+          "markdown_status": 200,
+          "roleId": "gm"
+        },
+        {
+          "json": "/ready/packet/organizer.json",
+          "json_bytes": 1409,
+          "json_content_type": "application/json",
+          "json_packet_role_id": "organizer",
+          "json_status": 200,
+          "json_verdict_role_id": "organizer",
+          "markdown": "/ready/packet/organizer.md",
+          "markdown_bytes": 597,
+          "markdown_content_type": "text/markdown; charset=utf-8",
+          "markdown_status": 200,
+          "roleId": "organizer"
+        }
+      ],
+      "pwa_route": "/mobile",
+      "status": "pass",
+      "status_code": 200,
+      "tool_ids": [
+        "ammo",
+        "health",
+        "inventory",
+        "living_world",
+        "modifiers",
+        "quick_rolls"
+      ]
+    }
+  },
+  "childStatuses": {
+    "browserPlaywright": "pass",
+    "downloads": "pass",
+    "flagshipHorizons": "pass",
+    "mobileLedger": "pass",
+    "mobilePwaServiceWorkerBoundary": "pass",
+    "navigation": "pass",
+    "participateIframeShell": "pass",
+    "portalRuntimeImage": "pass",
+    "preflight": "pass",
+    "pwaStatic": "pass",
+    "readyMobileHandoff": "pass"
+  },
+  "contractName": "chummer.public_edge_postdeploy_gate.v1",
+  "downloadsStatus": "pass",
+  "failures": [],
+  "flagshipHorizonIds": [
+    "near_term_stabilization",
+    "mid_term_pwa_session_utility",
+    "long_term_living_world_expansion"
+  ],
+  "flagshipHorizonsBrowserProofCoverage": "skipped",
+  "flagshipHorizonsStatus": "pass",
+  "generatedAtUtc": "2026-07-02T04:35:21.102252+00:00",
+  "mobileLedgerCacheControl": "private, no-store, no-cache, max-age=0",
+  "mobileLedgerPayloadStatus": "opt_in_required",
+  "mobileLedgerStatus": "pass",
+  "mobilePwaServiceWorkerBoundaryMode": "shared_portal_root_worker",
+  "mobilePwaServiceWorkerBoundaryStatus": "pass",
+  "navigationStatus": "pass",
+  "participateIframeRouteCount": 2,
+  "participateIframeShellStatus": "pass",
+  "portalRuntimeImageContainerImageId": "",
+  "portalRuntimeImageExpectedImageId": "",
+  "portalRuntimeImageStatus": "pass",
+  "preflightStatus": "pass",
+  "pwaStaticStatus": "pass",
+  "readyMobileHandoffPacketRoles": [
+    "gm",
+    "organizer",
+    "player"
+  ],
+  "readyMobileHandoffStatus": "pass",
+  "readyMobileHandoffToolIds": [
+    "ammo",
+    "health",
+    "inventory",
+    "living_world",
+    "modifiers",
+    "quick_rolls"
+  ],
+  "releaseManifestVersion": "run-20260701-124648",
+  "status": "pass",
+  "visibleVersion": "Version run-20260701-124648"
+}

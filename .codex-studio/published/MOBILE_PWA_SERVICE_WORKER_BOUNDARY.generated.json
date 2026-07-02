@@ -1,0 +1,35 @@
+{
+  "baseUrl": "https://chummer.run",
+  "contractName": "chummer.mobile_pwa_service_worker_boundary.v1",
+  "failures": [],
+  "generatedAtUtc": "2026-07-02T04:35:37.601007+00:00",
+  "ledgerBoundary": {
+    "cache_control": "private, no-store, no-cache, max-age=0",
+    "path": "/mobile/pwa/ledger.json",
+    "payload_status": "opt_in_required",
+    "pragma": "no-cache",
+    "status_code": 200,
+    "vary": "Cookie, Authorization"
+  },
+  "mobileRuntime": {
+    "content_type": "text/javascript",
+    "path": "/mobile-turn-companion.js",
+    "registrations": [
+      {
+        "scope": "/",
+        "script": "/service-worker.js"
+      }
+    ],
+    "serviceWorkerBoundaryMode": "shared_portal_root_worker",
+    "sha256": "e3b8e06aa053ff8a5b58b64ae80460607c2070685e712086031180dd4f49b1cf",
+    "status_code": 200
+  },
+  "rootWorker": {
+    "content_type": "text/javascript",
+    "kind": "portal_public_root_worker",
+    "path": "/service-worker.js",
+    "sha256": "a33646e610745157163e2fd94b5f97e6ed57578f7ec57379063574e77d845e6f",
+    "status_code": 200
+  },
+  "status": "pass"
+}

@@ -1,0 +1,69 @@
+{
+  "base_url": "https://chummer.run",
+  "contractName": "chummer.participate_iframe_shell.v1",
+  "failures": [],
+  "generatedAtUtc": "2026-07-02T04:35:37.802636+00:00",
+  "iframe_route_count": 2,
+  "live": [
+    {
+      "content_type": "text/html; charset=utf-8",
+      "failures": [],
+      "final_path": "/participate",
+      "final_url": "https://chummer.run/participate",
+      "has_iframe": true,
+      "has_offline_fallback": false,
+      "iframe_srcs": [
+        "https://chummer6.productlift.dev/"
+      ],
+      "iframe_uses_old_proxy": false,
+      "iframe_uses_productlift": true,
+      "removed_board_eyebrow_present": false,
+      "removed_summary_present": false,
+      "route": "/participate",
+      "sha256": "056ba6367e8597a523d243416394cccb9248654b3f9f5e2546cdc292347692db",
+      "status": "pass",
+      "status_code": 200
+    },
+    {
+      "content_type": "text/html; charset=utf-8",
+      "failures": [],
+      "final_path": "/participate",
+      "final_url": "https://chummer.run/participate",
+      "has_iframe": true,
+      "has_offline_fallback": false,
+      "iframe_srcs": [
+        "https://chummer6.productlift.dev/"
+      ],
+      "iframe_uses_old_proxy": false,
+      "iframe_uses_productlift": true,
+      "removed_board_eyebrow_present": false,
+      "removed_summary_present": false,
+      "route": "/partizipate",
+      "sha256": "056ba6367e8597a523d243416394cccb9248654b3f9f5e2546cdc292347692db",
+      "status": "pass",
+      "status_code": 200
+    }
+  ],
+  "offline_fallback_route_count": 0,
+  "route_count": 2,
+  "source": {
+    "failures": [],
+    "required": {
+      "legacy_builder_summary_is_minimal": true,
+      "legacy_builder_uses_hosted_upstream_iframe": true,
+      "public_builder_summary_is_minimal": true,
+      "public_builder_uses_hosted_upstream_iframe": true,
+      "view_allows_full_provider_feature_set": true,
+      "view_has_offline_fallback": true,
+      "view_has_real_iframe": true,
+      "view_has_screen_reader_title": true,
+      "view_removes_board_eyebrow": true,
+      "view_removes_old_summary": true,
+      "view_removes_visible_header": true,
+      "view_uses_cross_origin_referrer_policy": true,
+      "view_uses_existing_embed_href": true
+    },
+    "status": "pass"
+  },
+  "status": "pass"
+}

@@ -1,6 +1,6 @@
 # Mobile and PWA public projection audit
 
-- Generated: 2026-06-30T23:46:52.801060Z
+- Generated: 2026-07-02T04:35:25.805371Z
 - Status: `pass`
 - Manifest start URL: `/mobile`
 - Display mode: `standalone`

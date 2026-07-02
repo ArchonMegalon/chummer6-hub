@@ -12,7 +12,10 @@ from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_mobile_pwa_public_projection.py"
-DESIGN_SPEC_PATH = REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "MOBILE_PWA_PRODUCT_SPEC.md"
+DESIGN_SPEC_CANDIDATES = (
+    REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "MOBILE_PWA_PRODUCT_SPEC.md",
+    Path("/docker/chummercomplete/chummer-design/products/chummer/MOBILE_PWA_PRODUCT_SPEC.md"),
+)
 
 
 class _FakeResponse:
@@ -49,8 +52,8 @@ class _FakeSession:
                     '<details class="site-account-menu site-open-chummer-menu">'
                     '<summary><span>Open Chummer</span></summary>'
                     '<div aria-label="Open Chummer options">'
-                    '<a class="site-open-chummer-menu__button" href="/build">Build</a>'
-                    '<a class="site-open-chummer-menu__button" href="/play">Play</a>'
+                    '<button class="site-open-chummer-menu__button" type="button" disabled data-analytics-label="Build">Build</button>'
+                    '<a class="site-open-chummer-menu__button" href="/mobile/player" data-analytics-label="Play">Play</a>'
                     "</div></details>"
                 ),
             )
@@ -108,8 +111,16 @@ class _FakeSession:
                     "status": "opt_in_required",
                     "status_label": "Opt in required",
                     "summary": "Black Ledger live updates are available in the PWA when you opt in via account preferences.",
-                    "legal_posture": "Public lane stays aggregate only. No private run table state is published.",
+                    "legal_posture": "Public lane stays aggregate only. No private run table state, world heat, followed-world selection, or session continuity payload is published before opt-in.",
                     "opt_in_route": "/account",
+                    "world_gate": "account_opt_in_and_followed_world_selection",
+                    "heat_visibility": "hidden_until_opt_in",
+                    "session_visibility": "hidden_until_opt_in",
+                    "opt_in_required_for": [
+                        "black_ledger_heat",
+                        "followed_world_updates",
+                        "session_continuity",
+                    ],
                     "updates_route": "/mobile/pwa/ledger.json",
                 },
                 headers={
@@ -181,7 +192,10 @@ def _load_module():
 
 class MobilePwaPublicProjectionTests(unittest.TestCase):
     def test_design_spec_tracks_live_pwa_projection_contract(self) -> None:
-        text = DESIGN_SPEC_PATH.read_text(encoding="utf-8")
+        design_spec_path = next((path for path in DESIGN_SPEC_CANDIDATES if path.is_file()), None)
+        if design_spec_path is None:
+            self.skipTest("chummer-design checkout is not available")
+        text = design_spec_path.read_text(encoding="utf-8")
 
         for required in (
             "during-play companion surface",
@@ -286,7 +300,7 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
             def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
                 response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
                 if url.rstrip("/") == "http://example.test":
-                    return _FakeResponse(response.url, text=response.text.replace('href="/play"', 'href="/account"', 1))
+                    return _FakeResponse(response.url, text=response.text.replace('href="/mobile/player"', 'href="/account"', 1))
                 return response
 
         module = _load_module()
@@ -311,7 +325,7 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
                 for check in captured_payloads[0]["checks"]
             )
         )
-        self.assertIn('href="/play"', captured_payloads[0]["public_entry"]["home_open_chummer_missing_markers"])
+        self.assertIn('href="/mobile/player"', captured_payloads[0]["public_entry"]["home_open_chummer_missing_markers"])
 
     def test_verifier_fails_when_build_route_stops_opening_character_roster(self) -> None:
         class DriftedSession(_FakeSession):

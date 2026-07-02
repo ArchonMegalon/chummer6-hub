@@ -36,6 +36,68 @@ def test_extract_downloads_version_marker() -> None:
     assert module.extract_downloads_version_marker("<p>No marker</p>") == ""
 
 
+def test_verify_downloads_accepts_explicit_preview_posture(monkeypatch) -> None:
+    module = load_module()
+    release_payload = {
+        "version": "run-20260701-124648",
+        "releaseVersion": "run-20260701-124648",
+        "status": "published",
+        "channel": "preview",
+        "rolloutState": "promoted_preview",
+        "supportabilityState": "preview_supported",
+    }
+
+    def fake_fetch(base_url, path, timeout_seconds):
+        if path == "/downloads/RELEASE_CHANNEL.generated.json":
+            return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(release_payload), f"{base_url}{path}")
+        return module.FetchResult(
+            path,
+            200,
+            {"content-type": "text/html"},
+            '<p data-downloads-release-version>Version run-20260701-124648</p>',
+            f"{base_url}{path}",
+        )
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+
+    result = module.verify_downloads("https://chummer.run", 1.0, expected_release_channel="preview")
+
+    assert result["status"] == "pass"
+    assert result["expected_release_rollout_state"] == "promoted_preview"
+    assert result["expected_release_supportability_state"] == "preview_supported"
+
+
+def test_verify_downloads_still_rejects_preview_when_stable_expected(monkeypatch) -> None:
+    module = load_module()
+    release_payload = {
+        "version": "run-20260701-124648",
+        "status": "published",
+        "channel": "preview",
+        "rolloutState": "promoted_preview",
+        "supportabilityState": "preview_supported",
+    }
+
+    def fake_fetch(base_url, path, timeout_seconds):
+        if path == "/downloads/RELEASE_CHANNEL.generated.json":
+            return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(release_payload), f"{base_url}{path}")
+        return module.FetchResult(
+            path,
+            200,
+            {"content-type": "text/html"},
+            '<p data-downloads-release-version>Version run-20260701-124648</p>',
+            f"{base_url}{path}",
+        )
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+
+    result = module.verify_downloads("https://chummer.run", 1.0)
+
+    assert result["status"] == "fail"
+    assert "release channel expected public_stable, got preview" in result["failures"]
+    assert "release rollout expected public_stable, got promoted_preview" in result["failures"]
+    assert "release supportability expected gold_supported, got preview_supported" in result["failures"]
+
+
 def test_status_aggregation_adds_child_failure() -> None:
     module = load_module()
     failures: list[str] = []
