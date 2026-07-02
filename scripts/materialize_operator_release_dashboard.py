@@ -128,6 +128,10 @@ def build_payload() -> dict[str, Any]:
     final_gold = load_json(final_gold_path)
     oauth_path = PUBLISHED_ROOT / "GOOGLE_OAUTH_LINKING_PROOF.generated.json"
     oauth = load_json(oauth_path)
+    windows_visual_audit_path = PUBLISHED_ROOT / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json"
+    windows_visual_audit = load_json(windows_visual_audit_path)
+    windows_visual_intake_path = PUBLISHED_ROOT / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
+    windows_visual_intake = load_json(windows_visual_intake_path)
 
     checks = {
         "release_channel": gate("release_channel", release_channel_path, release_channel, accepted_statuses={"published", "pass", "passed", "ready"}),
@@ -142,6 +146,13 @@ def build_payload() -> dict[str, Any]:
         "release_ready": gate("release_ready", release_ready_path, release_ready),
         "final_gold_janitor": gate("final_gold_janitor", final_gold_path, final_gold),
         "google_oauth_linking_proof": gate("google_oauth_linking_proof", oauth_path, oauth),
+        "windows_installer_visual_audit": gate("windows_installer_visual_audit", windows_visual_audit_path, windows_visual_audit),
+        "windows_installer_visual_audit_intake_request": gate(
+            "windows_installer_visual_audit_intake_request",
+            windows_visual_intake_path,
+            windows_visual_intake,
+            accepted_statuses={"external_artifact_required", "pass", "passed", "ready"},
+        ),
     }
 
     # OAuth is a durable account-linking proof; it is surfaced as operator context but not required
@@ -149,6 +160,8 @@ def build_payload() -> dict[str, Any]:
     checks["google_oauth_linking_proof"]["release_blocking"] = False
     checks["release_ready"]["release_blocking"] = False
     checks["final_gold_janitor"]["release_blocking"] = False
+    checks["windows_installer_visual_audit"]["release_blocking"] = False
+    checks["windows_installer_visual_audit_intake_request"]["release_blocking"] = False
     required_names = [
         name
         for name, data in checks.items()
@@ -172,6 +185,13 @@ def build_payload() -> dict[str, Any]:
         if isinstance(data, dict)
     }
     frame_summary = ui_frame.get("summary") if isinstance(ui_frame.get("summary"), dict) else {}
+    visual_artifact = windows_visual_audit.get("artifact") if isinstance(windows_visual_audit.get("artifact"), dict) else {}
+    visual_source = windows_visual_audit.get("visualAuditSource") if isinstance(windows_visual_audit.get("visualAuditSource"), dict) else {}
+    intake_promoted = windows_visual_intake.get("promoted_installer") if isinstance(windows_visual_intake.get("promoted_installer"), dict) else {}
+    intake_discovery = windows_visual_intake.get("last_discovery") if isinstance(windows_visual_intake.get("last_discovery"), dict) else {}
+    intake_visual_sources = intake_discovery.get("visual_sources") if isinstance(intake_discovery.get("visual_sources"), dict) else {}
+    intake_gold_zip = intake_discovery.get("gold_proof_zip") if isinstance(intake_discovery.get("gold_proof_zip"), dict) else {}
+    intake_operator_request = windows_visual_intake.get("operator_request") if isinstance(windows_visual_intake.get("operator_request"), dict) else {}
 
     return {
         "contract_name": "chummer.operator_release_dashboard",
@@ -210,6 +230,22 @@ def build_payload() -> dict[str, Any]:
             "participate_iframe_shell_status": public_edge_postdeploy.get("participateIframeShellStatus"),
             "flagship_horizons_status": public_edge_postdeploy.get("flagshipHorizonsStatus"),
         },
+        "windows_installer_visual_audit": {
+            "status": windows_visual_audit.get("status"),
+            "failures": windows_visual_audit.get("failures") if isinstance(windows_visual_audit.get("failures"), list) else [],
+            "artifact_file_name": visual_artifact.get("fileName"),
+            "artifact_sha256": visual_artifact.get("sha256") or visual_artifact.get("actualSha256"),
+            "visual_source_status": visual_source.get("status"),
+            "visual_source_artifact_sha256": visual_source.get("artifactSha256"),
+            "visual_source_matches_promoted": (visual_source.get("artifactSha256") == (visual_artifact.get("sha256") or visual_artifact.get("actualSha256"))),
+            "intake_status": windows_visual_intake.get("status"),
+            "intake_promoted_sha256": intake_promoted.get("sha256") or intake_promoted.get("actual_sha256"),
+            "matching_promoted_visual_source_count": intake_visual_sources.get("matching_promoted_count"),
+            "gold_proof_zip_status": intake_gold_zip.get("status"),
+            "operator_request_summary": intake_operator_request.get("summary"),
+            "import_command": windows_visual_intake.get("import_command"),
+            "post_import_gates": windows_visual_intake.get("post_import_gates") if isinstance(windows_visual_intake.get("post_import_gates"), list) else [],
+        },
         "account_handoffs": {
             "billing_mode": ((account_handoff_runtime_config.get("billing") or {}) if isinstance(account_handoff_runtime_config.get("billing"), dict) else {}).get("mode"),
             "release_upload_mode": ((account_handoff_runtime_config.get("release_upload") or {}) if isinstance(account_handoff_runtime_config.get("release_upload"), dict) else {}).get("mode"),
@@ -226,6 +262,7 @@ def build_markdown(payload: dict[str, Any]) -> str:
     checks = payload.get("checks") if isinstance(payload.get("checks"), dict) else {}
     public_edge = payload.get("public_edge") if isinstance(payload.get("public_edge"), dict) else {}
     account_handoffs = payload.get("account_handoffs") if isinstance(payload.get("account_handoffs"), dict) else {}
+    windows_visual = payload.get("windows_installer_visual_audit") if isinstance(payload.get("windows_installer_visual_audit"), dict) else {}
     lines = [
         f"# {payload.get('verdict')}",
         "",
@@ -239,6 +276,7 @@ def build_markdown(payload: dict[str, Any]) -> str:
         f"- Mirrors: {', '.join(f'{name}={status}' for name, status in sorted((mirrors.get('providers') or {}).items()))}",
         f"- Billing mode: `{account_handoffs.get('billing_mode')}`",
         f"- Release-upload mode: `{account_handoffs.get('release_upload_mode')}`",
+        f"- Windows visual audit: `{windows_visual.get('status')}`; intake `{windows_visual.get('intake_status')}`; matching promoted sources `{windows_visual.get('matching_promoted_visual_source_count')}`",
         "",
         "## Rulesets",
     ]
@@ -257,6 +295,18 @@ def build_markdown(payload: dict[str, Any]) -> str:
                 mark = "INFO"
             suffix = "" if release_blocking else " (operator context, not release-blocking)"
             lines.append(f"- {mark} `{name}`: `{data.get('status')}`{suffix}")
+    if windows_visual:
+        lines.extend(["", "## Windows Visual Audit Handoff"])
+        lines.append(f"- Promoted installer: `{windows_visual.get('artifact_file_name')}` / `{windows_visual.get('artifact_sha256')}`")
+        lines.append(f"- Current visual source artifact: `{windows_visual.get('visual_source_artifact_sha256')}`")
+        lines.append(f"- Matching promoted visual sources discovered: `{windows_visual.get('matching_promoted_visual_source_count')}`")
+        lines.append(f"- Gold proof bundle discovery: `{windows_visual.get('gold_proof_zip_status')}`")
+        if windows_visual.get("operator_request_summary"):
+            lines.append(f"- Operator request: {windows_visual.get('operator_request_summary')}")
+        if windows_visual.get("import_command"):
+            lines.append(f"- Import command: `{windows_visual.get('import_command')}`")
+        for failure in windows_visual.get("failures") or []:
+            lines.append(f"- Current blocker: {failure}")
     failures = payload.get("failures") if isinstance(payload.get("failures"), list) else []
     if failures:
         lines.extend(["", "## Failures"])

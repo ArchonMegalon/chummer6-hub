@@ -347,12 +347,13 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StatusPageLaunchHealthSummariesPreferDownloadsAndCheckedRoutesLanguage()
+    public void StatusPageLaunchHealthSummariesPreferDownloadsAndUpdatedRoutesLanguage()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
 
         Assert.Contains("ReleaseRequiresReview(manifest)", controller, StringComparison.Ordinal);
+        Assert.Contains("Updated {BuildLiveVerificationLabel(manifest)}.", controller, StringComparison.Ordinal);
         Assert.Contains("Current installers remain available, but wider readiness is under review.", controller, StringComparison.Ordinal);
         Assert.Contains("Use Downloads for current installers and Help if setup blocks your table.", controller, StringComparison.Ordinal);
         Assert.Contains("current install routes are available on downloads right now", controller, StringComparison.Ordinal);

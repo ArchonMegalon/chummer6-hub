@@ -66,6 +66,33 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
                 published / "RELEASE_READY.generated.json": {"status": "pass", "verdict": "RELEASE_READY"},
                 published / "FINAL_GOLD_JANITOR.generated.json": {"status": "pass", "verdict": "GOLD_READY"},
                 published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json": {"status": "pass"},
+                published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json": {
+                    "status": "fail",
+                    "artifact": {
+                        "fileName": "chummer-avalonia-win-x64-installer.exe",
+                        "sha256": "promoted-sha",
+                    },
+                    "visualAuditSource": {
+                        "status": "pass",
+                        "artifactSha256": "stale-sha",
+                    },
+                    "failures": ["Windows installer visual audit source digest does not match promoted installer"],
+                },
+                published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json": {
+                    "status": "external_artifact_required",
+                    "promoted_installer": {
+                        "file_name": "chummer-avalonia-win-x64-installer.exe",
+                        "sha256": "promoted-sha",
+                    },
+                    "operator_request": {
+                        "summary": "Run the promoted Windows installer on a native Windows host and provide the gold proof bundle."
+                    },
+                    "last_discovery": {
+                        "gold_proof_zip": {"status": "not_found"},
+                        "visual_sources": {"matching_promoted_count": 0},
+                    },
+                    "import_command": "python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
+                },
                 registry / "RELEASE_CHANNEL.generated.json": {
                     "status": "published",
                     "version": "run-20260624-080000",
@@ -91,6 +118,18 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         self.assertTrue(payload["checks"]["public_edge_postdeploy_gate"]["pass"])
         self.assertEqual("2026-06-24T08:05:00Z", payload["checks"]["public_edge_postdeploy_gate"]["generated_at_utc"])
         self.assertEqual(payload["public_edge"]["mobile_ledger_payload_status"], "opt_in_required")
+        self.assertIn("windows_installer_visual_audit", payload["checks"])
+        self.assertFalse(payload["checks"]["windows_installer_visual_audit"]["release_blocking"])
+        self.assertIn("windows_installer_visual_audit_intake_request", payload["checks"])
+        self.assertFalse(payload["checks"]["windows_installer_visual_audit_intake_request"]["release_blocking"])
+        self.assertTrue(payload["checks"]["windows_installer_visual_audit_intake_request"]["pass"])
+        self.assertEqual(payload["windows_installer_visual_audit"]["artifact_sha256"], "promoted-sha")
+        self.assertEqual(payload["windows_installer_visual_audit"]["visual_source_artifact_sha256"], "stale-sha")
+        self.assertEqual(payload["windows_installer_visual_audit"]["matching_promoted_visual_source_count"], 0)
+        self.assertEqual(
+            payload["windows_installer_visual_audit"]["import_command"],
+            "python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
+        )
 
     def test_dashboard_requires_public_edge_postdeploy_gate(self) -> None:
         module = load_module()
