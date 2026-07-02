@@ -96,6 +96,63 @@ def test_dirty_source_fails() -> None:
     assert any(finding["id"] == "dirty_worktree" for finding in receipt["findings"])
 
 
+def test_generated_proof_drift_can_be_ignored_when_explicitly_requested() -> None:
+    with tempfile.TemporaryDirectory(prefix="chummer-edge-source-") as temp:
+        repo, head = make_repo(Path(temp))
+        proof = repo / ".codex-studio" / "published" / "LIVE_SURFACE_PARITY.generated.json"
+        proof.parent.mkdir(parents=True)
+        proof.write_text("{}\n", encoding="utf-8")
+
+        strict_receipt = MODULE.verify(repo, expected_head=head)
+        relaxed_receipt = MODULE.verify(repo, expected_head=head, ignore_generated_proof_drift=True)
+
+    assert strict_receipt["status"] == "fail"
+    assert any(finding["id"] == "dirty_worktree" for finding in strict_receipt["findings"])
+    assert relaxed_receipt["status"] == "pass"
+    assert relaxed_receipt["totalDirtyLineCount"] == 1
+    assert relaxed_receipt["dirtyLineCount"] == 0
+    assert relaxed_receipt["ignoredDirtyLineCount"] == 1
+    assert relaxed_receipt["ignoredDirtyLines"][0].endswith(".codex-studio/published/LIVE_SURFACE_PARITY.generated.json")
+
+
+def test_tracked_generated_proof_modification_can_be_ignored_when_explicitly_requested() -> None:
+    with tempfile.TemporaryDirectory(prefix="chummer-edge-source-") as temp:
+        repo, _head = make_repo(Path(temp))
+        proof = repo / ".codex-studio" / "published" / "LIVE_SURFACE_PARITY.generated.json"
+        proof.parent.mkdir(parents=True)
+        proof.write_text("{}\n", encoding="utf-8")
+        git(repo, "add", ".codex-studio/published/LIVE_SURFACE_PARITY.generated.json")
+        git(repo, "commit", "-qm", "add generated proof")
+        head = git(repo, "rev-parse", "HEAD")
+        proof.write_text('{"status":"pass"}\n', encoding="utf-8")
+
+        receipt = MODULE.verify(repo, expected_head=head, ignore_generated_proof_drift=True)
+
+    assert receipt["status"] == "pass"
+    assert receipt["totalDirtyLineCount"] == 1
+    assert receipt["dirtyLineCount"] == 0
+    assert receipt["ignoredDirtyLineCount"] == 1
+    assert receipt["ignoredDirtyLines"][0].endswith(".codex-studio/published/LIVE_SURFACE_PARITY.generated.json")
+
+
+def test_generated_proof_drift_ignore_does_not_hide_source_drift() -> None:
+    with tempfile.TemporaryDirectory(prefix="chummer-edge-source-") as temp:
+        repo, head = make_repo(Path(temp))
+        proof = repo / ".codex-studio" / "published" / "LIVE_SURFACE_PARITY.generated.json"
+        proof.parent.mkdir(parents=True)
+        proof.write_text("{}\n", encoding="utf-8")
+        (repo / "README.md").write_text("dirty deploy source\n", encoding="utf-8")
+
+        receipt = MODULE.verify(repo, expected_head=head, ignore_generated_proof_drift=True)
+
+    assert receipt["status"] == "fail"
+    assert receipt["totalDirtyLineCount"] == 2
+    assert receipt["dirtyLineCount"] == 1
+    assert receipt["ignoredDirtyLineCount"] == 1
+    assert any("README.md" in line for line in receipt["dirtyLines"])
+    assert any(finding["id"] == "dirty_worktree" for finding in receipt["findings"])
+
+
 def test_untracked_source_fails() -> None:
     with tempfile.TemporaryDirectory(prefix="chummer-edge-source-") as temp:
         repo, head = make_repo(Path(temp))
@@ -343,6 +400,7 @@ def test_release_ready_script_calls_public_edge_deploy_source_gate() -> None:
     assert "--compose-file" in script
     assert "--compose-service chummer-portal" in script
     assert "--require-upstream" in script
+    assert "--ignore-generated-proof-drift" in script
     assert "run_function_gate verify_public_edge_deploy_source" in script
     assert script.index("run_function_gate verify_public_edge_deploy_source") < script.index("run_hub_gate verify_windows_installer_visual_audit")
 

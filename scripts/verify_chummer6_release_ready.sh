@@ -107,6 +107,7 @@ verify_public_edge_deploy_source() {
     --compose-file "$run_services_root/docker-compose.public-edge.yml"
     --compose-service chummer-portal
     --require-upstream
+    --ignore-generated-proof-drift
     --json
   )
   if [[ -n "${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}" ]]; then

@@ -14,6 +14,7 @@ import yaml
 
 
 ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
+GENERATED_PROOF_PREFIXES = (".codex-studio/published/",)
 
 
 def expand_compose_value(value: str) -> str:
@@ -105,12 +106,33 @@ def dockerfile_has_portal_service_worker_guard(dockerfile_path: Path) -> bool:
     )
 
 
+def dirty_line_paths(line: str) -> list[str]:
+    if len(line) > 3 and line[2] == " ":
+        raw_path = line[3:].strip()
+    elif len(line) > 2 and line[1] == " ":
+        raw_path = line[2:].strip()
+    else:
+        raw_path = line.strip()
+    if " -> " in raw_path:
+        return [item.strip() for item in raw_path.split(" -> ") if item.strip()]
+    return [raw_path] if raw_path else []
+
+
+def is_generated_proof_dirty_line(line: str) -> bool:
+    paths = dirty_line_paths(line)
+    return bool(paths) and all(
+        any(path == prefix.rstrip("/") or path.startswith(prefix) for prefix in GENERATED_PROOF_PREFIXES)
+        for path in paths
+    )
+
+
 def verify(
     repo_root: Path,
     expected_head: str | None = None,
     require_upstream: bool = False,
     compose_file: Path | None = None,
     compose_service: str | None = None,
+    ignore_generated_proof_drift: bool = False,
 ) -> dict[str, Any]:
     repo_root = repo_root.resolve()
     inside = run_git(repo_root, "rev-parse", "--is-inside-work-tree")
@@ -121,7 +143,13 @@ def verify(
     head = run_git(top_level, "rev-parse", "HEAD")
     branch = run_git(top_level, "branch", "--show-current")
     status = run_git(top_level, "status", "--porcelain=v1", "--untracked-files=all")
-    dirty_lines = [line for line in status.splitlines() if line.strip()]
+    raw_dirty_lines = [line for line in status.splitlines() if line.strip()]
+    ignored_dirty_lines = (
+        [line for line in raw_dirty_lines if is_generated_proof_dirty_line(line)]
+        if ignore_generated_proof_drift
+        else []
+    )
+    dirty_lines = [line for line in raw_dirty_lines if line not in ignored_dirty_lines]
 
     findings: list[dict[str, str]] = []
     compose_build_source = ""
@@ -222,13 +250,17 @@ def verify(
         "expectedHead": expected_head or "",
         "requireUpstream": require_upstream,
         "upstream": upstream,
+        "ignoreGeneratedProofDrift": ignore_generated_proof_drift,
         "composeFile": str(compose_file.resolve()) if compose_file is not None else "",
         "composeService": compose_service or "",
         "composeBuildSource": compose_build_source,
         "composeDockerfileSource": compose_dockerfile_source,
         "composeDockerfilePath": compose_dockerfile_path,
+        "totalDirtyLineCount": len(raw_dirty_lines),
         "dirtyLineCount": len(dirty_lines),
         "dirtyLines": dirty_lines[:50],
+        "ignoredDirtyLineCount": len(ignored_dirty_lines),
+        "ignoredDirtyLines": ignored_dirty_lines[:50],
         "findings": findings,
     }
 
@@ -240,6 +272,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--require-upstream", action="store_true", help="Require HEAD to match the configured upstream branch.")
     parser.add_argument("--compose-file", default="", help="Optional compose file whose service build source must match --repo-root.")
     parser.add_argument("--compose-service", default="", help="Compose service name to validate when --compose-file is supplied.")
+    parser.add_argument(
+        "--ignore-generated-proof-drift",
+        action="store_true",
+        help="Ignore dirty files under .codex-studio/published because they are generated proof receipts, not public-edge build source.",
+    )
     parser.add_argument("--json", action="store_true", help="Print a JSON receipt.")
     args = parser.parse_args(argv)
 
@@ -250,6 +287,7 @@ def main(argv: list[str] | None = None) -> int:
             require_upstream=args.require_upstream,
             compose_file=Path(args.compose_file) if args.compose_file else None,
             compose_service=args.compose_service or None,
+            ignore_generated_proof_drift=args.ignore_generated_proof_drift,
         )
     except Exception as exc:
         receipt = {
