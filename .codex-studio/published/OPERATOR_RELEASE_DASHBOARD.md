@@ -1,6 +1,6 @@
 # NIGHTLY_HANDOFF_READY
 
-- Generated: 2026-07-02T11:01:32Z
+- Generated: 2026-07-02T11:43:09Z
 - Version: `run-20260701-124648`
 - Channel: `preview`
 - Published: `2026-07-01T14:29:35Z`
@@ -46,5 +46,4 @@
 
 ## Full Release Blockers
 - `release_ready`
-- `final_gold_janitor`
 - `windows_installer_visual_audit`

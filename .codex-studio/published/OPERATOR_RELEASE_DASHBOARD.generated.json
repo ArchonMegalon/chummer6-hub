@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.operator_release_dashboard",
-  "generated_at_utc": "2026-07-02T11:01:32Z",
+  "generated_at_utc": "2026-07-02T11:43:09Z",
   "status": "pass",
   "verdict": "NIGHTLY_HANDOFF_READY",
   "release_readiness": {
@@ -8,7 +8,6 @@
     "nightly_handoff_ready": true,
     "full_release_blockers": [
       "release_ready",
-      "final_gold_janitor",
       "windows_installer_visual_audit"
     ]
   },
@@ -158,7 +157,7 @@
       "exists": true,
       "status": "pass",
       "verdict": "READY",
-      "generated_at_utc": "2026-06-29T18:23:13Z",
+      "generated_at_utc": "2026-07-02T11:05:19Z",
       "pass": true
     },
     "public_edge_postdeploy_gate": {
@@ -166,7 +165,7 @@
       "exists": true,
       "status": "pass",
       "verdict": null,
-      "generated_at_utc": "2026-07-02T10:50:36.797385+00:00",
+      "generated_at_utc": "2026-07-02T11:43:01.307234+00:00",
       "pass": true
     },
     "release_ready": {
@@ -174,7 +173,7 @@
       "exists": true,
       "status": "fail",
       "verdict": "NOT_RELEASE_READY",
-      "generated_at_utc": "2026-07-02T10:57:56Z",
+      "generated_at_utc": "2026-07-02T11:28:31Z",
       "pass": false,
       "release_blocking": false
     },
@@ -183,7 +182,7 @@
       "exists": true,
       "status": "fail",
       "verdict": "NOT_GOLD",
-      "generated_at_utc": "2026-07-02T07:11:12Z",
+      "generated_at_utc": "2026-07-02T11:28:35Z",
       "pass": false,
       "release_blocking": false
     },
@@ -201,7 +200,7 @@
       "exists": true,
       "status": "fail",
       "verdict": null,
-      "generated_at_utc": "2026-07-02T10:57:56Z",
+      "generated_at_utc": "2026-07-02T11:28:31Z",
       "pass": false,
       "release_blocking": false
     },
