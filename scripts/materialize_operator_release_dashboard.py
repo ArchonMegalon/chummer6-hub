@@ -168,9 +168,11 @@ def build_payload() -> dict[str, Any]:
         if isinstance(data, dict) and data.get("release_blocking", True)
     ]
     failures = [name for name in required_names if not checks[name]["pass"]]
+    # Keep the dashboard's full-release signal acyclic: it can depend on
+    # prereq release gates, but not on the final gold aggregator that also
+    # reads this dashboard.
     full_release_gate_names = [
         "release_ready",
-        "final_gold_janitor",
         "windows_installer_visual_audit",
     ]
     full_release_blockers = [name for name in full_release_gate_names if not checks[name]["pass"]]

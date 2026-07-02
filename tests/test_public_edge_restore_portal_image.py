@@ -31,8 +31,21 @@ def test_restore_retages_and_recreates_when_container_or_tag_drift(monkeypatch, 
             return module.CommandResult(command, 0, expected, "")
         if command == ["docker", "image", "inspect", "--format", "{{.Id}}", "chummer-run-api:local"]:
             return module.CommandResult(command, 0, dirty, "")
-        if command == ["docker", "inspect", "--format", "{{.Image}} {{.Config.Image}}", "portal"]:
-            return module.CommandResult(command, 0, f"{dirty} chummer-run-api:local", "")
+        if command == ["docker", "inspect", "portal"]:
+            return module.CommandResult(
+                command,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Image": dirty,
+                            "Config": {"Image": "chummer-run-api:local"},
+                            "State": {"Status": "running", "Running": True, "ExitCode": 0},
+                        }
+                    ]
+                ),
+                "",
+            )
         return module.CommandResult(command, 0, "", "")
 
     monkeypatch.setattr(module, "run_command", fake_run_command)
@@ -79,8 +92,21 @@ def test_restore_skips_recreate_when_container_and_tag_match(monkeypatch, tmp_pa
         commands.append(command)
         if command[:4] == ["docker", "image", "inspect", "--format"]:
             return module.CommandResult(command, 0, expected, "")
-        if command == ["docker", "inspect", "--format", "{{.Image}} {{.Config.Image}}", "portal"]:
-            return module.CommandResult(command, 0, f"{expected} chummer-run-api:local", "")
+        if command == ["docker", "inspect", "portal"]:
+            return module.CommandResult(
+                command,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Image": expected,
+                            "Config": {"Image": "chummer-run-api:local"},
+                            "State": {"Status": "running", "Running": True, "ExitCode": 0},
+                        }
+                    ]
+                ),
+                "",
+            )
         return module.CommandResult(command, 0, "", "")
 
     monkeypatch.setattr(module, "run_command", fake_run_command)
@@ -103,6 +129,60 @@ def test_restore_skips_recreate_when_container_and_tag_match(monkeypatch, tmp_pa
     assert result["imageTags"][0]["retagged"] is False
 
 
+def test_restore_recreates_when_container_matches_but_is_not_running(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    expected = "sha256:" + "b" * 64
+    commands: list[list[str]] = []
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        commands.append(command)
+        if command[:4] == ["docker", "image", "inspect", "--format"]:
+            return module.CommandResult(command, 0, expected, "")
+        if command == ["docker", "inspect", "portal"]:
+            return module.CommandResult(
+                command,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Image": expected,
+                            "Config": {"Image": "chummer-run-api:local"},
+                            "State": {
+                                "Status": "exited",
+                                "Running": False,
+                                "ExitCode": 0,
+                                "StartedAt": "2026-07-02T11:00:00Z",
+                                "FinishedAt": "2026-07-02T11:01:00Z",
+                            },
+                        }
+                    ]
+                ),
+                "",
+            )
+        if command == ["docker", "image", "inspect", expected]:
+            return module.CommandResult(command, 0, json.dumps([{"Id": expected, "Config": {"Labels": {}}}]), "")
+        return module.CommandResult(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+
+    result = module.restore_portal_image(
+        expected,
+        ["chummer-run-api:local"],
+        tmp_path / "docker-compose.public-edge.yml",
+        None,
+        "chummer6-hub",
+        "chummer-portal",
+        "portal",
+        False,
+        False,
+    )
+
+    assert any(command[:2] == ["docker", "compose"] for command in commands)
+    assert result["containerRecreated"] is True
+    assert result["containerStatusBefore"] == "exited"
+    assert result["containerRunningBefore"] is False
+
+
 def test_restore_receipt_captures_drift_image_details(monkeypatch, tmp_path) -> None:
     module = load_module()
     expected = "sha256:" + "1" * 64
@@ -113,8 +193,21 @@ def test_restore_receipt_captures_drift_image_details(monkeypatch, tmp_path) -> 
             return module.CommandResult(command, 0, expected, "")
         if command == ["docker", "image", "inspect", "--format", "{{.Id}}", "chummer-run-api:local"]:
             return module.CommandResult(command, 0, dirty, "")
-        if command == ["docker", "inspect", "--format", "{{.Image}} {{.Config.Image}}", "portal"]:
-            return module.CommandResult(command, 0, f"{dirty} chummer-run-api:local", "")
+        if command == ["docker", "inspect", "portal"]:
+            return module.CommandResult(
+                command,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Image": dirty,
+                            "Config": {"Image": "chummer-run-api:local"},
+                            "State": {"Status": "running", "Running": True, "ExitCode": 0},
+                        }
+                    ]
+                ),
+                "",
+            )
         if command == ["docker", "image", "inspect", expected]:
             return module.CommandResult(
                 command,
@@ -214,7 +307,7 @@ def test_resolve_image_tags_includes_matching_public_edge_aliases(monkeypatch) -
             r"^chummer-run-api:current-source",
             r"^chummer-run-api:fixed-alias",
         ],
-        False,
+        dry_run=False,
     )
 
     assert result == [
@@ -236,8 +329,53 @@ def test_resolve_image_tags_defaults_to_local_without_patterns(monkeypatch) -> N
 
     monkeypatch.setattr(module, "run_command", fake_run_command)
 
-    assert module.resolve_image_tags([], [], False) == ["chummer-run-api:local"]
+    assert module.resolve_image_tags([], [], dry_run=False) == ["chummer-run-api:local"]
     assert calls == []
+
+
+def test_resolve_image_tags_discovers_runtime_aliases_for_dirty_container_image(monkeypatch) -> None:
+    module = load_module()
+    dirty = "sha256:" + "7" * 64
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        if command == ["docker", "image", "inspect", dirty]:
+            return module.CommandResult(
+                command,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Id": dirty,
+                            "Created": "2026-07-02T10:00:00Z",
+                            "RepoTags": [
+                                "chummer-run-api:local",
+                                "chummer-run-api:zz-07d1060-mobile-alias-keep",
+                                "other-service:ignore-me",
+                            ],
+                            "RepoDigests": [],
+                            "Config": {"Labels": {}},
+                        }
+                    ]
+                ),
+                "",
+            )
+        if command == ["docker", "image", "ls", "--format", "{{.Repository}}:{{.Tag}}"]:
+            return module.CommandResult(command, 0, "", "")
+        return module.CommandResult(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+
+    result = module.resolve_image_tags(
+        ["chummer-run-api:local"],
+        [],
+        container_image_id=dirty,
+        dry_run=False,
+    )
+
+    assert result == [
+        "chummer-run-api:local",
+        "chummer-run-api:zz-07d1060-mobile-alias-keep",
+    ]
 
 
 def test_postdeploy_gate_retries_until_runtime_is_warm(monkeypatch, tmp_path) -> None:
@@ -411,4 +549,76 @@ def test_stability_watch_repairs_drift_before_postdeploy(monkeypatch, tmp_path) 
     assert result["skipped"] is False
     assert result["repairCount"] == 1
     assert len(result["driftEvents"]) == 1
+    assert repairs == [{"expectedImageId": expected, "containerRecreated": True}]
+
+
+def test_stability_watch_repairs_stopped_container_even_when_image_matches(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    expected = "sha256:" + "8" * 64
+    states = [
+        {
+            "expectedImageId": expected,
+            "containerImageId": expected,
+            "containerStatus": "running",
+            "containerRunning": True,
+            "imageTags": [{"tag": "chummer-run-api:local", "imageId": expected}],
+            "drift": [],
+        },
+        {
+            "expectedImageId": expected,
+            "containerImageId": expected,
+            "containerStatus": "exited",
+            "containerRunning": False,
+            "imageTags": [{"tag": "chummer-run-api:local", "imageId": expected}],
+            "drift": ["portal container is not running (status exited)"],
+        },
+        {
+            "expectedImageId": expected,
+            "containerImageId": expected,
+            "containerStatus": "running",
+            "containerRunning": True,
+            "imageTags": [{"tag": "chummer-run-api:local", "imageId": expected}],
+            "drift": [],
+        },
+    ]
+    repairs: list[dict[str, object]] = []
+    monotonic_values = iter([0.0, 0.1, 0.2, 2.0])
+
+    def fake_inspect_runtime_state(*_args, **_kwargs):
+        return states.pop(0) if states else {
+            "expectedImageId": expected,
+            "containerImageId": expected,
+            "containerStatus": "running",
+            "containerRunning": True,
+            "imageTags": [{"tag": "chummer-run-api:local", "imageId": expected}],
+            "drift": [],
+        }
+
+    def fake_restore_portal_image(*_args, **_kwargs):
+        repair = {"expectedImageId": expected, "containerRecreated": True}
+        repairs.append(repair)
+        return repair
+
+    monkeypatch.setattr(module, "inspect_runtime_state", fake_inspect_runtime_state)
+    monkeypatch.setattr(module, "restore_portal_image", fake_restore_portal_image)
+    monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(module.time, "monotonic", lambda: next(monotonic_values))
+
+    result = module.watch_runtime_stability(
+        expected,
+        ["chummer-run-api:local"],
+        tmp_path / "docker-compose.public-edge.yml",
+        None,
+        "chummer6-hub",
+        "chummer-portal",
+        "portal",
+        1.0,
+        0.0,
+        2,
+        False,
+    )
+
+    assert result["status"] == "pass"
+    assert result["repairCount"] == 1
+    assert result["driftEvents"][0]["drift"] == ["portal container is not running (status exited)"]
     assert repairs == [{"expectedImageId": expected, "containerRecreated": True}]

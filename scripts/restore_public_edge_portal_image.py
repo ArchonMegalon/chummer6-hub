@@ -114,6 +114,33 @@ def inspect_container_image_id(container: str, dry_run: bool = False) -> tuple[s
     return image_id, image_ref
 
 
+def inspect_container_runtime(container: str, dry_run: bool = False) -> dict[str, Any]:
+    if dry_run:
+        return {
+            "imageId": "",
+            "imageRef": "",
+            "status": "running",
+            "running": True,
+            "exitCode": 0,
+            "startedAt": "",
+            "finishedAt": "",
+        }
+    result = run_checked(["docker", "inspect", container], dry_run=False)
+    payload = json.loads(result.stdout)
+    container_payload = payload[0] if isinstance(payload, list) and payload else {}
+    state = container_payload.get("State") if isinstance(container_payload.get("State"), dict) else {}
+    config = container_payload.get("Config") if isinstance(container_payload.get("Config"), dict) else {}
+    return {
+        "imageId": normalize_image_id(str(container_payload.get("Image") or "")),
+        "imageRef": str(config.get("Image") or "").strip(),
+        "status": str(state.get("Status") or "").strip(),
+        "running": bool(state.get("Running")),
+        "exitCode": state.get("ExitCode"),
+        "startedAt": str(state.get("StartedAt") or ""),
+        "finishedAt": str(state.get("FinishedAt") or ""),
+    }
+
+
 def list_local_image_tags(dry_run: bool = False) -> list[str]:
     if dry_run:
         return []
@@ -127,11 +154,52 @@ def list_local_image_tags(dry_run: bool = False) -> list[str]:
     return tags
 
 
-def resolve_image_tags(image_tags: list[str], include_patterns: list[str], dry_run: bool = False) -> list[str]:
+def repository_prefix_for_tag(tag: str) -> str:
+    candidate = str(tag or "").strip()
+    if ":" not in candidate:
+        return ""
+    return candidate.rsplit(":", 1)[0] + ":"
+
+
+def discover_runtime_alias_tags(
+    image_tags: list[str],
+    container_image_id: str,
+    dry_run: bool = False,
+) -> list[str]:
+    normalized_container_image_id = normalize_image_id(container_image_id)
+    if not normalized_container_image_id:
+        return []
+
+    repository_prefix = ""
+    for tag in image_tags:
+        repository_prefix = repository_prefix_for_tag(tag)
+        if repository_prefix:
+            break
+
+    details = try_inspect_image_details(normalized_container_image_id, dry_run=dry_run)
+    repo_tags = details.get("repoTags") if isinstance(details.get("repoTags"), list) else []
+    discovered: list[str] = []
+    for raw_tag in repo_tags:
+        tag = str(raw_tag or "").strip()
+        if not tag or "<none>" in tag:
+            continue
+        if repository_prefix and not tag.startswith(repository_prefix):
+            continue
+        discovered.append(tag)
+    return list(dict.fromkeys(discovered))
+
+
+def resolve_image_tags(
+    image_tags: list[str],
+    include_patterns: list[str],
+    container_image_id: str = "",
+    dry_run: bool = False,
+) -> list[str]:
     resolved = list(dict.fromkeys(tag.strip() for tag in image_tags if tag.strip()))
     if not resolved:
         resolved = [DEFAULT_PORTAL_IMAGE_TAG]
 
+    resolved.extend(discover_runtime_alias_tags(resolved, container_image_id, dry_run=dry_run))
     compiled_patterns = [re.compile(pattern) for pattern in include_patterns if pattern.strip()]
     if compiled_patterns:
         for tag in list_local_image_tags(dry_run=dry_run):
@@ -222,11 +290,15 @@ def restore_portal_image(
         )
 
     try:
-        container_image_id, container_image_ref = inspect_container_image_id(portal_container, dry_run=dry_run)
+        container_runtime = inspect_container_runtime(portal_container, dry_run=dry_run)
+        container_image_id = str(container_runtime.get("imageId") or "")
+        container_image_ref = str(container_runtime.get("imageRef") or "")
     except RuntimeError:
+        container_runtime = {}
         container_image_id, container_image_ref = "", ""
 
-    should_recreate = force_recreate or container_image_id != expected
+    container_running = container_runtime.get("running") is True
+    should_recreate = force_recreate or container_image_id != expected or not container_running
     compose_run: list[str] = []
     if should_recreate:
         compose_run = compose_command(compose_file, env_file, project_name, service)
@@ -239,6 +311,8 @@ def restore_portal_image(
         "portalContainer": portal_container,
         "containerImageIdBefore": container_image_id,
         "containerImageRefBefore": container_image_ref,
+        "containerStatusBefore": container_runtime.get("status", ""),
+        "containerRunningBefore": container_running,
         "containerImageDetailsBefore": try_inspect_image_details(container_image_id, dry_run=dry_run),
         "containerRecreated": should_recreate,
         "imageTags": tag_states,
@@ -273,10 +347,19 @@ def inspect_runtime_state(
 
     drift: list[str] = []
     try:
-        container_image_id, container_image_ref = inspect_container_image_id(portal_container, dry_run=False)
+        container_runtime = inspect_container_runtime(portal_container, dry_run=False)
+        container_image_id = str(container_runtime.get("imageId") or "")
+        container_image_ref = str(container_runtime.get("imageRef") or "")
     except RuntimeError as error:
+        container_runtime = {}
         container_image_id, container_image_ref = "", ""
         drift.append(f"portal container inspect failed: {error}")
+    container_status = str(container_runtime.get("status") or "")
+    if container_runtime and container_runtime.get("running") is not True:
+        if container_status:
+            drift.append(f"portal container is not running (status {container_status})")
+        else:
+            drift.append("portal container is not running")
     if container_image_id and container_image_id != expected:
         drift.append(f"portal container points at {container_image_id}")
 
@@ -296,6 +379,9 @@ def inspect_runtime_state(
         "portalContainer": portal_container,
         "containerImageId": container_image_id,
         "containerImageRef": container_image_ref,
+        "containerStatus": container_status,
+        "containerRunning": container_runtime.get("running") is True,
+        "containerExitCode": container_runtime.get("exitCode"),
         "containerImageDetails": try_inspect_image_details(container_image_id),
         "imageTags": tag_states,
         "drift": drift,
@@ -537,9 +623,17 @@ def main(argv: list[str] | None = None) -> int:
             browser_proofs.append("mobilePwaViewport")
         if args.require_all_browser_proofs or args.require_frontdoor_navigation_playwright:
             browser_proofs.append("frontdoorNavigation")
+        try:
+            container_image_id_before_discovery, _container_image_ref_before_discovery = inspect_container_image_id(
+                args.portal_container,
+                dry_run=args.dry_run,
+            )
+        except RuntimeError:
+            container_image_id_before_discovery = ""
         image_tags = resolve_image_tags(
             args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
             args.include_image_tags_matching,
+            container_image_id_before_discovery,
             args.dry_run,
         )
         restore_receipt = restore_portal_image(
@@ -595,8 +689,14 @@ def main(argv: list[str] | None = None) -> int:
         "postdeploy": postdeploy_receipt,
         "browserProofRequirements": browser_proofs,
         "imageTagDiscovery": {
+            "containerImageIdBeforeDiscovery": container_image_id_before_discovery,
             "explicitImageTags": args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
             "includeImageTagsMatching": args.include_image_tags_matching,
+            "runtimeAliasTagsMatchingContainerImage": discover_runtime_alias_tags(
+                args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
+                container_image_id_before_discovery,
+                dry_run=args.dry_run,
+            ),
             "resolvedImageTags": image_tags,
         },
     }
