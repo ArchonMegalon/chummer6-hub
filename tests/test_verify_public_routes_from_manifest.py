@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -27,7 +28,10 @@ def load_module():
 
 
 class _RouteFixtureHandler(BaseHTTPRequestHandler):
+    request_counts: dict[str, int] = {}
+
     def do_GET(self) -> None:  # noqa: N802
+        self.__class__.request_counts[self.path] = self.__class__.request_counts.get(self.path, 0) + 1
         if self.path == "/":
             self._send_text(200, "landing")
             return
@@ -36,6 +40,11 @@ class _RouteFixtureHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/public-required":
             self._send_text(200, "public route with flagship marker")
+            return
+        if self.path == "/flaky-timeout":
+            if self.__class__.request_counts[self.path] == 1:
+                time.sleep(0.25)
+            self._send_text(200, "flaky route recovered")
             return
         if self.path == "/contact/submitted/sample-case-id":
             self._send_text(200, "sample support receipt")
@@ -79,11 +88,15 @@ class _RouteFixtureHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
-        self.wfile.write(body.encode("utf-8"))
+        try:
+            self.wfile.write(body.encode("utf-8"))
+        except BrokenPipeError:
+            return
 
 
 class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
     def setUp(self) -> None:
+        _RouteFixtureHandler.request_counts = {}
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _RouteFixtureHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -357,6 +370,69 @@ class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
         self.assertEqual(3.0, args.request_timeout_seconds)
         self.assertEqual(0, args.max_retries)
         self.assertEqual(0.1, args.retry_delay_seconds)
+
+    def test_verifier_recovers_timeout_only_failures_with_isolated_retry(self) -> None:
+        manifest = {
+            "surface": "chummer.run",
+            "version": 1,
+            "public_routes": [
+                {
+                    "path": "/flaky-timeout",
+                    "audience": "public",
+                    "purpose": "proof_shelf",
+                    "requires_auth": False,
+                    "guest_fallback": "/flaky-timeout",
+                    "must_exist": True,
+                }
+            ],
+        }
+
+        completed, report = self.run_script(
+            manifest,
+            [
+                "--request-timeout-seconds", "0.05",
+                "--max-retries", "0",
+                "--timeout-recovery-seconds", "2",
+                "--timeout-recovery-retries", "0",
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["summary"]["failed_count"], 0)
+        self.assertEqual(report["summary"]["timeout_recovered_count"], 1)
+        self.assertEqual(report["summary"]["timeout_recovered_paths"], ["/flaky-timeout"])
+        self.assertIn("recovered after isolated timeout retry", report["routes"][0]["detail"])
+
+    def test_verifier_can_disable_timeout_recovery(self) -> None:
+        manifest = {
+            "surface": "chummer.run",
+            "version": 1,
+            "public_routes": [
+                {
+                    "path": "/flaky-timeout",
+                    "audience": "public",
+                    "purpose": "proof_shelf",
+                    "requires_auth": False,
+                    "guest_fallback": "/flaky-timeout",
+                    "must_exist": True,
+                }
+            ],
+        }
+
+        completed, report = self.run_script(
+            manifest,
+            [
+                "--request-timeout-seconds", "0.05",
+                "--max-retries", "0",
+                "--disable-timeout-recovery",
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["summary"]["failed_paths"], ["/flaky-timeout"])
+        self.assertEqual(report["summary"]["timeout_recovered_count"], 0)
 
     def test_verifier_requires_seed_receipts_for_strict_positive_parameterized_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

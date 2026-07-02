@@ -5,6 +5,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completion_path, now_iso, write_json, write_text
@@ -17,16 +18,24 @@ def parse_args() -> argparse.Namespace:
 
 
 def run_source_verifier(base_url: str) -> dict:
-    command = [
-        sys.executable,
-        "scripts/verify_public_routes_from_manifest.py",
-        "--base-url",
-        base_url,
-    ]
-    result = subprocess.run(command, cwd=RUN_SERVICES_ROOT, text=True, capture_output=True, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "route verifier failed")
-    return json.loads(result.stdout)
+    with tempfile.TemporaryDirectory(prefix="chummer-public-route-proof-") as temp_dir:
+        output_path = Path(temp_dir) / "source-route-proof.json"
+        command = [
+            sys.executable,
+            "scripts/verify_public_routes_from_manifest.py",
+            "--base-url",
+            base_url,
+            "--output",
+            str(output_path),
+        ]
+        result = subprocess.run(command, cwd=RUN_SERVICES_ROOT, text=True, capture_output=True, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "route verifier failed")
+        if output_path.is_file():
+            return json.loads(output_path.read_text(encoding="utf-8"))
+        if result.stdout.strip():
+            return json.loads(result.stdout)
+        raise RuntimeError("route verifier did not emit JSON proof")
 
 
 def build_output(source_payload: dict, base_url: str) -> dict:

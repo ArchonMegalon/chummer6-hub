@@ -9,7 +9,7 @@ import json
 import os
 import re
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -41,6 +41,9 @@ DEFAULT_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("CHUMMER_PUBLIC_ROUTE_PRO
 DEFAULT_MAX_RETRIES = int(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_MAX_RETRIES", "1"))
 DEFAULT_RETRY_DELAY_SECONDS = float(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_RETRY_DELAY_SECONDS", "0.5"))
 DEFAULT_MAX_WORKERS = int(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_MAX_WORKERS", "12"))
+DEFAULT_TIMEOUT_RECOVERY_SECONDS = float(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_TIMEOUT_RECOVERY_SECONDS", "30"))
+DEFAULT_TIMEOUT_RECOVERY_RETRIES = int(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_TIMEOUT_RECOVERY_RETRIES", "1"))
+TIMEOUT_FAILURE_TOKENS = ("timed out", "timeout", "read operation timed out")
 
 
 @dataclass
@@ -134,6 +137,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=DEFAULT_MAX_WORKERS,
         help="Maximum worker count for parallel live route verification.")
+    parser.add_argument(
+        "--disable-timeout-recovery",
+        action="store_true",
+        help="Disable isolated single-route retry for transport timeout failures.")
+    parser.add_argument(
+        "--timeout-recovery-seconds",
+        type=float,
+        default=DEFAULT_TIMEOUT_RECOVERY_SECONDS,
+        help="Per-request timeout for isolated timeout recovery retries.")
+    parser.add_argument(
+        "--timeout-recovery-retries",
+        type=int,
+        default=DEFAULT_TIMEOUT_RECOVERY_RETRIES,
+        help="Retry count for isolated timeout recovery retries.")
     return parser.parse_args(argv)
 
 
@@ -639,6 +656,23 @@ def verify_negative_path(
     )
 
 
+def is_transport_timeout_failure(result: RouteResult) -> bool:
+    if result.success or result.status_code is not None:
+        return False
+
+    detail = (result.detail or "").casefold()
+    return any(token in detail for token in TIMEOUT_FAILURE_TOKENS)
+
+
+def apply_timeout_recovery_detail(recovered: RouteResult, failed: RouteResult) -> RouteResult:
+    prior_detail = failed.detail or "transport timeout"
+    recovered_detail = recovered.detail or "route recovered"
+    return replace(
+        recovered,
+        detail=f"{recovered_detail}; recovered after isolated timeout retry (previous failure: {prior_detail})",
+    )
+
+
 def manifest_path_label(path: Path) -> str:
     try:
         return str(path.resolve().relative_to(REPO_ROOT.resolve()))
@@ -664,6 +698,7 @@ def build_report(
     seeded = [route for route in routes if route.seeded_receipt]
     seed_required = [route for route in routes if route.proof_class == "seed_required"]
     negative_failures = [path for path in negative_paths if not path.success]
+    timeout_recovered = [route for route in routes if "recovered after isolated timeout retry" in (route.detail or "")]
     status = "pass" if not failed and not negative_failures else "fail"
 
     return {
@@ -692,6 +727,8 @@ def build_report(
             "negative_path_failed_count": len(negative_failures),
             "seeded_receipt_count": len(seeded),
             "seed_required_count": len(seed_required),
+            "timeout_recovered_count": len(timeout_recovered),
+            "timeout_recovered_paths": [route.path for route in timeout_recovered],
             "failed_paths": [route.path for route in failed],
         },
         "routes": [asdict(route) for route in routes],
@@ -703,6 +740,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.max_workers <= 0:
         raise SystemExit("--max-workers must be positive")
+    if args.timeout_recovery_seconds <= 0:
+        raise SystemExit("--timeout-recovery-seconds must be positive")
+    if args.timeout_recovery_retries < 0:
+        raise SystemExit("--timeout-recovery-retries must be non-negative")
     manifest_path = Path(args.manifest).resolve()
     manifest, manifest_routes = read_manifest(manifest_path)
     hub_live_audit = load_hub_live_audit_module()
@@ -743,6 +784,31 @@ def main(argv: list[str] | None = None) -> int:
             negative_futures = [executor.submit(negative_task, route) for route in active_routes]
             results = [future.result() for future in route_futures]
             negative_paths = [negative for negative in (future.result() for future in negative_futures) if negative is not None]
+
+    if not args.disable_timeout_recovery:
+        recovered_results: list[RouteResult] = []
+        for route, result in zip(active_routes, results, strict=True):
+            if not is_transport_timeout_failure(result):
+                recovered_results.append(result)
+                continue
+
+            recovered = verify_route(
+                hub_live_audit.fetch,
+                args.base_url,
+                route,
+                public_host=args.public_host,
+                forwarded_proto=args.forwarded_proto,
+                strict_positive=bool(args.strict_positive),
+                seed_receipts=bool(args.seed_receipts),
+                request_timeout_seconds=args.timeout_recovery_seconds,
+                max_retries=args.timeout_recovery_retries,
+                retry_delay_seconds=args.retry_delay_seconds,
+            )
+            if recovered.success:
+                recovered_results.append(apply_timeout_recovery_detail(recovered, result))
+            else:
+                recovered_results.append(result)
+        results = recovered_results
 
     report = build_report(manifest, manifest_path, args, results, negative_paths)
     report_text = json.dumps(report, indent=2) + "\n"
