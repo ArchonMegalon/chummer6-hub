@@ -1,10 +1,12 @@
-# OPERABLE_RELEASE_READY
+# NIGHTLY_HANDOFF_READY
 
-- Generated: 2026-07-02T10:57:56Z
+- Generated: 2026-07-02T11:01:32Z
 - Version: `run-20260701-124648`
 - Channel: `preview`
 - Published: `2026-07-01T14:29:35Z`
 - Supportability: `preview_supported`
+- Full release ready: `False`
+- Nightly handoff ready: `True`
 - Public edge: `pass` / `Version run-20260701-124648`
 - Mobile PWA: `pass`, ledger `opt_in_required`
 - Mirrors: local_registry=pass, onedrive=fail, pcloud=fail, public_edge=pass
@@ -41,3 +43,8 @@
 - Operator request: Run the promoted Windows installer on a native Windows host and provide the gold proof bundle.
 - Import command: `python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify`
 - Current blocker: Windows installer visual audit source digest does not match promoted installer
+
+## Full Release Blockers
+- `release_ready`
+- `final_gold_janitor`
+- `windows_installer_visual_audit`

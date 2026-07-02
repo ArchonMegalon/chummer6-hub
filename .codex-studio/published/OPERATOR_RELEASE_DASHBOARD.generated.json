@@ -1,8 +1,17 @@
 {
   "contract_name": "chummer.operator_release_dashboard",
-  "generated_at_utc": "2026-07-02T10:57:56Z",
+  "generated_at_utc": "2026-07-02T11:01:32Z",
   "status": "pass",
-  "verdict": "OPERABLE_RELEASE_READY",
+  "verdict": "NIGHTLY_HANDOFF_READY",
+  "release_readiness": {
+    "full_release_ready": false,
+    "nightly_handoff_ready": true,
+    "full_release_blockers": [
+      "release_ready",
+      "final_gold_janitor",
+      "windows_installer_visual_audit"
+    ]
+  },
   "release": {
     "version": "run-20260701-124648",
     "published_at": "2026-07-01T14:29:35Z",
