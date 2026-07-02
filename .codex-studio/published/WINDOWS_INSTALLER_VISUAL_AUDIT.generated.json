@@ -1,24 +1,24 @@
 {
   "contract_name": "chummer.windows_installer_visual_audit",
-  "generated_at_utc": "2026-06-21T18:13:26Z",
-  "status": "pass",
+  "generated_at_utc": "2026-07-02T05:03:51Z",
+  "status": "fail",
   "release": {
-    "version": "run-20260621-054902",
-    "channel": "public_stable"
+    "version": "run-20260701-124648",
+    "channel": "preview"
   },
   "artifact": {
     "artifactId": "avalonia-win-x64-installer",
     "fileName": "chummer-avalonia-win-x64-installer.exe",
     "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/files/chummer-avalonia-win-x64-installer.exe",
-    "sha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b",
-    "actualSha256": "c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b"
+    "sha256": "4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3",
+    "actualSha256": "4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3"
   },
   "startupReceipt": {
     "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
     "status": "pass",
     "verificationDisposition": null,
     "skipClass": null,
-    "artifactDigest": "sha256:c5691dcdb5176394e9529985bf85022577a593098b3eddeda50d9d91af914c5b"
+    "artifactDigest": "sha256:4d14c414fcd46f4cf5d2b06ac12d02d8492431f19924bffa97390af5f1c68bf3"
   },
   "visualAuditSource": {
     "path": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json",
@@ -117,6 +117,18 @@
       "windowTitle": "Chummer6 Avalonia Desktop Installer - Install Complete"
     }
   ],
-  "failures": [],
-  "nextActions": []
+  "failures": [
+    "Windows installer visual audit source digest does not match promoted installer"
+  ],
+  "nextActions": [
+    "Run the promoted Windows installer on a native Windows host and capture native startup plus installer progress/completion surfaces.",
+    "Preferred remote path: run the native Windows proof runner from a controlled Windows host; it captures native Windows evidence only and does not publish downloads.",
+    "Use PowerShell: scripts/capture_windows_installer_gold_proof.ps1 -LaunchInstaller -CaptureVisualAudit -ScaledDpiScale 1.5",
+    "Use PowerShell: scripts/capture_windows_installer_visual_audit.ps1 -LaunchInstaller -CaptureRequiredSet -ScaledDpiScale 1.5 -ClippingStatus pass -ReadabilityStatus pass",
+    "If you need manual capture, run scripts/capture_windows_installer_visual_audit.ps1 once per surface/DPI for install-progress and completion at default plus scaled DPI.",
+    "If progress and completion screenshots are byte-identical, rerun manual capture with the progress dialog visible before accepting the completion dialog.",
+    "If proof came from a remote Windows runner, import it with: python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
+    "Commit the generated source receipt and screenshots under /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer.",
+    "Replace the incompatible-host Windows startup-smoke receipt with a native Windows pass for the same promoted installer digest."
+  ]
 }

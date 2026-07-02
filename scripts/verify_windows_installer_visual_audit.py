@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,61 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED_ROOT = ROOT / ".codex-studio" / "published"
-DEFAULT_DOWNLOADS_ROOT = ROOT / "Chummer.Portal" / "downloads"
+
+
+def downloads_root_has_promoted_windows_bytes(downloads_root: Path) -> bool:
+    def norm(value: Any) -> str:
+        return str(value or "").strip().lower()
+
+    manifest_path = downloads_root / "RELEASE_CHANNEL.generated.json"
+    files_root = downloads_root / "files"
+    if not manifest_path.is_file() or not files_root.is_dir():
+        return False
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+    except json.JSONDecodeError:
+        return False
+    rows = payload.get("artifacts") or payload.get("downloads") or []
+    if not isinstance(rows, list):
+        return False
+    for item in rows:
+        if not isinstance(item, dict):
+            continue
+        artifact_id = norm(item.get("artifactId") or item.get("id"))
+        platform = norm(item.get("platform"))
+        file_name = str(item.get("fileName") or "").strip()
+        if not file_name:
+            continue
+        if (artifact_id == "avalonia-win-x64-installer" or platform == "windows") and (files_root / file_name).is_file():
+            return True
+    return False
+
+
+def resolve_default_downloads_root() -> Path:
+    explicit = (
+        os.environ.get("CHUMMER_WINDOWS_INSTALLER_VISUAL_AUDIT_DOWNLOADS_ROOT")
+        or os.environ.get("CHUMMER_RELEASE_DOWNLOADS_ROOT")
+        or os.environ.get("CHUMMER_PORTAL_DOWNLOADS_ROOT")
+    )
+    if explicit:
+        return Path(explicit).expanduser()
+
+    candidates = [
+        ROOT / "Chummer.Portal" / "downloads",
+        ROOT.parent / "chummer.run-services" / "Chummer.Portal" / "downloads",
+        Path("/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads"),
+        Path("/docker/chummercomplete/chummer-presentation/Docker/Downloads"),
+    ]
+    for candidate in candidates:
+        if downloads_root_has_promoted_windows_bytes(candidate):
+            return candidate
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    return candidates[0]
+
+
+DEFAULT_DOWNLOADS_ROOT = resolve_default_downloads_root()
 DEFAULT_OUTPUT = PUBLISHED_ROOT / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json"
 DEFAULT_SOURCE = DEFAULT_DOWNLOADS_ROOT / "visual-audit" / "windows-installer" / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
 DEFAULT_STARTUP_RECEIPT = DEFAULT_DOWNLOADS_ROOT / "startup-smoke" / "startup-smoke-avalonia-win-x64.receipt.json"

@@ -6,8 +6,9 @@ import zipfile
 from pathlib import Path
 
 
-SCRIPT_PATH = Path("/docker/chummercomplete/chummer.run-services/scripts/verify_windows_installer_visual_audit.py")
-IMPORT_SCRIPT_PATH = Path("/docker/chummercomplete/chummer.run-services/scripts/import_windows_installer_gold_proof_artifact.py")
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_windows_installer_visual_audit.py"
+IMPORT_SCRIPT_PATH = REPO_ROOT / "scripts" / "import_windows_installer_gold_proof_artifact.py"
 
 
 def load_module():
@@ -92,6 +93,23 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertTrue(any("does not publish downloads" in item for item in payload["nextActions"]))
         self.assertTrue(any("byte-identical" in item for item in payload["nextActions"]))
         self.assertTrue(any("native Windows pass" in item for item in payload["nextActions"]))
+
+    def test_default_downloads_root_can_fall_back_to_published_artifact_shelf(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="windows-installer-default-root-") as temp_dir:
+            root = Path(temp_dir)
+            source_checkout = root / "source" / "Chummer.Portal" / "downloads"
+            deploy_checkout = root / "chummer.run-services" / "Chummer.Portal" / "downloads"
+            source_checkout.mkdir(parents=True)
+            deploy_checkout.mkdir(parents=True)
+            (source_checkout / "RELEASE_CHANNEL.generated.json").write_text(
+                json.dumps({"version": "run-test", "artifacts": []}),
+                encoding="utf-8",
+            )
+            downloads_root, _, _ = self._write_release_fixture(root / "chummer.run-services" / "Chummer.Portal")
+
+            with unittest.mock.patch.object(module, "ROOT", root / "source"):
+                self.assertEqual(downloads_root, module.resolve_default_downloads_root())
 
     def test_native_startup_with_only_completion_screenshots_still_fails(self) -> None:
         module = load_module()
