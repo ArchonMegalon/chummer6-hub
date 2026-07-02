@@ -89,7 +89,8 @@ Repository variables:
 
 Required live sequence:
 1. Deploy the updated public edge app first so the proof routes exist:
-`docker compose --env-file .env -p chummer6-hub -f docker-compose.public-edge.yml up -d --build chummer-portal`
+`CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD="$(git rev-parse HEAD)" CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM=1 bash scripts/deploy_public_edge_portal.sh`
+   - Do not use raw `docker compose ... up -d --build chummer-portal` for release publication. The guarded wrapper source-gates the audited checkout, builds `chummer-run-api:local` from explicit contexts, recreates `chummer-portal` with `--no-build`, and postdeploy-gates the exact image id before the deploy is considered publishable.
 2. Verify the live bootstrap matches the deployed source and the legacy path redirects cleanly:
 `bash scripts/verify-live-mac-bootstrap.sh`
 3. For a Mac release runner, open `https://chummer.run/downloads/release-upload` in a signed-in browser, copy the generated `Command` block, and paste that exact command into the Mac shell. That generated command includes the short-lived upload ticket; do not run the raw `bootstrap.sh` URL for promotion because it has no upload credential.
@@ -103,17 +104,19 @@ Required live sequence:
 Public-edge source and browser proof gate:
 1. Release-ready must prove the public-edge source before it can claim a deployable edge. `scripts/verify_chummer6_release_ready.sh` runs `scripts/verify_public_edge_deploy_source.py` before the Windows visual audit.
 2. The source gate fails when the deploy tree is dirty, untracked, behind upstream, or when `docker-compose.public-edge.yml` builds `chummer-portal` from a different source path than the audited checkout.
-3. When compose defaults point at machine-local paths, pin the audited source explicitly:
+3. For live portal publication, prefer the guarded deploy wrapper:
+`CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD="$(git rev-parse HEAD)" CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM=1 bash scripts/deploy_public_edge_portal.sh`
+4. When compose defaults point at machine-local paths, pin the audited source explicitly:
 `CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT=/docker/chummercomplete CHUMMER_RUN_SERVICES_CONTEXT_DIR=chummer.run-services CHUMMER_RUN_SERVICES_SOURCE=/docker/chummercomplete/chummer.run-services python3 scripts/verify_public_edge_deploy_source.py --repo-root /docker/chummercomplete/chummer.run-services --compose-file docker-compose.public-edge.yml --compose-service chummer-portal --require-upstream --json`
-4. The public-edge postdeploy gate must include browser-backed evidence for release claims:
+5. The public-edge postdeploy gate must include browser-backed evidence for release claims:
 `python3 scripts/verify_public_edge_postdeploy_gate.py --base-url https://chummer.run --skip-preflight --require-downloads-status-playwright --require-mobile-pwa-viewport-playwright --require-frontdoor-navigation-playwright --output .codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json`
-5. The browser receipts prove downloads/status, mobile viewport fit, and the Open Chummer Build/Play navigation; the same aggregate also verifies PWA static assets including manifest-declared icon/screenshot/shortcut paths and service-worker-declared cache/shell paths, the mobile ledger opt-in/no-store boundary for Black Ledger heat, followed-world updates, and session continuity, the service-worker non-interference boundary, ProductLift iframe shell, and ready-mobile handoff JSON plus its route-backed player/GM/organizer packet links.
-6. If `/service-worker.js` is served from the play shell instead of the portal worker, treat the deploy as a failed public edge even when mobile routes load. The expected live boundary is `shared_portal_root_worker`.
-7. On the release host, also pin the mutable local image tag to the approved portal image id:
+6. The browser receipts prove downloads/status, mobile viewport fit, and the Open Chummer Build/Play navigation; the same aggregate also verifies PWA static assets including manifest-declared icon/screenshot/shortcut paths and service-worker-declared cache/shell paths, the mobile ledger opt-in/no-store boundary for Black Ledger heat, followed-world updates, and session continuity, the service-worker non-interference boundary, ProductLift iframe shell, and ready-mobile handoff JSON plus its route-backed player/GM/organizer packet links.
+7. If `/service-worker.js` is served from the play shell instead of the portal worker, treat the deploy as a failed public edge even when mobile routes load. The expected live boundary is `shared_portal_root_worker`.
+8. On the release host, also pin the mutable local image tag to the approved portal image id:
 `python3 scripts/verify_public_edge_postdeploy_gate.py --base-url https://chummer.run --skip-preflight --expected-portal-image-id sha256:<approved-portal-image-id> --portal-container chummer6-hub-chummer-portal-1 --portal-image-tag chummer-run-api:local --output .codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json`
 This catches local `chummer-run-api:local` retags that can otherwise restore stale or dirty bytes while public routes still partially respond.
-8. The same aggregate emits the `flagshipHorizons` child receipt documented in `docs/FLAGSHIP_HORIZONS_GATE.md`; release evidence should show `flagshipHorizonsStatus=pass` and `flagshipHorizonsBrowserProofCoverage=full`.
-9. If the runtime image guard fails, restore the portal without rebuilding it, then rerun the same postdeploy gate:
+9. The same aggregate emits the `flagshipHorizons` child receipt documented in `docs/FLAGSHIP_HORIZONS_GATE.md`; release evidence should show `flagshipHorizonsStatus=pass` and `flagshipHorizonsBrowserProofCoverage=full`.
+10. If the runtime image guard fails, restore the portal without rebuilding it, then rerun the same postdeploy gate:
 `python3 scripts/restore_public_edge_portal_image.py --expected-portal-image-id sha256:<approved-portal-image-id> --image-tag chummer-run-api:local --compose-file docker-compose.public-edge.yml --env-file .env --project-name chummer6-hub --portal-container chummer6-hub-chummer-portal-1 --base-url https://chummer.run --stability-window-seconds 120 --stability-poll-seconds 10 --require-all-browser-proofs --playwright-artifact-dir .codex-studio/published/public-edge-browser-proofs --output .codex-studio/published/PUBLIC_EDGE_PORTAL_IMAGE_RESTORE.generated.json`
 The restore command validates the approved image id, records Docker created time, tags, digests, and labels for any drifted image it replaces, repoints only the configured mutable tag, recreates only `chummer-portal` with `docker compose up -d --no-build --no-deps --force-recreate`, repairs bounded image drift during the optional stability window, and retries the runtime image guard plus the downloads/status, mobile viewport, and Open Chummer navigation browser proofs in its postdeploy receipt while the container warms up.
 

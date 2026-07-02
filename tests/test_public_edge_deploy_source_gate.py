@@ -387,6 +387,28 @@ def test_public_edge_rebuild_scripts_call_source_gate() -> None:
         assert "docker compose" in script
 
 
+def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> None:
+    script = (ROOT / "scripts" / "deploy_public_edge_portal.sh").read_text(encoding="utf-8")
+
+    assert "scripts/verify_public_edge_deploy_source.py" in script
+    assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD" in script
+    assert "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM" in script
+    assert "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" in script
+    assert "CHUMMER_RUN_SERVICES_CONTEXT_DIR" in script
+    assert "CHUMMER_RUN_SERVICES_SOURCE" in script
+    assert "docker buildx build" in script
+    assert "--build-context \"run-services-source=$SOURCE_ROOT\"" in script
+    assert "--build-context \"fleet-media-factory-contracts=$FLEET_MEDIA_CONTRACTS\"" in script
+    assert "--build-context \"design-product=$DESIGN_PRODUCT_ROOT\"" in script
+    assert "docker image inspect \"$IMAGE_TAG\" --format '{{.Id}}'" in script
+    assert "up -d --no-build --no-deps --force-recreate chummer-portal" in script
+    assert "scripts/verify_public_edge_postdeploy_gate.py" in script
+    assert "--expected-portal-image-id \"$image_id\"" in script
+    assert "--require-downloads-status-playwright" in script
+    assert "--require-mobile-pwa-viewport-playwright" in script
+    assert "--require-frontdoor-navigation-playwright" in script
+
+
 def test_release_ready_script_calls_public_edge_deploy_source_gate() -> None:
     script = (ROOT / "scripts" / "verify_chummer6_release_ready.sh").read_text(encoding="utf-8")
 
@@ -411,6 +433,8 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     runbook = (ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md").read_text(encoding="utf-8")
 
     assert "Public-edge source and browser proof gate" in runbook
+    assert "scripts/deploy_public_edge_portal.sh" in runbook
+    assert "Do not use raw `docker compose ... up -d --build chummer-portal` for release publication." in runbook
     assert "scripts/verify_public_edge_deploy_source.py" in runbook
     assert "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" in runbook
     assert "CHUMMER_RUN_SERVICES_CONTEXT_DIR" in runbook
