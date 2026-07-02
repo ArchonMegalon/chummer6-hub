@@ -168,6 +168,16 @@ def build_payload() -> dict[str, Any]:
         if isinstance(data, dict) and data.get("release_blocking", True)
     ]
     failures = [name for name in required_names if not checks[name]["pass"]]
+    full_release_gate_names = [
+        "release_ready",
+        "final_gold_janitor",
+        "windows_installer_visual_audit",
+    ]
+    full_release_blockers = [name for name in full_release_gate_names if not checks[name]["pass"]]
+    full_release_ready = not failures and not full_release_blockers
+    verdict = "OPERABLE_RELEASE_BLOCKED"
+    if not failures:
+        verdict = "OPERABLE_RELEASE_READY" if full_release_ready else "NIGHTLY_HANDOFF_READY"
 
     providers = {
         provider: data.get("status")
@@ -197,7 +207,12 @@ def build_payload() -> dict[str, Any]:
         "contract_name": "chummer.operator_release_dashboard",
         "generated_at_utc": now_iso(),
         "status": "pass" if not failures else "fail",
-        "verdict": "OPERABLE_RELEASE_READY" if not failures else "OPERABLE_RELEASE_BLOCKED",
+        "verdict": verdict,
+        "release_readiness": {
+            "full_release_ready": full_release_ready,
+            "nightly_handoff_ready": not failures,
+            "full_release_blockers": full_release_blockers,
+        },
         "release": {
             "version": release_channel.get("version"),
             "published_at": release_channel.get("publishedAt") or release_channel.get("published_at"),
@@ -263,6 +278,7 @@ def build_markdown(payload: dict[str, Any]) -> str:
     public_edge = payload.get("public_edge") if isinstance(payload.get("public_edge"), dict) else {}
     account_handoffs = payload.get("account_handoffs") if isinstance(payload.get("account_handoffs"), dict) else {}
     windows_visual = payload.get("windows_installer_visual_audit") if isinstance(payload.get("windows_installer_visual_audit"), dict) else {}
+    release_readiness = payload.get("release_readiness") if isinstance(payload.get("release_readiness"), dict) else {}
     lines = [
         f"# {payload.get('verdict')}",
         "",
@@ -271,6 +287,8 @@ def build_markdown(payload: dict[str, Any]) -> str:
         f"- Channel: `{release.get('channel')}`",
         f"- Published: `{release.get('published_at')}`",
         f"- Supportability: `{release.get('supportability_state')}`",
+        f"- Full release ready: `{release_readiness.get('full_release_ready')}`",
+        f"- Nightly handoff ready: `{release_readiness.get('nightly_handoff_ready')}`",
         f"- Public edge: `{public_edge.get('status')}` / `{public_edge.get('visible_version')}`",
         f"- Mobile PWA: `{public_edge.get('pwa_static_status')}`, ledger `{public_edge.get('mobile_ledger_payload_status')}`",
         f"- Mirrors: {', '.join(f'{name}={status}' for name, status in sorted((mirrors.get('providers') or {}).items()))}",
@@ -307,6 +325,10 @@ def build_markdown(payload: dict[str, Any]) -> str:
             lines.append(f"- Import command: `{windows_visual.get('import_command')}`")
         for failure in windows_visual.get("failures") or []:
             lines.append(f"- Current blocker: {failure}")
+    full_release_blockers = release_readiness.get("full_release_blockers") if isinstance(release_readiness.get("full_release_blockers"), list) else []
+    if full_release_blockers:
+        lines.extend(["", "## Full Release Blockers"])
+        lines.extend(f"- `{blocker}`" for blocker in full_release_blockers)
     failures = payload.get("failures") if isinstance(payload.get("failures"), list) else []
     if failures:
         lines.extend(["", "## Failures"])

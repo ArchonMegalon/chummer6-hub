@@ -109,6 +109,14 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
                 mock.patch.object(module, "REGISTRY_ROOT", registry):
                 payload = module.build_payload()
 
+        self.assertEqual("pass", payload["status"])
+        self.assertEqual("NIGHTLY_HANDOFF_READY", payload["verdict"])
+        self.assertFalse(payload["release_readiness"]["full_release_ready"])
+        self.assertTrue(payload["release_readiness"]["nightly_handoff_ready"])
+        self.assertEqual(
+            ["windows_installer_visual_audit"],
+            payload["release_readiness"]["full_release_blockers"],
+        )
         self.assertIn("participate_billing_honesty", payload["checks"])
         self.assertTrue(payload["checks"]["participate_billing_honesty"]["pass"])
         self.assertIn("account_handoff_runtime_config", payload["checks"])
@@ -170,6 +178,7 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
                 payload = module.build_payload()
 
         self.assertEqual("fail", payload["status"])
+        self.assertEqual("OPERABLE_RELEASE_BLOCKED", payload["verdict"])
         self.assertIn("public_edge_postdeploy_gate", payload["failures"])
         self.assertFalse(payload["checks"]["public_edge_postdeploy_gate"]["pass"])
 
