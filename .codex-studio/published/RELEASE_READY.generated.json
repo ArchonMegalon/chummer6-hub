@@ -1,9 +1,9 @@
 {
   "contract_name": "chummer.release_ready",
-  "generated_at_utc": "2026-07-02T09:24:40Z",
+  "generated_at_utc": "2026-07-02T09:32:44Z",
   "status": "fail",
   "verdict": "NOT_RELEASE_READY",
-  "command": "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD=f99ef674353cbe42ad7f2498bfa8c19649b07adf CHUMMER_RUN_SERVICES_ROOT=/tmp/chummer-run-services-flagship-f023 bash /tmp/chummer-run-services-flagship-f023/scripts/verify_chummer6_release_ready.sh",
+  "command": "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD=177170db3ae86fd560e5d612dab2bf7048ccc914 CHUMMER_RUN_SERVICES_ROOT=/tmp/chummer-run-services-flagship-f023 bash /tmp/chummer-run-services-flagship-f023/scripts/verify_chummer6_release_ready.sh",
   "returncode": 1,
   "timed_out": false,
   "timeout_seconds": 900,
