@@ -2072,9 +2072,14 @@ async Task VerifyPublicLandingProjectionAsync()
     var storePath = Path.Combine(tempRoot, "community-store.json");
     var downloadsRoot = Path.Combine(tempRoot, "downloads");
     var downloadsFilesRoot = Path.Combine(downloadsRoot, "files");
+    var releaseEvidenceRoot = Path.Combine(downloadsRoot, "release-evidence", "browser-lane");
     Directory.CreateDirectory(downloadsFilesRoot);
+    Directory.CreateDirectory(releaseEvidenceRoot);
     File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-linux-x64.zip"), "smoke");
     File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-osx-arm64-installer.dmg"), "smoke-mac");
+    File.WriteAllText(
+        Path.Combine(releaseEvidenceRoot, "BLAZOR_PWA_PUBLIC_EDGE_PROOF.generated.json"),
+        "{\"status\":\"passed\"}");
     File.WriteAllText(
         Path.Combine(downloadsRoot, "RELEASE_CHANNEL.generated.json"),
         JsonSerializer.Serialize(
@@ -3369,6 +3374,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
     var authenticatedRedirect = authenticatedDownloadResult as RedirectResult;
     Assert(authenticatedRedirect is not null && string.Equals(authenticatedRedirect.Url, "/downloads/install/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in compatibility downloads should route through the install handoff.");
+    string? releaseEvidencePath = releases.ResolveReleaseEvidenceFilePath("browser-lane/BLAZOR_PWA_PUBLIC_EDGE_PROOF.generated.json");
+    Assert(!string.IsNullOrWhiteSpace(releaseEvidencePath) && File.Exists(releaseEvidencePath), "release evidence resolver should expose browser-lane JSON receipts.");
+    Assert(releases.ResolveReleaseEvidenceFilePath("../RELEASE_CHANNEL.generated.json") is null, "release evidence resolver should reject traversal.");
+    Assert(releases.ResolveReleaseEvidenceFilePath("browser-lane/not-json.txt") is null, "release evidence resolver should reject non-JSON files.");
     var blockedMacFile = await downloadsController.DownloadFile("smoke-poc-osx-arm64-installer.dmg", CancellationToken.None);
     Assert(blockedMacFile is NotFoundResult, "direct file routes should not serve macOS artifacts that were withheld from the public shelf.");
     var dispatchView = await authenticatedLandingController.DownloadDispatchPage("smoke-poc-linux-x64", CancellationToken.None) as ViewResult;

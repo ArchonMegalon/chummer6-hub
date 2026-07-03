@@ -230,6 +230,13 @@ app.MapMethods("/api/health", new[] { HttpMethods.Get, HttpMethods.Head }, () =>
     status = "pass",
     generatedAt = DateTimeOffset.UtcNow
 }));
+app.MapGet("/downloads/release-evidence/{**path}", (string? path, PublicReleaseManifestService releases) =>
+{
+    string? filePath = releases.ResolveReleaseEvidenceFilePath(path);
+    return filePath is null
+        ? Results.NotFound()
+        : Results.File(filePath, "application/json; charset=utf-8");
+});
 app.MapMethods("/api/rybbit/{**proxyPath}", new[] { "GET", "POST", "OPTIONS" }, ProxyRybbitAsync);
 app.MapPost("/api/desktop-analytics/track", async (
     DesktopAnalyticsTrackRequest request,

@@ -393,6 +393,33 @@ public sealed class PublicReleaseManifestService
         return candidate;
     }
 
+    public string? ResolveReleaseEvidenceFilePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        string relative = path.Trim().TrimStart('/').Replace('\\', '/');
+        if (relative.Contains("..", StringComparison.Ordinal)
+            || !relative.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string root = Path.GetFullPath(Path.Combine(ResolveDownloadsRoot(), "release-evidence"));
+        string candidate = Path.GetFullPath(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
+        string scopedRoot = root.EndsWith(Path.DirectorySeparatorChar)
+            ? root
+            : root + Path.DirectorySeparatorChar;
+        if (!candidate.StartsWith(scopedRoot, StringComparison.Ordinal) || !File.Exists(candidate))
+        {
+            return null;
+        }
+
+        return candidate;
+    }
+
     public PublicReleaseArtifactDto? FindDownload(string? artifactId)
     {
         var normalized = string.IsNullOrWhiteSpace(artifactId) ? null : artifactId.Trim();
