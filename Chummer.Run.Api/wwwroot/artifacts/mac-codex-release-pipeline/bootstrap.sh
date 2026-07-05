@@ -23,6 +23,31 @@ to_lower_ascii() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+array_count() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || {
+    printf '0\n'
+    return 0
+  }
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  eval "set -- \"\${${array_name}[@]}\""
+  local count="$#"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  printf '%s\n' "$count"
+}
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "required command missing: $1"
 }
@@ -513,19 +538,23 @@ PY
     done < <(jq -r '.directFileUrls[]? // empty' "$response_path")
 
     local url http_code
-    for url in "${install_urls[@]}"; do
-      http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url")"
-      if [[ "$http_code" == "404" ]]; then
-        die "install dispatch returned 404 after promotion: $url"
-      fi
-    done
+    if (( $(array_count install_urls) > 0 )); then
+      for url in "${install_urls[@]}"; do
+        http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url")"
+        if [[ "$http_code" == "404" ]]; then
+          die "install dispatch returned 404 after promotion: $url"
+        fi
+      done
+    fi
 
-    for url in "${direct_urls[@]}"; do
-      http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url")"
-      if [[ "$http_code" == "404" ]]; then
-        die "direct artifact returned 404 after promotion: $url"
-      fi
-    done
+    if (( $(array_count direct_urls) > 0 )); then
+      for url in "${direct_urls[@]}"; do
+        http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url")"
+        if [[ "$http_code" == "404" ]]; then
+          die "direct artifact returned 404 after promotion: $url"
+        fi
+      done
+    fi
   fi
 
   rm -f "$live_compat_path" "$live_canonical_path"
@@ -3192,7 +3221,7 @@ upload_release_bundle_http() {
     if [[ -n "$instance" ]]; then
       log "  instance: ${instance}"
     fi
-    if (( ${#validation_errors[@]} > 0 )); then
+    if (( $(array_count validation_errors) > 0 )); then
       log "  validation errors:"
       for line in "${validation_errors[@]}"; do
         [[ -n "$line" ]] && log "    ${line}"
@@ -3495,7 +3524,11 @@ PY
       [[ -n "$chunk_path" ]] || continue
       chunks+=("$chunk_path")
     done < <(find "$chunk_dir" -maxdepth 1 -type f | sort)
-    total="${#chunks[@]}"
+    total="$(array_count chunks)"
+    if (( total == 0 )); then
+      rm -rf "$chunk_dir"
+      die "chunking produced no files for ${relative_path}"
+    fi
     idx=0
     for chunk_path in "${chunks[@]}"; do
       if ! post_form_request \
@@ -3541,7 +3574,9 @@ PY
     [[ -n "$file_path" ]] || continue
     upload_files+=("$file_path")
   done < <(collect_upload_files "$bundle_dir")
-  if (( ${#upload_files[@]} == 0 )); then
+  local upload_file_count
+  upload_file_count="$(array_count upload_files)"
+  if (( upload_file_count == 0 )); then
     rm -f "$session_json"
     die "release upload payload has no files."
   fi
@@ -3555,13 +3590,13 @@ PY
       file_size_total=$(( file_size_total + file_size ))
     fi
   done
-  log "staged upload payload: ${#upload_files[@]} files, ${file_size_total} bytes total"
+  log "staged upload payload: ${upload_file_count} files, ${file_size_total} bytes total"
   for file_path in "${upload_files[@]:0:8}"; do
     file_size="$(stat -f '%z' "$file_path" 2>/dev/null || stat -c '%s' "$file_path" 2>/dev/null || echo 0)"
     log "  file: ${file_path#$bundle_dir/} (${file_size} bytes)"
   done
-  if (( ${#upload_files[@]} > 8 )); then
-    log "  ... and $((${#upload_files[@]} - 8)) additional files"
+  if (( upload_file_count > 8 )); then
+    log "  ... and $((upload_file_count - 8)) additional files"
   fi
 
   for file_path in "${upload_files[@]}"; do
@@ -3753,9 +3788,11 @@ main() {
   local -a bootstrap_tmp_paths=()
   cleanup_bootstrap_tmp_paths() {
     local path
-    for path in "${bootstrap_tmp_paths[@]}"; do
-      [[ -f "$path" ]] && rm -f "$path"
-    done
+    if (( $(array_count bootstrap_tmp_paths) > 0 )); then
+      for path in "${bootstrap_tmp_paths[@]}"; do
+        [[ -f "$path" ]] && rm -f "$path"
+      done
+    fi
 
     if [[ "${BOOTSTRAP_KEEP_UPLOAD_RESPONSE:-0}" != "1" ]] \
       && [[ -n "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH:-}" ]] \
@@ -3907,15 +3944,15 @@ main() {
     [[ -n "$raw_head" ]] || continue
     case "$raw_head" in
       all)
-        if [[ "${#app_heads[@]}" -eq 0 ]] || ! append_unique_value "avalonia" "${app_heads[@]}"; then
+        if (( $(array_count app_heads) == 0 )) || ! append_unique_value "avalonia" "${app_heads[@]}"; then
           app_heads+=("avalonia")
         fi
-        if [[ "${#app_heads[@]}" -eq 0 ]] || ! append_unique_value "blazor-desktop" "${app_heads[@]}"; then
+        if (( $(array_count app_heads) == 0 )) || ! append_unique_value "blazor-desktop" "${app_heads[@]}"; then
           app_heads+=("blazor-desktop")
         fi
         ;;
       avalonia|blazor-desktop)
-        if [[ "${#app_heads[@]}" -eq 0 ]] || ! append_unique_value "$raw_head" "${app_heads[@]}"; then
+        if (( $(array_count app_heads) == 0 )) || ! append_unique_value "$raw_head" "${app_heads[@]}"; then
           app_heads+=("$raw_head")
         fi
         ;;
@@ -3925,7 +3962,7 @@ main() {
     esac
   done
 
-  [[ "${#app_heads[@]}" -gt 0 ]] || die "no app heads requested"
+  (( $(array_count app_heads) > 0 )) || die "no app heads requested"
 
   export CHUMMER_LOCAL_CONTRACTS_PROJECT="$core_alias/Chummer.Contracts/Chummer.Contracts.csproj"
   export CHUMMER_LOCAL_CAMPAIGN_CONTRACTS_PROJECT="$hub_alias/Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj"

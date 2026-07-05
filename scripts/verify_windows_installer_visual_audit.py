@@ -222,12 +222,13 @@ def build_payload(
     startup_disposition = normalized(startup_receipt.get("verificationDisposition"))
     startup_skip_class = normalized(startup_receipt.get("skipClass"))
     startup_digest = normalized(startup_receipt.get("artifactDigest")).removeprefix("sha256:")
+    startup_incompatible_host = startup_disposition == "incompatible_host" or startup_skip_class == "incompatible_host"
     if not startup_receipt:
         failures.append("Windows startup receipt is missing")
+    elif startup_incompatible_host:
+        failures.append("Windows startup receipt is an incompatible-host skip, not native proof")
     elif startup_status != "pass":
         failures.append("Windows startup receipt is not a native pass")
-    if startup_disposition == "incompatible_host" or startup_skip_class == "incompatible_host":
-        failures.append("Windows startup receipt is an incompatible-host skip, not native proof")
     if artifact_sha and startup_digest and startup_digest != artifact_sha:
         failures.append("Windows startup receipt digest does not match promoted installer")
 
@@ -309,10 +310,17 @@ def build_payload(
             "Replace the incompatible-host Windows startup-smoke receipt with a native Windows pass for the same promoted installer digest.",
         ]
 
+    summary = (
+        "Native Windows visual audit matches the promoted installer."
+        if not failures
+        else "Native Windows visual audit still failing: " + failures[0]
+    )
+
     return {
         "contract_name": "chummer.windows_installer_visual_audit",
         "generated_at_utc": now_iso(),
         "status": "pass" if not failures else "fail",
+        "summary": summary,
         "release": {
             "version": release_channel.get("version") or release_channel.get("releaseVersion"),
             "channel": release_channel.get("channelId") or release_channel.get("channel"),

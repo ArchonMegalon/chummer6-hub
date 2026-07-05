@@ -92,6 +92,10 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
             )
 
         self.assertEqual("fail", payload["status"])
+        self.assertEqual(
+            "Native Windows visual audit still failing: Windows startup receipt is an incompatible-host skip, not native proof",
+            payload["summary"],
+        )
         self.assertIn("Windows startup receipt is an incompatible-host skip, not native proof", payload["failures"])
         self.assertIn("Windows installer visual audit source is missing", " ".join(payload["failures"]))
         self.assertIn("nextActions", payload)
