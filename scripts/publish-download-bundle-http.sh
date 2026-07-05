@@ -92,6 +92,31 @@ to_bool() {
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
 }
 
+array_count() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || {
+    printf '0\n'
+    return 0
+  }
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  local count="0"
+  eval "count=\${#${array_name}[@]}"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  printf '%s\n' "$count"
+}
+
 canonicalize_release_channel_registries() {
   local manifest_path="${1:-}"
   if [[ -z "$manifest_path" || ! -f "$manifest_path" ]]; then
@@ -671,12 +696,14 @@ while IFS= read -r file_path; do
   upload_files+=("$file_path")
 done < <(collect_upload_files "$BUNDLE_DIR")
 
-if (( ${#upload_files[@]} == 0 )); then
+upload_file_count="$(array_count upload_files)"
+
+if (( upload_file_count == 0 )); then
   echo "Bundle has no uploadable files: $BUNDLE_DIR" >&2
   exit 1
 fi
 
-echo "Publishing $((${#upload_files[@]})) bundle files from $BUNDLE_DIR"
+echo "Publishing ${upload_file_count} bundle files from $BUNDLE_DIR"
 
 session_json="$tmp_root/session.json"
 response_json="$tmp_root/response.json"

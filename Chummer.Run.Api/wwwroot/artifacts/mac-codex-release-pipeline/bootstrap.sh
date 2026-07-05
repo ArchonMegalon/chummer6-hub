@@ -38,8 +38,8 @@ array_count() {
       ;;
   esac
 
-  eval "set -- \"\${${array_name}[@]}\""
-  local count="$#"
+  local count="0"
+  eval "count=\${#${array_name}[@]}"
 
   if (( restore_nounset == 1 )); then
     set -u
@@ -719,7 +719,7 @@ resolve_ui_localization_release_gate_repo() {
     "/docker/chummercomplete/chummer-presentation-clean" \
     "/docker/chummercomplete/chummer-presentation"; do
     [[ -n "$candidate" ]] || continue
-    if [[ "${#candidates[@]}" -eq 0 ]]; then
+    if (( $(array_count candidates) == 0 )); then
       candidates+=("$candidate")
     elif append_unique_value "$candidate" "${candidates[@]}"; then
       candidates+=("$candidate")

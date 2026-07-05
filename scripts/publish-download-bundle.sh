@@ -23,6 +23,31 @@ to_bool() {
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
 }
 
+array_count() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || {
+    printf '0\n'
+    return 0
+  }
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  local count="0"
+  eval "count=\${#${array_name}[@]}"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  printf '%s\n' "$count"
+}
+
 if [[ -z "$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" ]]; then
   if [[ "${RELEASE_CHANNEL:-preview}" =~ ^[Pp][Rr][Ee][Vv][Ii][Ee][Ww]$ ]]; then
     PUBLIC_SKIP_STARTUP_SMOKE_FILTER="true"
@@ -205,7 +230,7 @@ for artifact_path in "$FILES_SOURCE"/*; do
   fi
 done
 
-if [[ "${#artifacts[@]}" -eq 0 ]]; then
+if (( $(array_count artifacts) == 0 )); then
   echo "No desktop artifacts found under $FILES_SOURCE" >&2
   exit 1
 fi
@@ -226,7 +251,7 @@ append_unique_downloads_mirror_dir() {
 
   [[ -n "$candidate" ]] || return 0
   resolved_candidate="$(realpath -m "$candidate")"
-  if [[ "${#live_downloads_mirror_dirs[@]}" -gt 0 ]]; then
+  if (( $(array_count live_downloads_mirror_dirs) > 0 )); then
     for existing in "${live_downloads_mirror_dirs[@]}"; do
       if [[ "$(realpath -m "$existing")" == "$resolved_candidate" ]]; then
         return 0
@@ -325,7 +350,7 @@ sync_live_downloads_mirror_dir() {
   done
 
   bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$target_dir/RELEASE_CHANNEL.generated.json" >/dev/null
-  echo "synced ${#promoted_file_names[@]} promoted artifact(s) -> $target_label mirror $target_dir"
+  echo "synced $(array_count promoted_file_names) promoted artifact(s) -> $target_label mirror $target_dir"
 }
 
 for artifact in "${artifacts[@]}"; do
@@ -449,7 +474,7 @@ for file_name in "${promoted_file_names[@]}"; do
   fi
 done
 
-if [[ "${#promoted_file_names[@]}" -gt 0 ]]; then
+if (( $(array_count promoted_file_names) > 0 )); then
   deduped_promoted_file_names=()
   while IFS= read -r deduped_file_name; do
     [[ -n "$deduped_file_name" ]] || continue
@@ -786,7 +811,7 @@ PY
   rm -rf "$startup_smoke_stage_dir"
 fi
 
-if [[ "${#live_downloads_mirror_dirs[@]}" -gt 0 ]]; then
+if (( $(array_count live_downloads_mirror_dirs) > 0 )); then
   for mirror_dir in "${live_downloads_mirror_dirs[@]}"; do
     sync_live_downloads_mirror_dir "$mirror_dir" "public-edge"
   done
@@ -807,4 +832,4 @@ if [[ -n "$LIVE_VERIFY_TARGET" ]]; then
   bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$LIVE_VERIFY_TARGET"
 fi
 
-echo "Published ${#promoted_file_names[@]} desktop artifact(s) into $DEPLOY_DIR"
+echo "Published $(array_count promoted_file_names) desktop artifact(s) into $DEPLOY_DIR"

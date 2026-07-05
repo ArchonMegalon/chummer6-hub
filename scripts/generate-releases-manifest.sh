@@ -26,6 +26,10 @@ PUBLIC_WEB_BASE_URL="${CHUMMER_PUBLIC_WEB_BASE_URL:-https://chummer.run}"
 DOWNLOADS_PREFIX="${CHUMMER_PUBLIC_DOWNLOADS_PREFIX:-${PUBLIC_WEB_BASE_URL%/}/downloads/files}"
 PUBLIC_VERSION="${CHUMMER_PUBLIC_VERSION:-0.0.0.1}"
 
+lower_ascii() {
+  printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]'
+}
+
 resolve_ui_localization_release_gate_path() {
   local explicit_path="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-}"
   if [[ -n "$explicit_path" ]]; then
@@ -55,7 +59,7 @@ resolve_ui_localization_release_gate_path() {
 }
 
 if [[ -z "$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" ]]; then
-  if [[ "${RELEASE_CHANNEL,,}" == "preview" ]]; then
+  if [[ "$(lower_ascii "$RELEASE_CHANNEL")" == "preview" ]]; then
     PUBLIC_SKIP_STARTUP_SMOKE_FILTER="true"
   else
     PUBLIC_SKIP_STARTUP_SMOKE_FILTER="false"
@@ -231,6 +235,31 @@ to_bool() {
   local value
   value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
+}
+
+array_count() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || {
+    printf '0\n'
+    return 0
+  }
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  local count="0"
+  eval "count=\${#${array_name}[@]}"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  printf '%s\n' "$count"
 }
 
 normalize_preview_install_access_classes() {
@@ -930,11 +959,12 @@ else
     fi
     portal_artifacts+=("$artifact_path")
   done
-  if [[ "${#portal_artifacts[@]}" -gt 0 ]]; then
+  portal_artifact_count="$(array_count portal_artifacts)"
+  if (( portal_artifact_count > 0 )); then
     cp "${portal_artifacts[@]}" "$portal_files_dir"/
     filter_files_to_manifest_truth "$portal_files_dir" "$PORTAL_CANONICAL_MANIFEST_PATH"
     materialize_aur_sidecar "$PORTAL_DOWNLOADS_DIR" "$PORTAL_MANIFEST_PATH" "$portal_files_dir"
-    echo "synced ${#portal_artifacts[@]} local portal artifact(s) -> $portal_files_dir"
+    echo "synced ${portal_artifact_count} local portal artifact(s) -> $portal_files_dir"
   else
     echo "no local desktop artifacts found in $DOWNLOADS_DIR for portal file sync"
   fi

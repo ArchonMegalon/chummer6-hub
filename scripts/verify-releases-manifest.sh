@@ -18,12 +18,37 @@ if [[ ! -f "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" ]]; then
   exit 1
 fi
 
+array_count() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || {
+    printf '0\n'
+    return 0
+  }
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  local count="0"
+  eval "count=\${#${array_name}[@]}"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  printf '%s\n' "$count"
+}
+
 VERIFY_ARGS=()
 if [[ "${CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE:-1}" != "0" ]]; then
   VERIFY_ARGS+=(--require-complete-desktop-coverage)
 fi
 
-if [[ "${#VERIFY_ARGS[@]}" -gt 0 ]]; then
+if (( $(array_count VERIFY_ARGS) > 0 )); then
   python3 "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "${VERIFY_ARGS[@]}" "$TARGET"
 else
   python3 "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "$TARGET"

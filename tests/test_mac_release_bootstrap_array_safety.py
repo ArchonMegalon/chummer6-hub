@@ -20,14 +20,15 @@ def test_mac_release_bootstrap_avoids_bash3_empty_array_expansions_under_nounset
     assert 'local restore_nounset=0' in text
     assert 'case "$-" in' in text
     assert 'set +u' in text
-    assert 'eval "set -- \\"\\${${array_name}[@]}\\""' in text
-    assert 'local count="$#"' in text
+    assert 'local count="0"' in text
+    assert 'eval "count=\\${#${array_name}[@]}"' in text
     assert 'set -u' in text
     assert 'if (( $(array_count install_urls) > 0 )); then' in text
     assert 'if (( $(array_count direct_urls) > 0 )); then' in text
     assert 'if (( $(array_count validation_errors) > 0 )); then' in text
     assert 'upload_file_count="$(array_count upload_files)"' in text
     assert 'if (( $(array_count bootstrap_tmp_paths) > 0 )); then' in text
+    assert 'if (( $(array_count candidates) == 0 )); then' in text
     assert 'if (( $(array_count app_heads) == 0 ))' in text
     assert '(( $(array_count app_heads) > 0 )) || die "no app heads requested"' in text
 
@@ -35,11 +36,10 @@ def test_mac_release_bootstrap_avoids_bash3_empty_array_expansions_under_nounset
         '${#install_urls[@]}',
         '${#direct_urls[@]}',
         '${#validation_errors[@]}',
+        '${#candidates[@]}',
         '${#chunks[@]}',
         '${#upload_files[@]}',
         '${#app_heads[@]}',
     )
     for pattern in unsafe_patterns:
         assert pattern not in text
-
-    assert 'eval "set -- \\${${array_name}[@]+\\"\\${${array_name}[@]}\\"}"' not in text
