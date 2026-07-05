@@ -381,9 +381,54 @@ def current_release_channel_failures(payload: dict[str, Any]) -> list[str]:
         failures.append("release channel supportability is not gold_supported")
     if rollout_state in BLOCKING_ROLLOUT_STATES:
         failures.append(f"release channel rollout is blocking: {rollout_state}")
+        failures.extend(release_channel_rollout_blocker_details(payload))
     elif rollout_state and rollout_state != FLAGSHIP_PUBLIC_STABLE_ROLLOUT_STATE:
         failures.append(f"release channel rollout is {rollout_state}, not public_stable")
     return failures
+
+
+def release_channel_rollout_blocker_details(payload: dict[str, Any]) -> list[str]:
+    coverage = payload.get("desktopTupleCoverage") if isinstance(payload.get("desktopTupleCoverage"), dict) else {}
+    if not coverage:
+        return []
+
+    details: list[str] = []
+    missing_platforms = normalized_strings(coverage.get("missingRequiredPlatforms"))
+    if missing_platforms:
+        details.append(
+            "release channel is missing required desktop platforms: "
+            + ", ".join(missing_platforms)
+        )
+
+    missing_pairs = normalized_strings(coverage.get("missingRequiredPlatformHeadPairs"))
+    if missing_pairs:
+        details.append(
+            "release channel is missing required desktop platform/head coverage: "
+            + ", ".join(missing_pairs)
+        )
+
+    missing_tuples = normalized_strings(coverage.get("missingRequiredPlatformHeadRidTuples"))
+    if missing_tuples:
+        details.append(
+            "release channel is missing required desktop tuples: "
+            + ", ".join(missing_tuples)
+        )
+
+    external_proof_requests = coverage.get("externalProofRequests")
+    requested_tuples = normalized_strings(
+        [
+            str(item.get("tupleId") or "").strip()
+            for item in external_proof_requests
+            if isinstance(external_proof_requests, list) and isinstance(item, dict)
+        ]
+    )
+    if requested_tuples:
+        details.append(
+            "release channel still requires external proof capture for tuples: "
+            + ", ".join(requested_tuples)
+        )
+
+    return normalized_strings(details)
 
 
 def receipt_failure_reasons(payload: dict[str, Any], fallback: str) -> list[str]:

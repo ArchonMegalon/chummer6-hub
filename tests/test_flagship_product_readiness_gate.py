@@ -398,6 +398,40 @@ def test_summary_prefers_current_release_truth_receipts_over_stale_release_ready
     assert "final gold janitor verdict is 'NOT_GOLD'" not in summary["reason"]
 
 
+def test_current_release_channel_failures_surface_missing_tuple_details() -> None:
+    module = load_module()
+
+    failures = module.current_release_channel_failures(
+        {
+            "status": "published",
+            "version": "run-20260704-170602",
+            "channel": "preview",
+            "supportabilityState": "review_required",
+            "rolloutState": "coverage_incomplete",
+            "desktopTupleCoverage": {
+                "missingRequiredPlatforms": ["linux"],
+                "missingRequiredPlatformHeadPairs": ["avalonia:linux"],
+                "missingRequiredPlatformHeadRidTuples": ["avalonia:linux-x64:linux"],
+                "externalProofRequests": [
+                    {
+                        "tupleId": "avalonia:linux-x64:linux",
+                    }
+                ],
+            },
+        }
+    )
+
+    assert failures == [
+        "release channel channel is preview, not a flagship stable lane",
+        "release channel supportability is not gold_supported",
+        "release channel rollout is blocking: coverage_incomplete",
+        "release channel is missing required desktop platforms: linux",
+        "release channel is missing required desktop platform/head coverage: avalonia:linux",
+        "release channel is missing required desktop tuples: avalonia:linux-x64:linux",
+        "release channel still requires external proof capture for tuples: avalonia:linux-x64:linux",
+    ]
+
+
 def test_main_skip_materialize_fails_closed_and_writes_summary(tmp_path, monkeypatch) -> None:
     module = load_module()
     readiness = tmp_path / "FLAGSHIP_PRODUCT_READINESS.generated.json"
