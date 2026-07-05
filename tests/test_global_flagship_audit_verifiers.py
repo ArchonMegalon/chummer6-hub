@@ -31,3 +31,9 @@ def test_global_audit_verifier_scripts_exist() -> None:
     assert (REPO_ROOT / "scripts" / "audit_black_ledger_feature_completion.py").is_file()
     assert (REPO_ROOT / "scripts" / "public_ip_privacy_scan.py").is_file()
     assert (REPO_ROOT / "scripts" / "release_dress_rehearsal.sh").is_file()
+
+
+def test_release_dress_rehearsal_uses_dashboard_release_ready_self_check() -> None:
+    script = read("scripts/release_dress_rehearsal.sh")
+
+    assert "python3 scripts/materialize_operator_release_dashboard.py --release-ready-self-check" in script

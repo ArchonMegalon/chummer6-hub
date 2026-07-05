@@ -243,7 +243,7 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, dict[str, A
         "python3 scripts/materialize_windows_installer_visual_audit_intake_request.py --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json",
         "python3 scripts/verify_windows_installer_visual_audit_intake_request.py",
         "python3 scripts/materialize_release_ready_receipt.py",
-        "python3 scripts/materialize_operator_release_dashboard.py",
+        "python3 scripts/materialize_operator_release_dashboard.py --release-ready-self-check",
     ]
     for command in required_post_import_gates:
         if command not in post_import_gates:

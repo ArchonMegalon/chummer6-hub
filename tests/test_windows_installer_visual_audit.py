@@ -1002,6 +1002,10 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertTrue(result["operator_action_still_required"])
         self.assertTrue(result["recovery_pack_pass"])
         self.assertEqual([], result["issues"])
+        self.assertIn(
+            "python3 scripts/materialize_operator_release_dashboard.py --release-ready-self-check",
+            payload["post_import_gates"],
+        )
 
     def test_auto_import_windows_installer_gold_proof_waiting_payload_surfaces_expected_bundle_details(self) -> None:
         module = load_auto_import_module()

@@ -104,6 +104,7 @@ def test_materialize_writes_request_and_template(tmp_path: Path, monkeypatch) ->
     ) < payload["post_import_gates"].index(
         "python3 scripts/verify_flagship_product_readiness_gate.py --summary-output .codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
     )
+    assert "python3 scripts/materialize_operator_release_dashboard.py --release-ready-self-check" in payload["post_import_gates"]
     assert payload["post_import_gates"][-1] == "python3 scripts/final_gold_janitor.py --skip-materializers"
     assert all("http://127.0.0.1" not in command and "http://localhost" not in command for command in payload["post_import_gates"])
     assert payload["artifact_intake"]["dedicated_drop_root"] == str(incoming_root)

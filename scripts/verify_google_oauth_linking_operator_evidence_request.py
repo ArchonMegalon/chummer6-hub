@@ -273,7 +273,7 @@ def verify(path: Path, *, require_pass: bool = False) -> tuple[bool, dict[str, A
                 "python3 scripts/verify_google_oauth_linking_proof.py --require-pass",
                 "python3 scripts/verify_flagship_product_readiness_gate.py --summary-output .codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json",
                 "python3 scripts/materialize_release_ready_receipt.py",
-                "python3 scripts/materialize_operator_release_dashboard.py",
+                "python3 scripts/materialize_operator_release_dashboard.py --release-ready-self-check",
                 "python3 scripts/final_gold_janitor.py --skip-materializers",
             ],
         )
