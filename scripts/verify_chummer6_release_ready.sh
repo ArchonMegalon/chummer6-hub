@@ -198,8 +198,19 @@ print("repo release posture ok")
 PY
 }
 
+verify_windows_installer_visual_audit_gate() {
+  cd "$run_services_root"
+  if python3 scripts/verify_windows_installer_visual_audit.py; then
+    return 0
+  fi
+  python3 scripts/materialize_windows_installer_visual_audit_intake_request.py >/dev/null 2>&1 || true
+  python3 scripts/auto_import_windows_installer_gold_proof.py --wait-seconds 0 >/dev/null 2>&1 || true
+  python3 scripts/verify_windows_installer_visual_audit_intake_request.py >/dev/null 2>&1 || true
+  return 1
+}
+
 run_function_gate verify_public_edge_deploy_source verify_public_edge_deploy_source
-run_hub_gate verify_windows_installer_visual_audit python3 scripts/verify_windows_installer_visual_audit.py
+run_function_gate verify_windows_installer_visual_audit verify_windows_installer_visual_audit_gate
 if ((${#failures[@]})) && [[ "${CHUMMER_RELEASE_READY_STOP_ON_PRECHECK_FAILURE:-1}" =~ ^(1|true|yes|on)$ ]]; then
   echo "NOT RELEASE READY"
   printf '%s\n' "${failures[@]}"

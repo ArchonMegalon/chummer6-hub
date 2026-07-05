@@ -143,13 +143,19 @@ Windows installer gold proof:
 2. Preferred remote path: run the native Windows proof runner from a controlled Windows host.
 3. The runner captures the promoted installer startup receipt plus installer progress/completion screenshots, then exports a `windows-installer-gold-proof` bundle.
 4. Auto-captured screenshots are intentionally marked `review_required`; a human must inspect clipping/readability before changing those rows to `pass`.
-5. Import the exported proof bundle from this repository root:
+5. Drop the exported zip into the ignored intake folder `.state/incoming_windows_installer_gold_proof/`, preferably named `windows-installer-gold-proof-<promoted-digest-prefix>.zip`.
+6. Import the exported proof bundle from this repository root:
 `python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify`
-6. Local native-Windows fallback:
+7. Refresh the current operator ask and digest-specific import command:
+`python3 scripts/materialize_windows_installer_visual_audit_intake_request.py`
+   - The current ask is written to `_completion/windows_installer_visual_audit/CURRENT_WINDOWS_INSTALLER_VISUAL_AUDIT_OPERATOR_ASK.txt`.
+8. Watch for the bundle automatically from this repository root:
+`python3 scripts/auto_import_windows_installer_gold_proof.py --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --wait-seconds 900 --poll-seconds 10 --refresh-intake-request`
+9. Local native-Windows fallback:
 `scripts/capture_windows_installer_gold_proof.ps1 -LaunchInstaller -CaptureVisualAudit -ScaledDpiScale 1.5`
-7. Manual screenshot fallback:
+10. Manual screenshot fallback:
 `scripts/capture_windows_installer_visual_audit.ps1 -LaunchInstaller -CaptureRequiredSet -ScaledDpiScale 1.5 -ClippingStatus pass -ReadabilityStatus pass`
-8. Gold remains blocked until `scripts/verify_windows_installer_visual_audit.py` passes against the promoted installer digest.
+11. Gold remains blocked until `scripts/verify_windows_installer_visual_audit.py` passes against the promoted installer digest.
 
 Manifest-driven public route proof:
 1. `python3 scripts/verify_public_routes_from_manifest.py --base-url https://chummer.run --manifest .codex-design/product/PUBLIC_LANDING_MANIFEST.yaml --output .codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json`
