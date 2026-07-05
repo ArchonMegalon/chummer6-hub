@@ -484,10 +484,17 @@ def build_markdown(payload: dict[str, Any]) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Materialize the operator release dashboard.")
+    parser.set_defaults(release_ready_self_check=True)
     parser.add_argument(
         "--release-ready-self-check",
         action="store_true",
         help="Refresh release-ready blocker detail from current flagship gate truth when the receipt is stale or incomplete.",
+    )
+    parser.add_argument(
+        "--no-release-ready-self-check",
+        dest="release_ready_self_check",
+        action="store_false",
+        help="Disable the current-truth refresh and use the release-ready receipt as-is.",
     )
     return parser.parse_args()
 

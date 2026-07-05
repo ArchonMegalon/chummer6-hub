@@ -44,6 +44,25 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
                 mock.patch.object(module, "REGISTRY_ROOT", Path(temp_dir) / "missing-registry"):
                 self.assertEqual(shared_release_channel, module.resolve_release_channel_path())
 
+    def test_parse_args_enables_release_ready_self_check_by_default(self) -> None:
+        module = load_module()
+
+        with mock.patch("sys.argv", ["materialize_operator_release_dashboard.py"]):
+            args = module.parse_args()
+
+        self.assertTrue(args.release_ready_self_check)
+
+    def test_parse_args_can_disable_release_ready_self_check(self) -> None:
+        module = load_module()
+
+        with mock.patch(
+            "sys.argv",
+            ["materialize_operator_release_dashboard.py", "--no-release-ready-self-check"],
+        ):
+            args = module.parse_args()
+
+        self.assertFalse(args.release_ready_self_check)
+
     def test_dashboard_surfaces_participate_billing_honesty_gate(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="operator-dashboard-") as temp_dir:
