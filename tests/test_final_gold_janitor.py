@@ -89,6 +89,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         module = load_module()
         commands = [" ".join(command) for command in module.MATERIALIZERS]
         public_edge_command = next(command for command in commands if "scripts/verify_public_edge_postdeploy_gate.py" in command)
+        dashboard_command = next(command for command in commands if "scripts/materialize_operator_release_dashboard.py" in command)
 
         live_windows_index = commands.index("python3 scripts/verify_live_public_windows_installer.py --base-url https://chummer.run")
         public_edge_index = commands.index(public_edge_command)
@@ -100,6 +101,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("--require-downloads-status-playwright", public_edge_command)
         self.assertIn("--require-mobile-pwa-viewport-playwright", public_edge_command)
         self.assertIn("--require-frontdoor-navigation-playwright", public_edge_command)
+        self.assertIn("--release-ready-self-check", dashboard_command)
         self.assertIn("public_edge_postdeploy_gate", module.REQUIRED_RECEIPTS)
         self.assertIn("public_edge_postdeploy_gate", module.FRESHNESS_REQUIRED_GATES)
 
@@ -304,6 +306,9 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "full_release_ready": False,
                             "nightly_handoff_ready": True,
                             "full_release_blockers": ["windows_installer_visual_audit"],
+                            "full_release_blocker_details": [
+                                "Windows installer visual audit source digest does not match promoted installer",
+                            ],
                         },
                     }
                 if key == "public_route_proof":
@@ -329,6 +334,45 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual("NIGHTLY_HANDOFF_READY", gate["verdict"])
         self.assertFalse(gate["release_readiness"]["full_release_ready"])
         self.assertIn("operator_release_dashboard is not full release ready", payload["failures"])
+
+    def test_verdict_markdown_surfaces_operator_release_blocker_details(self) -> None:
+        module = load_module()
+        payload = {
+            "verdict": "NOT_GOLD",
+            "generated_at_utc": module.now_iso(),
+            "scope": "full_estate_v20",
+            "required_gates": {
+                "operator_release_dashboard": {
+                    "pass": False,
+                    "status": "fail",
+                    "path": "/tmp/operator-dashboard.json",
+                    "release_readiness": {
+                        "full_release_ready": False,
+                        "nightly_handoff_ready": True,
+                        "full_release_blockers": ["release_ready", "windows_installer_visual_audit"],
+                        "full_release_blocker_details": [
+                            "release channel channel is preview, not a flagship stable lane",
+                            "Windows installer visual audit source digest does not match promoted installer",
+                        ],
+                    },
+                    "release": {
+                        "version": "run-20260705-040324",
+                        "channel": "preview",
+                    },
+                },
+            },
+            "caveats": [],
+            "failures": ["operator_release_dashboard is not full release ready"],
+        }
+
+        markdown = module.build_verdict_markdown(payload)
+
+        self.assertIn("  - full release blocker details:", markdown)
+        self.assertIn("    - release channel channel is preview, not a flagship stable lane", markdown)
+        self.assertIn(
+            "    - Windows installer visual audit source digest does not match promoted installer",
+            markdown,
+        )
 
     def test_main_writes_identical_published_and_durable_v20_janitor_artifacts(self) -> None:
         module = load_module()

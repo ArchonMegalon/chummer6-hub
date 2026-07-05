@@ -137,7 +137,7 @@ MATERIALIZERS = [
     ["python3", "scripts/verify_premium_ui_design_exit_gate.py", "--completion-dir", str(UI_LAYOUT_COMPLETION_ROOT)],
     ["python3", "scripts/materialize_design_quality_gate.py"],
     ["python3", "scripts/verify_windows_installer_visual_audit.py"],
-    ["python3", "scripts/materialize_operator_release_dashboard.py"],
+    ["python3", "scripts/materialize_operator_release_dashboard.py", "--release-ready-self-check"],
     ["python3", "scripts/materialize_release_ready_receipt.py"],
 ]
 
@@ -471,6 +471,10 @@ def build_verdict_markdown(payload: dict[str, Any]) -> str:
             blockers = release_readiness.get("full_release_blockers")
             if isinstance(blockers, list) and blockers:
                 lines.append(f"  - full release blockers: {', '.join(str(item) for item in blockers)}")
+            blocker_details = release_readiness.get("full_release_blocker_details")
+            if isinstance(blocker_details, list) and blocker_details:
+                lines.append("  - full release blocker details:")
+                lines.extend(f"    - {item}" for item in blocker_details)
         if name == "operator_release_dashboard" and gate.get("failures"):
             lines.append(f"  - dashboard failures: {', '.join(str(item) for item in gate['failures'])}")
         if name == "windows_installer_visual_audit" and gate.get("failures"):
