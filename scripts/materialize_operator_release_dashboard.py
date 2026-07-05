@@ -204,6 +204,8 @@ def build_payload() -> dict[str, Any]:
     intake_visual_sources = intake_discovery.get("visual_sources") if isinstance(intake_discovery.get("visual_sources"), dict) else {}
     intake_gold_zip = intake_discovery.get("gold_proof_zip") if isinstance(intake_discovery.get("gold_proof_zip"), dict) else {}
     intake_operator_request = windows_visual_intake.get("operator_request") if isinstance(windows_visual_intake.get("operator_request"), dict) else {}
+    oauth_operator_evidence = oauth.get("operator_end_to_end_evidence") if isinstance(oauth.get("operator_end_to_end_evidence"), dict) else {}
+    oauth_request_artifacts = oauth.get("operator_request_artifacts") if isinstance(oauth.get("operator_request_artifacts"), dict) else {}
 
     return {
         "contract_name": "chummer.operator_release_dashboard",
@@ -247,6 +249,31 @@ def build_payload() -> dict[str, Any]:
             "participate_iframe_shell_status": public_edge_postdeploy.get("participateIframeShellStatus"),
             "flagship_horizons_status": public_edge_postdeploy.get("flagshipHorizonsStatus"),
         },
+        "google_oauth_linking": {
+            "status": oauth.get("status"),
+            "failures": oauth.get("failures") if isinstance(oauth.get("failures"), list) else [],
+            "operator_evidence_pass": oauth_operator_evidence.get("pass"),
+            "operator_evidence_exists": oauth_operator_evidence.get("exists"),
+            "operator_evidence_path": oauth_operator_evidence.get("path"),
+            "request_artifacts_pass": oauth_request_artifacts.get("pass"),
+            "request_status": oauth_request_artifacts.get("request_status"),
+            "request_receipt_path": oauth_request_artifacts.get("request_receipt_path"),
+            "operator_ask_text_path": oauth_request_artifacts.get("operator_ask_text_path"),
+            "operator_ask_metadata_path": oauth_request_artifacts.get("operator_ask_metadata_path"),
+            "operator_ask_receipt_name": oauth_request_artifacts.get("operator_ask_receipt_name"),
+            "operator_ask_send_command": oauth_request_artifacts.get("operator_ask_send_command"),
+            "operator_ask_resend_command": oauth_request_artifacts.get("operator_ask_resend_command"),
+            "operator_ask_delivery_status": oauth_request_artifacts.get("operator_ask_delivery_status"),
+            "operator_ask_delivery_generated_at_utc": oauth_request_artifacts.get("operator_ask_delivery_generated_at_utc"),
+            "operator_ask_delivery_receipt_path": oauth_request_artifacts.get("operator_ask_delivery_receipt_path"),
+            "operator_ask_delivery_matches_current_text": oauth_request_artifacts.get("operator_ask_delivery_matches_current_text"),
+            "operator_ask_delivery_needs_resend": oauth_request_artifacts.get("operator_ask_delivery_needs_resend"),
+            "preferred_drop_path": oauth_request_artifacts.get("preferred_drop_path"),
+            "import_command": oauth_request_artifacts.get("import_command"),
+            "auto_import_watch_command": oauth_request_artifacts.get("auto_import_watch_command"),
+            "post_import_verify_command": oauth_request_artifacts.get("post_import_verify_command"),
+            "operator_evidence_template_path": oauth_request_artifacts.get("operator_evidence_template_path"),
+        },
         "windows_installer_visual_audit": {
             "status": windows_visual_audit.get("status"),
             "failures": windows_visual_audit.get("failures") if isinstance(windows_visual_audit.get("failures"), list) else [],
@@ -279,6 +306,7 @@ def build_markdown(payload: dict[str, Any]) -> str:
     checks = payload.get("checks") if isinstance(payload.get("checks"), dict) else {}
     public_edge = payload.get("public_edge") if isinstance(payload.get("public_edge"), dict) else {}
     account_handoffs = payload.get("account_handoffs") if isinstance(payload.get("account_handoffs"), dict) else {}
+    google_oauth = payload.get("google_oauth_linking") if isinstance(payload.get("google_oauth_linking"), dict) else {}
     windows_visual = payload.get("windows_installer_visual_audit") if isinstance(payload.get("windows_installer_visual_audit"), dict) else {}
     release_readiness = payload.get("release_readiness") if isinstance(payload.get("release_readiness"), dict) else {}
     lines = [
@@ -296,6 +324,7 @@ def build_markdown(payload: dict[str, Any]) -> str:
         f"- Mirrors: {', '.join(f'{name}={status}' for name, status in sorted((mirrors.get('providers') or {}).items()))}",
         f"- Billing mode: `{account_handoffs.get('billing_mode')}`",
         f"- Release-upload mode: `{account_handoffs.get('release_upload_mode')}`",
+        f"- Google OAuth linking: `{google_oauth.get('status')}`; request `{google_oauth.get('request_status')}`; resend `{google_oauth.get('operator_ask_delivery_needs_resend')}`",
         f"- Windows visual audit: `{windows_visual.get('status')}`; intake `{windows_visual.get('intake_status')}`; matching promoted sources `{windows_visual.get('matching_promoted_visual_source_count')}`",
         "",
         "## Rulesets",
@@ -315,6 +344,27 @@ def build_markdown(payload: dict[str, Any]) -> str:
                 mark = "INFO"
             suffix = "" if release_blocking else " (operator context, not release-blocking)"
             lines.append(f"- {mark} `{name}`: `{data.get('status')}`{suffix}")
+    if google_oauth:
+        lines.extend(["", "## Google OAuth Handoff"])
+        lines.append(f"- Operator evidence pass: `{google_oauth.get('operator_evidence_pass')}`")
+        lines.append(f"- Request artifacts pass: `{google_oauth.get('request_artifacts_pass')}`")
+        lines.append(f"- Request receipt: `{google_oauth.get('request_receipt_path')}`")
+        lines.append(f"- Operator evidence path: `{google_oauth.get('operator_evidence_path')}`")
+        lines.append(f"- Current ask delivery: `{google_oauth.get('operator_ask_delivery_status')}` at `{google_oauth.get('operator_ask_delivery_generated_at_utc')}`")
+        lines.append(f"- Current ask text matches delivered text: `{google_oauth.get('operator_ask_delivery_matches_current_text')}`")
+        lines.append(f"- Ask resend required: `{google_oauth.get('operator_ask_delivery_needs_resend')}`")
+        if google_oauth.get("preferred_drop_path"):
+            lines.append(f"- Preferred bundle drop: `{google_oauth.get('preferred_drop_path')}`")
+        if google_oauth.get("import_command"):
+            lines.append(f"- Import command: `{google_oauth.get('import_command')}`")
+        if google_oauth.get("auto_import_watch_command"):
+            lines.append(f"- Auto-import watch: `{google_oauth.get('auto_import_watch_command')}`")
+        if google_oauth.get("operator_ask_send_command"):
+            lines.append(f"- Current ask send command: `{google_oauth.get('operator_ask_send_command')}`")
+        if google_oauth.get("operator_ask_resend_command"):
+            lines.append(f"- Current ask resend command: `{google_oauth.get('operator_ask_resend_command')}`")
+        for failure in google_oauth.get("failures") or []:
+            lines.append(f"- Current blocker: {failure}")
     if windows_visual:
         lines.extend(["", "## Windows Visual Audit Handoff"])
         lines.append(f"- Promoted installer: `{windows_visual.get('artifact_file_name')}` / `{windows_visual.get('artifact_sha256')}`")
