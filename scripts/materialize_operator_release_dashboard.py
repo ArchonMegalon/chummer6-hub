@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from verify_flagship_product_readiness_gate import current_release_truth_launch_blockers
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
@@ -83,6 +91,14 @@ def normalized_strings(values: object) -> list[str]:
     return result
 
 
+def safe_current_release_truth_blockers() -> list[str]:
+    try:
+        blockers = current_release_truth_launch_blockers()
+    except Exception as exc:  # pragma: no cover - defensive surface only
+        return [f"release truth blocker inspection failed: {exc}"]
+    return normalized_strings(blockers)
+
+
 def resolve_release_channel_path() -> Path:
     explicit = os.environ.get("CHUMMER_OPERATOR_RELEASE_CHANNEL_PATH") or os.environ.get("CHUMMER_RELEASE_CHANNEL_PATH")
     candidates = unique_paths(
@@ -153,7 +169,7 @@ def gate(name: str, path: Path, payload: dict[str, Any] | None = None, *, accept
     }
 
 
-def build_payload() -> dict[str, Any]:
+def build_payload(*, release_ready_self_check: bool = False) -> dict[str, Any]:
     release_channel_path = resolve_release_channel_path()
     release_channel = load_json(release_channel_path)
     mirror_path = PUBLISHED_ROOT / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json"
@@ -261,6 +277,8 @@ def build_payload() -> dict[str, Any]:
     release_ready_failures = normalized_strings(release_ready.get("failures"))
     release_ready_failed_gates = normalized_strings(release_ready.get("failed_gates"))
     release_ready_truth_blockers = normalized_strings(release_ready.get("release_truth_blockers"))
+    if release_ready_self_check and not checks["release_ready"]["pass"]:
+        release_ready_truth_blockers = safe_current_release_truth_blockers()
     windows_visual_failures = normalized_strings(windows_visual_audit.get("failures"))
     full_release_blocker_details = normalized_strings(
         (
@@ -287,6 +305,7 @@ def build_payload() -> dict[str, Any]:
             "release_ready_failed_gates": release_ready_failed_gates,
             "release_ready_truth_blockers": release_ready_truth_blockers,
             "release_ready_truth_blocker_count": len(release_ready_truth_blockers),
+            "release_ready_self_check": release_ready_self_check,
         },
         "release": {
             "version": release_channel.get("version"),
@@ -463,8 +482,19 @@ def build_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Materialize the operator release dashboard.")
+    parser.add_argument(
+        "--release-ready-self-check",
+        action="store_true",
+        help="Refresh release-ready blocker detail from current flagship gate truth when the receipt is stale or incomplete.",
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
-    payload = build_payload()
+    args = parse_args()
+    payload = build_payload(release_ready_self_check=args.release_ready_self_check)
     OUTPUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_JSON.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     OUTPUT_MD.write_text(build_markdown(payload), encoding="utf-8")
