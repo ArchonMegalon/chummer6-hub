@@ -173,6 +173,14 @@ def rid_from_row(row: dict[str, Any]) -> str:
     platform_id = normalize_token(row.get("platformId"))
     if platform_id.startswith(("win-", "linux-", "osx-")):
         return platform_id
+    if "-" in platform_id:
+        platform_prefix, platform_suffix = platform_id.split("-", 1)
+        if platform_prefix in {"windows", "win"} and platform_suffix:
+            return f"win-{platform_suffix}"
+        if platform_prefix == "linux" and platform_suffix:
+            return f"linux-{platform_suffix}"
+        if platform_prefix in {"mac", "macos", "osx"} and platform_suffix:
+            return f"osx-{platform_suffix}"
     arch = normalize_token(row.get("arch"))
     if platform_id and arch:
         if platform_id in {"windows", "win"}:

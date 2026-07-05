@@ -4313,6 +4313,11 @@ main() {
       ;;
   esac
 
+  python3 "$hub_alias/scripts/verify_release_upload_response_truth.py" \
+    --local-manifest "$dist_dir/releases.json" \
+    --local-canonical-manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --upload-response "$response_path"
+
   log "verifying local bundle manifest"
   CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
     bash scripts/verify-releases-manifest.sh "$dist_dir/releases.json"

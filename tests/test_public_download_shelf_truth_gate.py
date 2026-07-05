@@ -174,8 +174,16 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
             "win-x64",
         )
         self.assertEqual(
+            MODULE.rid_from_row({"platformId": "windows-x64"}),
+            "win-x64",
+        )
+        self.assertEqual(
             MODULE.rid_from_row({"platformId": "linux", "arch": "arm64"}),
             "linux-arm64",
+        )
+        self.assertEqual(
+            MODULE.rid_from_row({"platformId": "macos-arm64"}),
+            "osx-arm64",
         )
         self.assertEqual(
             MODULE.rid_from_row({"platformId": "macos", "arch": "x64"}),
@@ -524,6 +532,8 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         publish_script = (ROOT / "scripts" / "publish-download-bundle-http.sh").read_text(encoding="utf-8")
         verify_script = (ROOT / "scripts" / "ai" / "verify.sh").read_text(encoding="utf-8")
 
+        self.assertIn('python3 "$SCRIPT_DIR/verify_release_upload_response_truth.py"', publish_script)
+        self.assertIn('--upload-response "$response_json"', publish_script)
         self.assertIn("CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH", publish_script)
         self.assertIn("CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_COUNT", publish_script)
         self.assertIn("CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_DELAY_SECONDS", publish_script)

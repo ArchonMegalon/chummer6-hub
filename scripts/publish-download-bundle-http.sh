@@ -620,6 +620,11 @@ echo "Upload accepted."
 cat "$response_json"
 echo
 
+python3 "$SCRIPT_DIR/verify_release_upload_response_truth.py" \
+  --local-manifest "$MANIFEST_PATH" \
+  --local-canonical-manifest "$CANONICAL_MANIFEST_PATH" \
+  --upload-response "$response_json"
+
 if to_bool "$VERIFY_MANIFEST"; then
   CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
     bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$VERIFY_URL"
