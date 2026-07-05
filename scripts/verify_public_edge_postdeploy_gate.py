@@ -441,6 +441,11 @@ def verify_downloads(base_url: str, timeout_seconds: float, expected_release_cha
     compatibility_rollout = str(compatibility_payload.get("rolloutState") or "")
     compatibility_supportability = str(compatibility_payload.get("supportabilityState") or "")
     compatibility_download_count = len(compatibility_payload.get("downloads") or [])
+    release_guarded_preview = (
+        expected_posture["channel"] == "preview"
+        and normalize_token(release_supportability) == "review_required"
+        and normalize_token(release_rollout) in {"coverage_incomplete", "desktop_polish_needed", "readiness_review_required"}
+    )
     compatibility_guarded_preview = (
         expected_posture["channel"] == "preview"
         and normalize_token(compatibility_supportability) == "review_required"
@@ -470,16 +475,17 @@ def verify_downloads(base_url: str, timeout_seconds: float, expected_release_cha
         failures,
         f"compatibility manifest channel expected {expected_posture['channel']}, got {compatibility_channel or '<empty>'}",
     )
-    require(
-        normalize_token(release_rollout) == expected_posture["rollout"],
-        failures,
-        f"release rollout expected {expected_posture['rollout']}, got {release_rollout or '<empty>'}",
-    )
-    require(
-        normalize_token(release_supportability) == expected_posture["supportability"],
-        failures,
-        f"release supportability expected {expected_posture['supportability']}, got {release_supportability or '<empty>'}",
-    )
+    if not release_guarded_preview:
+        require(
+            normalize_token(release_rollout) == expected_posture["rollout"],
+            failures,
+            f"release rollout expected {expected_posture['rollout']}, got {release_rollout or '<empty>'}",
+        )
+        require(
+            normalize_token(release_supportability) == expected_posture["supportability"],
+            failures,
+            f"release supportability expected {expected_posture['supportability']}, got {release_supportability or '<empty>'}",
+        )
     if not compatibility_guarded_preview:
         require(
             normalize_token(compatibility_rollout) == expected_posture["rollout"],
@@ -511,6 +517,7 @@ def verify_downloads(base_url: str, timeout_seconds: float, expected_release_cha
         "release_rollout_state": release_rollout,
         "release_status": release_status,
         "release_supportability_state": release_supportability,
+        "release_manifest_guarded_preview": release_guarded_preview,
         "compatibility_manifest_rollout_state": compatibility_rollout,
         "compatibility_manifest_supportability_state": compatibility_supportability,
         "compatibility_manifest_download_count": compatibility_download_count,

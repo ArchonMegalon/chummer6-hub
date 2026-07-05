@@ -127,6 +127,50 @@ def test_verify_downloads_accepts_guarded_preview_compatibility_manifest(monkeyp
     assert result["compatibility_manifest_rollout_state"] == "desktop_polish_needed"
 
 
+def test_verify_downloads_accepts_guarded_preview_release_manifest(monkeypatch) -> None:
+    module = load_module()
+    release_payload = {
+        "version": "run-20260704-170602",
+        "releaseVersion": "run-20260704-170602",
+        "status": "published",
+        "channel": "preview",
+        "rolloutState": "coverage_incomplete",
+        "supportabilityState": "review_required",
+    }
+    compatibility_payload = {
+        "version": "run-20260704-170602",
+        "releaseVersion": "run-20260704-170602",
+        "status": "published",
+        "channel": "preview",
+        "rolloutState": "desktop_polish_needed",
+        "supportabilityState": "review_required",
+        "downloads": [{"id": "avalonia-win-x64-installer"}],
+    }
+
+    def fake_fetch(base_url, path, timeout_seconds):
+        if path == "/downloads/RELEASE_CHANNEL.generated.json":
+            return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(release_payload), f"{base_url}{path}")
+        if path == "/downloads/releases.json":
+            return module.FetchResult(path, 200, {"content-type": "application/json"}, json.dumps(compatibility_payload), f"{base_url}{path}")
+        return module.FetchResult(
+            path,
+            200,
+            {"content-type": "text/html"},
+            '<p data-downloads-release-version>Version run-20260704-170602</p>',
+            f"{base_url}{path}",
+        )
+
+    monkeypatch.setattr(module, "fetch", fake_fetch)
+
+    result = module.verify_downloads("https://chummer.run", 1.0, expected_release_channel="preview")
+
+    assert result["status"] == "pass"
+    assert result["release_manifest_guarded_preview"] is True
+    assert result["compatibility_manifest_guarded_preview"] is True
+    assert result["release_supportability_state"] == "review_required"
+    assert result["release_rollout_state"] == "coverage_incomplete"
+
+
 def test_verify_downloads_still_rejects_preview_when_stable_expected(monkeypatch) -> None:
     module = load_module()
     release_payload = {
