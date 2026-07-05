@@ -13,6 +13,31 @@ fi
 
 failures=()
 
+array_count() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || {
+    printf '0\n'
+    return 0
+  }
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  eval "set -- \"\${${array_name}[@]}\""
+  local count="$#"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  printf '%s\n' "$count"
+}
+
 record_failure() {
   local name="$1"
   local log="$2"
@@ -211,7 +236,7 @@ verify_windows_installer_visual_audit_gate() {
 
 run_function_gate verify_public_edge_deploy_source verify_public_edge_deploy_source
 run_function_gate verify_windows_installer_visual_audit verify_windows_installer_visual_audit_gate
-if ((${#failures[@]})) && [[ "${CHUMMER_RELEASE_READY_STOP_ON_PRECHECK_FAILURE:-1}" =~ ^(1|true|yes|on)$ ]]; then
+if (( $(array_count failures) > 0 )) && [[ "${CHUMMER_RELEASE_READY_STOP_ON_PRECHECK_FAILURE:-1}" =~ ^(1|true|yes|on)$ ]]; then
   echo "NOT RELEASE READY"
   printf '%s\n' "${failures[@]}"
   exit 1
@@ -253,7 +278,7 @@ if [[ "${CHUMMER_PUBLIC_REQUIRE_BLAZOR:-0}" =~ ^(1|true|yes|on)$ ]]; then
   run_gate verify_chummer6_blazor_gold bash "$workspace_root/scripts/release/verify_chummer6_blazor_gold.sh"
 fi
 
-if ((${#failures[@]})); then
+if (( $(array_count failures) > 0 )); then
   echo "NOT RELEASE READY"
   printf '%s\n' "${failures[@]}"
   exit 1

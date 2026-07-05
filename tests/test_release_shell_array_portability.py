@@ -10,8 +10,8 @@ HELPER_SNIPPETS = (
     'local restore_nounset=0',
     'case "$-" in',
     'set +u',
-    'local count="0"',
-    'eval "count=\\${#${array_name}[@]}"',
+    'eval "set -- \\"\\${${array_name}[@]}\\""',
+    'local count="$#"',
     'set -u',
 )
 
@@ -50,6 +50,16 @@ SCRIPT_EXPECTATIONS = {
             '${#VERIFY_ARGS[@]}',
         ),
     },
+    REPO_ROOT / "scripts" / "verify_chummer6_release_ready.sh": {
+        "required": (
+            "array_count()",
+            'if (( $(array_count failures) > 0 )) && [[ "${CHUMMER_RELEASE_READY_STOP_ON_PRECHECK_FAILURE:-1}" =~ ^(1|true|yes|on)$ ]]; then',
+            'if (( $(array_count failures) > 0 )); then',
+        ),
+        "forbidden": (
+            '${#failures[@]}',
+        ),
+    },
 }
 
 
@@ -65,3 +75,7 @@ def test_release_shell_scripts_use_nounset_safe_array_count() -> None:
 
         for snippet in expectations["forbidden"]:
             assert snippet not in text, f"found bash3-unsafe raw array length expansion in {script_path}: {snippet}"
+
+        assert 'eval "count=\\${#${array_name}[@]}"' not in text, (
+            f"found bash3-unsafe array-length eval helper in {script_path}"
+        )
