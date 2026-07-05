@@ -12,6 +12,7 @@ from pathlib import Path
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 ROOT = RUN_SERVICES_ROOT.parent
 LEGACY_RUN_SERVICES_ROOT = ROOT / "chummer.run-services"
+SHARED_WORKSPACE_ROOT = Path(os.environ.get("CHUMMER_SHARED_WORKSPACE_ROOT") or "/docker/chummercomplete")
 OUTPUT_PATH = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "RELEASE_READY.generated.json"
 VERIFY_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "verify_chummer6_release_ready.sh"
 TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_RELEASE_READY_TIMEOUT_SECONDS", "900"))
@@ -84,6 +85,14 @@ def current_git_head() -> str:
     return result.stdout.strip()
 
 
+def resolve_workspace_root() -> Path:
+    candidates = [ROOT, SHARED_WORKSPACE_ROOT]
+    for candidate in candidates:
+        if (candidate / "chummer-hub-registry" / "scripts" / "release" / "verify_release_channel.sh").is_file():
+            return candidate
+    return ROOT
+
+
 def source_binding_failures() -> list[str]:
     if not VERIFY_SCRIPT.is_file():
         return [f"release verifier script is missing: {VERIFY_SCRIPT}"]
@@ -121,7 +130,7 @@ def main() -> int:
     env.setdefault("CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE", "1")
     env.setdefault("CHUMMER_PUBLIC_BASE_URL", "https://chummer.run")
     env.setdefault("CHUMMER_RUN_SERVICES_ROOT", str(RUN_SERVICES_ROOT))
-    env.setdefault("CHUMMER_WORKSPACE_ROOT", str(ROOT))
+    env.setdefault("CHUMMER_WORKSPACE_ROOT", str(resolve_workspace_root()))
     expected_head = env.setdefault("CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD", current_git_head())
     binding_failures = source_binding_failures()
     if binding_failures:

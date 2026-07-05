@@ -13,6 +13,11 @@ RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 ROOT = RUN_SERVICES_ROOT.parent
 PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 REGISTRY_ROOT = ROOT / "chummer-hub-registry" / ".codex-studio" / "published"
+SHARED_WORKSPACE_ROOT = Path(os.environ.get("CHUMMER_SHARED_WORKSPACE_ROOT") or "/docker/chummercomplete")
+SHARED_REGISTRY_ROOT = SHARED_WORKSPACE_ROOT / "chummer-hub-registry" / ".codex-studio" / "published"
+SHARED_RUN_SERVICES_ROOT = Path(
+    os.environ.get("CHUMMER_SHARED_RUN_SERVICES_ROOT") or "/docker/chummercomplete/chummer.run-services"
+)
 OUTPUT_JSON = PUBLISHED_ROOT / "OPERATOR_RELEASE_DASHBOARD.generated.json"
 OUTPUT_MD = PUBLISHED_ROOT / "OPERATOR_RELEASE_DASHBOARD.md"
 
@@ -48,6 +53,36 @@ def load_json(path: Path) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
+
+
+def unique_paths(paths: list[Path]) -> list[Path]:
+    result: list[Path] = []
+    seen: set[Path] = set()
+    for path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        result.append(path)
+    return result
+
+
+def resolve_release_channel_path() -> Path:
+    explicit = os.environ.get("CHUMMER_OPERATOR_RELEASE_CHANNEL_PATH") or os.environ.get("CHUMMER_RELEASE_CHANNEL_PATH")
+    candidates = unique_paths(
+        [
+            Path(explicit).expanduser() if explicit else REGISTRY_ROOT / "RELEASE_CHANNEL.generated.json",
+            REGISTRY_ROOT / "RELEASE_CHANNEL.generated.json",
+            SHARED_REGISTRY_ROOT / "RELEASE_CHANNEL.generated.json",
+            RUN_SERVICES_ROOT / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
+            RUN_SERVICES_ROOT / ".codex-studio" / "published" / "portal" / "RELEASE_CHANNEL.generated.json",
+            SHARED_RUN_SERVICES_ROOT / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
+            SHARED_RUN_SERVICES_ROOT / ".codex-studio" / "published" / "portal" / "RELEASE_CHANNEL.generated.json",
+        ]
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[0]
 
 
 def is_pass(payload: dict[str, Any]) -> bool:
@@ -102,7 +137,7 @@ def gate(name: str, path: Path, payload: dict[str, Any] | None = None, *, accept
 
 
 def build_payload() -> dict[str, Any]:
-    release_channel_path = REGISTRY_ROOT / "RELEASE_CHANNEL.generated.json"
+    release_channel_path = resolve_release_channel_path()
     release_channel = load_json(release_channel_path)
     mirror_path = PUBLISHED_ROOT / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json"
     mirror = load_json(mirror_path)

@@ -92,6 +92,7 @@ def test_summary_subsumes_desktop_client_gap_when_only_windows_external_proof_is
     monkeypatch.setattr(module, "DEFAULT_WINDOWS_INSTALLER_VISUAL_AUDIT", published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json")
     monkeypatch.setattr(module, "DEFAULT_RELEASE_CHANNEL", published / "RELEASE_CHANNEL.generated.json")
     monkeypatch.setattr(module, "DEFAULT_GOOGLE_OAUTH_LINKING_PROOF", published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json")
+    monkeypatch.setattr(module, "SHARED_RUN_SERVICES_ROOT", tmp_path / "missing-shared-run-services")
 
     payload = passing_payload()
     payload["status"] = "fail"
@@ -254,6 +255,7 @@ def test_summary_replaces_release_wrapper_blockers_with_concrete_release_ready_f
     monkeypatch.setattr(module, "DEFAULT_GOOGLE_OAUTH_LINKING_PROOF", published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json")
     monkeypatch.setattr(module, "DEFAULT_WINDOWS_INSTALLER_VISUAL_AUDIT", published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json")
     monkeypatch.setattr(module, "DEFAULT_RELEASE_CHANNEL", published / "RELEASE_CHANNEL.generated.json")
+    monkeypatch.setattr(module, "SHARED_RUN_SERVICES_ROOT", tmp_path / "missing-shared-run-services")
 
     payload = passing_payload()
     payload["coverage_details"] = {
@@ -614,3 +616,28 @@ def test_main_writes_default_published_summary_output(tmp_path, monkeypatch) -> 
     assert written["coverage_gap_keys"] == []
     assert written["scoped_coverage_gap_keys"] == []
     assert written["generated_at_utc"]
+
+
+def test_release_channel_resolution_falls_back_to_shared_run_services_portal(tmp_path, monkeypatch) -> None:
+    module = load_module()
+    shared_run_services = tmp_path / "shared-run-services"
+    shared_release_channel = shared_run_services / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json"
+    shared_release_channel.parent.mkdir(parents=True, exist_ok=True)
+    shared_release_channel.write_text(
+        json.dumps(
+            {
+                "contract_name": "chummer.release_channel",
+                "status": "published",
+                "version": "run-20260705-040324",
+                "channel": "preview",
+                "supportabilityState": "preview_supported",
+                "rolloutState": "promoted_preview",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(module, "DEFAULT_RELEASE_CHANNEL", tmp_path / "missing" / "RELEASE_CHANNEL.generated.json")
+    monkeypatch.setattr(module, "SHARED_RUN_SERVICES_ROOT", shared_run_services)
+
+    assert module.resolve_release_channel_path() == shared_release_channel

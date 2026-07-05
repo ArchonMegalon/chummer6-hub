@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -14,6 +15,9 @@ ROOT = Path("/docker/chummercomplete")
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 REGISTRY_PUBLISHED_ROOT = ROOT / "chummer-hub-registry" / ".codex-studio" / "published"
+SHARED_RUN_SERVICES_ROOT = Path(
+    os.environ.get("CHUMMER_SHARED_RUN_SERVICES_ROOT") or "/docker/chummercomplete/chummer.run-services"
+)
 DEFAULT_READINESS = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "FLAGSHIP_PRODUCT_READINESS.generated.json"
 DEFAULT_SUMMARY_OUTPUT = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
 DEFAULT_MATERIALIZER = Path("/docker/fleet/scripts/materialize_flagship_product_readiness.py")
@@ -52,6 +56,35 @@ def load_json(path: Path) -> tuple[dict[str, Any], str]:
     if not isinstance(payload, dict):
         return {}, "invalid"
     return payload, "loaded"
+
+
+def unique_paths(paths: list[Path]) -> list[Path]:
+    result: list[Path] = []
+    seen: set[Path] = set()
+    for path in paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        result.append(path)
+    return result
+
+
+def resolve_release_channel_path() -> Path:
+    explicit = os.environ.get("CHUMMER_RELEASE_CHANNEL_PATH")
+    candidates = unique_paths(
+        [
+            Path(explicit).expanduser() if explicit else DEFAULT_RELEASE_CHANNEL,
+            DEFAULT_RELEASE_CHANNEL,
+            SHARED_RUN_SERVICES_ROOT / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
+            SHARED_RUN_SERVICES_ROOT / ".codex-studio" / "published" / "portal" / "RELEASE_CHANNEL.generated.json",
+            RUN_SERVICES_ROOT / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
+            RUN_SERVICES_ROOT / ".codex-studio" / "published" / "portal" / "RELEASE_CHANNEL.generated.json",
+        ]
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[0]
 
 
 def receipt_load_failure(
@@ -271,10 +304,11 @@ def resolve_release_truth_launch_blockers(evidence: dict[str, Any]) -> list[str]
 
 def current_release_truth_launch_blockers() -> list[str]:
     details: list[str] = []
-    release_channel, release_channel_load_status = load_json(DEFAULT_RELEASE_CHANNEL)
+    resolved_release_channel_path = resolve_release_channel_path()
+    release_channel, release_channel_load_status = load_json(resolved_release_channel_path)
     release_channel_load_failure = receipt_load_failure(
         "release channel",
-        DEFAULT_RELEASE_CHANNEL,
+        resolved_release_channel_path,
         release_channel_load_status,
         include_missing=False,
     )

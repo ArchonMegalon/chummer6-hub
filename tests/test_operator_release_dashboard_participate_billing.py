@@ -26,6 +26,24 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         self.assertEqual(SCRIPT_PATH.parents[1], module.RUN_SERVICES_ROOT)
         self.assertEqual(SCRIPT_PATH.parents[1] / ".codex-studio" / "published", module.PUBLISHED_ROOT)
 
+    def test_dashboard_release_channel_path_falls_back_to_shared_workspace_when_local_registry_is_missing(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="operator-dashboard-release-channel-") as temp_dir:
+            shared_workspace = Path(temp_dir) / "shared"
+            shared_run_services = shared_workspace / "chummer.run-services"
+            shared_release_channel = shared_run_services / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json"
+            shared_release_channel.parent.mkdir(parents=True, exist_ok=True)
+            shared_release_channel.write_text(
+                json.dumps({"status": "published", "version": "run-20260705-040324"}) + "\n",
+                encoding="utf-8",
+            )
+
+            with mock.patch.object(module, "SHARED_WORKSPACE_ROOT", shared_workspace), \
+                mock.patch.object(module, "SHARED_REGISTRY_ROOT", shared_workspace / "chummer-hub-registry" / ".codex-studio" / "published"), \
+                mock.patch.object(module, "SHARED_RUN_SERVICES_ROOT", shared_run_services), \
+                mock.patch.object(module, "REGISTRY_ROOT", Path(temp_dir) / "missing-registry"):
+                self.assertEqual(shared_release_channel, module.resolve_release_channel_path())
+
     def test_dashboard_surfaces_participate_billing_honesty_gate(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="operator-dashboard-") as temp_dir:

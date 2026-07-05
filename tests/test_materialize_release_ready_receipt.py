@@ -57,6 +57,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 mock.patch.object(module, "OUTPUT_PATH", output_path),
                 mock.patch.object(module, "source_binding_failures", return_value=[]),
                 mock.patch.object(module, "current_git_head", return_value="abc123"),
+                mock.patch.object(module, "resolve_workspace_root", return_value=module.ROOT),
                 mock.patch.object(module.subprocess, "Popen", return_value=process) as popen,
             ):
                 result = module.main()
@@ -97,6 +98,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 mock.patch.object(module, "OUTPUT_PATH", output_path),
                 mock.patch.object(module, "source_binding_failures", return_value=[]),
                 mock.patch.object(module, "current_git_head", return_value="abc123"),
+                mock.patch.object(module, "resolve_workspace_root", return_value=module.ROOT),
                 mock.patch.object(module.subprocess, "Popen", return_value=process),
                 mock.patch.object(module.os, "killpg") as killpg,
             ):
@@ -124,6 +126,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 mock.patch.object(module, "OUTPUT_PATH", output_path),
                 mock.patch.object(module, "source_binding_failures", return_value=[failure]),
                 mock.patch.object(module, "current_git_head", return_value="abc123"),
+                mock.patch.object(module, "resolve_workspace_root", return_value=module.ROOT),
                 mock.patch.object(module.subprocess, "Popen") as popen,
             ):
                 result = module.main()
@@ -149,6 +152,23 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
 
             with mock.patch.object(module, "VERIFY_SCRIPT", verifier):
                 self.assertEqual([], module.source_binding_failures())
+
+    def test_resolve_workspace_root_prefers_shared_workspace_when_local_siblings_are_missing(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-ready-workspace-root-") as temp_dir:
+            local_root = Path(temp_dir) / "local"
+            shared_root = Path(temp_dir) / "shared"
+            (shared_root / "chummer-hub-registry" / "scripts" / "release").mkdir(parents=True, exist_ok=True)
+            (shared_root / "chummer-hub-registry" / "scripts" / "release" / "verify_release_channel.sh").write_text(
+                "#!/usr/bin/env bash\n",
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(module, "ROOT", local_root),
+                mock.patch.object(module, "SHARED_WORKSPACE_ROOT", shared_root),
+            ):
+                self.assertEqual(shared_root, module.resolve_workspace_root())
 
 
 if __name__ == "__main__":
