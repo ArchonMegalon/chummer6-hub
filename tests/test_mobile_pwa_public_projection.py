@@ -60,7 +60,7 @@ class _FakeSession:
         if url.endswith("/build"):
             return _FakeResponse(
                 "http://example.test/app?command=character_roster",
-                text="<main class=\"browser-preview-shell\"><h1>Character Roster</h1><p>Chummer Online</p></main>",
+                text="<section id=\"chummer-online-app\" class=\"browser-app-roster\"><span>Chummer Online</span><h1>Character Roster</h1></section>",
             )
         if url.endswith("/mobile"):
             return _FakeResponse(
@@ -352,6 +352,34 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
         self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
         self.assertTrue(any(check["id"] == "build_route_opens_character_roster" and check["pass"] is False for check in captured_payloads[0]["checks"]))
         self.assertEqual(captured_payloads[0]["public_entry"]["build_final_route"], "/build")
+
+    def test_verifier_accepts_legacy_preview_shell_marker_for_build_route(self) -> None:
+        class LegacyShellSession(_FakeSession):
+            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
+                if url.endswith("/build"):
+                    return _FakeResponse(
+                        "http://example.test/app?command=character_roster",
+                        text="<main class=\"browser-preview-shell\"><h1>Character Roster</h1><p>Chummer Online</p></main>",
+                    )
+                return super().get(url, timeout=timeout, allow_redirects=allow_redirects)
+
+        module = _load_module()
+        stdout = io.StringIO()
+        captured_payloads: list[dict] = []
+
+        with (
+            patch.object(module.requests, "Session", return_value=LegacyShellSession()),
+            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
+            patch.object(module, "write_json", side_effect=lambda _path, payload: captured_payloads.append(payload)),
+            patch.object(module, "write_text"),
+            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
+            redirect_stdout(stdout),
+        ):
+            result = module.run("http://example.test")
+
+        self.assertEqual(result, 0)
+        self.assertIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+        self.assertTrue(captured_payloads[0]["public_entry"]["build_route_holds"])
 
     def test_verifier_supports_explicit_output_and_report_paths(self) -> None:
         module = _load_module()

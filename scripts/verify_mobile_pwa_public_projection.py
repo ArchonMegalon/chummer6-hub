@@ -32,9 +32,12 @@ EXPECTED_HOME_OPEN_CHUMMER_MARKERS = {
     'data-analytics-label="Play">Play</a>',
 }
 EXPECTED_BUILD_SHELL_MARKERS = {
-    "browser-preview-shell",
     "Character Roster",
     "Chummer Online",
+}
+EXPECTED_BUILD_SHELL_VARIANT_MARKERS = {
+    "browser-app-roster",
+    "browser-preview-shell",
 }
 EXPECTED_PLAY_SHELL_MARKERS = {
     "pwa-ledger-stream",
@@ -203,6 +206,8 @@ def run(base_url: str, *, output_path: Path | None = None, report_path: Path | N
     parsed_build_final = urlparse(build_final_url)
     build_final_route = f"{parsed_build_final.path}{f'?{parsed_build_final.query}' if parsed_build_final.query else ''}"
     build_missing_markers = sorted(marker for marker in EXPECTED_BUILD_SHELL_MARKERS if marker not in build_html.text)
+    if not any(marker in build_html.text for marker in EXPECTED_BUILD_SHELL_VARIANT_MARKERS):
+        build_missing_markers.append("browser-app-roster|browser-preview-shell")
     build_route_holds = build_final_route == EXPECTED_BUILD_FINAL_ROUTE and not build_missing_markers
     play_shell_missing_markers = sorted(
         marker for marker in EXPECTED_PLAY_SHELL_MARKERS if marker not in play_shell_html.text
