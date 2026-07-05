@@ -16,8 +16,8 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   await expect(desktop.locator('.minimal-hero h1')).toContainText('Chummer');
   await expect(desktop.locator('.minimal-hero__lead')).toContainText('A Shadowrun character manager');
   const heroActions = await desktop.locator('.minimal-hero .minimal-actions a.button-like').allTextContents();
-  if (heroActions.map((text) => text.trim()).join('|') !== 'Download Chummer') {
-    failures.push(`homepage: expected one Download Chummer hero action, found ${heroActions.join(', ')}`);
+  if (heroActions.map((text) => text.trim()).join('|') !== 'Download Chummer|Watch 90 sec') {
+    failures.push(`homepage: expected Download Chummer and Watch 90 sec hero actions, found ${heroActions.join(', ')}`);
   }
   const heroImage = desktop.locator('.minimal-hero__visual img');
   const heroMediaLink = desktop.locator('.minimal-hero__visual[href="/media/promo/every-wonder-horizon-promo.mp4"]');
@@ -128,7 +128,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       '',
       `- Generated: ${new Date().toISOString()}`,
       `- Base URL: ${baseUrl}`,
-      '- Checks: homepage starts with one download action, avoids duplicate homepage download strips, downloads exposes lane buttons for every promoted release platform, status uses compact next-action rail.',
+      '- Checks: homepage starts with download plus promo actions, avoids duplicate homepage download strips, downloads exposes lane buttons for every promoted release platform, status uses compact next-action rail.',
       '',
       ...results.map((result) => `- ${String(result.surface)} checked`),
       ...(failures.length > 0 ? ['', '## Failures', '', ...failures.map((failure) => `- ${failure}`)] : []),

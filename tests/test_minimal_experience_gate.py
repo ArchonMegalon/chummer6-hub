@@ -60,7 +60,7 @@ class MinimalExperienceGateTests(unittest.TestCase):
         self.assertFalse(payload["results"][0]["nav_panel_open"])
         self.assertTrue(payload["results"][0]["hero_image_loaded"])
         self.assertEqual(payload["results"][0]["product_video_links"], ["/media/promo/every-wonder-horizon-promo.mp4"])
-        self.assertEqual(payload["results"][1]["updated_label_count"], 1)
+        self.assertEqual(payload["results"][1]["updated_label_count"], 0)
         self.assertEqual(payload["results"][2]["updated_label_count"], 0)
 
     def test_payload_rejects_repeated_dates_and_internal_release_noise(self) -> None:
@@ -74,14 +74,14 @@ class MinimalExperienceGateTests(unittest.TestCase):
                 </body>
             """,
             "https://example.invalid/downloads": """
-                <span>Updated</span><span>Updated</span>
+                <span>Updated 2026-07-05</span><span>Updated 2026-07-05</span>
                 <article id="stable"><span>Stable</span><p>Stable release.</p></article>
                 <article id="nightly"><span>Nightly</span><h2>No newer build</h2></article>
                 <p>Released 2026-06-23</p>
             """,
             "https://example.invalid/status": """
                 <div class="minimal-page-hero minimal-status-pill"></div>
-                <span>Updated</span><span>Updated</span>
+                <span>Updated 2026-07-05</span><span>Updated 2026-07-05</span>
                 <p>Build run-20260623-102621</p>
                 <p>Checks passed</p>
                 <a data-analytics-event="status_next_action">Downloads</a>

@@ -96,6 +96,10 @@ def count_class_token(text: str, token: str) -> int:
     return len(re.findall(pattern, text, flags=re.IGNORECASE))
 
 
+def count_dated_update_mentions(text: str) -> int:
+    return len(re.findall(r"\bUpdated\s+\d{4}-\d{2}-\d{2}\b", text, flags=re.IGNORECASE))
+
+
 def find_release_noise(text: str) -> list[str]:
     patterns = [
         r"\brun-\d{8}-\d{6}\b",
@@ -159,8 +163,8 @@ def build_payload(
     nightly_visible = 'id="nightly"' in downloads_html and "Nightly" in downloads_text
     decision_card_count = count_class_token(status_html, "minimal-status-pill")
     next_action_count = count_occurrences(status_html, 'data-analytics-event="status_next_action"')
-    status_updated_count = count_occurrences(status_text, "Updated")
-    downloads_updated_count = count_occurrences(downloads_text, "Updated")
+    status_updated_count = count_dated_update_mentions(status_text)
+    downloads_updated_count = count_dated_update_mentions(downloads_text)
     status_release_noise = find_release_noise(status_text)
     downloads_release_noise = find_release_noise(downloads_text)
 
