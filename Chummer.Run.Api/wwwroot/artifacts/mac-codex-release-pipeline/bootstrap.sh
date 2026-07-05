@@ -38,8 +38,8 @@ array_count() {
       ;;
   esac
 
-  local count="0"
-  eval "count=\${#${array_name}[@]}"
+  eval "set -- \"\${${array_name}[@]}\""
+  local count="$#"
 
   if (( restore_nounset == 1 )); then
     set -u

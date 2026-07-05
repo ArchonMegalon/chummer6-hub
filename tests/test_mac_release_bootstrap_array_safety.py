@@ -20,8 +20,8 @@ def test_mac_release_bootstrap_avoids_bash3_empty_array_expansions_under_nounset
     assert 'local restore_nounset=0' in text
     assert 'case "$-" in' in text
     assert 'set +u' in text
-    assert 'local count="0"' in text
-    assert 'eval "count=\\${#${array_name}[@]}"' in text
+    assert 'eval "set -- \\"\\${${array_name}[@]}\\""' in text
+    assert 'local count="$#"' in text
     assert 'set -u' in text
     assert 'if (( $(array_count install_urls) > 0 )); then' in text
     assert 'if (( $(array_count direct_urls) > 0 )); then' in text
@@ -43,3 +43,5 @@ def test_mac_release_bootstrap_avoids_bash3_empty_array_expansions_under_nounset
     )
     for pattern in unsafe_patterns:
         assert pattern not in text
+
+    assert 'eval "count=\\${#${array_name}[@]}"' not in text
