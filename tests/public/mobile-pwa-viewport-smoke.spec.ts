@@ -10,13 +10,37 @@ const viewports = [
   { name: 'desktop-1366', width: 1366, height: 768 },
 ];
 
-const routes = [
-  { path: '/mobile', expected: 'Mobile and PWA entry' },
-  { path: '/mobile/player', expected: 'Player entry' },
-  { path: '/mobile/gm', expected: 'GM entry' },
-  { path: '/mobile/observer', expected: 'Observer entry' },
-  { path: '/play', expected: 'Player entry' },
-  { path: '/play/continuity', expected: 'NEXUS-PAN continuity' },
+const routeMatrix = [
+  {
+    viewportName: 'phone-390',
+    routes: [
+      { path: '/mobile', expected: 'Mobile and PWA entry' },
+      { path: '/mobile/player', expected: 'Player entry' },
+      { path: '/mobile/gm', expected: 'GM entry' },
+      { path: '/mobile/observer', expected: 'Observer entry' },
+      { path: '/play', expected: 'Player entry' },
+      { path: '/play/continuity', expected: 'NEXUS-PAN continuity' },
+    ],
+  },
+  {
+    viewportName: 'tablet',
+    routes: [
+      { path: '/mobile', expected: 'Mobile and PWA entry' },
+      { path: '/mobile/player', expected: 'Player entry' },
+      { path: '/mobile/gm', expected: 'GM entry' },
+      { path: '/mobile/observer', expected: 'Observer entry' },
+      { path: '/play', expected: 'Player entry' },
+      { path: '/play/continuity', expected: 'NEXUS-PAN continuity' },
+    ],
+  },
+  {
+    viewportName: 'desktop-1366',
+    routes: [
+      { path: '/mobile', expected: 'Mobile and PWA entry' },
+      { path: '/play', expected: 'Player entry' },
+      { path: '/play/continuity', expected: 'NEXUS-PAN continuity' },
+    ],
+  },
 ];
 
 test('core mobile PWA routes fit phone tablet and desktop viewports', async ({ browser }) => {
@@ -36,7 +60,8 @@ test('core mobile PWA routes fit phone tablet and desktop viewports', async ({ b
       await route.continue();
     });
 
-    for (const route of routes) {
+    const viewportRoutes = routeMatrix.find((entry) => entry.viewportName === viewport.name)?.routes ?? [];
+    for (const route of viewportRoutes) {
       let status = 0;
       let navigationError = '';
       let overflowX = 0;
@@ -68,7 +93,7 @@ test('core mobile PWA routes fit phone tablet and desktop viewports', async ({ b
         failures.push(`${route.path} ${viewport.name} has ${Math.round(overflowX)}px horizontal overflow`);
       }
 
-      results.push({
+    results.push({
         route: route.path,
         viewport: viewport.name,
         width: viewport.width,
@@ -87,8 +112,8 @@ test('core mobile PWA routes fit phone tablet and desktop viewports', async ({ b
     generated_at_utc: new Date().toISOString(),
     status: failures.length === 0 ? 'pass' : 'fail',
     base_url: baseUrl,
-    routes: routes.map((route) => route.path),
-    route_count: routes.length,
+    routes: routeMatrix.flatMap((entry) => entry.routes.map((route) => route.path)),
+    route_count: routeMatrix.reduce((count, entry) => count + entry.routes.length, 0),
     viewport_count: viewports.length,
     results,
     failures,

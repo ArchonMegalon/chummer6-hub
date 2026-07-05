@@ -174,6 +174,78 @@ def normalize_token(value: Any) -> str:
     return str(value or "").strip().casefold()
 
 
+def resolve_playwright_package_spec() -> str:
+    override = str(os.environ.get("CHUMMER_PLAYWRIGHT_PACKAGE_SPEC") or "").strip()
+    if override:
+        return override
+
+    package_lock_path = ROOT / "package-lock.json"
+    if package_lock_path.is_file():
+        try:
+            package_lock = json.loads(package_lock_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            package_lock = {}
+        packages = package_lock.get("packages")
+        if isinstance(packages, dict):
+            playwright_package = packages.get("node_modules/playwright")
+            if isinstance(playwright_package, dict):
+                version = str(playwright_package.get("version") or "").strip()
+                if version:
+                    return f"playwright@{version}"
+
+    package_json_path = ROOT / "package.json"
+    if package_json_path.is_file():
+        try:
+            package_json = json.loads(package_json_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            package_json = {}
+        for field in ("dependencies", "devDependencies"):
+            dependencies = package_json.get(field)
+            if not isinstance(dependencies, dict):
+                continue
+            version_spec = str(dependencies.get("playwright") or "").strip()
+            if version_spec:
+                return f"playwright@{version_spec}"
+
+    return "playwright"
+
+
+def resolve_playwright_node_modules_root() -> Path | None:
+    override_root = str(os.environ.get("CHUMMER_PLAYWRIGHT_NODE_MODULES_ROOT") or "").strip()
+    candidates = []
+    if override_root:
+        candidates.append(Path(override_root).expanduser())
+    candidates.extend(
+        [
+            ROOT / "node_modules",
+            ROOT.parent / "chummer.run-services" / "node_modules",
+            Path("/docker/chummercomplete/chummer.run-services/node_modules"),
+        ]
+    )
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        if (candidate / ".bin" / "playwright").is_file():
+            return candidate
+    return None
+
+
+def resolve_playwright_command() -> list[str]:
+    override_bin = str(os.environ.get("CHUMMER_PLAYWRIGHT_BIN") or "").strip()
+    if override_bin:
+        return [override_bin]
+
+    node_modules_root = resolve_playwright_node_modules_root()
+    if node_modules_root is not None:
+        return [str(node_modules_root / ".bin" / "playwright")]
+
+    return ["npx", "--yes", resolve_playwright_package_spec()]
+
+
 def expected_release_posture(expected_release_channel: str) -> dict[str, str]:
     normalized = normalize_token(expected_release_channel) or "public_stable"
     if normalized in {"preview", "nightly", "promoted_preview"}:
@@ -1025,13 +1097,31 @@ def run_playwright_browser_proofs(
     completion_dir = artifact_dir or Path(tempfile.mkdtemp(prefix="chummer-public-edge-browser-proof-"))
     completion_dir.mkdir(parents=True, exist_ok=True)
 
-    playwright_bin = ROOT / "node_modules" / ".bin" / "playwright"
-    playwright_command = [str(playwright_bin)] if playwright_bin.is_file() else ["npx", "--no-install", "playwright"]
+    for proof_id in required_proofs:
+        if proof_id not in PLAYWRIGHT_REQUIREMENTS:
+            continue
+        artifact_name = str(PLAYWRIGHT_REQUIREMENTS[proof_id]["artifact"])
+        artifact_path = completion_dir / artifact_name
+        if artifact_path.exists():
+            artifact_path.unlink()
+
+    playwright_command = resolve_playwright_command()
     playwright_env = {**os.environ}
     playwright_env.pop("FORCE_COLOR", None)
     playwright_env.pop("NO_COLOR", None)
     playwright_env["BASE_URL"] = base_url
     playwright_env["CHUMMER_COMPLETION_DIR"] = str(completion_dir)
+    npm_cache_dir = completion_dir / ".npm-cache"
+    npm_cache_dir.mkdir(parents=True, exist_ok=True)
+    playwright_env.setdefault("npm_config_cache", str(npm_cache_dir))
+    playwright_node_modules_root = resolve_playwright_node_modules_root()
+    if playwright_node_modules_root is not None:
+        existing_node_path = str(playwright_env.get("NODE_PATH") or "").strip()
+        playwright_env["NODE_PATH"] = (
+            f"{playwright_node_modules_root}{os.pathsep}{existing_node_path}"
+            if existing_node_path
+            else str(playwright_node_modules_root)
+        )
     started = datetime.now(UTC)
     runs: dict[str, Any] = {}
     for proof_id in required_proofs:

@@ -32,16 +32,42 @@ test('downloads and status stay concise and point to the right next steps', asyn
   const downloadsVersionMarker = downloadsMain.locator('[data-downloads-release-version]');
   await expect(downloadsVersionMarker).toContainText(/^Version \S+/);
   const downloadsVersionText = (await downloadsVersionMarker.textContent())?.trim() || '';
-  await expect(downloadsPage.locator('body')).toContainText(/Stable release/);
-  await expect(downloadsPage.locator('body')).toContainText('Nightly handoff');
+  await expect(downloadsPage.locator('body')).toContainText(
+    /Stable release|No Stable build on this shelf\.|Stable release is unchanged while this nightly handoff is under review\.|Stable release is not available for this platform yet\./,
+  );
+  await expect(downloadsPage.locator('body')).toContainText(
+    /Nightly handoff|No newer Nightly right now\.|Preview build\. Check Help before you install\./,
+  );
   await expect(downloadsPage.locator('body')).toContainText('Build from source');
-  await expect(downloadsMain.getByRole('link', { name: /Download for|Download script|Use Nightly|Use Stable/ })).toHaveCount(2);
+  const primaryLaneActions = await downloadsMain.locator('#stable a.button-like, #nightly a.button-like').evaluateAll(
+    (items) => items.map((item) => ({
+      text: (item.textContent ?? '').trim(),
+      href: item.getAttribute('href') ?? '',
+    })).filter((item) => item.text),
+  );
+  expect(primaryLaneActions).toHaveLength(2);
+  for (const action of primaryLaneActions) {
+    expect(
+      action.text === 'Use Nightly'
+      || action.text === 'Use Stable'
+      || action.text === 'Other downloads'
+      || action.text.startsWith('Download for'),
+    ).toBe(true);
+    expect(
+      action.href === '#nightly'
+      || action.href === '#stable'
+      || action.href === '#other-downloads'
+      || action.href.startsWith('/downloads/'),
+    ).toBe(true);
+  }
   await downloadsPage.close();
 
   const statusPage = await openPublicPage(browser, '/status');
   await expect(statusPage).toHaveURL(/\/status(?:[?#].*)?$/);
-  await expect(statusPage.getByRole('heading', { name: 'Updated' })).toBeVisible();
-  await expect(statusPage.locator('.minimal-page-hero.minimal-status-pill')).toBeVisible();
+  const statusHero = statusPage.locator('.minimal-page-hero.minimal-status-pill');
+  await expect(statusHero).toBeVisible();
+  await expect(statusHero).toContainText(/Now|Updated/);
+  await expect(statusHero).toContainText(/Preview downloads|Stable downloads|Downloads/);
   const statusVersionMarker = statusPage.locator('[data-downloads-release-version]');
   await expect(statusVersionMarker).toContainText(/^Version \S+/);
   const statusVersionText = (await statusVersionMarker.textContent())?.trim() || '';

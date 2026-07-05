@@ -531,6 +531,7 @@ def test_playwright_browser_proofs_collect_artifact_status(monkeypatch, tmp_path
     module = load_module()
 
     def fake_run(command, cwd, env, text, capture_output, timeout, check):
+        assert env["npm_config_cache"] == str(tmp_path / ".npm-cache")
         artifact_path = Path(env["CHUMMER_COMPLETION_DIR"]) / "DOWNLOADS_STATUS_E2E.generated.json"
         artifact_path.write_text(
             json.dumps(
@@ -551,6 +552,78 @@ def test_playwright_browser_proofs_collect_artifact_status(monkeypatch, tmp_path
     assert result["status"] == "pass"
     assert result["runs"]["downloadsStatus"]["returnCode"] == 0
     assert result["artifacts"]["downloadsStatus"]["status"] == "pass"
+
+
+def test_resolve_playwright_command_falls_back_to_declared_package_version(monkeypatch, tmp_path) -> None:
+    module = load_module()
+
+    (tmp_path / "package-lock.json").write_text(
+        json.dumps(
+            {
+                "packages": {
+                    "node_modules/playwright": {
+                        "version": "1.60.0",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.delenv("CHUMMER_PLAYWRIGHT_BIN", raising=False)
+    monkeypatch.delenv("CHUMMER_PLAYWRIGHT_PACKAGE_SPEC", raising=False)
+    monkeypatch.delenv("CHUMMER_PLAYWRIGHT_NODE_MODULES_ROOT", raising=False)
+    monkeypatch.setattr(module, "resolve_playwright_node_modules_root", lambda: None)
+
+    assert module.resolve_playwright_command() == ["npx", "--yes", "playwright@1.60.0"]
+
+
+def test_resolve_playwright_command_prefers_shared_node_modules_root(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    shared_root = tmp_path / "shared-node-modules"
+    bin_dir = shared_root / ".bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "playwright").write_text("#!/bin/sh\n", encoding="utf-8")
+
+    monkeypatch.setattr(module, "ROOT", tmp_path / "clean-clone")
+    monkeypatch.setenv("CHUMMER_PLAYWRIGHT_NODE_MODULES_ROOT", str(shared_root))
+    monkeypatch.delenv("CHUMMER_PLAYWRIGHT_BIN", raising=False)
+
+    assert module.resolve_playwright_command() == [str(bin_dir / "playwright")]
+    assert module.resolve_playwright_node_modules_root() == shared_root
+
+
+def test_playwright_browser_proofs_delete_stale_artifacts_before_running(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    stale_artifact_path = tmp_path / "DOWNLOADS_STATUS_E2E.generated.json"
+    stale_artifact_path.write_text(
+        json.dumps(
+            {
+                "contractName": "chummer.downloads_status_e2e.v1",
+                "status": "pass",
+                "base_url": "https://stale.example.invalid",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_run(command, cwd, env, text, capture_output, timeout, check):
+        assert env["npm_config_cache"] == str(tmp_path / ".npm-cache")
+        assert not stale_artifact_path.exists()
+        return subprocess.CompletedProcess(command, 1, stdout="", stderr="playwright failed")
+
+    monkeypatch.setattr(module, "resolve_playwright_command", lambda: ["playwright"])
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    result = module.run_playwright_browser_proofs("https://chummer.run", ["downloadsStatus"], 1.0, tmp_path)
+
+    assert result["status"] == "fail"
+    assert result["runs"]["downloadsStatus"]["returnCode"] == 1
+    assert result["artifacts"]["downloadsStatus"]["status"] == "missing"
+    assert any(
+        "downloadsStatus did not write DOWNLOADS_STATUS_E2E.generated.json" in failure
+        for failure in result["failures"]
+    )
 
 
 def test_portal_runtime_image_guard_skips_without_expected_image() -> None:
