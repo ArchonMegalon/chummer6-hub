@@ -557,8 +557,9 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"', script_text)
         self.assertIn('canonicalize_release_channel_registries() {', script_text)
         self.assertIn('canonicalize_bundle_release_channel_registries()', script_text)
-        self.assertIn('canonicalize_bundle_release_channel_registries', script_text)
         self.assertIn('payload["installAwareArtifactRegistry"] = derive_verifier_owned_value(', script_text)
+        self.assertEqual(script_text.count('canonicalize_release_channel_registries() {'), 1)
+        self.assertEqual(script_text.count('canonicalize_bundle_release_channel_registries() {'), 1)
         self.assertIn('canonicalize_bundle_release_channel_registries\n\nupload_files=()', script_text)
 
     def test_http_release_upload_verifies_manifest_artifacts_not_hardcoded_platforms(self):
@@ -597,8 +598,9 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"', script_text)
         self.assertIn('canonicalize_release_channel_registries() {', script_text)
         self.assertIn('canonicalize_bundle_release_channel_registries()', script_text)
-        self.assertIn('canonicalize_bundle_release_channel_registries', script_text)
         self.assertIn('payload["installAwareArtifactRegistry"] = derive_verifier_owned_value(', script_text)
+        self.assertEqual(script_text.count('canonicalize_release_channel_registries() {'), 1)
+        self.assertEqual(script_text.count('canonicalize_bundle_release_channel_registries() {'), 1)
         self.assertIn('canonicalize_bundle_release_channel_registries\n\nupload_files=()', script_text)
 
     def test_mac_bootstrap_verifies_local_canonical_manifest_before_live_publish_check(self):

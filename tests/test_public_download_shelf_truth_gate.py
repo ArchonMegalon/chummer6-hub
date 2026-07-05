@@ -110,6 +110,10 @@ def make_canonical_manifest() -> dict:
     }
 
 
+def clone_payload(payload: dict) -> dict:
+    return json.loads(json.dumps(payload))
+
+
 def add_windows_bootstrap_artifact(
     *,
     releases_payload: dict,
@@ -338,6 +342,109 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         self.assertEqual(receipt["status"], "pass")
         self.assertEqual(call_count["downloads"], 2)
 
+    def test_live_confirmation_requires_consecutive_matching_samples(self) -> None:
+        releases_payload = make_releases_manifest()
+        canonical_payload = make_canonical_manifest()
+        old_releases_payload = clone_payload(releases_payload)
+        old_canonical_payload = clone_payload(canonical_payload)
+        old_releases_payload["version"] = "run-20260704-170602"
+        old_releases_payload["publishedAt"] = "2026-07-04T17:48:20+00:00"
+        old_canonical_payload["version"] = "run-20260704-170602"
+        old_canonical_payload["publishedAt"] = "2026-07-04T17:48:20Z"
+
+        with tempfile.TemporaryDirectory(prefix="download-shelf-truth-") as temp_root:
+            root = Path(temp_root)
+            local_manifest = root / "releases.json"
+            local_canonical = root / "RELEASE_CHANNEL.generated.json"
+            write_json(local_manifest, releases_payload)
+            write_json(local_canonical, canonical_payload)
+            live_call_counts = {"releases": 0, "canonical": 0}
+
+            def fake_get(url: str, *args, **kwargs) -> FakeResponse:
+                normalized_url = url.split("?", 1)[0]
+                if normalized_url == "https://chummer.run/downloads":
+                    return FakeResponse(
+                        url=url,
+                        text='<a data-download-artifact="avalonia-linux-x64-installer" href="/downloads/get/avalonia-linux-x64-installer">Download</a>',
+                    )
+                if normalized_url == "https://chummer.run/downloads/releases.json":
+                    live_call_counts["releases"] += 1
+                    payload = old_releases_payload if live_call_counts["releases"] == 1 else releases_payload
+                    return FakeResponse(url=url, json_payload=payload)
+                if normalized_url == "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json":
+                    live_call_counts["canonical"] += 1
+                    payload = old_canonical_payload if live_call_counts["canonical"] == 1 else canonical_payload
+                    return FakeResponse(url=url, json_payload=payload)
+                raise AssertionError(f"unexpected GET {url}")
+
+            with mock.patch.object(MODULE.requests, "get", side_effect=fake_get):
+                receipt = MODULE.evaluate(
+                    base_url="https://chummer.run",
+                    local_manifest_path=local_manifest,
+                    local_canonical_manifest_path=local_canonical,
+                    timeout=5.0,
+                    artifact_probes_enabled=False,
+                    live_confirmation_count=2,
+                    live_confirmation_delay_seconds=0.0,
+                    live_max_samples=3,
+                )
+
+        self.assertEqual(receipt["status"], "pass")
+        self.assertTrue(receipt["live"]["confirmation"]["stabilized"])
+        self.assertEqual(receipt["live"]["confirmation"]["samplesObserved"], 3)
+        self.assertEqual(receipt["live"]["confirmation"]["requiredConsecutiveMatches"], 2)
+
+    def test_live_confirmation_fails_when_public_truth_never_catches_up(self) -> None:
+        releases_payload = make_releases_manifest()
+        canonical_payload = make_canonical_manifest()
+        old_releases_payload = clone_payload(releases_payload)
+        old_canonical_payload = clone_payload(canonical_payload)
+        old_releases_payload["version"] = "run-20260704-170602"
+        old_releases_payload["publishedAt"] = "2026-07-04T17:48:20+00:00"
+        old_canonical_payload["version"] = "run-20260704-170602"
+        old_canonical_payload["publishedAt"] = "2026-07-04T17:48:20Z"
+
+        with tempfile.TemporaryDirectory(prefix="download-shelf-truth-") as temp_root:
+            root = Path(temp_root)
+            local_manifest = root / "releases.json"
+            local_canonical = root / "RELEASE_CHANNEL.generated.json"
+            write_json(local_manifest, releases_payload)
+            write_json(local_canonical, canonical_payload)
+
+            def fake_get(url: str, *args, **kwargs) -> FakeResponse:
+                normalized_url = url.split("?", 1)[0]
+                if normalized_url == "https://chummer.run/downloads":
+                    return FakeResponse(
+                        url=url,
+                        text='<a data-download-artifact="avalonia-linux-x64-installer" href="/downloads/get/avalonia-linux-x64-installer">Download</a>',
+                    )
+                if normalized_url == "https://chummer.run/downloads/releases.json":
+                    return FakeResponse(url=url, json_payload=old_releases_payload)
+                if normalized_url == "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json":
+                    return FakeResponse(url=url, json_payload=old_canonical_payload)
+                raise AssertionError(f"unexpected GET {url}")
+
+            with mock.patch.object(MODULE.requests, "get", side_effect=fake_get):
+                receipt = MODULE.evaluate(
+                    base_url="https://chummer.run",
+                    local_manifest_path=local_manifest,
+                    local_canonical_manifest_path=local_canonical,
+                    timeout=5.0,
+                    artifact_probes_enabled=False,
+                    live_confirmation_count=2,
+                    live_confirmation_delay_seconds=0.0,
+                    live_max_samples=3,
+                )
+
+        self.assertEqual(receipt["status"], "fail")
+        self.assertFalse(receipt["live"]["confirmation"]["stabilized"])
+        self.assertTrue(
+            any(
+                "live shelf never matched local manifests for 2 consecutive sample(s) within 3 sample(s)" in failure
+                for failure in receipt["failures"]
+            )
+        )
+
     def test_live_page_unknown_artifact_id_fails(self) -> None:
         releases_payload = make_releases_manifest()
         canonical_payload = make_canonical_manifest()
@@ -418,7 +525,13 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         verify_script = (ROOT / "scripts" / "ai" / "verify.sh").read_text(encoding="utf-8")
 
         self.assertIn("CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH", publish_script)
+        self.assertIn("CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_COUNT", publish_script)
+        self.assertIn("CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_DELAY_SECONDS", publish_script)
+        self.assertIn("CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_MAX_SAMPLES", publish_script)
         self.assertIn('python3 "$SCRIPT_DIR/public_download_shelf_truth_gate.py"', publish_script)
+        self.assertIn('--live-confirmation-count "$VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_COUNT"', publish_script)
+        self.assertIn('--live-confirmation-delay-seconds "$VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_DELAY_SECONDS"', publish_script)
+        self.assertIn('--live-max-samples "$VERIFY_SHELF_TRUTH_LIVE_MAX_SAMPLES"', publish_script)
         self.assertIn("test_public_download_shelf_truth_gate.py", verify_script)
         self.assertIn('python3 "$ROOT_DIR/scripts/public_download_shelf_truth_gate.py"', verify_script)
 

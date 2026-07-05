@@ -20,3 +20,12 @@ def test_publish_download_bundle_http_avoids_empty_array_length_expansions() -> 
     assert '${#upload_files[@]}' not in text
     assert 'eval "count=\\${#${array_name}[@]}"' not in text
     assert "Publishing ${upload_file_count} bundle files from $BUNDLE_DIR" in text
+    assert 'VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_COUNT="${CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_COUNT:-3}"' in text
+    assert 'VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_DELAY_SECONDS="${CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_DELAY_SECONDS:-2}"' in text
+    assert 'VERIFY_SHELF_TRUTH_LIVE_MAX_SAMPLES="${CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_MAX_SAMPLES:-6}"' in text
+    assert '--live-confirmation-count "$VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_COUNT"' in text
+    assert '--live-confirmation-delay-seconds "$VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_DELAY_SECONDS"' in text
+    assert '--live-max-samples "$VERIFY_SHELF_TRUTH_LIVE_MAX_SAMPLES"' in text
+    assert text.count("canonicalize_release_channel_registries() {") == 1
+    assert text.count("canonicalize_bundle_release_channel_registries() {") == 1
+    assert text.count("canonicalize_bundle_release_channel_registries\n") == 1

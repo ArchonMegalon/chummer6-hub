@@ -22,6 +22,9 @@ DEFAULT_LOCAL_CANONICAL_MANIFEST = Path("/docker/chummercomplete/chummer.run-ser
 RETRYABLE_STATUS_CODES = {502, 503, 504}
 DEFAULT_REQUEST_ATTEMPTS = 6
 DEFAULT_RETRY_DELAY_SECONDS = 2.0
+DEFAULT_LIVE_CONFIRMATION_COUNT = 3
+DEFAULT_LIVE_CONFIRMATION_DELAY_SECONDS = 2.0
+DEFAULT_LIVE_MAX_SAMPLES = 6
 
 
 def now_iso() -> str:
@@ -35,6 +38,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--local-canonical-manifest", default=str(DEFAULT_LOCAL_CANONICAL_MANIFEST))
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--skip-artifact-probes", action="store_true")
+    parser.add_argument("--live-confirmation-count", type=int, default=DEFAULT_LIVE_CONFIRMATION_COUNT)
+    parser.add_argument("--live-confirmation-delay-seconds", type=float, default=DEFAULT_LIVE_CONFIRMATION_DELAY_SECONDS)
+    parser.add_argument("--live-max-samples", type=int, default=DEFAULT_LIVE_MAX_SAMPLES)
     return parser.parse_args()
 
 
@@ -112,6 +118,11 @@ def fetch_response(url: str, *, timeout: float) -> requests.Response:
     if last_response is not None:
         last_response.raise_for_status()
     raise RuntimeError(f"Failed to fetch {url}")
+
+
+def append_cache_bust(url: str, token: str) -> str:
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}chummer_live_sample={token}"
 
 
 def top_level_manifest_view(payload: dict[str, Any]) -> dict[str, Any]:
@@ -355,40 +366,51 @@ def build_probe_plan(rows: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     return probes
 
 
-def evaluate(
+def fetch_live_snapshot(
     *,
     base_url: str,
-    local_manifest_path: Path,
-    local_canonical_manifest_path: Path,
     timeout: float,
-    artifact_probes_enabled: bool,
+    sample_index: int,
+    cache_bust: bool,
 ) -> dict[str, Any]:
-    base = base_url.rstrip("/")
-    downloads_response = fetch_response(f"{base}/downloads", timeout=timeout)
-    live_releases_response, live_releases_payload = fetch_json(f"{base}/downloads/releases.json", timeout=timeout)
-    live_canonical_response, live_canonical_payload = fetch_json(
-        f"{base}/downloads/RELEASE_CHANNEL.generated.json",
-        timeout=timeout,
-    )
+    downloads_url = f"{base_url}/downloads"
+    releases_url = f"{base_url}/downloads/releases.json"
+    canonical_url = f"{base_url}/downloads/RELEASE_CHANNEL.generated.json"
+    if cache_bust:
+        downloads_url = append_cache_bust(downloads_url, f"downloads-{sample_index}")
+        releases_url = append_cache_bust(releases_url, f"releases-{sample_index}")
+        canonical_url = append_cache_bust(canonical_url, f"canonical-{sample_index}")
 
-    local_manifest_payload = load_json(local_manifest_path)
-    local_canonical_payload = load_json(local_canonical_manifest_path)
+    downloads_response = fetch_response(downloads_url, timeout=timeout)
+    live_releases_response, live_releases_payload = fetch_json(releases_url, timeout=timeout)
+    live_canonical_response, live_canonical_payload = fetch_json(canonical_url, timeout=timeout)
+    return {
+        "downloadsResponse": downloads_response,
+        "releasesResponse": live_releases_response,
+        "releasesPayload": live_releases_payload,
+        "canonicalResponse": live_canonical_response,
+        "canonicalPayload": live_canonical_payload,
+    }
 
-    local_manifest_summary = manifest_summary(local_manifest_payload, base_url=base)
-    local_canonical_summary = manifest_summary(local_canonical_payload, base_url=base)
-    live_manifest_summary = manifest_summary(live_releases_payload, base_url=base)
-    live_canonical_summary = manifest_summary(live_canonical_payload, base_url=base)
 
+def analyze_live_snapshot(
+    *,
+    base_url: str,
+    local_manifest_summary: dict[str, Any],
+    local_canonical_summary: dict[str, Any],
+    snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    downloads_response = snapshot["downloadsResponse"]
+    live_releases_response = snapshot["releasesResponse"]
+    live_releases_payload = snapshot["releasesPayload"]
+    live_canonical_response = snapshot["canonicalResponse"]
+    live_canonical_payload = snapshot["canonicalPayload"]
+
+    live_manifest_summary = manifest_summary(live_releases_payload, base_url=base_url)
+    live_canonical_summary = manifest_summary(live_canonical_payload, base_url=base_url)
     failures: list[str] = []
 
     compare_views(
-        "local releases.json",
-        local_manifest_summary["topLevel"],
-        "local RELEASE_CHANNEL.generated.json",
-        local_canonical_summary["topLevel"],
-        failures=failures,
-    )
-    compare_views(
         "live releases.json",
         live_manifest_summary["topLevel"],
         "live RELEASE_CHANNEL.generated.json",
@@ -410,13 +432,6 @@ def evaluate(
         failures=failures,
     )
 
-    compare_artifact_indexes(
-        "local releases.json",
-        local_manifest_summary["artifacts"],
-        "local RELEASE_CHANNEL.generated.json",
-        local_canonical_summary["artifacts"],
-        failures=failures,
-    )
     compare_artifact_indexes(
         "live releases.json",
         live_manifest_summary["artifacts"],
@@ -458,6 +473,120 @@ def evaluate(
             + ", ".join(missing_page_artifact_ids)
         )
 
+    return {
+        "downloadsResponse": downloads_response,
+        "releasesResponse": live_releases_response,
+        "canonicalResponse": live_canonical_response,
+        "manifest": live_manifest_summary,
+        "canonicalManifest": live_canonical_summary,
+        "pageArtifactIds": page_artifact_ids,
+        "publicArtifactIds": live_public_artifact_ids,
+        "unknownPageArtifactIds": unknown_page_artifact_ids,
+        "missingPageArtifactIds": missing_page_artifact_ids,
+        "failures": failures,
+    }
+
+
+def evaluate(
+    *,
+    base_url: str,
+    local_manifest_path: Path,
+    local_canonical_manifest_path: Path,
+    timeout: float,
+    artifact_probes_enabled: bool,
+    live_confirmation_count: int = 1,
+    live_confirmation_delay_seconds: float = 0.0,
+    live_max_samples: int = 1,
+) -> dict[str, Any]:
+    base = base_url.rstrip("/")
+    local_manifest_payload = load_json(local_manifest_path)
+    local_canonical_payload = load_json(local_canonical_manifest_path)
+
+    local_manifest_summary = manifest_summary(local_manifest_payload, base_url=base)
+    local_canonical_summary = manifest_summary(local_canonical_payload, base_url=base)
+
+    failures: list[str] = []
+    compare_views(
+        "local releases.json",
+        local_manifest_summary["topLevel"],
+        "local RELEASE_CHANNEL.generated.json",
+        local_canonical_summary["topLevel"],
+        failures=failures,
+    )
+    compare_artifact_indexes(
+        "local releases.json",
+        local_manifest_summary["artifacts"],
+        "local RELEASE_CHANNEL.generated.json",
+        local_canonical_summary["artifacts"],
+        failures=failures,
+    )
+
+    required_consecutive_matches = max(1, live_confirmation_count)
+    sample_limit = max(required_consecutive_matches, live_max_samples)
+    cache_bust_live_reads = sample_limit > 1
+    live_analysis: dict[str, Any] | None = None
+    live_confirmation_samples: list[dict[str, Any]] = []
+    consecutive_matches = 0
+    stabilized = False
+
+    for sample_index in range(1, sample_limit + 1):
+        snapshot = fetch_live_snapshot(
+            base_url=base,
+            timeout=timeout,
+            sample_index=sample_index,
+            cache_bust=cache_bust_live_reads,
+        )
+        live_analysis = analyze_live_snapshot(
+            base_url=base,
+            local_manifest_summary=local_manifest_summary,
+            local_canonical_summary=local_canonical_summary,
+            snapshot=snapshot,
+        )
+        sample_failures = list(live_analysis["failures"])
+        matched_local_truth = len(sample_failures) == 0
+        if matched_local_truth:
+            consecutive_matches += 1
+        else:
+            consecutive_matches = 0
+        live_confirmation_samples.append(
+            {
+                "sampleIndex": sample_index,
+                "matchedLocalTruth": matched_local_truth,
+                "consecutiveMatches": consecutive_matches,
+                "releasesVersion": live_analysis["manifest"]["topLevel"]["version"],
+                "canonicalVersion": live_analysis["canonicalManifest"]["topLevel"]["version"],
+                "releasesPublishedAt": live_analysis["manifest"]["topLevel"]["publishedAt"],
+                "canonicalPublishedAt": live_analysis["canonicalManifest"]["topLevel"]["publishedAt"],
+                "failureCount": len(sample_failures),
+                "summary": "pass" if matched_local_truth else (sample_failures[0] if sample_failures else "live sample mismatch"),
+            }
+        )
+        if consecutive_matches >= required_consecutive_matches:
+            stabilized = True
+            break
+        if sample_index < sample_limit and live_confirmation_delay_seconds > 0:
+            time.sleep(live_confirmation_delay_seconds)
+
+    if live_analysis is None:
+        raise RuntimeError("no live download shelf snapshot was captured")
+
+    failures.extend(live_analysis["failures"])
+    if not stabilized:
+        failures.append(
+            "live shelf never matched local manifests for "
+            f"{required_consecutive_matches} consecutive sample(s) within {sample_limit} sample(s)"
+        )
+
+    downloads_response = live_analysis["downloadsResponse"]
+    live_releases_response = live_analysis["releasesResponse"]
+    live_canonical_response = live_analysis["canonicalResponse"]
+    live_manifest_summary = live_analysis["manifest"]
+    live_canonical_summary = live_analysis["canonicalManifest"]
+    page_artifact_ids = live_analysis["pageArtifactIds"]
+    live_public_artifact_ids = live_analysis["publicArtifactIds"]
+    unknown_page_artifact_ids = live_analysis["unknownPageArtifactIds"]
+    missing_page_artifact_ids = live_analysis["missingPageArtifactIds"]
+
     artifact_probes: list[dict[str, Any]] = []
     if artifact_probes_enabled:
         for probe in build_probe_plan(live_manifest_summary["artifacts"]):
@@ -495,6 +624,14 @@ def evaluate(
             "canonicalManifest": live_canonical_summary,
             "pageArtifactIds": page_artifact_ids,
             "publicArtifactIds": live_public_artifact_ids,
+            "confirmation": {
+                "requiredConsecutiveMatches": required_consecutive_matches,
+                "delaySeconds": live_confirmation_delay_seconds,
+                "maxSamples": sample_limit,
+                "samplesObserved": len(live_confirmation_samples),
+                "stabilized": stabilized,
+                "samples": live_confirmation_samples,
+            },
             "artifactProbes": artifact_probes,
         },
         "alignment": {
@@ -530,6 +667,9 @@ def main() -> int:
         local_canonical_manifest_path=Path(args.local_canonical_manifest),
         timeout=args.timeout,
         artifact_probes_enabled=not args.skip_artifact_probes,
+        live_confirmation_count=args.live_confirmation_count,
+        live_confirmation_delay_seconds=args.live_confirmation_delay_seconds,
+        live_max_samples=args.live_max_samples,
     )
     for out_path in OUT_PATHS:
         out_path.parent.mkdir(parents=True, exist_ok=True)
