@@ -55,6 +55,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
 
             with (
                 mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(module, "current_release_truth_launch_blockers", return_value=[]),
                 mock.patch.object(module, "source_binding_failures", return_value=[]),
                 mock.patch.object(module, "current_git_head", return_value="abc123"),
                 mock.patch.object(module, "resolve_workspace_root", return_value=module.ROOT),
@@ -73,6 +74,8 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             self.assertEqual(0, payload["returncode"])
             self.assertFalse(payload["timed_out"])
             self.assertEqual(module.TIMEOUT_SECONDS, payload["timeout_seconds"])
+            self.assertEqual([], payload["failed_gates"])
+            self.assertEqual([], payload["release_truth_blockers"])
             self.assertTrue(payload["source_binding"]["pass"])
             self.assertTrue(payload["source_binding"]["verifier_accepts_current_root"])
             self.assertIn("CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD=", payload["command"])
@@ -96,6 +99,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
 
             with (
                 mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(module, "current_release_truth_launch_blockers", return_value=[]),
                 mock.patch.object(module, "source_binding_failures", return_value=[]),
                 mock.patch.object(module, "current_git_head", return_value="abc123"),
                 mock.patch.object(module, "resolve_workspace_root", return_value=module.ROOT),
@@ -111,6 +115,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             self.assertEqual("NOT_RELEASE_READY", payload["verdict"])
             self.assertEqual(124, payload["returncode"])
             self.assertTrue(payload["timed_out"])
+            self.assertEqual(["verify_live_surface_parity"], payload["failed_gates"])
             self.assertIn(f"verify_release_ready timed out after {module.TIMEOUT_SECONDS}s", payload["failures"])
             self.assertIn("last release-ready gate before timeout: verify_live_surface_parity", payload["failures"])
             self.assertIn("FAIL verify_live_surface_parity", payload["failures"])
@@ -124,6 +129,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
 
             with (
                 mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(module, "current_release_truth_launch_blockers", return_value=[]),
                 mock.patch.object(module, "source_binding_failures", return_value=[failure]),
                 mock.patch.object(module, "current_git_head", return_value="abc123"),
                 mock.patch.object(module, "resolve_workspace_root", return_value=module.ROOT),
@@ -140,6 +146,48 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
             self.assertFalse(payload["timed_out"])
             self.assertIn(failure, payload["failures"])
             self.assertFalse(payload["source_binding"]["pass"])
+
+    def test_main_surfaces_release_truth_blockers_when_release_verifier_fails(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-ready-truth-") as temp_dir:
+            output_path = Path(temp_dir) / "RELEASE_READY.generated.json"
+
+            process = mock.Mock(pid=1234, returncode=1)
+            process.communicate.return_value = (
+                "RUN verify_release_channel\n"
+                "FAIL verify_release_channel: release channel channel is preview, not a flagship stable lane\n",
+                "",
+            )
+
+            with (
+                mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(
+                    module,
+                    "current_release_truth_launch_blockers",
+                    return_value=[
+                        "release channel channel is preview, not a flagship stable lane",
+                        "google oauth operator evidence is still missing: /tmp/operator-evidence.json",
+                    ],
+                ),
+                mock.patch.object(module, "source_binding_failures", return_value=[]),
+                mock.patch.object(module, "current_git_head", return_value="abc123"),
+                mock.patch.object(module, "resolve_workspace_root", return_value=module.ROOT),
+                mock.patch.object(module.subprocess, "Popen", return_value=process),
+            ):
+                result = module.main()
+
+            self.assertEqual(0, result)
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual("fail", payload["status"])
+            self.assertEqual(["verify_release_channel"], payload["failed_gates"])
+            self.assertEqual(
+                [
+                    "release channel channel is preview, not a flagship stable lane",
+                    "google oauth operator evidence is still missing: /tmp/operator-evidence.json",
+                ],
+                payload["release_truth_blockers"],
+            )
+            self.assertEqual(2, payload["release_truth_blocker_count"])
 
     def test_source_binding_allows_override_aware_verifier(self) -> None:
         module = load_module()

@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"
-REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"
 
 BUNDLE_DIR="${1:-${DOWNLOAD_BUNDLE_DIR:-$REPO_ROOT/Chummer.Portal/downloads}}"
 MANIFEST_PATH="${CHUMMER_RELEASE_UPLOAD_MANIFEST_PATH:-$BUNDLE_DIR/releases.json}"
@@ -75,11 +74,6 @@ python3 "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" \
   --manifest "$MANIFEST_PATH" \
   --manifest "$CANONICAL_MANIFEST_PATH" \
   --allow-empty
-
-if [[ ! -f "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" ]]; then
-  echo "Missing registry verifier: $REGISTRY_ROOT/scripts/verify_public_release_channel.py" >&2
-  exit 1
-fi
 
 if [[ ! -f "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" ]]; then
   echo "Missing registry verifier: $REGISTRY_ROOT/scripts/verify_public_release_channel.py" >&2

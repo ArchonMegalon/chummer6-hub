@@ -135,6 +135,7 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
             ["windows_installer_visual_audit"],
             payload["release_readiness"]["full_release_blockers"],
         )
+        self.assertEqual([], payload["release_readiness"]["release_ready_truth_blockers"])
         self.assertIn("participate_billing_honesty", payload["checks"])
         self.assertTrue(payload["checks"]["participate_billing_honesty"]["pass"])
         self.assertIn("account_handoff_runtime_config", payload["checks"])
@@ -269,7 +270,15 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
                 published / "PARTICIPATE_BILLING_HONESTY.generated.json": {"status": "pass", "verdict": "READY"},
                 published / "ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json": {"status": "pass", "verdict": "READY"},
                 published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json": {"status": "pass"},
-                published / "RELEASE_READY.generated.json": {"status": "fail", "verdict": "NOT_RELEASE_READY"},
+                published / "RELEASE_READY.generated.json": {
+                    "status": "fail",
+                    "verdict": "NOT_RELEASE_READY",
+                    "failed_gates": ["verify_release_channel", "verify_google_oauth_linking_proof"],
+                    "release_truth_blockers": [
+                        "release channel channel is preview, not a flagship stable lane",
+                        "google oauth operator evidence is still missing: /tmp/operator-evidence.json",
+                    ],
+                },
                 published / "FINAL_GOLD_JANITOR.generated.json": {"status": "fail", "verdict": "NOT_GOLD"},
                 published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json": {"status": "pass"},
                 published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json": {"status": "fail"},
@@ -295,6 +304,28 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         self.assertEqual(
             ["release_ready", "windows_installer_visual_audit"],
             payload["release_readiness"]["full_release_blockers"],
+        )
+        self.assertEqual(
+            [
+                "verify_release_channel",
+                "verify_google_oauth_linking_proof",
+            ],
+            payload["release_readiness"]["release_ready_failed_gates"],
+        )
+        self.assertEqual(
+            [
+                "release channel channel is preview, not a flagship stable lane",
+                "google oauth operator evidence is still missing: /tmp/operator-evidence.json",
+            ],
+            payload["release_readiness"]["release_ready_truth_blockers"],
+        )
+        self.assertEqual(
+            [
+                "release channel channel is preview, not a flagship stable lane",
+                "google oauth operator evidence is still missing: /tmp/operator-evidence.json",
+                "windows_installer_visual_audit",
+            ],
+            payload["release_readiness"]["full_release_blocker_details"],
         )
 
     def test_dashboard_requires_public_edge_postdeploy_gate(self) -> None:

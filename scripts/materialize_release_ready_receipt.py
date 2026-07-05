@@ -5,8 +5,15 @@ import json
 import os
 import signal
 import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from verify_flagship_product_readiness_gate import current_release_truth_launch_blockers
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
@@ -125,6 +132,35 @@ def progress_lines(stdout: str, stderr: str) -> list[str]:
     ]
 
 
+def extract_failed_gates(failure_lines: list[str]) -> list[str]:
+    failed_gates: list[str] = []
+    seen: set[str] = set()
+    for line in failure_lines:
+        text = line.strip()
+        if text.startswith("FAIL "):
+            gate = text.removeprefix("FAIL ").split(":", 1)[0].split(maxsplit=1)[0]
+        elif text.startswith("verify_"):
+            gate = text.split(":", 1)[0].split(maxsplit=1)[0]
+            if text != gate and not text.startswith(f"{gate}:"):
+                continue
+        else:
+            continue
+        gate = gate.rstrip(":")
+        if not gate or gate in seen:
+            continue
+        seen.add(gate)
+        failed_gates.append(gate)
+    return failed_gates
+
+
+def safe_release_truth_blockers() -> list[str]:
+    try:
+        blockers = current_release_truth_launch_blockers()
+    except Exception as exc:  # pragma: no cover - defensive fail-open detail capture
+        return [f"release truth blocker inspection failed: {exc}"]
+    return [str(item).strip() for item in blockers if str(item).strip()]
+
+
 def main() -> int:
     env = os.environ.copy()
     env.setdefault("CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE", "1")
@@ -149,6 +185,8 @@ def main() -> int:
         failure_lines.append(f"verify_release_ready timed out after {TIMEOUT_SECONDS}s")
         if verifier_progress:
             failure_lines.append(f"last release-ready gate before timeout: {verifier_progress[-1][4:]}")
+    failed_gates = extract_failed_gates(failure_lines)
+    release_truth_blockers = safe_release_truth_blockers() if returncode != 0 else []
     payload = {
         "contract_name": "chummer.release_ready",
         "generated_at_utc": now_iso(),
@@ -158,7 +196,10 @@ def main() -> int:
         "returncode": returncode,
         "timed_out": timed_out,
         "timeout_seconds": TIMEOUT_SECONDS,
+        "failed_gates": failed_gates,
         "failures": failure_lines,
+        "release_truth_blockers": release_truth_blockers,
+        "release_truth_blocker_count": len(release_truth_blockers),
         "source_binding": {
             "current_repo": str(RUN_SERVICES_ROOT),
             "legacy_run_services_root": str(LEGACY_RUN_SERVICES_ROOT),

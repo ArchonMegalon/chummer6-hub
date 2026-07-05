@@ -66,6 +66,23 @@ def unique_paths(paths: list[Path]) -> list[Path]:
     return result
 
 
+def normalized_strings(values: object) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        candidate = str(value).strip()
+        if not candidate:
+            continue
+        folded = candidate.casefold()
+        if folded in seen:
+            continue
+        seen.add(folded)
+        result.append(candidate)
+    return result
+
+
 def resolve_release_channel_path() -> Path:
     explicit = os.environ.get("CHUMMER_OPERATOR_RELEASE_CHANNEL_PATH") or os.environ.get("CHUMMER_RELEASE_CHANNEL_PATH")
     candidates = unique_paths(
@@ -241,6 +258,21 @@ def build_payload() -> dict[str, Any]:
     intake_operator_request = windows_visual_intake.get("operator_request") if isinstance(windows_visual_intake.get("operator_request"), dict) else {}
     oauth_operator_evidence = oauth.get("operator_end_to_end_evidence") if isinstance(oauth.get("operator_end_to_end_evidence"), dict) else {}
     oauth_request_artifacts = oauth.get("operator_request_artifacts") if isinstance(oauth.get("operator_request_artifacts"), dict) else {}
+    release_ready_failures = normalized_strings(release_ready.get("failures"))
+    release_ready_failed_gates = normalized_strings(release_ready.get("failed_gates"))
+    release_ready_truth_blockers = normalized_strings(release_ready.get("release_truth_blockers"))
+    windows_visual_failures = normalized_strings(windows_visual_audit.get("failures"))
+    full_release_blocker_details = normalized_strings(
+        (
+            release_ready_truth_blockers
+            or release_ready_failures
+            or (["release_ready"] if not checks["release_ready"]["pass"] else [])
+        )
+        + (
+            windows_visual_failures
+            or (["windows_installer_visual_audit"] if not checks["windows_installer_visual_audit"]["pass"] else [])
+        )
+    )
 
     return {
         "contract_name": "chummer.operator_release_dashboard",
@@ -251,6 +283,10 @@ def build_payload() -> dict[str, Any]:
             "full_release_ready": full_release_ready,
             "nightly_handoff_ready": not failures,
             "full_release_blockers": full_release_blockers,
+            "full_release_blocker_details": full_release_blocker_details,
+            "release_ready_failed_gates": release_ready_failed_gates,
+            "release_ready_truth_blockers": release_ready_truth_blockers,
+            "release_ready_truth_blocker_count": len(release_ready_truth_blockers),
         },
         "release": {
             "version": release_channel.get("version"),
@@ -416,6 +452,10 @@ def build_markdown(payload: dict[str, Any]) -> str:
     if full_release_blockers:
         lines.extend(["", "## Full Release Blockers"])
         lines.extend(f"- `{blocker}`" for blocker in full_release_blockers)
+    full_release_blocker_details = release_readiness.get("full_release_blocker_details") if isinstance(release_readiness.get("full_release_blocker_details"), list) else []
+    if full_release_blocker_details:
+        lines.extend(["", "## Full Release Blocker Details"])
+        lines.extend(f"- {blocker}" for blocker in full_release_blocker_details)
     failures = payload.get("failures") if isinstance(payload.get("failures"), list) else []
     if failures:
         lines.extend(["", "## Failures"])
