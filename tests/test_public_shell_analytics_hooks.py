@@ -1,9 +1,11 @@
 from pathlib import Path
+import os
 import re
 import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+UI_REPO_ROOT = Path(os.environ.get("CHUMMER_UI_REPO_ROOT", REPO_ROOT.parent / "chummer6-ui")).resolve()
 LAYOUT_PATH = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "_Layout.cshtml"
 ENV_EXAMPLE_PATH = REPO_ROOT / ".env.example"
 PUBLIC_EDGE_COMPOSE_PATH = REPO_ROOT / "docker-compose.public-edge.yml"
@@ -273,7 +275,7 @@ class PublicShellAnalyticsHooksTests(unittest.TestCase):
 
     def test_desktop_analytics_bridge_accepts_every_avalonia_shell_event(self) -> None:
         bridge_source = (REPO_ROOT / "Chummer.Run.Api" / "Services" / "DesktopAnalyticsBridgeService.cs").read_text(encoding="utf-8")
-        event_handler_source = (REPO_ROOT.parent / "chummer6-ui" / "Chummer.Avalonia" / "MainWindow.EventHandlers.cs").read_text(encoding="utf-8")
+        event_handler_source = (UI_REPO_ROOT / "Chummer.Avalonia" / "MainWindow.EventHandlers.cs").read_text(encoding="utf-8")
 
         allowed_events = self._read_csharp_string_set(bridge_source, "AllowedEvents")
         emitted_events = set(re.findall(r'TrackDesktopShellEventAsync\("([^"]+)"', event_handler_source))
