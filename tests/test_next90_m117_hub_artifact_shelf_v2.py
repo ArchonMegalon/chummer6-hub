@@ -209,14 +209,14 @@ class Next90M117HubArtifactShelfV2Tests(unittest.TestCase):
             shelf_view_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"
             shelf_view_text = shelf_view_path.read_text(encoding="utf-8")
             shelf_view_path.write_text(
-                shelf_view_text.replace('"Creator view"', '"Creator lane"'),
+                shelf_view_text.replace('"Creator"', '"Creator lane"'),
                 encoding="utf-8",
             )
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('"Creator view"', result.stderr)
+        self.assertIn('"Creator"', result.stderr)
 
     def test_verifier_fails_when_shelf_view_loses_public_filter(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m117-shelf-public-view-") as temp_dir:
@@ -225,14 +225,14 @@ class Next90M117HubArtifactShelfV2Tests(unittest.TestCase):
             shelf_view_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"
             shelf_view_text = shelf_view_path.read_text(encoding="utf-8")
             shelf_view_path.write_text(
-                shelf_view_text.replace('"Public view"', '"Published lane"'),
+                shelf_view_text.replace('"Public"', '"Published lane"'),
                 encoding="utf-8",
             )
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('"Public view"', result.stderr)
+        self.assertIn('"Public"', result.stderr)
 
     def test_verifier_fails_when_controller_stops_filtering_by_audience(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m117-controller-filter-") as temp_dir:

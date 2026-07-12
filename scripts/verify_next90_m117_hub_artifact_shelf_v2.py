@@ -115,7 +115,7 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
             "/artifacts/publications/{publicationId}",
             "/api/v1/public/artifacts/publications/{publicationId}",
             "/home/work",
-            "/account/work",
+            "/account/roster",
         ],
         "surfaces": [
             "artifact_shelf:v2",
@@ -142,7 +142,7 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
         "routes": [
             "/artifacts",
             "/home/work",
-            "/account/work",
+            "/account/roster",
         ],
         "surfaces": [
             "artifact_audience_filters",
@@ -228,10 +228,10 @@ SOURCE_MARKERS: dict[str, list[str]] = {
     ],
     "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml": [
         'static string ArtifactViewTitle(string view) => view switch',
-        '"Personal view"',
-        '"Campaign view"',
-        '"Creator view"',
-        '"Public view"',
+        '"Personal"',
+        '"Campaign"',
+        '"Creator"',
+        '"Public"',
         "@PublicSurfaceStatus.AudienceLabel(item.Audience)",
         '@HumanizeStatus(item.PublicationState, "Ready")',
         "CreatorPublicationHref(linkedPublication, item.CreatorPublicationId)",
@@ -281,7 +281,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'self.assertIn("status must be \'complete\'", result.stderr)',
         'self.assertIn("milestone 117 status must be \'complete\'", result.stderr)',
         'self.assertIn("work task 117.1 title drifted", result.stderr)',
-        'self.assertIn(\'"Creator view"\', result.stderr)',
+        'self.assertIn(\'"Creator"\', result.stderr)',
         'self.assertIn("return AudienceContains(item.Audience, signedInArtifactView);", result.stderr)',
         'self.assertIn(\'SignedInArtifactView, "public"\', result.stderr)',
         'self.assertIn("HasApprovedManifestAuthority(item.Draft, item.Detail)", result.stderr)',
