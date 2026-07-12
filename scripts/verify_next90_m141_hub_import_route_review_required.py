@@ -97,11 +97,11 @@ SOURCE_MARKERS = {
     ],
     "Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml": [
         "Model.TrustPulse?.ParityClaimsReviewRequired == true",
-        "Current direct parity proof receipts still keep the public parity claim under review.",
+        "This page keeps the useful parts together while broader comparison copy stays short.",
     ],
     "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml": [
         "Model.TrustPulse?.ParityClaimsReviewRequired == true",
-        "Public parity claims remain review-required until current direct parity proof receipts are green.",
+        "Broader comparisons return when they are useful and current.",
     ],
     "scripts/materialize_hub_local_release_proof.py": [
         f'"package_id": "{PACKAGE_ID}"',
