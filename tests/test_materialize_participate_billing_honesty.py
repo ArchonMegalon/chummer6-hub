@@ -9,6 +9,7 @@ from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_participate_billing_honesty.py"
+VERIFY_SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "ai" / "verify.sh"
 
 
 def load_module():
@@ -31,6 +32,28 @@ class _DummyContext:
 
 
 class MaterializeParticipateBillingHonestyTests(unittest.TestCase):
+    def test_playwright_uses_only_the_locked_local_npx_dependency(self) -> None:
+        module = load_module()
+        env = {"BASE_URL": "http://127.0.0.1:12345"}
+
+        with mock.patch.object(module.subprocess, "run") as run_mock:
+            module.run_playwright("npx", "tests/public/example.spec.ts", env)
+
+        run_mock.assert_called_once_with(
+            ["npx", "--no-install", "playwright", "test", "tests/public/example.spec.ts"],
+            check=True,
+            env=env,
+        )
+
+    def test_authoritative_verify_installs_lockfile_before_runtime_materialization(self) -> None:
+        verify_script = VERIFY_SCRIPT_PATH.read_text(encoding="utf-8")
+        install_command = "npm ci --ignore-scripts --no-audit --no-fund"
+        materialize_command = 'python3 "$ROOT_DIR/scripts/materialize_participate_billing_honesty.py"'
+
+        self.assertIn(install_command, verify_script)
+        self.assertIn(materialize_command, verify_script)
+        self.assertLess(verify_script.index(install_command), verify_script.index(materialize_command))
+
     def test_materialize_runs_both_runtime_states_and_writes_aggregate_receipt(self) -> None:
         module = load_module()
 

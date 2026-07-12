@@ -27,8 +27,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def run_playwright(node_runner: str, spec_path: str, env: dict[str, str]) -> None:
+    command = [node_runner]
+    if Path(node_runner).name == "npx":
+        command.append("--no-install")
+    command.extend(["playwright", "test", spec_path])
     subprocess.run(
-        [node_runner, "playwright", "test", spec_path],
+        command,
         check=True,
         env=env,
     )

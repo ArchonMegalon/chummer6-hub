@@ -160,6 +160,16 @@ restore_run_services_test_project() {
 
 restore_run_services_test_project
 
+install_node_release_gate_dependencies() {
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "npm is required to install the locked browser-test dependencies" >&2
+    return 1
+  fi
+  npm ci --ignore-scripts --no-audit --no-fund
+}
+
+install_node_release_gate_dependencies
+
 run_slice_safe_dotnet_test() {
   local filter_name="$1"
   if ! has_full_local_run_services_tree; then
