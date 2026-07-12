@@ -2012,7 +2012,7 @@ internal static class CampaignSpineRestoreVerification
                     && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal)))
                 && reloadedWorkspace.Consequences.Any(item =>
                     string.Equals(item.Kind, "downtime", StringComparison.Ordinal)
-                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, "/account/work#aftermath-packages", StringComparison.Ordinal))),
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, "/account/roster#aftermath-packages", StringComparison.Ordinal))),
                 "Governed campaign consequence updates should survive a community-store reload with durable heat, faction, contact, reputation, and downtime return-loop receipts.");
             VerificationAssert.True(
                 reloadedWorkspace.Consequences?.Any(item =>
@@ -2044,18 +2044,18 @@ internal static class CampaignSpineRestoreVerification
             VerificationAssert.True(
                 reloadedWorkspaceServerPlaneProjection.Consequences.Any(item =>
                     string.Equals(item.Kind, "downtime", StringComparison.Ordinal)
-                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, "/account/work#aftermath-packages", StringComparison.Ordinal))),
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, "/account/roster#aftermath-packages", StringComparison.Ordinal))),
                 "Workspace server plane should keep downtime consequence routes pinned to the governed aftermath return rail.");
             VerificationAssert.True(
                 consequenceTruth.ConsequenceCount >= 6
-                && consequenceTruth.States.Any(item => string.Equals(item.Kind, "heat", StringComparison.Ordinal) && string.Equals(item.ReturnLoopRoute, "/account/work", StringComparison.Ordinal))
+                && consequenceTruth.States.Any(item => string.Equals(item.Kind, "heat", StringComparison.Ordinal) && string.Equals(item.ReturnLoopRoute, "/account/roster", StringComparison.Ordinal))
                 && consequenceTruth.ReturnLoopActions.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)),
                 "Governed consequence truth API should summarize promoted heat, faction, contact, reputation, downtime, and aftermath state with explicit return-loop posture.");
             VerificationAssert.True(
-                string.Equals(downtimeAftermath.ReturnLoopRoute, "/account/work#aftermath-packages", StringComparison.Ordinal)
+                string.Equals(downtimeAftermath.ReturnLoopRoute, "/account/roster#aftermath-packages", StringComparison.Ordinal)
                 && downtimeAftermath.ReturnLoopActions.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal))
                 && downtimeAftermath.Consequences.Any(item => string.Equals(item.Kind, "downtime", StringComparison.Ordinal))
-                && downtimeAftermath.EvidenceLines.Any(item => item.Contains("Return-loop route: /account/work#aftermath-packages.", StringComparison.Ordinal)),
+                && downtimeAftermath.EvidenceLines.Any(item => item.Contains("Return-loop route: /account/roster#aftermath-packages.", StringComparison.Ordinal)),
                 "Downtime aftermath API should keep downtime receipts, consequence state, and return-loop evidence on the governed aftermath rail.");
         }
         finally
