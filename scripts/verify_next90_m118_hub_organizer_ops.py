@@ -91,7 +91,7 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
         "routes": [
             "/api/v1/campaign-spine/me/organizer-ops",
             "/home/work",
-            "/account/work",
+            "/account/roster",
         ],
         "surfaces": [
             "organizer_ops",
@@ -118,7 +118,7 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
         "routes": [
             "/api/v1/campaign-spine/me/organizer-ops",
             "/home/work",
-            "/account/work",
+            "/account/roster",
         ],
         "surfaces": [
             "league_convention_season_ops",
@@ -180,23 +180,23 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "ArtifactPublicationSummary: ResolveGroupArtifactPublicationSummary(groupWorkspaces),",
         "SupportEscalationSummary: ResolveGroupSupportEscalationSummary(user));",
         "private static string ResolveGroupArtifactPublicationSummary(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)",
-        'return "No governed artifact publication receipt is attached to this operator rail yet.";',
+        'return "No governed artifact publication receipt is attached to this maintainer path yet.";',
         "private string ResolveGroupSupportEscalationSummary(HubUserDto user)",
-        'return "No tracked support escalation is blocking this operator rail right now.";',
+        'return "No tracked support escalation is blocking this maintainer path right now.";',
         "SupportCaseStatuses.UserNotified",
     ],
     "Chummer.Run.Api/Views/Accounts/Account.cshtml": [
-        "<span>Publication status</span>",
+        "<span>Publication</span>",
         "<strong>@op.ArtifactPublicationSummary</strong>",
-        "<span>Support escalation</span>",
+        "<span>Support path</span>",
         "<strong>@op.SupportEscalationSummary</strong>",
-        "<li>Publication status: @op.ArtifactPublicationSummary</li>",
-        "<li>Support escalation: @op.SupportEscalationSummary</li>",
+        "<li>Publication: @op.ArtifactPublicationSummary</li>",
+        "<li>Support path: @op.SupportEscalationSummary</li>",
         '<p class="muted-copy">@op.SupportEscalationSummary</p>',
     ],
     "Chummer.Run.Api/Views/PublicLanding/Home.cshtml": [
-        "<span> Publication: @leadCommunityOperation.ArtifactPublicationSummary</span>",
-        "<span> Support: @leadCommunityOperation.SupportEscalationSummary</span>",
+        "<span> Shared: @HomeText(leadCommunityOperation.ArtifactPublicationSummary)</span>",
+        "<span> Support: @PublicText(leadCommunityOperation.SupportEscalationSummary)</span>",
     ],
     "tests/RunServicesSmoke/Program.cs": [
         "var organizerOpsResult = await campaignSpineController.GetMyOrganizerOperations(CancellationToken.None);",

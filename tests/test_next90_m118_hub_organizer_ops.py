@@ -226,7 +226,7 @@ class Next90M118HubOrganizerOpsTests(unittest.TestCase):
             home_view_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Home.cshtml"
             home_view_text = home_view_path.read_text(encoding="utf-8")
             home_view_path.write_text(
-                home_view_text.replace("@leadCommunityOperation.SupportEscalationSummary", "@leadCommunityOperation.OperationsSummary"),
+                home_view_text.replace("leadCommunityOperation.SupportEscalationSummary", "leadCommunityOperation.OperationsSummary"),
                 encoding="utf-8",
             )
 
@@ -234,7 +234,7 @@ class Next90M118HubOrganizerOpsTests(unittest.TestCase):
             result = self.run_verifier(temp_root, **verifier_paths)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("@leadCommunityOperation.SupportEscalationSummary", result.stderr)
+        self.assertIn("leadCommunityOperation.SupportEscalationSummary", result.stderr)
 
     def test_verifier_fails_when_controller_loses_organizer_endpoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m118-controller-") as temp_dir:
