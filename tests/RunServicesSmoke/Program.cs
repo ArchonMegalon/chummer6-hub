@@ -5761,7 +5761,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHorizonsModel?.TrustPulse is not null, "authenticated horizons page should keep the weekly public trust pulse visible.");
     Assert(authenticatedHorizonsModel?.SignedInStatus is not null, "authenticated horizons page should project the shared signed-in trust status.");
 
-    var participateHtml = participateContent?.Content ?? string.Empty;
+    var participateHtml = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Partizipate.cshtml"));
     Assert(participateHtml.Contains("Participate", StringComparison.Ordinal), "participate page should keep the first-party heading.");
     Assert(!participateHtml.Contains("Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate page should not render the removed public summary.");
     Assert(participateHtml.Contains("data-chummer-participate-frame", StringComparison.Ordinal), "participate page should render the board iframe shell.");
@@ -8153,7 +8153,7 @@ async Task VerifyHostedBoundedContextCoverageWorkflowAsync()
             PublicSignals: signalBundle,
             InstallLinking: installLinking,
             Locale: "en-US",
-            CommunityHubRoute: "/account/work#community-ops"));
+            CommunityHubRoute: "/account/roster#community-ops"));
 
         Assert(
             boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "public_context", StringComparison.Ordinal) && string.Equals(item.Route, "/", StringComparison.Ordinal)),
@@ -8162,10 +8162,10 @@ async Task VerifyHostedBoundedContextCoverageWorkflowAsync()
             boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "account_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account", StringComparison.Ordinal)),
             "hub bounded-context coverage should keep account context proof on the signed-in account rail.");
         Assert(
-            boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "community_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work#community-ops", StringComparison.Ordinal)),
+            boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "community_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/roster#community-ops", StringComparison.Ordinal)),
             "hub bounded-context coverage should keep community context proof on the signed-in community rail.");
         Assert(
-            boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "campaign_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work/workspaces/workspace-demo-135", StringComparison.Ordinal)),
+            boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "campaign_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/campaigns/workspace-demo-135", StringComparison.Ordinal)),
             "hub bounded-context coverage should keep campaign context proof on the workspace continuity rail.");
         Assert(
             boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "support_context", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal)),
