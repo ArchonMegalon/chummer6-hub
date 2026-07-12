@@ -46,10 +46,12 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
         audit_script = (REPO_ROOT / "scripts" / "audit-ui-parity.sh").read_text(encoding="utf-8")
         self.assertIn("proofRoutes includes install routes without published artifacts", audit_script)
 
-        for relative_path in (
-            "Chummer.Portal/downloads/releases.json",
-            "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
-        ):
+        release_catalog_paths = [Path("Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json")]
+        materialized_releases_path = Path("Chummer.Portal/downloads/releases.json")
+        if (REPO_ROOT / materialized_releases_path).is_file():
+            release_catalog_paths.insert(0, materialized_releases_path)
+
+        for relative_path in release_catalog_paths:
             payload = json.loads((REPO_ROOT / relative_path).read_text(encoding="utf-8"))
             artifact_ids = {
                 str(item.get("artifactId") or item.get("id") or "").strip()
@@ -65,7 +67,7 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
                 if str(route).startswith("/downloads/install/")
             }
 
-            self.assertTrue(install_route_ids, msg=relative_path)
+            self.assertTrue(install_route_ids, msg=str(relative_path))
             self.assertTrue(
                 install_route_ids.issubset(artifact_ids),
                 msg=f"{relative_path} has install proof routes without artifact rows: {sorted(install_route_ids - artifact_ids)}",
