@@ -6,11 +6,13 @@ import csv
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,11 @@ DEFAULT_API_BASE_URL = "https://app.teable.ai/api"
 DEFAULT_HUB_BASE_URL = "https://chummer.run"
 DEFAULT_TABLE_NAME = "Chummer Important Work"
 DEFAULT_DB_TABLE_NAME = "chummer_important_work"
+DEFAULT_HTTP_TIMEOUT_SECONDS = 15.0
+DEFAULT_SYNC_DEADLINE_SECONDS = 180.0
+DEFAULT_BATCH_SIZE = 10
+DEFAULT_TRANSIENT_RETRY_LIMIT = 2
+DEFAULT_RETRY_BACKOFF_SECONDS = 0.5
 
 
 @dataclass(frozen=True)
@@ -57,6 +64,50 @@ REQUIRED_FIELDS: tuple[dict[str, Any], ...] = (
 
 def now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def env_assignments(path: Path) -> dict[str, str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+
+    assignments: dict[str, str] = {}
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if "=" not in line:
+            continue
+        key, raw_value = line.split("=", 1)
+        key = key.strip()
+        if not key or not key.replace("_", "a").isalnum() or key[0].isdigit():
+            continue
+        value = raw_value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        assignments[key] = value
+    return assignments
+
+
+@lru_cache(maxsize=1)
+def local_env_assignments() -> dict[str, str]:
+    return env_assignments(RUN_SERVICES_ROOT / ".env")
+
+
+def configured_value(*keys: str) -> str | None:
+    for key in keys:
+        value = normalize(os.environ.get(key))
+        if value is not None:
+            return value
+    assignments = local_env_assignments()
+    for key in keys:
+        value = normalize(assignments.get(key))
+        if value is not None:
+            return value
+    return None
 
 
 def important_work_items() -> list[ImportantWorkItem]:
@@ -458,6 +509,18 @@ def important_work_items() -> list[ImportantWorkItem]:
             acceptance_gate="Subscribr can draft from approved sources only; publication remains disabled until separate human approval.",
         ),
         ImportantWorkItem(
+            item_id="sendr-black-ledger-outreach-lane",
+            title="Sendr Tier 4 Black Ledger outreach lane",
+            area="Provider governance",
+            priority="P1",
+            status="draft-review-gated",
+            cadence="weekly until pilot receipt",
+            source="Sendr Tier 4 guide",
+            why_it_matters="Black Ledger needs relationship-building distribution without giving Sendr rules, editorial, release, support, sponsor-contract, or private-data truth.",
+            next_action="Use the Sendr provider-lane contract, campaign packet verifier, dry-run campaign receipt, reply/engagement batch receipt, and suppression-sync verifier before any sponsor, guest, creator, or launch outreach; keep WhatsApp, direct send, and auto-reply disabled.",
+            acceptance_gate="A sponsor-pilot packet with provider-lane metadata, recipient-basis receipt, engagement batch receipt, suppression-sync pass, message-copy hash, platform-policy check, and human approval receipt exist before any limited Sendr send is claimed.",
+        ),
+        ImportantWorkItem(
             item_id="origin-visuals-magicfit-runsite-magicai",
             title="Magicfit origin visuals and MagicAI runsite pool",
             area="Provider governance",
@@ -603,7 +666,110 @@ def normalize(value: str | None) -> str | None:
     return text or None
 
 
-def send_json(method: str, url: str, api_key: str, payload: dict[str, Any] | None = None, timeout: int = 60) -> Any:
+def resolve_duration_seconds(value: object, default: float) -> float:
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        return default
+    return seconds if seconds > 0 else default
+
+
+def resolve_http_timeout_seconds() -> float:
+    return resolve_duration_seconds(
+        configured_value("CHUMMER_TEABLE_HTTP_TIMEOUT_SECONDS"),
+        DEFAULT_HTTP_TIMEOUT_SECONDS,
+    )
+
+
+def resolve_sync_deadline_seconds() -> float:
+    return resolve_duration_seconds(
+        configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_SYNC_DEADLINE_SECONDS"),
+        DEFAULT_SYNC_DEADLINE_SECONDS,
+    )
+
+
+def operation_deadline(start_monotonic: float, deadline_seconds: float | None) -> float | None:
+    if deadline_seconds is None or deadline_seconds <= 0:
+        return None
+    return start_monotonic + deadline_seconds
+
+
+def bounded_timeout_seconds(
+    requested_timeout_seconds: float,
+    *,
+    deadline_monotonic: float | None,
+    label: str,
+) -> float:
+    timeout_seconds = max(1.0, float(requested_timeout_seconds))
+    if deadline_monotonic is None:
+        return timeout_seconds
+    remaining = deadline_monotonic - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError(f"{label}_deadline_exceeded")
+    return max(1.0, min(timeout_seconds, remaining))
+
+
+def chunked(items: list[Any], batch_size: int) -> list[list[Any]]:
+    effective_batch_size = max(1, int(batch_size))
+    return [items[index : index + effective_batch_size] for index in range(0, len(items), effective_batch_size)]
+
+
+def is_transient_teable_error(error: BaseException) -> bool:
+    text = str(error).strip().lower()
+    if "deadline_exceeded" in text:
+        return False
+    return any(
+        token in text
+        for token in (
+            "timed out",
+            "timeout",
+            "teable_transport_error:",
+            "teable_http_408:",
+            "teable_http_425:",
+            "teable_http_429:",
+            "teable_http_500:",
+            "teable_http_502:",
+            "teable_http_503:",
+            "teable_http_504:",
+            "teable_batch_update_count_mismatch:",
+            "teable_batch_create_count_mismatch:",
+            "teable_invalid_json_response",
+        )
+    )
+
+
+def sleep_before_teable_retry(
+    retry_number: int,
+    *,
+    retry_backoff_seconds: float,
+    deadline_monotonic: float | None,
+) -> None:
+    delay_seconds = max(0.0, float(retry_backoff_seconds)) * (2 ** max(0, retry_number - 1))
+    if delay_seconds <= 0:
+        return
+    if deadline_monotonic is not None:
+        remaining = deadline_monotonic - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("teable_sync_deadline_exceeded")
+        delay_seconds = min(delay_seconds, remaining)
+    time.sleep(delay_seconds)
+
+
+def send_json(
+    method: str,
+    url: str,
+    api_key: str,
+    payload: dict[str, Any] | None = None,
+    timeout: float | None = None,
+    *,
+    deadline_monotonic: float | None = None,
+) -> Any:
+    requested_timeout_seconds = resolve_http_timeout_seconds() if timeout is None else float(timeout)
+    effective_timeout_seconds = bounded_timeout_seconds(
+        requested_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+        label="teable_request",
+    )
     data: bytes | None = None
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -617,18 +783,41 @@ def send_json(method: str, url: str, api_key: str, payload: dict[str, Any] | Non
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=headers, method=method.upper())
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=effective_timeout_seconds) as response:
             body = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"teable_http_{exc.code}:{body[:240]}") from exc
+    except urllib.error.URLError as exc:
+        reason = str(exc.reason or "").strip()
+        if "timed out" in reason.lower():
+            raise RuntimeError(f"teable_timeout_after_{effective_timeout_seconds:g}s") from exc
+        raise RuntimeError(f"teable_transport_error:{reason[:180]}") from exc
+    except TimeoutError as exc:
+        detail = str(exc) or f"teable_timeout_after_{effective_timeout_seconds:g}s"
+        raise RuntimeError(detail[:180]) from exc
     if not body.strip():
         return {}
-    return json.loads(body)
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("teable_invalid_json_response") from exc
 
 
-def discover_base_id(api_base_url: str, api_key: str) -> str | None:
-    response = send_json("GET", f"{api_base_url}/base/access/all", api_key)
+def discover_base_id(
+    api_base_url: str,
+    api_key: str,
+    *,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    deadline_monotonic: float | None = None,
+) -> str | None:
+    response = send_json(
+        "GET",
+        f"{api_base_url}/base/access/all",
+        api_key,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
     if not isinstance(response, list):
         return None
     ids = [str(entry.get("id") or "").strip() for entry in response if isinstance(entry, dict) and str(entry.get("id") or "").strip()]
@@ -643,8 +832,22 @@ def matches_table(entry: dict[str, Any], table_name: str) -> bool:
     return table_name.strip().lower() in names or DEFAULT_DB_TABLE_NAME.lower() in names
 
 
-def resolve_or_create_table(api_base_url: str, api_key: str, base_id: str, table_name: str) -> str:
-    tables = send_json("GET", f"{api_base_url}/base/{urllib.parse.quote(base_id)}/table", api_key)
+def resolve_or_create_table(
+    api_base_url: str,
+    api_key: str,
+    base_id: str,
+    table_name: str,
+    *,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    deadline_monotonic: float | None = None,
+) -> str:
+    tables = send_json(
+        "GET",
+        f"{api_base_url}/base/{urllib.parse.quote(base_id)}/table",
+        api_key,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
     if isinstance(tables, list):
         for table in tables:
             if isinstance(table, dict) and matches_table(table, table_name):
@@ -658,14 +861,34 @@ def resolve_or_create_table(api_base_url: str, api_key: str, base_id: str, table
         "fieldKeyType": "name",
         "fields": [teable_field_definition(field) for field in REQUIRED_FIELDS],
     }
-    created = send_json("POST", f"{api_base_url}/base/{urllib.parse.quote(base_id)}/table/", api_key, payload)
+    created = send_json(
+        "POST",
+        f"{api_base_url}/base/{urllib.parse.quote(base_id)}/table/",
+        api_key,
+        payload,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
     if not isinstance(created, dict) or not normalize(str(created.get("id") or "")):
         raise RuntimeError("teable_table_create_missing_id")
     return str(created["id"])
 
 
-def ensure_fields(api_base_url: str, api_key: str, table_id: str) -> None:
-    response = send_json("GET", f"{api_base_url}/table/{urllib.parse.quote(table_id)}/field?filterHidden=false", api_key)
+def ensure_fields(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    *,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    deadline_monotonic: float | None = None,
+) -> None:
+    response = send_json(
+        "GET",
+        f"{api_base_url}/table/{urllib.parse.quote(table_id)}/field?filterHidden=false",
+        api_key,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
     existing = set()
     if isinstance(response, list):
         for field in response:
@@ -676,16 +899,131 @@ def ensure_fields(api_base_url: str, api_key: str, table_id: str) -> None:
     for field in REQUIRED_FIELDS:
         if str(field["name"]).lower() in existing:
             continue
-        send_json("POST", f"{api_base_url}/table/{urllib.parse.quote(table_id)}/field", api_key, teable_field_definition(field))
+        send_json(
+            "POST",
+            f"{api_base_url}/table/{urllib.parse.quote(table_id)}/field",
+            api_key,
+            teable_field_definition(field),
+            timeout=request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
+        )
 
 
-def find_existing_record(api_base_url: str, api_key: str, table_id: str, item_id: str) -> str | None:
+def existing_record_ids_by_item_id(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    *,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    deadline_monotonic: float | None = None,
+) -> dict[str, str]:
+    response = send_json(
+        "GET",
+        f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record?fieldKeyType=name&take=1000",
+        api_key,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
+    if not isinstance(response, dict) or not isinstance(response.get("records"), list):
+        raise RuntimeError("teable_record_list_invalid_response")
+
+    result: dict[str, str] = {}
+    for record in response["records"]:
+        if not isinstance(record, dict):
+            continue
+        fields = record.get("fields") if isinstance(record.get("fields"), dict) else {}
+        item_id = normalize(str(fields.get("Item Id") or ""))
+        record_id = normalize(str(record.get("id") or ""))
+        if not item_id or not record_id:
+            continue
+        if item_id in result and result[item_id] != record_id:
+            raise RuntimeError(f"teable_duplicate_item_id:{item_id}")
+        result[item_id] = record_id
+    return result
+
+
+def update_record_batch(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    items: list[tuple[ImportantWorkItem, str]],
+    synced_at: str,
+    *,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    deadline_monotonic: float | None = None,
+) -> int:
+    if not items:
+        return 0
+    response = send_json(
+        "PATCH",
+        f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record",
+        api_key,
+        {
+            "fieldKeyType": "name",
+            "typecast": True,
+            "records": [
+                {"id": record_id, "fields": teable_fields_for_row(item, synced_at)}
+                for item, record_id in items
+            ],
+        },
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
+    if not isinstance(response, list) or len(response) != len(items):
+        raise RuntimeError(f"teable_batch_update_count_mismatch:{len(items)}")
+    return len(items)
+
+
+def create_record_batch(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    items: list[ImportantWorkItem],
+    synced_at: str,
+    *,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    deadline_monotonic: float | None = None,
+) -> int:
+    if not items:
+        return 0
+    response = send_json(
+        "POST",
+        f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record",
+        api_key,
+        {
+            "fieldKeyType": "name",
+            "typecast": True,
+            "records": [
+                {"fields": teable_fields_for_row(item, synced_at)}
+                for item in items
+            ],
+        },
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
+    records = response.get("records") if isinstance(response, dict) else None
+    if not isinstance(records, list) or len(records) != len(items):
+        raise RuntimeError(f"teable_batch_create_count_mismatch:{len(items)}")
+    return len(items)
+
+
+def find_existing_record(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    item_id: str,
+    *,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    deadline_monotonic: float | None = None,
+) -> str | None:
     safe_item_id = item_id.replace("'", "\\'")
     filter_by_tql = urllib.parse.quote(f"{{Item Id}} = '{safe_item_id}'")
     response = send_json(
         "GET",
         f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record?fieldKeyType=name&take=1&filterByTql={filter_by_tql}",
         api_key,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
     )
     if not isinstance(response, dict):
         return None
@@ -700,15 +1038,33 @@ def find_existing_record(api_base_url: str, api_key: str, table_id: str, item_id
     return None
 
 
-def upsert_record(api_base_url: str, api_key: str, table_id: str, item: ImportantWorkItem, synced_at: str) -> str:
+def upsert_record(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    item: ImportantWorkItem,
+    synced_at: str,
+    *,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    deadline_monotonic: float | None = None,
+) -> str:
     fields = teable_fields_for_row(item, synced_at)
-    record_id = find_existing_record(api_base_url, api_key, table_id, item.item_id)
+    record_id = find_existing_record(
+        api_base_url,
+        api_key,
+        table_id,
+        item.item_id,
+        request_timeout_seconds=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
     if record_id:
         send_json(
             "PATCH",
             f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record/{urllib.parse.quote(record_id)}",
             api_key,
             {"fieldKeyType": "name", "typecast": True, "record": {"fields": fields}},
+            timeout=request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
         )
         return "updated"
     send_json(
@@ -716,6 +1072,8 @@ def upsert_record(api_base_url: str, api_key: str, table_id: str, item: Importan
         f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record",
         api_key,
         {"fieldKeyType": "name", "typecast": True, "records": [{"fields": fields}]},
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
     )
     return "created"
 
@@ -727,35 +1085,84 @@ def sync_to_teable(
     base_id: str | None,
     table_id: str | None,
     table_name: str,
+    request_timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    sync_deadline_seconds: float | None = DEFAULT_SYNC_DEADLINE_SECONDS,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    transient_retry_limit: int = DEFAULT_TRANSIENT_RETRY_LIMIT,
+    retry_backoff_seconds: float = DEFAULT_RETRY_BACKOFF_SECONDS,
 ) -> dict[str, Any]:
     started_at = now_iso()
+    started_monotonic = time.monotonic()
+    deadline_monotonic = operation_deadline(started_monotonic, sync_deadline_seconds)
+    effective_batch_size = max(1, int(batch_size))
+    effective_retry_limit = max(0, int(transient_retry_limit))
+    rows = important_work_items()
     if not api_key:
         return {
             "state": "blocked",
             "attempted": True,
             "started_at_utc": started_at,
+            "request_timeout_seconds": request_timeout_seconds,
+            "sync_deadline_seconds": sync_deadline_seconds,
+            "batch_size": effective_batch_size,
+            "transient_retry_limit": effective_retry_limit,
             "synced_count": 0,
-            "failed_count": len(important_work_items()),
+            "failed_count": len(rows),
             "errors": ["teable_api_key_missing"],
         }
     resolved_base_id = base_id
     resolved_table_id = table_id
     try:
+        bounded_timeout_seconds(
+            request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
+            label="teable_sync",
+        )
         if not resolved_table_id:
             if not resolved_base_id:
-                resolved_base_id = discover_base_id(api_base_url, api_key)
+                resolved_base_id = discover_base_id(
+                    api_base_url,
+                    api_key,
+                    request_timeout_seconds=request_timeout_seconds,
+                    deadline_monotonic=deadline_monotonic,
+                )
             if not resolved_base_id:
                 return {
                     "state": "blocked",
                     "attempted": True,
                     "started_at_utc": started_at,
+                    "request_timeout_seconds": request_timeout_seconds,
+                    "sync_deadline_seconds": sync_deadline_seconds,
+                    "batch_size": effective_batch_size,
+                    "transient_retry_limit": effective_retry_limit,
                     "synced_count": 0,
-                    "failed_count": len(important_work_items()),
+                    "failed_count": len(rows),
                     "errors": ["teable_base_id_required_when_table_id_is_missing"],
                 }
-            resolved_table_id = resolve_or_create_table(api_base_url, api_key, resolved_base_id, table_name)
-        ensure_fields(api_base_url, api_key, resolved_table_id)
+            resolved_table_id = resolve_or_create_table(
+                api_base_url,
+                api_key,
+                resolved_base_id,
+                table_name,
+                request_timeout_seconds=request_timeout_seconds,
+                deadline_monotonic=deadline_monotonic,
+            )
+        ensure_fields(
+            api_base_url,
+            api_key,
+            resolved_table_id,
+            request_timeout_seconds=request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
+        )
+        existing_record_ids = existing_record_ids_by_item_id(
+            api_base_url,
+            api_key,
+            resolved_table_id,
+            request_timeout_seconds=request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
+        )
     except Exception as exc:
+        deadline_exceeded = "deadline_exceeded" in str(exc)
         return {
             "state": "failed",
             "attempted": True,
@@ -765,24 +1172,129 @@ def sync_to_teable(
             "base_id": resolved_base_id,
             "table_id": resolved_table_id,
             "table_name": table_name,
+            "request_timeout_seconds": request_timeout_seconds,
+            "sync_deadline_seconds": sync_deadline_seconds,
+            "batch_size": effective_batch_size,
+            "transient_retry_limit": effective_retry_limit,
+            "deadline_exceeded": deadline_exceeded,
             "synced_count": 0,
-            "failed_count": len(important_work_items()),
+            "failed_count": len(rows),
             "errors": [f"teable_setup:{str(exc)[:180]}"],
         }
     synced_at = now_iso()
     created = 0
     updated = 0
     errors: list[str] = []
-    for item in important_work_items():
-        try:
-            result = upsert_record(api_base_url, api_key, resolved_table_id, item, synced_at)
-            if result == "created":
-                created += 1
-            else:
-                updated += 1
-        except Exception as exc:  # pragma: no cover - exact provider failures are integration-level.
-            errors.append(f"{item.item_id}:{str(exc)[:180]}")
-    failed = len(errors)
+    deadline_exceeded = False
+    last_item_id: str | None = None
+    retry_count = 0
+    reconciled_create_count = 0
+    completed_batch_count = 0
+
+    update_items = [
+        (item, existing_record_ids[item.item_id])
+        for item in rows
+        if item.item_id in existing_record_ids
+    ]
+    create_items = [item for item in rows if item.item_id not in existing_record_ids]
+    batches: list[tuple[str, list[Any]]] = [
+        *[("update", batch) for batch in chunked(update_items, effective_batch_size)],
+        *[("create", batch) for batch in chunked(create_items, effective_batch_size)],
+    ]
+    for action, batch_items in batches:
+        if not batch_items:
+            continue
+        original_batch_items = list(batch_items)
+        pending_batch_items = list(batch_items)
+        first_item = original_batch_items[0][0] if action == "update" else original_batch_items[0]
+        last_item = original_batch_items[-1][0] if action == "update" else original_batch_items[-1]
+        last_item_id = last_item.item_id
+        batch_retry_count = 0
+        while pending_batch_items:
+            try:
+                bounded_timeout_seconds(
+                    request_timeout_seconds,
+                    deadline_monotonic=deadline_monotonic,
+                    label="teable_sync",
+                )
+                if action == "update":
+                    updated += update_record_batch(
+                        api_base_url,
+                        api_key,
+                        resolved_table_id,
+                        pending_batch_items,
+                        synced_at,
+                        request_timeout_seconds=request_timeout_seconds,
+                        deadline_monotonic=deadline_monotonic,
+                    )
+                else:
+                    created += create_record_batch(
+                        api_base_url,
+                        api_key,
+                        resolved_table_id,
+                        pending_batch_items,
+                        synced_at,
+                        request_timeout_seconds=request_timeout_seconds,
+                        deadline_monotonic=deadline_monotonic,
+                    )
+                pending_batch_items = []
+                completed_batch_count += 1
+            except Exception as exc:  # pragma: no cover - exact provider failures are integration-level.
+                error_text = str(exc)
+                if "deadline_exceeded" in error_text:
+                    deadline_exceeded = True
+                    errors.append(f"{action}:{first_item.item_id}..{last_item.item_id}:{error_text[:180]}")
+                    break
+                if not is_transient_teable_error(exc) or batch_retry_count >= effective_retry_limit:
+                    errors.append(f"{action}:{first_item.item_id}..{last_item.item_id}:{error_text[:180]}")
+                    break
+
+                if action == "create":
+                    try:
+                        refreshed_record_ids = existing_record_ids_by_item_id(
+                            api_base_url,
+                            api_key,
+                            resolved_table_id,
+                            request_timeout_seconds=request_timeout_seconds,
+                            deadline_monotonic=deadline_monotonic,
+                        )
+                    except Exception as reconciliation_error:
+                        errors.append(
+                            f"create:{first_item.item_id}..{last_item.item_id}:"
+                            f"ambiguous_create_reconciliation_failed:{str(reconciliation_error)[:128]}"
+                        )
+                        break
+                    confirmed_items = [
+                        item for item in pending_batch_items if item.item_id in refreshed_record_ids
+                    ]
+                    if confirmed_items:
+                        confirmed_count = len(confirmed_items)
+                        created += confirmed_count
+                        reconciled_create_count += confirmed_count
+                        pending_batch_items = [
+                            item for item in pending_batch_items if item.item_id not in refreshed_record_ids
+                        ]
+                        if not pending_batch_items:
+                            completed_batch_count += 1
+                            break
+
+                batch_retry_count += 1
+                retry_count += 1
+                try:
+                    sleep_before_teable_retry(
+                        batch_retry_count,
+                        retry_backoff_seconds=retry_backoff_seconds,
+                        deadline_monotonic=deadline_monotonic,
+                    )
+                except TimeoutError as retry_deadline_error:
+                    deadline_exceeded = True
+                    errors.append(
+                        f"{action}:{first_item.item_id}..{last_item.item_id}:{str(retry_deadline_error)}"
+                    )
+                    break
+        if deadline_exceeded:
+            break
+    failed = len(rows) - created - updated
     return {
         "state": "passed" if failed == 0 else "failed",
         "attempted": True,
@@ -792,6 +1304,16 @@ def sync_to_teable(
         "base_id": resolved_base_id,
         "table_id": resolved_table_id,
         "table_name": table_name,
+        "request_timeout_seconds": request_timeout_seconds,
+        "sync_deadline_seconds": sync_deadline_seconds,
+        "batch_size": effective_batch_size,
+        "batch_count": len(batches),
+        "completed_batch_count": completed_batch_count,
+        "transient_retry_limit": effective_retry_limit,
+        "retry_count": retry_count,
+        "reconciled_create_count": reconciled_create_count,
+        "deadline_exceeded": deadline_exceeded,
+        "last_item_id": last_item_id,
         "synced_count": created + updated,
         "created_count": created,
         "updated_count": updated,
@@ -878,10 +1400,10 @@ def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any
 
 
 def resolve_api_base_url() -> str:
-    explicit_api = normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_BASE_URL")) or normalize(os.environ.get("TEABLE_API_BASE_URL"))
+    explicit_api = configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_API_BASE_URL", "TEABLE_API_BASE_URL")
     if explicit_api:
         return explicit_api.rstrip("/")
-    configured_base = normalize(os.environ.get("TEABLE_BASE_URL")) or normalize(os.environ.get("TEABLE_RUNTIME_BASE_URL"))
+    configured_base = configured_value("TEABLE_BASE_URL", "TEABLE_RUNTIME_BASE_URL")
     if not configured_base:
         return DEFAULT_API_BASE_URL
     configured_base = configured_base.rstrip("/")
@@ -893,14 +1415,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--csv-output", type=Path, default=None, help="Write a Teable import CSV beside the JSON receipt.")
     parser.add_argument("--seed-hub", action="store_true", help="Record the same work rows into the Chummer Hub internal store before Teable sync.")
-    parser.add_argument("--hub-base-url", default=normalize(os.environ.get("CHUMMER_PUBLIC_BASE_URL")) or normalize(os.environ.get("CHUMMER_HUB_BASE_URL")) or DEFAULT_HUB_BASE_URL)
-    parser.add_argument("--hub-token", default=normalize(os.environ.get("FLEET_INTERNAL_API_TOKEN")) or normalize(os.environ.get("CHUMMER_HUB_INTERNAL_API_TOKEN")))
+    parser.add_argument("--hub-base-url", default=configured_value("CHUMMER_PUBLIC_BASE_URL", "CHUMMER_HUB_BASE_URL") or DEFAULT_HUB_BASE_URL)
+    parser.add_argument("--hub-token", default=configured_value("FLEET_INTERNAL_API_TOKEN", "CHUMMER_HUB_INTERNAL_API_TOKEN"))
     parser.add_argument("--sync", action="store_true", help="Upsert rows into Teable. Dry-run artifact only by default.")
     parser.add_argument("--api-base-url", default=resolve_api_base_url())
-    parser.add_argument("--api-key", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY")) or normalize(os.environ.get("TEABLE_API_KEY")))
-    parser.add_argument("--base-id", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID")))
-    parser.add_argument("--table-id", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_ID")))
-    parser.add_argument("--table-name", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_NAME")) or DEFAULT_TABLE_NAME)
+    parser.add_argument("--api-key", default=configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY", "TEABLE_API_KEY"))
+    parser.add_argument("--base-id", default=configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID"))
+    parser.add_argument("--table-id", default=configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_ID"))
+    parser.add_argument("--table-name", default=configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_NAME") or DEFAULT_TABLE_NAME)
+    parser.add_argument("--request-timeout-seconds", type=float, default=resolve_http_timeout_seconds())
+    parser.add_argument("--sync-deadline-seconds", type=float, default=resolve_sync_deadline_seconds())
+    parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
+    parser.add_argument("--transient-retry-limit", type=int, default=DEFAULT_TRANSIENT_RETRY_LIMIT)
+    parser.add_argument("--retry-backoff-seconds", type=float, default=DEFAULT_RETRY_BACKOFF_SECONDS)
     return parser.parse_args(argv)
 
 
@@ -921,6 +1448,11 @@ def main(argv: list[str] | None = None) -> int:
             base_id=args.base_id,
             table_id=args.table_id,
             table_name=args.table_name,
+            request_timeout_seconds=float(args.request_timeout_seconds),
+            sync_deadline_seconds=float(args.sync_deadline_seconds),
+            batch_size=int(args.batch_size),
+            transient_retry_limit=int(args.transient_retry_limit),
+            retry_backoff_seconds=float(args.retry_backoff_seconds),
         )
         if projection["sync"]["state"] != "passed":
             projection["status"] = "blocked" if projection["sync"]["state"] == "blocked" else "failed"
