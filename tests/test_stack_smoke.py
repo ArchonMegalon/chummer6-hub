@@ -270,11 +270,11 @@ class StackConfigSmokeTests(unittest.TestCase):
         dockerfile_text = dockerfile_path.read_text(encoding="utf-8")
 
         self.assertIn(
-            "COPY --from=build /src/chummercomplete/chummer.run-services/.codex-design /app/.codex-design",
+            "COPY --from=build /src/chummer.run-services/.codex-design /app/.codex-design",
             dockerfile_text,
         )
         self.assertIn(
-            "COPY chummercomplete/chummer-design/products/chummer/ /app/.codex-design/product/",
+            "COPY --from=design-product products/chummer/ /app/.codex-design/product/",
             dockerfile_text,
             msg="public edge image should overlay the canonical chummer-design product onto the app product root",
         )
@@ -432,7 +432,13 @@ class StackConfigSmokeTests(unittest.TestCase):
         for script_path in script_paths:
             self.assertTrue(script_path.exists(), msg=f"missing expected manifest verifier: {script_path}")
             script_text = script_path.read_text(encoding="utf-8")
-            self.assertIn('if [[ "${#VERIFY_ARGS[@]}" -gt 0 ]]; then', script_text)
+            self.assertIn("array_count()", script_text)
+            self.assertTrue(
+                'verify_arg_count="$(array_count VERIFY_ARGS)"' in script_text
+                or 'if (( $(array_count VERIFY_ARGS) > 0 )); then' in script_text,
+                msg=f"missing nounset-safe VERIFY_ARGS guard in {script_path}",
+            )
+            self.assertNotIn('${#VERIFY_ARGS[@]}', script_text)
             self.assertIn('python3 "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "$TARGET"', script_text)
 
     def test_release_publish_scripts_keep_macos_artifact_gate_behavior(self):
