@@ -2337,10 +2337,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "landing should reuse the signed-in trust posture for live access guidance on the authenticated front door.");
     Assert(landingSource.Contains("starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession", StringComparison.Ordinal), "landing should derive the signed-in starter path from the first playable session truth already attached to the campaign spine.");
     Assert(landingSource.Contains("Open first session on Home", StringComparison.Ordinal), "landing should keep a direct signed-in first-session route instead of forcing repo knowledge.");
-    Assert(landingSource.Contains("Open first playable session", StringComparison.Ordinal), "landing should keep a direct route from the front door into the first-session detail.");
-    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Fix availability\"", StringComparison.Ordinal), "landing starter path should reuse signed-in fix-availability truth instead of tutorial prose.");
-    Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Current caution\"", StringComparison.Ordinal), "landing starter path should reuse signed-in caution truth instead of tutorial prose.");
-    Assert(landingSource.Contains("Open install support", StringComparison.Ordinal), "landing starter path should keep install-support follow-through on the same front-door rail.");
+    Assert(landingSource.Contains("Model.Chrome.Authenticated ? \"/account\"", StringComparison.Ordinal), "landing should keep a direct authenticated route from the front door into account continuity.");
+    Assert(landingSource.Contains("site-account-menu__label\">Open Chummer", StringComparison.Ordinal), "landing should keep the authenticated product-entry menu visible on the front door.");
+    Assert(landingSource.Contains("href=\"/build\"", StringComparison.Ordinal), "landing should keep the signed-in build entry on the product menu.");
+    Assert(landingSource.Contains("href=\"/help\"", StringComparison.Ordinal), "landing should keep help follow-through visible on the front door.");
     var trustPulseBodySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_PublicTrustPulseBody.cshtml"));
     Assert(trustPulseBodySource.Contains("@if (Model.TrendSamples.Count > 1)", StringComparison.Ordinal), "shared trust pulse body should render measured progress points directly on the weekly trust pulse.");
     Assert(trustPulseBodySource.Contains("trust-pulse-trend__point", StringComparison.Ordinal), "shared trust pulse body should carry the measured-trend rail.");
