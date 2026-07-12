@@ -10,6 +10,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "e2e-portal.cjs"
+VERIFY_SCRIPT = REPO_ROOT / "scripts" / "ai" / "verify.sh"
 
 
 class _PortalFixtureHandler(BaseHTTPRequestHandler):
@@ -440,6 +441,13 @@ class _PortalFixtureHandler(BaseHTTPRequestHandler):
 
 
 class PortalE2EBlazorGateTests(unittest.TestCase):
+    def test_authoritative_verify_requires_blazor_by_default(self) -> None:
+        verify_script = VERIFY_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn(
+            'CHUMMER_PORTAL_REQUIRE_BLAZOR="${CHUMMER_HUB_PUBLIC_REQUIRE_BLAZOR:-1}"',
+            verify_script,
+        )
+
     def setUp(self) -> None:
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _PortalFixtureHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)

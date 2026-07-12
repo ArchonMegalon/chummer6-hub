@@ -215,7 +215,7 @@ python3 "$ROOT_DIR/scripts/verify_black_ledger_live_media_proof.py" --base-url "
 CHUMMER_PORTAL_BASE_URL="${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" \
 CHUMMER_PORTAL_PUBLIC_HOST= \
 CHUMMER_PORTAL_FORWARDED_PROTO= \
-CHUMMER_PORTAL_REQUIRE_BLAZOR="${CHUMMER_HUB_PUBLIC_REQUIRE_BLAZOR:-0}" \
+CHUMMER_PORTAL_REQUIRE_BLAZOR="${CHUMMER_HUB_PUBLIC_REQUIRE_BLAZOR:-1}" \
 node "$ROOT_DIR/scripts/e2e-portal.cjs" >/dev/null
 node "$ROOT_DIR/scripts/verify_partizipate_runtime_fallback.cjs" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null
 run_slice_safe_dotnet_test "FullyQualifiedName~HubPageChromeServiceTests"
