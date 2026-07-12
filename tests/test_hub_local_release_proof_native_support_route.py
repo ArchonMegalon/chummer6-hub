@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
+import runpy
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +16,23 @@ NATIVE_SUPPORT_ROUTE = "/api/v1/install-linking/continuation/support"
 
 
 class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
+    def test_readiness_source_uses_payload_time_instead_of_file_mtime(self) -> None:
+        namespace = runpy.run_path(str(MATERIALIZER))
+        choose_readiness_path = namespace["_flagship_readiness_path"]
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            local_path = Path(temp_root) / "local-readiness.json"
+            fallback_path = Path(temp_root) / "fallback-readiness.json"
+            local_path.write_text(json.dumps({"generated_at": "2026-06-27T20:04:25Z"}), encoding="utf-8")
+            fallback_path.write_text(json.dumps({"generated_at": "2026-07-01T15:07:43Z"}), encoding="utf-8")
+            os.utime(local_path, (200, 200))
+            os.utime(fallback_path, (100, 100))
+
+            choose_readiness_path.__globals__["DEFAULT_FLAGSHIP_READINESS_PATH"] = local_path
+            choose_readiness_path.__globals__["FALLBACK_FLAGSHIP_READINESS_PATH"] = fallback_path
+            with mock.patch.dict(os.environ, {"CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH": ""}):
+                self.assertEqual(fallback_path, choose_readiness_path())
+
     def test_materialized_proof_routes_match_release_channel_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
@@ -42,6 +62,7 @@ class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
                 "/home/work",
                 "/account/access",
                 "/account/work",
+                "/account/roster",
                 "/account/support",
                 "/contact",
                 "/downloads",

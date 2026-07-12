@@ -69,6 +69,7 @@ public sealed class HubLocalReleaseProofMaterializerTests
                 "/home/access",
                 "/home/work",
                 "/account/access",
+                "/account/work",
                 "/account/roster",
                 "/account/support",
                 "/contact",

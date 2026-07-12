@@ -1204,7 +1204,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             source_view_path = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
             view_path.write_text(
                 source_view_path.read_text(encoding="utf-8").replace(
-                    'Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")',
+                    'Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")',
                     "Observation time hidden.",
                 ),
                 encoding="utf-8",
@@ -1224,7 +1224,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Chummer.Run.Api/Views/Accounts/Account.cshtml", result.stderr)
-        self.assertIn('Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")', result.stderr)
+        self.assertIn('Updated: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")', result.stderr)
 
     def test_verifier_fails_closed_when_surface_recovery_hint_is_hidden(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-surface-recovery-hint-") as temp_dir:
@@ -1383,7 +1383,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             payload["proof_routes"] = [
                 route
                 for route in payload["proof_routes"]
-                if route != "/account/work"
+                if route != "/account/roster"
             ]
             release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
@@ -1400,7 +1400,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("proof_routes missing package-scoped receipt route /account/work", result.stderr)
+        self.assertIn("proof_routes missing package-scoped receipt route /account/roster", result.stderr)
         self.assertIn("workspace_restore:provenance", result.stderr)
 
     def test_verifier_fails_closed_when_release_proof_contains_untracked_package_receipt(self) -> None:
@@ -2681,7 +2681,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             self.assertEqual(105, receipt_by_id[receipt_id]["milestone_id"])
             self.assertEqual(4623636482, receipt_by_id[receipt_id]["frontier_id"])
             self.assertIn("/home/work", receipt_by_id[receipt_id]["routes"])
-            self.assertIn("/account/work", receipt_by_id[receipt_id]["routes"])
+            self.assertIn("/account/roster", receipt_by_id[receipt_id]["routes"])
 
         self.assertIn("workspace_restore:provenance", receipt_by_id["workspace_restore:provenance"]["surfaces"])
         self.assertIn("entitlement_sync:conflict_receipts", receipt_by_id["entitlement_sync:conflict_receipts"]["surfaces"])

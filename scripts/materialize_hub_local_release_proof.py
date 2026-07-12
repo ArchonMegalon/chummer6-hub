@@ -76,7 +76,15 @@ def _flagship_readiness_path() -> Path:
         return Path(raw)
     candidates = [path for path in (DEFAULT_FLAGSHIP_READINESS_PATH, FALLBACK_FLAGSHIP_READINESS_PATH) if path.is_file()]
     if candidates:
-        return max(candidates, key=lambda path: path.stat().st_mtime)
+        def generated_at(path: Path) -> dt.datetime:
+            payload = _load_flagship_readiness_payload(path) or {}
+            parsed = _parse_iso_timestamp(str(payload.get("generated_at") or payload.get("generatedAt") or ""))
+            return parsed or dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+
+        return max(
+            candidates,
+            key=lambda path: (generated_at(path), path == FALLBACK_FLAGSHIP_READINESS_PATH),
+        )
     return FALLBACK_FLAGSHIP_READINESS_PATH
 
 
@@ -836,6 +844,7 @@ def main() -> int:
             "/home/work",
             "/account/access",
             "/account/work",
+            "/account/roster",
             "/account/support",
             "/contact",
             "/downloads",
