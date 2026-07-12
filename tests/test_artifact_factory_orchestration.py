@@ -782,7 +782,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "\n            if (!IsStablePublicShelfSegment(decodedSegment))\n"
                     "            {\n"
                     "                throw new InvalidDataException(\n"
-                    "                    $\"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must use stable public proof shelf segment characters.\"); // .Replace(\n"
+                    "                    $\"source pack '{sourcePackId}' has unsafe public status shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must use stable public status shelf segments.\");\n"
                     "            }\n",
                     "",
                 ),
@@ -802,7 +802,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("artifact factory bundle refs must use stable public proof shelf segment characters", result.stderr)
+        self.assertIn("artifact factory bundle refs must use stable public status shelf segments", result.stderr)
 
     def test_verifier_fails_closed_when_recipe_catalog_endpoint_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-recipe-endpoint-proof-") as temp_dir:
@@ -1583,7 +1583,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "            || releaseArtifactId.Contains('\\\\', StringComparison.Ordinal))\n"
                     "        {\n"
                     "            throw new InvalidDataException(\n"
-                    "                $\"source pack '{sourcePackId}' has unsafe release public proof shelf {fieldName} '{publicShelfRef}'; release bundle anchors must resolve to exactly one release artifact segment.\"); // .Replace(\n"
+                    "                $\"source pack '{sourcePackId}' has unsafe public status shelf {fieldName} '{publicShelfRef}'; release bundle anchors must resolve to exactly one release artifact segment.\");\n"
                     "        }\n"
                     "    }\n",
                     "",
