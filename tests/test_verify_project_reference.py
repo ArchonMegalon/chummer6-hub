@@ -143,6 +143,58 @@ def test_rejects_conditioned_or_non_consumed_owner_reference(
     assert result.returncode == 1
 
 
+@pytest.mark.parametrize(
+    "project_markup",
+    [
+        pytest.param(
+            '<Project Sdk="Microsoft.NET.Sdk">'
+            '<ItemGroup Condition="\'$(UseOwner)\' == \'true\'">'
+            "{reference}</ItemGroup></Project>",
+            id="conditioned-item-group",
+        ),
+        pytest.param(
+            '<Project Sdk="Microsoft.NET.Sdk" Condition="\'$(UseOwner)\' == \'true\'">'
+            "<ItemGroup>{reference}</ItemGroup></Project>",
+            id="conditioned-project",
+        ),
+        pytest.param(
+            '<Project Sdk="Microsoft.NET.Sdk"><Choose>'
+            '<When Condition="\'$(UseOwner)\' == \'true\'">'
+            "<ItemGroup>{reference}</ItemGroup>"
+            "</When></Choose></Project>",
+            id="choose-when",
+        ),
+        pytest.param(
+            '<Project Sdk="Microsoft.NET.Sdk"><Choose><Otherwise>'
+            "<ItemGroup>{reference}</ItemGroup>"
+            "</Otherwise></Choose></Project>",
+            id="choose-otherwise",
+        ),
+        pytest.param(
+            '<Project Sdk="Microsoft.NET.Sdk"><Target Name="AddOwnerReference">'
+            "<ItemGroup>{reference}</ItemGroup>"
+            "</Target></Project>",
+            id="target-scoped",
+        ),
+    ],
+)
+def test_rejects_reference_outside_static_unconditional_item_group(
+    tmp_path: Path,
+    project_markup: str,
+) -> None:
+    include = "$(MSBuildProjectDirectory)/../../chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj"
+    project, expected = _fixture(tmp_path, include)
+    reference = f'<ProjectReference Include="{include}" />'
+    project.write_text(
+        project_markup.format(reference=reference) + "\n",
+        encoding="utf-8",
+    )
+
+    result = _run(project, expected)
+
+    assert result.returncode == 1
+
+
 def test_rejects_missing_expected_owner_project(tmp_path: Path) -> None:
     project, expected = _fixture(
         tmp_path,

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import sys
 import xml.etree.ElementTree as ET
+from collections.abc import Iterator
 from pathlib import Path
 
 
@@ -47,14 +48,37 @@ def _is_unconditional_consumed_reference(element: ET.Element) -> bool:
     return True
 
 
+def _is_static_unconditional_scope(ancestors: tuple[ET.Element, ...]) -> bool:
+    if len(ancestors) != 2:
+        return False
+    project, item_group = ancestors
+    if (
+        _local_name(project.tag) != "Project"
+        or _local_name(item_group.tag) != "ItemGroup"
+    ):
+        return False
+    return not any(ancestor.get("Condition", "").strip() for ancestor in ancestors)
+
+
+def _elements_with_ancestors(
+    element: ET.Element,
+    ancestors: tuple[ET.Element, ...] = (),
+) -> Iterator[tuple[ET.Element, tuple[ET.Element, ...]]]:
+    yield element, ancestors
+    for child in element:
+        yield from _elements_with_ancestors(child, (*ancestors, element))
+
+
 def has_project_reference(project: Path, expected: Path) -> bool:
     try:
         root = ET.parse(project).getroot()
     except (OSError, ET.ParseError) as exc:
         raise ValueError(f"cannot parse {project}: {exc}") from exc
 
-    for element in root.iter():
+    for element, ancestors in _elements_with_ancestors(root):
         if _local_name(element.tag) != "ProjectReference":
+            continue
+        if not _is_static_unconditional_scope(ancestors):
             continue
         if not _is_unconditional_consumed_reference(element):
             continue
