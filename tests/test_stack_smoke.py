@@ -729,6 +729,14 @@ class StackConfigSmokeTests(unittest.TestCase):
             release_fixture["releaseProof"]["status"] = "pass"
             release_fixture["releaseProof"]["generatedAt"] = published_at
             release_fixture["releaseProof"]["generated_at"] = published_at
+            release_fixture["releaseProof"]["proofRoutes"] = [
+                route
+                for route in release_fixture["releaseProof"].get("proofRoutes") or []
+                if not (
+                    str(route).startswith("/downloads/install/")
+                    and route != "/downloads/install/avalonia-linux-x64-installer"
+                )
+            ]
             ui_gate = release_fixture["releaseProof"].get("uiLocalizationReleaseGate") or {}
             if isinstance(ui_gate, dict):
                 ui_gate["generatedAt"] = published_at
