@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VERIFIER = ROOT / "scripts" / "ai" / "run_services_verification.sh"
+EXTRACTION_VERIFIER = ROOT / "tests" / "RunServicesVerification" / "HubExtractionReadinessVerification.cs"
 RUN_CONTRACTS_PROJECT = ROOT / "Chummer.Run.Contracts" / "Chummer.Run.Contracts.csproj"
 RUN_AI_PROJECT = ROOT / "Chummer.Run.AI" / "Chummer.Run.AI.csproj"
 
@@ -30,3 +31,14 @@ def test_current_projects_bind_contract_and_runtime_to_media_factory_owner() -> 
     assert "$(ChummerMediaFactoryRoot)\\src\\Chummer.Media.Factory.Runtime\\bin\\$(Configuration)" in ai_project
     assert '<ProjectReference Include="$(ChummerMediaFactoryRoot)\\src\\Chummer.Media.Contracts' in ai_project
     assert '<ProjectReference Include="$(ChummerMediaFactoryRoot)\\src\\Chummer.Media.Factory.Runtime' in ai_project
+
+
+def test_extraction_verifier_accepts_configurable_media_factory_owner_root() -> None:
+    verifier = EXTRACTION_VERIFIER.read_text(encoding="utf-8")
+
+    assert "usesConfiguredMediaContractsRoot" in verifier
+    assert "usesConfiguredMediaRuntimeRoot" in verifier
+    assert "$(ChummerMediaFactoryRoot)\\src\\Chummer.Media.Contracts\\bin\\$(Configuration)" in verifier
+    assert "$(ChummerMediaFactoryRoot)\\src\\Chummer.Media.Contracts\\Chummer.Media.Contracts.csproj" in verifier
+    assert "$(ChummerMediaFactoryRoot)\\src\\Chummer.Media.Factory.Runtime\\bin\\$(Configuration)" in verifier
+    assert "$(ChummerMediaFactoryRoot)\\src\\Chummer.Media.Factory.Runtime\\Chummer.Media.Factory.Runtime.csproj" in verifier

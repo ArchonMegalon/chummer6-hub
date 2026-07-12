@@ -152,6 +152,12 @@ internal static class HubExtractionReadinessVerification
             "Chummer.Media.Contracts must remain dependency-light with no package references.");
 
         var runAiProject = XDocument.Load(Path.Combine(RepoRoot, "Chummer.Run.AI", "Chummer.Run.AI.csproj"));
+        var runAiProjectReferences = runAiProject
+            .Descendants("ProjectReference")
+            .Select(static element => (string?)element.Attribute("Include"))
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value!)
+            .ToHashSet(StringComparer.Ordinal);
         var mediaReference = runAiProject
             .Descendants("Reference")
             .Select(static element => new
@@ -161,9 +167,19 @@ internal static class HubExtractionReadinessVerification
             })
             .FirstOrDefault(static entry => string.Equals(entry.Include, "Chummer.Media.Contracts", StringComparison.Ordinal));
         VerificationAssert.NotNull(mediaReference, "Chummer.Run.AI must reference the media-factory owner contract assembly.");
+        string? mediaReferenceHintPath = mediaReference!.HintPath;
+        bool usesConfiguredMediaContractsRoot = string.Equals(
+            mediaReferenceHintPath,
+            @"$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll",
+            StringComparison.Ordinal);
         VerificationAssert.True(
-            string.Equals(mediaReference!.HintPath, @"..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll", StringComparison.Ordinal),
+            usesConfiguredMediaContractsRoot
+            || string.Equals(mediaReferenceHintPath, @"..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll", StringComparison.Ordinal),
             "Chummer.Run.AI must consume Chummer.Media.Contracts through the sibling media-factory owner package.");
+        VerificationAssert.True(
+            !usesConfiguredMediaContractsRoot
+            || runAiProjectReferences.Contains(@"$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj"),
+            "Configurable Chummer.Media.Contracts owner bindings must retain the canonical owner project reference.");
 
         var mediaRuntimeReference = runAiProject
             .Descendants("Reference")
@@ -174,9 +190,19 @@ internal static class HubExtractionReadinessVerification
             })
             .FirstOrDefault(static entry => string.Equals(entry.Include, "Chummer.Media.Factory.Runtime", StringComparison.Ordinal));
         VerificationAssert.NotNull(mediaRuntimeReference, "Chummer.Run.AI must reference the media-factory runtime assembly.");
+        string? mediaRuntimeReferenceHintPath = mediaRuntimeReference!.HintPath;
+        bool usesConfiguredMediaRuntimeRoot = string.Equals(
+            mediaRuntimeReferenceHintPath,
+            @"$(ChummerMediaFactoryRoot)\src\Chummer.Media.Factory.Runtime\bin\$(Configuration)\net10.0\Chummer.Media.Factory.Runtime.dll",
+            StringComparison.Ordinal);
         VerificationAssert.True(
-            string.Equals(mediaRuntimeReference!.HintPath, @"..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Factory.Runtime\bin\$(Configuration)\net10.0\Chummer.Media.Factory.Runtime.dll", StringComparison.Ordinal),
+            usesConfiguredMediaRuntimeRoot
+            || string.Equals(mediaRuntimeReferenceHintPath, @"..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Factory.Runtime\bin\$(Configuration)\net10.0\Chummer.Media.Factory.Runtime.dll", StringComparison.Ordinal),
             "Chummer.Run.AI must consume media execution through the sibling media-factory runtime assembly.");
+        VerificationAssert.True(
+            !usesConfiguredMediaRuntimeRoot
+            || runAiProjectReferences.Contains(@"$(ChummerMediaFactoryRoot)\src\Chummer.Media.Factory.Runtime\Chummer.Media.Factory.Runtime.csproj"),
+            "Configurable media runtime owner bindings must retain the canonical owner project reference.");
 
         foreach (var retiredMediaService in new[]
                  {
