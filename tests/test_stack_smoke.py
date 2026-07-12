@@ -671,6 +671,27 @@ class StackConfigSmokeTests(unittest.TestCase):
             )
             release_fixture = json.loads(known_good_release_channel.read_text(encoding="utf-8"))
             proof_path = temp_path / "release-proof.json"
+            flagship_readiness_path = temp_path / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
+            flagship_readiness_path.write_text(
+                json.dumps(
+                    {
+                        "contract_name": "chummer.flagship_product_readiness_gate.v1",
+                        "status": "fail",
+                        "generated_at_utc": published_at,
+                        "summary": {
+                            "reason": "Launch-critical nested blockers remain; final gold janitor verdict is 'NOT_GOLD'.",
+                            "coverage_gap_keys": [],
+                            "scoped_coverage_gap_keys": [],
+                            "launch_critical_nested_blockers": [
+                                "final gold janitor verdict is 'NOT_GOLD'",
+                            ],
+                        },
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
 
             source_bootstrap_script = (
                 "source <(python3 - <<'PY'\n"
@@ -726,6 +747,8 @@ class StackConfigSmokeTests(unittest.TestCase):
                     published_at,
                     "--proof",
                     str(proof_path),
+                    "--flagship-readiness",
+                    str(flagship_readiness_path),
                     "--output",
                     str(manifest_path),
                     "--compat-output",
@@ -749,7 +772,11 @@ class StackConfigSmokeTests(unittest.TestCase):
 
             materialized = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(materialized.get("channel"), "preview")
-            self.assertIn("preview", str(materialized.get("rolloutState") or "").lower())
+            self.assertEqual(
+                materialized.get("rolloutState"),
+                "public_release_review_required",
+                msg="blocked flagship readiness must keep the preview shelf review-required",
+            )
 
             stamped_receipt = receipt_path.read_text(encoding="utf-8")
             self.assertIn('"status": "pass"', stamped_receipt)

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="$(ChummerCoreEngineRoot)\Chummer.Contracts\Chummer.Contracts.csproj" />
+    <ProjectReference Include="$(MSBuildProjectDirectory)/../../chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

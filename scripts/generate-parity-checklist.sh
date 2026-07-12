@@ -18,6 +18,9 @@ from typing import Sequence
 
 repo_root = pathlib.Path(sys.argv[1])
 output_path = pathlib.Path(sys.argv[2])
+sys.path.insert(0, str(repo_root))
+
+from scripts.parity_source_parser import extract_switch_expression_body as extract_csharp_switch_expression_body
 
 parity_oracle_path = repo_root / "docs" / "PARITY_ORACLE.json"
 
@@ -157,16 +160,11 @@ def parse_static_string_hash_set_ids(text: str, *, set_name: str, source: str) -
 
 
 def extract_switch_expression_body(text: str, *, variable_name: str) -> str:
-    match = re.search(
-        rf'return\s+{re.escape(variable_name)}\s+switch\s*\{{(?P<body>.*?)\n\s*\}};',
+    return extract_csharp_switch_expression_body(
         text,
-        re.DOTALL,
+        variable_name=variable_name,
+        source=display_path(desktop_dialog_factory_path),
     )
-    if match is None:
-        raise ValueError(
-            f"{display_path(desktop_dialog_factory_path)} is missing a switch expression for {variable_name}"
-        )
-    return match.group("body")
 
 
 def parse_switch_case_ids(text: str, *, variable_name: str) -> list[str]:

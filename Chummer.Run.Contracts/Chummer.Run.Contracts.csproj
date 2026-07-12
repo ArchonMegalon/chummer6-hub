@@ -14,7 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(ChummerCoreEngineRoot)\Chummer.Contracts\Chummer.Contracts.csproj" />
+    <ProjectReference Include="$(MSBuildProjectDirectory)/../../chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj" />
     <ProjectReference Include="$(ChummerHubRegistryRoot)\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Play.Contracts\Chummer.Play.Contracts.csproj" />
     <ProjectReference Include="$(ChummerMediaContractsProject)" Condition="'$(ChummerMediaContractsProject)' != ''" />
