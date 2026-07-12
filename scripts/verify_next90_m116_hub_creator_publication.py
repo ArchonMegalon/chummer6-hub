@@ -159,7 +159,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
     "Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml": [
         "Why this publication is live",
         "This page keeps discovery, trust, comparison, lineage, moderation, and the next step together instead of scattering them across separate routes.",
-        '<span class="tag">Trust</span>',
+        '<span class="tag">Review</span>',
         '<span class="tag">Discovery</span>',
         '<span class="tag">Moderation</span>',
     ],
