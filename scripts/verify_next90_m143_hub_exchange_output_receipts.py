@@ -479,17 +479,17 @@ def main() -> int:
     )
     require_contains(
         CREATOR_PUBLICATION_VIEW,
-        'var routeStateLabel = HumanizeStatus(Model.RouteState, "Bounded failure");',
+        'var routeStateLabel = HumanizeStatus(Model.RouteState, "Limited");',
         issues,
     )
     require_contains(
         CREATOR_PUBLICATION_VIEW,
-        'Receipt @Model.RouteReceipt.ReceiptId via @Model.RouteReceipt.MatchedRoute',
+        'var routeReceiptSummary = Model.RouteReceipt?.Summary',
         issues,
     )
     require_contains(
         CREATOR_PUBLICATION_VIEW,
-        'This publication stays bounded until a current outward-facing receipt is attached.',
+        'This publication stays brief until a current public update is attached.',
         issues,
     )
     require_contains(
