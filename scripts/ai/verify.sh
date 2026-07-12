@@ -76,6 +76,7 @@ VISUAL_REQUIRED_TESTS_ORDER_DRIFT_MARKER="visual receipt required_tests must pre
 VISUAL_INTERACTION_KEYS_ORDER_DRIFT_MARKER="visual receipt required_legacy_interaction_keys must preserve canonical milestone-2 interaction key ordering"
 VISUAL_SCREENSHOTS_ORDER_DRIFT_MARKER="visual receipt required_screenshots must preserve canonical milestone-2 screenshot ordering"
 VISUAL_MISSING_INTERACTION_KEYS_MARKER="parity audit failed: visual receipt is missing required milestone-2 interaction keys: "
+MISSING_EXECUTABLE_RECEIPT_MARKER="parity audit failed: required executable receipt is missing:"
 HUB_LOCAL_RELEASE_PROOF_PATH="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH:-$ROOT_DIR/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
 HUB_SERVED_RELEASE_PROOF_PATH="${CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH:-$ROOT_DIR/Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json}"
 HUB_RELEASE_PROOF_BASE_URL="${CHUMMER_HUB_RELEASE_PROOF_BASE_URL:-https://chummer.run}"
@@ -538,6 +539,23 @@ run_gate_materializer_script() {
   bash "$script_path"
 }
 
+resolve_ui_parity_release_channel_recovery_path() {
+  local explicit_path="${CHUMMER_UI_PARITY_RELEASE_CHANNEL_RECOVERY_PATH:-}"
+  local candidate
+  for candidate in \
+    "$explicit_path" \
+    "$ROOT_DIR/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json" \
+    "$UI_REPO_ROOT/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json" \
+    "$UI_REPO_ROOT/Docker/Downloads/RELEASE_CHANNEL.generated.json"
+  do
+    if [[ -n "$candidate" && -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
 run_ui_parity_audit_with_workflow_gate_retry() {
   local parity_log
   parity_log="$(mktemp)"
@@ -549,6 +567,21 @@ run_ui_parity_audit_with_workflow_gate_retry() {
   fi
 
   cat "$parity_log" >&2
+  if grep -Fq "$MISSING_EXECUTABLE_RECEIPT_MARKER" "$parity_log"; then
+    local release_channel_recovery_path
+    if ! release_channel_recovery_path="$(resolve_ui_parity_release_channel_recovery_path)"; then
+      echo "verify gate failed: UI parity receipt recovery requires an existing authoritative release-channel manifest." >&2
+      return 1
+    fi
+    echo "verify note: rematerializing UI parity receipts after a non-portable nested release-channel path." >&2
+    CHUMMER_UI_REPO_ROOT_ALIAS="$UI_REPO_ROOT" \
+    CHUMMER_DESKTOP_WORKFLOW_RELEASE_CHANNEL_PATH="$release_channel_recovery_path" \
+    CHUMMER_DESKTOP_VISUAL_RELEASE_CHANNEL_PATH="$release_channel_recovery_path" \
+    CHUMMER_FLAGSHIP_UI_RELEASE_CHANNEL_PATH="$release_channel_recovery_path" \
+      run_gate_materializer_script "$UI_WORKFLOW_GATE_MATERIALIZER" "workflow gate materializer"
+    bash scripts/audit-ui-parity.sh
+    return $?
+  fi
   if grep -Fq "$WORKFLOW_GATE_DRIFT_RETRY_MARKER_PREFIX" "$parity_log"; then
     echo "verify note: rematerializing desktop workflow execution gate after milestone-2 release-channel drift." >&2
     run_gate_materializer_script "$UI_WORKFLOW_GATE_MATERIALIZER" "workflow gate materializer"
