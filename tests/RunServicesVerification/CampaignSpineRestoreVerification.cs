@@ -233,7 +233,7 @@ internal static class CampaignSpineRestoreVerification
                         string.Equals(item.Surface, "workspace_restore", StringComparison.Ordinal)
                         && !string.IsNullOrWhiteSpace(item.Status.LeadReceiptId)
                         && !string.IsNullOrWhiteSpace(item.Status.LeadRecoveryHint)
-                        && string.Equals(item.Status.RecoveryRoute, "/account/work", StringComparison.Ordinal)
+                        && string.Equals(item.Status.RecoveryRoute, "/account/roster", StringComparison.Ordinal)
                         && string.Equals(item.Status.ContinuePosture, "safe_to_continue_with_receipt", StringComparison.Ordinal))
                     && serverPlane.RestoreReceiptSurfaces.Any(item =>
                         string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)
