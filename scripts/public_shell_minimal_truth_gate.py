@@ -30,6 +30,7 @@ class RouteContract:
     expected_final_path: str | None = None
     required_all: tuple[str, ...] = ()
     required_any: tuple[str, ...] = ()
+    required_one_of_groups: tuple[tuple[str, ...], ...] = ()
     forbidden: tuple[str, ...] = ()
     require_public_meta_urls: bool = False
 
@@ -43,7 +44,11 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
     billing_contract = RouteContract(
         route="/account/billing",
         expected_final_path="/login",
-        required_all=("Supporter", "Email first. Billing stays attached after this step.", "After this step, Chummer returns to billing.", "Continue with email", "Continue with Google"),
+        required_all=("Supporter", "After this step, Chummer returns to billing.", "Continue with Google"),
+        required_one_of_groups=(
+            ("Email first. Billing stays attached after this step.", "Continue with email"),
+            ("Google first. Billing stays attached after that step.",),
+        ),
         forbidden=("Supporter is not open right now.",),
         require_public_meta_urls=True,
     )
@@ -57,7 +62,11 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
         ),
         RouteContract(
             route="/login?next=%2F",
-            required_all=("Continue with email",),
+            required_all=("Continue with Google",),
+            required_one_of_groups=(
+                ("Email first. Google if you prefer.", "Continue with email"),
+                ("Email sign-in is unavailable on this host right now. Continue with Google instead.",),
+            ),
             require_public_meta_urls=True,
         ),
         billing_contract,
@@ -70,8 +79,9 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
         RouteContract(
             route="/status",
             expected_final_path="/status",
-            required_all=("Updated", "Downloads", "Help"),
-            forbidden=("Released", "Checks passed"),
+            required_all=("Downloads", "Now"),
+            required_any=("Preview downloads", "Stable downloads", "Downloads paused"),
+            forbidden=("Released", "Checks passed", "Updated", "No Stable build on this shelf.", "Preview build. Review required.", "Nightly", "Build from source"),
             require_public_meta_urls=True,
         ),
         RouteContract(
@@ -79,6 +89,7 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
             expected_final_path="/participate",
             required_all=("Participate",),
             required_any=("data-chummer-participate-frame", "Board offline right now"),
+            forbidden=("Public requests, clear bugs, useful ideas.", '<p class="eyebrow">Board</p>'),
             require_public_meta_urls=True,
         ),
         RouteContract(
@@ -86,6 +97,7 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
             expected_final_path="/participate",
             required_all=("Participate",),
             required_any=("data-chummer-participate-frame", "Board offline right now"),
+            forbidden=("Public requests, clear bugs, useful ideas.", '<p class="eyebrow">Board</p>'),
             require_public_meta_urls=True,
         ),
     )
@@ -111,10 +123,6 @@ def parse_args() -> argparse.Namespace:
 
 def normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().lower()
-
-
-def strip_iframe_tags(html: str) -> str:
-    return re.sub(r"<iframe\b[\s\S]*?(?:</iframe>|>)", " ", html, flags=re.IGNORECASE)
 
 
 def extract_meta_content(html: str, *, property_name: str | None = None, name: str | None = None) -> str:
@@ -172,13 +180,12 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float, allow
     failures: list[str] = []
     body = response.text
     normalized_body = normalize_text(body)
-    normalized_forbidden_body = normalize_text(strip_iframe_tags(body))
 
     if response.status_code != 200:
         failures.append(f"route returned HTTP {response.status_code}")
 
     for token in GENERIC_FORBIDDEN_SUBSTRINGS + contract.forbidden:
-        if normalize_text(token) in normalized_forbidden_body:
+        if normalize_text(token) in normalized_body:
             failures.append(f"route contains forbidden copy: {token}")
 
     required_all = contract.required_all
@@ -200,6 +207,20 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float, allow
             failures.append(
                 "route is missing every allowed state token: "
                 + ", ".join(required_any)
+            )
+
+    if contract.required_one_of_groups:
+        coherent_group_found = any(
+            all(normalize_text(token) in normalized_body for token in group)
+            for group in contract.required_one_of_groups
+        )
+        if not coherent_group_found:
+            rendered_groups = " or ".join(
+                "[" + ", ".join(group) + "]"
+                for group in contract.required_one_of_groups
+            )
+            failures.append(
+                "route does not match any coherent required state: " + rendered_groups
             )
 
     final_path = urlparse(response.url).path or "/"
@@ -226,6 +247,7 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float, allow
         "failures": failures,
         "requiredAll": list(required_all),
         "requiredAny": list(required_any),
+        "requiredOneOfGroups": [list(group) for group in contract.required_one_of_groups],
         "forbidden": list(contract.forbidden),
     }
 
