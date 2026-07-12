@@ -221,15 +221,45 @@ if ! grep -En '<HintPath>\.\.\\Chummer\.Play\.Contracts\\bin\\\$\(Configuration\
   exit 1
 fi
 
-if ! grep -En '<HintPath>\.\.\\\.\.\\\.\.\\fleet\\repos\\chummer-media-factory\\src\\Chummer\.Media\.Contracts\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Media\.Contracts\.dll</HintPath>' \
-  Chummer.Run.Contracts/Chummer.Run.Contracts.csproj \
-  Chummer.Run.AI/Chummer.Run.AI.csproj >/dev/null; then
+run_contracts_uses_media_contracts_owner() {
+  grep -Fq '<ProjectReference Include="$(ChummerMediaContractsProject)"' \
+    Chummer.Run.Contracts/Chummer.Run.Contracts.csproj \
+    && {
+      grep -Fq '$(ChummerMediaFactoryRoot)/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj' \
+        Chummer.Run.Contracts/Chummer.Run.Contracts.csproj \
+      || grep -Fq '$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj' \
+        Chummer.Run.Contracts/Chummer.Run.Contracts.csproj
+    }
+}
+
+run_ai_uses_media_contracts_owner() {
+  if grep -Fq '<HintPath>..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll</HintPath>' \
+    Chummer.Run.AI/Chummer.Run.AI.csproj; then
+    return 0
+  fi
+  grep -Fq '<HintPath>$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\bin\$(Configuration)\net10.0\Chummer.Media.Contracts.dll</HintPath>' \
+    Chummer.Run.AI/Chummer.Run.AI.csproj \
+    && grep -Fq '<ProjectReference Include="$(ChummerMediaFactoryRoot)\src\Chummer.Media.Contracts\Chummer.Media.Contracts.csproj"' \
+      Chummer.Run.AI/Chummer.Run.AI.csproj
+}
+
+run_ai_uses_media_runtime_owner() {
+  if grep -Fq '<HintPath>..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Factory.Runtime\bin\$(Configuration)\net10.0\Chummer.Media.Factory.Runtime.dll</HintPath>' \
+    Chummer.Run.AI/Chummer.Run.AI.csproj; then
+    return 0
+  fi
+  grep -Fq '<HintPath>$(ChummerMediaFactoryRoot)\src\Chummer.Media.Factory.Runtime\bin\$(Configuration)\net10.0\Chummer.Media.Factory.Runtime.dll</HintPath>' \
+    Chummer.Run.AI/Chummer.Run.AI.csproj \
+    && grep -Fq '<ProjectReference Include="$(ChummerMediaFactoryRoot)\src\Chummer.Media.Factory.Runtime\Chummer.Media.Factory.Runtime.csproj"' \
+      Chummer.Run.AI/Chummer.Run.AI.csproj
+}
+
+if ! run_contracts_uses_media_contracts_owner || ! run_ai_uses_media_contracts_owner; then
   echo "Chummer.Media.Contracts consumers must point at the owner-repo canonical contract assembly." >&2
   exit 1
 fi
 
-if ! grep -En '<HintPath>\.\.\\\.\.\\\.\.\\fleet\\repos\\chummer-media-factory\\src\\Chummer\.Media\.Factory\.Runtime\\bin\\\$\(Configuration\)\\net10\.0\\Chummer\.Media\.Factory\.Runtime\.dll</HintPath>' \
-  Chummer.Run.AI/Chummer.Run.AI.csproj >/dev/null; then
+if ! run_ai_uses_media_runtime_owner; then
   echo "Chummer.Run.AI must consume media execution through the owner-repo runtime assembly." >&2
   exit 1
 fi
