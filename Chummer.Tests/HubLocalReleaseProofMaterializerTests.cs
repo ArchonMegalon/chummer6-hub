@@ -70,7 +70,6 @@ public sealed class HubLocalReleaseProofMaterializerTests
                 "/home/work",
                 "/account/access",
                 "/account/work",
-                "/account/roster",
                 "/account/support",
                 "/contact",
                 "/downloads",
@@ -167,12 +166,36 @@ public sealed class HubLocalReleaseProofMaterializerTests
             journeys);
     }
 
-    private static void RunMaterializer(string scriptPath, string proofPath, IReadOnlyDictionary<string, string>? environment = null)
+    [Fact]
+    public void MaterializedProofSatisfiesRegistryReleaseProofContract()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "hub-local-proof", Guid.NewGuid().ToString("N"));
+        string proofPath = Path.Combine(tempRoot, "HUB_LOCAL_RELEASE_PROOF.generated.json");
+        string materializerPath = RepoPaths.FromRoot("scripts", "materialize_hub_local_release_proof.py");
+        string registryValidatorPath = Path.GetFullPath(
+            Path.Combine(
+                RepoPaths.Root,
+                "..",
+                "chummer-hub-registry",
+                "scripts",
+                "materialize_public_release_channel.py"));
+
+        Directory.CreateDirectory(tempRoot);
+
+        RunMaterializer(materializerPath, proofPath, baseUrl: "https://chummer.run");
+        RunRegistryReleaseProofValidator(registryValidatorPath, proofPath);
+    }
+
+    private static void RunMaterializer(
+        string scriptPath,
+        string proofPath,
+        IReadOnlyDictionary<string, string>? environment = null,
+        string baseUrl = "http://127.0.0.1:8091")
     {
         var startInfo = new ProcessStartInfo
         {
             FileName = "python3",
-            Arguments = $"{scriptPath} {proofPath} http://127.0.0.1:8091 docker-compose.public-edge.yml 300 true",
+            Arguments = $"{scriptPath} {proofPath} {baseUrl} docker-compose.public-edge.yml 300 true",
             RedirectStandardError = true,
             RedirectStandardOutput = true,
             UseShellExecute = false,
@@ -194,5 +217,33 @@ public sealed class HubLocalReleaseProofMaterializerTests
         Assert.True(
             process.ExitCode == 0,
             $"hub local proof materializer should succeed but exited with {process.ExitCode}\nstdout:\n{stdout}\nstderr:\n{stderr}");
+    }
+
+    private static void RunRegistryReleaseProofValidator(string scriptPath, string proofPath)
+    {
+        Assert.True(File.Exists(scriptPath), $"Registry release-proof validator was not found: {scriptPath}");
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "python3",
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+        };
+        startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add(
+            "from pathlib import Path; import runpy, sys; "
+            + "runpy.run_path(sys.argv[1])['load_release_proof'](Path(sys.argv[2]))");
+        startInfo.ArgumentList.Add(scriptPath);
+        startInfo.ArgumentList.Add(proofPath);
+
+        using Process process = Process.Start(startInfo)!;
+        string stdout = process.StandardOutput.ReadToEnd();
+        string stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        Assert.True(
+            process.ExitCode == 0,
+            $"Registry release-proof validator should accept the generated Hub proof but exited with {process.ExitCode}\nstdout:\n{stdout}\nstderr:\n{stderr}");
     }
 }
