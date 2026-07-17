@@ -28,6 +28,18 @@ DEFAULT_RETRY_DELAY_SECONDS = 2.0
 DEFAULT_LIVE_CONFIRMATION_COUNT = 3
 DEFAULT_LIVE_CONFIRMATION_DELAY_SECONDS = 2.0
 DEFAULT_LIVE_MAX_SAMPLES = 6
+ACCOUNT_REQUIRED = "account_required"
+OPEN_PUBLIC = "open_public"
+INSTALLER_EXTENSIONS = (
+    ".appimage",
+    ".deb",
+    ".dmg",
+    ".exe",
+    ".msi",
+    ".msix",
+    ".pkg",
+    ".rpm",
+)
 
 
 def now_iso() -> str:
@@ -257,6 +269,20 @@ def compare_views(
             failures.append(
                 f"{left_name} and {right_name} differ for {key}: {left_value.get(key)!r} != {right_value.get(key)!r}"
             )
+
+
+def views_equal(
+    left_value: dict[str, Any],
+    right_value: dict[str, Any],
+    *,
+    ignore_keys: set[str] | None = None,
+) -> bool:
+    ignored = ignore_keys or set()
+    return all(
+        left_value.get(key) == right_value.get(key)
+        for key in set(left_value) | set(right_value)
+        if key not in ignored
+    )
 
 
 def compare_artifact_indexes(
@@ -654,6 +680,7 @@ def analyze_live_snapshot(
     *,
     base_url: str,
     local_manifest_summary: dict[str, Any],
+    local_projected_summary: dict[str, Any],
     local_canonical_summary: dict[str, Any],
     snapshot: dict[str, Any],
 ) -> dict[str, Any]:
@@ -665,11 +692,14 @@ def analyze_live_snapshot(
 
     live_manifest_summary = manifest_summary(live_releases_payload, base_url=base_url)
     live_canonical_summary = manifest_summary(live_canonical_payload, base_url=base_url)
+    live_projected_summary = projected_public_manifest_summary(live_canonical_payload, base_url=base_url)
     failures: list[str] = []
 
     compare_views(
         "live releases.json",
         live_manifest_summary["topLevel"],
+        "live projected public manifest",
+        live_projected_summary["topLevel"],
         failures=failures,
         ignore_keys={"rolloutState", "supportabilityState"},
     )
@@ -692,8 +722,8 @@ def analyze_live_snapshot(
     compare_artifact_indexes(
         "live releases.json",
         live_manifest_summary["artifacts"],
-        "live RELEASE_CHANNEL.generated.json",
-        live_canonical_summary["artifacts"],
+        "live projected public manifest",
+        live_projected_summary["artifacts"],
         failures=failures,
     )
     compare_artifact_indexes(
@@ -736,6 +766,7 @@ def analyze_live_snapshot(
         "releasesResponse": live_releases_response,
         "canonicalResponse": live_canonical_response,
         "manifest": live_manifest_summary,
+        "projectedPublicManifest": live_projected_summary,
         "canonicalManifest": live_canonical_summary,
         "pageArtifactIds": page_artifact_ids,
         "publicArtifactIds": live_public_artifact_ids,
@@ -762,20 +793,22 @@ def evaluate(
 
     local_manifest_summary = manifest_summary(local_manifest_payload, base_url=base)
     local_canonical_summary = manifest_summary(local_canonical_payload, base_url=base)
+    local_projected_summary = projected_public_manifest_summary(local_canonical_payload, base_url=base)
 
     failures: list[str] = []
     compare_views(
         "local releases.json",
         local_manifest_summary["topLevel"],
-        "local RELEASE_CHANNEL.generated.json",
-        local_canonical_summary["topLevel"],
+        "local projected public manifest",
+        local_projected_summary["topLevel"],
         failures=failures,
+        ignore_keys={"rolloutState", "supportabilityState"},
     )
     compare_artifact_indexes(
         "local releases.json",
         local_manifest_summary["artifacts"],
-        "local RELEASE_CHANNEL.generated.json",
-        local_canonical_summary["artifacts"],
+        "local projected public manifest",
+        local_projected_summary["artifacts"],
         failures=failures,
     )
 
@@ -797,6 +830,7 @@ def evaluate(
         live_analysis = analyze_live_snapshot(
             base_url=base,
             local_manifest_summary=local_manifest_summary,
+            local_projected_summary=local_projected_summary,
             local_canonical_summary=local_canonical_summary,
             snapshot=snapshot,
         )
@@ -839,6 +873,7 @@ def evaluate(
     live_releases_response = live_analysis["releasesResponse"]
     live_canonical_response = live_analysis["canonicalResponse"]
     live_manifest_summary = live_analysis["manifest"]
+    live_projected_summary = live_analysis["projectedPublicManifest"]
     live_canonical_summary = live_analysis["canonicalManifest"]
     page_artifact_ids = live_analysis["pageArtifactIds"]
     live_public_artifact_ids = live_analysis["publicArtifactIds"]
@@ -896,13 +931,28 @@ def evaluate(
         },
         "alignment": {
             "localManifestsAligned": (
-                local_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
+                views_equal(
+                    local_manifest_summary["topLevel"],
+                    local_projected_summary["topLevel"],
+                    ignore_keys={"rolloutState", "supportabilityState"},
+                )
+                and local_manifest_summary["artifacts"] == local_projected_summary["artifacts"]
             ),
             "liveManifestsAligned": (
-                live_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
+                views_equal(
+                    live_manifest_summary["topLevel"],
+                    live_projected_summary["topLevel"],
+                    ignore_keys={"rolloutState", "supportabilityState"},
+                )
+                and live_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
             ),
             "localMatchesLive": (
-                local_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
+                views_equal(
+                    local_projected_summary["topLevel"],
+                    live_manifest_summary["topLevel"],
+                    ignore_keys={"rolloutState", "supportabilityState"},
+                )
+                and local_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
                 and local_canonical_summary == live_canonical_summary
             ),
             "pageArtifactIdsAligned": not unknown_page_artifact_ids and not missing_page_artifact_ids,

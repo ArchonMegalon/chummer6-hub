@@ -110,6 +110,48 @@ def make_canonical_manifest() -> dict:
     }
 
 
+def make_hidden_macos_releases_manifest() -> dict:
+    return {
+        "version": "run-20260704-201323",
+        "channel": "preview",
+        "rolloutState": "release_review_required",
+        "supportabilityState": "review_required",
+        "publishedAt": "2026-07-04T20:15:34Z",
+        "status": "published",
+        "downloads": [],
+    }
+
+
+def make_hidden_macos_canonical_manifest() -> dict:
+    return {
+        "version": "run-20260704-201323",
+        "channel": "preview",
+        "channelId": "preview",
+        "rolloutState": "release_review_required",
+        "supportabilityState": "review_required",
+        "publishedAt": "2026-07-04T20:15:34Z",
+        "status": "published",
+        "artifacts": [
+            {
+                "id": "avalonia-osx-arm64-installer",
+                "artifactId": "avalonia-osx-arm64-installer",
+                "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
+                "downloadUrl": "https://chummer.run/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                "sha256": "d" * 64,
+                "sizeBytes": 4321,
+                "head": "avalonia",
+                "platform": "macos",
+                "arch": "arm64",
+                "rid": "osx-arm64",
+                "channel": "preview",
+                "channelId": "preview",
+                "installAccessClass": "account_required",
+                "kind": "installer",
+            }
+        ],
+    }
+
+
 def clone_payload(payload: dict) -> dict:
     return json.loads(json.dumps(payload))
 
@@ -573,6 +615,10 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         self.assertEqual(receipt["status"], "pass")
         self.assertEqual(receipt["live"]["manifest"]["artifactCount"], 0)
         self.assertEqual(receipt["local"]["projectedPublicManifest"]["artifactCount"], 0)
+        self.assertEqual(receipt["live"]["projectedPublicManifest"]["artifactCount"], 0)
+        self.assertEqual(receipt["local"]["canonicalManifest"]["artifactCount"], 1)
+        self.assertTrue(receipt["alignment"]["localManifestsAligned"])
+        self.assertTrue(receipt["alignment"]["liveManifestsAligned"])
 
     def test_publish_and_verify_lanes_call_public_download_shelf_truth_gate(self) -> None:
         publish_script = (ROOT / "scripts" / "publish-download-bundle-http.sh").read_text(encoding="utf-8")
