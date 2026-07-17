@@ -21,6 +21,22 @@ def load_module():
     return module
 
 
+def test_restore_uses_exclusive_shared_public_edge_mutation_lock(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock_path = tmp_path / ".state" / "public-edge-mutation.lock"
+    monkeypatch.setattr(module, "PUBLIC_EDGE_MUTATION_LOCK", lock_path)
+
+    acquired = module.acquire_public_edge_mutation_lock(dry_run=False)
+    assert acquired == lock_path
+    with pytest.raises(RuntimeError, match="another public-edge mutation"):
+        module.acquire_public_edge_mutation_lock(dry_run=False)
+    module.release_public_edge_mutation_lock(acquired)
+    assert not lock_path.exists()
+
+
 def test_restore_retages_and_recreates_when_container_or_tag_drift(monkeypatch, tmp_path) -> None:
     module = load_module()
     expected = "sha256:" + "1" * 64

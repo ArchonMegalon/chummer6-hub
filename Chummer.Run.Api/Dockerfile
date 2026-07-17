@@ -29,6 +29,7 @@ ARG CHUMMER_BUILD_CONCURRENCY=1
 WORKDIR /src
 COPY --from=run-services-source Directory.Build.props chummer.run-services/
 COPY --from=run-services-source Chummer.Run.Api/Chummer.Run.Api.csproj chummer.run-services/Chummer.Run.Api/
+COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj chummer.run-services/Chummer.InstallLinking.Postgres.Tool/
 COPY --from=run-services-source Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj chummer.run-services/Chummer.Campaign.Contracts/
 COPY --from=run-services-source Chummer.Control.Contracts/Chummer.Control.Contracts.csproj chummer.run-services/Chummer.Control.Contracts/
 COPY --from=run-services-source Chummer.Run.Contracts/Chummer.Run.Contracts.csproj chummer.run-services/Chummer.Run.Contracts/
@@ -38,8 +39,9 @@ COPY chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj chummer-core
 COPY chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj chummer-hub-registry/Chummer.Hub.Registry.Contracts/
 COPY chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj chummer-hub-registry/Chummer.Run.Registry/
 COPY --from=fleet-media-factory-contracts Chummer.Media.Contracts.csproj fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
-RUN dotnet restore chummer.run-services/Chummer.Run.Api/Chummer.Run.Api.csproj
+RUN dotnet restore chummer.run-services/Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj
 COPY --from=run-services-source Chummer.Run.Api/ chummer.run-services/Chummer.Run.Api/
+COPY --from=run-services-source Chummer.InstallLinking.Postgres.Tool/ chummer.run-services/Chummer.InstallLinking.Postgres.Tool/
 COPY --from=run-services-source Chummer.Campaign.Contracts/ chummer.run-services/Chummer.Campaign.Contracts/
 COPY --from=run-services-source Chummer.Control.Contracts/ chummer.run-services/Chummer.Control.Contracts/
 COPY --from=run-services-source Chummer.Run.Contracts/ chummer.run-services/Chummer.Run.Contracts/
@@ -60,9 +62,26 @@ RUN nice -n 10 dotnet build /src/chummer.run-services/Chummer.Play.Contracts/Chu
  && nice -n 10 dotnet build /src/chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false \
  && nice -n 10 dotnet build /src/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj -c Release --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false
 RUN nice -n 10 dotnet publish -c Release -o /app/publish --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false -p:UseSharedCompilation=false
+RUN nice -n 10 dotnet publish /src/chummer.run-services/Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj -c Release -o /app/install-linking-postgres-tool --no-restore --nologo -m:${CHUMMER_BUILD_CONCURRENCY} -p:BuildInParallel=false -p:UseSharedCompilation=false
 RUN test -f /app/publish/wwwroot/service-worker.js \
- && grep -q 'const CACHE_NAME = "chummer-public-v4";' /app/publish/wwwroot/service-worker.js \
- && ! grep -q 'play-shell-v' /app/publish/wwwroot/service-worker.js
+ && grep -Fq 'const CACHE_VERSION = "v19";' /app/publish/wwwroot/service-worker.js \
+ && grep -Fq 'const CACHE_CONTRACT = "run-api-projection-v2";' /app/publish/wwwroot/service-worker.js \
+ && grep -Fq 'const CRITICAL_SHELL_ASSETS = [' /app/publish/wwwroot/service-worker.js \
+ && grep -Fq '"/manifest.play.webmanifest"' /app/publish/wwwroot/service-worker.js \
+ && grep -Fq 'play_public_route_network_unavailable' /app/publish/wwwroot/service-worker.js \
+ && grep -Fq 'url.pathname.startsWith("/api/play/")' /app/publish/wwwroot/service-worker.js \
+ && ! grep -Fq 'self.skipWaiting()' /app/publish/wwwroot/service-worker.js \
+ && ! grep -Fq 'self.clients.claim()' /app/publish/wwwroot/service-worker.js \
+ && ! grep -Fq '"/mobile-turn-companion.js"' /app/publish/wwwroot/service-worker.js
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS install-linking-postgres-tool-final
+ARG CHUMMER_RUNTIME_UID=1654
+ARG CHUMMER_RUNTIME_GID=1654
+WORKDIR /app
+COPY --from=build /app/install-linking-postgres-tool .
+RUN set -eu; link="$(find -P /app -xdev -type l -print -quit)"; test -z "$link"; find -P /app -xdev -type d -exec chmod 0755 {} +; find -P /app -xdev -type f -exec chmod 0644 {} +
+USER ${CHUMMER_RUNTIME_UID}:${CHUMMER_RUNTIME_GID}
+ENTRYPOINT ["/bin/sh", "-c", "umask 077 && exec dotnet Chummer.InstallLinking.Postgres.Tool.dll \"$@\"", "install-linking-postgres-tool"]
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 ARG CHUMMER_RUNTIME_UID=1654

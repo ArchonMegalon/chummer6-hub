@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
+import os
 import re
 import subprocess
 import sys
@@ -19,6 +21,7 @@ DEFAULT_PORTAL_SERVICE = "chummer-portal"
 DEFAULT_PORTAL_CONTAINER = "chummer6-hub-chummer-portal-1"
 DEFAULT_PORTAL_IMAGE_TAG = "chummer-run-api:local"
 DEFAULT_BASE_URL = "https://chummer.run"
+PUBLIC_EDGE_MUTATION_LOCK = Path("/docker/chummercomplete/.state/public-edge-mutation.lock")
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,30 @@ class CommandResult:
     stdout: str
     stderr: str
     skipped: bool = False
+
+
+def acquire_public_edge_mutation_lock(*, dry_run: bool) -> Path | None:
+    if dry_run:
+        return None
+    lock_root = PUBLIC_EDGE_MUTATION_LOCK.parent
+    lock_root.mkdir(parents=True, mode=0o700, exist_ok=True)
+    if lock_root.is_symlink() or not lock_root.is_dir():
+        raise RuntimeError("public-edge mutation lock root is not a real directory")
+    if lock_root.stat().st_uid != os.getuid():
+        raise RuntimeError("public-edge mutation lock root is not owned by the caller")
+    os.chmod(lock_root, 0o700)
+    try:
+        PUBLIC_EDGE_MUTATION_LOCK.mkdir(mode=0o700)
+    except FileExistsError as error:
+        raise RuntimeError(
+            "another public-edge mutation owns the shared deployment authority"
+        ) from error
+    return PUBLIC_EDGE_MUTATION_LOCK
+
+
+def release_public_edge_mutation_lock(lock_path: Path | None) -> None:
+    if lock_path is not None:
+        lock_path.rmdir()
 
 
 def normalize_image_id(value: str) -> str:
@@ -719,7 +746,11 @@ def main(argv: list[str] | None = None) -> int:
     if not compose_file.is_file():
         parser.error(f"compose file not found: {compose_file}")
 
+    mutation_lock: Path | None = None
     try:
+        mutation_lock = acquire_public_edge_mutation_lock(dry_run=args.dry_run)
+        if mutation_lock is not None:
+            atexit.register(release_public_edge_mutation_lock, mutation_lock)
         env_file = resolve_env_file(args.env_file, repo_root)
         expected = require_sha256_image_id(args.expected_portal_image_id)
         browser_proofs: list[str] = []
@@ -783,8 +814,24 @@ def main(argv: list[str] | None = None) -> int:
                 args.dry_run,
             )
     except Exception as error:
+        if mutation_lock is not None:
+            try:
+                release_public_edge_mutation_lock(mutation_lock)
+            except OSError as release_error:
+                error = RuntimeError(f"{error}; failed to release public-edge mutation lock: {release_error}")
+            finally:
+                atexit.unregister(release_public_edge_mutation_lock)
         print(str(error), file=sys.stderr)
         return 1
+
+    if mutation_lock is not None:
+        try:
+            release_public_edge_mutation_lock(mutation_lock)
+        except OSError as error:
+            print(f"failed to release public-edge mutation lock: {error}", file=sys.stderr)
+            return 1
+        finally:
+            atexit.unregister(release_public_edge_mutation_lock)
 
     receipt = {
         "contractName": "chummer.public_edge_portal_image_restore.v1",

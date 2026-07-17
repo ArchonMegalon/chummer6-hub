@@ -622,8 +622,8 @@ services:
     profiles: ["install-linking-postgres-admin"]
     restart: "no"
     build:
-      context: /docker/chummercomplete
-      dockerfile: chummer.run-services/Chummer.Run.Api/Dockerfile
+      context: ${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}
+      dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
       target: install-linking-postgres-tool-final
       additional_contexts:
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
@@ -642,7 +642,7 @@ services:
     ulimits:
       core: 0
     tmpfs:
-      - /tmp:rw,noexec,nosuid,nodev,mode=1700
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
     environment:
       CHUMMER_INSTALL_LINKING_MIGRATOR_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-migrator.connection-string
       CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE: "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE:?Set the pre-existing InstallLinking PostgreSQL runtime role}"
@@ -659,8 +659,8 @@ services:
     profiles: ["install-linking-postgres-admin"]
     restart: "no"
     build:
-      context: /docker/chummercomplete
-      dockerfile: chummer.run-services/Chummer.Run.Api/Dockerfile
+      context: ${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}
+      dockerfile: ${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile
       target: install-linking-postgres-tool-final
       additional_contexts:
         run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
@@ -679,7 +679,7 @@ services:
     ulimits:
       core: 0
     tmpfs:
-      - /tmp:rw,noexec,nosuid,nodev,mode=1700
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys

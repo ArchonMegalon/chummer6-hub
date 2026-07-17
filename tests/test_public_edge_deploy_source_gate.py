@@ -449,11 +449,15 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "docker image inspect \"$IMAGE_TAG\" --format '{{.Id}}'" in script
     assert 'stop chummer-portal' in script
     assert "run --rm --no-deps chummer-portal-volume-init" in script
-    assert "up -d --no-build --no-deps --force-recreate chummer-portal" in script
+    assert "up -d --no-build --no-deps --force-recreate" in script
+    assert '--wait --wait-timeout "$PORTAL_READY_TIMEOUT_SECONDS" chummer-portal' in script
+    assert "public-edge-mutation.lock" in script
+    assert "public edge deploy refuses a Compose file outside the audited source root" in script
+    assert "--self-contained-direct" in script
     stop_index = script.index("stop chummer-portal")
     init_index = script.index("run --rm --no-deps chummer-portal-volume-init")
     recreate_index = script.index(
-        "up -d --no-build --no-deps --force-recreate chummer-portal",
+        "up -d --no-build --no-deps --force-recreate",
         init_index,
     )
     assert stop_index < init_index < recreate_index

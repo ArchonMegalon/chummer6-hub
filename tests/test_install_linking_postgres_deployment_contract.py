@@ -55,6 +55,27 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
                 self.assertIn("no-new-privileges:true", service["security_opt"])
                 self.assertEqual(0, service["ulimits"]["core"])
 
+    def test_operator_jobs_use_selected_source_and_nonroot_writable_sticky_tmp(self) -> None:
+        for service_name in (
+            "chummer-install-linking-postgres-admin",
+            "chummer-install-linking-postgres-import",
+        ):
+            with self.subTest(service=service_name):
+                service = self.services[service_name]
+                build = service["build"]
+                self.assertEqual(
+                    "${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}",
+                    build["context"],
+                )
+                self.assertEqual(
+                    "${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/Chummer.Run.Api/Dockerfile",
+                    build["dockerfile"],
+                )
+                self.assertEqual(
+                    ["/tmp:rw,noexec,nosuid,nodev,mode=1777"],
+                    service["tmpfs"],
+                )
+
     def test_docker_context_includes_every_named_context_input(self) -> None:
         dockerignore = DOCKERIGNORE_PATH.read_text(encoding="utf-8")
         for marker in (
@@ -155,12 +176,18 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
 
     def test_runbook_has_bounded_exact_cutover_and_fail_closed_recovery(self) -> None:
         runbook = RUNBOOK_PATH.read_text(encoding="utf-8")
+        self.assertIn("## Install-linking PostgreSQL authority cutover and recovery", runbook)
+        self.assertNotIn("+## Install-linking PostgreSQL authority cutover", runbook)
         section = runbook[runbook.index("## Install-linking PostgreSQL authority cutover") :]
         ordered_markers = (
-            '--output "$overlay_preflight_receipt"',
+            '--output "$overlay_publish_receipt"',
+            "build chummer-portal chummer-install-linking-postgres-admin",
+            '--output "$prebuild_overlay_preflight_receipt"',
             "cutover_drained=1",
             "stop chummer-run-cloudflared",
             "stop chummer-portal",
+            "publish_public_edge_portal_overlay.py --activate --reuse-staging",
+            '--output "$overlay_preflight_receipt"',
             "chummer-install-linking-postgres-admin prepare",
             "import-local --confirm-empty-authority",
             "chummer-install-linking-postgres-admin validate",
@@ -185,12 +212,16 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         self.assertGreaterEqual(section.count("timeout --kill-after=10s 180s"), 4)
         self.assertIn("timeout --kill-after=30s 3600s", section)
         self.assertIn("timeout --kill-after=30s 3000s", section)
+        self.assertIn("timeout --kill-after=30s 1800s", section)
+        self.assertIn("verify_public_edge_postdeploy_gate.py --self-contained-direct", section)
+        self.assertIn("restore_prior_portal_image_tag", section)
+        self.assertIn("portal_image_tag_committed=1", section)
         self.assertNotIn("CHUMMER_INSTALL_LINKING_POSTGRES_OPERATOR_TIMEOUT_SECONDS", section)
         self.assertIn("set -eu", section)
         self.assertIn("umask 077", section)
-        self.assertIn("install-linking-postgres-cutover.lock", section)
+        self.assertIn("public-edge-mutation.lock", section)
         self.assertIn(
-            "cutover_lock_dir=/docker/chummercomplete/chummer.run-services/.state/",
+            "cutover_lock_dir=/docker/chummercomplete/.state/public-edge-mutation.lock",
             section,
         )
         self.assertNotIn("cutover_state_dir=", section)
@@ -210,7 +241,7 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             2,
         )
         self.assertIn("validate_install_linking_cutover_overlay_binding.py", section)
-        self.assertIn("publish_public_edge_portal_overlay.py --activate", section)
+        self.assertIn("publish_public_edge_portal_overlay.py --activate --reuse-staging", section)
         self.assertIn("--release-channel-receipt-sha256", section)
         self.assertIn('--source-root "$source_root" --active-root "$active_root"', section)
         self.assertGreaterEqual(section.count("--wait-timeout 180"), 2)
@@ -241,6 +272,9 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             'export CHUMMER_RUN_SERVICES_SOURCE="$source_root"',
             shell,
         )
+        self.assertIn('export CHUMMER_RUN_SERVICES_CONTEXT_DIR="$source_root"', shell)
+        self.assertIn('export CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT="$build_context"', shell)
+        self.assertIn('cd -- "$source_root"', shell)
         self.assertIn(
             'export CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR="$active_root"',
             shell,
@@ -252,6 +286,9 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             shell,
         )
         self.assertIn('contexts.get("run-services-source")', shell)
+        self.assertIn('build.get("context")', shell)
+        self.assertIn('build.get("dockerfile")', shell)
+        self.assertIn('build.get("target")', shell)
         self.assertIn('volume.get("target") == "/app"', shell)
         self.assertIn('app_bind.get("source") != expected_overlay', shell)
         self.assertIn('app_bind.get("read_only") is not True', shell)
@@ -268,12 +305,15 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             "config --format json",
             overlay_export_position,
         )
+        shared_lock_position = shell.index(
+            "cutover_lock_dir=/docker/chummercomplete/.state/public-edge-mutation.lock"
+        )
         compose_attestation_position = shell.index(
             '"contractName": "chummer.install_linking.compose_root_binding.v1"',
             compose_config_position,
         )
         overlay_publish_position = shell.index(
-            "publish_public_edge_portal_overlay.py --activate",
+            "publish_public_edge_portal_overlay.py \\",
             compose_attestation_position,
         )
         first_mutating_docker_position = shell.index(
@@ -282,18 +322,41 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         )
         self.assertLess(source_export_position, compose_config_position)
         self.assertLess(overlay_export_position, compose_config_position)
+        self.assertLess(shared_lock_position, compose_config_position)
         self.assertLess(compose_config_position, compose_attestation_position)
         self.assertLess(compose_attestation_position, overlay_publish_position)
         self.assertLess(compose_attestation_position, first_mutating_docker_position)
 
-        prebuild_position = shell.index('--output "$prebuild_overlay_preflight_receipt"')
+        staged_position = shell.index('--output "$overlay_publish_receipt"')
         build_position = shell.index(
             "build chummer-portal chummer-install-linking-postgres-admin",
-            prebuild_position,
+            staged_position,
         )
-        postbuild_position = shell.index('--output "$overlay_preflight_receipt"', build_position)
-        self.assertLess(prebuild_position, build_position)
+        postbuild_position = shell.index('--output "$prebuild_overlay_preflight_receipt"', build_position)
+        stop_position = shell.index("stop chummer-portal", postbuild_position)
+        activation_position = shell.index(
+            "publish_public_edge_portal_overlay.py --activate --reuse-staging",
+            stop_position,
+        )
+        active_preflight_position = shell.index(
+            '--output "$overlay_preflight_receipt"', activation_position
+        )
+        self.assertLess(staged_position, build_position)
         self.assertLess(build_position, postbuild_position)
+        self.assertLess(postbuild_position, stop_position)
+        self.assertLess(stop_position, activation_position)
+        self.assertLess(activation_position, active_preflight_position)
+        self.assertIn('--header "@$cf_access_header_file"', shell)
+        public_readiness_position = shell.index(
+            'https://chummer.run/api/ready >"$public_readiness_receipt"'
+        )
+        postdeploy_gate_position = shell.index(
+            "verify_public_edge_postdeploy_gate.py --self-contained-direct",
+            public_readiness_position,
+        )
+        commit_position = shell.index("cutover_drained=0", postdeploy_gate_position)
+        self.assertLess(public_readiness_position, postdeploy_gate_position)
+        self.assertLess(postdeploy_gate_position, commit_position)
         for match in re.finditer(r"\bdocker (?:compose|ps|rm)\b", shell):
             command_prefix = shell[max(0, match.start() - 120) : match.start()]
             self.assertIn("timeout --kill-after=", command_prefix)

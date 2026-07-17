@@ -430,6 +430,7 @@ PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS = {
         "COPY --from=run-services-source scripts/verify_public_pwa_static_assets.py scripts/verify_public_pwa_static_assets.py",
         "COPY --from=run-services-source scripts/validate_public_pwa_proof_authority.py scripts/validate_public_pwa_proof_authority.py",
         "COPY --from=run-services-source .codex-design/",
+        "COPY --from=run-services-source --chmod=0555 scripts/initialize-public-edge-volumes.sh /usr/local/libexec/chummer/initialize-public-edge-volumes.sh",
         "RUN rm -rf /src/chummer.run-services/Chummer.Run.Api/bin /src/chummer.run-services/Chummer.Run.Api/obj",
         'grep -Fq \'const CACHE_VERSION = "v19";\'',
         'grep -Fq \'const CACHE_CONTRACT = "run-api-projection-v2";\'',
@@ -486,12 +487,19 @@ PUBLIC_EDGE_REQUIRED_OVERLAY_MARKERS = {
         '"landingMarkerStatus": "pass"',
         '"landingHasTurnAnchor": true',
         '"landingHasTurnAnchorRedirect": true',
+        '"landingHasBuildPublicInstallHandoff": true',
+        '"landingHasPlayPublicInstallHandoff": true',
+        '"landingRetiredMarkersAbsent": true',
         '"landingBrowserRedirectStatus": "pass"',
         '"landingBrowserRedirectExpectedPath": "/mobile/player"',
         '"landingBrowserRedirectExpectedHash": "#turn-runsite-card"',
+        '"landingBrowserRedirectExpectedQuery": ""',
+        '"landingBrowserRedirectFinalQuery": ""',
+        '"landingBrowserRedirectQueryDropped": true',
         '"landingBrowserRedirectPathMatches": true',
         '"landingBrowserRedirectHashMatches": true',
         '"landingMissingMarkerCount": 0',
+        '"landingForbiddenMarkerCount": 0',
     ),
     "wwwroot/manifest.json": PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS["Chummer.Run.Api/wwwroot/manifest.json"],
     "wwwroot/site.webmanifest": PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS["Chummer.Run.Api/wwwroot/site.webmanifest"],
@@ -559,7 +567,17 @@ PUBLIC_EDGE_DOCKER_NAMED_CONTEXTS_BY_STAGE = {
         {"run-services-source", "fleet-media-factory-contracts"}
     ),
     PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE: frozenset(),
-    PUBLIC_EDGE_DOCKER_FINAL_STAGE: frozenset({"design-product"}),
+    PUBLIC_EDGE_DOCKER_FINAL_STAGE: frozenset(
+        {"design-product", "run-services-source"}
+    ),
+}
+PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE = {
+    PUBLIC_EDGE_DOCKER_FINAL_STAGE: frozenset(
+        {
+            "COPY --from=run-services-source --chmod=0555 scripts/initialize-public-edge-volumes.sh /usr/local/libexec/chummer/initialize-public-edge-volumes.sh",
+            "COPY --from=design-product products/chummer/ /app/.codex-design/product/",
+        }
+    ),
 }
 PUBLIC_EDGE_DOCKER_COPY_STAGE_REFERENCES_BY_STAGE = {
     PUBLIC_EDGE_DOCKER_PROOF_STAGE: frozenset(),
@@ -644,8 +662,13 @@ PUBLIC_EDGE_DOCKER_FINAL_PAYLOAD_MODE_RUN = (
 )
 PUBLIC_EDGE_COMPOSE_RELATIVE_PATH = "docker-compose.public-edge.yml"
 PUBLIC_EDGE_COMPOSE_PORTAL_SERVICE = "chummer-portal"
-PUBLIC_EDGE_COMPOSE_BUILD_CONTEXT = "/docker/chummercomplete"
-PUBLIC_EDGE_COMPOSE_DOCKERFILE = "chummer.run-services/Chummer.Run.Api/Dockerfile"
+PUBLIC_EDGE_COMPOSE_BUILD_CONTEXT = (
+    "${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}"
+)
+PUBLIC_EDGE_COMPOSE_DOCKERFILE = (
+    "${CHUMMER_RUN_SERVICES_CONTEXT_DIR:-chummer.run-services}/"
+    "Chummer.Run.Api/Dockerfile"
+)
 PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS = {
     "run-services-source": (
         "${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}"
@@ -654,6 +677,20 @@ PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS = {
         "/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts"
     ),
     "design-product": "/docker/chummercomplete/chummer-design",
+}
+PUBLIC_EDGE_COMPOSE_BUILD_SERVICE_CONTRACTS = {
+    PUBLIC_EDGE_COMPOSE_PORTAL_SERVICE: {
+        "target": "",
+        "namedContexts": PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS,
+    },
+    "chummer-install-linking-postgres-admin": {
+        "target": PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE,
+        "namedContexts": PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS,
+    },
+    "chummer-install-linking-postgres-import": {
+        "target": PUBLIC_EDGE_DOCKER_TOOL_FINAL_STAGE,
+        "namedContexts": PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS,
+    },
 }
 PUBLIC_EDGE_DOCKER_RESERVED_CONTEXT_NAMES = frozenset(
     {
@@ -1085,6 +1122,8 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
     copy_from_references: list[dict[str, Any]] = []
     malformed_copy_from_lines: list[int] = []
     unknown_copy_from_references: list[tuple[int, str]] = []
+    invalid_named_context_copies: list[tuple[int, str, str]] = []
+    named_context_copy_lines_by_stage: dict[str, list[str]] = {}
     invalid_copy_from_stages: list[tuple[int, str, str]] = []
     forward_copy_from_references: list[tuple[int, str, str]] = []
     derived_proof_stages: list[int] = []
@@ -1168,6 +1207,19 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
             )
             if reference in allowed_named_contexts:
                 reference_kind = "named-context"
+                named_context_copy_lines_by_stage.setdefault(current_alias, []).append(line)
+                exact_named_context_copies = (
+                    PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE.get(
+                        current_alias
+                    )
+                )
+                if (
+                    exact_named_context_copies is not None
+                    and line not in exact_named_context_copies
+                ):
+                    invalid_named_context_copies.append(
+                        (line_number, current_alias, reference)
+                    )
             else:
                 unknown_copy_from_references.append((line_number, reference))
         copy_from_references.append(
@@ -1239,10 +1291,18 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         )
     if malformed_copy_from_lines:
         failures.append("every Docker COPY --from reference must use one exact literal value")
-    if unknown_copy_from_references:
+    if unknown_copy_from_references or invalid_named_context_copies:
         failures.append(
             "Dockerfile COPY --from references must name an allowed earlier stage or named context"
         )
+    exact_required_named_context_copies = True
+    for stage, expected_copies in PUBLIC_EDGE_DOCKER_EXACT_NAMED_CONTEXT_COPIES_BY_STAGE.items():
+        actual_copies = named_context_copy_lines_by_stage.get(stage, [])
+        if set(actual_copies) != set(expected_copies) or len(actual_copies) != len(expected_copies):
+            exact_required_named_context_copies = False
+            failures.append(
+                f"Dockerfile {stage} stage must contain the exact required named-context COPY set"
+            )
     if invalid_copy_from_stages:
         failures.append("Dockerfile COPY stage references drifted from the closed stage graph")
     if forward_copy_from_references:
@@ -1315,9 +1375,11 @@ def validate_public_pwa_docker_build_contract(path: Path) -> dict[str, Any]:
         "exactCopyFromReferences": not (
             malformed_copy_from_lines
             or unknown_copy_from_references
+            or invalid_named_context_copies
             or invalid_copy_from_stages
             or forward_copy_from_references
         ),
+        "exactRequiredNamedContextCopies": exact_required_named_context_copies,
         "buildDependsOnProof": build_depends_on_proof,
         "toolFinalDependsOnBuild": tool_final_depends_on_build,
         "finalDependsOnBuild": final_depends_on_build,
@@ -1399,16 +1461,18 @@ def _compose_mapping_entry(raw_line: str, *, indent: int) -> tuple[str, str] | N
 
 def _parse_public_pwa_compose_build_bindings(
     text: str,
-) -> tuple[str, str, dict[str, str], list[str]]:
+    *,
+    service_name: str = PUBLIC_EDGE_COMPOSE_PORTAL_SERVICE,
+) -> tuple[str, str, str, dict[str, str], list[str]]:
     lines = text.splitlines()
     failures: list[str] = []
     service_indexes = [
         index
         for index, raw_line in enumerate(lines)
-        if raw_line == f"  {PUBLIC_EDGE_COMPOSE_PORTAL_SERVICE}:"
+        if raw_line == f"  {service_name}:"
     ]
     if len(service_indexes) != 1:
-        return "", "", {}, ["Compose must declare chummer-portal exactly once"]
+        return "", "", "", {}, [f"Compose must declare {service_name} exactly once"]
     service_start = service_indexes[0]
     service_end = len(lines)
     for index in range(service_start + 1, len(lines)):
@@ -1425,7 +1489,7 @@ def _parse_public_pwa_compose_build_bindings(
         if lines[index] == "    build:"
     ]
     if len(build_indexes) != 1:
-        return "", "", {}, ["Compose chummer-portal must declare build exactly once"]
+        return "", "", "", {}, [f"Compose {service_name} must declare build exactly once"]
     build_start = build_indexes[0]
     build_end = service_end
     for index in range(build_start + 1, service_end):
@@ -1447,13 +1511,14 @@ def _parse_public_pwa_compose_build_bindings(
             duplicate_build_keys.add(key)
         build_entries[key] = (index, value)
     if duplicate_build_keys:
-        failures.append("Compose chummer-portal build contains duplicate keys")
+        failures.append(f"Compose {service_name} build contains duplicate keys")
     build_context = build_entries.get("context", (-1, ""))[1]
     dockerfile = build_entries.get("dockerfile", (-1, ""))[1]
+    target = build_entries.get("target", (-1, ""))[1]
     contexts_entry = build_entries.get("additional_contexts")
     if contexts_entry is None or contexts_entry[1]:
-        failures.append("Compose chummer-portal additional_contexts mapping is missing")
-        return build_context, dockerfile, {}, failures
+        failures.append(f"Compose {service_name} additional_contexts mapping is missing")
+        return build_context, dockerfile, target, {}, failures
     contexts_start = contexts_entry[0]
     bindings: dict[str, str] = {}
     duplicate_context_names: set[str] = set()
@@ -1467,44 +1532,28 @@ def _parse_public_pwa_compose_build_bindings(
             break
         entry = _compose_mapping_entry(raw_line, indent=8)
         if entry is None:
-            failures.append("Compose additional_contexts contains a non-literal entry")
+            failures.append(
+                f"Compose {service_name} additional_contexts contains a non-literal entry"
+            )
             continue
         name, value = entry
         if name in bindings:
             duplicate_context_names.add(name)
         bindings[name] = value
     if duplicate_context_names:
-        failures.append("Compose additional_contexts contains duplicate names")
-    return build_context, dockerfile, bindings, failures
+        failures.append(f"Compose {service_name} additional_contexts contains duplicate names")
+    return build_context, dockerfile, target, bindings, failures
 
 
-def validate_public_pwa_compose_context_contract(path: Path) -> dict[str, Any]:
-    expected_bindings = dict(PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS)
-    result: dict[str, Any] = {
-        "status": "fail",
-        "present": path.is_file(),
-        "service": PUBLIC_EDGE_COMPOSE_PORTAL_SERVICE,
-        "buildContext": "",
-        "dockerfile": "",
-        "bindings": {},
-        "expectedBindings": expected_bindings,
-        "bindingMatches": {name: False for name in expected_bindings},
-        "missingContextNames": sorted(expected_bindings),
-        "unexpectedContextNames": [],
-        "reservedContextNames": [],
-        "checks": {},
-        "failures": [],
-    }
-    if not path.is_file():
-        result["failures"] = ["Compose file is missing"]
-        return result
-    try:
-        text = path.read_text(encoding="utf-8", errors="strict")
-    except (OSError, UnicodeError) as exc:
-        result["failures"] = [f"Compose file could not be read as strict UTF-8: {exc}"]
-        return result
-    build_context, dockerfile, actual_bindings, failures = (
-        _parse_public_pwa_compose_build_bindings(text)
+def _validate_public_pwa_compose_service_contract(
+    text: str,
+    *,
+    service_name: str,
+    expected_target: str,
+    expected_bindings: dict[str, str],
+) -> dict[str, Any]:
+    build_context, dockerfile, target, actual_bindings, failures = (
+        _parse_public_pwa_compose_build_bindings(text, service_name=service_name)
     )
     contexts_are_mapping = not any(
         "additional_contexts" in failure for failure in failures
@@ -1529,32 +1578,101 @@ def validate_public_pwa_compose_context_contract(path: Path) -> dict[str, Any]:
         and all(binding_matches.values())
     )
     if build_context != PUBLIC_EDGE_COMPOSE_BUILD_CONTEXT:
-        failures.append("Compose chummer-portal build context drifted")
+        failures.append(f"Compose {service_name} build context drifted")
     if dockerfile != PUBLIC_EDGE_COMPOSE_DOCKERFILE:
-        failures.append("Compose chummer-portal Dockerfile binding drifted")
+        failures.append(f"Compose {service_name} Dockerfile binding drifted")
+    if target != expected_target:
+        failures.append(f"Compose {service_name} build target drifted")
     if not contexts_are_mapping:
-        failures.append("Compose chummer-portal additional_contexts must be a mapping")
+        failures.append(f"Compose {service_name} additional_contexts must be a mapping")
     if not exact_bindings:
-        failures.append("Compose chummer-portal named-context bindings drifted")
+        failures.append(f"Compose {service_name} named-context bindings drifted")
     if reserved_names:
-        failures.append("Compose named contexts must not override reserved Docker references")
+        failures.append(
+            f"Compose {service_name} named contexts must not override reserved Docker references"
+        )
     checks = {
         "exactBuildContext": build_context == PUBLIC_EDGE_COMPOSE_BUILD_CONTEXT,
         "exactDockerfile": dockerfile == PUBLIC_EDGE_COMPOSE_DOCKERFILE,
+        "exactTarget": target == expected_target,
         "contextsAreMapping": contexts_are_mapping,
         "exactNamedContextBindings": exact_bindings,
         "noReservedContextNames": not reserved_names,
     }
+    return {
+        "status": "pass" if not failures and all(checks.values()) else "fail",
+        "service": service_name,
+        "buildContext": build_context,
+        "dockerfile": dockerfile,
+        "target": target,
+        "expectedTarget": expected_target,
+        "bindings": actual_bindings,
+        "expectedBindings": expected_bindings,
+        "bindingMatches": binding_matches,
+        "missingContextNames": missing_names,
+        "unexpectedContextNames": unexpected_names,
+        "reservedContextNames": reserved_names,
+        "checks": checks,
+        "failures": list(dict.fromkeys(failures)),
+    }
+
+
+def validate_public_pwa_compose_context_contract(path: Path) -> dict[str, Any]:
+    expected_bindings = dict(PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS)
+    result: dict[str, Any] = {
+        "status": "fail",
+        "present": path.is_file(),
+        "service": PUBLIC_EDGE_COMPOSE_PORTAL_SERVICE,
+        "buildContext": "",
+        "dockerfile": "",
+        "bindings": {},
+        "expectedBindings": expected_bindings,
+        "bindingMatches": {name: False for name in expected_bindings},
+        "missingContextNames": sorted(expected_bindings),
+        "unexpectedContextNames": [],
+        "reservedContextNames": [],
+        "serviceContracts": {},
+        "checks": {},
+        "failures": [],
+    }
+    if not path.is_file():
+        result["failures"] = ["Compose file is missing"]
+        return result
+    try:
+        text = path.read_text(encoding="utf-8", errors="strict")
+    except (OSError, UnicodeError) as exc:
+        result["failures"] = [f"Compose file could not be read as strict UTF-8: {exc}"]
+        return result
+
+    service_contracts: dict[str, dict[str, Any]] = {}
+    failures: list[str] = []
+    for service_name, expected in PUBLIC_EDGE_COMPOSE_BUILD_SERVICE_CONTRACTS.items():
+        service_contract = _validate_public_pwa_compose_service_contract(
+            text,
+            service_name=service_name,
+            expected_target=str(expected["target"]),
+            expected_bindings=dict(expected["namedContexts"]),
+        )
+        service_contracts[service_name] = service_contract
+        failures.extend(service_contract["failures"])
+
+    portal_contract = service_contracts[PUBLIC_EDGE_COMPOSE_PORTAL_SERVICE]
+    all_service_contracts = all(
+        contract["status"] == "pass" for contract in service_contracts.values()
+    )
+    checks = dict(portal_contract["checks"])
+    checks["allServiceBuildContracts"] = all_service_contracts
     result.update(
         {
             "status": "pass" if not failures and all(checks.values()) else "fail",
-            "buildContext": build_context,
-            "dockerfile": dockerfile,
-            "bindings": actual_bindings,
-            "bindingMatches": binding_matches,
-            "missingContextNames": missing_names,
-            "unexpectedContextNames": unexpected_names,
-            "reservedContextNames": reserved_names,
+            "buildContext": portal_contract["buildContext"],
+            "dockerfile": portal_contract["dockerfile"],
+            "bindings": portal_contract["bindings"],
+            "bindingMatches": portal_contract["bindingMatches"],
+            "missingContextNames": portal_contract["missingContextNames"],
+            "unexpectedContextNames": portal_contract["unexpectedContextNames"],
+            "reservedContextNames": portal_contract["reservedContextNames"],
+            "serviceContracts": service_contracts,
             "checks": checks,
             "failures": list(dict.fromkeys(failures)),
         }
@@ -3064,12 +3182,19 @@ def overlay_build_info_source_fingerprint_check(source_root: Path, overlay_root:
         "landingMarkerStatus": "pass",
         "landingHasTurnAnchor": True,
         "landingHasTurnAnchorRedirect": True,
+        "landingHasBuildPublicInstallHandoff": True,
+        "landingHasPlayPublicInstallHandoff": True,
+        "landingRetiredMarkersAbsent": True,
         "landingBrowserRedirectStatus": "pass",
         "landingBrowserRedirectExpectedPath": "/mobile/player",
         "landingBrowserRedirectExpectedHash": "#turn-runsite-card",
+        "landingBrowserRedirectExpectedQuery": "",
+        "landingBrowserRedirectFinalQuery": "",
+        "landingBrowserRedirectQueryDropped": True,
         "landingBrowserRedirectPathMatches": True,
         "landingBrowserRedirectHashMatches": True,
         "landingMissingMarkerCount": 0,
+        "landingForbiddenMarkerCount": 0,
     }
     for field, expected_value in required_exact_fields.items():
         if payload.get(field) != expected_value:
