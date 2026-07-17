@@ -1879,10 +1879,7 @@ public sealed class PublicLandingController : Controller
         CancellationToken cancellationToken)
     {
         bool authenticated = await TryIsAuthenticatedAsync(cancellationToken);
-        bool generationBoundProof = proofInstaller.LegacyFilePath is null;
-        string primaryDownloadHref = generationBoundProof
-            ? proofInstaller.DownloadUrl
-            : $"/downloads/install/{Uri.EscapeDataString(artifactId)}/supplemental";
+        string primaryDownloadHref = proofInstaller.DownloadUrl;
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
             "Supplemental Windows installer",
             "Direct Windows installer for support outside the main downloads page.",
@@ -1912,8 +1909,8 @@ public sealed class PublicLandingController : Controller
             AutoStartDownload: true,
             BootstrapScriptDownload: false,
             PromoteSecondaryDownload: false,
-            SecondaryDownloadHref: generationBoundProof ? null : proofInstaller.DownloadUrl,
-            SecondaryDownloadLabel: generationBoundProof ? null : "Direct file mirror",
+            SecondaryDownloadHref: null,
+            SecondaryDownloadLabel: null,
             AccountHref: "/downloads",
             AccountLabel: "Back to downloads",
             HelpHref: release.InstallHelpHref,

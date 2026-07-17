@@ -20,6 +20,29 @@ namespace Chummer.Tests;
 
 public sealed class WindowsProofUploadProtocolTests
 {
+    [Theory]
+    [InlineData(null, null, false)]
+    [InlineData("true", null, false)]
+    [InlineData(null, "true", false)]
+    [InlineData("true", "true", true)]
+    public void UploadConfigurationRequiresBothExplicitOperatorFlags(
+        string? uploadEnabled,
+        string? cfAccessGated,
+        bool expectedAdmittedPosture)
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_WINDOWS_PROOF_UPLOAD_ENABLED"] = uploadEnabled,
+                ["CHUMMER_WINDOWS_PROOF_CF_ACCESS_GATED"] = cfAccessGated
+            })
+            .Build();
+
+        WindowsProofUploadOptions options = WindowsProofUploadOptions.FromConfiguration(configuration);
+
+        Assert.Equal(expectedAdmittedPosture, options.Enabled && options.CfAccessGated);
+    }
+
     [Fact]
     public void TicketScopesAreCryptographicallyDisjoint()
     {

@@ -135,7 +135,6 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         return Ok(_aurPackages.LoadCatalog(snapshot));
     }
 
-    [HttpGet("/downloads/supplemental/windows")]
     [HttpGet("/downloads/proof/windows")]
     [HttpGet("/downloads/proof/windows/current")]
     public IActionResult WindowsProofInstallers()
@@ -151,7 +150,6 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             : WindowsProofMissing();
     }
 
-    [HttpGet("/downloads/g/{generationId}/proof/windows")]
     [HttpGet("/downloads/proof/windows/generations/{generationId}")]
     public IActionResult GenerationWindowsProofInstallers([FromRoute] string generationId)
     {
@@ -178,8 +176,6 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         return proof is null ? NotFound() : BuildWindowsProofCatalog(proof);
     }
 
-    [HttpGet("/downloads/supplemental/windows/{fileName}")]
-    [HttpHead("/downloads/supplemental/windows/{fileName}")]
     [HttpGet("/downloads/proof/windows/{fileName}")]
     [HttpHead("/downloads/proof/windows/{fileName}")]
     public IActionResult DownloadWindowsProofInstaller([FromRoute] string fileName)
@@ -199,8 +195,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             : NotFound();
     }
 
-    [HttpGet("/downloads/g/{generationId}/proof/windows/{fileName}")]
-    [HttpHead("/downloads/g/{generationId}/proof/windows/{fileName}")]
+    [HttpGet("/downloads/proof/windows/generations/{generationId}/files/{fileName}")]
+    [HttpHead("/downloads/proof/windows/generations/{generationId}/files/{fileName}")]
     public IActionResult DownloadGenerationWindowsProofInstaller(
         [FromRoute] string generationId,
         [FromRoute] string fileName)
@@ -226,10 +222,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             : DownloadLegacyWindowsProofInstaller(legacy, fileName, byArtifactId: false);
     }
 
-    [HttpGet("/downloads/install/{artifactId}/supplemental")]
-    [HttpHead("/downloads/install/{artifactId}/supplemental")]
-    [HttpGet("/downloads/install/{artifactId}/proof")]
-    [HttpHead("/downloads/install/{artifactId}/proof")]
+    [HttpGet("/downloads/proof/windows/current/installers/{artifactId}")]
+    [HttpHead("/downloads/proof/windows/current/installers/{artifactId}")]
     public IActionResult DownloadWindowsProofInstallerByArtifactId([FromRoute] string artifactId)
     {
         WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureCurrentProof();
@@ -249,10 +243,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             : NotFound();
     }
 
-    [HttpGet("/downloads/g/{generationId}/install/{artifactId}/supplemental")]
-    [HttpHead("/downloads/g/{generationId}/install/{artifactId}/supplemental")]
-    [HttpGet("/downloads/g/{generationId}/install/{artifactId}/proof")]
-    [HttpHead("/downloads/g/{generationId}/install/{artifactId}/proof")]
+    [HttpGet("/downloads/proof/windows/generations/{generationId}/installers/{artifactId}")]
+    [HttpHead("/downloads/proof/windows/generations/{generationId}/installers/{artifactId}")]
     public IActionResult DownloadGenerationWindowsProofInstallerByArtifactId(
         [FromRoute] string generationId,
         [FromRoute] string artifactId)

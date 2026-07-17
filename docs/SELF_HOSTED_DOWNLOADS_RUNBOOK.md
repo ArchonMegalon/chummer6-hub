@@ -139,7 +139,7 @@ Required post-publish checks:
 1. `https://chummer.run/downloads/RELEASE_CHANNEL.generated.json`
 2. `https://chummer.run/downloads/install/avalonia-osx-arm64-installer`
 3. `https://chummer.run/downloads/install/avalonia-win-x64-installer`
-4. `https://chummer.run/downloads/install/avalonia-win-x64-installer/proof`
+4. `https://chummer.run/downloads/proof/windows/current/artifacts/avalonia-win-x64-installer/installer`
 5. `https://chummer.run/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe`
 6. `python3 scripts/public_download_shelf_truth_gate.py --base-url https://chummer.run --local-manifest /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/releases.json --local-canonical-manifest /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json`
    - Treat a publish as incomplete if the gate cannot prove the same promoted version on repeated live samples. A one-off match is not enough evidence for public truth.
@@ -162,6 +162,12 @@ Windows installer gold proof:
 10. Manual screenshot fallback:
 `scripts/capture_windows_installer_visual_audit.ps1 -LaunchInstaller -CaptureRequiredSet -ScaledDpiScale 1.5 -ClippingStatus pass -ReadabilityStatus pass`
 11. Gold remains blocked until `scripts/verify_windows_installer_visual_audit.py` passes against the promoted installer digest.
+
+Private Windows proof upload lane:
+1. The durable proof shelf is mounted separately at `/windows-proof-store`; upload sessions use `/windows-proof-upload-sessions`. Neither path may overlap `/downloads-source`, which remains the canonical release shelf.
+2. Keep `CHUMMER_WINDOWS_PROOF_UPLOAD_ENABLED=false` and `CHUMMER_WINDOWS_PROOF_CF_ACCESS_GATED=false` by default.
+3. Confirm the Cloudflare Access policy covers the complete `/downloads/proof/windows` route family before setting both flags to `true` and recreating `chummer-portal`. Setting only one flag leaves the upload middleware unavailable.
+4. Never publish proof bytes through `/downloads/supplemental/windows`, `/downloads/install/{artifactId}/proof`, or other aliases outside the protected route family.
 
 Manifest-driven public route proof:
 1. `python3 scripts/verify_public_routes_from_manifest.py --base-url https://chummer.run --manifest .codex-design/product/PUBLIC_LANDING_MANIFEST.yaml --output .codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json`
@@ -197,7 +203,7 @@ Docker tests:
 2. `version` is not `"unpublished"` in deployment mode.
 3. When `CHUMMER_PORTAL_DOWNLOADS_VERIFY_LINKS=true` (or `DOWNLOADS_VERIFY_LINKS=1`), each artifact URL/file in manifest verification is reachable.
 4. Portal `/downloads/` renders artifact links that return HTTP 200.
-5. When the bundle ships `proof/windows`, the deployed shelf exposes both the proof dispatch routes and the direct proof files.
+5. When the bundle ships `proof/windows`, the deployed shelf exposes both the proof dispatch routes and the direct proof files exclusively below the Cloudflare Access-gated `/downloads/proof/windows` boundary. Public `/downloads/install/{artifactId}` routes may dispatch users to that boundary but must never serve proof-store bytes themselves.
 
 ## Portal Status Meanings
 

@@ -16,41 +16,49 @@ namespace Chummer.Tests;
 public sealed class DownloadsCompatibilityControllerTests
 {
     [Fact]
-    public void WindowsProofInstallerRoutes_Advertise_Head_And_Get_For_Probe_Safe_Binary_Downloads()
+    public void WindowsProofStoreActionsExposeOnlyCloudflareProtectedRoutes()
     {
-        var byFile = typeof(DownloadsCompatibilityController).GetMethod(nameof(DownloadsCompatibilityController.DownloadWindowsProofInstaller));
-        Assert.NotNull(byFile);
-
-        var byArtifact = typeof(DownloadsCompatibilityController).GetMethod(nameof(DownloadsCompatibilityController.DownloadWindowsProofInstallerByArtifactId));
-        Assert.NotNull(byArtifact);
-
-        var byFileRoutes = byFile!
-            .GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true)
-            .Cast<HttpMethodAttribute>()
+        var proofStoreActions = typeof(DownloadsCompatibilityController)
+            .GetMethods()
+            .Where(method => method.DeclaringType == typeof(DownloadsCompatibilityController))
+            .Where(method => method.Name.Contains("WindowsProof", StringComparison.Ordinal))
+            .Where(method => method.GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true).Length > 0)
             .ToArray();
-        var byArtifactRoutes = byArtifact!
-            .GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true)
-            .Cast<HttpMethodAttribute>()
-            .ToArray();
+        Assert.NotEmpty(proofStoreActions);
 
-        Assert.Contains(byFileRoutes, route =>
-            string.Equals(route.Template, "/downloads/supplemental/windows/{fileName}", StringComparison.Ordinal)
-            && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
-        Assert.Contains(byFileRoutes, route =>
-            string.Equals(route.Template, "/downloads/supplemental/windows/{fileName}", StringComparison.Ordinal)
-            && route.HttpMethods.Contains("HEAD", StringComparer.OrdinalIgnoreCase));
-        Assert.Contains(byFileRoutes, route =>
-            string.Equals(route.Template, "/downloads/proof/windows/{fileName}", StringComparison.Ordinal)
-            && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
-        Assert.Contains(byArtifactRoutes, route =>
-            string.Equals(route.Template, "/downloads/install/{artifactId}/supplemental", StringComparison.Ordinal)
-            && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
-        Assert.Contains(byArtifactRoutes, route =>
-            string.Equals(route.Template, "/downloads/install/{artifactId}/supplemental", StringComparison.Ordinal)
-            && route.HttpMethods.Contains("HEAD", StringComparer.OrdinalIgnoreCase));
-        Assert.Contains(byArtifactRoutes, route =>
-            string.Equals(route.Template, "/downloads/install/{artifactId}/proof", StringComparison.Ordinal)
-            && route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
+        foreach (var action in proofStoreActions)
+        {
+            HttpMethodAttribute[] routes = action
+                .GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true)
+                .Cast<HttpMethodAttribute>()
+                .ToArray();
+            Assert.NotEmpty(routes);
+            Assert.All(routes, route => Assert.StartsWith(
+                "/downloads/proof/windows",
+                route.Template,
+                StringComparison.Ordinal));
+        }
+
+        AssertRouteSupportsGetAndHead(
+            nameof(DownloadsCompatibilityController.DownloadWindowsProofInstaller),
+            "/downloads/proof/windows/{fileName}");
+        AssertRouteSupportsGetAndHead(
+            nameof(DownloadsCompatibilityController.DownloadWindowsProofInstallerByArtifactId),
+            "/downloads/proof/windows/current/installers/{artifactId}");
+
+        string[] allRoutes = typeof(DownloadsCompatibilityController)
+            .GetMethods()
+            .Where(method => method.DeclaringType == typeof(DownloadsCompatibilityController))
+            .SelectMany(method => method.GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true))
+            .Cast<HttpMethodAttribute>()
+            .Select(route => route.Template ?? string.Empty)
+            .ToArray();
+        Assert.DoesNotContain(allRoutes, route =>
+            route.StartsWith("/downloads/supplemental/windows", StringComparison.Ordinal)
+            || route.Contains("/install/{artifactId}/supplemental", StringComparison.Ordinal)
+            || route.Contains("/install/{artifactId}/proof", StringComparison.Ordinal)
+            || route.StartsWith("/downloads/g/", StringComparison.Ordinal)
+                && route.Contains("/proof/windows", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -347,8 +355,8 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.DoesNotContain("verification and support rail", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-blazor-desktop-win-x64-installer.exe", payload, StringComparison.Ordinal);
-        Assert.Contains("/downloads/supplemental/windows/chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
-        Assert.DoesNotContain("/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
+        Assert.Contains("/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("/downloads/supplemental/windows", payload, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -557,6 +565,19 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.IsType<NotFoundObjectResult>(catalog);
         Assert.IsType<NotFoundResult>(byFile);
         Assert.IsType<NotFoundResult>(byArtifact);
+    }
+
+    private static void AssertRouteSupportsGetAndHead(string methodName, string template)
+    {
+        var method = typeof(DownloadsCompatibilityController).GetMethod(methodName);
+        Assert.NotNull(method);
+        HttpMethodAttribute[] routes = method!
+            .GetCustomAttributes(typeof(HttpMethodAttribute), inherit: true)
+            .Cast<HttpMethodAttribute>()
+            .Where(route => string.Equals(route.Template, template, StringComparison.Ordinal))
+            .ToArray();
+        Assert.Contains(routes, route => route.HttpMethods.Contains("GET", StringComparer.OrdinalIgnoreCase));
+        Assert.Contains(routes, route => route.HttpMethods.Contains("HEAD", StringComparer.OrdinalIgnoreCase));
     }
 
     private static void WriteEmbeddedPayloadInstaller(string path, string head)

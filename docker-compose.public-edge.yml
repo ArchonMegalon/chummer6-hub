@@ -295,6 +295,12 @@ services:
       CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_TRANSPORT: ${CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_TRANSPORT:-}
       CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID: ${CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID:-hub}
       CHUMMER_DOWNLOADS_SOURCE_ROOT: /downloads-source
+      # Windows proof publication is independent from the canonical release shelf. Both
+      # operator assertions must be true before its upload middleware admits requests.
+      CHUMMER_WINDOWS_PROOF_UPLOAD_ENABLED: "${CHUMMER_WINDOWS_PROOF_UPLOAD_ENABLED:-false}"
+      CHUMMER_WINDOWS_PROOF_CF_ACCESS_GATED: "${CHUMMER_WINDOWS_PROOF_CF_ACCESS_GATED:-false}"
+      CHUMMER_WINDOWS_PROOF_ROOT: /windows-proof-store
+      CHUMMER_WINDOWS_PROOF_UPLOAD_SESSION_ROOT: /windows-proof-upload-sessions
       # These two flags are deliberately required from the operator environment. For the
       # controlled first activation only, use layout=false and initial-migration=true.
       # After current.json, the layout marker, and its committed activation receipt are
@@ -555,6 +561,8 @@ services:
       - /docker/fleet/.codex-studio/published:/fleet-artifacts:ro
       - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
       - chummer-release-upload-sessions:/release-upload-sessions
+      - chummer-windows-proof-store:/windows-proof-store
+      - chummer-windows-proof-upload-sessions:/windows-proof-upload-sessions
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json:/proofs/FINAL_GOLD_JANITOR.generated.json:ro
@@ -691,6 +699,8 @@ volumes:
   chummer-play-web-state:
   chummer-run-api-state:
   chummer-release-upload-sessions:
+  chummer-windows-proof-store:
+  chummer-windows-proof-upload-sessions:
   chummer-run-identity-state:
 
 networks:
