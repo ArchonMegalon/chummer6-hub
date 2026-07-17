@@ -631,40 +631,13 @@ if ! builder_identity="$(
     | "$TRUSTED_PYTHON" -I -c '
 import json, sys
 matches = []
-
-def semantic_identity(item):
-    nodes = item.get("Nodes")
-    if isinstance(nodes, list):
-        semantic_nodes = [
-            {
-                "Name": node.get("Name"),
-                "Endpoint": node.get("Endpoint"),
-                "Status": node.get("Status"),
-            }
-            if isinstance(node, dict)
-            else {"InvalidNode": node}
-            for node in nodes
-        ]
-    else:
-        semantic_nodes = {"InvalidNodes": nodes}
-    return json.dumps(
-        {
-            "Current": item.get("Current"),
-            "Driver": item.get("Driver"),
-            "Nodes": semantic_nodes,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-
 for raw in sys.stdin:
     if not raw.strip():
         continue
     item = json.loads(raw)
     if item.get("Name") == "default":
         matches.append(item)
-semantic_identities = {semantic_identity(item) for item in matches}
-if not matches or len(semantic_identities) != 1:
+if len(matches) != 1:
     raise SystemExit(1)
 item = matches[0]
 nodes = item.get("Nodes")

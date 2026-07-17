@@ -96,6 +96,84 @@ EXPECTED_PORTAL_DEPENDENCIES = {
 EXPECTED_CORE_ULIMIT = {"core": {}}
 EXPECTED_TOOL_PROFILE = ["install-linking-postgres-admin"]
 EXPECTED_TOOL_TMPFS = ["/tmp:rw,noexec,nosuid,nodev,mode=1777"]
+EXPECTED_PORTAL_RESOURCES = {
+    "cpu_shares": 256,
+    "cpus": 1,
+    "mem_limit": "1610612736",
+}
+EXPECTED_SERVICE_FIELDS = {
+    "chummer-portal-volume-init": {
+        "cap_add",
+        "cap_drop",
+        "command",
+        "entrypoint",
+        "environment",
+        "image",
+        "network_mode",
+        "pids_limit",
+        "read_only",
+        "restart",
+        "security_opt",
+        "ulimits",
+        "user",
+        "volumes",
+    },
+    "chummer-portal": {
+        "build",
+        "cap_drop",
+        "command",
+        "cpu_shares",
+        "cpus",
+        "depends_on",
+        "entrypoint",
+        "environment",
+        "extra_hosts",
+        "healthcheck",
+        "image",
+        "mem_limit",
+        "networks",
+        "ports",
+        "restart",
+        "security_opt",
+        "ulimits",
+        "user",
+        "volumes",
+    },
+    "chummer-install-linking-postgres-admin": {
+        "build",
+        "cap_drop",
+        "command",
+        "entrypoint",
+        "environment",
+        "image",
+        "networks",
+        "profiles",
+        "read_only",
+        "restart",
+        "security_opt",
+        "tmpfs",
+        "ulimits",
+        "user",
+        "volumes",
+    },
+    "chummer-install-linking-postgres-import": {
+        "build",
+        "cap_drop",
+        "command",
+        "entrypoint",
+        "environment",
+        "image",
+        "networks",
+        "profiles",
+        "read_only",
+        "restart",
+        "security_opt",
+        "tmpfs",
+        "ulimits",
+        "user",
+        "volumes",
+    },
+}
 
 
 def mapping(value: object, *, label: str) -> dict[str, Any]:
@@ -124,6 +202,17 @@ def require_empty_sequence(value: object, *, label: str) -> None:
 def require_empty_mapping(value: object, *, label: str) -> None:
     if value not in (None, {}):
         raise ValueError(f"rendered {label} must be empty")
+
+
+def require_exact_service_fields(
+    service: dict[str, Any], *, service_name: str
+) -> None:
+    expected_fields = EXPECTED_SERVICE_FIELDS[service_name]
+    if set(service) != expected_fields:
+        raise ValueError(
+            f"rendered {service_name} service fields drifted from the canonical "
+            "runtime policy"
+        )
 
 
 def require_exact_mounts(
@@ -369,6 +458,9 @@ def validate_runtime(
         selected[service_name] = mapping(
             services.get(service_name), label=f"rendered {service_name} service"
         )
+        require_exact_service_fields(
+            selected[service_name], service_name=service_name
+        )
 
     if selected["chummer-portal"].get("image") != EXPECTED_PORTAL_IMAGE:
         raise ValueError("rendered portal image tag is not canonical")
@@ -400,6 +492,11 @@ def validate_runtime(
         portal,
         service_name="chummer-portal",
         read_only=False,
+    )
+    require_exact_mapping(
+        {field: portal.get(field) for field in EXPECTED_PORTAL_RESOURCES},
+        expected=EXPECTED_PORTAL_RESOURCES,
+        label="chummer-portal resource limits",
     )
     for service_name, service in (
         ("chummer-install-linking-postgres-admin", admin),
@@ -710,8 +807,10 @@ def validate_runtime(
         "proxyGates": {key: "false" for key in PROXY_GATE_KEYS},
         "retiredProxyKeysAbsent": True,
         "runtimePolicyChecks": [
+            "closed-service-fields",
             "identity",
             "security",
+            "resource-limits",
             "command-entrypoint",
             "mounts",
             "ports-health",

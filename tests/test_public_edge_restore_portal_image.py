@@ -240,7 +240,7 @@ def test_restore_subprocess_uses_absolute_canonical_docker_and_clean_environment
     assert result.command == captured["command"]
 
 
-def test_restore_builder_identity_deduplicates_identical_records_and_rejects_conflict() -> None:
+def test_restore_builder_identity_rejects_every_duplicate_default_record() -> None:
     module = load_module()
     canonical = {
         "Name": "default",
@@ -249,11 +249,12 @@ def test_restore_builder_identity_deduplicates_identical_records_and_rejects_con
         "Nodes": [{"Name": "default", "Endpoint": "default", "Status": "running"}],
     }
     duplicate = json.dumps(canonical) + "\n" + json.dumps(canonical) + "\n"
-    assert module._canonical_builder_identity(duplicate) == "default|docker|default|running"
+    with pytest.raises(RuntimeError, match="missing or duplicated"):
+        module._canonical_builder_identity(duplicate)
 
     conflicting = dict(canonical)
     conflicting["Driver"] = "docker-container"
-    with pytest.raises(RuntimeError, match="conflicting duplicates"):
+    with pytest.raises(RuntimeError, match="missing or duplicated"):
         module._canonical_builder_identity(
             json.dumps(canonical) + "\n" + json.dumps(conflicting) + "\n"
         )

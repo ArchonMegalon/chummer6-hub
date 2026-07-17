@@ -419,11 +419,9 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         self.assertIn("/usr/bin/docker --context default", shell)
         self.assertIn("CHUMMER_PUBLIC_EDGE_PORT=8091", shell)
         self.assertIn("--published-port 8091", shell)
-        self.assertIn("identities = {}", shell)
-        self.assertIn(
-            'identities[json.dumps(identity, sort_keys=True, separators=(",", ":"))] = identity',
-            shell,
-        )
+        self.assertIn("matches = []", shell)
+        self.assertIn("matches.append(item)", shell)
+        self.assertIn("if len(matches) != 1:", shell)
         timed_docker_calls = re.findall(
             r"/usr/bin/timeout --kill-after=[^\n]*\n?(?:\s+)?\"\$\{docker_command\[@\]\}\"",
             shell,

@@ -284,25 +284,19 @@ builder_identity="$(
     /usr/bin/env -i PATH=/usr/bin:/bin LANG=C LC_ALL=C HOME=/nonexistent \
     /usr/bin/python3 -I -c '
 import json, sys
-identities = {}
+matches = []
 for line in sys.stdin:
     if not line.strip():
         continue
     item = json.loads(line)
     if item.get("Name") != "default":
         continue
-    nodes = item.get("Nodes")
-    identity = {
-        "Current": item.get("Current"),
-        "Driver": item.get("Driver"),
-        "Nodes": nodes,
-    }
-    identities[json.dumps(identity, sort_keys=True, separators=(",", ":"))] = identity
-if len(identities) != 1:
+    matches.append(item)
+if len(matches) != 1:
     raise SystemExit(1)
-item = next(iter(identities.values()))
-nodes = item["Nodes"]
-if (item["Current"] is not True or item["Driver"] != "docker"
+item = matches[0]
+nodes = item.get("Nodes")
+if (item.get("Current") is not True or item.get("Driver") != "docker"
         or not isinstance(nodes, list) or len(nodes) != 1
         or nodes[0].get("Name") != "default" or nodes[0].get("Endpoint") != "default"
         or nodes[0].get("Status") != "running"):

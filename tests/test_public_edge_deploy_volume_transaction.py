@@ -393,7 +393,7 @@ def test_guarded_deploy_attests_local_daemon_and_builder_before_compose(
     )
 
 
-def test_guarded_deploy_accepts_semantically_identical_duplicate_default_builders(
+def test_guarded_deploy_rejects_identical_duplicate_default_builders(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     builder = {
@@ -412,8 +412,6 @@ def test_guarded_deploy_accepts_semantically_identical_duplicate_default_builder
         "FAKE_BUILDER_JSON",
         "\n".join((json.dumps(builder), json.dumps(builder, sort_keys=True))),
     )
-    monkeypatch.setenv("FAKE_SOURCE_GATE_EXIT", "23")
-
     result = subprocess.run(
         ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
         cwd=ROOT,
@@ -422,8 +420,8 @@ def test_guarded_deploy_accepts_semantically_identical_duplicate_default_builder
         capture_output=True,
     )
 
-    assert result.returncode == 23
-    assert "non-canonical Buildx builder" not in result.stderr
+    assert result.returncode == 2
+    assert "non-canonical Buildx builder" in result.stderr
 
 
 def test_guarded_deploy_rejects_conflicting_duplicate_default_builders(

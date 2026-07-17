@@ -116,9 +116,12 @@ def rendered_compose(
                 "image": "chummer-run-api:local",
                 "build": build(),
                 "restart": "unless-stopped",
-                "user": "1654:1654",
-                **security,
-                "command": None,
+            "user": "1654:1654",
+            **security,
+            "cpu_shares": 256,
+            "cpus": 1,
+            "mem_limit": "1610612736",
+            "command": None,
                 "entrypoint": None,
                 "depends_on": {
                     "chummer-portal-volume-init": {
@@ -422,13 +425,97 @@ def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environmen
             lambda payload: payload["services"]["chummer-portal"].update(
                 privileged=True
             ),
-            "must not be privileged",
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(pid="host"),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(ipc="host"),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(
+                devices=["/dev/kvm:/dev/kvm"]
+            ),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(
+                userns_mode="host"
+            ),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(
+                runtime="attacker-runtime"
+            ),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(
+                sysctls={"net.ipv4.ip_unprivileged_port_start": "0"}
+            ),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(
+                group_add=["docker"]
+            ),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(
+                isolation="hyperv"
+            ),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(
+                cpu_shares=512
+            ),
+            "resource limits drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(cpus=2),
+            "resource limits drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal"].update(
+                mem_limit="3221225472"
+            ),
+            "resource limits drifted",
+        ),
+        (
+            lambda payload: payload["services"][
+                "chummer-install-linking-postgres-admin"
+            ].update(pid="host"),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"][
+                "chummer-install-linking-postgres-admin"
+            ].update(env_file=["/run/secrets/attacker.env"]),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"]["chummer-portal-volume-init"].update(
+                cgroup="host"
+            ),
+            "service fields drifted",
+        ),
+        (
+            lambda payload: payload["services"][
+                "chummer-install-linking-postgres-import"
+            ].update(ipc="host"),
+            "service fields drifted",
         ),
         (
             lambda payload: payload["services"]["chummer-portal"].update(
                 cap_add=["NET_ADMIN"]
             ),
-            "cap_add must be empty",
+            "service fields drifted",
         ),
         (
             lambda payload: payload["services"]["chummer-portal-volume-init"].update(
@@ -501,7 +588,7 @@ def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environmen
             lambda payload: payload["services"][
                 "chummer-install-linking-postgres-import"
             ].update(ports=[{"target": 8080, "published": "9999"}]),
-            "import ports must be empty",
+            "service fields drifted",
         ),
         (
             lambda payload: payload["services"]["chummer-portal"]["healthcheck"].update(

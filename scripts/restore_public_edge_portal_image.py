@@ -217,18 +217,17 @@ def run_command(command: list[str], cwd: Path = ROOT, dry_run: bool = False) -> 
 
 
 def _canonical_builder_identity(payload: str) -> str:
-    records: dict[str, dict[str, Any]] = {}
+    records: list[dict[str, Any]] = []
     for raw in payload.splitlines():
         if not raw.strip():
             continue
         item = json.loads(raw)
         if item.get("Name") != "default":
             continue
-        semantic = json.dumps(item, sort_keys=True, separators=(",", ":"))
-        records.setdefault(semantic, item)
+        records.append(item)
     if len(records) != 1:
-        raise RuntimeError("canonical Buildx builder is missing or has conflicting duplicates")
-    item = next(iter(records.values()))
+        raise RuntimeError("canonical Buildx builder is missing or duplicated")
+    item = records[0]
     nodes = item.get("Nodes")
     if (
         item.get("Current") is not True
