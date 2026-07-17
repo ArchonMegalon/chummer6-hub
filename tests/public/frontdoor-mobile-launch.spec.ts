@@ -48,6 +48,10 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
     proofStage = 'public-handoffs';
     const hero = page.locator('[data-homepage-section="hero"]');
     await expect(hero).toContainText('Download Chummer');
+    const homepageLaneText = await hero
+      .locator('.minimal-meta')
+      .filter({ hasText: 'Current public lane:' })
+      .innerText();
     const openMenu = hero.locator('.minimal-open-chummer');
     await openMenu.locator('summary').click();
     await expect(openMenu).toHaveAttribute('open', '');
@@ -131,6 +135,7 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
     writeJsonArtifact('FRONTDOOR_MOBILE_LAUNCH.generated.json', {
       ...proof,
       status: 'pass',
+      homepage_lane_text: homepageLaneText.trim(),
       public_install_targets: ['/build', '/mobile/player'],
       device_routing: 'auto_ua_ch_mobile_direct',
       play_surface: 'install-only',
@@ -286,6 +291,7 @@ test('homepage legacy mobile anchors drop all landing queries before entering th
   const proof = {
     contractName: 'chummer.frontdoor_mobile_anchor_redirect.v2',
     generated_at_utc: new Date().toISOString(),
+    base_url: publicOrigin,
     source_path: landingPath,
   };
   let proofStage = 'source-contract';

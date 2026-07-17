@@ -218,7 +218,8 @@ DOTNET_RUN_RE = re.compile(r"(?:^|\s)dotnet\s+run\b", re.IGNORECASE)
 PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS = {
     "docker-compose.public-edge.yml": (
         'profiles: ["play-private"]',
-        'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"',
+        'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"',
+        'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"',
         "${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app}:/app:ro",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json:ro",
@@ -499,6 +500,8 @@ PUBLIC_EDGE_REQUIRED_OVERLAY_MARKERS = {
 }
 PUBLIC_EDGE_FORBIDDEN_SOURCE_MARKERS = {
     "docker-compose.public-edge.yml": (
+        "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED",
+        "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED",
         "CHUMMER_PUBLIC_PLAY_PROXY_URL:",
         "CHUMMER_PUBLIC_PLAY_PROXY_API_KEY:",
     ),

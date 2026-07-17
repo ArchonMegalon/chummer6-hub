@@ -1728,7 +1728,36 @@ def _verify_source_impl(
         label="public edge compose",
     ).decode("utf-8", errors="replace")
     require('profiles: ["play-private"]' in compose, failures, "compose: private Play profile missing")
-    require('CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"' in compose, failures, "compose: projection must default off")
+    require(
+        'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"' in compose,
+        failures,
+        "compose: public Play proxy must be literal false",
+    )
+    require(
+        compose.count("CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:") == 1,
+        failures,
+        "compose: public Play proxy must have exactly one declaration",
+    )
+    require(
+        'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"' in compose,
+        failures,
+        "compose: public Play live-session proxy must be literal false",
+    )
+    require(
+        compose.count("CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED:") == 1,
+        failures,
+        "compose: public Play live-session proxy must have exactly one declaration",
+    )
+    require(
+        "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED" not in compose,
+        failures,
+        "compose: public Play proxy must not be environment-overridable",
+    )
+    require(
+        "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED" not in compose,
+        failures,
+        "compose: public Play live-session proxy must not be environment-overridable",
+    )
     portal_parts = compose.split("  chummer-portal:", 1)
     require(len(portal_parts) == 2, failures, "compose: portal service is missing")
     portal_dependencies = portal_parts[1].split("    environment:", 1)[0] if len(portal_parts) == 2 else ""

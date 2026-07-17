@@ -50,7 +50,11 @@ def test_default_compose_never_starts_or_injects_credentials_into_private_play()
     compose = (ROOT / "docker-compose.public-edge.yml").read_text(encoding="utf-8")
 
     assert 'profiles: ["play-private"]' in compose
-    assert 'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"' in compose
+    assert 'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"' in compose
+    assert 'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"' in compose
+    assert "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED" not in compose
+    assert "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED" not in compose
+    assert "CHUMMER_PUBLIC_PLAY_PROXY_URL" not in compose
     assert "CHUMMER_PUBLIC_PLAY_PROXY_API_KEY" not in compose
     portal_dependencies = compose.split("  chummer-portal:", 1)[1].split("    environment:", 1)[0]
     assert "chummer-play-web:" not in portal_dependencies

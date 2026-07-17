@@ -378,16 +378,27 @@ def passing_browser_redirect() -> dict[str, object]:
     return {
         "status": "pass",
         "reason": "",
-        "entryUrl": "http://127.0.0.1:5000/#turn-runsite-card",
+        "entryUrl": (
+            "http://127.0.0.1:5000/"
+            "?sessionId=synthetic-probe&grant=synthetic-probe"
+            "&tracking=synthetic-probe#turn-runsite-card?grant=synthetic-fragment"
+        ),
         "finalUrl": "http://127.0.0.1:5000/mobile/player#turn-runsite-card",
         "expectedPath": "/mobile/player",
         "expectedHash": "#turn-runsite-card",
+        "expectedQuery": "",
+        "finalQuery": "",
         "pathMatches": True,
         "hashMatches": True,
+        "queryDropped": True,
         "error": "",
         "title": "Player entry · Chummer",
         "heading": "Player entry",
     }
+
+
+def passing_landing_body(module) -> str:  # noqa: ANN001
+    return "\n".join(module.REQUIRED_LANDING_MARKERS.values())
 
 
 def passing_live_surface_parity(
@@ -3224,13 +3235,18 @@ def test_probe_landing_anchor_browser_redirect_returns_pass_when_hash_canonicali
             self.url = "http://127.0.0.1:5010/mobile/player#turn-runsite-card"
 
         def goto(self, url: str, wait_until: str, timeout: int) -> None:
-            assert url == "http://127.0.0.1:5010/#turn-runsite-card"
+            assert url == (
+                "http://127.0.0.1:5010/"
+                "?sessionId=synthetic-probe&grant=synthetic-probe"
+                "&tracking=synthetic-probe#turn-runsite-card?grant=synthetic-fragment"
+            )
             assert wait_until == "domcontentloaded"
             assert 0 < timeout <= 5_000
 
         def wait_for_function(self, script: str, timeout: int) -> None:
             assert "currentUrl.pathname === '/mobile/player'" in script
             assert "currentUrl.hash === '#turn-runsite-card'" in script
+            assert "currentUrl.search === ''" in script
             assert 0 < timeout <= 5_000
 
         def locator(self, selector: str) -> FakeLocator:
@@ -3273,10 +3289,17 @@ def test_probe_landing_anchor_browser_redirect_returns_pass_when_hash_canonicali
     receipt = module.probe_landing_anchor_browser_redirect("http://127.0.0.1:5010", 5.0)
 
     assert receipt["status"] == "pass"
-    assert receipt["entryUrl"] == "http://127.0.0.1:5010/#turn-runsite-card"
+    assert receipt["entryUrl"] == (
+        "http://127.0.0.1:5010/"
+        "?sessionId=synthetic-probe&grant=synthetic-probe"
+        "&tracking=synthetic-probe#turn-runsite-card?grant=synthetic-fragment"
+    )
     assert receipt["finalUrl"] == "http://127.0.0.1:5010/mobile/player#turn-runsite-card"
     assert receipt["pathMatches"] is True
     assert receipt["hashMatches"] is True
+    assert receipt["expectedQuery"] == ""
+    assert receipt["finalQuery"] == ""
+    assert receipt["queryDropped"] is True
     assert receipt["title"] == "Player entry · Chummer"
     assert receipt["heading"] == "Player entry"
 
@@ -3490,15 +3513,7 @@ def test_verify_published_overlay_forces_probe_urls_and_clears_port_overrides(tm
         if path == "/status":
             return "<h1>Status</h1>"
         if path == "/":
-            return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                    'const normalizedHash = window.location.hash.split("?")[0];',
-                    "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
-                ]
-            )
+            return passing_landing_body(module)
         raise AssertionError(f"unexpected path {path}")
 
     monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)
@@ -3730,7 +3745,10 @@ def test_verify_published_overlay_rejects_preexisting_pass_receipt_when_child_cr
     assert not verification_receipt_path.exists()
 
 
-def test_verify_published_overlay_requires_landing_anchor_redirect_markers(tmp_path: Path, monkeypatch) -> None:
+def test_verify_published_overlay_requires_public_install_handoffs_and_query_dropping_redirect(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
     staging_root.mkdir(parents=True, exist_ok=True)
@@ -3746,15 +3764,7 @@ def test_verify_published_overlay_requires_landing_anchor_redirect_markers(tmp_p
         if path == "/status":
             return "<h1>Status</h1>"
         if path == "/":
-            return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                    'const normalizedHash = window.location.hash.split("?")[0];',
-                    "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
-                ]
-            )
+            return passing_landing_body(module)
         raise AssertionError(f"unexpected path {path}")
 
     monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)
@@ -3789,11 +3799,23 @@ def test_verify_published_overlay_requires_landing_anchor_redirect_markers(tmp_p
     assert receipt["status"] == "pass"
     assert receipt["landingMarkerStatus"] == "pass"
     assert receipt["landingMissingMarkers"] == []
+    assert receipt["landingForbiddenMarkers"] == []
+    assert receipt["landingMarkerChecks"]["buildPublicInstallHandoff"] is True
+    assert receipt["landingMarkerChecks"]["playPublicInstallHandoff"] is True
     assert receipt["landingMarkerChecks"]["turnAnchorNormalizedHash"] is True
     assert receipt["landingMarkerChecks"]["turnAnchorRedirect"] is True
+    assert all(receipt["landingForbiddenMarkerChecks"].values())
     assert receipt["landingBrowserRedirect"]["status"] == "pass"
+    assert receipt["landingBrowserRedirect"]["finalQuery"] == ""
+    assert receipt["landingBrowserRedirect"]["queryDropped"] is True
+    assert receipt["receiptSummary"]["landingHasBuildPublicInstallHandoff"] is True
+    assert receipt["receiptSummary"]["landingHasPlayPublicInstallHandoff"] is True
+    assert receipt["receiptSummary"]["landingRetiredMarkersAbsent"] is True
     assert receipt["receiptSummary"]["landingHasTurnAnchorRedirect"] is True
     assert receipt["receiptSummary"]["landingBrowserRedirectStatus"] == "pass"
+    assert receipt["receiptSummary"]["landingBrowserRedirectExpectedQuery"] == ""
+    assert receipt["receiptSummary"]["landingBrowserRedirectFinalQuery"] == ""
+    assert receipt["receiptSummary"]["landingBrowserRedirectQueryDropped"] is True
     assert receipt["localLiveSurfaceParity"]["status"] == "pass"
 
 
@@ -3813,15 +3835,7 @@ def test_verify_published_overlay_allows_release_posture_only_receipt_failures(t
         if path == "/status":
             return "<h1>Preview downloads</h1>"
         if path == "/":
-            return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                    'const normalizedHash = window.location.hash.split("?")[0];',
-                    "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
-                ]
-            )
+            return passing_landing_body(module)
         raise AssertionError(f"unexpected path {path}")
 
     monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)
@@ -3901,6 +3915,69 @@ def test_verify_published_overlay_allows_release_posture_only_receipt_failures(t
     assert receipt["localLiveSurfaceParity"]["status"] == "pass"
 
 
+def test_verify_published_overlay_rejects_retired_play_gate_marker(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    staging_root = tmp_path / "overlay" / "app"
+    staging_root.mkdir(parents=True, exist_ok=True)
+    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    verification_receipt_path = tmp_path / "verify.json"
+    release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
+
+    monkeypatch.setattr(module, "pick_free_port", lambda: 5012)
+
+    def fake_wait_for_http(base_url: str, path: str, timeout_seconds: float) -> str:
+        if path.startswith("/http_api/posts"):
+            return '{"data":[],"total":0}'
+        if path == "/status":
+            return "<h1>Status</h1>"
+        if path == "/":
+            return passing_landing_body(module) + '\ndata-disabled-target="/mobile/player"'
+        raise AssertionError(f"unexpected path {path}")
+
+    monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)
+    monkeypatch.setattr(module.subprocess, "Popen", lambda *args, **kwargs: _FakeProcess())
+    monkeypatch.setattr(
+        module,
+        "probe_landing_anchor_browser_redirect",
+        lambda base_url, timeout_seconds: passing_browser_redirect(),
+    )
+    monkeypatch.setattr(
+        module,
+        "verify_local_live_surface_parity",
+        lambda base_url, output_path, program_binding: passing_live_surface_parity(program_binding),
+    )
+
+    def fake_run(command, *, cwd, check, text, stdout, stderr, pass_fds):
+        write_child_verification_receipt(
+            verification_receipt_path,
+            release_channel_receipt,
+            release_channel_receipt_sha256,
+            command[command.index("--invocation-id") + 1],
+        )
+        return make_completed(stdout="verify ok\n")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    receipt = module.verify_published_overlay(
+        staging_root,
+        source_root=tmp_path / "source",
+        verify_timeout_seconds=5.0,
+        verification_receipt_path=verification_receipt_path,
+        release_channel_receipt=release_channel_receipt,
+        release_channel_receipt_sha256=release_channel_receipt_sha256,
+    )
+
+    assert receipt["status"] == "fail"
+    assert receipt["reason"] == "landing_forbidden_marker_present"
+    assert receipt["landingMarkerStatus"] == "fail"
+    assert 'data-disabled-target="/mobile/player"' in receipt["landingForbiddenMarkers"]
+    assert receipt["landingForbiddenMarkerChecks"]["playDisabledTarget"] is False
+    assert receipt["receiptSummary"]["landingRetiredMarkersAbsent"] is False
+
+
 def test_verify_published_overlay_fails_when_landing_anchor_redirect_marker_is_missing(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
@@ -3918,11 +3995,9 @@ def test_verify_published_overlay_fails_when_landing_anchor_redirect_marker_is_m
             return "<h1>Status</h1>"
         if path == "/":
             return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                ]
+                marker
+                for name, marker in module.REQUIRED_LANDING_MARKERS.items()
+                if name != "turnAnchorRedirect"
             )
         raise AssertionError(f"unexpected path {path}")
 
@@ -3954,7 +4029,9 @@ def test_verify_published_overlay_fails_when_landing_anchor_redirect_marker_is_m
     assert receipt["status"] == "fail"
     assert receipt["reason"] == "landing_marker_missing"
     assert receipt["landingMarkerStatus"] == "fail"
-    assert "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);" in receipt["landingMissingMarkers"]
+    assert "window.location.replace(`/mobile/player${normalizedHash}`);" in receipt[
+        "landingMissingMarkers"
+    ]
     assert receipt["receiptSummary"]["landingHasTurnAnchorRedirect"] is False
 
 
@@ -3974,15 +4051,7 @@ def test_verify_published_overlay_fails_when_browser_redirect_does_not_canonical
         if path == "/status":
             return "<h1>Status</h1>"
         if path == "/":
-            return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                    'const normalizedHash = window.location.hash.split("?")[0];',
-                    "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
-                ]
-            )
+            return passing_landing_body(module)
         raise AssertionError(f"unexpected path {path}")
 
     monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)
@@ -4034,6 +4103,80 @@ def test_verify_published_overlay_fails_when_browser_redirect_does_not_canonical
     assert receipt["receiptSummary"]["landingBrowserRedirectHashMatches"] is False
 
 
+def test_verify_published_overlay_fails_when_browser_redirect_leaks_synthetic_query(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    staging_root = tmp_path / "overlay" / "app"
+    staging_root.mkdir(parents=True, exist_ok=True)
+    (staging_root / "Chummer.Run.Api.dll").write_text("dll\n", encoding="utf-8")
+    verification_receipt_path = tmp_path / "verify.json"
+    release_channel_receipt, release_channel_receipt_sha256 = write_release_channel_receipt(tmp_path)
+
+    monkeypatch.setattr(module, "pick_free_port", lambda: 5013)
+
+    def fake_wait_for_http(base_url: str, path: str, timeout_seconds: float) -> str:
+        if path.startswith("/http_api/posts"):
+            return '{"data":[],"total":0}'
+        if path == "/status":
+            return "<h1>Status</h1>"
+        if path == "/":
+            return passing_landing_body(module)
+        raise AssertionError(f"unexpected path {path}")
+
+    leaked_query = "sessionId=synthetic-probe&grant=synthetic-probe&tracking=synthetic-probe"
+    redirect_receipt = passing_browser_redirect()
+    redirect_receipt.update(
+        {
+            "finalUrl": f"http://127.0.0.1:5000/mobile/player?{leaked_query}#turn-runsite-card",
+            "finalQuery": leaked_query,
+            "queryDropped": False,
+        }
+    )
+
+    monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)
+    monkeypatch.setattr(module.subprocess, "Popen", lambda *args, **kwargs: _FakeProcess())
+    monkeypatch.setattr(
+        module,
+        "probe_landing_anchor_browser_redirect",
+        lambda base_url, timeout_seconds: redirect_receipt,
+    )
+    monkeypatch.setattr(
+        module,
+        "verify_local_live_surface_parity",
+        lambda base_url, output_path, program_binding: passing_live_surface_parity(program_binding),
+    )
+
+    def fake_run(command, *, cwd, check, text, stdout, stderr, pass_fds):
+        write_child_verification_receipt(
+            verification_receipt_path,
+            release_channel_receipt,
+            release_channel_receipt_sha256,
+            command[command.index("--invocation-id") + 1],
+        )
+        return make_completed(stdout="verify ok\n")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    receipt = module.verify_published_overlay(
+        staging_root,
+        source_root=tmp_path / "source",
+        verify_timeout_seconds=5.0,
+        verification_receipt_path=verification_receipt_path,
+        release_channel_receipt=release_channel_receipt,
+        release_channel_receipt_sha256=release_channel_receipt_sha256,
+    )
+
+    assert receipt["status"] == "fail"
+    assert receipt["reason"] == "landing_browser_redirect_failed"
+    assert receipt["landingBrowserRedirect"]["expectedQuery"] == ""
+    assert receipt["landingBrowserRedirect"]["finalQuery"] == leaked_query
+    assert receipt["landingBrowserRedirect"]["queryDropped"] is False
+    assert receipt["receiptSummary"]["landingBrowserRedirectFinalQuery"] == leaked_query
+    assert receipt["receiptSummary"]["landingBrowserRedirectQueryDropped"] is False
+
+
 def test_verify_published_overlay_fails_when_local_live_surface_parity_fails(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
     staging_root = tmp_path / "overlay" / "app"
@@ -4050,15 +4193,7 @@ def test_verify_published_overlay_fails_when_local_live_surface_parity_fails(tmp
         if path == "/status":
             return "<h1>Status</h1>"
         if path == "/":
-            return "\n".join(
-                [
-                    'data-disabled-target="/mobile/player"',
-                    'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
-                    "#turn-runsite-card",
-                    'const normalizedHash = window.location.hash.split("?")[0];',
-                    "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
-                ]
-            )
+            return passing_landing_body(module)
         raise AssertionError(f"unexpected path {path}")
 
     monkeypatch.setattr(module, "wait_for_http", fake_wait_for_http)

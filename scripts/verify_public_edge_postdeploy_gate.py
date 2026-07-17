@@ -1398,7 +1398,7 @@ OPTIONAL_PLAYWRIGHT_CONTRACTS = {
     "mobilePwaViewport": "chummer.mobile_pwa_viewport_smoke.v1",
     "pwaOfflineCache": "chummer.pwa_offline_cache.v2",
     "blazorNewRunnerMenu": "chummer.blazor_new_runner_menu.v1",
-    "frontdoorNavigationMobile": "chummer.frontdoor_mobile_launch.v2",
+    "frontdoorNavigationMobile": "chummer.frontdoor_mobile_install_boundary.v2",
     "frontdoorNavigationLedger": "chummer.black_ledger_globe_frontdoor.v1",
     "frontdoorNavigationAnchor": "chummer.frontdoor_mobile_anchor_redirect.v2",
 }
@@ -2825,30 +2825,28 @@ def frontdoor_mobile_artifact_matches_privacy_contract(mobile_artifact: dict[str
     return (
         receipt_contract(mobile_artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationMobile"]
         and not artifact_contains_raw_private_identity(mobile_artifact)
-        and mobile_artifact.get("private_identity_redacted") is True
-        and mobile_artifact.get("visible_player_url_private_identity_absent") is True
-        and visible_role_url_is_path_only(mobile_artifact.get("final_url"), "/mobile/player")
-        and mobile_artifact.get("player_session_context_present") is True
-        and mobile_artifact.get("player_device_context_present") is True
-        and mobile_artifact.get("visible_gm_url_private_identity_absent") is True
-        and visible_role_url_is_path_only(mobile_artifact.get("gm_final_url"), "/mobile/gm")
-        and mobile_artifact.get("gm_session_context_present") is True
-        and mobile_artifact.get("gm_device_context_present") is True
-        and str(mobile_artifact.get("gm_route") or "").strip() == "/mobile/gm"
-        and mobile_artifact.get("gm_route_session_id_present") is True
-        and mobile_artifact.get("gm_route_private_identity_redacted") is True
-        and mobile_artifact.get("player_session_handoff_private_identity_redacted") is True
-        and redacted_handoff_url_matches_contract(
-            mobile_artifact.get("player_session_handoff_url"),
-            "/mobile/player",
-            "Player",
+        and string_list(mobile_artifact.get("public_install_targets"))
+        == ["/build", "/mobile/player"]
+        and str(mobile_artifact.get("device_routing") or "").strip()
+        == "auto_ua_ch_mobile_direct"
+        and str(mobile_artifact.get("play_surface") or "").strip() == "install-only"
+        and str(mobile_artifact.get("play_authority") or "").strip() == "none"
+        and str(mobile_artifact.get("live_session") or "").strip() == "unavailable"
+        and str(mobile_artifact.get("pwa_manifest_path") or "").strip()
+        == "/manifest.player.webmanifest"
+        and mobile_artifact.get("live_turn_companion_shell") is False
+        and all(
+            type(mobile_artifact.get(field)) is int
+            and mobile_artifact.get(field) == 0
+            for field in (
+                "private_browser_state_keys",
+                "play_api_requests",
+                "blazor_circuit_requests",
+                "analytics_requests",
+                "private_query_requests",
+            )
         )
-        and mobile_artifact.get("gm_session_handoff_private_identity_redacted") is True
-        and redacted_handoff_url_matches_contract(
-            mobile_artifact.get("gm_session_handoff_url"),
-            "/mobile/gm",
-            "GameMaster",
-        )
+        and mobile_artifact.get("page_errors") == []
     )
 
 
@@ -2886,31 +2884,35 @@ def pwa_offline_artifact_matches_privacy_contract(artifact: dict[str, Any]) -> b
     )
 
 
+def frontdoor_ledger_artifact_matches_current_contract(ledger_artifact: dict[str, Any]) -> bool:
+    return (
+        receipt_contract(ledger_artifact)
+        == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationLedger"]
+        and not artifact_contains_raw_private_identity(ledger_artifact)
+        and str(ledger_artifact.get("route") or "").strip() == "/"
+        and string_list(ledger_artifact.get("open_menu_targets"))
+        == [
+            "/build",
+            "/mobile/player",
+            "/login?next=%2Faccount%2Faccess",
+        ]
+        and ledger_artifact.get("gated_targets") == []
+        and string_list(ledger_artifact.get("public_targets")) == ["Build", "Play"]
+        and ledger_artifact.get("ledger_primary") is False
+    )
+
+
 def frontdoor_anchor_artifact_matches_current_contract(anchor_artifact: dict[str, Any]) -> bool:
-    entry_url = str(anchor_artifact.get("entry_url") or "").strip()
     final_path = str(anchor_artifact.get("final_pathname") or "").strip()
+    final_search = str(anchor_artifact.get("final_search") or "")
     final_hash = str(anchor_artifact.get("final_hash") or "").strip()
-    manifest_path = str(anchor_artifact.get("pwa_manifest_path") or "").strip()
-    role = str(anchor_artifact.get("pwa_role") or "").strip()
-    blazor_shell = str(anchor_artifact.get("blazor_shell") or "").strip()
     return (
         receipt_contract(anchor_artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"]
         and not artifact_contains_raw_private_identity(anchor_artifact)
-        and frontdoor_anchor_entry_url_matches_contract(entry_url)
-        and visible_role_url_is_path_only(
-            anchor_artifact.get("final_url"),
-            "/mobile/player",
-            "#turn-runsite-card",
-        )
+        and anchor_artifact.get("entry_had_query") is True
         and final_path == "/mobile/player"
+        and final_search == ""
         and final_hash == "#turn-runsite-card"
-        and manifest_path == "/manifest.player.webmanifest"
-        and role == "Player"
-        and blazor_shell == "interactive-server"
-        and anchor_artifact.get("private_identity_redacted") is True
-        and anchor_artifact.get("visible_url_private_identity_absent") is True
-        and anchor_artifact.get("session_context_present") is True
-        and anchor_artifact.get("device_context_present") is True
     )
 
 
@@ -3550,74 +3552,30 @@ def compose_status(
         if dialog_title != "New runner":
             failures.append("Blazor new-runner Playwright proof did not reopen the New runner dialog")
     if frontdoor_navigation:
-        raw_mobile_artifact = frontdoor_navigation.get("mobileArtifact") if isinstance(frontdoor_navigation.get("mobileArtifact"), dict) else {}
-        raw_ledger_artifact = frontdoor_navigation.get("ledgerArtifact") if isinstance(frontdoor_navigation.get("ledgerArtifact"), dict) else {}
-        raw_anchor_artifact = frontdoor_navigation.get("anchorArtifact") if isinstance(frontdoor_navigation.get("anchorArtifact"), dict) else {}
+        raw_mobile_artifact = artifact_object(frontdoor_navigation.get("mobileArtifact"))
+        raw_ledger_artifact = artifact_object(frontdoor_navigation.get("ledgerArtifact"))
+        raw_anchor_artifact = artifact_object(frontdoor_navigation.get("anchorArtifact"))
         mobile_artifact = redact_private_identity(raw_mobile_artifact)
         ledger_artifact = redact_private_identity(raw_ledger_artifact)
         anchor_artifact = redact_private_identity(raw_anchor_artifact)
         frontdoor_navigation_stderr_tail = str(
             redact_private_identity(frontdoor_navigation.get("stderrTail") or "")
         ).strip()
-        frontdoor_navigation_artifacts_missing = not mobile_artifact and not ledger_artifact and not anchor_artifact
-        mobile_artifact_privacy_contract_satisfied = frontdoor_mobile_artifact_matches_privacy_contract(
-            raw_mobile_artifact
+        frontdoor_navigation_artifacts_missing = (
+            not mobile_artifact and not ledger_artifact and not anchor_artifact
         )
-        anchor_artifact_privacy_contract_satisfied = frontdoor_anchor_artifact_matches_current_contract(
-            raw_anchor_artifact
+        mobile_artifact_privacy_contract_satisfied = (
+            frontdoor_mobile_artifact_matches_privacy_contract(raw_mobile_artifact)
         )
-        frontdoor_gated_targets = string_set(mobile_artifact.get("gated_targets"))
-        frontdoor_public_targets = string_set(mobile_artifact.get("public_targets"))
-        frontdoor_homepage_lane_text = str(mobile_artifact.get("homepage_lane_text") or "").strip()
-        frontdoor_play_route = str(mobile_artifact.get("play_route") or "").strip()
-        frontdoor_play_sign_in_route = str(mobile_artifact.get("play_sign_in_route") or "").strip()
-        frontdoor_direct_player_route = str(mobile_artifact.get("direct_player_route") or "").strip()
-        frontdoor_final_path = ""
-        frontdoor_final_url = str(mobile_artifact.get("final_url") or "").strip()
-        if frontdoor_final_url:
-            try:
-                frontdoor_final_path = urlparse(frontdoor_final_url).path
-            except ValueError:
-                frontdoor_final_path = ""
-        frontdoor_http_status = int_value(mobile_artifact.get("direct_player_http_status"))
-        frontdoor_pwa_manifest_path = str(mobile_artifact.get("pwa_manifest_path") or "").strip()
-        frontdoor_pwa_role = str(mobile_artifact.get("pwa_role") or "").strip()
-        frontdoor_blazor_shell = str(mobile_artifact.get("blazor_shell") or "").strip()
-        frontdoor_rybbit_tag = str(mobile_artifact.get("rybbit_tag") or "").strip()
-        frontdoor_rybbit_route = str(mobile_artifact.get("rybbit_route") or "").strip()
-        frontdoor_rybbit_mode = str(mobile_artifact.get("rybbit_mode") or "").strip()
-        frontdoor_rybbit_role = str(mobile_artifact.get("rybbit_role") or "").strip()
-        player_handoff_url = str(mobile_artifact.get("player_session_handoff_url") or "").strip()
-        player_handoff_status = str(mobile_artifact.get("player_session_handoff_status") or "").strip()
-        player_handoff_link_text = str(mobile_artifact.get("player_session_handoff_link_text") or "").strip()
-        frontdoor_gm_route = str(mobile_artifact.get("gm_route") or "").strip()
-        frontdoor_gm_final_path = ""
-        frontdoor_gm_final_url = str(mobile_artifact.get("gm_final_url") or "").strip()
-        if frontdoor_gm_final_url:
-            try:
-                frontdoor_gm_final_path = urlparse(frontdoor_gm_final_url).path
-            except ValueError:
-                frontdoor_gm_final_path = ""
-        frontdoor_gm_http_status = int_value(mobile_artifact.get("gm_http_status"))
-        frontdoor_gm_pwa_manifest_path = str(mobile_artifact.get("gm_pwa_manifest_path") or "").strip()
-        frontdoor_gm_pwa_role = str(mobile_artifact.get("gm_pwa_role") or "").strip()
-        frontdoor_gm_blazor_shell = str(mobile_artifact.get("gm_blazor_shell") or "").strip()
-        frontdoor_gm_rybbit_tag = str(mobile_artifact.get("gm_rybbit_tag") or "").strip()
-        frontdoor_gm_rybbit_route = str(mobile_artifact.get("gm_rybbit_route") or "").strip()
-        frontdoor_gm_rybbit_mode = str(mobile_artifact.get("gm_rybbit_mode") or "").strip()
-        frontdoor_gm_rybbit_role = str(mobile_artifact.get("gm_rybbit_role") or "").strip()
-        gm_handoff_url = str(mobile_artifact.get("gm_session_handoff_url") or "").strip()
-        gm_handoff_status = str(mobile_artifact.get("gm_session_handoff_status") or "").strip()
-        gm_handoff_link_text = str(mobile_artifact.get("gm_session_handoff_link_text") or "").strip()
-        frontdoor_anchor_entry_url = str(anchor_artifact.get("entry_url") or "").strip()
-        frontdoor_anchor_final_url = str(anchor_artifact.get("final_url") or "").strip()
-        frontdoor_anchor_final_path = str(anchor_artifact.get("final_pathname") or "").strip()
-        frontdoor_anchor_final_hash = str(anchor_artifact.get("final_hash") or "").strip()
-        frontdoor_anchor_pwa_manifest_path = str(anchor_artifact.get("pwa_manifest_path") or "").strip()
-        frontdoor_anchor_pwa_role = str(anchor_artifact.get("pwa_role") or "").strip()
-        frontdoor_anchor_blazor_shell = str(anchor_artifact.get("blazor_shell") or "").strip()
-        frontdoor_anchor_failure = str(anchor_artifact.get("failure") or "").strip()
-        frontdoor_anchor_current_contract_satisfied = anchor_artifact_privacy_contract_satisfied
+        ledger_artifact_current_contract_satisfied = (
+            frontdoor_ledger_artifact_matches_current_contract(raw_ledger_artifact)
+        )
+        frontdoor_anchor_current_contract_satisfied = (
+            frontdoor_anchor_artifact_matches_current_contract(raw_anchor_artifact)
+        )
+        frontdoor_homepage_lane_text = str(
+            mobile_artifact.get("homepage_lane_text") or ""
+        ).strip()
         expected_frontdoor_homepage_lane_text = expected_homepage_lane_text(
             expected_release_status,
             expected_release_version,
@@ -3639,7 +3597,10 @@ def compose_status(
                 )
                 first_line = normalized_stderr_tail.splitlines()[0].strip()
                 if first_line:
-                    failures.append("front-door navigation Playwright proof failed before artifacts were written: " + first_line)
+                    failures.append(
+                        "front-door navigation Playwright proof failed before artifacts were written: "
+                        + first_line
+                    )
         else:
             if receipt_contract(mobile_artifact) != OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationMobile"]:
                 failures.append(
@@ -3657,163 +3618,60 @@ def compose_status(
                     + OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"]
                 )
             if artifact_contains_raw_private_identity(raw_mobile_artifact):
-                failures.append("front-door navigation mobile artifact contains raw private session or device identity")
+                failures.append(
+                    "front-door navigation mobile artifact contains raw private session or device identity"
+                )
+            if artifact_contains_raw_private_identity(raw_ledger_artifact):
+                failures.append(
+                    "front-door navigation ledger artifact contains raw private session or device identity"
+                )
             if artifact_contains_raw_private_identity(raw_anchor_artifact):
-                failures.append("front-door navigation anchor artifact contains raw private session or device identity")
-            if receipt_contract(mobile_artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationMobile"] and not mobile_artifact_privacy_contract_satisfied:
-                failures.append("front-door navigation mobile artifact does not satisfy the redacted proof contract")
-            if receipt_contract(anchor_artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"] and not anchor_artifact_privacy_contract_satisfied:
-                failures.append("front-door navigation anchor artifact does not satisfy the redacted proof contract")
-            if "Build" not in frontdoor_gated_targets:
-                failures.append("front-door navigation does not gate Build")
-            if "Build" in frontdoor_public_targets:
-                failures.append("front-door navigation exposes Build as public")
-            if "Play" not in frontdoor_gated_targets:
-                failures.append("front-door navigation does not gate Play")
-            if "Play" in frontdoor_public_targets:
-                failures.append("front-door navigation exposes Play as public")
-            if not frontdoor_homepage_lane_text:
-                failures.append("front-door navigation homepage does not disclose current public lane")
-            if expected_frontdoor_homepage_lane_text and frontdoor_homepage_lane_matches_release_channel is not True:
-                failures.append("front-door navigation homepage current public lane copy does not match release posture")
-            if frontdoor_play_route != "/mobile/player":
-                failures.append("front-door navigation Play route is not /mobile/player")
-            if frontdoor_play_sign_in_route != "/login?next=%2Fmobile%2Fplayer":
-                failures.append("front-door navigation Play sign-in route is not /login?next=%2Fmobile%2Fplayer")
-            if frontdoor_direct_player_route != "/mobile/player":
-                failures.append("front-door navigation direct player route is not /mobile/player")
-            if frontdoor_http_status != 200:
-                failures.append("front-door navigation Play launch did not return HTTP 200")
-            if frontdoor_final_path != "/mobile/player":
-                failures.append("front-door navigation Play launch did not land on /mobile/player")
-            if not visible_role_url_is_path_only(frontdoor_final_url, "/mobile/player"):
-                failures.append("front-door navigation Play launch visible URL is not path-only after sanitization")
-            if mobile_artifact.get("visible_player_url_private_identity_absent") is not True:
-                failures.append("front-door navigation Play launch did not prove private identity was removed from the visible URL")
-            if mobile_artifact.get("player_session_context_present") is not True:
-                failures.append("front-door navigation Play launch did not prove nonempty session context")
-            if mobile_artifact.get("player_device_context_present") is not True:
-                failures.append("front-door navigation Play launch did not prove nonempty device context")
-            if mobile_artifact.get("live_turn_companion_shell") is not True:
-                failures.append("front-door navigation Play launch did not prove the live turn companion shell")
-            if frontdoor_pwa_manifest_path != "/manifest.player.webmanifest":
-                failures.append("front-door navigation Play launch did not activate the player PWA manifest")
-            if frontdoor_pwa_role != "Player":
-                failures.append("front-door navigation Play launch did not prove the Player role")
-            if frontdoor_blazor_shell != "interactive-server":
-                failures.append("front-door navigation Play launch did not prove the interactive Blazor shell")
-            if mobile_artifact.get("rybbit_configured") is not True or frontdoor_rybbit_tag != "mobile_play_shell":
-                failures.append("front-door navigation Play launch did not prove the Rybbit mobile shell config")
-            if frontdoor_rybbit_route != "/mobile/player" or frontdoor_rybbit_mode != "player" or frontdoor_rybbit_role != "Player":
-                failures.append("front-door navigation Play launch did not prove the Player Rybbit role config")
-            if mobile_artifact.get("rybbit_site_id_present") is not True or mobile_artifact.get("rybbit_script_url_allowed") is not True:
-                failures.append("front-door navigation Play launch did not prove the Rybbit provider config")
-            if mobile_artifact.get("rybbit_skip_mobile_paths") is not True:
-                failures.append("front-door navigation Play launch did not prove Rybbit skips mobile paths")
-            if mobile_artifact.get("rybbit_mask_mobile_paths") is not True:
-                failures.append("front-door navigation Play launch did not prove Rybbit masks mobile paths")
-            if mobile_artifact.get("rybbit_masks_private_play_routes") is not True:
-                failures.append("front-door navigation Play launch did not prove Rybbit masks private play routes")
-            if mobile_artifact.get("rybbit_replay_blocks_turn_root") is not True:
-                failures.append("front-door navigation Play launch did not prove Rybbit replay blocks turn content")
-            if not redacted_handoff_url_matches_contract(player_handoff_url, "/mobile/player", "Player"):
-                failures.append("front-door navigation Player session handoff URL is not safely redacted")
-            if mobile_artifact.get("player_session_handoff_private_identity_redacted") is not True:
-                failures.append("front-door navigation Player session handoff proof did not redact private identity")
-            if player_handoff_status != "Session handoff is ready in the link above.":
-                failures.append("front-door navigation Player session handoff did not expose ready status")
-            if player_handoff_link_text != "Open session handoff link":
-                failures.append("front-door navigation Player session handoff did not relabel the visible route")
-            if mobile_artifact.get("player_session_handoff_preserves_session") is not True:
-                failures.append("front-door navigation Player session handoff did not preserve session id")
-            if mobile_artifact.get("player_session_handoff_preserves_role") is not True:
-                failures.append("front-door navigation Player session handoff did not preserve role")
-            if mobile_artifact.get("player_session_handoff_strips_device") is not True:
-                failures.append("front-door navigation Player session handoff leaked sender device id")
-            if mobile_artifact.get("player_session_handoff_sender_device_id_present") is not True:
-                failures.append("front-door navigation Player session handoff did not prove a sender device id was stripped")
-            if frontdoor_gm_route != "/mobile/gm":
-                failures.append("front-door navigation GM switch route is not /mobile/gm")
-            if mobile_artifact.get("gm_route_session_id_present") is not True:
-                failures.append("front-door navigation GM switch did not prove session handoff context")
-            if mobile_artifact.get("gm_route_private_identity_redacted") is not True:
-                failures.append("front-door navigation GM switch proof did not redact private identity")
-            if frontdoor_gm_http_status != 200:
-                failures.append("front-door navigation GM switch did not return HTTP 200")
-            if frontdoor_gm_final_path != "/mobile/gm":
-                failures.append("front-door navigation GM switch did not land on /mobile/gm")
-            if not visible_role_url_is_path_only(frontdoor_gm_final_url, "/mobile/gm"):
-                failures.append("front-door navigation GM visible URL is not path-only after sanitization")
-            if mobile_artifact.get("visible_gm_url_private_identity_absent") is not True:
-                failures.append("front-door navigation GM switch did not prove private identity was removed from the visible URL")
-            if mobile_artifact.get("gm_session_context_present") is not True:
-                failures.append("front-door navigation GM switch did not prove nonempty session context")
-            if mobile_artifact.get("gm_device_context_present") is not True:
-                failures.append("front-door navigation GM switch did not prove nonempty device context")
-            if mobile_artifact.get("gm_live_turn_companion_shell") is not True:
-                failures.append("front-door navigation GM switch did not prove the live turn companion shell")
-            if frontdoor_gm_pwa_manifest_path != "/manifest.gm.webmanifest":
-                failures.append("front-door navigation GM switch did not activate the GM PWA manifest")
-            if frontdoor_gm_pwa_role != "GameMaster":
-                failures.append("front-door navigation GM switch did not prove the GameMaster role")
-            if frontdoor_gm_blazor_shell != "interactive-server":
-                failures.append("front-door navigation GM switch did not prove the interactive Blazor shell")
-            if mobile_artifact.get("gm_rybbit_configured") is not True or frontdoor_gm_rybbit_tag != "mobile_play_shell":
-                failures.append("front-door navigation GM switch did not prove the Rybbit mobile shell config")
-            if frontdoor_gm_rybbit_route != "/mobile/gm" or frontdoor_gm_rybbit_mode != "gm" or frontdoor_gm_rybbit_role != "GameMaster":
-                failures.append("front-door navigation GM switch did not prove the GM Rybbit role config")
-            if mobile_artifact.get("gm_rybbit_site_id_present") is not True or mobile_artifact.get("gm_rybbit_script_url_allowed") is not True:
-                failures.append("front-door navigation GM switch did not prove the Rybbit provider config")
-            if mobile_artifact.get("gm_rybbit_skip_mobile_paths") is not True:
-                failures.append("front-door navigation GM switch did not prove Rybbit skips mobile paths")
-            if mobile_artifact.get("gm_rybbit_mask_mobile_paths") is not True:
-                failures.append("front-door navigation GM switch did not prove Rybbit masks mobile paths")
-            if mobile_artifact.get("gm_rybbit_masks_private_play_routes") is not True:
-                failures.append("front-door navigation GM switch did not prove Rybbit masks private play routes")
-            if mobile_artifact.get("gm_rybbit_replay_blocks_turn_root") is not True:
-                failures.append("front-door navigation GM switch did not prove Rybbit replay blocks turn content")
-            if not redacted_handoff_url_matches_contract(gm_handoff_url, "/mobile/gm", "GameMaster"):
-                failures.append("front-door navigation GM session handoff URL is not safely redacted")
-            if mobile_artifact.get("gm_session_handoff_private_identity_redacted") is not True:
-                failures.append("front-door navigation GM session handoff proof did not redact private identity")
-            if gm_handoff_status != "Session handoff is ready in the link above.":
-                failures.append("front-door navigation GM session handoff did not expose ready status")
-            if gm_handoff_link_text != "Open session handoff link":
-                failures.append("front-door navigation GM session handoff did not relabel the visible route")
-            if mobile_artifact.get("gm_session_handoff_preserves_session") is not True:
-                failures.append("front-door navigation GM session handoff did not preserve session id")
-            if mobile_artifact.get("gm_session_handoff_preserves_role") is not True:
-                failures.append("front-door navigation GM session handoff did not preserve role")
-            if mobile_artifact.get("gm_session_handoff_strips_device") is not True:
-                failures.append("front-door navigation GM session handoff leaked sender device id")
-            if mobile_artifact.get("gm_session_handoff_sender_device_id_present") is not True:
-                failures.append("front-door navigation GM session handoff did not prove a sender device id was stripped")
-            if not frontdoor_anchor_entry_url_matches_contract(frontdoor_anchor_entry_url):
-                failures.append("front-door navigation homepage anchor proof did not start from /#turn-runsite-card")
-            if frontdoor_anchor_final_path != "/mobile/player":
-                failures.append("front-door navigation homepage anchor proof did not land on /mobile/player")
-            if frontdoor_anchor_final_hash != "#turn-runsite-card":
-                failures.append("front-door navigation homepage anchor proof did not preserve #turn-runsite-card")
-            if frontdoor_anchor_pwa_manifest_path != "/manifest.player.webmanifest":
-                failures.append("front-door navigation homepage anchor proof did not activate the player PWA manifest")
-            if frontdoor_anchor_pwa_role != "Player":
-                failures.append("front-door navigation homepage anchor proof did not prove the Player role")
-            if frontdoor_anchor_blazor_shell != "interactive-server":
-                failures.append("front-door navigation homepage anchor proof did not prove the interactive Blazor shell")
-            if not visible_role_url_is_path_only(
-                frontdoor_anchor_final_url,
-                "/mobile/player",
-                "#turn-runsite-card",
+                failures.append(
+                    "front-door navigation anchor artifact contains raw private session or device identity"
+                )
+            if (
+                receipt_contract(mobile_artifact)
+                == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationMobile"]
+                and not mobile_artifact_privacy_contract_satisfied
             ):
-                failures.append("front-door navigation homepage anchor visible URL is not path-only after sanitization")
-            if anchor_artifact.get("visible_url_private_identity_absent") is not True:
-                failures.append("front-door navigation homepage anchor did not prove private identity was removed from the visible URL")
-            if anchor_artifact.get("session_context_present") is not True:
-                failures.append("front-door navigation homepage anchor proof did not reach a session-backed player route")
-            if anchor_artifact.get("device_context_present") is not True:
-                failures.append("front-door navigation homepage anchor proof did not reach a device-backed player route")
-            if frontdoor_anchor_failure:
-                failures.append("front-door navigation homepage anchor proof failed: " + frontdoor_anchor_failure)
+                failures.append(
+                    "front-door navigation mobile artifact does not satisfy the default-denied public install contract"
+                )
+            if (
+                receipt_contract(ledger_artifact)
+                == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationLedger"]
+                and not ledger_artifact_current_contract_satisfied
+            ):
+                failures.append(
+                    "front-door navigation ledger artifact does not expose public Build and Play handoffs"
+                )
+            if (
+                receipt_contract(anchor_artifact)
+                == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"]
+                and not frontdoor_anchor_current_contract_satisfied
+            ):
+                failures.append(
+                    "front-door navigation anchor artifact does not satisfy the query-dropping redirect contract"
+                )
+            anchor_failure_stage = str(anchor_artifact.get("failure_stage") or "").strip()
+            anchor_failure_type = str(anchor_artifact.get("failure_type") or "").strip()
+            if anchor_failure_type:
+                failures.append(
+                    "front-door navigation anchor proof failed"
+                    + (f" at {anchor_failure_stage}" if anchor_failure_stage else "")
+                    + f": {anchor_failure_type}"
+                )
+            if not frontdoor_homepage_lane_text:
+                failures.append(
+                    "front-door navigation homepage does not disclose current public lane"
+                )
+            if (
+                expected_frontdoor_homepage_lane_text
+                and frontdoor_homepage_lane_matches_release_channel is not True
+            ):
+                failures.append(
+                    "front-door navigation homepage current public lane copy does not match release posture"
+                )
 
     preflight_findings = preflight.get("findings") if isinstance(preflight.get("findings"), list) else []
     preflight_overlay_fingerprint = (
@@ -3984,110 +3842,41 @@ def compose_status(
         )
         result["childReceipts"]["mobilePwaViewport"] = mobile_pwa_viewport
     if frontdoor_navigation:
-        mobile_artifact = redact_private_identity(
-            frontdoor_navigation.get("mobileArtifact") if isinstance(frontdoor_navigation.get("mobileArtifact"), dict) else {}
-        )
-        ledger_artifact = redact_private_identity(
-            frontdoor_navigation.get("ledgerArtifact") if isinstance(frontdoor_navigation.get("ledgerArtifact"), dict) else {}
-        )
-        anchor_artifact = redact_private_identity(
-            frontdoor_navigation.get("anchorArtifact") if isinstance(frontdoor_navigation.get("anchorArtifact"), dict) else {}
-        )
         result["frontdoorNavigationStatus"] = frontdoor_navigation.get("status")
         result["frontdoorNavigationExitCode"] = frontdoor_navigation.get("exitCode")
         result["frontdoorNavigationArtifactDir"] = frontdoor_navigation.get("artifactDir")
         result["frontdoorNavigationMobileArtifactContract"] = receipt_contract(mobile_artifact)
         result["frontdoorNavigationLedgerArtifactContract"] = receipt_contract(ledger_artifact)
         result["frontdoorNavigationAnchorArtifactContract"] = receipt_contract(anchor_artifact)
-        result["frontdoorNavigationGatedTargets"] = mobile_artifact.get("gated_targets")
-        result["frontdoorNavigationPublicTargets"] = mobile_artifact.get("public_targets")
         result["frontdoorNavigationHomepageLaneText"] = mobile_artifact.get("homepage_lane_text")
         result["frontdoorNavigationHomepageLaneExpected"] = expected_frontdoor_homepage_lane_text
         result["frontdoorNavigationHomepageLaneMatchesReleaseChannel"] = frontdoor_homepage_lane_matches_release_channel
-        result["frontdoorNavigationPlayRoute"] = mobile_artifact.get("play_route")
-        result["frontdoorNavigationPlaySignInRoute"] = mobile_artifact.get("play_sign_in_route")
-        result["frontdoorNavigationDirectPlayerRoute"] = mobile_artifact.get("direct_player_route")
-        result["frontdoorNavigationDirectPlayerHttpStatus"] = mobile_artifact.get("direct_player_http_status")
-        result["frontdoorNavigationFinalUrl"] = mobile_artifact.get("final_url")
-        result["frontdoorNavigationPrivateIdentityRedacted"] = mobile_artifact.get("private_identity_redacted")
-        result["frontdoorNavigationVisiblePlayerUrlPrivateIdentityAbsent"] = mobile_artifact.get("visible_player_url_private_identity_absent")
-        result["frontdoorNavigationPlayerSessionContextPresent"] = mobile_artifact.get("player_session_context_present")
-        result["frontdoorNavigationPlayerDeviceContextPresent"] = mobile_artifact.get("player_device_context_present")
-        result["frontdoorNavigationLiveTurnCompanionShell"] = mobile_artifact.get("live_turn_companion_shell")
+        result["frontdoorNavigationPublicInstallTargets"] = mobile_artifact.get("public_install_targets")
+        result["frontdoorNavigationDeviceRouting"] = mobile_artifact.get("device_routing")
+        result["frontdoorNavigationPlaySurface"] = mobile_artifact.get("play_surface")
+        result["frontdoorNavigationPlayAuthority"] = mobile_artifact.get("play_authority")
+        result["frontdoorNavigationLiveSession"] = mobile_artifact.get("live_session")
         result["frontdoorNavigationPwaManifestPath"] = mobile_artifact.get("pwa_manifest_path")
-        result["frontdoorNavigationPwaRole"] = mobile_artifact.get("pwa_role")
-        result["frontdoorNavigationBlazorShell"] = mobile_artifact.get("blazor_shell")
-        result["frontdoorNavigationRybbitConfigured"] = mobile_artifact.get("rybbit_configured")
-        result["frontdoorNavigationRybbitTag"] = mobile_artifact.get("rybbit_tag")
-        result["frontdoorNavigationRybbitRoute"] = mobile_artifact.get("rybbit_route")
-        result["frontdoorNavigationRybbitMode"] = mobile_artifact.get("rybbit_mode")
-        result["frontdoorNavigationRybbitRole"] = mobile_artifact.get("rybbit_role")
-        result["frontdoorNavigationRybbitSiteIdPresent"] = mobile_artifact.get("rybbit_site_id_present")
-        result["frontdoorNavigationRybbitScriptUrlPresent"] = mobile_artifact.get("rybbit_script_url_present")
-        result["frontdoorNavigationRybbitScriptUrlAllowed"] = mobile_artifact.get("rybbit_script_url_allowed")
-        result["frontdoorNavigationRybbitSkipPatterns"] = mobile_artifact.get("rybbit_skip_patterns")
-        result["frontdoorNavigationRybbitMaskPatterns"] = mobile_artifact.get("rybbit_mask_patterns")
-        result["frontdoorNavigationRybbitSkipMobilePaths"] = mobile_artifact.get("rybbit_skip_mobile_paths")
-        result["frontdoorNavigationRybbitMaskMobilePaths"] = mobile_artifact.get("rybbit_mask_mobile_paths")
-        result["frontdoorNavigationRybbitMasksPrivatePlayRoutes"] = mobile_artifact.get("rybbit_masks_private_play_routes")
-        result["frontdoorNavigationRybbitReplayBlockSelector"] = mobile_artifact.get("rybbit_replay_block_selector")
-        result["frontdoorNavigationRybbitReplayBlocksTurnRoot"] = mobile_artifact.get("rybbit_replay_blocks_turn_root")
-        result["frontdoorNavigationPlayerSessionHandoffUrl"] = mobile_artifact.get("player_session_handoff_url")
-        result["frontdoorNavigationPlayerSessionHandoffStatus"] = mobile_artifact.get("player_session_handoff_status")
-        result["frontdoorNavigationPlayerSessionHandoffLinkText"] = mobile_artifact.get("player_session_handoff_link_text")
-        result["frontdoorNavigationPlayerSessionHandoffPreservesSession"] = mobile_artifact.get("player_session_handoff_preserves_session")
-        result["frontdoorNavigationPlayerSessionHandoffPreservesRole"] = mobile_artifact.get("player_session_handoff_preserves_role")
-        result["frontdoorNavigationPlayerSessionHandoffStripsDevice"] = mobile_artifact.get("player_session_handoff_strips_device")
-        result["frontdoorNavigationPlayerSessionHandoffSenderDeviceIdPresent"] = mobile_artifact.get("player_session_handoff_sender_device_id_present")
-        result["frontdoorNavigationPlayerSessionHandoffPrivateIdentityRedacted"] = mobile_artifact.get("player_session_handoff_private_identity_redacted")
-        result["frontdoorNavigationGmRoute"] = mobile_artifact.get("gm_route")
-        result["frontdoorNavigationGmRouteSessionIdPresent"] = mobile_artifact.get("gm_route_session_id_present")
-        result["frontdoorNavigationGmRoutePrivateIdentityRedacted"] = mobile_artifact.get("gm_route_private_identity_redacted")
-        result["frontdoorNavigationGmHttpStatus"] = mobile_artifact.get("gm_http_status")
-        result["frontdoorNavigationGmFinalUrl"] = mobile_artifact.get("gm_final_url")
-        result["frontdoorNavigationVisibleGmUrlPrivateIdentityAbsent"] = mobile_artifact.get("visible_gm_url_private_identity_absent")
-        result["frontdoorNavigationGmSessionContextPresent"] = mobile_artifact.get("gm_session_context_present")
-        result["frontdoorNavigationGmDeviceContextPresent"] = mobile_artifact.get("gm_device_context_present")
-        result["frontdoorNavigationGmLiveTurnCompanionShell"] = mobile_artifact.get("gm_live_turn_companion_shell")
-        result["frontdoorNavigationGmPwaManifestPath"] = mobile_artifact.get("gm_pwa_manifest_path")
-        result["frontdoorNavigationGmPwaRole"] = mobile_artifact.get("gm_pwa_role")
-        result["frontdoorNavigationGmBlazorShell"] = mobile_artifact.get("gm_blazor_shell")
-        result["frontdoorNavigationGmRybbitConfigured"] = mobile_artifact.get("gm_rybbit_configured")
-        result["frontdoorNavigationGmRybbitTag"] = mobile_artifact.get("gm_rybbit_tag")
-        result["frontdoorNavigationGmRybbitRoute"] = mobile_artifact.get("gm_rybbit_route")
-        result["frontdoorNavigationGmRybbitMode"] = mobile_artifact.get("gm_rybbit_mode")
-        result["frontdoorNavigationGmRybbitRole"] = mobile_artifact.get("gm_rybbit_role")
-        result["frontdoorNavigationGmRybbitSiteIdPresent"] = mobile_artifact.get("gm_rybbit_site_id_present")
-        result["frontdoorNavigationGmRybbitScriptUrlPresent"] = mobile_artifact.get("gm_rybbit_script_url_present")
-        result["frontdoorNavigationGmRybbitScriptUrlAllowed"] = mobile_artifact.get("gm_rybbit_script_url_allowed")
-        result["frontdoorNavigationGmRybbitSkipPatterns"] = mobile_artifact.get("gm_rybbit_skip_patterns")
-        result["frontdoorNavigationGmRybbitMaskPatterns"] = mobile_artifact.get("gm_rybbit_mask_patterns")
-        result["frontdoorNavigationGmRybbitSkipMobilePaths"] = mobile_artifact.get("gm_rybbit_skip_mobile_paths")
-        result["frontdoorNavigationGmRybbitMaskMobilePaths"] = mobile_artifact.get("gm_rybbit_mask_mobile_paths")
-        result["frontdoorNavigationGmRybbitMasksPrivatePlayRoutes"] = mobile_artifact.get("gm_rybbit_masks_private_play_routes")
-        result["frontdoorNavigationGmRybbitReplayBlockSelector"] = mobile_artifact.get("gm_rybbit_replay_block_selector")
-        result["frontdoorNavigationGmRybbitReplayBlocksTurnRoot"] = mobile_artifact.get("gm_rybbit_replay_blocks_turn_root")
-        result["frontdoorNavigationGmSessionHandoffUrl"] = mobile_artifact.get("gm_session_handoff_url")
-        result["frontdoorNavigationGmSessionHandoffStatus"] = mobile_artifact.get("gm_session_handoff_status")
-        result["frontdoorNavigationGmSessionHandoffLinkText"] = mobile_artifact.get("gm_session_handoff_link_text")
-        result["frontdoorNavigationGmSessionHandoffPreservesSession"] = mobile_artifact.get("gm_session_handoff_preserves_session")
-        result["frontdoorNavigationGmSessionHandoffPreservesRole"] = mobile_artifact.get("gm_session_handoff_preserves_role")
-        result["frontdoorNavigationGmSessionHandoffStripsDevice"] = mobile_artifact.get("gm_session_handoff_strips_device")
-        result["frontdoorNavigationGmSessionHandoffSenderDeviceIdPresent"] = mobile_artifact.get("gm_session_handoff_sender_device_id_present")
-        result["frontdoorNavigationGmSessionHandoffPrivateIdentityRedacted"] = mobile_artifact.get("gm_session_handoff_private_identity_redacted")
+        result["frontdoorNavigationLiveTurnCompanionShell"] = mobile_artifact.get("live_turn_companion_shell")
+        result["frontdoorNavigationPrivateBrowserStateKeys"] = mobile_artifact.get("private_browser_state_keys")
+        result["frontdoorNavigationPlayApiRequests"] = mobile_artifact.get("play_api_requests")
+        result["frontdoorNavigationBlazorCircuitRequests"] = mobile_artifact.get("blazor_circuit_requests")
+        result["frontdoorNavigationAnalyticsRequests"] = mobile_artifact.get("analytics_requests")
+        result["frontdoorNavigationPrivateQueryRequests"] = mobile_artifact.get("private_query_requests")
+        result["frontdoorNavigationPageErrors"] = mobile_artifact.get("page_errors")
+        result["frontdoorNavigationMobileArtifactInstallContractSatisfied"] = mobile_artifact_privacy_contract_satisfied
+        result["frontdoorNavigationLedgerRoute"] = ledger_artifact.get("route")
+        result["frontdoorNavigationLedgerOpenMenuTargets"] = ledger_artifact.get("open_menu_targets")
+        result["frontdoorNavigationLedgerGatedTargets"] = ledger_artifact.get("gated_targets")
+        result["frontdoorNavigationLedgerPublicTargets"] = ledger_artifact.get("public_targets")
         result["frontdoorNavigationLedgerPrimary"] = ledger_artifact.get("ledger_primary")
-        result["frontdoorNavigationAnchorEntryUrl"] = anchor_artifact.get("entry_url")
-        result["frontdoorNavigationAnchorFinalUrl"] = anchor_artifact.get("final_url")
+        result["frontdoorNavigationLedgerArtifactCurrentContractSatisfied"] = ledger_artifact_current_contract_satisfied
+        result["frontdoorNavigationAnchorEntryHadQuery"] = anchor_artifact.get("entry_had_query")
         result["frontdoorNavigationAnchorFinalPath"] = anchor_artifact.get("final_pathname")
+        result["frontdoorNavigationAnchorFinalSearch"] = anchor_artifact.get("final_search")
         result["frontdoorNavigationAnchorFinalHash"] = anchor_artifact.get("final_hash")
-        result["frontdoorNavigationAnchorPwaManifestPath"] = anchor_artifact.get("pwa_manifest_path")
-        result["frontdoorNavigationAnchorPwaRole"] = anchor_artifact.get("pwa_role")
-        result["frontdoorNavigationAnchorBlazorShell"] = anchor_artifact.get("blazor_shell")
-        result["frontdoorNavigationAnchorPrivateIdentityRedacted"] = anchor_artifact.get("private_identity_redacted")
-        result["frontdoorNavigationAnchorVisibleUrlPrivateIdentityAbsent"] = anchor_artifact.get("visible_url_private_identity_absent")
-        result["frontdoorNavigationAnchorSessionContextPresent"] = anchor_artifact.get("session_context_present")
-        result["frontdoorNavigationAnchorDeviceContextPresent"] = anchor_artifact.get("device_context_present")
-        result["frontdoorNavigationAnchorFailure"] = anchor_artifact.get("failure")
+        result["frontdoorNavigationAnchorFailureStage"] = anchor_artifact.get("failure_stage")
+        result["frontdoorNavigationAnchorFailureType"] = anchor_artifact.get("failure_type")
         result["frontdoorNavigationAnchorArtifactCurrentContractSatisfied"] = frontdoor_anchor_current_contract_satisfied
         result["childReceipts"]["frontdoorNavigation"] = redact_private_identity(frontdoor_navigation)
     if pwa_offline_cache:
@@ -4423,6 +4212,7 @@ def run_frontdoor_navigation_playwright(
             anchor_age_hours = artifact_age_hours(anchor_artifact)
             anchor_current_contract = frontdoor_anchor_artifact_matches_current_contract(anchor_artifact)
             mobile_privacy_contract = frontdoor_mobile_artifact_matches_privacy_contract(mobile_artifact)
+            ledger_current_contract = frontdoor_ledger_artifact_matches_current_contract(ledger_artifact)
             mobile_homepage_lane_text = str(mobile_artifact.get("homepage_lane_text") or "").strip()
             mobile_homepage_lane_matches_expected = (
                 mobile_homepage_lane_text == expected_homepage_lane_text
@@ -4457,6 +4247,7 @@ def run_frontdoor_navigation_playwright(
                 and ledger_contract == expected_ledger_contract
                 and artifact_base_url_matches(ledger_artifact, base_url)
                 and ledger_fresh
+                and ledger_current_contract
             )
             anchor_pass = (
                 str(anchor_artifact.get("status") or "").strip().lower() == "pass"
@@ -4501,6 +4292,7 @@ def run_frontdoor_navigation_playwright(
                     "anchorArtifactFresh": anchor_fresh,
                     "mobileHomepageLaneMatchesExpected": mobile_homepage_lane_matches_expected,
                     "mobileArtifactPrivacyContractSatisfied": mobile_privacy_contract,
+                    "ledgerArtifactCurrentContractSatisfied": ledger_current_contract,
                     "anchorArtifactCurrentContractSatisfied": anchor_current_contract,
                     "artifactMaxAgeHours": reuse_artifact_max_age_hours,
                     "artifactReused": True,
@@ -4517,603 +4309,15 @@ def run_frontdoor_navigation_playwright(
             artifact_path.unlink()
         except FileNotFoundError:
             pass
-    probe_path = artifact_dir / "frontdoor-navigation-proof.cjs"
-    probe_path.write_text(
-        r"""const fs = require('node:fs');
-const path = require('node:path');
-const { chromium } = require(path.join(process.cwd(), 'node_modules', 'playwright'));
-
-const baseUrl = (process.env.BASE_URL || 'https://chummer.run').replace(/\/+$/, '');
-const artifactDir = process.env.CHUMMER_COMPLETION_DIR || process.cwd();
-const mobileViewport = { width: 390, height: 844 };
-const proofTimeoutMs = """
-        + str(int(playwright_timeout_seconds * 1000))
-        + r""";
-const ignoredConsoleErrorFragments = [
-  'Failed to load resource: net::ERR_NETWORK_CHANGED',
-  'Failed to load resource: the server responded with a status of 401',
-  'Failed to send tracking data: TypeError: Failed to fetch',
-  'WebSocket closed with status code: 1006',
-];
-
-function writeJson(fileName, payload) {
-  fs.mkdirSync(artifactDir, { recursive: true });
-  fs.writeFileSync(path.join(artifactDir, fileName), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
-}
-
-function assertProof(condition, message) {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-function redactPrivateText(value) {
-  return String(value || '').replace(/((?:[?&]|\b)(?:sessionId|deviceId)["']?\s*[:=]\s*["']?)[^&#,}\s"']*/gi, '$1[redacted]');
-}
-
-function redactedPrivateUrl(value) {
-  try {
-    const url = new URL(String(value || ''), baseUrl);
-    for (const key of ['sessionId', 'deviceId']) {
-      if (url.searchParams.has(key)) {
-        url.searchParams.set(key, '[redacted]');
-      }
-    }
-    return url.toString();
-  } catch {
-    return redactPrivateText(value);
-  }
-}
-
-function visibleRoleUrlIsPathOnly(value, expectedPath, expectedHash = '') {
-  try {
-    const url = new URL(String(value || ''), baseUrl);
-    return url.pathname === expectedPath
-      && url.search === ''
-      && url.hash === expectedHash;
-  } catch {
-    return false;
-  }
-}
-
-async function readPrivateContext(page) {
-  return page.evaluate(() => {
-    const root = document.querySelector('[data-turn-root]');
-    const client = root && root.__chummerPlayClient ? root.__chummerPlayClient : null;
-    return {
-      sessionId: String((client && client.sessionId) || (root && root.getAttribute('data-session-id')) || ''),
-      deviceId: String((client && client.deviceId) || (root && root.getAttribute('data-device-id')) || ''),
-    };
-  });
-}
-
-async function firstAttributeOrNull(locator, name) {
-  try {
-    return await locator.first().getAttribute(name);
-  } catch {
-    return null;
-  }
-}
-
-async function assertContains(locator, text, label) {
-  const content = (await locator.textContent()) || '';
-  assertProof(content.includes(text), `${label} does not contain ${text}`);
-}
-
-function jsonStringArray(value) {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim()).filter(Boolean);
-  }
-  const raw = String(value || '').trim();
-  if (!raw) {
-    return [];
-  }
-  try {
-    const decoded = JSON.parse(raw);
-    if (Array.isArray(decoded)) {
-      return decoded.map((item) => String(item).trim()).filter(Boolean);
-    }
-  } catch {
-  }
-  return [raw];
-}
-
-function analyticsProof(config, spec) {
-  const skipPatterns = new Set(jsonStringArray(config.skipPatterns));
-  const maskPatterns = new Set(jsonStringArray(config.maskPatterns));
-  const scriptUrl = String(config.scriptUrl || '').trim();
-  const siteId = String(config.siteId || '').trim();
-  const proof = {
-    enabled: config.enabled === true,
-    script_url_present: Boolean(scriptUrl),
-    script_url_allowed: scriptUrl.startsWith('https://') || scriptUrl.startsWith('/'),
-    site_id_present: Boolean(siteId),
-    tag: config.tag || '',
-    route: config.route || '',
-    mode: config.mode || '',
-    role: config.role || '',
-    skip_patterns: Array.from(skipPatterns).sort(),
-    mask_patterns: Array.from(maskPatterns).sort(),
-    replay_block_selector: config.replayBlockSelector || '',
-    skip_mobile_paths: skipPatterns.has('/mobile/**'),
-    mask_mobile_paths: maskPatterns.has('/mobile/**'),
-    masks_private_play_routes: maskPatterns.has('/api/play/**'),
-    replay_blocks_turn_root: config.replayBlockSelector === '[data-turn-root]',
-  };
-  proof.pass = proof.enabled
-    && proof.script_url_present
-    && proof.script_url_allowed
-    && proof.site_id_present
-    && proof.tag === 'mobile_play_shell'
-    && proof.route === spec.route
-    && proof.mode === spec.mode
-    && proof.role === spec.role
-    && proof.skip_mobile_paths
-    && proof.mask_mobile_paths
-    && proof.masks_private_play_routes
-    && proof.replay_blocks_turn_root;
-  return proof;
-}
-
-const transientNavigationErrorFragments = [
-  'net::ERR_NETWORK_CHANGED',
-  'net::ERR_CONNECTION_RESET',
-  'net::ERR_TIMED_OUT',
-  'net::ERR_HTTP2_PROTOCOL_ERROR',
-  'net::ERR_QUIC_PROTOCOL_ERROR',
-];
-
-async function gotoWithTransientRetry(page, url, options) {
-  const maxAttempts = 3;
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      return await page.goto(url, options);
-    } catch (error) {
-      const message = String(error?.message || error || '');
-      const transient = transientNavigationErrorFragments.some((fragment) => message.includes(fragment));
-      if (!transient || attempt === maxAttempts) {
-        throw error;
-      }
-      await page.waitForTimeout(500 * attempt);
-    }
-  }
-  throw new Error(`Navigation retry loop exhausted for ${url}`);
-}
-
-async function main() {
-  const browser = await chromium.launch({
-    channel: (process.env.CHUMMER_PLAYWRIGHT_CHANNEL || 'chromium').trim() || 'chromium',
-    headless: true,
-    args: ['--disable-quic'],
-  });
-  try {
-    const page = await browser.newPage({ viewport: mobileViewport });
-    await page.addInitScript(() => {
-      try {
-        Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
-        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
-      } catch {
-      }
-    });
-    const pageErrors = [];
-    page.on('pageerror', (error) => pageErrors.push(error.message));
-    page.on('console', (message) => {
-      if (message.type() !== 'error') {
-        return;
-      }
-      const text = message.text();
-      if (!ignoredConsoleErrorFragments.some((fragment) => text.includes(fragment))) {
-        pageErrors.push(text);
-      }
-    });
-
-    await gotoWithTransientRetry(page, baseUrl, { waitUntil: 'domcontentloaded' });
-    const homepageMetrics = await page.evaluate(() => ({
-      viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight,
-      overflowX: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth,
-    }));
-
-    const hero = page.locator('[data-homepage-section="hero"]');
-    await assertContains(hero, 'Download Chummer', 'hero');
-    const heroText = ((await hero.innerText()) || '').replace(/\s+/g, ' ').trim();
-    const homepageLaneMatch = heroText.match(/Current public lane:\s*(Stable\.|Preview\. Review required\.|Downloads paused\.)/);
-    const homepageLaneText = homepageLaneMatch ? `Current public lane: ${homepageLaneMatch[1]}` : '';
-    const legacyHomepageLaneMatch = heroText.match(/Current release:\s*(Stable\.|Preview build\.|Downloads paused\.)/);
-    const legacyHomepageLaneText = legacyHomepageLaneMatch ? `Current release: ${legacyHomepageLaneMatch[1]}` : '';
-    assertProof(
-      Boolean(homepageLaneText),
-      legacyHomepageLaneText
-        ? `Homepage still serves legacy release posture copy: ${legacyHomepageLaneText}`
-        : 'Homepage does not disclose current public lane'
-    );
-    const openMenu = hero.locator('.minimal-open-chummer');
-    await assertContains(openMenu.locator('summary'), 'Open Chummer', 'open menu summary');
-    await openMenu.locator('summary').click();
-
-    const buildButton = openMenu.locator('button.site-open-chummer-menu__button[data-disabled-target="/build"]', { hasText: 'Build' }).first();
-    assertProof(await buildButton.count() === 1, 'Build button is missing');
-    assertProof(await buildButton.isDisabled(), 'Build button is not gated');
-    const playButton = openMenu.locator('button.site-open-chummer-menu__button[data-disabled-target="/mobile/player"]', { hasText: 'Play' }).first();
-    assertProof(await playButton.count() === 1, 'Play button is missing');
-    assertProof(await playButton.isDisabled(), 'Play button is not gated');
-    const accountLink = openMenu.getByRole('link', { name: 'Sign in first' }).first();
-    assertProof(await accountLink.count() === 1, 'Sign-in link is missing');
-    assertProof(await openMenu.locator('.site-open-chummer-menu__button[href="/build"]').count() === 0, 'Build is exposed as a public link');
-    assertProof(await openMenu.locator('.site-open-chummer-menu__button[href="/mobile/player"]').count() === 0, 'Play is exposed as a public link');
-    assertProof(await openMenu.locator('.site-open-chummer-menu__button[href="/play"]').count() === 0, 'Legacy /play link is exposed');
-
-    const accountRoute = await accountLink.getAttribute('href');
-    const playRoute = await playButton.getAttribute('data-disabled-target');
-    const playSignInRoute = await playButton.getAttribute('data-sign-in-href');
-    const directPlayerRoute = playRoute;
-    assertProof(playRoute === '/mobile/player', 'Play route is not /mobile/player');
-    assertProof(playSignInRoute === '/login?next=%2Fmobile%2Fplayer', 'Play sign-in route is not /login?next=%2Fmobile%2Fplayer');
-    assertProof(directPlayerRoute === '/mobile/player', 'Play direct route is not /mobile/player');
-    const directPlayerResponse = await page.request.get(new URL(directPlayerRoute || '/mobile/player', baseUrl).toString());
-    await gotoWithTransientRetry(
-      page,
-      new URL(directPlayerRoute || '/mobile/player', baseUrl).toString(),
-      { waitUntil: 'domcontentloaded' },
-    );
-    const playerShell = page.locator('[data-blazor-shell="interactive-server"][data-role="Player"]').first();
-    assertProof(await playerShell.count() === 1, 'Play did not open the interactive Player shell');
-    const pwaManifestPath = await page.locator('link[rel="manifest"]').first().getAttribute('href');
-    const directPlayerTitle = await page.title();
-    const pwaRole = await playerShell.getAttribute('data-role');
-    const blazorShell = await playerShell.getAttribute('data-blazor-shell');
-    const analyticsConfig = await page.locator('#chummer-play-analytics-config').first().textContent();
-    const analytics = analyticsConfig ? JSON.parse(analyticsConfig) : {};
-    const playerAnalyticsProof = analyticsProof(analytics, { route: '/mobile/player', mode: 'player', role: 'Player' });
-    await page.waitForFunction(() => {
-      const visible = new URL(window.location.href);
-      return visible.pathname === '/mobile/player'
-        && visible.search === '';
-    }, null, { timeout: proofTimeoutMs });
-    const finalUrl = page.url();
-    const playerFinalUrl = new URL(finalUrl);
-    const playerPrivateContext = await readPrivateContext(page);
-    const playerSessionId = playerPrivateContext.sessionId;
-    const playerDeviceId = playerPrivateContext.deviceId;
-    assertProof(pageErrors.length === 0, `Unexpected page errors: ${pageErrors.join('; ')}`);
-    assertProof(directPlayerResponse && directPlayerResponse.status() === 200, 'Play did not return HTTP 200');
-    assertProof(new URL(finalUrl).pathname === '/mobile/player', 'Play did not land on /mobile/player');
-    assertProof(visibleRoleUrlIsPathOnly(finalUrl, '/mobile/player'), 'Play did not remove private identity from the visible URL');
-    assertProof(Boolean(playerSessionId), 'Player shell did not establish session context');
-    assertProof(Boolean(playerDeviceId), 'Player shell did not establish device context');
-    assertProof(pwaManifestPath === '/manifest.player.webmanifest', 'Player PWA manifest is not active');
-    assertProof(pwaRole === 'Player', 'Player shell role marker is missing');
-    assertProof(blazorShell === 'interactive-server', 'Blazor interactive shell marker is missing');
-    assertProof(playerAnalyticsProof.pass, 'Rybbit Player mobile shell privacy config is missing');
-    await page.locator('#turn-share-owner-route-button').click();
-    const playerHandoffHandle = await page.waitForFunction(() => {
-      const link = document.getElementById('turn-owner-route-link');
-      const href = link?.getAttribute('href') || '';
-      const status = (document.getElementById('turn-owner-route-share-status')?.textContent || '').trim();
-      if (status !== 'Session handoff is ready in the link above.' || !href) {
-        return null;
-      }
-      return {
-        href: new URL(href, window.location.origin).toString(),
-        text: (link?.textContent || '').trim(),
-        status,
-      };
-    }, null, { timeout: 30000 });
-    const playerHandoff = await playerHandoffHandle.jsonValue();
-    assertProof(Boolean(playerHandoff.href), 'Player session handoff did not expose a URL');
-    const playerHandoffUrl = new URL(playerHandoff.href);
-    assertProof(playerHandoffUrl.pathname === '/mobile/player', 'Player session handoff did not stay on /mobile/player');
-    assertProof(playerHandoffUrl.searchParams.get('sessionId') === playerSessionId, 'Player session handoff did not preserve session id');
-    assertProof(playerHandoffUrl.searchParams.get('role') === 'Player', 'Player session handoff did not preserve role');
-    assertProof(!playerHandoffUrl.searchParams.has('deviceId'), 'Player session handoff leaked sender device id');
-    assertProof(playerHandoff.text === 'Open session handoff link', 'Player session handoff did not expose the handoff link label');
-    const gmLink = page.locator('a.role-button[href^="/mobile/gm"]').first();
-    assertProof(await gmLink.count() === 1, 'GM role switch is missing from the Player shell');
-    const gmRoute = await gmLink.getAttribute('href');
-    const gmRouteUrl = new URL(gmRoute || '/mobile/gm', baseUrl);
-    const gmRouteSessionId = gmRouteUrl.searchParams.get('sessionId') || '';
-    assertProof(gmRouteUrl.pathname === '/mobile/gm', 'GM role switch route is not /mobile/gm');
-    assertProof(Boolean(gmRouteSessionId), 'GM role switch did not carry session context');
-    assertProof(gmRouteSessionId === playerSessionId, 'GM role switch did not preserve session context');
-    assertProof(!gmRouteUrl.searchParams.has('deviceId'), 'GM role switch leaked sender device id');
-    const gmRouteResponse = await page.request.get(new URL(gmRoute || '/mobile/gm', baseUrl).toString());
-    await Promise.all([
-      page.waitForURL('**/mobile/gm**', { timeout: proofTimeoutMs }),
-      gmLink.click({ noWaitAfter: true }),
-    ]);
-    const gmShell = page.locator('[data-blazor-shell="interactive-server"][data-role="GameMaster"]').first();
-    assertProof(await gmShell.count() === 1, 'GM switch did not open the interactive GM shell');
-    const gmPwaManifestPath = await page.locator('link[rel="manifest"]').first().getAttribute('href');
-    const gmRole = await gmShell.getAttribute('data-role');
-    const gmBlazorShell = await gmShell.getAttribute('data-blazor-shell');
-    const gmAnalyticsConfig = await page.locator('#chummer-play-analytics-config').first().textContent();
-    const gmAnalytics = gmAnalyticsConfig ? JSON.parse(gmAnalyticsConfig) : {};
-    const gmAnalyticsProof = analyticsProof(gmAnalytics, { route: '/mobile/gm', mode: 'gm', role: 'GameMaster' });
-    await page.waitForFunction(() => {
-      const visible = new URL(window.location.href);
-      return visible.pathname === '/mobile/gm'
-        && visible.search === '';
-    }, null, { timeout: proofTimeoutMs });
-    const gmFinalUrl = page.url();
-    const gmFinalUrlParsed = new URL(gmFinalUrl);
-    const gmPrivateContext = await readPrivateContext(page);
-    const gmSessionId = gmPrivateContext.sessionId;
-    const gmDeviceId = gmPrivateContext.deviceId;
-    assertProof(gmRouteResponse.status() === 200, 'GM switch did not return HTTP 200');
-    assertProof(new URL(gmFinalUrl).pathname === '/mobile/gm', 'GM switch did not land on /mobile/gm');
-    assertProof(visibleRoleUrlIsPathOnly(gmFinalUrl, '/mobile/gm'), 'GM switch did not remove private identity from the visible URL');
-    assertProof(Boolean(gmSessionId), 'GM shell did not establish session context');
-    assertProof(Boolean(gmDeviceId), 'GM shell did not establish device context');
-    assertProof(gmPwaManifestPath === '/manifest.gm.webmanifest', 'GM PWA manifest is not active');
-    assertProof(gmRole === 'GameMaster', 'GM shell role marker is missing');
-    assertProof(gmBlazorShell === 'interactive-server', 'GM Blazor interactive shell marker is missing');
-    assertProof(gmAnalyticsProof.pass, 'Rybbit GM mobile shell privacy config is missing');
-    await page.locator('#turn-share-owner-route-button').click();
-    const gmHandoffHandle = await page.waitForFunction(() => {
-      const link = document.getElementById('turn-owner-route-link');
-      const href = link?.getAttribute('href') || '';
-      const status = (document.getElementById('turn-owner-route-share-status')?.textContent || '').trim();
-      if (status !== 'Session handoff is ready in the link above.' || !href) {
-        return null;
-      }
-      return {
-        href: new URL(href, window.location.origin).toString(),
-        text: (link?.textContent || '').trim(),
-        status,
-      };
-    }, null, { timeout: 30000 });
-    const gmHandoff = await gmHandoffHandle.jsonValue();
-    assertProof(Boolean(gmHandoff.href), 'GM session handoff did not expose a URL');
-    const gmHandoffUrl = new URL(gmHandoff.href);
-    assertProof(gmHandoffUrl.pathname === '/mobile/gm', 'GM session handoff did not stay on /mobile/gm');
-    assertProof(gmHandoffUrl.searchParams.get('sessionId') === gmSessionId, 'GM session handoff did not preserve session id');
-    assertProof(gmHandoffUrl.searchParams.get('role') === 'GameMaster', 'GM session handoff did not preserve role');
-    assertProof(!gmHandoffUrl.searchParams.has('deviceId'), 'GM session handoff leaked sender device id');
-    assertProof(gmHandoff.text === 'Open session handoff link', 'GM session handoff did not expose the handoff link label');
-
-    writeJson('FRONTDOOR_MOBILE_LAUNCH.generated.json', {
-      contractName: 'chummer.frontdoor_mobile_launch.v2',
-      generated_at_utc: new Date().toISOString(),
-      status: 'pass',
-      base_url: baseUrl,
-      viewport: mobileViewport,
-      homepage_overflow_x: homepageMetrics.overflowX,
-      homepage_lane_text: homepageLaneText,
-      account_route: accountRoute,
-      play_route: playRoute,
-      play_sign_in_route: playSignInRoute,
-      direct_player_route: directPlayerRoute,
-      direct_player_http_status: directPlayerResponse ? directPlayerResponse.status() : 0,
-      direct_player_title: directPlayerTitle,
-      final_url: finalUrl,
-      private_identity_redacted: true,
-      visible_player_url_private_identity_absent: visibleRoleUrlIsPathOnly(finalUrl, '/mobile/player'),
-      player_session_context_present: Boolean(playerSessionId),
-      player_device_context_present: Boolean(playerDeviceId),
-      pwa_role: pwaRole,
-      blazor_shell: blazorShell,
-      live_turn_companion_shell: true,
-      pwa_manifest: pwaManifestPath,
-      pwa_manifest_path: pwaManifestPath,
-      rybbit_configured: playerAnalyticsProof.pass,
-      rybbit_tag: playerAnalyticsProof.tag || '',
-      rybbit_route: playerAnalyticsProof.route || '',
-      rybbit_mode: playerAnalyticsProof.mode || '',
-      rybbit_role: playerAnalyticsProof.role || '',
-      rybbit_site_id_present: playerAnalyticsProof.site_id_present,
-      rybbit_script_url_present: playerAnalyticsProof.script_url_present,
-      rybbit_script_url_allowed: playerAnalyticsProof.script_url_allowed,
-      rybbit_skip_patterns: playerAnalyticsProof.skip_patterns,
-      rybbit_mask_patterns: playerAnalyticsProof.mask_patterns,
-      rybbit_skip_mobile_paths: playerAnalyticsProof.skip_mobile_paths,
-      rybbit_mask_mobile_paths: playerAnalyticsProof.mask_mobile_paths,
-      rybbit_masks_private_play_routes: playerAnalyticsProof.masks_private_play_routes,
-      rybbit_replay_block_selector: playerAnalyticsProof.replay_block_selector,
-      rybbit_replay_blocks_turn_root: playerAnalyticsProof.replay_blocks_turn_root,
-      player_session_handoff_url: redactedPrivateUrl(playerHandoffUrl.toString()),
-      player_session_handoff_status: playerHandoff.status,
-      player_session_handoff_link_text: playerHandoff.text,
-      player_session_handoff_preserves_session: playerHandoffUrl.searchParams.get('sessionId') === playerSessionId,
-      player_session_handoff_preserves_role: playerHandoffUrl.searchParams.get('role') === 'Player',
-      player_session_handoff_strips_device: !playerHandoffUrl.searchParams.has('deviceId'),
-      player_session_handoff_sender_device_id_present: Boolean(playerDeviceId),
-      player_session_handoff_private_identity_redacted: true,
-      gm_route: '/mobile/gm',
-      gm_route_session_id_present: Boolean(gmRouteSessionId),
-      gm_route_private_identity_redacted: true,
-      gm_http_status: gmRouteResponse.status(),
-      gm_final_url: gmFinalUrl,
-      visible_gm_url_private_identity_absent: visibleRoleUrlIsPathOnly(gmFinalUrl, '/mobile/gm'),
-      gm_session_context_present: Boolean(gmSessionId),
-      gm_device_context_present: Boolean(gmDeviceId),
-      gm_live_turn_companion_shell: true,
-      gm_pwa_manifest_path: gmPwaManifestPath,
-      gm_pwa_role: gmRole,
-      gm_blazor_shell: gmBlazorShell,
-      gm_rybbit_configured: gmAnalyticsProof.pass,
-      gm_rybbit_tag: gmAnalyticsProof.tag || '',
-      gm_rybbit_route: gmAnalyticsProof.route || '',
-      gm_rybbit_mode: gmAnalyticsProof.mode || '',
-      gm_rybbit_role: gmAnalyticsProof.role || '',
-      gm_rybbit_site_id_present: gmAnalyticsProof.site_id_present,
-      gm_rybbit_script_url_present: gmAnalyticsProof.script_url_present,
-      gm_rybbit_script_url_allowed: gmAnalyticsProof.script_url_allowed,
-      gm_rybbit_skip_patterns: gmAnalyticsProof.skip_patterns,
-      gm_rybbit_mask_patterns: gmAnalyticsProof.mask_patterns,
-      gm_rybbit_skip_mobile_paths: gmAnalyticsProof.skip_mobile_paths,
-      gm_rybbit_mask_mobile_paths: gmAnalyticsProof.mask_mobile_paths,
-      gm_rybbit_masks_private_play_routes: gmAnalyticsProof.masks_private_play_routes,
-      gm_rybbit_replay_block_selector: gmAnalyticsProof.replay_block_selector,
-      gm_rybbit_replay_blocks_turn_root: gmAnalyticsProof.replay_blocks_turn_root,
-      gm_session_handoff_url: redactedPrivateUrl(gmHandoffUrl.toString()),
-      gm_session_handoff_status: gmHandoff.status,
-      gm_session_handoff_link_text: gmHandoff.text,
-      gm_session_handoff_preserves_session: gmHandoffUrl.searchParams.get('sessionId') === gmSessionId,
-      gm_session_handoff_preserves_role: gmHandoffUrl.searchParams.get('role') === 'GameMaster',
-      gm_session_handoff_strips_device: !gmHandoffUrl.searchParams.has('deviceId'),
-      gm_session_handoff_sender_device_id_present: Boolean(gmDeviceId),
-      gm_session_handoff_private_identity_redacted: true,
-      gated_targets: ['Build', 'Play'],
-      public_targets: [],
-      page_errors: pageErrors.map(redactPrivateText),
-    });
-
-    await page.close({ runBeforeUnload: false }).catch(() => undefined);
-
-    const anchorPage = await browser.newPage({ viewport: mobileViewport });
-    const anchorPageErrors = [];
-    anchorPage.on('pageerror', (error) => anchorPageErrors.push(error.message));
-    anchorPage.on('console', (message) => {
-      if (message.type() !== 'error') {
-        return;
-      }
-      const text = message.text();
-      if (!ignoredConsoleErrorFragments.some((fragment) => text.includes(fragment))) {
-        anchorPageErrors.push(text);
-      }
-    });
-
-    const anchorEntryUrl = new URL('/#turn-runsite-card', baseUrl).toString();
-    let anchorStatus = 'fail';
-    let anchorFailure = '';
-    let anchorFinalUrlText = anchorEntryUrl;
-    let anchorFinalPath = '';
-    let anchorFinalHash = '';
-    let anchorManifestPath = null;
-    let anchorRole = null;
-    let anchorBlazorShell = null;
-    let anchorSessionContextPresent = false;
-    let anchorDeviceContextPresent = false;
-    let anchorVisibleUrlPrivateIdentityAbsent = false;
-    try {
-      await anchorPage.goto(anchorEntryUrl, { waitUntil: 'domcontentloaded' });
-      await anchorPage.waitForFunction(() => {
-        const currentUrl = new URL(window.location.href);
-        return currentUrl.pathname === '/mobile/player'
-          && currentUrl.hash === '#turn-runsite-card'
-          && currentUrl.search === '';
-      }, null, { timeout: proofTimeoutMs });
-      const anchorFinalUrl = new URL(anchorPage.url());
-      anchorFinalUrlText = anchorPage.url();
-      anchorFinalPath = anchorFinalUrl.pathname;
-      anchorFinalHash = anchorFinalUrl.hash;
-      const anchorPlayerShell = anchorPage.locator('[data-blazor-shell="interactive-server"][data-role="Player"]').first();
-      assertProof(await anchorPlayerShell.count() === 1, 'Homepage anchor redirect did not open the interactive Player shell');
-      anchorManifestPath = await firstAttributeOrNull(anchorPage.locator('link[rel="manifest"]'), 'href');
-      anchorRole = await anchorPlayerShell.getAttribute('data-role');
-      anchorBlazorShell = await anchorPlayerShell.getAttribute('data-blazor-shell');
-      const anchorPrivateContext = await readPrivateContext(anchorPage);
-      anchorSessionContextPresent = Boolean(anchorPrivateContext.sessionId);
-      anchorDeviceContextPresent = Boolean(anchorPrivateContext.deviceId);
-      anchorVisibleUrlPrivateIdentityAbsent = visibleRoleUrlIsPathOnly(
-        anchorFinalUrlText,
-        '/mobile/player',
-        '#turn-runsite-card',
-      );
-      assertProof(anchorFinalPath === '/mobile/player', 'Homepage anchor redirect did not land on /mobile/player');
-      assertProof(anchorFinalHash === '#turn-runsite-card', 'Homepage anchor redirect did not preserve #turn-runsite-card');
-      assertProof(anchorVisibleUrlPrivateIdentityAbsent, 'Homepage anchor redirect did not remove private identity from the visible URL');
-      assertProof(anchorSessionContextPresent, 'Homepage anchor redirect did not establish session context');
-      assertProof(anchorDeviceContextPresent, 'Homepage anchor redirect did not establish device context');
-      assertProof(anchorManifestPath === '/manifest.player.webmanifest', 'Homepage anchor redirect did not activate the player PWA manifest');
-      assertProof(anchorRole === 'Player', 'Homepage anchor redirect did not prove the Player role');
-      assertProof(anchorBlazorShell === 'interactive-server', 'Homepage anchor redirect did not prove the interactive Blazor shell');
-      anchorStatus = 'pass';
-    } catch (error) {
-      anchorFailure = redactPrivateText(error && error.message ? error.message : String(error));
-      const anchorObservedUrlText = anchorPage.url();
-      anchorFinalUrlText = redactedPrivateUrl(anchorObservedUrlText);
-      anchorVisibleUrlPrivateIdentityAbsent = visibleRoleUrlIsPathOnly(
-        anchorObservedUrlText,
-        '/mobile/player',
-        '#turn-runsite-card',
-      );
-      try {
-        const anchorObservedUrl = new URL(anchorObservedUrlText);
-        anchorFinalPath = anchorObservedUrl.pathname;
-        anchorFinalHash = anchorObservedUrl.hash;
-      } catch {
-      }
-      anchorManifestPath = await firstAttributeOrNull(anchorPage.locator('link[rel="manifest"]'), 'href');
-      const anchorPlayerShell = anchorPage.locator('[data-blazor-shell="interactive-server"][data-role="Player"]').first();
-      if (await anchorPlayerShell.count() === 1) {
-        anchorRole = await anchorPlayerShell.getAttribute('data-role');
-        anchorBlazorShell = await anchorPlayerShell.getAttribute('data-blazor-shell');
-        const anchorPrivateContext = await readPrivateContext(anchorPage);
-        anchorSessionContextPresent = Boolean(anchorPrivateContext.sessionId);
-        anchorDeviceContextPresent = Boolean(anchorPrivateContext.deviceId);
-      }
-    }
-
-    writeJson('FRONTDOOR_MOBILE_ANCHOR_REDIRECT.generated.json', {
-      contractName: 'chummer.frontdoor_mobile_anchor_redirect.v2',
-      generated_at_utc: new Date().toISOString(),
-      status: anchorStatus,
-      base_url: baseUrl,
-      entry_url: anchorEntryUrl,
-      final_url: anchorFinalUrlText,
-      final_pathname: anchorFinalPath,
-      final_hash: anchorFinalHash,
-      pwa_manifest_path: anchorManifestPath,
-      pwa_role: anchorRole,
-      blazor_shell: anchorBlazorShell,
-      private_identity_redacted: true,
-      visible_url_private_identity_absent: anchorVisibleUrlPrivateIdentityAbsent,
-      session_context_present: anchorSessionContextPresent,
-      device_context_present: anchorDeviceContextPresent,
-      failure: anchorFailure,
-      page_errors: anchorPageErrors.map(redactPrivateText),
-    });
-    await anchorPage.close({ runBeforeUnload: false }).catch(() => undefined);
-
-    const ledgerPage = await browser.newPage();
-    await ledgerPage.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-    const ledgerHero = ledgerPage.locator('[data-homepage-section="hero"]');
-    await assertContains(ledgerHero, 'Chummer', 'ledger hero');
-    await assertContains(ledgerHero, 'A Shadowrun character manager', 'ledger hero');
-    assertProof(await ledgerHero.locator('[data-black-ledger-geoscape-root]').count() === 0, 'Black Ledger geoscape is on the primary homepage');
-    assertProof(await ledgerPage.getByText('Black Ledger').count() === 0, 'Black Ledger copy is on the primary homepage');
-    const heroActionLinks = ledgerHero.locator('.minimal-actions a.button-like');
-    assertProof(await heroActionLinks.count() > 0, 'Primary hero action links are missing');
-    await ledgerHero.locator('.minimal-open-chummer summary').click();
-    const ledgerOpenMenu = ledgerHero.locator('.minimal-open-chummer');
-    const ledgerBuildButton = ledgerOpenMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Build' }).first();
-    const ledgerPlayButton = ledgerOpenMenu.locator('button.site-open-chummer-menu__button[data-disabled-target="/mobile/player"]', { hasText: 'Play' }).first();
-    assertProof(await ledgerBuildButton.count() === 1 && await ledgerBuildButton.isDisabled(), 'Build is not gated on ledger frontdoor check');
-    assertProof(await ledgerPlayButton.count() === 1 && await ledgerPlayButton.isDisabled(), 'Play is not gated on ledger frontdoor check');
-    assertProof(await ledgerOpenMenu.locator('.site-open-chummer-menu__button[href="/build"]').count() === 0, 'Build public link leaked on ledger frontdoor check');
-    assertProof(await ledgerOpenMenu.locator('.site-open-chummer-menu__button[href="/mobile/player"]').count() === 0, 'Play public link leaked on ledger frontdoor check');
-    assertProof(await ledgerOpenMenu.locator('.site-open-chummer-menu__button[href="/play"]').count() === 0, 'Legacy /play link leaked on ledger frontdoor check');
-    const ctaLabels = await heroActionLinks.evaluateAll((items) => items.map((item) => item.textContent ? item.textContent.trim() : ''));
-    writeJson('BLACK_LEDGER_GLOBE_FRONTDOOR.generated.json', {
-      contractName: 'chummer.black_ledger_globe_frontdoor.v1',
-      generated_at_utc: new Date().toISOString(),
-      status: 'pass',
-      base_url: baseUrl,
-      route: '/',
-      cta_labels: ctaLabels,
-      open_menu_targets: ['/login?next=%2Fbuild', '/login?next=%2Fmobile%2Fplayer', '/login?next=%2Faccount%2Faccess'],
-      gated_targets: ['Build', 'Play'],
-      public_targets: [],
-      ledger_primary: false,
-    });
-    await ledgerPage.close({ runBeforeUnload: false }).catch(() => undefined);
-    if (anchorFailure) {
-      throw new Error(anchorFailure);
-    }
-  } finally {
-    await browser.close();
-  }
-}
-
-main().catch((error) => {
-  console.error(redactPrivateText(error && error.stack ? error.stack : String(error)));
-  process.exit(1);
-});
-""",
-        encoding="utf-8",
-    )
-    command = ["node", str(probe_path)]
+    command = [
+        "npx",
+        "playwright",
+        "test",
+        "tests/public/frontdoor-mobile-launch.spec.ts",
+        "tests/public/black-ledger-frontdoor.spec.ts",
+        "--workers=1",
+        "--reporter=line",
+    ]
     exit_code, stdout, stderr, timed_out = run_playwright_command(command, env, playwright_timeout_seconds)
     mobile_artifact, mobile_artifact_load_status = load_json_with_status(mobile_artifact_path)
     ledger_artifact, ledger_artifact_load_status = load_json_with_status(ledger_artifact_path)
@@ -5125,9 +4329,38 @@ main().catch((error) => {
     ledger_contract_ok = ledger_contract == expected_ledger_contract
     anchor_contract_ok = anchor_contract == expected_anchor_contract
     mobile_privacy_contract = frontdoor_mobile_artifact_matches_privacy_contract(mobile_artifact)
+    ledger_current_contract = frontdoor_ledger_artifact_matches_current_contract(ledger_artifact)
     anchor_current_contract = frontdoor_anchor_artifact_matches_current_contract(anchor_artifact)
+    mobile_base_url_matches = artifact_base_url_matches(mobile_artifact, base_url)
+    ledger_base_url_matches = artifact_base_url_matches(ledger_artifact, base_url)
+    anchor_base_url_matches = artifact_base_url_matches(anchor_artifact, base_url)
+    mobile_homepage_lane_text = str(mobile_artifact.get("homepage_lane_text") or "").strip()
+    mobile_homepage_lane_matches_expected = (
+        mobile_homepage_lane_text == expected_homepage_lane_text
+        if expected_homepage_lane_text
+        else True
+    )
+    proof_passed = (
+        exit_code == 0
+        and mobile_artifact_load_status == "loaded"
+        and ledger_artifact_load_status == "loaded"
+        and anchor_artifact_load_status == "loaded"
+        and mobile_artifact.get("status") == "pass"
+        and ledger_artifact.get("status") == "pass"
+        and anchor_artifact.get("status") == "pass"
+        and mobile_contract_ok
+        and ledger_contract_ok
+        and anchor_contract_ok
+        and mobile_base_url_matches
+        and ledger_base_url_matches
+        and anchor_base_url_matches
+        and mobile_homepage_lane_matches_expected
+        and mobile_privacy_contract
+        and ledger_current_contract
+        and anchor_current_contract
+    )
     return {
-        "status": "pass" if exit_code == 0 and mobile_artifact_load_status == "loaded" and ledger_artifact_load_status == "loaded" and anchor_artifact_load_status == "loaded" and mobile_artifact.get("status") == "pass" and ledger_artifact.get("status") == "pass" and anchor_artifact.get("status") == "pass" and mobile_contract_ok and ledger_contract_ok and anchor_contract_ok and mobile_privacy_contract and anchor_current_contract else "fail",
+        "status": "pass" if proof_passed else "fail",
         "exitCode": exit_code,
         "timedOut": timed_out,
         "timeoutSeconds": playwright_timeout_seconds,
@@ -5147,10 +4380,12 @@ main().catch((error) => {
         "mobileArtifact": redact_private_identity(mobile_artifact),
         "ledgerArtifact": redact_private_identity(ledger_artifact),
         "anchorArtifact": redact_private_identity(anchor_artifact),
-        "mobileArtifactBaseUrlMatchesRequested": artifact_base_url_matches(mobile_artifact, base_url),
-        "ledgerArtifactBaseUrlMatchesRequested": artifact_base_url_matches(ledger_artifact, base_url),
-        "anchorArtifactBaseUrlMatchesRequested": artifact_base_url_matches(anchor_artifact, base_url),
+        "mobileArtifactBaseUrlMatchesRequested": mobile_base_url_matches,
+        "ledgerArtifactBaseUrlMatchesRequested": ledger_base_url_matches,
+        "anchorArtifactBaseUrlMatchesRequested": anchor_base_url_matches,
+        "mobileHomepageLaneMatchesExpected": mobile_homepage_lane_matches_expected,
         "mobileArtifactPrivacyContractSatisfied": mobile_privacy_contract,
+        "ledgerArtifactCurrentContractSatisfied": ledger_current_contract,
         "anchorArtifactCurrentContractSatisfied": anchor_current_contract,
         "artifactReused": False,
         "playwrightExecuted": True,

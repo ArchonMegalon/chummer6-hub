@@ -85,7 +85,12 @@ def write_audit_artifacts(payload: dict[str, Any], markdown: str) -> None:
 def compose_topology(source_root: Path, failures: list[str]) -> dict[str, Any]:
     text = (source_root / "docker-compose.public-edge.yml").read_text(encoding="utf-8")
     profile_only = 'profiles: ["play-private"]' in text
-    default_off = 'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"' in text
+    default_off = (
+        'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"' in text
+        and 'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"' in text
+        and "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED" not in text
+        and "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED" not in text
+    )
     no_edge_secret = "CHUMMER_PUBLIC_PLAY_PROXY_API_KEY" not in text
     no_edge_upstream = "CHUMMER_PUBLIC_PLAY_PROXY_URL:" not in text
     portal_dependencies = text.split("  chummer-portal:", 1)[1].split("    environment:", 1)[0]

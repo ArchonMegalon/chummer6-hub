@@ -434,7 +434,10 @@ def test_current_source_marker_check_passes(tmp_path: Path) -> None:
     assert "Target: MobileAppHandoffTarget.Build" in landing_required
     assert "Target: MobileAppHandoffTarget.Play" in landing_required
     assert 'profiles: ["play-private"]' in checks["docker-compose.public-edge.yml"]["requiredMarkers"]
-    assert 'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"' in checks["docker-compose.public-edge.yml"]["requiredMarkers"]
+    assert 'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"' in checks["docker-compose.public-edge.yml"]["requiredMarkers"]
+    assert 'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"' in checks["docker-compose.public-edge.yml"]["requiredMarkers"]
+    assert "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED" in checks["docker-compose.public-edge.yml"]["forbiddenMarkers"]
+    assert "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED" in checks["docker-compose.public-edge.yml"]["forbiddenMarkers"]
     assert "${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app}:/app:ro" in checks["docker-compose.public-edge.yml"]["requiredMarkers"]
     assert "TryResolveRoleAliasRedirectPath" in checks["Chummer.Run.Api/Program.cs"]["requiredMarkers"]
     program_markers = checks["Chummer.Run.Api/Program.cs"]["requiredMarkers"]
@@ -1687,7 +1690,11 @@ def test_source_marker_check_requires_default_off_profile_gated_local_play_contr
     module = load_module()
     source_root = write_complete_marker_source_tree(module, tmp_path / "source")
     compose = source_root / "docker-compose.public-edge.yml"
-    compose.write_text("CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: \"${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-true}\"\n", encoding="utf-8")
+    compose.write_text(
+        'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"\n'
+        'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED:-false}"\n',
+        encoding="utf-8",
+    )
 
     receipt = module.verify(
         [],
@@ -1698,7 +1705,10 @@ def test_source_marker_check_requires_default_off_profile_gated_local_play_contr
     assert receipt["status"] == "fail"
     compose_check = next(check for check in receipt["sourceMarkerChecks"] if check["path"] == "docker-compose.public-edge.yml")
     assert 'profiles: ["play-private"]' in compose_check["missingMarkers"]
-    assert 'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"' in compose_check["missingMarkers"]
+    assert 'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"' in compose_check["missingMarkers"]
+    assert 'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"' in compose_check["missingMarkers"]
+    assert "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED" in compose_check["presentForbiddenMarkers"]
+    assert "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED" in compose_check["presentForbiddenMarkers"]
     assert "${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app}:/app:ro" in compose_check["missingMarkers"]
 
 

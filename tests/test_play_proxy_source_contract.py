@@ -56,7 +56,11 @@ def test_public_edge_defaults_to_local_shell_and_private_play_is_profile_only() 
     compose = (ROOT / "docker-compose.public-edge.yml").read_text(encoding="utf-8")
 
     assert 'profiles: ["play-private"]' in compose
-    assert 'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"' in compose
+    assert 'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"' in compose
+    assert 'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"' in compose
+    assert "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED" not in compose
+    assert "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED" not in compose
+    assert "CHUMMER_PUBLIC_PLAY_PROXY_URL" not in compose
     assert "CHUMMER_PUBLIC_PLAY_PROXY_API_KEY" not in compose
     portal_dependencies = compose.split("  chummer-portal:", 1)[1].split("    environment:", 1)[0]
     assert "chummer-play-web:" not in portal_dependencies
@@ -136,9 +140,16 @@ def test_qr_control_and_display_mode_are_bidirectional() -> None:
     install_projection = (PLAY_ROOT / "mobile-install-shell.js").read_text(encoding="utf-8")
 
     assert 'aria-expanded="false"' in partial
-    assert "data-mobile-app-qr-card tabindex=\"-1\" hidden" in partial
+    qr_card_tag = next(
+        line for line in partial.splitlines() if "data-mobile-app-qr-card" in line
+    )
+    assert " hidden>" in qr_card_tag
+    assert "tabindex=" not in qr_card_tag
     assert "setQrExpanded" in handoff
     assert 'showQrButton.setAttribute("aria-expanded"' in handoff
+    assert 'showQrButton.focus({ preventScroll: true });' in handoff
+    assert "showQrButton.focus();" in handoff
+    assert "qrCard.focus" not in handoff
     assert "restoreBrowserInstallState" in install_source
     assert "} else if (window.navigator.standalone !== true) {" in install_source
     assert 'register("/mobile/service-worker.js", { scope: "/mobile/" })' in install_source

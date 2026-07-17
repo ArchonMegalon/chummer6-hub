@@ -212,11 +212,26 @@ REQUIRED_COMPOSE_MOUNTPOINTS = (
     Path("wwwroot") / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
 )
 REQUIRED_LANDING_MARKERS = {
-    "playDisabledTarget": 'data-disabled-target="/mobile/player"',
-    "playSignInRoute": 'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
+    "buildPublicInstallHandoff": (
+        'href="/build" data-mobile-app-handoff="build-mobile-app-handoff" '
+        'aria-haspopup="dialog" aria-controls="build-mobile-app-handoff" '
+        'data-public-install-handoff="true"'
+    ),
+    "playPublicInstallHandoff": (
+        'href="/mobile/player" data-mobile-app-handoff="mobile-app-handoff" '
+        'aria-haspopup="dialog" aria-controls="mobile-app-handoff" '
+        'data-public-install-handoff="true"'
+    ),
     "turnAnchor": "#turn-runsite-card",
     "turnAnchorNormalizedHash": 'const normalizedHash = window.location.hash.split("?")[0];',
-    "turnAnchorRedirect": "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);",
+    "turnAnchorRedirect": "window.location.replace(`/mobile/player${normalizedHash}`);",
+}
+FORBIDDEN_LANDING_MARKERS = {
+    "playDisabledTarget": 'data-disabled-target="/mobile/player"',
+    "playSignInRoute": 'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"',
+    "queryPreservingTurnAnchorRedirect": (
+        "window.location.replace(`/mobile/player${window.location.search}${normalizedHash}`);"
+    ),
 }
 ALLOWED_OVERLAY_ACTIVATION_RECEIPT_FAILURES = frozenset(
     {
@@ -2872,6 +2887,14 @@ def write_overlay_build_info(
             "overlay build-info cannot bind a payload with unsafe runtime modes"
         )
     built_staged_payload_fingerprint = staged_payload_fingerprint(root)
+    landing_forbidden_marker_checks = verification.get(
+        "landingForbiddenMarkerChecks"
+    )
+    landing_forbidden_marker_checks = (
+        landing_forbidden_marker_checks
+        if isinstance(landing_forbidden_marker_checks, dict)
+        else {}
+    )
     payload = {
         "contractName": CONTRACT_NAME,
         "generatedAtUtc": now_iso(),
@@ -2961,8 +2984,20 @@ def write_overlay_build_info(
             "releaseManifestRolloutCompatible"
         ),
         "landingMarkerStatus": str(verification.get("landingMarkerStatus") or "").strip(),
-        "landingHasPlayDisabledTarget": bool((verification.get("landingMarkerChecks") or {}).get("playDisabledTarget")),
-        "landingHasPlaySignInRoute": bool((verification.get("landingMarkerChecks") or {}).get("playSignInRoute")),
+        "landingHasBuildPublicInstallHandoff": bool(
+            (verification.get("landingMarkerChecks") or {}).get(
+                "buildPublicInstallHandoff"
+            )
+        ),
+        "landingHasPlayPublicInstallHandoff": bool(
+            (verification.get("landingMarkerChecks") or {}).get(
+                "playPublicInstallHandoff"
+            )
+        ),
+        "landingRetiredMarkersAbsent": bool(
+            set(landing_forbidden_marker_checks) == set(FORBIDDEN_LANDING_MARKERS)
+            and all(landing_forbidden_marker_checks.values())
+        ),
         "landingHasTurnAnchor": bool((verification.get("landingMarkerChecks") or {}).get("turnAnchor")),
         "landingHasTurnAnchorRedirect": bool((verification.get("landingMarkerChecks") or {}).get("turnAnchorRedirect")),
         "landingBrowserRedirectStatus": str((verification.get("landingBrowserRedirect") or {}).get("status") or "").strip(),
@@ -2970,9 +3005,13 @@ def write_overlay_build_info(
         "landingBrowserRedirectFinalUrl": str((verification.get("landingBrowserRedirect") or {}).get("finalUrl") or "").strip(),
         "landingBrowserRedirectExpectedPath": str((verification.get("landingBrowserRedirect") or {}).get("expectedPath") or "").strip(),
         "landingBrowserRedirectExpectedHash": str((verification.get("landingBrowserRedirect") or {}).get("expectedHash") or "").strip(),
+        "landingBrowserRedirectExpectedQuery": str((verification.get("landingBrowserRedirect") or {}).get("expectedQuery") or ""),
+        "landingBrowserRedirectFinalQuery": str((verification.get("landingBrowserRedirect") or {}).get("finalQuery") or ""),
         "landingBrowserRedirectPathMatches": bool((verification.get("landingBrowserRedirect") or {}).get("pathMatches")),
         "landingBrowserRedirectHashMatches": bool((verification.get("landingBrowserRedirect") or {}).get("hashMatches")),
+        "landingBrowserRedirectQueryDropped": bool((verification.get("landingBrowserRedirect") or {}).get("queryDropped")),
         "landingMissingMarkerCount": len(verification.get("landingMissingMarkers") or []),
+        "landingForbiddenMarkerCount": len(verification.get("landingForbiddenMarkers") or []),
         "localLiveSurfaceParityStatus": str((verification.get("localLiveSurfaceParity") or {}).get("status") or "").strip(),
         "localLiveSurfaceParityFailureCount": int((verification.get("localLiveSurfaceParity") or {}).get("failureCount") or 0),
         "sourceFingerprint": built_source_fingerprint,
@@ -3371,9 +3410,13 @@ def bind_verification_programs_into_child_receipt(
 
 
 def probe_landing_anchor_browser_redirect(base_url: str, timeout_seconds: float) -> dict[str, Any]:
-    entry_url = f"{base_url.rstrip('/')}/#turn-runsite-card"
+    entry_url = (
+        f"{base_url.rstrip('/')}/?sessionId=synthetic-probe&grant=synthetic-probe"
+        "&tracking=synthetic-probe#turn-runsite-card?grant=synthetic-fragment"
+    )
     expected_path = "/mobile/player"
     expected_hash = "#turn-runsite-card"
+    expected_query = ""
     try:
         from playwright.sync_api import Error as PlaywrightError, sync_playwright
     except ImportError as exc:
@@ -3384,8 +3427,11 @@ def probe_landing_anchor_browser_redirect(base_url: str, timeout_seconds: float)
             "finalUrl": "",
             "expectedPath": expected_path,
             "expectedHash": expected_hash,
+            "expectedQuery": expected_query,
+            "finalQuery": "",
             "pathMatches": False,
             "hashMatches": False,
+            "queryDropped": False,
             "error": str(exc),
             "title": "",
             "heading": "",
@@ -3434,7 +3480,8 @@ def probe_landing_anchor_browser_redirect(base_url: str, timeout_seconds: float)
                         () => {
                             const currentUrl = new URL(window.location.href);
                             return currentUrl.pathname === '/mobile/player'
-                                && currentUrl.hash === '#turn-runsite-card';
+                                && currentUrl.hash === '#turn-runsite-card'
+                                && currentUrl.search === '';
                         }
                         """,
                         timeout=remaining_timeout_ms(),
@@ -3455,8 +3502,11 @@ def probe_landing_anchor_browser_redirect(base_url: str, timeout_seconds: float)
                         "finalUrl": final_url,
                         "expectedPath": expected_path,
                         "expectedHash": expected_hash,
+                        "expectedQuery": expected_query,
+                        "finalQuery": parsed.query,
                         "pathMatches": parsed.path == expected_path,
                         "hashMatches": parsed.fragment == expected_hash.lstrip("#"),
+                        "queryDropped": parsed.query == expected_query,
                         "error": "",
                         "title": page.title(),
                         "heading": heading,
@@ -3477,8 +3527,11 @@ def probe_landing_anchor_browser_redirect(base_url: str, timeout_seconds: float)
             "finalUrl": "",
             "expectedPath": expected_path,
             "expectedHash": expected_hash,
+            "expectedQuery": expected_query,
+            "finalQuery": "",
             "pathMatches": False,
             "hashMatches": False,
+            "queryDropped": False,
             "error": str(exc),
             "title": "",
             "heading": "",
@@ -3491,8 +3544,11 @@ def probe_landing_anchor_browser_redirect(base_url: str, timeout_seconds: float)
         "finalUrl": "",
         "expectedPath": expected_path,
         "expectedHash": expected_hash,
+        "expectedQuery": expected_query,
+        "finalQuery": "",
         "pathMatches": False,
         "hashMatches": False,
+        "queryDropped": False,
         "error": "\n\n".join(launch_failures),
         "title": "",
         "heading": "",
@@ -3804,10 +3860,19 @@ def _verify_published_overlay_with_budget(
                         name: marker in landing_body
                         for name, marker in REQUIRED_LANDING_MARKERS.items()
                     }
+                    landing_forbidden_marker_checks = {
+                        name: marker not in landing_body
+                        for name, marker in FORBIDDEN_LANDING_MARKERS.items()
+                    }
                     landing_missing_markers = [
                         marker
                         for name, marker in REQUIRED_LANDING_MARKERS.items()
                         if not landing_marker_checks.get(name, False)
+                    ]
+                    landing_forbidden_markers = [
+                        marker
+                        for name, marker in FORBIDDEN_LANDING_MARKERS.items()
+                        if not landing_forbidden_marker_checks.get(name, False)
                     ]
                     landing_browser_redirect = probe_landing_anchor_browser_redirect(
                         base_url,
@@ -3965,7 +4030,12 @@ def _verify_published_overlay_with_budget(
                         or not parity_program_binding_matches
                         or (receipt_payload and not receipt_program_bindings_match)
                     )
-                    browser_redirect_passed = str(landing_browser_redirect.get("status") or "").strip() == "pass"
+                    browser_redirect_passed = (
+                        str(landing_browser_redirect.get("status") or "").strip() == "pass"
+                        and landing_browser_redirect.get("pathMatches") is True
+                        and landing_browser_redirect.get("hashMatches") is True
+                        and landing_browser_redirect.get("queryDropped") is True
+                    )
                     local_live_surface_parity_passed = str(local_live_surface_parity.get("status") or "").strip() == "pass"
                     overlay_readiness_passed = str(overlay_readiness.get("status") or "").strip() == "pass"
                     receipt_passed_for_overlay = (
@@ -3987,6 +4057,7 @@ def _verify_published_overlay_with_budget(
                         receipt_passed_for_overlay
                         and overlay_readiness_passed
                         and not landing_missing_markers
+                        and not landing_forbidden_markers
                         and browser_redirect_passed
                         and local_live_surface_parity_passed
                     )
@@ -4002,6 +4073,8 @@ def _verify_published_overlay_with_budget(
                             if overlay_readiness_passed is False
                             else "landing_marker_missing"
                             if receipt_passed_for_overlay and landing_missing_markers
+                            else "landing_forbidden_marker_present"
+                            if receipt_passed_for_overlay and landing_forbidden_markers
                             else "landing_browser_redirect_failed"
                             if receipt_passed_for_overlay and browser_redirect_passed is False
                             else "live_surface_parity_failed"
@@ -4080,9 +4153,15 @@ def _verify_published_overlay_with_budget(
                         "releaseManifestRolloutCompatible": receipt_payload.get(
                             "release_manifest_rollout_compatible_with_release_channel"
                         ),
-                        "landingMarkerStatus": "pass" if not landing_missing_markers else "fail",
+                        "landingMarkerStatus": (
+                            "pass"
+                            if not landing_missing_markers and not landing_forbidden_markers
+                            else "fail"
+                        ),
                         "landingMarkerChecks": landing_marker_checks,
                         "landingMissingMarkers": landing_missing_markers,
+                        "landingForbiddenMarkerChecks": landing_forbidden_marker_checks,
+                        "landingForbiddenMarkers": landing_forbidden_markers,
                         "landingBrowserRedirect": landing_browser_redirect,
                         "combinedReadiness": overlay_readiness,
                         "localRuntimeDependencyBaseUrl": dependency_stub.base_url,
@@ -4115,13 +4194,23 @@ def _verify_published_overlay_with_budget(
                                     "release_manifest_conservative_review_floor_applied"
                                 )
                             ),
-                            "landingHasPlayDisabledTarget": landing_marker_checks.get("playDisabledTarget"),
-                            "landingHasPlaySignInRoute": landing_marker_checks.get("playSignInRoute"),
+                            "landingHasBuildPublicInstallHandoff": landing_marker_checks.get(
+                                "buildPublicInstallHandoff"
+                            ),
+                            "landingHasPlayPublicInstallHandoff": landing_marker_checks.get(
+                                "playPublicInstallHandoff"
+                            ),
+                            "landingRetiredMarkersAbsent": all(
+                                landing_forbidden_marker_checks.values()
+                            ),
                             "landingHasTurnAnchor": landing_marker_checks.get("turnAnchor"),
                             "landingHasTurnAnchorRedirect": landing_marker_checks.get("turnAnchorRedirect"),
                             "landingBrowserRedirectStatus": landing_browser_redirect.get("status"),
+                            "landingBrowserRedirectExpectedQuery": landing_browser_redirect.get("expectedQuery"),
+                            "landingBrowserRedirectFinalQuery": landing_browser_redirect.get("finalQuery"),
                             "landingBrowserRedirectPathMatches": landing_browser_redirect.get("pathMatches"),
                             "landingBrowserRedirectHashMatches": landing_browser_redirect.get("hashMatches"),
+                            "landingBrowserRedirectQueryDropped": landing_browser_redirect.get("queryDropped"),
                             "combinedReadinessStatus": overlay_readiness.get("status"),
                             "combinedReadinessHttpStatus": overlay_readiness.get("httpStatus"),
                             "combinedReadinessBodyReady": overlay_readiness.get("bodyReady"),

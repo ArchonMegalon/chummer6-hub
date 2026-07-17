@@ -232,6 +232,30 @@ def test_authority_validator_rejects_digest_drift(tmp_path: Path) -> None:
         )
 
 
+def test_authority_validator_rejects_stale_verifier_digest(tmp_path: Path) -> None:
+    module = load_module()
+    authority = json.loads(AUTHORITY.read_text(encoding="utf-8"))
+    authority["verifierSha256"] = (
+        "b5fa1a2863fe19f57cfe1d56ee6961f1eb92ec48829484ad740942e96d2210d7"
+    )
+    stale_authority = tmp_path / "stale-authority.json"
+    stale_authority.write_text(
+        json.dumps(authority, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="verifierSha256"):
+        module.validate(
+            stale_authority,
+            VERIFIER,
+            GENERATOR,
+            INVENTORY,
+            MIRROR,
+            PROJECTION,
+            TEMPLATE,
+        )
+
+
 @pytest.mark.parametrize(
     ("label", "payload"),
     (

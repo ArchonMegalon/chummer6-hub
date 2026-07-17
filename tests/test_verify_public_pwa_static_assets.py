@@ -815,24 +815,64 @@ def test_mirror_closure_rejects_generator_dependency_symlink(tmp_path: Path) -> 
     assert any("symlink" in failure and "projection_template" in failure for failure in failures)
 
 
-def test_source_contract_rejects_default_on_or_portal_dependency(tmp_path: Path) -> None:
+def test_source_contract_rejects_overrideable_proxy_flags_or_portal_dependency(tmp_path: Path) -> None:
     module = load_module()
     fixture = copy_contract_fixture(tmp_path)
     compose = (ROOT / "docker-compose.public-edge.yml").read_text(encoding="utf-8")
     compose = compose.replace(
+        'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"',
         'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"',
-        'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-true}"',
     ).replace(
-        "    depends_on:\n      chummer-public-blazor:",
-        "    depends_on:\n      chummer-play-web:\n        condition: service_healthy\n      chummer-public-blazor:",
+        'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"',
+        'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED:-false}"',
+    ).replace(
+        "      chummer-public-blazor:\n        condition: service_healthy",
+        "      chummer-play-web:\n        condition: service_healthy\n"
+        "      chummer-public-blazor:\n        condition: service_healthy",
     )
     (fixture / "docker-compose.public-edge.yml").write_text(compose, encoding="utf-8")
 
     result = module.verify_source(fixture)
 
     assert result["status"] == "fail"
-    assert any("default off" in failure for failure in result["failures"])
+    assert any("public Play proxy must be literal false" in failure for failure in result["failures"])
+    assert any("public Play live-session proxy must be literal false" in failure for failure in result["failures"])
+    assert any("public Play proxy must not be environment-overridable" in failure for failure in result["failures"])
+    assert any("public Play live-session proxy must not be environment-overridable" in failure for failure in result["failures"])
     assert any("must not depend" in failure for failure in result["failures"])
+
+
+@pytest.mark.parametrize(
+    ("name", "failure"),
+    (
+        (
+            "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED",
+            "public Play proxy must have exactly one declaration",
+        ),
+        (
+            "CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED",
+            "public Play live-session proxy must have exactly one declaration",
+        ),
+    ),
+)
+def test_source_contract_rejects_duplicate_proxy_declarations(
+    tmp_path: Path,
+    name: str,
+    failure: str,
+) -> None:
+    module = load_module()
+    fixture = copy_contract_fixture(tmp_path)
+    compose = (ROOT / "docker-compose.public-edge.yml").read_text(encoding="utf-8")
+    compose = compose.replace(
+        f'{name}: "false"',
+        f'{name}: "false"\n      {name}: "true"',
+    )
+    (fixture / "docker-compose.public-edge.yml").write_text(compose, encoding="utf-8")
+
+    result = module.verify_source(fixture)
+
+    assert result["status"] == "fail"
+    assert any(failure in item for item in result["failures"])
 
 
 def test_worker_generator_rejects_undeclared_source_drift(tmp_path: Path) -> None:
