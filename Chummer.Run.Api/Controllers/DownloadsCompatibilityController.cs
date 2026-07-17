@@ -1113,6 +1113,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         if (isRawArtifactPath
             && _artifactDelivery.AnonymousRawArtifactDownloadsEnabled
+            && !binding.RequiresAccount
             && !HasCredentialQuery(Request))
         {
             if (generationBoundRawPath)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -20,8 +20,9 @@ CURRENT_VERIFY_URL="${CHUMMER_PORTAL_DOWNLOADS_CURRENT_VERIFY_URL:-}"
 GENERATION_VERIFY_BASE_URL="${CHUMMER_PORTAL_DOWNLOADS_GENERATION_VERIFY_BASE_URL:-}"
 RELEASE_SHELF_HELPER="$SCRIPT_DIR/release_shelf_generation.py"
 SHELF_LAYOUT_MARKER=".release-shelf-layout-v1"
-SHELF_LAYOUT_V1_ENABLED="${CHUMMER_RELEASE_SHELF_LAYOUT_V1_ENABLED:-false}"
 SHELF_GENERATION_ID="${CHUMMER_RELEASE_GENERATION_ID:-}"
+PRIMARY_RELEASE_COMMITTED=false
+PRIMARY_COMMITTED_GENERATION=""
 
 if [[ ! -f "$MANIFEST_SOURCE" || ! -d "$FILES_SOURCE" ]]; then
   echo "Expected desktop-download-bundle layout: releases.json + files/chummer-*" >&2
@@ -83,12 +84,6 @@ if ! command -v aws >/dev/null 2>&1; then
   exit 1
 fi
 
-to_bool() {
-  local value
-  value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
-  [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
-}
-
 sha256_for_file() {
   python3 - "$1" <<'PY'
 import hashlib
@@ -116,7 +111,17 @@ prepared_layout_dir="$(mktemp -d)"
 cleanup() {
   rm -rf "$filtered_files_dir" "$generation_candidate_dir" "$prepared_layout_dir"
 }
+report_publish_error() {
+  local status="$1"
+  if [[ "$PRIMARY_RELEASE_COMMITTED" == true ]]; then
+    echo "PRIMARY_RELEASE_COMMITTED generation=$PRIMARY_COMMITTED_GENERATION; a post-commit verification or latest-alias step failed" >&2
+  else
+    echo "PRIMARY_RELEASE_NOT_COMMITTED; publication failed before the primary current.json commit point" >&2
+  fi
+  exit "$status"
+}
 trap cleanup EXIT
+trap 'report_publish_error "$?"' ERR
 
 mkdir -p "$filtered_files_dir"
 while IFS= read -r artifact; do
@@ -164,13 +169,87 @@ s3_object_key() {
   fi
 }
 
-s3_object_exists() {
+s3_head_or_absent() {
   local target_uri="$1"
   local relative_path="$2"
+  local head_tmp=""
+  local list_json=""
+  local exact_count=""
   s3_object_key "$target_uri" "$relative_path"
-  aws_cli s3api head-object \
-    --bucket "$S3_BUCKET" \
-    --key "$S3_OBJECT_KEY" >/dev/null 2>&1
+  head_tmp="$(mktemp)"
+  if aws_cli s3api head-object \
+      --bucket "$S3_BUCKET" \
+      --key "$S3_OBJECT_KEY" >"$head_tmp" 2>/dev/null; then
+    cat "$head_tmp"
+    rm -f "$head_tmp"
+    return 0
+  fi
+  rm -f "$head_tmp"
+  if ! list_json="$(aws_cli s3api list-objects-v2 \
+      --bucket "$S3_BUCKET" \
+      --prefix "$S3_OBJECT_KEY" \
+      --max-keys 2)"; then
+    echo "Unable to distinguish a missing S3 object from an authorization/transport failure: $target_uri/$relative_path" >&2
+    return 1
+  fi
+  exact_count="$(python3 -c 'import json, sys; payload=json.load(sys.stdin); key=sys.argv[1]; print(sum(1 for row in payload.get("Contents", []) if row.get("Key") == key))' "$S3_OBJECT_KEY" <<<"$list_json")"
+  if [[ "$exact_count" == "0" ]]; then
+    return 3
+  fi
+  echo "S3 listed $target_uri/$relative_path, but HeadObject failed; refusing to treat it as absent" >&2
+  return 1
+}
+
+s3_put_immutable_file() {
+  local target_uri="$1"
+  local relative_path="$2"
+  local source_path="$3"
+  local digest="$4"
+  local cache_control="${5:-}"
+  local -a args=()
+  s3_object_key "$target_uri" "$relative_path"
+  args=(
+    s3api put-object
+    --bucket "$S3_BUCKET"
+    --key "$S3_OBJECT_KEY"
+    --body "$source_path"
+    --if-none-match '*'
+  )
+  if [[ -n "$digest" ]]; then
+    args+=(--metadata "sha256=$digest")
+  fi
+  if [[ -n "$cache_control" ]]; then
+    args+=(--cache-control "$cache_control")
+  fi
+  aws_cli "${args[@]}" >/dev/null
+}
+
+s3_put_current_pointer() {
+  local target_uri="$1"
+  local source_path="$2"
+  local digest="$3"
+  local expected_etag="$4"
+  local expect_absent="$5"
+  local -a args=()
+  s3_object_key "$target_uri" "current.json"
+  args=(
+    s3api put-object
+    --bucket "$S3_BUCKET"
+    --key "$S3_OBJECT_KEY"
+    --body "$source_path"
+    --cache-control "no-store, max-age=0"
+    --metadata "sha256=$digest"
+  )
+  if [[ "$expect_absent" == true ]]; then
+    args+=(--if-none-match '*')
+  else
+    if [[ -z "$expected_etag" ]]; then
+      echo "S3 current pointer CAS requires a captured ETag" >&2
+      return 1
+    fi
+    args+=(--if-match "$expected_etag")
+  fi
+  aws_cli "${args[@]}" >/dev/null
 }
 
 validate_remote_current_generation() {
@@ -249,18 +328,13 @@ PY
 
 remote_layout_mode() {
   local target_uri="$1"
-  local marker_exists=false
-  local pointer_exists=false
+  local marker_head=""
+  local pointer_head=""
+  local presence_status=0
   local pointer_tmp=""
   local pointer_json=""
   local current_generation=""
-  if s3_object_exists "$target_uri" "$SHELF_LAYOUT_MARKER"; then
-    marker_exists=true
-  fi
-  if s3_object_exists "$target_uri" "current.json"; then
-    pointer_exists=true
-  fi
-  if [[ "$pointer_exists" == true ]]; then
+  if pointer_head="$(s3_head_or_absent "$target_uri" "current.json")"; then
     pointer_tmp="$(mktemp)"
     aws_cli s3 cp "$target_uri/current.json" "$pointer_tmp" --only-show-errors
     pointer_json="$(python3 "$RELEASE_SHELF_HELPER" pointer --pointer "$pointer_tmp")"
@@ -272,37 +346,26 @@ remote_layout_mode() {
     rm -f "$pointer_tmp"
     printf 'generation\n'
     return 0
+  else
+    presence_status=$?
+    if [[ "$presence_status" -ne 3 ]]; then
+      return "$presence_status"
+    fi
   fi
-  if [[ "$marker_exists" == true ]]; then
+
+  if marker_head="$(s3_head_or_absent "$target_uri" "$SHELF_LAYOUT_MARKER")"; then
     echo "$target_uri has $SHELF_LAYOUT_MARKER without current.json; refusing legacy fallback" >&2
     return 1
-  fi
-  if to_bool "$SHELF_LAYOUT_V1_ENABLED"; then
-    printf 'generation\n'
   else
-    printf 'legacy\n'
+    presence_status=$?
+    if [[ "$presence_status" -ne 3 ]]; then
+      return "$presence_status"
+    fi
   fi
-}
-
-copy_legacy_target() {
-  local target_uri="$1"
-  local target_mode=""
-  target_mode="$(remote_layout_mode "$target_uri")"
-  if [[ "$target_mode" != "legacy" ]]; then
-    echo "Refusing legacy top-level publication after $SHELF_LAYOUT_MARKER activation: $target_uri" >&2
-    return 1
-  fi
-  aws_cli s3 cp "$filtered_files_dir/" "$target_uri/files/" --recursive
-  aws_cli s3 rm "$target_uri/proof/" --recursive >/dev/null 2>&1 || true
-  if [[ -d "$PROOF_SOURCE" ]]; then
-    aws_cli s3 cp "$PROOF_SOURCE/" "$target_uri/proof/" --recursive
-  fi
-  aws_cli s3 rm "$target_uri/startup-smoke/" --recursive >/dev/null 2>&1 || true
-  if [[ -d "$STARTUP_SMOKE_SOURCE" ]]; then
-    aws_cli s3 cp "$STARTUP_SMOKE_SOURCE/" "$target_uri/startup-smoke/" --recursive
-  fi
-  aws_cli s3 cp "$MANIFEST_SOURCE" "$target_uri/releases.json"
-  aws_cli s3 cp "$CANONICAL_MANIFEST_SOURCE" "$target_uri/RELEASE_CHANNEL.generated.json"
+  # Layout-v1 is the only supported S3 writer protocol. An empty target is an
+  # explicit first-generation initialization; there is no legacy top-level
+  # publication fallback or opt-in switch.
+  printf 'generation\n'
 }
 
 stage_release_shelf_generation() {
@@ -338,8 +401,8 @@ stage_release_shelf_generation() {
 activate_release_shelf_generation() {
   local target_uri="$1"
   local target_mode="$2"
+  local target_role="$3"
   local generation_uri="$target_uri/generations/$PREPARED_GENERATION_ID"
-  local existing_objects=""
   local source_path=""
   local relative_path=""
   local digest=""
@@ -349,22 +412,86 @@ activate_release_shelf_generation() {
   local remote_size=""
   local pointer_digest=""
   local pointer_tmp=""
+  local pointer_head=""
+  local current_pointer_json=""
+  local current_generation=""
+  local current_etag=""
+  local presence_status=0
+  local expect_absent=false
+  local marker_head=""
+  local marker_tmp=""
   if [[ "$target_mode" != "generation" ]]; then
     echo "internal error: generation upload selected for legacy target $target_uri" >&2
     return 1
   fi
-  existing_objects="$(aws_cli s3 ls "$generation_uri/" --recursive)"
-  if [[ -n "$existing_objects" ]]; then
-    echo "Refusing to reuse immutable generation ID $PREPARED_GENERATION_ID at $target_uri" >&2
-    return 1
+
+  pointer_tmp="$(mktemp)"
+  if pointer_head="$(s3_head_or_absent "$target_uri" "current.json")"; then
+    current_etag="$(python3 -c 'import json, sys; print(json.load(sys.stdin).get("ETag") or "")' <<<"$pointer_head")"
+    if [[ -z "$current_etag" ]]; then
+      rm -f "$pointer_tmp"
+      echo "$target_uri current.json HeadObject response is missing ETag; CAS cannot proceed" >&2
+      return 1
+    fi
+    aws_cli s3 cp "$target_uri/current.json" "$pointer_tmp" --only-show-errors
+    current_pointer_json="$(python3 "$RELEASE_SHELF_HELPER" pointer --pointer "$pointer_tmp")"
+    current_generation="$(python3 -c 'import json, sys; print(json.load(sys.stdin)["generationId"])' <<<"$current_pointer_json")"
+    validate_remote_current_generation "$target_uri" "$pointer_tmp" "$current_generation"
+    if ! python3 - "$pointer_tmp" "$prepared_layout_dir/current.json" <<'PY'
+import json
+import sys
+from datetime import datetime
+
+def instant(value):
+    raw = str(value or "").strip()
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    return datetime.fromisoformat(raw)
+
+current = json.load(open(sys.argv[1], encoding="utf-8"))
+incoming = json.load(open(sys.argv[2], encoding="utf-8"))
+if instant(incoming.get("publishedAt")) <= instant(current.get("publishedAt")):
+    raise SystemExit(
+        "incoming release publishedAt must be strictly newer than the active S3 generation"
+    )
+PY
+    then
+      rm -f "$pointer_tmp"
+      return 1
+    fi
+  else
+    presence_status=$?
+    if [[ "$presence_status" -ne 3 ]]; then
+      rm -f "$pointer_tmp"
+      return "$presence_status"
+    fi
+    expect_absent=true
+    if marker_head="$(s3_head_or_absent "$target_uri" "$SHELF_LAYOUT_MARKER")"; then
+      rm -f "$pointer_tmp"
+      echo "$target_uri has $SHELF_LAYOUT_MARKER without current.json; refusing ambiguous activation" >&2
+      return 1
+    else
+      presence_status=$?
+      if [[ "$presence_status" -ne 3 ]]; then
+        rm -f "$pointer_tmp"
+        return "$presence_status"
+      fi
+    fi
   fi
+
   while IFS= read -r -d '' source_path; do
     relative_path="${source_path#"$PREPARED_GENERATION_ROOT/"}"
     digest="$(sha256_for_file "$source_path")"
     size_bytes="$(wc -c <"$source_path" | tr -d ' ')"
-    aws_cli s3 cp "$source_path" "$generation_uri/$relative_path" \
-      --only-show-errors \
-      --metadata "sha256=$digest"
+    if ! s3_put_immutable_file \
+        "$target_uri" \
+        "generations/$PREPARED_GENERATION_ID/$relative_path" \
+        "$source_path" \
+        "$digest"; then
+      rm -f "$pointer_tmp"
+      echo "Refusing to overwrite or reuse immutable generation object: $generation_uri/$relative_path" >&2
+      return 1
+    fi
     s3_object_key "$target_uri" "generations/$PREPARED_GENERATION_ID/$relative_path"
     remote_head="$(aws_cli s3api head-object --bucket "$S3_BUCKET" --key "$S3_OBJECT_KEY")"
     remote_digest="$(python3 -c 'import json, sys; print((json.load(sys.stdin).get("Metadata") or {}).get("sha256") or "")' <<<"$remote_head")"
@@ -379,11 +506,28 @@ activate_release_shelf_generation() {
   # object and metadata digest was verified. A valid pointer is sufficient for v1
   # readers, so a crash cannot strand a precommit marker without a current shelf.
   pointer_digest="$(sha256_for_file "$prepared_layout_dir/current.json")"
-  aws_cli s3 cp "$prepared_layout_dir/current.json" "$target_uri/current.json" \
-    --only-show-errors \
-    --cache-control "no-store, max-age=0" \
-    --metadata "sha256=$pointer_digest"
-  pointer_tmp="$(mktemp)"
+  if ! s3_put_current_pointer \
+      "$target_uri" \
+      "$prepared_layout_dir/current.json" \
+      "$pointer_digest" \
+      "$current_etag" \
+      "$expect_absent"; then
+    # A lost response after a successful conditional PutObject is reconciled by
+    # exact pointer bytes. A different pointer is a clean CAS loss.
+    if ! aws_cli s3 cp "$target_uri/current.json" "$pointer_tmp" --only-show-errors \
+      || ! cmp -s "$prepared_layout_dir/current.json" "$pointer_tmp"; then
+      rm -f "$pointer_tmp"
+      echo "S3 current.json CAS failed; another publisher won or the commit outcome is unverifiable at $target_uri" >&2
+      return 1
+    fi
+  fi
+  # A successful conditional PutObject, or the exact-byte reconciliation above
+  # after a lost response, is the publication commit point. Record that truth
+  # before any fallible readback, marker, latest-alias, or HTTP verification.
+  if [[ "$target_role" == "primary" ]]; then
+    PRIMARY_RELEASE_COMMITTED=true
+    PRIMARY_COMMITTED_GENERATION="$PREPARED_GENERATION_ID"
+  fi
   aws_cli s3 cp "$target_uri/current.json" "$pointer_tmp" --only-show-errors
   if ! cmp -s "$prepared_layout_dir/current.json" "$pointer_tmp"; then
     rm -f "$pointer_tmp"
@@ -393,10 +537,34 @@ activate_release_shelf_generation() {
   rm -f "$pointer_tmp"
   # The marker is a durable post-commit "ever crossed" downgrade sentinel. Its
   # failure cannot turn a live committed generation into a safe-to-retry error.
-  if ! s3_object_exists "$target_uri" "$SHELF_LAYOUT_MARKER"; then
-    if ! aws_cli s3 cp "$prepared_layout_dir/$SHELF_LAYOUT_MARKER" "$target_uri/$SHELF_LAYOUT_MARKER" \
-      --only-show-errors --cache-control "no-store"; then
-      echo "WARNING: current.json is active, but post-commit layout marker creation failed at $target_uri" >&2
+  if marker_head="$(s3_head_or_absent "$target_uri" "$SHELF_LAYOUT_MARKER")"; then
+    marker_tmp="$(mktemp)"
+    if ! aws_cli s3 cp "$target_uri/$SHELF_LAYOUT_MARKER" "$marker_tmp" --only-show-errors \
+      || ! cmp -s "$prepared_layout_dir/$SHELF_LAYOUT_MARKER" "$marker_tmp"; then
+      rm -f "$marker_tmp"
+      echo "existing S3 layout marker is not byte-identical to the immutable layout-v1 sentinel" >&2
+      return 1
+    fi
+    rm -f "$marker_tmp"
+  else
+    presence_status=$?
+    if [[ "$presence_status" -ne 3 ]]; then
+      return "$presence_status"
+    fi
+    if ! s3_put_immutable_file \
+        "$target_uri" \
+        "$SHELF_LAYOUT_MARKER" \
+        "$prepared_layout_dir/$SHELF_LAYOUT_MARKER" \
+        "" \
+        "no-store"; then
+      marker_tmp="$(mktemp)"
+      if ! aws_cli s3 cp "$target_uri/$SHELF_LAYOUT_MARKER" "$marker_tmp" --only-show-errors \
+        || ! cmp -s "$prepared_layout_dir/$SHELF_LAYOUT_MARKER" "$marker_tmp"; then
+        rm -f "$marker_tmp"
+        echo "current.json is committed, but immutable layout marker reconciliation failed at $target_uri" >&2
+        return 1
+      fi
+      rm -f "$marker_tmp"
     fi
   fi
   echo "Activated immutable release shelf generation $PREPARED_GENERATION_ID at $target_uri"
@@ -414,39 +582,24 @@ if [[ -n "$S3_LATEST_URI" ]]; then
   LATEST_TARGET_MODE="$(remote_layout_mode "$S3_LATEST_URI")"
 fi
 
-if [[ "$PRIMARY_TARGET_MODE" == "generation" || "$LATEST_TARGET_MODE" == "generation" ]]; then
-  stage_release_shelf_generation
-fi
-
-if [[ "$PRIMARY_TARGET_MODE" == "generation" ]]; then
-  activate_release_shelf_generation "$S3_TARGET_URI" "$PRIMARY_TARGET_MODE"
-else
-  copy_legacy_target "$S3_TARGET_URI"
-fi
+stage_release_shelf_generation
+activate_release_shelf_generation "$S3_TARGET_URI" "$PRIMARY_TARGET_MODE" "primary"
 if [[ -n "$S3_LATEST_URI" ]]; then
-  if [[ "$LATEST_TARGET_MODE" == "generation" ]]; then
-    activate_release_shelf_generation "$S3_LATEST_URI" "$LATEST_TARGET_MODE"
-  else
-    copy_legacy_target "$S3_LATEST_URI"
-  fi
+  activate_release_shelf_generation "$S3_LATEST_URI" "$LATEST_TARGET_MODE" "latest"
 fi
 
-if [[ "$PRIMARY_TARGET_MODE" == "generation" ]]; then
-  verify_base="${VERIFY_URL%/}"
-  case "$verify_base" in
-    */RELEASE_CHANNEL.generated.json|*/releases.json|*/current.json)
-      verify_base="${verify_base%/*}"
-      ;;
-  esac
-  CURRENT_VERIFY_URL="${CURRENT_VERIFY_URL:-$verify_base/current.json}"
-  GENERATION_VERIFY_BASE_URL="${GENERATION_VERIFY_BASE_URL:-$verify_base/g}"
-  python3 "$RELEASE_SHELF_HELPER" verify-http \
-    --pointer-url "$CURRENT_VERIFY_URL" \
-    --generation-base-url "$GENERATION_VERIFY_BASE_URL" \
-    --expected-generation-id "$PREPARED_GENERATION_ID"
-else
-  bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$VERIFY_URL"
-fi
+verify_base="${VERIFY_URL%/}"
+case "$verify_base" in
+  */RELEASE_CHANNEL.generated.json|*/releases.json|*/current.json)
+    verify_base="${verify_base%/*}"
+    ;;
+esac
+CURRENT_VERIFY_URL="${CURRENT_VERIFY_URL:-$verify_base/current.json}"
+GENERATION_VERIFY_BASE_URL="${GENERATION_VERIFY_BASE_URL:-$verify_base/g}"
+python3 "$RELEASE_SHELF_HELPER" verify-http \
+  --pointer-url "$CURRENT_VERIFY_URL" \
+  --generation-base-url "$GENERATION_VERIFY_BASE_URL" \
+  --expected-generation-id "$PREPARED_GENERATION_ID"
 
 artifact_count="$(find "$filtered_files_dir" -maxdepth 1 -type f \( \
   -name 'chummer-*-installer.exe' -o \

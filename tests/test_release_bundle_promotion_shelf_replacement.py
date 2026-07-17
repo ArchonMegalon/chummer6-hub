@@ -9,17 +9,17 @@ SERVICE_PATH = REPO_ROOT / "Chummer.Run.Api" / "Services" / "ReleaseBundlePromot
 
 
 class ReleaseBundlePromotionShelfReplacementTests(unittest.TestCase):
-    def test_promotion_activates_registry_manifests_without_rederiving_them(self) -> None:
+    def test_promotion_activates_narrow_registry_generation_projection(self) -> None:
         text = SERVICE_PATH.read_text(encoding="utf-8")
         promotion_start = text.index("private Task<ReleaseBundlePromotionResult> PromotePreparedBundleAsync(")
         promotion_end = text.index("\n    private string ResolveDownloadsRoot()", promotion_start)
         promotion_body = text[promotion_start:promotion_end]
 
         self.assertIn("ValidateRegistryAuthoredManifestPair(", promotion_body)
-        self.assertIn("incomingCompatibilityBytes = prepared.CompatibilityManifestBytes", promotion_body)
-        self.assertIn("incomingCanonicalBytes = prepared.CanonicalManifestBytes", promotion_body)
-        self.assertIn("compatibilityManifestSha256 = Sha256For(incomingCompatibilityBytes)", promotion_body)
-        self.assertIn("canonicalManifestSha256 = Sha256For(incomingCanonicalBytes)", promotion_body)
+        self.assertIn("incomingCompatibilityManifestObject = prepared.CompatibilityManifestObject", promotion_body)
+        self.assertIn("incomingCanonicalManifest = prepared.CanonicalManifest", promotion_body)
+        self.assertIn("compatibilityManifestSha256 = Sha256For(stagedCompatibilityManifestPath)", promotion_body)
+        self.assertIn("canonicalManifestSha256 = Sha256For(stagedCanonicalManifestPath)", promotion_body)
         self.assertNotIn("NormalizeMergedShelfProjection(", promotion_body)
         self.assertNotIn("MergeCompatibilityManifest(", promotion_body)
         self.assertNotIn("MergeCanonicalManifest(", promotion_body)
@@ -27,10 +27,12 @@ class ReleaseBundlePromotionShelfReplacementTests(unittest.TestCase):
         stage_start = text.index("private static void PrepareStagedShelf(")
         stage_end = text.index("\n    private static void RewritePayloadSidecarsForGeneration(", stage_start)
         stage_body = text[stage_start:stage_end]
-        self.assertIn("compatibilityManifestBytes", stage_body)
-        self.assertIn("canonicalManifestBytes", stage_body)
+        self.assertEqual(2, stage_body.count("ProjectRegistryManifestForGeneration("))
+        self.assertIn("projectedCompatibilityBytes", stage_body)
+        self.assertIn("projectedCanonicalBytes", stage_body)
         self.assertIn("File.WriteAllBytes(", stage_body)
-        self.assertNotIn("NormalizeManifestForGeneration(", stage_body)
+        self.assertNotIn("incomingCompatibilityBytes", stage_body)
+        self.assertNotIn("incomingCanonicalBytes", stage_body)
 
     def test_activation_is_digest_bound_and_enforces_registry_platform_floor(self) -> None:
         text = SERVICE_PATH.read_text(encoding="utf-8")

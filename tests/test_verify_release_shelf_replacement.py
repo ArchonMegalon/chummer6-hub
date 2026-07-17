@@ -97,7 +97,8 @@ def test_publishers_run_preflight_before_mutation() -> None:
     assert filesystem.index("verify_release_shelf_replacement.py") < filesystem.index(
         'bash "$SCRIPT_DIR/generate-releases-manifest.sh"'
     )
-    assert object_storage.index("verify_release_shelf_replacement.py") < min(
-        object_storage.index('copy_legacy_target "$S3_TARGET_URI"'),
-        object_storage.index('activate_release_shelf_generation "$S3_TARGET_URI"'),
+    assert "copy_legacy_target" not in object_storage
+    assert "CHUMMER_RELEASE_SHELF_LAYOUT_V1_ENABLED" not in object_storage
+    assert object_storage.index("verify_release_shelf_replacement.py") < object_storage.index(
+        'activate_release_shelf_generation "$S3_TARGET_URI"'
     )

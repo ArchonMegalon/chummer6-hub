@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -158,6 +159,11 @@ public sealed class ReleaseBundlePromotionService
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = true
+    };
+    private static readonly JsonSerializerOptions CanonicalManifestJsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        WriteIndented = false
     };
 
     private readonly IConfiguration _configuration;
@@ -535,6 +541,7 @@ public sealed class ReleaseBundlePromotionService
             }
 
             result = BuildPromotionResultFromCommittedJournal(downloadsRoot, journal);
+            AcknowledgeActivationCompletionUnderLock(downloadsRoot, intent);
             return true;
         }
 
@@ -557,6 +564,7 @@ public sealed class ReleaseBundlePromotionService
                 _ = BuildPromotionResultFromCommittedJournal(downloadsRoot, journal);
                 _postActivationDirectoryFlush(downloadsRoot);
                 ResolveActivationIntentDurably(downloadsRoot, journal, state: "committed");
+                AcknowledgeActivationCompletionUnderLock(downloadsRoot, intent);
             }
             catch (Exception ex) when (ex is not ReleaseActivationOutcomeUnknownException)
             {
@@ -1022,9 +1030,8 @@ public sealed class ReleaseBundlePromotionService
     {
         PreparedReleaseBundle prepared = PrepareBundle(bundleRoot);
         PublicReleaseManifestDto incomingCompatibilityManifest = prepared.CompatibilityManifest;
+        JsonObject incomingCompatibilityManifestObject = prepared.CompatibilityManifestObject;
         JsonObject incomingCanonicalManifest = prepared.CanonicalManifest;
-        byte[] incomingCompatibilityBytes = prepared.CompatibilityManifestBytes;
-        byte[] incomingCanonicalBytes = prepared.CanonicalManifestBytes;
         string filesRoot = prepared.FilesRoot;
         string? startupSmokeRoot = prepared.StartupSmokeRoot;
         string? signingRoot = prepared.SigningRoot;
@@ -1044,9 +1051,6 @@ public sealed class ReleaseBundlePromotionService
             : null;
 
         ValidateNoDesktopInstallTupleRegression(existingCanonicalManifest, incomingCanonicalManifest);
-        string compatibilityManifestSha256 = Sha256For(incomingCompatibilityBytes);
-        string canonicalManifestSha256 = Sha256For(incomingCanonicalBytes);
-
         DateTimeOffset activatedAt = _timeProvider.GetUtcNow().ToUniversalTime();
         string generationId = NewGenerationId(activatedAt);
         string activationReceiptId = $"activation-{Guid.NewGuid():N}";
@@ -1070,8 +1074,8 @@ public sealed class ReleaseBundlePromotionService
                 releaseEvidenceRoot,
                 aurPackagesPath,
                 incomingCompatibilityManifest,
-                incomingCompatibilityBytes,
-                incomingCanonicalBytes,
+                incomingCompatibilityManifestObject,
+                incomingCanonicalManifest,
                 generationId,
                 cancellationToken);
 
@@ -1079,11 +1083,14 @@ public sealed class ReleaseBundlePromotionService
 
             string stagedCompatibilityManifestPath = Path.Combine(stagedRoot, CompatibilityManifestName);
             string stagedCanonicalManifestPath = Path.Combine(stagedRoot, CanonicalManifestName);
+            string compatibilityManifestSha256 = Sha256For(stagedCompatibilityManifestPath);
+            string canonicalManifestSha256 = Sha256For(stagedCanonicalManifestPath);
             PublicReleaseManifestDto publicShelfManifest = ValidatePublicShelfCoherence(
                 stagedRoot,
                 stagedCompatibilityManifestPath,
                 stagedCanonicalManifestPath,
                 promotedArtifactIds,
+                generationId,
                 compatibilityManifestSha256,
                 canonicalManifestSha256);
             IReadOnlyList<ActivationInventoryEntry> inventory = BuildActivationInventory(stagedRoot);
@@ -1309,9 +1316,8 @@ public sealed class ReleaseBundlePromotionService
 
         return new PreparedReleaseBundle(
             incomingCompatibilityManifest,
+            incomingCompatibilityManifestObject,
             incomingCanonicalManifest,
-            incomingCompatibilityBytes,
-            incomingCanonicalBytes,
             filesRoot,
             startupSmokeRoot,
             signingRoot,
@@ -1323,9 +1329,8 @@ public sealed class ReleaseBundlePromotionService
 
     private sealed record PreparedReleaseBundle(
         PublicReleaseManifestDto CompatibilityManifest,
+        JsonObject CompatibilityManifestObject,
         JsonObject CanonicalManifest,
-        byte[] CompatibilityManifestBytes,
-        byte[] CanonicalManifestBytes,
         string FilesRoot,
         string? StartupSmokeRoot,
         string? SigningRoot,
@@ -1448,8 +1453,8 @@ public sealed class ReleaseBundlePromotionService
         string? releaseEvidenceRoot,
         string? aurPackagesPath,
         PublicReleaseManifestDto compatibilityManifest,
-        byte[] compatibilityManifestBytes,
-        byte[] canonicalManifestBytes,
+        JsonObject compatibilityManifestObject,
+        JsonObject canonicalManifest,
         string generationId,
         CancellationToken cancellationToken)
     {
@@ -1509,14 +1514,23 @@ public sealed class ReleaseBundlePromotionService
             compatibilityManifest,
             generationId);
 
+        byte[] projectedCompatibilityBytes = ProjectRegistryManifestForGeneration(
+            compatibilityManifestObject,
+            generationId,
+            compatibilityManifest);
+        byte[] projectedCanonicalBytes = ProjectRegistryManifestForGeneration(
+            canonicalManifest,
+            generationId,
+            compatibilityManifest);
+
         cancellationToken.ThrowIfCancellationRequested();
         File.WriteAllBytes(
             Path.Combine(stagedRoot, CompatibilityManifestName),
-            compatibilityManifestBytes);
+            projectedCompatibilityBytes);
         cancellationToken.ThrowIfCancellationRequested();
         File.WriteAllBytes(
             Path.Combine(stagedRoot, CanonicalManifestName),
-            canonicalManifestBytes);
+            projectedCanonicalBytes);
         cancellationToken.ThrowIfCancellationRequested();
     }
 
@@ -1789,6 +1803,208 @@ public sealed class ReleaseBundlePromotionService
             or >= 'a' and <= 'z'
             or >= '0' and <= '9';
 
+    /// <summary>
+    /// Materializes the Registry-owned layout-v1 generation projection. The
+    /// incoming Registry document remains the truth source; this deterministic
+    /// projection only binds that truth to one immutable generation identity and
+    /// its access-class-aware delivery paths. Python/object-storage publishers
+    /// implement and golden-test the same canonical byte contract.
+    /// </summary>
+    internal static byte[] ProjectRegistryManifestForGeneration(
+        JsonObject registryManifest,
+        string generationId,
+        PublicReleaseManifestDto compatibilityManifest)
+    {
+        ArgumentNullException.ThrowIfNull(registryManifest);
+        ArgumentNullException.ThrowIfNull(compatibilityManifest);
+        if (!IsSafeGenerationId(generationId))
+        {
+            throw new InvalidDataException(
+                "release shelf generationId is not a traversal-safe opaque token.");
+        }
+
+        Dictionary<string, GenerationArtifactRoute> artifactRoutes = compatibilityManifest.Downloads
+            .Where(static artifact => !string.IsNullOrWhiteSpace(artifact.Id))
+            .Select(artifact => new GenerationArtifactRoute(
+                RequireArtifactToken(artifact.Id, "compatibility artifact id"),
+                RequirePortableArtifactFileName(
+                    artifact.FileName,
+                    artifact.Id,
+                    "compatibility fileName"),
+                string.IsNullOrWhiteSpace(artifact.PayloadFileName)
+                    ? null
+                    : RequirePortableArtifactFileName(
+                        artifact.PayloadFileName,
+                        artifact.Id,
+                        "compatibility payloadFileName"),
+                string.Equals(
+                    artifact.InstallAccessClass?.Trim(),
+                    "open_public",
+                    StringComparison.OrdinalIgnoreCase)))
+            .ToDictionary(
+                static route => route.ArtifactId,
+                static route => route,
+                StringComparer.OrdinalIgnoreCase);
+
+        JsonObject projected = (JsonObject)registryManifest.DeepClone();
+        RejectProofRouteLookalikes(projected);
+        ValidateRegistryProjectionSourceRoutes(
+            projected,
+            generationId,
+            artifactRoutes);
+        projected["generationId"] = generationId;
+        ProjectArtifactDownloadRoutes(projected, artifactRoutes);
+        NormalizeManifestForGeneration(projected, generationId, artifactRoutes);
+        JsonNode canonical = CanonicalizeManifestNode(projected);
+        byte[] body = JsonSerializer.SerializeToUtf8Bytes(
+            canonical,
+            CanonicalManifestJsonOptions);
+        byte[] terminated = new byte[body.Length + 1];
+        body.CopyTo(terminated, 0);
+        terminated[^1] = (byte)'\n';
+        return terminated;
+    }
+
+    private static void ValidateRegistryProjectionSourceRoutes(
+        JsonObject manifest,
+        string generationId,
+        IReadOnlyDictionary<string, GenerationArtifactRoute> artifactRoutes)
+    {
+        JsonNode? canonicalProofRoutes = manifest["releaseProof"]?["proofRoutes"] is JsonArray routes
+            ? routes
+            : null;
+        foreach (string value in EnumerateGenerationBoundStrings(manifest, canonicalProofRoutes))
+        {
+            _ = RewriteReleaseUrl(value, generationId, artifactRoutes);
+        }
+    }
+
+    private static void ProjectArtifactDownloadRoutes(
+        JsonObject manifest,
+        IReadOnlyDictionary<string, GenerationArtifactRoute> artifactRoutes)
+    {
+        foreach (string collectionName in new[] { "artifacts", "downloads" })
+        {
+            if (manifest[collectionName] is not JsonArray rows)
+            {
+                continue;
+            }
+
+            foreach (JsonObject row in rows.OfType<JsonObject>())
+            {
+                string? artifactId = GetJsonString(row["artifactId"])
+                                     ?? GetJsonString(row["id"]);
+                if (string.IsNullOrWhiteSpace(artifactId)
+                    || !artifactRoutes.TryGetValue(
+                        artifactId.Trim(),
+                        out GenerationArtifactRoute? route))
+                {
+                    continue;
+                }
+
+                string primary = route.IsOpenPublic
+                    ? $"/downloads/g/{GetJsonString(manifest["generationId"])}/files/{route.FileName}"
+                    : $"/downloads/g/{GetJsonString(manifest["generationId"])}/install/{route.ArtifactId}";
+                if (row.ContainsKey("downloadUrl"))
+                {
+                    row["downloadUrl"] = primary;
+                }
+
+                if (row.ContainsKey("url"))
+                {
+                    row["url"] = primary;
+                }
+
+                if (row.ContainsKey("payloadDownloadUrl")
+                    && !string.IsNullOrWhiteSpace(route.PayloadFileName))
+                {
+                    row["payloadDownloadUrl"] =
+                        $"/downloads/g/{GetJsonString(manifest["generationId"])}/install/{route.ArtifactId}/payload";
+                }
+            }
+        }
+    }
+
+    private static JsonNode CanonicalizeManifestNode(JsonNode node)
+    {
+        if (node is JsonObject jsonObject)
+        {
+            var canonical = new JsonObject();
+            foreach ((string key, JsonNode? value) in jsonObject
+                         .OrderBy(static property => property.Key, StringComparer.Ordinal))
+            {
+                canonical[key] = value is null
+                    ? null
+                    : CanonicalizeManifestNode(value);
+            }
+
+            return canonical;
+        }
+
+        if (node is JsonArray jsonArray)
+        {
+            var canonical = new JsonArray();
+            foreach (JsonNode? value in jsonArray)
+            {
+                canonical.Add(value is null
+                    ? null
+                    : CanonicalizeManifestNode(value));
+            }
+
+            return canonical;
+        }
+
+        return node.DeepClone();
+    }
+
+    private static void RejectProofRouteLookalikes(JsonObject root)
+    {
+        static void Visit(JsonNode node, IReadOnlyList<string> path)
+        {
+            if (node is JsonObject jsonObject)
+            {
+                foreach ((string key, JsonNode? child) in jsonObject)
+                {
+                    bool isNestedReleaseProofLookalike = path.Count > 1
+                                                        && string.Equals(
+                                                            path[^1],
+                                                            "releaseProof",
+                                                            StringComparison.Ordinal)
+                                                        && string.Equals(
+                                                            key,
+                                                            "proofRoutes",
+                                                            StringComparison.Ordinal);
+                    if (string.Equals(key, "proof_routes", StringComparison.Ordinal)
+                        || isNestedReleaseProofLookalike)
+                    {
+                        throw new InvalidDataException(
+                            "Registry generation projection rejects nested releaseProof.proofRoutes lookalikes and noncanonical aliases.");
+                    }
+
+                    if (child is not null)
+                    {
+                        Visit(child, path.Append(key).ToArray());
+                    }
+                }
+
+                return;
+            }
+
+            if (node is JsonArray jsonArray)
+            {
+                foreach (JsonNode? child in jsonArray)
+                {
+                    if (child is not null)
+                    {
+                        Visit(child, path.Append("[]").ToArray());
+                    }
+                }
+            }
+        }
+
+        Visit(root, Array.Empty<string>());
+    }
+
     private static void NormalizeManifestForGeneration(
         JsonObject manifest,
         string generationId,
@@ -1893,6 +2109,7 @@ public sealed class ReleaseBundlePromotionService
         }
 
         string generationPrefix = $"/downloads/g/{generationId}/";
+        string relative;
         const string priorGenerationPrefix = "/downloads/g/";
         if (path.StartsWith(priorGenerationPrefix, StringComparison.Ordinal))
         {
@@ -1903,65 +2120,43 @@ public sealed class ReleaseBundlePromotionService
                 throw new InvalidDataException($"manifest contains a malformed generation-bound release URL: {value}");
             }
 
-            string priorRelative = remainder[(separator + 1)..];
-            if (priorRelative.StartsWith("files/", StringComparison.Ordinal))
-            {
-                return BindFileRoute(
-                    priorRelative["files/".Length..],
-                    generationPrefix,
-                    artifactRoutes);
-            }
-
-            foreach (string dispatchRoot in new[] { "install", "get", "file" })
-            {
-                string prefix = dispatchRoot + "/";
-                if (priorRelative.StartsWith(prefix, StringComparison.Ordinal))
-                {
-                    return BindArtifactRoute(
-                        priorRelative[prefix.Length..],
-                        generationPrefix,
-                        artifactRoutes);
-                }
-            }
-
-            return generationPrefix + priorRelative;
+            relative = remainder[(separator + 1)..];
+        }
+        else
+        {
+            relative = path["/downloads/".Length..];
         }
 
-        const string filesPrefix = "/downloads/files/";
-        if (path.StartsWith(filesPrefix, StringComparison.Ordinal))
+        const string filesPrefix = "files/";
+        if (relative.StartsWith(filesPrefix, StringComparison.Ordinal))
         {
-            return BindFileRoute(path[filesPrefix.Length..], generationPrefix, artifactRoutes);
-        }
-
-        foreach (string routeRoot in new[] { "proof", "startup-smoke", "release-evidence" })
-        {
-            string prefix = $"/downloads/{routeRoot}/";
-            if (path.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                return generationPrefix + path["/downloads/".Length..];
-            }
-        }
-
-        if (string.Equals(path, $"/downloads/{CanonicalManifestName}", StringComparison.Ordinal))
-        {
-            return generationPrefix + CanonicalManifestName;
-        }
-
-        if (string.Equals(path, $"/downloads/{CompatibilityManifestName}", StringComparison.Ordinal))
-        {
-            return generationPrefix + CompatibilityManifestName;
+            return BindFileRoute(relative[filesPrefix.Length..], generationPrefix, artifactRoutes);
         }
 
         foreach (string dispatchRoot in new[] { "install", "get", "file" })
         {
-            string prefix = $"/downloads/{dispatchRoot}/";
-            if (!path.StartsWith(prefix, StringComparison.Ordinal))
+            string prefix = dispatchRoot + "/";
+            if (relative.StartsWith(prefix, StringComparison.Ordinal))
             {
-                continue;
+                return BindArtifactRoute(
+                    relative[prefix.Length..],
+                    generationPrefix,
+                    artifactRoutes);
             }
+        }
 
-            string artifactId = path[prefix.Length..];
-            return BindArtifactRoute(artifactId, generationPrefix, artifactRoutes);
+        if (string.Equals(relative, CanonicalManifestName, StringComparison.Ordinal)
+            || string.Equals(relative, CompatibilityManifestName, StringComparison.Ordinal))
+        {
+            return generationPrefix + relative;
+        }
+
+        foreach (string routeRoot in new[] { "proof", "startup-smoke", "release-evidence" })
+        {
+            if (relative.StartsWith(routeRoot + "/", StringComparison.Ordinal))
+            {
+                return generationPrefix + relative;
+            }
         }
 
         throw new InvalidDataException($"manifest retains a non-generation-bound release URL: {value}");
@@ -2017,16 +2212,26 @@ public sealed class ReleaseBundlePromotionService
         IReadOnlyDictionary<string, GenerationArtifactRoute> artifactRoutes)
     {
         string fileName = Path.GetFileName(requestedFile);
-        GenerationArtifactRoute? route = artifactRoutes.Values.FirstOrDefault(candidate =>
-            string.Equals(candidate.FileName, fileName, StringComparison.Ordinal)
-            || string.Equals(candidate.PayloadFileName, fileName, StringComparison.Ordinal)
-            || (!string.IsNullOrWhiteSpace(candidate.PayloadFileName)
-                && string.Equals(candidate.PayloadFileName + ".json", fileName, StringComparison.Ordinal)));
-        if (route is null)
+        if (string.IsNullOrWhiteSpace(fileName)
+            || !string.Equals(fileName, requestedFile, StringComparison.Ordinal))
         {
-            throw new InvalidDataException($"manifest file URL references unknown artifact bytes '{fileName}'.");
+            throw new InvalidDataException(
+                $"manifest file URL has a noncanonical basename '{requestedFile}'.");
         }
 
+        GenerationArtifactRoute[] matches = artifactRoutes.Values.Where(candidate =>
+                string.Equals(candidate.FileName, fileName, StringComparison.Ordinal)
+                || string.Equals(candidate.PayloadFileName, fileName, StringComparison.Ordinal)
+                || (!string.IsNullOrWhiteSpace(candidate.PayloadFileName)
+                    && string.Equals(candidate.PayloadFileName + ".json", fileName, StringComparison.Ordinal)))
+            .ToArray();
+        if (matches.Length != 1)
+        {
+            throw new InvalidDataException(
+                $"manifest file URL references unknown or ambiguous artifact bytes '{fileName}'.");
+        }
+
+        GenerationArtifactRoute route = matches[0];
         if (string.Equals(route.PayloadFileName, fileName, StringComparison.Ordinal))
         {
             return generationPrefix + "install/" + Uri.EscapeDataString(route.ArtifactId) + "/payload";
@@ -2048,35 +2253,74 @@ public sealed class ReleaseBundlePromotionService
         path = string.Empty;
         if (value.StartsWith("/downloads/", StringComparison.Ordinal))
         {
-            if (value.Contains('?') || value.Contains('#'))
+            if (value.Contains('?')
+                || value.Contains('#')
+                || value.Contains('\\')
+                || value.Contains('%'))
             {
-                throw new InvalidDataException($"release URL cannot contain a query or fragment: {value}");
+                throw new InvalidDataException(
+                    $"release URL must be a canonical unencoded site path without query, fragment, or backslash: {value}");
             }
 
-            path = Uri.UnescapeDataString(value);
+            path = value;
             return true;
         }
 
         if (Uri.TryCreate(value, UriKind.Absolute, out Uri? absolute)
             && absolute.AbsolutePath.StartsWith("/downloads/", StringComparison.Ordinal))
         {
-            if (!string.IsNullOrEmpty(absolute.Query) || !string.IsNullOrEmpty(absolute.Fragment))
+            throw new InvalidDataException(
+                $"release URL must be a plain canonical site path, not an absolute URL: {value}");
+        }
+
+        if (value.StartsWith("//", StringComparison.Ordinal))
+        {
+            int pathStart = value.IndexOf('/', 2);
+            if (pathStart >= 0
+                && value[pathStart..].StartsWith("/downloads/", StringComparison.Ordinal))
             {
-                throw new InvalidDataException($"release URL cannot contain a query or fragment: {value}");
+                throw new InvalidDataException(
+                    $"release URL must be a plain canonical site path, not a scheme-relative URL: {value}");
+            }
+        }
+
+        if (value.Contains('%'))
+        {
+            string decoded;
+            try
+            {
+                decoded = Uri.UnescapeDataString(value);
+            }
+            catch (UriFormatException ex)
+            {
+                throw new InvalidDataException(
+                    $"release URL contains malformed percent encoding: {value}",
+                    ex);
             }
 
-            path = Uri.UnescapeDataString(absolute.AbsolutePath);
-            return true;
+            if (decoded.StartsWith("/downloads/", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    $"release URL cannot hide a download path behind percent encoding: {value}");
+            }
         }
 
         return false;
     }
 
-    private static void ValidateGenerationBoundManifestRoutes(JsonNode node, string generationId)
+    private static void ValidateGenerationBoundManifestRoutes(JsonObject node, string generationId)
     {
+        if (!string.Equals(
+                GetJsonString(node["generationId"]),
+                generationId,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "authoritative generation manifest must bind the active generationId.");
+        }
+
         string expectedPrefix = $"/downloads/g/{generationId}/";
-        JsonNode? proofRoutesCandidate =
-            (node as JsonObject)?["releaseProof"]?["proofRoutes"];
+        JsonNode? proofRoutesCandidate = node["releaseProof"]?["proofRoutes"];
         JsonNode? canonicalProofRoutes = proofRoutesCandidate is JsonArray
             ? proofRoutesCandidate
             : null;
@@ -2107,12 +2351,20 @@ public sealed class ReleaseBundlePromotionService
                 throw new InvalidDataException($"manifest contains an unsafe generation-bound release URL: {value}");
             }
 
-            if (parts[0] == "install"
-                && parts.Length != 2
-                && (parts.Length != 3 || parts[2] is not "payload" and not "metadata"))
+            bool invalidShape = parts[0] switch
+            {
+                CanonicalManifestName or CompatibilityManifestName => parts.Length != 1,
+                "files" => parts.Length != 2,
+                "install" => parts.Length != 2
+                             && (parts.Length != 3
+                                 || parts[2] is not "payload" and not "metadata"),
+                "proof" or "startup-smoke" or "release-evidence" => parts.Length < 2,
+                _ => true
+            };
+            if (invalidShape)
             {
                 throw new InvalidDataException(
-                    $"manifest generation install URL must bind exactly one artifact ID and optional payload role: {value}");
+                    $"manifest generation URL has a noncanonical route shape: {value}");
             }
         }
     }
@@ -2325,6 +2577,7 @@ public sealed class ReleaseBundlePromotionService
             Path.Combine(generationRoot, CompatibilityManifestName),
             Path.Combine(generationRoot, CanonicalManifestName),
             promotedArtifactIds,
+            pointer.GenerationId,
             pointer.Manifests.Compatibility.Sha256,
             pointer.Manifests.Canonical.Sha256);
         if (!string.Equals(manifest.Version, pointer.ReleaseVersion, StringComparison.Ordinal)
@@ -7583,6 +7836,7 @@ public sealed class ReleaseBundlePromotionService
         string liveCompatibilityManifestPath,
         string liveCanonicalManifestPath,
         IReadOnlyList<string> promotedArtifactIds,
+        string expectedGenerationId,
         string expectedCompatibilitySha256,
         string expectedCanonicalSha256)
     {
@@ -7609,6 +7863,9 @@ public sealed class ReleaseBundlePromotionService
         }
 
         JsonObject liveCompatibilityManifestObject = LoadJsonObject(liveCompatibilityManifestPath);
+        ValidateGenerationBoundManifestRoutes(
+            liveCompatibilityManifestObject,
+            expectedGenerationId);
         PublicReleaseManifestDto liveCompatibilityManifest = LoadCompatibilityManifest(liveCompatibilityManifestPath);
         HashSet<string> liveCompatibilityIds = liveCompatibilityManifest.Downloads
             .Select(static artifact => artifact.Id)
@@ -7616,6 +7873,9 @@ public sealed class ReleaseBundlePromotionService
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         JsonObject liveCanonicalManifest = LoadJsonObject(liveCanonicalManifestPath);
+        ValidateGenerationBoundManifestRoutes(
+            liveCanonicalManifest,
+            expectedGenerationId);
         ValidateIncomingManifestIdentity(
             liveCompatibilityManifestObject,
             liveCompatibilityManifest,

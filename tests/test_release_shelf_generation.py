@@ -19,6 +19,222 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
+def install_fake_conditional_s3_cli(
+    tmp_path: Path,
+) -> tuple[Path, Path, Path, Path, Path]:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_aws = fake_bin / "aws"
+    fake_aws.write_text(
+        """#!/usr/bin/env python3
+import fcntl
+import hashlib
+import json
+import os
+import shutil
+import sys
+import time
+from pathlib import Path
+
+remote = Path(os.environ["FAKE_AWS_ROOT"])
+public = Path(os.environ["FAKE_PUBLIC_ROOT"])
+latest_public = Path(os.environ["FAKE_LATEST_PUBLIC_ROOT"])
+log = Path(os.environ["FAKE_AWS_LOG"])
+args = sys.argv[1:]
+remote.mkdir(parents=True, exist_ok=True)
+
+def option(name):
+    return args[args.index(name) + 1]
+
+def s3_path(uri):
+    raw = uri[len("s3://"):]
+    bucket, _, key = raw.partition("/")
+    return remote / bucket / key, bucket, key
+
+def etag(path):
+    return '"' + hashlib.sha256(path.read_bytes()).hexdigest() + '"'
+
+def record(text):
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("a", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        handle.write(text + "\\n")
+        handle.flush()
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+def mirror_public(source, key):
+    target = None
+    if "/generations/" in key:
+        prefix, relative = key.split("/generations/", 1)
+        generation_id, _, generation_relative = relative.partition("/")
+        if prefix == "downloads":
+            target = public / "g" / generation_id / generation_relative
+        elif prefix == "latest":
+            target = latest_public / "g" / generation_id / generation_relative
+    elif key == "downloads/current.json":
+        target = public / "current.json"
+    elif key == "latest/current.json":
+        target = latest_public / "current.json"
+    if target is not None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temp = target.with_name(target.name + f".tmp-{os.getpid()}")
+        shutil.copy2(source, temp)
+        os.replace(temp, target)
+
+if args[:2] == ["s3api", "head-object"]:
+    bucket = option("--bucket")
+    key = option("--key")
+    path = remote / bucket / key
+    record(f"HEAD {key}")
+    if not path.is_file():
+        raise SystemExit(255)
+    metadata_path = Path(str(path) + ".metadata.json")
+    metadata = json.loads(metadata_path.read_text()) if metadata_path.is_file() else {}
+    print(json.dumps({"ContentLength": path.stat().st_size, "Metadata": metadata, "ETag": etag(path)}))
+    raise SystemExit(0)
+
+if args[:2] == ["s3api", "list-objects-v2"]:
+    bucket = option("--bucket")
+    prefix = option("--prefix")
+    bucket_root = remote / bucket
+    contents = []
+    if bucket_root.is_dir():
+        for child in sorted(bucket_root.rglob("*")):
+            if not child.is_file() or child.name.endswith(".metadata.json") or ".tmp-" in child.name:
+                continue
+            key = child.relative_to(bucket_root).as_posix()
+            if key.startswith(prefix):
+                contents.append({"Key": key})
+    record(f"LIST {prefix}")
+    print(json.dumps({"Contents": contents[:2]}))
+    raise SystemExit(0)
+
+if args[:2] == ["s3api", "put-object"]:
+    bucket = option("--bucket")
+    key = option("--key")
+    source = Path(option("--body"))
+    destination = remote / bucket / key
+    fail_prefix = os.environ.get("FAKE_AWS_FAIL_PUT_PREFIX", "")
+    if fail_prefix and key.startswith(fail_prefix):
+        record(f"PUT_FAIL {key}")
+        raise SystemExit(42)
+    delay_ms = int(os.environ.get("FAKE_AWS_PUT_DELAY_MS", "0"))
+    if delay_ms:
+        time.sleep(delay_ms / 1000)
+    lock_path = remote / ".conditional-put.lock"
+    with lock_path.open("a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        if "--if-none-match" in args and destination.exists():
+            record(f"PUT_CONDITION_FAILED {key}")
+            raise SystemExit(255)
+        if "--if-match" in args:
+            expected = option("--if-match")
+            if not destination.is_file() or etag(destination) != expected:
+                record(f"PUT_CONDITION_FAILED {key}")
+                raise SystemExit(255)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temp = destination.with_name(destination.name + f".tmp-{os.getpid()}")
+        shutil.copy2(source, temp)
+        os.replace(temp, destination)
+        metadata = {}
+        if "--metadata" in args:
+            raw = option("--metadata")
+            metadata = dict(item.split("=", 1) for item in raw.split(",") if "=" in item)
+        metadata_path = Path(str(destination) + ".metadata.json")
+        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+        record(f"PUT {key}")
+        mirror_public(destination, key)
+        response_etag = etag(destination)
+        fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+    print(json.dumps({"ETag": response_etag}))
+    raise SystemExit(0)
+
+if args[:2] == ["s3", "cp"]:
+    source, destination = args[2], args[3]
+    if not source.startswith("s3://"):
+        raise SystemExit(f"legacy upload is forbidden in fake conditional S3: {args}")
+    source_path, _, key = s3_path(source)
+    if key == os.environ.get("FAKE_AWS_FAIL_GET_KEY", ""):
+        record(f"GET_FAIL {key}")
+        raise SystemExit(43)
+    record(f"GET {key}")
+    if not source_path.is_file():
+        raise SystemExit(1)
+    destination_path = Path(destination)
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_path, destination_path)
+    raise SystemExit(0)
+
+raise SystemExit(f"unsupported fake aws invocation: {args}")
+""",
+        encoding="utf-8",
+    )
+    fake_aws.chmod(0o755)
+    remote_root = tmp_path / "remote"
+    public_root = tmp_path / "public"
+    latest_public_root = tmp_path / "latest-public"
+    log_path = tmp_path / "aws.log"
+    return fake_bin, remote_root, public_root, latest_public_root, log_path
+
+
+def write_s3_publish_bundle(
+    root: Path,
+    *,
+    version: str,
+    published_at: str,
+    payload: bytes,
+) -> Path:
+    files = root / "files"
+    files.mkdir(parents=True)
+    artifact = files / "chummer-avalonia-osx-arm64-installer.dmg"
+    artifact.write_bytes(payload)
+    digest = MODULE.sha256_file(artifact)
+    canonical = {
+        "version": version,
+        "releaseVersion": version,
+        "channel": "preview",
+        "publishedAt": published_at,
+        "artifacts": [
+            {
+                "artifactId": "avalonia-osx-arm64-installer",
+                "head": "avalonia",
+                "platform": "macos",
+                "rid": "osx-arm64",
+                "kind": "dmg",
+                "fileName": artifact.name,
+                "downloadUrl": f"/downloads/files/{artifact.name}",
+                "sha256": digest,
+                "sizeBytes": artifact.stat().st_size,
+            }
+        ],
+    }
+    compatibility = {
+        "version": version,
+        "channel": "preview",
+        "publishedAt": published_at,
+        "downloads": [
+            {
+                "id": "avalonia-osx-arm64-installer",
+                "head": "avalonia",
+                "platformId": "macos",
+                "rid": "osx-arm64",
+                "kind": "dmg",
+                "fileName": artifact.name,
+                "url": f"/downloads/files/{artifact.name}",
+                "sha256": digest,
+                "sizeBytes": artifact.stat().st_size,
+            }
+        ],
+    }
+    (root / MODULE.CANONICAL_MANIFEST).write_text(
+        json.dumps(canonical, indent=2) + "\n", encoding="utf-8"
+    )
+    (root / MODULE.COMPATIBILITY_MANIFEST).write_text(
+        json.dumps(compatibility, indent=2) + "\n", encoding="utf-8"
+    )
+    return root
+
+
 def test_inventory_digest_matches_cross_language_golden_fixture() -> None:
     fixture = json.loads(
         (
@@ -85,7 +301,7 @@ def write_candidate(root: Path, version: str = "release-1", artifact: bytes = b"
             {
                 "id": "test-installer",
                 "fileName": artifact_path.name,
-                "url": f"https://chummer.run/downloads/files/{artifact_path.name}",
+                "url": f"/downloads/files/{artifact_path.name}",
                 "sha256": digest,
                 "sizeBytes": len(artifact),
                 "installAccessClass": "open_public",
@@ -268,16 +484,127 @@ def test_manifest_normalizer_projects_artifact_routes_by_access_and_omits_mutabl
     assert "absentFact" not in normalized
     assert "mutableContinuation" not in normalized
     assert normalized["proofRoutes"] == [
+        "/downloads/g/generation-routes/install/protected-installer",
+    ]
+    assert normalized["releaseProof"]["proofRoutes"] == [
         "/downloads/install/avalonia-linux-x64-installer",
         "/downloads/install/protected-installer",
     ]
-    assert normalized["releaseProof"]["proofRoutes"] == normalized["proofRoutes"]
     MODULE.validate_manifest_routes(normalized, "generation-routes", "fixture")
+
+
+def test_registry_generation_projection_matches_cross_language_golden_bytes(
+    tmp_path: Path,
+) -> None:
+    source = {
+        "version": "release-parity",
+        "channel": "preview",
+        "publishedAt": "2026-07-17T20:00:00Z",
+        "downloads": [
+            {
+                "id": "open",
+                "fileName": "open.bin",
+                "url": "/downloads/files/open.bin",
+                "installAccessClass": "open_public",
+            },
+            {
+                "id": "protected",
+                "fileName": "protected.bin",
+                "url": "/downloads/files/protected.bin",
+                "installAccessClass": "account_required",
+                "payloadFileName": "protected.zip",
+                "payloadDownloadUrl": "/downloads/files/protected.zip",
+            },
+        ],
+        "releaseProof": {"proofRoutes": ["/downloads/install/protected"]},
+    }
+    manifest_path = tmp_path / MODULE.COMPATIBILITY_MANIFEST
+    manifest_path.write_text(json.dumps(source), encoding="utf-8")
+
+    MODULE.normalize_manifest(manifest_path, "generation-parity")
+
+    expected = (
+        b'{"channel":"preview","downloads":[{"fileName":"open.bin","id":"open",'
+        b'"installAccessClass":"open_public","url":"/downloads/g/generation-parity/files/open.bin"},'
+        b'{"fileName":"protected.bin","id":"protected","installAccessClass":"account_required",'
+        b'"payloadDownloadUrl":"/downloads/g/generation-parity/install/protected/payload",'
+        b'"payloadFileName":"protected.zip","url":"/downloads/g/generation-parity/install/protected"}],'
+        b'"generationId":"generation-parity","publishedAt":"2026-07-17T20:00:00Z",'
+        b'"releaseProof":{"proofRoutes":["/downloads/install/protected"]},'
+        b'"version":"release-parity"}\n'
+    )
+    assert manifest_path.read_bytes() == expected
+
+
+@pytest.mark.parametrize(
+    "route",
+    (
+        "/downloads/files/open.bin?ticket=secret",
+        "/downloads/files/open.bin#fragment",
+        "/downloads/files%2Fopen.bin",
+        "/downloads/files/nested/open.bin",
+        "https://chummer.run/downloads/files/open.bin",
+        "//chummer.run/downloads/files/open.bin",
+    ),
+)
+def test_registry_generation_projection_rejects_noncanonical_source_routes(
+    tmp_path: Path,
+    route: str,
+) -> None:
+    manifest_path = tmp_path / MODULE.COMPATIBILITY_MANIFEST
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "version": "release-invalid-route",
+                "channel": "preview",
+                "publishedAt": "2026-07-17T20:00:00Z",
+                "downloads": [
+                    {
+                        "id": "open",
+                        "fileName": "open.bin",
+                        "url": route,
+                        "installAccessClass": "open_public",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(MODULE.ReleaseShelfError, match="canonical|plain"):
+        MODULE.normalize_manifest(manifest_path, "generation-invalid-route")
+
+
+def test_registry_generation_projection_rejects_nested_release_proof_lookalike(
+    tmp_path: Path,
+) -> None:
+    manifest_path = tmp_path / MODULE.COMPATIBILITY_MANIFEST
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "version": "release-lookalike",
+                "channel": "preview",
+                "publishedAt": "2026-07-17T20:00:00Z",
+                "downloads": [],
+                "extension": {
+                    "releaseProof": {
+                        "proofRoutes": ["/downloads/install/shadow"]
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(MODULE.ReleaseShelfError, match="nested"):
+        MODULE.normalize_manifest(manifest_path, "generation-lookalike")
 
 
 @pytest.mark.parametrize(
     "url",
     (
+        "/downloads/g/generation-routes/",
+        "/downloads/g/generation-routes/files/nested/open.bin",
         "/downloads/g/generation-routes/install/protected-installer/claim",
         "/downloads/g/generation-routes/install/protected-installer?ticket=x",
         "/downloads/g/generation-routes/install/protected-installer#claim",
@@ -285,9 +612,12 @@ def test_manifest_normalizer_projects_artifact_routes_by_access_and_omits_mutabl
     ),
 )
 def test_manifest_validator_rejects_non_exact_generation_install_routes(url: str) -> None:
-    with pytest.raises(MODULE.ReleaseShelfError, match="unsafe generation URL|plain site path"):
+    with pytest.raises(
+        MODULE.ReleaseShelfError,
+        match="unsafe generation URL|noncanonical route shape|canonical unencoded site path",
+    ):
         MODULE.validate_manifest_routes(
-            {"url": url},
+            {"generationId": "generation-routes", "url": url},
             "generation-routes",
             "fixture",
         )
@@ -621,95 +951,9 @@ def test_s3_publisher_uploads_immutable_objects_before_single_pointer_put_withou
         json.dumps(compatibility, indent=2) + "\n", encoding="utf-8"
     )
 
-    fake_bin = tmp_path / "bin"
-    fake_bin.mkdir()
-    fake_aws = fake_bin / "aws"
-    fake_aws.write_text(
-        """#!/usr/bin/env python3
-import json
-import os
-import shutil
-import sys
-from pathlib import Path
-
-remote = Path(os.environ["FAKE_AWS_ROOT"])
-public = Path(os.environ["FAKE_PUBLIC_ROOT"])
-log = Path(os.environ["FAKE_AWS_LOG"])
-args = sys.argv[1:]
-
-def option(name):
-    return args[args.index(name) + 1]
-
-def s3_path(uri):
-    raw = uri[len("s3://"):]
-    bucket, _, key = raw.partition("/")
-    return remote / bucket / key, bucket, key
-
-def record(text):
-    with log.open("a", encoding="utf-8") as handle:
-        handle.write(text + "\\n")
-
-if args[:2] == ["s3api", "head-object"]:
-    bucket = option("--bucket")
-    key = option("--key")
-    path = remote / bucket / key
-    record(f"HEAD {key}")
-    if not path.is_file():
-        raise SystemExit(255)
-    metadata_path = Path(str(path) + ".metadata.json")
-    metadata = json.loads(metadata_path.read_text()) if metadata_path.is_file() else {}
-    print(json.dumps({"ContentLength": path.stat().st_size, "Metadata": metadata}))
-    raise SystemExit(0)
-
-if args[:2] == ["s3", "ls"]:
-    path, _, key = s3_path(args[2])
-    record(f"LS {key}")
-    if path.exists():
-        for child in sorted(path.rglob("*")):
-            if child.is_file() and not child.name.endswith(".metadata.json"):
-                print(child)
-    raise SystemExit(0)
-
-if args[:2] == ["s3", "cp"]:
-    source, destination = args[2], args[3]
-    if source.startswith("s3://"):
-        source_path, _, key = s3_path(source)
-        record(f"GET {key}")
-        if not source_path.is_file():
-            raise SystemExit(1)
-        destination_path = Path(destination)
-        destination_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source_path, destination_path)
-        raise SystemExit(0)
-    destination_path, _, key = s3_path(destination)
-    destination_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source, destination_path)
-    metadata = {}
-    if "--metadata" in args:
-        raw = option("--metadata")
-        metadata = dict(item.split("=", 1) for item in raw.split(",") if "=" in item)
-    Path(str(destination_path) + ".metadata.json").write_text(json.dumps(metadata))
-    record(f"PUT {key}")
-    prefix = "downloads/generations/"
-    if key.startswith(prefix):
-        relative = key[len(prefix):]
-        generation_id, _, generation_relative = relative.partition("/")
-        public_path = public / "g" / generation_id / generation_relative
-        public_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, public_path)
-    elif key == "downloads/current.json":
-        public.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, public / "current.json")
-    raise SystemExit(0)
-
-raise SystemExit(f"unsupported fake aws invocation: {args}")
-""",
-        encoding="utf-8",
+    fake_bin, remote_root, public_root, latest_public_root, log_path = (
+        install_fake_conditional_s3_cli(tmp_path)
     )
-    fake_aws.chmod(0o755)
-    remote_root = tmp_path / "remote"
-    public_root = tmp_path / "public"
-    log_path = tmp_path / "aws.log"
     missing_existing = tmp_path / "missing-existing.json"
     env = os.environ.copy()
     env.update(
@@ -717,12 +961,12 @@ raise SystemExit(f"unsupported fake aws invocation: {args}")
             "PATH": f"{fake_bin}:{env['PATH']}",
             "FAKE_AWS_ROOT": str(remote_root),
             "FAKE_PUBLIC_ROOT": str(public_root),
+            "FAKE_LATEST_PUBLIC_ROOT": str(latest_public_root),
             "FAKE_AWS_LOG": str(log_path),
             "CHUMMER_PORTAL_DOWNLOADS_S3_URI": "s3://fixture/downloads",
             "CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL": str(missing_existing),
             "CHUMMER_PORTAL_DOWNLOADS_CURRENT_VERIFY_URL": (public_root / "current.json").as_uri(),
             "CHUMMER_PORTAL_DOWNLOADS_GENERATION_VERIFY_BASE_URL": (public_root / "g").as_uri(),
-            "CHUMMER_RELEASE_SHELF_LAYOUT_V1_ENABLED": "true",
             "CHUMMER_RELEASE_GENERATION_ID": "generation-s3",
         }
     )
@@ -756,6 +1000,197 @@ raise SystemExit(f"unsupported fake aws invocation: {args}")
     )
     pointer = json.loads((public_root / "current.json").read_text(encoding="utf-8"))
     assert pointer["generationId"] == "generation-s3"
+
+
+def test_s3_concurrent_publishers_cannot_overwrite_current_pointer(
+    tmp_path: Path,
+) -> None:
+    published_at = "2026-07-15T13:00:00Z"
+    bundle_a = write_s3_publish_bundle(
+        tmp_path / "bundle-a",
+        version="release-concurrent-a",
+        published_at=published_at,
+        payload=b"concurrent artifact a",
+    )
+    bundle_b = write_s3_publish_bundle(
+        tmp_path / "bundle-b",
+        version="release-concurrent-b",
+        published_at=published_at,
+        payload=b"concurrent artifact b",
+    )
+    fake_bin, remote_root, public_root, latest_public_root, log_path = (
+        install_fake_conditional_s3_cli(tmp_path)
+    )
+    missing_existing = tmp_path / "missing-existing.json"
+    common_env = os.environ.copy()
+    common_env.update(
+        {
+            "PATH": f"{fake_bin}:{common_env['PATH']}",
+            "FAKE_AWS_ROOT": str(remote_root),
+            "FAKE_PUBLIC_ROOT": str(public_root),
+            "FAKE_LATEST_PUBLIC_ROOT": str(latest_public_root),
+            "FAKE_AWS_LOG": str(log_path),
+            "FAKE_AWS_PUT_DELAY_MS": "15",
+            "CHUMMER_PORTAL_DOWNLOADS_S3_URI": "s3://fixture/downloads",
+            "CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL": str(missing_existing),
+            "CHUMMER_PORTAL_DOWNLOADS_CURRENT_VERIFY_URL": (
+                public_root / "current.json"
+            ).as_uri(),
+            "CHUMMER_PORTAL_DOWNLOADS_GENERATION_VERIFY_BASE_URL": (
+                public_root / "g"
+            ).as_uri(),
+        }
+    )
+    env_a = common_env | {"CHUMMER_RELEASE_GENERATION_ID": "generation-concurrent-a"}
+    env_b = common_env | {"CHUMMER_RELEASE_GENERATION_ID": "generation-concurrent-b"}
+    command = ["bash", str(ROOT / "scripts" / "publish-download-bundle-s3.sh")]
+    process_a = subprocess.Popen(
+        command + [str(bundle_a)],
+        cwd=ROOT,
+        env=env_a,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    process_b = subprocess.Popen(
+        command + [str(bundle_b)],
+        cwd=ROOT,
+        env=env_b,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout_a, stderr_a = process_a.communicate(timeout=60)
+    stdout_b, stderr_b = process_b.communicate(timeout=60)
+
+    outcomes = [process_a.returncode, process_b.returncode]
+    assert outcomes.count(0) == 1, (
+        f"publisher A status={process_a.returncode}\n{stdout_a}{stderr_a}\n"
+        f"publisher B status={process_b.returncode}\n{stdout_b}{stderr_b}"
+    )
+    assert sum(status != 0 for status in outcomes) == 1
+    pointer_bytes = (remote_root / "fixture" / "downloads" / "current.json").read_bytes()
+    assert pointer_bytes == (public_root / "current.json").read_bytes()
+    pointer = json.loads(pointer_bytes)
+    assert pointer["generationId"] in {
+        "generation-concurrent-a",
+        "generation-concurrent-b",
+    }
+    operations = log_path.read_text(encoding="utf-8").splitlines()
+    assert operations.count("PUT downloads/current.json") == 1
+
+
+def test_s3_latest_failure_reports_primary_pointer_as_committed(
+    tmp_path: Path,
+) -> None:
+    bundle = write_s3_publish_bundle(
+        tmp_path / "bundle",
+        version="release-latest-failure",
+        published_at="2026-07-15T14:00:00Z",
+        payload=b"latest failure artifact",
+    )
+    fake_bin, remote_root, public_root, latest_public_root, log_path = (
+        install_fake_conditional_s3_cli(tmp_path)
+    )
+    missing_existing = tmp_path / "missing-existing.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_AWS_ROOT": str(remote_root),
+            "FAKE_PUBLIC_ROOT": str(public_root),
+            "FAKE_LATEST_PUBLIC_ROOT": str(latest_public_root),
+            "FAKE_AWS_LOG": str(log_path),
+            "FAKE_AWS_FAIL_PUT_PREFIX": "latest/generations/",
+            "CHUMMER_PORTAL_DOWNLOADS_S3_URI": "s3://fixture/downloads",
+            "CHUMMER_PORTAL_DOWNLOADS_S3_LATEST_URI": "s3://fixture/latest",
+            "CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL": str(missing_existing),
+            "CHUMMER_PORTAL_DOWNLOADS_CURRENT_VERIFY_URL": (
+                public_root / "current.json"
+            ).as_uri(),
+            "CHUMMER_PORTAL_DOWNLOADS_GENERATION_VERIFY_BASE_URL": (
+                public_root / "g"
+            ).as_uri(),
+            "CHUMMER_RELEASE_GENERATION_ID": "generation-latest-failure",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts" / "publish-download-bundle-s3.sh"), str(bundle)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "PRIMARY_RELEASE_COMMITTED generation=generation-latest-failure" in result.stderr
+    )
+    assert "PRIMARY_RELEASE_NOT_COMMITTED" not in result.stderr
+    pointer = json.loads((public_root / "current.json").read_text(encoding="utf-8"))
+    assert pointer["generationId"] == "generation-latest-failure"
+    assert not (latest_public_root / "current.json").exists()
+
+
+def test_s3_pointer_readback_failure_reports_primary_pointer_as_committed(
+    tmp_path: Path,
+) -> None:
+    bundle = write_s3_publish_bundle(
+        tmp_path / "bundle",
+        version="release-readback-failure",
+        published_at="2026-07-15T15:00:00Z",
+        payload=b"readback failure artifact",
+    )
+    fake_bin, remote_root, public_root, latest_public_root, log_path = (
+        install_fake_conditional_s3_cli(tmp_path)
+    )
+    missing_existing = tmp_path / "missing-existing.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_AWS_ROOT": str(remote_root),
+            "FAKE_PUBLIC_ROOT": str(public_root),
+            "FAKE_LATEST_PUBLIC_ROOT": str(latest_public_root),
+            "FAKE_AWS_LOG": str(log_path),
+            "FAKE_AWS_FAIL_GET_KEY": "downloads/current.json",
+            "CHUMMER_PORTAL_DOWNLOADS_S3_URI": "s3://fixture/downloads",
+            "CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL": str(missing_existing),
+            "CHUMMER_PORTAL_DOWNLOADS_CURRENT_VERIFY_URL": (
+                public_root / "current.json"
+            ).as_uri(),
+            "CHUMMER_PORTAL_DOWNLOADS_GENERATION_VERIFY_BASE_URL": (
+                public_root / "g"
+            ).as_uri(),
+            "CHUMMER_RELEASE_GENERATION_ID": "generation-readback-failure",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts" / "publish-download-bundle-s3.sh"), str(bundle)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert (
+        "PRIMARY_RELEASE_COMMITTED generation=generation-readback-failure"
+        in result.stderr
+    )
+    assert "PRIMARY_RELEASE_NOT_COMMITTED" not in result.stderr
+    pointer = json.loads(
+        (remote_root / "fixture" / "downloads" / "current.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert pointer["generationId"] == "generation-readback-failure"
 
 
 def test_runtime_generation_routes_and_production_downgrade_sentinel_are_wired() -> None:

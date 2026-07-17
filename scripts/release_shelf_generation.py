@@ -187,39 +187,13 @@ def _manifest_identity(
     return version, channel, published_at
 
 
-def _rewrite_versioned_url(value: str, generation_id: str) -> str:
-    try:
-        parsed = urlsplit(value)
-    except ValueError:
-        return value
-    path = parsed.path
-    generation_prefix = "/downloads/g/"
-    if path.startswith(generation_prefix):
-        suffix = path[len(generation_prefix) :]
-        prior_generation, separator, remainder = suffix.partition("/")
-        if not separator or not prior_generation or not remainder:
-            raise ReleaseShelfError(f"malformed generation-bound download URL: {value}")
-        path = f"{generation_prefix}{generation_id}/{remainder}"
-    else:
-        for prefix in VERSIONED_ROUTE_PREFIXES:
-            if path.startswith(prefix):
-                relative = path[len("/downloads/") :]
-                path = f"{generation_prefix}{generation_id}/{relative}"
-                break
-    if path == parsed.path:
-        return value
-    if parsed.query or parsed.fragment:
-        raise ReleaseShelfError(f"generation-bound download URLs cannot contain query or fragment: {value}")
-    # Authoritative manifests carry site paths. Origins are deployment concerns and
-    # must not create a second URL identity for the same immutable object.
-    return path
-
-
 _OMIT_MANIFEST_VALUE = object()
 
 
-def _artifact_routes(payload: dict[str, Any], generation_id: str) -> dict[str, str]:
-    routes: dict[str, str] = {}
+def _artifact_routes(
+    payload: dict[str, Any], generation_id: str
+) -> dict[str, dict[str, str | None]]:
+    routes: dict[str, dict[str, str | None]] = {}
     for collection_name in ("artifacts", "downloads"):
         rows = payload.get(collection_name) or []
         if not isinstance(rows, list):
@@ -238,14 +212,46 @@ def _artifact_routes(payload: dict[str, Any], generation_id: str) -> dict[str, s
                 raise ReleaseShelfError(
                     f"manifest contains unsafe artifact fileName for {artifact_id}: {file_name}"
                 )
+            if not PORTABLE_INVENTORY_SEGMENT.fullmatch(file_name):
+                raise ReleaseShelfError(
+                    f"manifest contains non-portable artifact fileName for {artifact_id}: {file_name}"
+                )
+            if not SAFE_GENERATION_ID.fullmatch(artifact_id) or ".." in artifact_id:
+                raise ReleaseShelfError(
+                    f"manifest contains unsafe artifactId: {artifact_id}"
+                )
             access_class = str(
                 row.get("installAccessClass") or row.get("install_access_class") or ""
             ).strip().lower()
-            route = (
+            primary_route = (
                 f"/downloads/g/{generation_id}/files/{file_name}"
                 if access_class == "open_public"
                 else f"/downloads/g/{generation_id}/install/{quote(artifact_id, safe='')}"
             )
+            payload_name = str(row.get("payloadFileName") or "").strip() or None
+            if payload_name is not None and (
+                Path(payload_name).name != payload_name
+                or not PORTABLE_INVENTORY_SEGMENT.fullmatch(payload_name)
+            ):
+                raise ReleaseShelfError(
+                    f"manifest contains unsafe payloadFileName for {artifact_id}: {payload_name}"
+                )
+            route: dict[str, str | None] = {
+                "artifact_id": artifact_id,
+                "file_name": file_name,
+                "payload_file_name": payload_name,
+                "primary": primary_route,
+                "payload": (
+                    f"/downloads/g/{generation_id}/install/{quote(artifact_id, safe='')}/payload"
+                    if payload_name is not None
+                    else None
+                ),
+                "metadata": (
+                    f"/downloads/g/{generation_id}/install/{quote(artifact_id, safe='')}/metadata"
+                    if payload_name is not None
+                    else None
+                ),
+            }
             prior = routes.get(artifact_id)
             if prior is not None and prior != route:
                 raise ReleaseShelfError(
@@ -256,7 +262,7 @@ def _artifact_routes(payload: dict[str, Any], generation_id: str) -> dict[str, s
 
 
 def _project_artifact_download_urls(
-    payload: dict[str, Any], artifact_routes: dict[str, str]
+    payload: dict[str, Any], artifact_routes: dict[str, dict[str, str | None]]
 ) -> None:
     for collection_name in ("artifacts", "downloads"):
         rows = payload.get(collection_name) or []
@@ -270,64 +276,151 @@ def _project_artifact_download_urls(
             if route is None:
                 continue
             if "downloadUrl" in row:
-                row["downloadUrl"] = route
+                row["downloadUrl"] = route["primary"]
             if "url" in row:
-                row["url"] = route
+                row["url"] = route["primary"]
+            if "payloadDownloadUrl" in row and route["payload"] is not None:
+                row["payloadDownloadUrl"] = route["payload"]
 
 
-def _rewrite_artifact_dispatch_url(
-    value: str, artifact_routes: dict[str, str]
-) -> str | object | None:
+def _release_path(value: str) -> str | None:
     try:
         parsed = urlsplit(value)
-    except ValueError:
+    except ValueError as exc:
+        if "/downloads/" in value:
+            raise ReleaseShelfError(f"malformed release URL: {value}") from exc
         return None
-    prefixes = ("/downloads/install/", "/downloads/get/", "/downloads/file/")
-    prefix = next((candidate for candidate in prefixes if parsed.path.startswith(candidate)), None)
-    if prefix is None:
-        return None
-    if parsed.scheme or parsed.netloc or parsed.query or parsed.fragment:
+    if value.startswith("/downloads/"):
+        if parsed.scheme or parsed.netloc or parsed.query or parsed.fragment or "\\" in value or "%" in value:
+            raise ReleaseShelfError(
+                f"release URL must be a canonical unencoded site path without query, fragment, or backslash: {value}"
+            )
+        return parsed.path
+    if (parsed.scheme or parsed.netloc) and parsed.path.startswith("/downloads/"):
         raise ReleaseShelfError(
-            f"release artifact dispatch URL must be a plain site path: {value}"
+            f"release URL must be a plain canonical site path, not an absolute URL: {value}"
         )
-    artifact_id, separator, suffix = parsed.path[len(prefix) :].partition("/")
-    # Only the artifact dispatch itself represents immutable bytes. Continuation,
-    # claim, template, and historic routes are mutable control-plane facts and are
-    # deliberately omitted from an authoritative generation manifest.
-    if not artifact_id or separator or suffix:
+    if "%" in value and unquote(value).startswith("/downloads/"):
+        raise ReleaseShelfError(
+            f"release URL cannot hide a download path behind percent encoding: {value}"
+        )
+    return None
+
+
+def _bind_artifact_route(
+    value: str,
+    artifact_routes: dict[str, dict[str, str | None]],
+) -> str | object:
+    artifact_id = value
+    role = "primary"
+    for suffix, candidate_role in (("/payload", "payload"), ("/metadata", "metadata")):
+        if artifact_id.endswith(suffix):
+            artifact_id = artifact_id[: -len(suffix)]
+            role = candidate_role
+            break
+    route = artifact_routes.get(artifact_id)
+    if route is None or route.get(role) is None:
         return _OMIT_MANIFEST_VALUE
-    return artifact_routes.get(artifact_id, _OMIT_MANIFEST_VALUE)
+    return str(route[role])
+
+
+def _bind_file_route(
+    file_name: str,
+    artifact_routes: dict[str, dict[str, str | None]],
+) -> str:
+    if PurePosixPath(file_name).name != file_name:
+        raise ReleaseShelfError(f"manifest file URL has a noncanonical basename: {file_name}")
+    matches: list[tuple[dict[str, str | None], str]] = []
+    for route in artifact_routes.values():
+        if route["file_name"] == file_name:
+            matches.append((route, "primary"))
+        if route["payload_file_name"] == file_name:
+            matches.append((route, "payload"))
+        if route["payload_file_name"] is not None and f'{route["payload_file_name"]}.json' == file_name:
+            matches.append((route, "metadata"))
+    if len(matches) != 1:
+        raise ReleaseShelfError(f"manifest file URL references unknown or ambiguous bytes: {file_name}")
+    route, role = matches[0]
+    bound = route.get(role)
+    if bound is None:
+        raise ReleaseShelfError(f"manifest file URL references unavailable bytes: {file_name}")
+    return str(bound)
+
+
+def _rewrite_release_url(
+    value: str,
+    generation_id: str,
+    artifact_routes: dict[str, dict[str, str | None]],
+) -> str | object:
+    path = _release_path(value)
+    if path is None:
+        return value
+    generation_prefix = f"/downloads/g/{generation_id}/"
+    relative: str
+    if path.startswith("/downloads/g/"):
+        remainder = path[len("/downloads/g/") :]
+        prior_generation, separator, relative = remainder.partition("/")
+        if not separator or not prior_generation or not relative:
+            raise ReleaseShelfError(f"malformed generation-bound download URL: {value}")
+    else:
+        relative = path[len("/downloads/") :]
+
+    if relative.startswith("files/"):
+        return _bind_file_route(relative[len("files/") :], artifact_routes)
+    for dispatch_root in ("install", "get", "file"):
+        prefix = f"{dispatch_root}/"
+        if relative.startswith(prefix):
+            return _bind_artifact_route(relative[len(prefix) :], artifact_routes)
+    if relative in (CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST):
+        return generation_prefix + relative
+    if any(relative.startswith(f"{root}/") for root in ("proof", "startup-smoke", "release-evidence")):
+        return generation_prefix + relative
+    raise ReleaseShelfError(f"manifest retains an unsupported release URL: {value}")
 
 
 def _rewrite_manifest_value(
-    value: Any, generation_id: str, artifact_routes: dict[str, str]
+    value: Any,
+    generation_id: str,
+    artifact_routes: dict[str, dict[str, str | None]],
+    path: tuple[str, ...] = (),
 ) -> Any:
     if isinstance(value, dict):
         rewritten: dict[str, Any] = {}
         for key, item in value.items():
             if key in PROOF_ROUTE_KEYS:
-                rewritten[key] = copy.deepcopy(item)
-                continue
-            projected = _rewrite_manifest_value(item, generation_id, artifact_routes)
+                if path == ("releaseProof",) and key == "proofRoutes":
+                    rewritten[key] = copy.deepcopy(item)
+                    continue
+                if key == "proof_routes" or (path and path[-1] == "releaseProof"):
+                    raise ReleaseShelfError(
+                        "Registry generation projection rejects nested releaseProof.proofRoutes lookalikes and noncanonical aliases"
+                    )
+            projected = _rewrite_manifest_value(
+                item, generation_id, artifact_routes, path + (key,)
+            )
             if projected is not _OMIT_MANIFEST_VALUE:
                 rewritten[key] = projected
         return rewritten
     if isinstance(value, list):
         rewritten_items = [
-            _rewrite_manifest_value(item, generation_id, artifact_routes) for item in value
+            _rewrite_manifest_value(item, generation_id, artifact_routes, path + ("[]",))
+            for item in value
         ]
         return [item for item in rewritten_items if item is not _OMIT_MANIFEST_VALUE]
     if isinstance(value, str):
-        dispatch_projection = _rewrite_artifact_dispatch_url(value, artifact_routes)
-        if dispatch_projection is not None:
-            return dispatch_projection
-        return _rewrite_versioned_url(value, generation_id)
+        return _rewrite_release_url(value, generation_id, artifact_routes)
     return value
 
 
-def normalize_manifest(path: Path, generation_id: str) -> dict[str, Any]:
+def normalize_manifest(
+    path: Path,
+    generation_id: str,
+    artifact_routes: dict[str, dict[str, str | None]] | None = None,
+) -> dict[str, Any]:
     payload = read_json_object(path, path.name)
-    artifact_routes = _artifact_routes(payload, generation_id)
+    artifact_routes = artifact_routes or _artifact_routes(payload, generation_id)
+    for source_value in _walk_strings(payload):
+        _rewrite_release_url(source_value, generation_id, artifact_routes)
     source = copy.deepcopy(payload)
     _project_artifact_download_urls(source, artifact_routes)
     normalized = _rewrite_manifest_value(
@@ -335,49 +428,59 @@ def normalize_manifest(path: Path, generation_id: str) -> dict[str, Any]:
     )
     assert isinstance(normalized, dict)
     normalized["generationId"] = generation_id
-    write_json(path, normalized)
+    path.write_bytes(canonical_json_bytes(normalized) + b"\n")
     return normalized
 
 
-def _walk_strings(value: Any) -> Iterator[str]:
+def _walk_strings(value: Any, path: tuple[str, ...] = ()) -> Iterator[str]:
     if isinstance(value, dict):
         for key, item in value.items():
             if key in PROOF_ROUTE_KEYS:
-                continue
-            yield from _walk_strings(item)
+                if path == ("releaseProof",) and key == "proofRoutes":
+                    continue
+                if key == "proof_routes" or (path and path[-1] == "releaseProof"):
+                    raise ReleaseShelfError(
+                        "authoritative manifest contains a nested releaseProof.proofRoutes lookalike or noncanonical alias"
+                    )
+            yield from _walk_strings(item, path + (key,))
     elif isinstance(value, list):
         for item in value:
-            yield from _walk_strings(item)
+            yield from _walk_strings(item, path + ("[]",))
     elif isinstance(value, str):
         yield value
 
 
 def validate_manifest_routes(payload: dict[str, Any], generation_id: str, label: str) -> None:
+    if payload.get("generationId") != generation_id:
+        raise ReleaseShelfError(f"{label} generationId mismatch")
     expected_prefix = f"/downloads/g/{generation_id}/"
     for value in _walk_strings(payload):
-        try:
-            parsed = urlsplit(value)
-            path = parsed.path
-        except ValueError:
+        path = _release_path(value)
+        if path is None:
             continue
-        if not path.startswith("/downloads/"):
-            continue
-        if parsed.scheme or parsed.netloc or parsed.query or parsed.fragment:
-            raise ReleaseShelfError(f"{label} download URL must be a plain site path: {value}")
-        decoded_path = unquote(path)
-        if not decoded_path.startswith(expected_prefix):
+        if not path.startswith(expected_prefix):
             raise ReleaseShelfError(f"{label} retains non-generation download URL: {value}")
-        relative_text = decoded_path[len(expected_prefix) :]
+        relative_text = path[len(expected_prefix) :]
         relative = PurePosixPath(relative_text)
-        invalid_root_shape = relative.parts[0] not in ALLOWED_GENERATION_ROUTE_ROOTS
-        if relative.parts[0] == "install":
-            invalid_root_shape = len(relative.parts) != 2
         if (
             not relative_text
+            or not relative.parts
             or relative.is_absolute()
             or any(part in {"", ".", ".."} for part in relative.parts)
-            or invalid_root_shape
         ):
+            raise ReleaseShelfError(f"{label} has unsafe generation URL: {value}")
+        invalid_root_shape = relative.parts[0] not in ALLOWED_GENERATION_ROUTE_ROOTS
+        if relative.parts[0] == "install":
+            invalid_root_shape = len(relative.parts) not in (2, 3) or (
+                len(relative.parts) == 3 and relative.parts[2] not in ("payload", "metadata")
+            )
+        elif relative.parts[0] in (CANONICAL_MANIFEST, COMPATIBILITY_MANIFEST):
+            invalid_root_shape = len(relative.parts) != 1
+        elif relative.parts[0] == "files":
+            invalid_root_shape = len(relative.parts) != 2
+        elif relative.parts[0] in ("proof", "startup-smoke", "release-evidence"):
+            invalid_root_shape = len(relative.parts) < 2
+        if invalid_root_shape:
             raise ReleaseShelfError(f"{label} has unsafe generation URL: {value}")
 
 
@@ -600,8 +703,21 @@ def materialize_generation(
 ) -> dict[str, Any]:
     generation_id = validate_generation_id(generation_id)
     copy_candidate(candidate_root, generation_root)
-    canonical = normalize_manifest(generation_root / CANONICAL_MANIFEST, generation_id)
-    compatibility = normalize_manifest(generation_root / COMPATIBILITY_MANIFEST, generation_id)
+    compatibility_source = read_json_object(
+        generation_root / COMPATIBILITY_MANIFEST,
+        COMPATIBILITY_MANIFEST,
+    )
+    artifact_routes = _artifact_routes(compatibility_source, generation_id)
+    canonical = normalize_manifest(
+        generation_root / CANONICAL_MANIFEST,
+        generation_id,
+        artifact_routes,
+    )
+    compatibility = normalize_manifest(
+        generation_root / COMPATIBILITY_MANIFEST,
+        generation_id,
+        artifact_routes,
+    )
     validate_manifest_routes(canonical, generation_id, CANONICAL_MANIFEST)
     validate_manifest_routes(compatibility, generation_id, COMPATIBILITY_MANIFEST)
     canonical_identity = _manifest_identity(canonical, CANONICAL_MANIFEST)

@@ -1016,8 +1016,9 @@ Repository secrets:
 Local release path:
 1. Build the release bundle on the controlled release host.
 2. If `CHUMMER_PORTAL_DOWNLOADS_S3_URI` is configured, run `RUNBOOK_MODE=downloads-sync-s3` to deploy the bundle after generation.
-3. The runbook syncs the bundle using `scripts/publish-download-bundle-s3.sh`.
-4. The runbook verifies the live manifest URL.
+3. The runbook publishes only through the immutable layout-v1 protocol in `scripts/publish-download-bundle-s3.sh`. Generation objects are conditional creates, and `current.json` is a conditional create or ETag CAS after every object has been verified. There is no flat-shelf/legacy fallback switch.
+4. An existing pointer must validate completely and the incoming `publishedAt` must be strictly newer. A marker without a valid pointer, an unreadable object, an immutable-key collision, or a lost pointer CAS fails closed.
+5. The runbook verifies the live pointer and generation projection. If the optional latest alias or this post-primary verification fails after primary `current.json` committed, the command explicitly reports `PRIMARY_RELEASE_COMMITTED generation=<id>`; do not treat that nonzero exit as authorization to publish another release.
 
 Manual path:
 1. `RUNBOOK_MODE=downloads-sync-s3 DOWNLOAD_BUNDLE_DIR=<bundleDir> CHUMMER_PORTAL_DOWNLOADS_S3_URI=<s3://bucket/path> CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL=<portalBaseOrManifestUrl> [CHUMMER_PORTAL_DOWNLOADS_S3_ENDPOINT_URL=<endpoint>] bash scripts/runbook.sh`
@@ -1214,6 +1215,9 @@ Canonical domain posture:
 1. Treat `.release-shelf-layout-v1` as a production downgrade sentinel: after layout-v1 has been activated, legacy flat-shelf readers and writers must fail closed.
 2. For the one-time migration only, set `CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=true`, activate the first immutable generation, and verify `current.json` plus its matching committed activation receipt.
 3. Immediately restore `CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=false`; normal publication must use the generation pointer and durable activation journal.
+4. The migration flag applies to the filesystem/server lane only. The S3 writer has no legacy mode: an empty target may receive its first conditional pointer, while any partial or ambiguous target is rejected.
+5. Registry manifests are projected, not copied byte-for-byte. The C# and Python writers retain Registry release truth, add the generation identity, apply access-class-aware immutable routes, and emit the same canonical JSON bytes. Absolute, encoded, query-bearing, fragmented, or nested proof-route lookalikes are invalid inputs.
+6. `account_required` artifacts are never anonymously downloadable through retained raw `/files` paths. Current aliases enter the account flow; immutable generation raw aliases require a generation-and-digest-bound claim or install ticket. Only `open_public` artifacts may use anonymous raw routes.
 
 ## Strict Test Gate Commands (host-side)
 

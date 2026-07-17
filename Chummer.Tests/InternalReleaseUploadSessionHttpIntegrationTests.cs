@@ -70,7 +70,7 @@ public sealed class InternalReleaseUploadSessionHttpIntegrationTests
     };
 
     [Fact]
-    public async Task StagedUploadSessionPreservesRegistryManifestsAndReturnsGenerationBoundClaims()
+    public async Task StagedUploadSessionProjectsRegistryManifestsAndReturnsGenerationBoundClaims()
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         DateTimeOffset evaluatedAt = new(
@@ -139,14 +139,26 @@ public sealed class InternalReleaseUploadSessionHttpIntegrationTests
             .GetRequiredService<PublicReleaseManifestService>();
         var activatedManifest = releaseManifestService.LoadManifest(
             releaseManifestService.CaptureShelfGeneration(activatedGenerationId));
+        byte[] expectedProjectedCompatibility =
+            ReleaseBundlePromotionService.ProjectRegistryManifestForGeneration(
+                JsonNode.Parse(expectedCompatibility)?.AsObject()
+                    ?? throw new InvalidDataException("fixture compatibility manifest was not an object."),
+                activatedGenerationId,
+                activatedManifest);
+        byte[] expectedProjectedCanonical =
+            ReleaseBundlePromotionService.ProjectRegistryManifestForGeneration(
+                JsonNode.Parse(expectedCanonical)?.AsObject()
+                    ?? throw new InvalidDataException("fixture canonical manifest was not an object."),
+                activatedGenerationId,
+                activatedManifest);
         Assert.Equal(activatedGenerationId, activatedManifest.GenerationId);
         Assert.Equal(ShelfArtifacts.Count, activatedManifest.Downloads.Count);
         Assert.Equal(
-            expectedCompatibility,
+            expectedProjectedCompatibility,
             releaseManifestService.LoadGenerationCompatibilityManifestBytes(
                 releaseManifestService.CaptureShelfGeneration(activatedGenerationId)));
         Assert.Equal(
-            expectedCanonical,
+            expectedProjectedCanonical,
             releaseManifestService.LoadGenerationCanonicalManifestBytes(
                 releaseManifestService.CaptureShelfGeneration(activatedGenerationId)));
         Assert.Equal(
@@ -169,7 +181,7 @@ public sealed class InternalReleaseUploadSessionHttpIntegrationTests
         using HttpResponseMessage immutableCanonical = await client.GetAsync(
             $"/downloads/g/{activatedGenerationId}/RELEASE_CHANNEL.generated.json");
         Assert.Equal(HttpStatusCode.OK, immutableCanonical.StatusCode);
-        Assert.Equal(expectedCanonical, await immutableCanonical.Content.ReadAsByteArrayAsync());
+        Assert.Equal(expectedProjectedCanonical, await immutableCanonical.Content.ReadAsByteArrayAsync());
         Assert.Contains("immutable", immutableCanonical.Headers.CacheControl?.ToString(), StringComparison.OrdinalIgnoreCase);
 
         string retainedSessionRoot = Path.Combine(fixture.SessionRoot, sessionId);
@@ -191,7 +203,7 @@ public sealed class InternalReleaseUploadSessionHttpIntegrationTests
     }
 
     [Fact]
-    public async Task GenerationRoutesServeExactWindowsBytesAndRawPathsStayAnonymousWhenAccountForcingIsDisabled()
+    public async Task GenerationRoutesServeExactBytesAndRawPathsHonorArtifactAccessClass()
     {
         byte[] windowsBytes = [0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 0x50, 0x45];
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -213,7 +225,8 @@ public sealed class InternalReleaseUploadSessionHttpIntegrationTests
                 new ReleaseBundlePromotionServiceTests.BundleArtifact(
                     "avalonia-linux-x64-installer", "avalonia", "linux", "x64", "installer",
                     "chummer-avalonia-linux-x64-installer.deb", "linux-http"u8.ToArray(),
-                    false, false, "not_applicable", "not_applicable"),
+                    false, false, "not_applicable", "not_applicable",
+                    InstallAccessClass: "open_public"),
                 new ReleaseBundlePromotionServiceTests.BundleArtifact(
                     "avalonia-win-x64-installer", "avalonia", "windows", "x64", "installer",
                     "chummer-avalonia-win-x64-installer.exe", windowsBytes,
@@ -234,17 +247,30 @@ public sealed class InternalReleaseUploadSessionHttpIntegrationTests
         using HttpClient client = fixture.CreateClient(allowAutoRedirect: false);
         string rawPath = "/downloads/files/chummer-avalonia-win-x64-installer.exe";
         using HttpResponseMessage currentRaw = await client.GetAsync(rawPath);
-        Assert.Equal(HttpStatusCode.OK, currentRaw.StatusCode);
-        Assert.Equal("application/octet-stream", currentRaw.Content.Headers.ContentType?.MediaType);
-        Assert.Equal(windowsBytes, await currentRaw.Content.ReadAsByteArrayAsync());
-        Assert.DoesNotContain("text/html", currentRaw.Content.Headers.ContentType?.ToString() ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpStatusCode.Redirect, currentRaw.StatusCode);
+        Assert.StartsWith("/login?next=", currentRaw.Headers.Location?.OriginalString, StringComparison.Ordinal);
 
         string generationRawPath = $"/downloads/g/{migrated.GenerationId}/files/chummer-avalonia-win-x64-installer.exe";
         using HttpResponseMessage generationRaw = await client.GetAsync(generationRawPath);
-        Assert.Equal(HttpStatusCode.OK, generationRaw.StatusCode);
-        Assert.Equal("application/octet-stream", generationRaw.Content.Headers.ContentType?.MediaType);
-        Assert.Equal(windowsBytes, await generationRaw.Content.ReadAsByteArrayAsync());
-        Assert.Contains("immutable", generationRaw.Headers.CacheControl?.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(HttpStatusCode.Conflict, generationRaw.StatusCode);
+        Assert.Contains(
+            "generation_bound_credential_required",
+            await generationRaw.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
+
+        byte[] linuxBytes = "linux-http"u8.ToArray();
+        using HttpResponseMessage currentOpenRaw = await client.GetAsync(
+            "/downloads/files/chummer-avalonia-linux-x64-installer.deb");
+        Assert.Equal(HttpStatusCode.OK, currentOpenRaw.StatusCode);
+        Assert.Equal("application/octet-stream", currentOpenRaw.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(linuxBytes, await currentOpenRaw.Content.ReadAsByteArrayAsync());
+        string generationOpenRawPath =
+            $"/downloads/g/{migrated.GenerationId}/files/chummer-avalonia-linux-x64-installer.deb";
+        using HttpResponseMessage generationOpenRaw = await client.GetAsync(generationOpenRawPath);
+        Assert.Equal(HttpStatusCode.OK, generationOpenRaw.StatusCode);
+        Assert.Equal("application/octet-stream", generationOpenRaw.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(linuxBytes, await generationOpenRaw.Content.ReadAsByteArrayAsync());
+        Assert.Contains("immutable", generationOpenRaw.Headers.CacheControl?.ToString(), StringComparison.OrdinalIgnoreCase);
 
         PublicReleaseManifestService manifests = fixture.Services.GetRequiredService<PublicReleaseManifestService>();
         ReleaseShelfSnapshot generation = manifests.CaptureShelfGeneration(migrated.GenerationId!);
@@ -266,6 +292,11 @@ public sealed class InternalReleaseUploadSessionHttpIntegrationTests
         Assert.Equal(HttpStatusCode.OK, claimedInstall.StatusCode);
         Assert.Equal("application/octet-stream", claimedInstall.Content.Headers.ContentType?.MediaType);
         Assert.Equal(windowsBytes, await claimedInstall.Content.ReadAsByteArrayAsync());
+
+        using HttpResponseMessage claimedRaw = await client.GetAsync(
+            $"{generationRawPath}?claimCode={Uri.EscapeDataString(dispatch.ClaimTicket.ClaimCode)}");
+        Assert.Equal(HttpStatusCode.OK, claimedRaw.StatusCode);
+        Assert.Equal(windowsBytes, await claimedRaw.Content.ReadAsByteArrayAsync());
 
         foreach (string missingPath in new[]
         {

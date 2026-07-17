@@ -18,6 +18,83 @@ public sealed class ReleaseBundlePromotionServiceTests
     private static readonly JsonSerializerOptions TestJsonOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
+    public void RegistryGenerationProjectionMatchesCrossLanguageGoldenBytes()
+    {
+        const string source = """
+            {
+              "version": "release-parity",
+              "channel": "preview",
+              "publishedAt": "2026-07-17T20:00:00Z",
+              "downloads": [
+                {
+                  "id": "open",
+                  "fileName": "open.bin",
+                  "url": "/downloads/files/open.bin",
+                  "installAccessClass": "open_public"
+                },
+                {
+                  "id": "protected",
+                  "fileName": "protected.bin",
+                  "url": "/downloads/files/protected.bin",
+                  "installAccessClass": "account_required",
+                  "payloadFileName": "protected.zip",
+                  "payloadDownloadUrl": "/downloads/files/protected.zip"
+                }
+              ],
+              "releaseProof": {
+                "proofRoutes": ["/downloads/install/protected"]
+              }
+            }
+            """;
+        JsonObject manifest = JsonNode.Parse(source)!.AsObject();
+        PublicReleaseManifestDto compatibility = JsonSerializer.Deserialize<PublicReleaseManifestDto>(
+            source,
+            TestJsonOptions)!;
+
+        byte[] projected = ReleaseBundlePromotionService.ProjectRegistryManifestForGeneration(
+            manifest,
+            "generation-parity",
+            compatibility);
+
+        const string expected = "{\"channel\":\"preview\",\"downloads\":[{\"fileName\":\"open.bin\",\"id\":\"open\",\"installAccessClass\":\"open_public\",\"url\":\"/downloads/g/generation-parity/files/open.bin\"},{\"fileName\":\"protected.bin\",\"id\":\"protected\",\"installAccessClass\":\"account_required\",\"payloadDownloadUrl\":\"/downloads/g/generation-parity/install/protected/payload\",\"payloadFileName\":\"protected.zip\",\"url\":\"/downloads/g/generation-parity/install/protected\"}],\"generationId\":\"generation-parity\",\"publishedAt\":\"2026-07-17T20:00:00Z\",\"releaseProof\":{\"proofRoutes\":[\"/downloads/install/protected\"]},\"version\":\"release-parity\"}\n";
+        Assert.Equal(expected, Encoding.UTF8.GetString(projected));
+    }
+
+    [Theory]
+    [InlineData("/downloads/files/open.bin?ticket=secret")]
+    [InlineData("/downloads/files/open.bin#fragment")]
+    [InlineData("/downloads/files%2Fopen.bin")]
+    [InlineData("/downloads/files/nested/open.bin")]
+    [InlineData("https://chummer.run/downloads/files/open.bin")]
+    [InlineData("//chummer.run/downloads/files/open.bin")]
+    public void RegistryGenerationProjectionRejectsNoncanonicalSourceRoutes(string route)
+    {
+        string source = $$"""
+            {
+              "version": "release-invalid-route",
+              "channel": "preview",
+              "publishedAt": "2026-07-17T20:00:00Z",
+              "downloads": [{
+                "id": "open",
+                "fileName": "open.bin",
+                "url": "{{route}}",
+                "installAccessClass": "open_public"
+              }]
+            }
+            """;
+        JsonObject manifest = JsonNode.Parse(source)!.AsObject();
+        PublicReleaseManifestDto compatibility = JsonSerializer.Deserialize<PublicReleaseManifestDto>(
+            source,
+            TestJsonOptions)!;
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseBundlePromotionService.ProjectRegistryManifestForGeneration(
+                manifest,
+                "generation-invalid-route",
+                compatibility));
+    }
+
+    [Fact]
     public async Task InitialLegacyMigrationCommitsGenerationOnceAndRemainsReadyAfterRestart()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
@@ -41,8 +118,6 @@ public sealed class ReleaseBundlePromotionServiceTests
             publishedAt: "2026-07-17T20:00:00Z",
             proofGeneratedAt: "2026-07-17T19:55:00Z");
         fixture.ExtractBundleAsLegacyShelf(bundlePath);
-        byte[] compatibilityBefore = File.ReadAllBytes(Path.Combine(fixture.DownloadsRoot, "releases.json"));
-        byte[] canonicalBefore = File.ReadAllBytes(Path.Combine(fixture.DownloadsRoot, "RELEASE_CHANNEL.generated.json"));
         Assert.True(fixture.CaptureActiveShelf().IsLegacy);
 
         ReleaseBundlePromotionResult? migrated = await fixture.EnsureInitialLegacyMigrationAsync();
@@ -51,8 +126,14 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.False(string.IsNullOrWhiteSpace(migrated!.GenerationId));
         Assert.False(fixture.CaptureActiveShelf().IsLegacy);
         Assert.Equal(migrated.GenerationId, fixture.CaptureActiveShelf().GenerationId);
-        Assert.Equal(compatibilityBefore, fixture.ReadGenerationBytes(migrated.GenerationId!, "releases.json"));
-        Assert.Equal(canonicalBefore, fixture.ReadGenerationBytes(migrated.GenerationId!, "RELEASE_CHANNEL.generated.json"));
+        using (JsonDocument compatibility = fixture.ReadGenerationJson(migrated.GenerationId!, "releases.json"))
+        using (JsonDocument canonical = fixture.ReadGenerationJson(
+                   migrated.GenerationId!,
+                   "RELEASE_CHANNEL.generated.json"))
+        {
+            Assert.Equal(migrated.GenerationId, compatibility.RootElement.GetProperty("generationId").GetString());
+            Assert.Equal(migrated.GenerationId, canonical.RootElement.GetProperty("generationId").GetString());
+        }
         Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, ".release-shelf-layout-v1")));
         Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, ".release-shelf-writer-policy.json")));
         Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, ".release-shelf-activation-intent.json")));
@@ -419,15 +500,9 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.Equal(capturedIntent.GenerationId, reconciled!.GenerationId);
         Assert.True(File.Exists(Path.Combine(receiptRoot, "outcome.json")));
         ReleaseShelfPublicationReadinessProbeResult committedReadiness = fixture.EvaluateActivationReadiness();
-        Assert.False(committedReadiness.Ready);
-        Assert.Equal("activation_ack_pending", committedReadiness.Code);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.PromoteAsync(bundleA));
-
-        fixture.AcknowledgeActivationCompletion(capturedIntent);
+        Assert.True(committedReadiness.Ready);
+        Assert.Equal("ready", committedReadiness.Code);
         Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, ".release-shelf-activation-intent.json")));
-        Assert.Equal(
-            new ReleaseShelfPublicationReadinessProbeResult(true, "ready"),
-            fixture.EvaluateActivationReadiness());
         ReleaseBundlePromotionResult resultC = await fixture.PromoteAsync(bundleA);
         Assert.NotEqual(capturedIntent.GenerationId, resultC.GenerationId);
         Assert.True(fixture.TryReconcileActivation(capturedIntent, out ReleaseBundlePromotionResult? historical));
@@ -909,13 +984,13 @@ public sealed class ReleaseBundlePromotionServiceTests
             Path.Combine(snapshot.PhysicalRoot, "RELEASE_CHANNEL.generated.json")));
         using JsonDocument compatibility = JsonDocument.Parse(File.ReadAllText(
             Path.Combine(snapshot.PhysicalRoot, "releases.json")));
-        Assert.False(canonical.RootElement.TryGetProperty("generationId", out _));
-        Assert.False(compatibility.RootElement.TryGetProperty("generationId", out _));
+        Assert.Equal(result.GenerationId, canonical.RootElement.GetProperty("generationId").GetString());
+        Assert.Equal(result.GenerationId, compatibility.RootElement.GetProperty("generationId").GetString());
         Assert.Equal(
-            "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+            $"/downloads/g/{result.GenerationId}/install/{artifactId}",
             canonical.RootElement.GetProperty("artifacts")[0].GetProperty("downloadUrl").GetString());
         Assert.Equal(
-            "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+            $"/downloads/g/{result.GenerationId}/install/{artifactId}",
             compatibility.RootElement.GetProperty("downloads")[0].GetProperty("url").GetString());
         string[] proofRoutes = canonical.RootElement.GetProperty("releaseProof").GetProperty("proofRoutes")
             .EnumerateArray()
@@ -932,7 +1007,7 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
-    public async Task PromoteAsyncPreservesNestedRegistryExtensionBytes()
+    public async Task PromoteAsyncRejectsNestedReleaseProofRouteLookalike()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
         const string artifactId = "avalonia-win-x64-installer";
@@ -963,17 +1038,11 @@ public sealed class ReleaseBundlePromotionServiceTests
                 }
             });
 
-        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
-        ReleaseShelfSnapshot snapshot = fixture.CaptureActiveShelf();
-        using JsonDocument canonical = JsonDocument.Parse(File.ReadAllText(
-            Path.Combine(snapshot.PhysicalRoot, "RELEASE_CHANNEL.generated.json")));
-        string nestedRoute = canonical.RootElement
-            .GetProperty("extension")
-            .GetProperty("releaseProof")
-            .GetProperty("proofRoutes")[0]
-            .GetString()!;
+        InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+            () => fixture.PromoteAsync(bundlePath));
 
-        Assert.Equal($"/downloads/install/{artifactId}", nestedRoute);
+        Assert.Contains("nested", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(fixture.CaptureActiveShelf().IsLegacy);
     }
 
     [Fact]
@@ -1016,7 +1085,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             result.GenerationId!,
             "RELEASE_CHANNEL.generated.json")));
         Assert.Equal(
-            $"/downloads/files/{fileName}",
+            $"/downloads/g/{result.GenerationId}/files/{fileName}",
             canonical.RootElement.GetProperty("artifacts")[0].GetProperty("downloadUrl").GetString());
 
         string replacementBundle = fixture.CreateBundle(
@@ -1152,7 +1221,9 @@ public sealed class ReleaseBundlePromotionServiceTests
                         Path.Combine(generationRoot, "RELEASE_CHANNEL.generated.json")));
                     JsonElement artifact = manifest.RootElement.GetProperty("artifacts")[0];
                     string downloadUrl = artifact.GetProperty("downloadUrl").GetString()!;
-                    Assert.Equal($"/downloads/files/{fileName}", downloadUrl);
+                    Assert.Equal(
+                        $"/downloads/g/{generationId}/install/{artifactId}",
+                        downloadUrl);
                     string bytes = File.ReadAllText(Path.Combine(generationRoot, "files", fileName));
                     string version = manifest.RootElement.GetProperty("version").GetString()!;
                     Assert.True(
@@ -3074,13 +3145,13 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.Equal(expectedUrl, sidecar.RootElement.GetProperty("downloadUrl").GetString());
         using JsonDocument compatibility = fixture.ReadGenerationJson(result.GenerationId!, "releases.json");
         Assert.Equal(
-            "/downloads/files/chummer-avalonia-win-x64-payload.zip",
+            expectedUrl,
             compatibility.RootElement.GetProperty("downloads")[0].GetProperty("payloadDownloadUrl").GetString());
         using JsonDocument canonical = fixture.ReadGenerationJson(
             result.GenerationId!,
             "RELEASE_CHANNEL.generated.json");
         Assert.Equal(
-            "/downloads/files/chummer-avalonia-win-x64-payload.zip",
+            expectedUrl,
             canonical.RootElement.GetProperty("artifacts")[0].GetProperty("payloadDownloadUrl").GetString());
     }
 

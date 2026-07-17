@@ -72,7 +72,9 @@ Generation directories are immutable after activation. The pointer and its tempo
 replacement must live on the same filesystem; activation uses an atomic rename, not
 copy/delete. A malformed pointer or missing generation fails closed rather than
 falling back to stale top-level bytes. Absence of both the layout marker and pointer
-is the only allowed legacy fallback during migration.
+is the only allowed legacy fallback during the explicit filesystem migration. The S3
+writer never performs a legacy copy; the same empty state is only first-generation
+layout-v1 initialization.
 
 ### Canonical inventory digest
 
@@ -97,6 +99,9 @@ Authoritative manifests must reference immutable generation routes, for example:
 
 ```text
 /downloads/g/<generation-id>/files/<file-name>
+/downloads/g/<generation-id>/install/<artifact-id>
+/downloads/g/<generation-id>/install/<artifact-id>/payload
+/downloads/g/<generation-id>/install/<artifact-id>/metadata
 /downloads/g/<generation-id>/proof/<path>
 /downloads/g/<generation-id>/startup-smoke/<receipt>
 /downloads/g/<generation-id>/release-evidence/<path>
@@ -110,6 +115,24 @@ being paired with same-named bytes from generation B after an activation.
 
 Every manifest and relevant HTTP response exposes the generation ID. Consumers that
 read both canonical and compatibility projections must reject unequal generation IDs.
+
+The Registry document is the release-truth authority. The writers do not copy its
+uploaded bytes unchanged: both the C# server writer and the Python/S3 writer apply the
+same narrow, golden-tested generation projection. That projection adds `generationId`,
+maps each artifact route from its Registry access class, rewrites other release URLs to
+the same immutable generation, sorts object keys, and emits compact UTF-8 JSON with one
+trailing newline. It must not re-derive supportability, proof freshness, rollout reason,
+or public-trust posture. Non-canonical source paths (absolute URLs, encoding, query,
+fragment, backslash, traversal, or nested `releaseProof.proofRoutes` lookalikes) fail
+before staging. Only the exact top-level Registry-owned
+`releaseProof.proofRoutes` evidence array is retained without generation rewriting.
+
+`open_public` primary artifacts use immutable `/files/<file-name>` routes.
+`account_required` primary artifacts use `/install/<artifact-id>` and payload roles use
+their `/install/.../payload|metadata` routes. Retained raw `/files` aliases never bypass
+that policy: anonymous access is allowed only for `open_public`; an account-required
+current alias requires the account flow, while an immutable generation raw alias
+requires a claim or ticket bound to that exact generation and digest.
 
 ## Reader migration inventory
 
@@ -196,10 +219,18 @@ verification may turn the HTTP result into a retryable failure.
   place. Its mirror helper copies manifests before smoke/proof/artifacts. It must call
   the shared stage/validate/activate primitive and must refuse a layout-v1 root when
   running in legacy copy mode.
-- `scripts/publish-download-bundle-s3.sh` currently uploads files/proof/smoke and then
-  overwrites two manifests. It must upload to an immutable generation prefix, use
-  version-bound artifact URLs, then replace one `current.json` object. CDN validation
-  must prove the pointer and generation objects agree.
+- `scripts/publish-download-bundle-s3.sh` implements only layout-v1. It writes every
+  immutable generation object with conditional `PutObject` (`If-None-Match: *`), verifies
+  its digest metadata, and commits `current.json` with a captured ETag CAS (or a
+  conditional create for the first generation). The incoming `publishedAt` must be
+  strictly newer than the active pointer. A competing publisher therefore wins exactly
+  one pointer commit; the loser fails closed without overwriting either generation or
+  pointer. The post-commit downgrade marker is also immutable. There is no legacy-copy
+  opt-in or ambiguous fallback.
+- Primary S3 activation is the publication commit point. A subsequent latest-alias or
+  HTTP verification failure reports the primary generation as already committed so an
+  operator cannot mistake the status for a safe blind retry. CDN validation still must
+  prove the pointer and generation objects agree.
 - `scripts/generate-releases-manifest.sh` is a producer only; it writes into a candidate
   generation, never an active root.
 - `scripts/materialize-public-downloads-bundle.sh` and
@@ -213,9 +244,10 @@ duplicated Hub upload service in `chummer6-hub`, must move in the same contract 
 `chummer-presentation/scripts/publish-latest-nightly-to-downloads.sh` is also a writer
 and may not target the live top-level shelf directly after layout-v1 activation.
 
-Registry producers in `chummer-hub-registry/scripts/release/` must carry the same
-generation/release identity into both canonical and compatibility manifests. They do
-not activate the Hub shelf directly.
+Registry producers in `chummer-hub-registry/scripts/release/` own the release-truth
+document. The activating writer owns the deterministic generation projection described
+above and applies it identically to canonical and compatibility documents; Registry
+producers do not activate the Hub shelf directly.
 
 ## Activation sequence
 
@@ -224,8 +256,8 @@ not activate the Hub shelf directly.
    a root carrying this policy; production local publication uses the staged HTTP API.
 2. Read one current generation (or the legacy shelf before first migration).
 3. Materialize a complete candidate in a same-filesystem temporary directory.
-4. Normalize both manifests and bind every artifact, proof, smoke receipt, and evidence
-   URL to the new generation ID.
+4. Apply the narrow Registry-owned generation projection to both manifests and bind
+   every artifact, proof, smoke receipt, and evidence URL to the new generation ID.
 5. Run all contract, digest, provenance, freshness, tuple-retention, and privacy gates
    against the candidate root only.
 6. Write and verify `activation-candidate.json`; flush candidate files/directories.
@@ -249,6 +281,9 @@ not activate the Hub shelf directly.
    a non-retryable warning and marker-without-pointer fails closed.
 13. Return the activation receipt. Post-rename durability ambiguity is outcome-unknown,
     never a retryable failed publication; retry reconciles the exact stored intent.
+    If recovery proves that `current.json` already contains the committed target, it
+    writes/loads the committed outcome and durably removes the active acknowledgement
+    barrier before reporting ready, so the next promotion is not stranded.
 14. Update top-level and cross-repository compatibility mirrors after commit. Mirror
     failure is an operational warning, never a rollback of the authoritative pointer.
 15. Retain prior generations long enough for in-flight responses and rollback. Garbage
@@ -262,7 +297,8 @@ not activate the Hub shelf directly.
 3. Ship the staged HTTP writer and the `server-journal-v1` policy guard first. Every
    legacy filesystem, nightly, Python, and mirror writer fails closed when either the
    writer-policy marker or `.release-shelf-layout-v1` exists. S3 remains a separate
-   object-storage protocol and never writes the local production mount.
+   object-storage protocol and never writes the local production mount; its writer has
+   no legacy mode and treats an empty target only as first-generation initialization.
 4. Materialize an initial generation from the currently validated shelf and compare it
    byte-for-byte/semantically with live HTTP truth.
 5. Atomically activate the initial pointer, then write the layout marker as the
@@ -315,6 +351,10 @@ it must never delete the pointer and expose a partially updated mirror.
 
 - HTTP, filesystem, S3, nightly, and mirror publishers emit the same candidate inventory
   and activation record for the same fixture;
+- C# and Python emit byte-identical Registry generation projections for the same golden
+  fixture and reject the same malformed or ambiguous source routes;
+- concurrent S3 publishers produce exactly one successful `current.json` CAS, immutable
+  generation keys reject reuse, and post-primary latest failures report committed truth;
 - every legacy writer refuses a layout-v1 target;
 - producer-to-consumer tests feed Registry output through Hub candidate validation;
 - a repository-wide gate fails if any release-mode script writes a top-level active
