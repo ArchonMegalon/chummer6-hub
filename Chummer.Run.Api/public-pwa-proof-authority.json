@@ -4,7 +4,7 @@
   "assetPolicyCount": 12,
   "dependencyPolicyCount": 4,
   "verifierPath": "scripts/verify_public_pwa_static_assets.py",
-  "verifierSha256": "b5fa1a2863fe19f57cfe1d56ee6961f1eb92ec48829484ad740942e96d2210d7",
+  "verifierSha256": "1818b7ed7a0f73e781b4b1f05fc81321f90d9b1a1e277abfb6819912f89a91d2",
   "generatorPath": "scripts/generate_public_play_worker_projection.py",
   "generatorSha256": "d05c3610bd44546af5dd5cb4703012395eaccb6cae0ffae8768d4ce9518dbf17",
   "inventoryPath": "Chummer.Run.Api/play-pwa-required-inventory.json",

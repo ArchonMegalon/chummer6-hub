@@ -815,24 +815,134 @@ def test_mirror_closure_rejects_generator_dependency_symlink(tmp_path: Path) -> 
     assert any("symlink" in failure and "projection_template" in failure for failure in failures)
 
 
-def test_source_contract_rejects_default_on_or_portal_dependency(tmp_path: Path) -> None:
+def test_source_contract_rejects_overrideable_proxy_flags_or_portal_dependency(tmp_path: Path) -> None:
     module = load_module()
     fixture = copy_contract_fixture(tmp_path)
     compose = (ROOT / "docker-compose.public-edge.yml").read_text(encoding="utf-8")
     compose = compose.replace(
+        'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"',
         'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"',
-        'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-true}"',
     ).replace(
-        "    depends_on:\n      chummer-public-blazor:",
-        "    depends_on:\n      chummer-play-web:\n        condition: service_healthy\n      chummer-public-blazor:",
+        'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"',
+        'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED:-false}"',
+    ).replace(
+        "      chummer-public-blazor:\n        condition: service_healthy",
+        "      chummer-play-web:\n        condition: service_healthy\n"
+        "      chummer-public-blazor:\n        condition: service_healthy",
     )
     (fixture / "docker-compose.public-edge.yml").write_text(compose, encoding="utf-8")
 
     result = module.verify_source(fixture)
 
     assert result["status"] == "fail"
-    assert any("default off" in failure for failure in result["failures"])
+    assert any("CHUMMER_PUBLIC_PLAY_PROXY_ENABLED must be exactly" in failure for failure in result["failures"])
+    assert any("CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED must be exactly" in failure for failure in result["failures"])
+    assert any("CHUMMER_PUBLIC_PLAY_PROXY_ENABLED must not use interpolation" in failure for failure in result["failures"])
+    assert any("CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED must not use interpolation" in failure for failure in result["failures"])
     assert any("must not depend" in failure for failure in result["failures"])
+
+
+@pytest.mark.parametrize(
+    "name",
+    (
+        "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED",
+        "CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED",
+    ),
+)
+def test_source_contract_rejects_duplicate_proxy_declarations(
+    tmp_path: Path,
+    name: str,
+) -> None:
+    module = load_module()
+    fixture = copy_contract_fixture(tmp_path)
+    compose = (ROOT / "docker-compose.public-edge.yml").read_text(encoding="utf-8")
+    compose = compose.replace(
+        f'{name}: "false"',
+        f'{name}: "false"\n      {name}: "true"',
+    )
+    (fixture / "docker-compose.public-edge.yml").write_text(compose, encoding="utf-8")
+
+    result = module.verify_source(fixture)
+
+    assert result["status"] == "fail"
+    assert any("portal environment keys must be unique" in item for item in result["failures"])
+    assert any(f"{name} must occur exactly once" in item for item in result["failures"])
+
+
+def test_source_contract_rejects_explicit_key_with_decoy_false_marker(tmp_path: Path) -> None:
+    module = load_module()
+    fixture = copy_contract_fixture(tmp_path)
+    compose_path = fixture / "docker-compose.public-edge.yml"
+    compose = compose_path.read_text(encoding="utf-8").replace(
+        '      CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"',
+        "      ? CHUMMER_PUBLIC_PLAY_PROXY_ENABLED\n"
+        '      : "true"\n'
+        '      # CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"',
+    )
+    compose_path.write_text(compose, encoding="utf-8")
+
+    result = module.verify_source(fixture)
+
+    assert result["status"] == "fail"
+    assert any("explicit YAML mapping keys are forbidden" in item for item in result["failures"])
+    assert any("CHUMMER_PUBLIC_PLAY_PROXY_ENABLED must be exactly" in item for item in result["failures"])
+
+
+@pytest.mark.parametrize(
+    ("replacement", "expected_failure"),
+    (
+        ('      CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: &proxy-disabled "false"', "anchors and aliases are forbidden"),
+        ('      CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: *proxy-disabled', "anchors and aliases are forbidden"),
+        ('      CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: !str "false"', "YAML tags are forbidden"),
+        ('      CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: {value: "false"}', "flow mappings are forbidden"),
+        (
+            '      CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"',
+            "must not use interpolation",
+        ),
+    ),
+)
+def test_source_contract_rejects_ambiguous_protected_proxy_yaml(
+    tmp_path: Path,
+    replacement: str,
+    expected_failure: str,
+) -> None:
+    module = load_module()
+    fixture = copy_contract_fixture(tmp_path)
+    compose_path = fixture / "docker-compose.public-edge.yml"
+    compose = compose_path.read_text(encoding="utf-8").replace(
+        '      CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"',
+        replacement,
+    )
+    compose_path.write_text(compose, encoding="utf-8")
+
+    result = module.verify_source(fixture)
+
+    assert result["status"] == "fail"
+    assert any(expected_failure in item for item in result["failures"])
+
+
+def test_source_contract_rejects_environment_merge_key(tmp_path: Path) -> None:
+    module = load_module()
+    fixture = copy_contract_fixture(tmp_path)
+    compose_path = fixture / "docker-compose.public-edge.yml"
+    compose = compose_path.read_text(encoding="utf-8").replace(
+        '      CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"',
+        '      <<: *portal-environment\n      CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"',
+    )
+    compose_path.write_text(compose, encoding="utf-8")
+
+    result = module.verify_source(fixture)
+
+    assert result["status"] == "fail"
+    assert any("YAML merge keys are forbidden" in item for item in result["failures"])
+
+
+def test_yaml_comment_scanner_preserves_hash_inside_doubled_single_quote() -> None:
+    module = load_module()
+
+    assert module._yaml_code_without_comment(
+        "      SAFE_VALUE: 'it''s # data' # comment"
+    ) == "      SAFE_VALUE: 'it''s # data'"
 
 
 def test_worker_generator_rejects_undeclared_source_drift(tmp_path: Path) -> None:

@@ -267,15 +267,16 @@ def test_homepage_has_minimal_promo_entry_surface() -> None:
     assert "Desktop build. Mobile play packet." in landing
     assert 'href="/build"' in landing
     assert 'href="/mobile/player"' in landing
-    assert 'type="button" disabled aria-disabled="true"' in landing
+    assert landing.count('data-public-install-handoff="true"') == 2
+    assert 'data-disabled-target="/build"' not in landing
+    assert 'data-disabled-target="/mobile/player"' not in landing
+    assert 'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"' not in landing
     assert "Sign in first" in landing
     assert 'var playAnalyticsEvent = "homepage_open_play";' in landing
     assert 'data-analytics-event="homepage_open_build"' in landing
     assert 'data-analytics-event="@playAnalyticsEvent"' in landing
-    assert 'data-analytics-label="Build">Build</button>' in landing
-    assert 'data-disabled-target="/mobile/player"' in landing
-    assert 'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"' in landing
-    assert 'data-analytics-label="Play">Play</button>' in landing
+    assert 'data-analytics-label="Build">Build</a>' in landing
+    assert 'data-analytics-label="Play">Play</a>' in landing
     assert "/media/product/chummer-desktop-runner.png" in landing
     assert "/media/promo/every-wonder-horizon-promo.mp4" in landing
     assert 'data-homepage-section="runner-roster"' not in landing

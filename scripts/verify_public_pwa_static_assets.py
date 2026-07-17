@@ -95,6 +95,16 @@ BROWSER_USER_AGENT = (
     "ChummerPwaStaticAssetProof/2.0"
 )
 
+PUBLIC_PLAY_PROXY_PROTECTED_ENV = (
+    "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED",
+    "CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED",
+)
+PUBLIC_PLAY_PROXY_RETIRED_ENV = (
+    "CHUMMER_PUBLIC_PLAY_PROXY_URL",
+    "CHUMMER_PUBLIC_PLAY_PROXY_API_KEY",
+)
+YAML_BLOCK_MAPPING_KEY = re.compile(r"^( *)([A-Za-z0-9_.-]+)\s*:(.*)$")
+
 MANIFESTS = {
     "/manifest.webmanifest": {
         "id": "/mobile",
@@ -521,6 +531,301 @@ def write_receipt_descriptor(descriptor: int, payload: bytes) -> None:
 def require(condition: bool, failures: list[str], message: str) -> None:
     if not condition:
         failures.append(message)
+
+
+def _yaml_code_without_comment(line: str) -> str:
+    """Return YAML source before an unquoted comment marker.
+
+    The public-edge proof deliberately accepts only the small block-mapping
+    surface that Compose uses for service configuration.  It is not a YAML
+    implementation; ambiguous YAML features are rejected below instead of
+    being interpreted with a different schema than Docker Compose.
+    """
+
+    quote = ""
+    escaped = False
+    index = 0
+    while index < len(line):
+        character = line[index]
+        if quote == '"':
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = ""
+            index += 1
+            continue
+        if quote == "'":
+            if character == quote:
+                if index + 1 < len(line) and line[index + 1] == quote:
+                    index += 2
+                    continue
+                quote = ""
+            index += 1
+            continue
+        if character in {'"', "'"}:
+            quote = character
+            index += 1
+            continue
+        if character == "#" and (index == 0 or line[index - 1].isspace()):
+            return line[:index].rstrip()
+        index += 1
+    return line.rstrip()
+
+
+def _yaml_unquoted_text(value: str) -> str:
+    result: list[str] = []
+    quote = ""
+    escaped = False
+    index = 0
+    while index < len(value):
+        character = value[index]
+        if quote == '"':
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = ""
+            index += 1
+            continue
+        if quote == "'":
+            if character == quote:
+                if index + 1 < len(value) and value[index + 1] == quote:
+                    index += 2
+                    continue
+                quote = ""
+            index += 1
+            continue
+        if character in {'"', "'"}:
+            quote = character
+            index += 1
+            continue
+        if value.startswith("${", index):
+            cursor = index + 2
+            depth = 1
+            while cursor < len(value) and depth:
+                if value.startswith("${", cursor):
+                    depth += 1
+                    cursor += 2
+                    continue
+                if value[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                result.append(value[index:])
+                break
+            result.append(" " * (cursor - index))
+            index = cursor
+            continue
+        result.append(character)
+        index += 1
+    return "".join(result)
+
+
+def _yaml_block_entries(
+    lines: list[str],
+    *,
+    start: int,
+    end: int,
+    indent: int,
+    label: str,
+    failures: list[str],
+) -> tuple[dict[str, tuple[str, int]], list[str]]:
+    entries: dict[str, tuple[str, int]] = {}
+    duplicates: list[str] = []
+    for line_number in range(start, end):
+        code = _yaml_code_without_comment(lines[line_number])
+        if not code.strip():
+            continue
+        actual_indent = len(code) - len(code.lstrip(" "))
+        if actual_indent != indent:
+            continue
+        match = YAML_BLOCK_MAPPING_KEY.fullmatch(code)
+        if match is None:
+            failures.append(
+                f"compose: {label} uses unsupported YAML syntax at line {line_number + 1}"
+            )
+            continue
+        key = match.group(2)
+        value = match.group(3).strip()
+        if key in entries:
+            duplicates.append(key)
+        else:
+            entries[key] = (value, line_number)
+    return entries, duplicates
+
+
+def verify_public_edge_proxy_compose_contract(
+    compose: str,
+    failures: list[str],
+) -> dict[str, Any]:
+    """Validate the exact portal proxy environment without a permissive YAML loader."""
+
+    lines = compose.splitlines()
+    if "\t" in compose:
+        failures.append("compose: tabs are forbidden in the closed YAML proof subset")
+
+    semantic_lines: list[str] = []
+    all_mapping_keys: list[str] = []
+    for line_number, line in enumerate(lines, start=1):
+        code = _yaml_code_without_comment(line)
+        if not code.strip():
+            continue
+        semantic_lines.append(code)
+        stripped = code.lstrip(" ")
+        if re.match(r"^\?(?:\s|$)|^:\s", stripped):
+            failures.append(
+                f"compose: explicit YAML mapping keys are forbidden at line {line_number}"
+            )
+            continue
+        if re.match(r"^<<\s*:", stripped):
+            failures.append(f"compose: YAML merge keys are forbidden at line {line_number}")
+        unquoted = _yaml_unquoted_text(code)
+        if re.search(r"(?<!\S)[&*][A-Za-z0-9_-]+", unquoted):
+            failures.append(f"compose: YAML anchors and aliases are forbidden at line {line_number}")
+        if re.search(r"(?<!\S)![^\s]+", unquoted):
+            failures.append(f"compose: YAML tags are forbidden at line {line_number}")
+        match = YAML_BLOCK_MAPPING_KEY.fullmatch(code)
+        if match is None:
+            continue
+        key = match.group(2)
+        all_mapping_keys.append(key)
+
+    services_entries, services_duplicates = _yaml_block_entries(
+        lines,
+        start=0,
+        end=len(lines),
+        indent=0,
+        label="document root",
+        failures=failures,
+    )
+    require(not services_duplicates, failures, "compose: top-level mapping keys must be unique")
+    services_value, services_line = services_entries.get("services", ("<missing>", -1))
+    require(services_value == "", failures, "compose: services must be one block mapping")
+
+    services_end = len(lines)
+    if services_line >= 0:
+        for index in range(services_line + 1, len(lines)):
+            code = _yaml_code_without_comment(lines[index])
+            if code.strip() and len(code) - len(code.lstrip(" ")) == 0:
+                services_end = index
+                break
+    service_entries, service_duplicates = _yaml_block_entries(
+        lines,
+        start=services_line + 1 if services_line >= 0 else 0,
+        end=services_end,
+        indent=2,
+        label="services",
+        failures=failures,
+    )
+    require(not service_duplicates, failures, "compose: service names must be unique")
+    portal_value, portal_line = service_entries.get("chummer-portal", ("<missing>", -1))
+    require(portal_value == "", failures, "compose: services.chummer-portal must be one block mapping")
+
+    portal_end = services_end
+    if portal_line >= 0:
+        for index in range(portal_line + 1, services_end):
+            code = _yaml_code_without_comment(lines[index])
+            if not code.strip():
+                continue
+            actual_indent = len(code) - len(code.lstrip(" "))
+            if actual_indent <= 2:
+                portal_end = index
+                break
+    portal_entries, portal_duplicates = _yaml_block_entries(
+        lines,
+        start=portal_line + 1 if portal_line >= 0 else 0,
+        end=portal_end,
+        indent=4,
+        label="services.chummer-portal",
+        failures=failures,
+    )
+    require(not portal_duplicates, failures, "compose: chummer-portal properties must be unique")
+    environment_value, environment_line = portal_entries.get("environment", ("<missing>", -1))
+    require(
+        environment_value == "",
+        failures,
+        "compose: services.chummer-portal.environment must be one block mapping",
+    )
+
+    environment_end = portal_end
+    if environment_line >= 0:
+        for index in range(environment_line + 1, portal_end):
+            code = _yaml_code_without_comment(lines[index])
+            if not code.strip():
+                continue
+            actual_indent = len(code) - len(code.lstrip(" "))
+            if actual_indent <= 4:
+                environment_end = index
+                break
+            if actual_indent != 6:
+                failures.append(
+                    "compose: services.chummer-portal.environment accepts only scalar block entries "
+                    f"(line {index + 1})"
+                )
+            elif "{" in _yaml_unquoted_text(code) or "}" in _yaml_unquoted_text(code):
+                failures.append(
+                    "compose: flow mappings are forbidden in services.chummer-portal.environment "
+                    f"at line {index + 1}"
+                )
+    environment_entries, environment_duplicates = _yaml_block_entries(
+        lines,
+        start=environment_line + 1 if environment_line >= 0 else 0,
+        end=environment_end,
+        indent=6,
+        label="services.chummer-portal.environment",
+        failures=failures,
+    )
+    require(
+        not environment_duplicates,
+        failures,
+        "compose: portal environment keys must be unique",
+    )
+
+    semantic_source = "\n".join(semantic_lines)
+    protected_values: dict[str, str] = {}
+    for name in PUBLIC_PLAY_PROXY_PROTECTED_ENV:
+        value, _ = environment_entries.get(name, ("", -1))
+        protected_values[name] = value
+        require(
+            value == '"false"',
+            failures,
+            f"compose: {name} must be exactly the string false in services.chummer-portal.environment",
+        )
+        require(
+            "${" not in value,
+            failures,
+            f"compose: {name} must not use interpolation",
+        )
+        occurrences = len(re.findall(rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])", semantic_source))
+        require(
+            occurrences == 1,
+            failures,
+            f"compose: {name} must occur exactly once without decoy markers",
+        )
+
+    for name in PUBLIC_PLAY_PROXY_RETIRED_ENV:
+        require(
+            name not in all_mapping_keys
+            and re.search(rf"(?<![A-Za-z0-9_]){re.escape(name)}(?![A-Za-z0-9_])", semantic_source) is None,
+            failures,
+            f"compose: retired {name} must be absent",
+        )
+
+    return {
+        "status": "pass" if not failures else "fail",
+        "environmentKeyCount": len(environment_entries),
+        "protectedValues": protected_values,
+        "retiredKeysAbsent": all(name not in semantic_source for name in PUBLIC_PLAY_PROXY_RETIRED_ENV),
+        "duplicateMappingKeys": sorted(
+            set(services_duplicates)
+            | set(service_duplicates)
+            | set(portal_duplicates)
+            | set(environment_duplicates)
+        ),
+    }
 
 
 def quoted_array(source: str, name: str) -> set[str]:
@@ -1728,7 +2033,7 @@ def _verify_source_impl(
         label="public edge compose",
     ).decode("utf-8", errors="replace")
     require('profiles: ["play-private"]' in compose, failures, "compose: private Play profile missing")
-    require('CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"' in compose, failures, "compose: projection must default off")
+    compose_proxy_contract = verify_public_edge_proxy_compose_contract(compose, failures)
     portal_parts = compose.split("  chummer-portal:", 1)
     require(len(portal_parts) == 2, failures, "compose: portal service is missing")
     portal_dependencies = portal_parts[1].split("    environment:", 1)[0] if len(portal_parts) == 2 else ""
@@ -1755,6 +2060,7 @@ def _verify_source_impl(
         "manifests": manifests,
         "worker": worker,
         "mirror": mirror,
+        "composeProxyContract": compose_proxy_contract,
         "assetDigestInventory": asset_inventory,
         "inputSnapshot": {
             "status": (

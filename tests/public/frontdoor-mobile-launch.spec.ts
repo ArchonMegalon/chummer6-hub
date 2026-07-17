@@ -1,11 +1,12 @@
 import { expect, test } from 'playwright/test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { writeJsonArtifact } from './ux-artifacts';
+import { requiredProofClosureSha256, writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 const publicOrigin = new URL(baseUrl).origin;
 const mobileViewport = { width: 390, height: 844 };
+const proofClosureSha256 = requiredProofClosureSha256();
 const ignoredConsoleErrorFragments = [
   'Failed to load resource: net::ERR_NETWORK_CHANGED',
   'WebSocket closed with status code: 1006',
@@ -38,6 +39,7 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
     contractName: 'chummer.frontdoor_mobile_install_boundary.v2',
     generated_at_utc: new Date().toISOString(),
     base_url: publicOrigin,
+    proof_closure_sha256: proofClosureSha256,
     viewport: mobileViewport,
   };
   let proofStage = 'landing-load';
@@ -48,6 +50,10 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
     proofStage = 'public-handoffs';
     const hero = page.locator('[data-homepage-section="hero"]');
     await expect(hero).toContainText('Download Chummer');
+    const homepageLaneText = await hero
+      .locator('.minimal-meta')
+      .filter({ hasText: 'Current public lane:' })
+      .innerText();
     const openMenu = hero.locator('.minimal-open-chummer');
     await openMenu.locator('summary').click();
     await expect(openMenu).toHaveAttribute('open', '');
@@ -131,6 +137,7 @@ test('signed-out frontdoor exposes public Build and Play install handoffs and Pl
     writeJsonArtifact('FRONTDOOR_MOBILE_LAUNCH.generated.json', {
       ...proof,
       status: 'pass',
+      homepage_lane_text: homepageLaneText.trim(),
       public_install_targets: ['/build', '/mobile/player'],
       device_routing: 'auto_ua_ch_mobile_direct',
       play_surface: 'install-only',
@@ -286,6 +293,8 @@ test('homepage legacy mobile anchors drop all landing queries before entering th
   const proof = {
     contractName: 'chummer.frontdoor_mobile_anchor_redirect.v2',
     generated_at_utc: new Date().toISOString(),
+    base_url: publicOrigin,
+    proof_closure_sha256: proofClosureSha256,
     source_path: landingPath,
   };
   let proofStage = 'source-contract';
