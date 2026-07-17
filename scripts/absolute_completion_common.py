@@ -426,33 +426,50 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
         if self._should_skip_build():
             command.append("--no-build")
 
-        self._log_handle = self._log_path.open("w", encoding="utf-8")
-        self._process = subprocess.Popen(
-            command,
-            cwd=RUN_SERVICES_ROOT,
-            env=env,
-            stdout=self._log_handle,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
         try:
+            self._log_handle = self._log_path.open("w", encoding="utf-8")
+            self._process = subprocess.Popen(
+                command,
+                cwd=RUN_SERVICES_ROOT,
+                env=env,
+                stdout=self._log_handle,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
             wait_for_http(self.base_url, "/login", accepted=(200,), timeout_seconds=self.startup_timeout_seconds)
         except Exception as exc:
-            raise RuntimeError(f"{exc}\nLocalHubApp log tail:\n{self._read_log_tail()}") from exc
+            log_tail = self._read_log_tail()
+            try:
+                self._stop_process()
+            finally:
+                self._cleanup_temp_root()
+            raise RuntimeError(f"{exc}\nLocalHubApp log tail:\n{log_tail}") from exc
         return self
 
     def _stop_process(self) -> None:
         if self._process is not None:
-            self._process.terminate()
-            try:
-                self._process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                self._process.kill()
-                self._process.wait(timeout=10)
+            if self._process.poll() is None:
+                self._process.terminate()
+                try:
+                    self._process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    self._process.kill()
+                    self._process.wait(timeout=10)
+            self._process = None
         if self._log_handle is not None:
             self._log_handle.close()
+            self._log_handle = None
+
+    def _cleanup_temp_root(self) -> None:
         if self._temp_root is not None:
-            self._temp_root.cleanup()
+            shutil.rmtree(self._temp_root, ignore_errors=True)
+            self._temp_root = None
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        try:
+            self._stop_process()
+        finally:
+            self._cleanup_temp_root()
 
     def _read_log_tail(self, line_count: int = 80) -> str:
         if self._log_handle is not None:
