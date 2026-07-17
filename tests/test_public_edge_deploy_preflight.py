@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -26,6 +27,36 @@ def load_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def write_valid_runtime_proof(path: Path) -> str:
+    proof_payload = json.loads(
+        (
+            REPO_ROOT
+            / ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json"
+        ).read_text(encoding="utf-8")
+    )
+    generated_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace(
+        "+00:00", "Z"
+    )
+    proof_payload["generatedAt"] = generated_at
+    proof_payload["generated_at"] = generated_at
+    proof_payload["release_channel"] = {
+        "status": "available",
+        "path": "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
+        "channelId": "preview",
+        "channel": "preview",
+        "version": "run-test",
+        "releaseVersion": "run-test",
+        "rolloutState": "published",
+        "supportabilityState": "review_required",
+        "publishedAt": generated_at,
+    }
+    rendered = json.dumps(proof_payload, indent=2) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(rendered, encoding="utf-8")
+    path.chmod(0o644)
+    return rendered
 
 
 def test_cli_imports_sibling_contract_under_isolated_python(tmp_path: Path) -> None:
@@ -400,8 +431,7 @@ def test_current_source_marker_check_passes(tmp_path: Path) -> None:
     module = load_module()
     module.PUBLIC_EDGE_OPERATIONAL_MIRROR_ROOTS = {}
     runtime_proof = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
-    runtime_proof.write_text('{"status":"pass"}\n', encoding="utf-8")
-    runtime_proof.chmod(0o644)
+    write_valid_runtime_proof(runtime_proof)
 
     receipt = module.verify(
         [],
@@ -2129,8 +2159,7 @@ def test_main_checks_default_overlay_root_when_not_explicitly_configured(tmp_pat
     source_root = write_complete_marker_source_tree(module, tmp_path / "source")
     overlay_root = write_complete_marker_overlay_tree(module, tmp_path / "overlay", source_root)
     runtime_proof = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
-    runtime_proof.write_text('{"status":"pass"}\n', encoding="utf-8")
-    runtime_proof.chmod(0o644)
+    write_valid_runtime_proof(runtime_proof)
     output_path = tmp_path / "preflight.json"
 
     module.process_lines_from_system = lambda: []
@@ -2159,8 +2188,8 @@ def test_full_preflight_requires_exact_runtime_proof_bind_source_mode_and_shape(
     source_root = write_complete_marker_source_tree(module, tmp_path / "source")
     proof_path = tmp_path / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
     proof_path.parent.mkdir(parents=True)
-    proof_path.write_text('{"status":"pass"}\n', encoding="utf-8")
-    proof_path.chmod(0o644)
+
+    valid_proof_text = write_valid_runtime_proof(proof_path)
 
     receipt = module.verify(
         [],
@@ -2172,6 +2201,39 @@ def test_full_preflight_requires_exact_runtime_proof_bind_source_mode_and_shape(
     assert receipt["status"] == "pass"
     assert receipt["runtimeProofBindSource"]["status"] == "pass"
     assert receipt["runtimeProofBindSource"]["actualMode"] == "0644"
+    assert receipt["runtimeProofBindSource"]["checks"]["pathStillBound"] is True
+    assert receipt["runtimeProofBindSource"]["checks"]["semanticContract"] is True
+    assert receipt["runtimeProofBindSource"]["checks"]["fresh"] is True
+    assert receipt["runtimeProofBindSource"]["checks"]["releaseChannelAvailable"] is True
+
+    invalid_proof = json.loads(valid_proof_text)
+    del invalid_proof["release_channel"]["status"]
+    proof_path.write_text(json.dumps(invalid_proof, indent=2) + "\n", encoding="utf-8")
+    semantic_receipt = module.runtime_proof_bind_source_check(proof_path)
+    assert semantic_receipt["status"] == "fail"
+    assert semantic_receipt["checks"]["exactMode0644"] is True
+    assert semantic_receipt["checks"]["strictJsonObject"] is True
+    assert semantic_receipt["checks"]["semanticContract"] is False
+    assert semantic_receipt["checks"]["releaseChannelAvailable"] is False
+
+    stale_proof = json.loads(valid_proof_text)
+    stale_proof["generatedAt"] = "2000-01-01T00:00:00Z"
+    stale_proof["generated_at"] = "2000-01-01T00:00:00Z"
+    proof_path.write_text(json.dumps(stale_proof, indent=2) + "\n", encoding="utf-8")
+    stale_receipt = module.runtime_proof_bind_source_check(proof_path)
+    assert stale_receipt["status"] == "fail"
+    assert stale_receipt["checks"]["semanticContract"] is True
+    assert stale_receipt["checks"]["fresh"] is False
+
+    proof_path.write_text(
+        '{"status":"passed","status":"passed"}\n',
+        encoding="utf-8",
+    )
+    ambiguous_receipt = module.runtime_proof_bind_source_check(proof_path)
+    assert ambiguous_receipt["status"] == "fail"
+    assert ambiguous_receipt["checks"]["strictJsonObject"] is False
+
+    proof_path.write_text(valid_proof_text, encoding="utf-8")
 
     proof_path.chmod(0o664)
     receipt = module.verify(
@@ -2253,8 +2315,7 @@ def test_main_can_skip_overlay_marker_check(tmp_path: Path) -> None:
     source_root = write_complete_marker_source_tree(module, tmp_path / "source")
     overlay_root = tmp_path / "overlay-missing"
     runtime_proof = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
-    runtime_proof.write_text('{"status":"pass"}\n', encoding="utf-8")
-    runtime_proof.chmod(0o644)
+    write_valid_runtime_proof(runtime_proof)
     output_path = tmp_path / "preflight.json"
 
     module.process_lines_from_system = lambda: []
