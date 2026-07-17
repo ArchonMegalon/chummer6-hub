@@ -19,7 +19,7 @@ PUBLIC_EDGE_LEGACY_PRIVATE_CACHE_PREFIXES = {
 }
 PUBLIC_EDGE_V2_ARTIFACT_CONTRACTS = {
     "pwaOfflineCacheArtifactContract": "chummer.pwa_offline_cache.v2",
-    "frontdoorNavigationMobileArtifactContract": "chummer.frontdoor_mobile_launch.v2",
+    "frontdoorNavigationMobileArtifactContract": "chummer.frontdoor_mobile_install_boundary.v2",
     "frontdoorNavigationAnchorArtifactContract": "chummer.frontdoor_mobile_anchor_redirect.v2",
 }
 _PRIVATE_IDENTITY_KEYS = {"sessionid", "deviceid"}
@@ -205,6 +205,107 @@ PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS = {
 
 def receipt_contract(payload: dict[str, Any]) -> str:
     return str(payload.get("contractName") or payload.get("contract_name") or "").strip()
+
+
+def release_channel_trust_invariant_failures(payload: dict[str, Any]) -> list[str]:
+    """Validate canonical supportability, proof freshness, and public posture as one truth."""
+
+    def token(value: Any) -> str:
+        return str(value or "").strip().lower()
+
+    public_trust = (
+        payload.get("publicTrustMetrics")
+        if isinstance(payload.get("publicTrustMetrics"), dict)
+        else {}
+    )
+    public_release = (
+        public_trust.get("releaseChannel")
+        if isinstance(public_trust.get("releaseChannel"), dict)
+        else {}
+    )
+    proof_freshness = (
+        public_trust.get("proofFreshness")
+        if isinstance(public_trust.get("proofFreshness"), dict)
+        else {}
+    )
+    registry_coverage = (
+        payload.get("registryBoundaryCoverage")
+        if isinstance(payload.get("registryBoundaryCoverage"), dict)
+        else {}
+    )
+    registry_release = (
+        registry_coverage.get("releaseChannel")
+        if isinstance(registry_coverage.get("releaseChannel"), dict)
+        else {}
+    )
+    status = token(payload.get("status"))
+    rollout = token(payload.get("rolloutState"))
+    top_supportability = token(payload.get("supportabilityState"))
+    trust_contract_required = bool(
+        top_supportability == "gold_supported"
+        or rollout == "public_stable"
+        or public_trust
+        or registry_coverage
+    )
+    if not trust_contract_required:
+        return []
+
+    failures: list[str] = []
+    freshness = token(proof_freshness.get("status"))
+    if freshness not in {"fresh", "stale", "missing"}:
+        failures.append(
+            "release channel proof freshness is missing or unrecognized"
+        )
+
+    public_supportability = token(public_release.get("supportabilityState"))
+    registry_supportability = token(registry_release.get("supportabilityState"))
+    for label, value in (
+        ("public trust", public_supportability),
+        ("registry boundary", registry_supportability),
+    ):
+        if not value:
+            failures.append(f"release channel {label} supportability is missing")
+        elif value != top_supportability:
+            failures.append(
+                "release channel supportability contradicts "
+                f"{label} supportability ({top_supportability or 'missing'} != {value})"
+            )
+
+    if freshness in {"stale", "missing"}:
+        for label, value in (
+            ("top-level", top_supportability),
+            ("public trust", public_supportability),
+            ("registry boundary", registry_supportability),
+        ):
+            if value != "review_required":
+                failures.append(
+                    f"release channel {label} supportability must be review_required when proof freshness is {freshness}"
+                )
+
+    expected_posture = "blocked"
+    if freshness == "fresh" and status == "published":
+        expected_posture = "live" if rollout == "public_stable" else "preview"
+    if status == "revoked" or rollout == "revoked":
+        expected_posture = "revoked"
+    public_posture = token(public_release.get("posture"))
+    registry_posture = token(registry_release.get("publicTrustPosture"))
+    for label, value in (
+        ("public trust", public_posture),
+        ("registry boundary", registry_posture),
+    ):
+        if not value:
+            failures.append(f"release channel {label} posture is missing")
+        elif value != expected_posture:
+            failures.append(
+                f"release channel {label} posture is {value}, expected {expected_posture}"
+            )
+    if public_posture and registry_posture and public_posture != registry_posture:
+        failures.append("release channel public trust posture contradicts registry boundary posture")
+
+    if (top_supportability == "gold_supported" or rollout == "public_stable") and freshness != "fresh":
+        failures.append("release channel flagship stable posture requires fresh proof receipts")
+
+    return list(dict.fromkeys(failures))
 
 
 def _present(value: Any) -> bool:

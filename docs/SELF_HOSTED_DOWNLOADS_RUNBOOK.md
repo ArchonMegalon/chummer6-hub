@@ -1053,6 +1053,8 @@ Windows installer gold proof:
 1. This proof is a native Windows visual/startup gate only. It must not publish downloads or promote a release.
 2. Preferred remote path: run the native Windows proof runner from a controlled Windows host.
 3. The runner captures the promoted installer startup receipt plus installer progress/completion screenshots, then exports a `windows-installer-gold-proof` bundle.
+   Every bundle must contain both the native-Windows startup receipt and the visual-audit source plus its referenced screenshot bytes for the same promoted digest.
+   Delivery must be a bounded zip whose proof tree includes `WINDOWS_INSTALLER_VISUAL_AUDIT.source.json`; loose folders and extra archive members are rejected.
 4. Auto-captured screenshots are intentionally marked `review_required`; a human must inspect clipping/readability before changing those rows to `pass`.
 5. Drop the exported zip into the ignored intake folder `.state/incoming_windows_installer_gold_proof/`, preferably named `windows-installer-gold-proof-<promoted-digest-prefix>.zip`.
 6. Import the exported proof bundle from this repository root:

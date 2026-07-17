@@ -5,6 +5,15 @@ import os
 from pathlib import Path
 
 from absolute_completion_common import completion_path, read_json, read_yaml, write_yaml
+from verify_blazor_execution_horizon_bridge import (
+    EXPECTED_MOBILE_CONTRACT,
+    EXPECTED_MOBILE_MODE_CHECK_IDS,
+    EXPECTED_PUBLIC_ENTRY_CONTRACT,
+    EXPECTED_PUBLIC_ENTRY_CHECK_IDS,
+    EXPECTED_PUBLIC_INSTALL_TARGETS,
+    frontdoor_install_entry_summary,
+    mobile_v2_contract_summary,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -54,50 +63,41 @@ def claim_entry(claim: str, file_or_route: str, required_proof: str, proof_path:
     }
 
 
-def check_by_id(payload: dict, check_id: str) -> dict:
-    for row in payload.get("checks") or []:
-        if isinstance(row, dict) and str(row.get("id") or "").strip() == check_id:
-            return row
-    return {}
-
-
 def mobile_public_entry_supported(mobile_proof: dict) -> bool:
-    public_entry = mobile_proof.get("public_entry") if isinstance(mobile_proof.get("public_entry"), dict) else {}
-    required_checks = (
-        "home_open_chummer_dropdown_routes_build_and_play",
-        "build_route_opens_character_roster",
-        "play_route_opens_pwa_play_shell",
-    )
-    return (
-        mobile_proof.get("status") == "pass"
-        and public_entry.get("home_open_chummer_dropdown_holds") is True
-        and public_entry.get("build_route_holds") is True
-        and public_entry.get("play_shell_holds") is True
-        and public_entry.get("build_final_route") == "/app?command=character_roster"
-        and public_entry.get("play_final_route") == "/play"
-        and all(check_by_id(mobile_proof, check_id).get("pass") is True for check_id in required_checks)
-    )
+    return mobile_v2_contract_summary(mobile_proof)["pass"] is True
+
+
+def frontdoor_install_entry_supported(postdeploy_proof: dict) -> bool:
+    return frontdoor_install_entry_summary(postdeploy_proof)["checks_pass"] is True
 
 
 def blazor_bridge_public_entry_supported(blazor_bridge: dict) -> bool:
     proof = (blazor_bridge.get("proofs") or {}).get("hub_mobile_pwa_public_projection") or {}
     public_entry = proof.get("public_entry") if isinstance(proof.get("public_entry"), dict) else {}
     checks = public_entry.get("checks") if isinstance(public_entry.get("checks"), dict) else {}
-    required_checks = (
-        "home_open_chummer_dropdown_routes_build_and_play",
-        "build_route_opens_character_roster",
-        "play_route_opens_pwa_play_shell",
-    )
+    source_contract = proof.get("source_contract") if isinstance(proof.get("source_contract"), dict) else {}
+    source_checks = source_contract.get("checks") if isinstance(source_contract.get("checks"), dict) else {}
+    source_mode = source_contract.get("mode")
+    expected_source_checks = EXPECTED_MOBILE_MODE_CHECK_IDS.get(source_mode, ())
     return (
         proof.get("pass") is True
         and proof.get("base_url") == "https://chummer.run"
-        and public_entry.get("home_open_chummer_dropdown_holds") is True
-        and public_entry.get("build_route_holds") is True
-        and public_entry.get("play_shell_holds") is True
-        and public_entry.get("build_final_route") == "/app?command=character_roster"
-        and public_entry.get("play_final_route") == "/play"
+        and source_contract.get("pass") is True
+        and source_contract.get("contractName") == EXPECTED_MOBILE_CONTRACT
+        and bool(expected_source_checks)
+        and set(source_checks) == set(expected_source_checks)
+        and all(source_checks.get(check_id) is True for check_id in expected_source_checks)
+        and public_entry.get("contract_name") == EXPECTED_PUBLIC_ENTRY_CONTRACT
+        and public_entry.get("public_install_targets") == EXPECTED_PUBLIC_INSTALL_TARGETS
+        and public_entry.get("build_target") == "/build"
+        and public_entry.get("play_target") == "/mobile/player"
+        and public_entry.get("play_surface") == "install-only"
+        and public_entry.get("play_authority") == "none"
+        and public_entry.get("live_session") == "unavailable"
+        and public_entry.get("pwa_manifest_path") == "/manifest.player.webmanifest"
         and public_entry.get("checks_pass") is True
-        and all((checks.get(check_id) or {}).get("pass") is True for check_id in required_checks)
+        and set(checks) == set(EXPECTED_PUBLIC_ENTRY_CHECK_IDS)
+        and all(checks.get(check_id) is True for check_id in EXPECTED_PUBLIC_ENTRY_CHECK_IDS)
     )
 
 
@@ -106,6 +106,9 @@ def main() -> int:
     receipt_proof = read_json(completion_path("RECEIPT_ROUTE_POSITIVE_PROOF.generated.json"))
     package_proof = read_json(completion_path("PACKAGE_ROUTE_AND_API_AUDIT.generated.json"))
     mobile_proof, mobile_proof_path = read_json_with_published_fallback("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json")
+    public_edge_postdeploy, public_edge_postdeploy_path = read_json_with_published_fallback(
+        "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
+    )
     blazor_bridge, blazor_bridge_path = read_json_with_published_fallback("BLAZOR_EXECUTION_HORIZON_BRIDGE.generated.json")
     mobile_proof, mobile_proof_path = prefer_published_when_supported(
         "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json",
@@ -149,9 +152,13 @@ def main() -> int:
         claim_entry(
             "Mobile and play entry stays on a first-party PWA-backed public rail.",
             "/, /build, /mobile, and /play",
-            "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json + PUBLIC_SCREENSHOT_MANIFEST.generated.yaml",
+            "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json + PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json + PUBLIC_SCREENSHOT_MANIFEST.generated.yaml",
             mobile_proof_path,
-            "supported" if mobile_public_entry_supported(mobile_proof) and screenshot_manifest.get("status") == "pass" else "unsupported",
+            "supported"
+            if mobile_public_entry_supported(mobile_proof)
+            and frontdoor_install_entry_supported(public_edge_postdeploy)
+            and screenshot_manifest.get("status") == "pass"
+            else "unsupported",
         ),
         claim_entry(
             "Mobile PWA readiness and Blazor hosted play-shell execution horizon are integrated without upgrading smoke proof into a full live public-edge matrix claim.",

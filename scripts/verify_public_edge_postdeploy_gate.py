@@ -545,7 +545,7 @@ def service_worker_declared_fetchable_paths(service_worker: dict[str, Any]) -> l
             continue
         if path in non_cacheable_paths or path.split("?", 1)[0] in non_cacheable_bases:
             continue
-        paths.add(path)
+        paths.add(path.split("?", 1)[0])
     return sorted(paths)
 
 
@@ -563,9 +563,7 @@ def inspect_service_worker(body: str, failures: list[str]) -> dict[str, Any]:
         for path in [
             "/mobile",
             "/mobile/player",
-            "/mobile/player?role=Player",
             "/mobile/gm",
-            "/mobile/gm?role=GameMaster",
             "/mobile/observer",
             "/_framework/blazor.web.js",
             "/mobile.css",
@@ -863,6 +861,13 @@ def verify_ready_mobile_handoff(base_url: str, timeout_seconds: float) -> dict[s
     roles = {str(item.get("roleId") or "") for item in packet_routes if isinstance(item, dict)}
     boundaries = payload.get("boundaries") if isinstance(payload.get("boundaries"), list) else []
     boundary_text = " ".join(str(item) for item in boundaries).lower()
+    frontdoor_launch_route = str(payload.get("frontdoor_launch_route") or "").strip()
+    role_routes = payload.get("role_routes") if isinstance(payload.get("role_routes"), list) else []
+    role_routes_by_role = {
+        str(item.get("role") or "").strip(): item
+        for item in role_routes
+        if isinstance(item, dict) and str(item.get("role") or "").strip()
+    }
     packet_route_results: list[dict[str, Any]] = []
 
     require(result.status_code == 200, failures, f"/ready/handoff/mobile.json expected 200, got {result.status_code}")
@@ -878,6 +883,35 @@ def verify_ready_mobile_handoff(base_url: str, timeout_seconds: float) -> dict[s
     require("heat" in living_world_summary, failures, "living-world tool summary is not bound to heat tracking")
     require("followed-world" in living_world_summary or "followed world" in living_world_summary, failures, "living-world tool summary is not bound to followed-world selection")
     require("opt-in" in living_world_summary or "opt in" in living_world_summary, failures, "living-world tool summary is not bound to account opt-in")
+    require(
+        frontdoor_launch_route == REQUIRED_READY_MOBILE_FRONTDOOR_LAUNCH_ROUTE,
+        failures,
+        "mobile handoff frontdoor_launch_route is not " + REQUIRED_READY_MOBILE_FRONTDOOR_LAUNCH_ROUTE,
+    )
+    for role_name, expected in REQUIRED_READY_MOBILE_ROLE_ROUTES.items():
+        role_route = role_routes_by_role.get(role_name)
+        require(role_route is not None, failures, f"mobile handoff missing role route {role_name}")
+        if not isinstance(role_route, dict):
+            continue
+        for field in (
+            "mode",
+            "route",
+            "manifest_path",
+            "manifest_id",
+            "manifest_start_url",
+            "session_handoff_route_template",
+        ):
+            require(
+                role_route.get(field) == expected[field],
+                failures,
+                f"mobile handoff {role_name} {field} is not {expected[field]}",
+            )
+        require(
+            role_route.get("frontdoor_default") is expected["frontdoor_default"],
+            failures,
+            "mobile handoff "
+            f"{role_name} frontdoor_default is not {str(expected['frontdoor_default']).lower()}",
+        )
 
     for packet_route in packet_routes:
         if not isinstance(packet_route, dict):
@@ -940,9 +974,11 @@ def verify_ready_mobile_handoff(base_url: str, timeout_seconds: float) -> dict[s
         "status_code": result.status_code,
         "pwa_route": payload.get("pwa_route"),
         "continuity_route": payload.get("continuity_route"),
+        "frontdoor_launch_route": frontdoor_launch_route,
         "tool_ids": sorted(tool_ids),
         "living_world_summary": living_world_summary,
         "packet_roles": sorted(roles),
+        "role_routes": role_routes,
         "packet_route_count": len(packet_route_results),
         "packet_routes": packet_route_results,
         "failures": failures,
@@ -1578,7 +1614,7 @@ REQUIRED_READY_MOBILE_ROLE_ROUTES = {
         "route": "/mobile/player",
         "manifest_path": "/manifest.player.webmanifest",
         "manifest_id": "/mobile/player",
-        "manifest_start_url": "/mobile/player?role=Player",
+        "manifest_start_url": "/mobile/player",
         "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player",
         "frontdoor_default": True,
     },
@@ -1587,7 +1623,7 @@ REQUIRED_READY_MOBILE_ROLE_ROUTES = {
         "route": "/mobile/gm",
         "manifest_path": "/manifest.gm.webmanifest",
         "manifest_id": "/mobile/gm",
-        "manifest_start_url": "/mobile/gm?role=GameMaster",
+        "manifest_start_url": "/mobile/gm",
         "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster",
         "frontdoor_default": False,
     },

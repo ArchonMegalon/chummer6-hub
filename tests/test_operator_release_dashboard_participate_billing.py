@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import sys
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
@@ -18,12 +19,13 @@ WINDOWS_INTAKE_SCRIPT_PATH = (
 )
 
 
-def load_module():
+def load_module(*, preserve_workspace_candidates: bool = False):
     spec = importlib.util.spec_from_file_location("materialize_operator_release_dashboard", SCRIPT_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    module.WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES = ()
+    if not preserve_workspace_candidates:
+        module.WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES = ()
     module.WORKSPACE_PLAY_SURFACE_HORIZON_CANDIDATES = ()
     module.supply_chain_release_gate_path = (
         lambda: module.PUBLISHED_ROOT / "SUPPLY_CHAIN_RELEASE_GATE.generated.json"
@@ -55,6 +57,44 @@ def with_fresh_timestamp(path: Path, payload: dict[str, object]) -> dict[str, ob
     if path.name == "RELEASE_CHANNEL.generated.json":
         stamped.setdefault("supportabilityState", "gold_supported")
         stamped.setdefault("rolloutState", "public_stable")
+        public_trust = dict(
+            stamped.get("publicTrustMetrics")
+            if isinstance(stamped.get("publicTrustMetrics"), dict)
+            else {}
+        )
+        proof_freshness = dict(
+            public_trust.get("proofFreshness")
+            if isinstance(public_trust.get("proofFreshness"), dict)
+            else {}
+        )
+        proof_freshness.setdefault("status", "fresh")
+        public_release = dict(
+            public_trust.get("releaseChannel")
+            if isinstance(public_trust.get("releaseChannel"), dict)
+            else {}
+        )
+        public_release.setdefault("supportabilityState", stamped["supportabilityState"])
+        public_release.setdefault(
+            "posture",
+            "live" if stamped["rolloutState"] == "public_stable" else "preview",
+        )
+        public_trust["proofFreshness"] = proof_freshness
+        public_trust["releaseChannel"] = public_release
+        registry_coverage = dict(
+            stamped.get("registryBoundaryCoverage")
+            if isinstance(stamped.get("registryBoundaryCoverage"), dict)
+            else {}
+        )
+        registry_release = dict(
+            registry_coverage.get("releaseChannel")
+            if isinstance(registry_coverage.get("releaseChannel"), dict)
+            else {}
+        )
+        registry_release.setdefault("supportabilityState", stamped["supportabilityState"])
+        registry_release.setdefault("publicTrustPosture", public_release["posture"])
+        registry_coverage["releaseChannel"] = registry_release
+        stamped["publicTrustMetrics"] = public_trust
+        stamped["registryBoundaryCoverage"] = registry_coverage
         return stamped
     if "generatedAtUtc" in stamped:
         stamped["generatedAtUtc"] = fresh_timestamp()
@@ -281,14 +321,14 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
                 "path": "/manifest.player.webmanifest",
                 "role": "Player",
                 "id": "/mobile/player",
-                "start_url": "/mobile/player?role=Player",
+                "start_url": "/mobile/player",
                 "display": "standalone",
             },
             {
                 "path": "/manifest.gm.webmanifest",
                 "role": "GameMaster",
                 "id": "/mobile/gm",
-                "start_url": "/mobile/gm?role=GameMaster",
+                "start_url": "/mobile/gm",
                 "display": "standalone",
             },
         ],
@@ -310,7 +350,7 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
                 "route": "/mobile/player",
                 "manifest_path": "/manifest.player.webmanifest",
                 "manifest_id": "/mobile/player",
-                "manifest_start_url": "/mobile/player?role=Player",
+                "manifest_start_url": "/mobile/player",
                 "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player",
                 "frontdoor_default": True,
             },
@@ -320,7 +360,7 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
                 "route": "/mobile/gm",
                 "manifest_path": "/manifest.gm.webmanifest",
                 "manifest_id": "/mobile/gm",
-                "manifest_start_url": "/mobile/gm?role=GameMaster",
+                "manifest_start_url": "/mobile/gm",
                 "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster",
                 "frontdoor_default": False,
             },
@@ -410,7 +450,7 @@ def passing_public_edge_postdeploy_payload() -> dict[str, object]:
         "participateIframeRouteIframeCount": 2,
         "participateIframeRouteOfflineFallbackCount": 0,
         "frontdoorNavigationStatus": "pass",
-        "frontdoorNavigationMobileArtifactContract": "chummer.frontdoor_mobile_launch.v2",
+        "frontdoorNavigationMobileArtifactContract": "chummer.frontdoor_mobile_install_boundary.v2",
         "frontdoorNavigationLedgerArtifactContract": "chummer.black_ledger_globe_frontdoor.v1",
         "frontdoorNavigationAnchorArtifactContract": "chummer.frontdoor_mobile_anchor_redirect.v2",
         "frontdoorNavigationGatedTargets": ["Build", "Play"],
@@ -1167,6 +1207,36 @@ def test_dashboard_direct_release_evidence_checks_pass_on_authoritative_green_re
     assert "- PASS `public_edge_observability_release_gate`: `pass`" in markdown
 
 
+def test_dashboard_rejects_optimistic_release_posture_with_stale_proof() -> None:
+    module = load_module()
+    failures = module.release_channel_semantic_failures(
+        {
+            "status": "published",
+            "version": "run-20260714-191136",
+            "channel": "public_stable",
+            "supportabilityState": "gold_supported",
+            "rolloutState": "public_stable",
+            "publicTrustMetrics": {
+                "releaseChannel": {
+                    "supportabilityState": "review_required",
+                    "posture": "blocked",
+                },
+                "proofFreshness": {"status": "stale"},
+            },
+            "registryBoundaryCoverage": {
+                "releaseChannel": {
+                    "supportabilityState": "review_required",
+                    "publicTrustPosture": "blocked",
+                }
+            },
+        }
+    )
+
+    assert failures
+    assert "release channel flagship stable posture requires fresh proof receipts" in failures
+    assert any("supportability contradicts" in failure for failure in failures)
+
+
 def test_dashboard_fails_closed_on_pass_shaped_portability_supply_chain_and_observability_drift() -> None:
     module = load_module()
     with tempfile.TemporaryDirectory(prefix="operator-dashboard-direct-release-evidence-fail-") as temp_dir:
@@ -1255,48 +1325,687 @@ def test_dashboard_fails_closed_on_pass_shaped_portability_supply_chain_and_obse
 
 
 class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
-    def test_dashboard_materializes_into_current_repo_published_root(self) -> None:
+    def test_dashboard_uses_its_own_worktree_as_run_services_root(self) -> None:
+        module = load_module(preserve_workspace_candidates=True)
+
+        self.assertEqual(
+            Path(module.__file__).resolve().parents[1],
+            module.RUN_SERVICES_ROOT,
+        )
+        self.assertEqual(
+            module.RUN_SERVICES_ROOT / ".codex-studio" / "published",
+            module.PUBLISHED_ROOT,
+        )
+        self.assertEqual(
+            module.RUN_SERVICES_ROOT / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
+            module.WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES[0],
+        )
+        self.assertEqual(
+            module.PUBLISHED_ROOT / "portal" / "RELEASE_CHANNEL.generated.json",
+            module.WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES[1],
+        )
+
+    def test_release_ready_self_check_defaults_on_with_explicit_opt_out(self) -> None:
         module = load_module()
 
-        self.assertEqual(SCRIPT_PATH.parents[1], module.RUN_SERVICES_ROOT)
-        self.assertEqual(SCRIPT_PATH.parents[1] / ".codex-studio" / "published", module.PUBLISHED_ROOT)
+        with mock.patch.object(sys, "argv", ["materialize_operator_release_dashboard.py"]):
+            self.assertTrue(module.parse_args().release_ready_self_check)
+        with mock.patch.object(
+            sys,
+            "argv",
+            [
+                "materialize_operator_release_dashboard.py",
+                "--no-release-ready-self-check",
+            ],
+        ):
+            self.assertFalse(module.parse_args().release_ready_self_check)
 
-    def test_dashboard_release_channel_path_falls_back_to_shared_workspace_when_local_registry_is_missing(self) -> None:
+    def test_windows_operator_request_artifacts_refreshes_watcher_state_via_status_command(self) -> None:
         module = load_module()
-        with tempfile.TemporaryDirectory(prefix="operator-dashboard-release-channel-") as temp_dir:
-            shared_workspace = Path(temp_dir) / "shared"
-            shared_run_services = shared_workspace / "chummer.run-services"
-            shared_release_channel = shared_run_services / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json"
-            shared_release_channel.parent.mkdir(parents=True, exist_ok=True)
-            shared_release_channel.write_text(
-                json.dumps({"status": "published", "version": "run-20260705-040324"}) + "\n",
+        with tempfile.TemporaryDirectory(prefix="dashboard-windows-watcher-refresh-") as temp_dir:
+            root = Path(temp_dir)
+            intake_request = root / "published" / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
+            ask_text_path = root / "_completion" / "CURRENT_WINDOWS_INSTALLER_VISUAL_AUDIT_OPERATOR_ASK.txt"
+            ask_metadata_path = root / "_completion" / "CURRENT_WINDOWS_INSTALLER_VISUAL_AUDIT_OPERATOR_ASK.generated.json"
+            watcher_state_path = root / "state" / "windows_installer_gold_proof_watcher.generated.json"
+            ask_text_path.parent.mkdir(parents=True, exist_ok=True)
+            ask_text_path.write_text("windows ask current\n", encoding="utf-8")
+            ask_metadata_path.write_text("{}\n", encoding="utf-8")
+            watcher_state_path.parent.mkdir(parents=True, exist_ok=True)
+            watcher_state_path.write_text(
+                json.dumps(
+                    {
+                        "generated_at_utc": "2026-07-06T15:00:00Z",
+                        "status": "running",
+                        "pid": 1111,
+                        "process_alive": True,
+                        "matching_process_pids": [1111],
+                        "matching_process_count": 1,
+                        "duplicate_process_pids": [],
+                        "duplicate_process_count": 0,
+                        "note": "stale watcher snapshot",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            payload = {
+                "preferred_drop_path": str(root / "incoming" / "windows-proof.zip"),
+                "operator_telegram_draft": {
+                    "current_message_path": str(ask_text_path),
+                    "current_metadata_path": str(ask_metadata_path),
+                    "receipt_name": "windows.receipt.json",
+                    "message_preview": "Windows operator ask preview",
+                },
+                "artifact_intake": {
+                    "watcher_state_path": str(watcher_state_path),
+                    "watcher_status_command": "python3 watcher-status --intake-request /tmp/intake.json",
+                },
+            }
+            intake_request.parent.mkdir(parents=True, exist_ok=True)
+            intake_request.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+            def fake_run(*_args, **_kwargs):
+                watcher_state_path.write_text(
+                    json.dumps(
+                        {
+                            "generated_at_utc": "2026-07-06T15:24:14Z",
+                            "status": "running",
+                            "pid": 2086931,
+                            "process_alive": True,
+                            "matching_process_pids": [2086931],
+                            "matching_process_count": 1,
+                            "duplicate_process_pids": [],
+                            "duplicate_process_count": 0,
+                            "note": "watcher discovered by pid file or process scan",
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
+                artifacts = module.windows_operator_request_artifacts(
+                    intake_request,
+                    payload,
+                    runtime_refresh_authorized=True,
+                )
+
+        self.assertEqual("2026-07-06T15:24:14Z", artifacts["watcher_state_receipt_generated_at_utc"])
+        self.assertEqual(2086931, artifacts["watcher_pid"])
+        self.assertEqual("watcher discovered by pid file or process scan", artifacts["watcher_note"])
+
+    def test_windows_operator_request_artifacts_refreshes_auto_import_before_watcher_state(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="dashboard-windows-auto-import-refresh-") as temp_dir:
+            root = Path(temp_dir)
+            intake_request = root / "published" / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
+            auto_import_path = root / "published" / "WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json"
+            ask_text_path = root / "_completion" / "CURRENT_WINDOWS_INSTALLER_VISUAL_AUDIT_OPERATOR_ASK.txt"
+            ask_metadata_path = root / "_completion" / "CURRENT_WINDOWS_INSTALLER_VISUAL_AUDIT_OPERATOR_ASK.generated.json"
+            watcher_state_path = root / "state" / "windows_installer_gold_proof_watcher.generated.json"
+            ask_text_path.parent.mkdir(parents=True, exist_ok=True)
+            ask_text_path.write_text("windows ask current\n", encoding="utf-8")
+            ask_metadata_path.write_text("{}\n", encoding="utf-8")
+            watcher_state_path.parent.mkdir(parents=True, exist_ok=True)
+            watcher_state_path.write_text(
+                json.dumps(
+                    {
+                        "generated_at_utc": "2026-07-06T15:00:00Z",
+                        "status": "running",
+                        "pid": 1111,
+                        "process_alive": True,
+                        "matching_process_pids": [1111],
+                        "matching_process_count": 1,
+                        "duplicate_process_pids": [],
+                        "duplicate_process_count": 0,
+                        "note": "stale watcher snapshot",
+                        "auto_import_receipt_status": "waiting_for_artifact",
+                        "auto_import_receipt_generated_at_utc": "2026-07-06T15:00:00Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            auto_import_path.parent.mkdir(parents=True, exist_ok=True)
+            auto_import_path.write_text(
+                json.dumps(
+                    {
+                        "generated_at_utc": "2026-07-06T15:00:00Z",
+                        "status": "waiting_for_artifact",
+                        "actionable_candidate_count": 0,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            payload = {
+                "preferred_drop_path": str(root / "incoming" / "windows-proof.zip"),
+                "operator_telegram_draft": {
+                    "current_message_path": str(ask_text_path),
+                    "current_metadata_path": str(ask_metadata_path),
+                    "receipt_name": "windows.receipt.json",
+                    "message_preview": "Windows operator ask preview",
+                },
+                "artifact_intake": {
+                    "watcher_state_path": str(watcher_state_path),
+                    "watcher_status_command": "python3 watcher-status --intake-request /tmp/intake.json",
+                    "auto_import_command": "python3 auto-import --intake-request /tmp/intake.json",
+                },
+            }
+            intake_request.parent.mkdir(parents=True, exist_ok=True)
+            intake_request.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+            run_calls: list[list[str]] = []
+
+            def fake_run(args, **_kwargs):
+                command = list(args)
+                run_calls.append(command)
+                if command[:2] == ["python3", "auto-import"]:
+                    auto_import_path.write_text(
+                        json.dumps(
+                            {
+                                "generated_at_utc": "2026-07-06T15:24:12Z",
+                                "status": "waiting_for_artifact",
+                                "actionable_candidate_count": 0,
+                            }
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+                elif command[:2] == ["python3", "watcher-status"]:
+                    watcher_state_path.write_text(
+                        json.dumps(
+                            {
+                                "generated_at_utc": "2026-07-06T15:24:14Z",
+                                "status": "running",
+                                "pid": 2086931,
+                                "process_alive": True,
+                                "matching_process_pids": [2086931],
+                                "matching_process_count": 1,
+                                "duplicate_process_pids": [],
+                                "duplicate_process_count": 0,
+                                "note": "watcher discovered by pid file or process scan",
+                                "auto_import_receipt_status": "waiting_for_artifact",
+                                "auto_import_receipt_generated_at_utc": "2026-07-06T15:24:12Z",
+                            }
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
+                artifacts = module.windows_operator_request_artifacts(
+                    intake_request,
+                    payload,
+                    runtime_refresh_authorized=True,
+                )
+
+        self.assertEqual(str(auto_import_path), artifacts["auto_import_receipt_path"])
+        self.assertEqual("2026-07-06T15:24:12Z", artifacts["auto_import_receipt_generated_at_utc"])
+        self.assertEqual("2026-07-06T15:24:14Z", artifacts["watcher_state_receipt_generated_at_utc"])
+        self.assertEqual(["python3", "auto-import"], run_calls[0][:2])
+        self.assertEqual(["python3", "watcher-status"], run_calls[1][:2])
+
+    def test_windows_operator_request_artifacts_does_not_execute_unverified_commands(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="dashboard-windows-unverified-refresh-") as temp_dir:
+            root = Path(temp_dir)
+            intake_request = (
+                root
+                / "published"
+                / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
+            )
+            payload = {
+                "artifact_intake": {
+                    "auto_import_command": "python3 untrusted-auto-import",
+                    "watcher_status_command": "python3 untrusted-watcher-status",
+                }
+            }
+            intake_request.parent.mkdir(parents=True, exist_ok=True)
+            intake_request.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+            with mock.patch.object(module.subprocess, "run") as run:
+                module.windows_operator_request_artifacts(
+                    intake_request,
+                    payload,
+                    refresh_windows_runtime_receipts=True,
+                    runtime_refresh_authorized=False,
+                )
+
+        run.assert_not_called()
+
+    def test_windows_operator_request_artifacts_can_reuse_existing_windows_runtime_receipts(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="dashboard-windows-runtime-reuse-") as temp_dir:
+            root = Path(temp_dir)
+            intake_request = root / "published" / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
+            auto_import_path = root / "published" / "WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json"
+            ask_text_path = root / "_completion" / "CURRENT_WINDOWS_INSTALLER_VISUAL_AUDIT_OPERATOR_ASK.txt"
+            ask_metadata_path = root / "_completion" / "CURRENT_WINDOWS_INSTALLER_VISUAL_AUDIT_OPERATOR_ASK.generated.json"
+            watcher_state_path = root / "state" / "windows_installer_gold_proof_watcher.generated.json"
+            ask_text_path.parent.mkdir(parents=True, exist_ok=True)
+            ask_text_path.write_text("windows ask current\n", encoding="utf-8")
+            ask_metadata_path.write_text("{}\n", encoding="utf-8")
+            watcher_state_path.parent.mkdir(parents=True, exist_ok=True)
+            watcher_state_path.write_text(
+                json.dumps(
+                    {
+                        "generated_at_utc": "2026-07-06T15:24:14Z",
+                        "status": "running",
+                        "pid": 2086931,
+                        "process_alive": True,
+                        "matching_process_pids": [2086931],
+                        "matching_process_count": 1,
+                        "duplicate_process_pids": [],
+                        "duplicate_process_count": 0,
+                        "note": "watcher discovered by pid file or process scan",
+                        "auto_import_receipt_status": "waiting_for_artifact",
+                        "auto_import_receipt_generated_at_utc": "2026-07-06T15:24:12Z",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            auto_import_path.parent.mkdir(parents=True, exist_ok=True)
+            auto_import_path.write_text(
+                json.dumps(
+                    {
+                        "generated_at_utc": "2026-07-06T15:24:12Z",
+                        "status": "waiting_for_artifact",
+                        "actionable_candidate_count": 0,
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            payload = {
+                "preferred_drop_path": str(root / "incoming" / "windows-proof.zip"),
+                "operator_telegram_draft": {
+                    "current_message_path": str(ask_text_path),
+                    "current_metadata_path": str(ask_metadata_path),
+                    "receipt_name": "windows.receipt.json",
+                    "message_preview": "Windows operator ask preview",
+                },
+                "artifact_intake": {
+                    "watcher_state_path": str(watcher_state_path),
+                    "watcher_status_command": "python3 watcher-status --intake-request /tmp/intake.json",
+                    "auto_import_command": "python3 auto-import --intake-request /tmp/intake.json",
+                },
+            }
+            intake_request.parent.mkdir(parents=True, exist_ok=True)
+            intake_request.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+            with mock.patch.object(module.subprocess, "run") as run_mock:
+                artifacts = module.windows_operator_request_artifacts(
+                    intake_request,
+                    payload,
+                    refresh_windows_runtime_receipts=False,
+                )
+
+        self.assertEqual(str(auto_import_path), artifacts["auto_import_receipt_path"])
+        self.assertEqual("2026-07-06T15:24:12Z", artifacts["auto_import_receipt_generated_at_utc"])
+        self.assertEqual("2026-07-06T15:24:14Z", artifacts["watcher_state_receipt_generated_at_utc"])
+        run_mock.assert_not_called()
+
+    def test_flagship_release_blocking_recovery_accepts_explicit_release_truth_blockers(self) -> None:
+        module = load_module()
+
+        self.assertTrue(
+            module.flagship_product_readiness_launch_blockers_recoverable(
+                {
+                    "launch_critical_nested_blockers": [
+                        "release channel channel is preview, not a flagship stable lane",
+                        "release channel supportability is not gold_supported",
+                        "release channel rollout is promoted_preview, not public_stable",
+                        "Windows installer visual audit source digest does not match promoted installer",
+                    ]
+                }
+            )
+        )
+
+    def test_enrich_operator_ask_delivery_details_hides_historical_preview_when_request_not_required(self) -> None:
+        module = load_module()
+
+        artifacts = module.enrich_operator_ask_delivery_details(
+            {
+                "request_status": "not_required",
+                "operator_ask_message_sha256": "a" * 64,
+                "operator_ask_delivery_text_sha256": "b" * 64,
+                "operator_ask_delivery_text_preview": "Old operator ask said proof was still missing.",
+                "operator_ask_send_command": "python3 resend-google",
+                "import_command": "python3 import-google",
+                "auto_import_watch_command": "python3 watch-google",
+                "post_import_commands": ["python3 verify-google"],
+                "preferred_drop_path": "/tmp/google-proof.zip",
+            }
+        )
+
+        self.assertFalse(artifacts["operator_ask_delivery_current_text_comparable"])
+        self.assertFalse(artifacts["operator_ask_delivery_matches_current_text"])
+        self.assertFalse(artifacts["operator_ask_delivery_needs_resend"])
+        self.assertEqual("", artifacts["operator_ask_resend_command"])
+        self.assertTrue(artifacts["operator_ask_delivery_historical_only"])
+        self.assertEqual("", artifacts["operator_ask_delivery_text_preview"])
+        self.assertEqual(
+            "Old operator ask said proof was still missing.",
+            artifacts["operator_ask_delivery_historical_text_preview"],
+        )
+        self.assertEqual("", artifacts["operator_ask_send_command"])
+        self.assertEqual("", artifacts["import_command"])
+        self.assertEqual("", artifacts["auto_import_watch_command"])
+        self.assertEqual([], artifacts["post_import_commands"])
+        self.assertEqual("", artifacts["preferred_drop_path"])
+        self.assertTrue(artifacts["operator_action_historical_only"])
+        self.assertEqual(
+            {
+                "operator_ask_send_command": "python3 resend-google",
+                "import_command": "python3 import-google",
+                "auto_import_watch_command": "python3 watch-google",
+                "post_import_commands": ["python3 verify-google"],
+                "preferred_drop_path": "/tmp/google-proof.zip",
+            },
+            artifacts["operator_action_historical_artifacts"],
+        )
+
+    def test_enrich_operator_ask_delivery_details_restores_actions_when_effective_status_requires_followup(self) -> None:
+        module = load_module()
+
+        suppressed = module.enrich_operator_ask_delivery_details(
+            {
+                "request_status": "not_required",
+                "operator_ask_message_sha256": "a" * 64,
+                "operator_ask_delivery_text_sha256": "b" * 64,
+                "operator_ask_delivery_text_preview": "Old operator ask said proof was still missing.",
+                "operator_ask_send_command": "python3 resend-windows",
+                "import_command": "python3 import-windows",
+                "auto_import_watch_command": "python3 watch-windows",
+                "post_import_commands": ["python3 verify-windows"],
+                "preferred_drop_path": "/tmp/windows-proof.zip",
+            }
+        )
+
+        suppressed["request_effective_status"] = "external_artifact_required"
+        suppressed["operator_action_still_required"] = True
+        restored = module.enrich_operator_ask_delivery_details(suppressed)
+
+        self.assertTrue(restored["operator_ask_delivery_current_text_comparable"])
+        self.assertFalse(restored["operator_ask_delivery_matches_current_text"])
+        self.assertTrue(restored["operator_ask_delivery_needs_resend"])
+        self.assertEqual("python3 resend-windows", restored["operator_ask_resend_command"])
+        self.assertFalse(restored["operator_ask_delivery_historical_only"])
+        self.assertEqual(
+            "Old operator ask said proof was still missing.",
+            restored["operator_ask_delivery_text_preview"],
+        )
+        self.assertEqual("python3 resend-windows", restored["operator_ask_send_command"])
+        self.assertEqual("python3 import-windows", restored["import_command"])
+        self.assertEqual("python3 watch-windows", restored["auto_import_watch_command"])
+        self.assertEqual(["python3 verify-windows"], restored["post_import_commands"])
+        self.assertEqual("/tmp/windows-proof.zip", restored["preferred_drop_path"])
+
+    def test_build_markdown_hides_google_action_commands_when_request_not_required(self) -> None:
+        module = load_module()
+        payload = {
+            "verdict": "OPERABLE_RELEASE_READY",
+            "generated_at_utc": fresh_timestamp(),
+            "release": {},
+            "mirrors": {"providers": {}},
+            "account_handoffs": {},
+            "root_blockers": [],
+            "checks": {
+                "google_oauth_linking_proof": {
+                    "status": "pass",
+                    "pass": True,
+                    "operator_request_artifacts": {
+                        "request_status": "not_required",
+                        "required_operator_evidence_path": "/tmp/operator-evidence.json",
+                        "request_receipt_path": "/tmp/operator-request.generated.json",
+                        "operator_ask_text_path": "/tmp/CURRENT_GOOGLE_OAUTH_LINKING_OPERATOR_ASK.txt",
+                        "operator_ask_metadata_path": "/tmp/CURRENT_GOOGLE_OAUTH_LINKING_OPERATOR_ASK.generated.json",
+                        "operator_evidence_template_path": "/tmp/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.template.generated.json",
+                        "preferred_drop_path": "/tmp/google-oauth-linking-operator-evidence.zip",
+                        "operator_ask_send_command": "python3 resend-google",
+                        "import_command": "python3 import-google",
+                        "auto_import_watch_command": "python3 watch-google",
+                        "post_import_verify_command": "python3 verify-google",
+                        "post_import_commands": ["python3 step1"],
+                        "post_import_verify_note": "verify note",
+                        "operator_ask_delivery_status": "sent",
+                        "operator_ask_delivery_receipt_path": "/tmp/google.receipt.json",
+                        "operator_ask_delivery_current_text_comparable": False,
+                        "operator_ask_delivery_matches_current_text": False,
+                        "operator_ask_resend_command": "python3 resend-google",
+                    },
+                    "receipt_verifier": {"status": "pass", "operator_evidence_pass": True, "operator_request_artifacts_pass": True},
+                }
+            },
+        }
+
+        markdown = module.build_markdown(payload)
+
+        self.assertIn("google oauth operator evidence:", markdown)
+        self.assertIn("google oauth operator packet:", markdown)
+        self.assertIn("google oauth operator ask delivery:", markdown)
+        self.assertNotIn("google oauth operator ask send:", markdown)
+        self.assertNotIn("google oauth operator intake:", markdown)
+        self.assertNotIn("google oauth intake verify:", markdown)
+        self.assertNotIn("google oauth operator ask resend:", markdown)
+
+    def test_dashboard_public_edge_semantics_short_circuit_frontdoor_noise_when_homepage_lane_is_missing(self) -> None:
+        module = load_module()
+        payload = passing_public_edge_postdeploy_payload()
+        payload.update(
+            {
+                "frontdoorNavigationStatus": "fail",
+                "frontdoorNavigationMobileArtifactContract": "",
+                "frontdoorNavigationLedgerArtifactContract": "",
+                "frontdoorNavigationGatedTargets": [],
+                "frontdoorNavigationPublicTargets": ["Build", "Play"],
+                "frontdoorNavigationPlayRoute": "",
+                "frontdoorNavigationDirectPlayerRoute": "",
+                "frontdoorNavigationDirectPlayerHttpStatus": 500,
+                "frontdoorNavigationFinalUrl": "",
+                "frontdoorNavigationGmRoute": "",
+                "frontdoorNavigationGmHttpStatus": 500,
+                "frontdoorNavigationGmFinalUrl": "",
+                "frontdoorNavigationLedgerPrimary": True,
+                "failures": [
+                    module.PUBLIC_EDGE_HOMEPAGE_LANE_DISCLOSURE_RECEIPT_FAILURE,
+                    module.PUBLIC_EDGE_HOMEPAGE_LANE_COPY_MISMATCH_RECEIPT_FAILURE,
+                ],
+            }
+        )
+
+        failures = module.public_edge_postdeploy_semantic_failures(payload)
+
+        self.assertIn("public-edge postdeploy homepage does not disclose current public lane", failures)
+        self.assertIn("public-edge postdeploy receipt contains failures", failures)
+        self.assertNotIn("public-edge postdeploy frontdoorNavigationStatus is not pass", failures)
+        self.assertNotIn("public-edge postdeploy frontdoorNavigationMobileArtifactContract is not chummer.frontdoor_mobile_install_boundary.v2", failures)
+        self.assertNotIn("public-edge postdeploy frontdoorNavigationLedgerArtifactContract is not chummer.black_ledger_globe_frontdoor.v1", failures)
+        self.assertNotIn("public-edge postdeploy front-door navigation does not gate Build", failures)
+        self.assertNotIn("public-edge postdeploy front-door navigation Play route is not /mobile/player", failures)
+
+    def test_dashboard_public_edge_semantics_fail_closed_on_v1_raw_identity_and_private_cache(self) -> None:
+        module = load_module()
+        payload = passing_public_edge_postdeploy_payload()
+        payload.update(
+            {
+                "pwaOfflineCacheArtifactContract": "chummer.pwa_offline_cache.v1",
+                "pwaOfflineCachePrivateApiCached": True,
+                "pwaOfflineCacheStaticPaths": [*payload["pwaOfflineCacheStaticPaths"], "/api/play/session?deviceId=private-device"],
+                "frontdoorNavigationMobileArtifactContract": "chummer.frontdoor_mobile_launch.v1",
+                "frontdoorNavigationFinalUrl": "https://chummer.run/mobile/player?sessionId=private-session",
+                "frontdoorNavigationGmRoute": "/mobile/gm?sessionId=private-session",
+                "frontdoorNavigationGmFinalUrl": "https://chummer.run/mobile/gm?deviceId=private-device",
+                "frontdoorNavigationGmSessionHandoffUrl": "https://chummer.run/mobile/gm?sessionId=private-session&role=GameMaster",
+            }
+        )
+
+        failures = module.public_edge_postdeploy_semantic_failures(payload)
+
+        self.assertIn("public-edge postdeploy pwaOfflineCacheArtifactContract is not chummer.pwa_offline_cache.v2", failures)
+        self.assertIn("public-edge postdeploy frontdoorNavigationMobileArtifactContract is not chummer.frontdoor_mobile_install_boundary.v2", failures)
+        self.assertIn("public-edge postdeploy PWA offline static cache contains a private or query-bearing route", failures)
+        self.assertIn("public-edge postdeploy PWA offline cache did not prove private API responses remain uncached", failures)
+        self.assertIn("public-edge postdeploy front-door visible GM URL is not query-free /mobile/gm", failures)
+        self.assertIn("public-edge postdeploy front-door GM handoff is not a redacted GM route", failures)
+        self.assertNotIn("public-edge postdeploy Black Ledger remains primary on the front door", failures)
+
+    def test_dashboard_check_failures_stay_concise_when_homepage_lane_is_missing(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="operator-dashboard-homepage-lane-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            completion = Path(temp_dir) / "completion"
+            completion.mkdir(parents=True, exist_ok=True)
+            registry = Path(temp_dir) / "registry"
+            registry.mkdir(parents=True, exist_ok=True)
+
+            public_edge = passing_public_edge_postdeploy_payload()
+            public_edge.update(
+                {
+                    "frontdoorNavigationStatus": "fail",
+                    "frontdoorNavigationMobileArtifactContract": "",
+                    "frontdoorNavigationLedgerArtifactContract": "",
+                    "frontdoorNavigationGatedTargets": [],
+                    "frontdoorNavigationPublicTargets": ["Build", "Play"],
+                    "frontdoorNavigationPlayRoute": "",
+                    "frontdoorNavigationDirectPlayerRoute": "",
+                    "frontdoorNavigationDirectPlayerHttpStatus": 500,
+                    "frontdoorNavigationFinalUrl": "",
+                    "frontdoorNavigationGmRoute": "",
+                    "frontdoorNavigationGmHttpStatus": 500,
+                    "frontdoorNavigationGmFinalUrl": "",
+                    "frontdoorNavigationLedgerPrimary": True,
+                    "failures": [
+                        module.PUBLIC_EDGE_HOMEPAGE_LANE_DISCLOSURE_RECEIPT_FAILURE,
+                        module.PUBLIC_EDGE_HOMEPAGE_LANE_COPY_MISMATCH_RECEIPT_FAILURE,
+                    ],
+                }
+            )
+
+            receipts = {
+                published / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json": {"status": "pass"},
+                published / "RULESET_READINESS.generated.json": {"status": "pass", "rulesets": {}},
+                published / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json": {
+                    "status": "pass",
+                    "base_url": "https://chummer.run",
+                    "summary": {"route_count": 12, "failed_count": 0, "negative_path_failed_count": 0},
+                },
+                published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json": public_edge,
+                published / "TEABLE_IMPORTANT_WORK.generated.json": passing_teable_important_work_payload(),
+                published / "FLAGSHIP_PRODUCT_READINESS.generated.json": passing_flagship_product_readiness_payload(),
+                published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json": passing_windows_installer_visual_audit_payload(),
+                completion / "UI_FRAME_INTEGRITY.generated.json": {
+                    "status": "pass",
+                    "verdict": "READY", "base_url": "https://chummer.run",
+                    "summary": {"checked_pages": 1, "failure_count": 0},
+                },
+                published / "DESIGN_QUALITY_GATE.generated.json": {"status": "pass", "verdict": "DESIGN_READY"},
+                published / "PUBLIC_COPY_LEAK_GATE.generated.json": {"status": "pass", "verdict": "READY"},
+                published / "PARTICIPATE_BILLING_HONESTY.generated.json": {"status": "pass", "verdict": "READY"},
+                published / "ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json": {
+                    "status": "pass",
+                    "verdict": "READY",
+                    "billing": {"mode": "external_handoff_configured"},
+                    "release_upload": {"mode": "default_single_operator"},
+                },
+                published / "RELEASE_READY.generated.json": {
+                    **passing_release_ready_payload(),
+                    "blocking_gate_artifacts": {
+                        "windows_installer_visual_audit": {
+                            "stage_release_build_handoff_path": "/tmp/RELEASE_BUILD_HANDOFF.generated.json",
+                            "stage_release_build_handoff_status": "fail",
+                            "stage_windows_visual_proof_handoff_path": "/tmp/WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.json",
+                            "stage_windows_visual_proof_handoff_status": "ready_for_windows_host",
+                            "stage_windows_visual_proof_handoff_summary": "Windows desktop exit gate failed: Windows installer visual proof version does not match release channel.",
+                        },
+                    },
+                },
+                published / "FINAL_GOLD_JANITOR.generated.json": {"status": "pass", "verdict": "GOLD_READY"},
+                published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json": {"status": "pass"},
+                registry / "RELEASE_CHANNEL.generated.json": {
+                    "status": "published",
+                    "version": "run-test",
+                    "publishedAt": "2026-06-24T08:00:00Z",
+                    "channel": "stable",
+                    "supportabilityState": "gold_supported",
+                },
+            }
+            write_receipts(receipts)
+            (published / "WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json").write_text(
+                json.dumps(
+                    {
+                        "status": "fail",
+                        "generated_at_utc": fresh_timestamp(),
+                        "artifact": "/tmp/windows-installer-gold-proof-a.zip",
+                        "import_failure": {
+                            "type": "BadZipFile",
+                            "message": "File is not a zip file",
+                            "code": None,
+                        },
+                        "summary": "Selected Windows installer gold-proof artifact failed import validation.",
+                        "actionable_candidate_count": 0,
+                        "matching_promoted_directory_candidate_count": 0,
+                        "matching_promoted_zip_candidate_count": 0,
+                        "stale_directory_candidate_count": 11,
+                        "stage_like_stale_directory_candidate_count": 2,
+                        "stale_directory_digest_summary": [
+                            {
+                                "artifact_sha256": f"{'d' * 64}",
+                                "count": 2,
+                                "stage_like_count": 2,
+                                "sample_path": "/tmp/chummer-run-services-browserfix3",
+                                "latest_source_updated_at_utc": "2026-06-21T17:44:15.3027652Z",
+                            },
+                            {
+                                "artifact_sha256": f"{'e' * 64}",
+                                "count": 9,
+                                "stage_like_count": 0,
+                                "sample_path": "/tmp/windows-installer-proof-27866529115",
+                                "latest_source_updated_at_utc": "2026-06-20T09:21:23Z",
+                            },
+                        ],
+                        "directory_candidate_note": (
+                            "Complete extracted proof directories were found, but none match the promoted installer digest. "
+                            "Digest-mismatched directories were summarized separately."
+                        ),
+                    }
+                ),
                 encoding="utf-8",
             )
 
-            with mock.patch.object(module, "SHARED_WORKSPACE_ROOT", shared_workspace), \
-                mock.patch.object(module, "SHARED_REGISTRY_ROOT", shared_workspace / "chummer-hub-registry" / ".codex-studio" / "published"), \
-                mock.patch.object(module, "SHARED_RUN_SERVICES_ROOT", shared_run_services), \
-                mock.patch.object(module, "REGISTRY_ROOT", Path(temp_dir) / "missing-registry"):
-                self.assertEqual(shared_release_channel, module.resolve_release_channel_path())
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), \
+                mock.patch.object(module, "COMPLETION_ROOT", completion), \
+                mock.patch.object(module, "REGISTRY_ROOT", registry):
+                payload = module.build_payload()
 
-    def test_parse_args_enables_release_ready_self_check_by_default(self) -> None:
-        module = load_module()
-
-        with mock.patch("sys.argv", ["materialize_operator_release_dashboard.py"]):
-            args = module.parse_args()
-
-        self.assertTrue(args.release_ready_self_check)
-
-    def test_parse_args_can_disable_release_ready_self_check(self) -> None:
-        module = load_module()
-
-        with mock.patch(
-            "sys.argv",
-            ["materialize_operator_release_dashboard.py", "--no-release-ready-self-check"],
-        ):
-            args = module.parse_args()
-
-        self.assertFalse(args.release_ready_self_check)
+        public_edge_check = payload["checks"]["public_edge_postdeploy_gate"]
+        self.assertFalse(public_edge_check["pass"])
+        self.assertEqual(
+            [
+                "public-edge postdeploy homepage does not disclose current public lane",
+                "public-edge postdeploy receipt contains failures",
+            ],
+            public_edge_check["failures"],
+        )
+        self.assertEqual(
+            [
+                "public-edge postdeploy homepage does not disclose current public lane",
+                "public-edge postdeploy receipt contains failures",
+            ],
+            public_edge_check["summary"]["semantic_failures"],
+        )
+        self.assertEqual(
+            [
+                module.PUBLIC_EDGE_HOMEPAGE_LANE_DISCLOSURE_RECEIPT_FAILURE,
+                module.PUBLIC_EDGE_HOMEPAGE_LANE_COPY_MISMATCH_RECEIPT_FAILURE,
+            ],
+            public_edge_check["summary"]["receipt_failures"],
+        )
 
     def test_dashboard_surfaces_participate_billing_honesty_gate(self) -> None:
         module = load_module()
@@ -1331,49 +2040,20 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
                     "billing": {"mode": "external_handoff_configured"},
                     "release_upload": {"mode": "default_single_operator"},
                 },
-                published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json": {
-                    "status": "pass",
-                    "generatedAtUtc": "2026-06-24T08:05:00Z",
-                    "releaseManifestVersion": "run-20260624-080000",
-                    "visibleVersion": "Version run-20260624-080000",
-                    "navigationStatus": "pass",
-                    "pwaStaticStatus": "pass",
-                    "mobileLedgerStatus": "pass",
-                    "mobileLedgerPayloadStatus": "opt_in_required",
-                    "readyMobileHandoffStatus": "pass",
-                    "participateIframeShellStatus": "pass",
-                    "flagshipHorizonsStatus": "pass",
+                published / "RELEASE_READY.generated.json": {
+                    **passing_release_ready_payload(),
+                    "blocking_gate_artifacts": {
+                        "windows_installer_visual_audit": {
+                            "stage_release_build_handoff_path": "/tmp/RELEASE_BUILD_HANDOFF.generated.json",
+                            "stage_release_build_handoff_status": "fail",
+                            "stage_windows_visual_proof_handoff_path": "/tmp/WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.json",
+                            "stage_windows_visual_proof_handoff_status": "ready_for_windows_host",
+                            "stage_windows_visual_proof_handoff_summary": "Windows desktop exit gate failed: Windows installer visual proof version does not match release channel.",
+                        },
+                    },
                 },
-                published / "RELEASE_READY.generated.json": {"status": "pass", "verdict": "RELEASE_READY"},
                 published / "FINAL_GOLD_JANITOR.generated.json": {"status": "pass", "verdict": "GOLD_READY"},
                 published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json": {"status": "pass"},
-                published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json": {
-                    "status": "fail",
-                    "artifact": {
-                        "fileName": "chummer-avalonia-win-x64-installer.exe",
-                        "sha256": "promoted-sha",
-                    },
-                    "visualAuditSource": {
-                        "status": "pass",
-                        "artifactSha256": "stale-sha",
-                    },
-                    "failures": ["Windows installer visual audit source digest does not match promoted installer"],
-                },
-                published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json": {
-                    "status": "external_artifact_required",
-                    "promoted_installer": {
-                        "file_name": "chummer-avalonia-win-x64-installer.exe",
-                        "sha256": "promoted-sha",
-                    },
-                    "operator_request": {
-                        "summary": "Run the promoted Windows installer on a native Windows host and provide the gold proof bundle."
-                    },
-                    "last_discovery": {
-                        "gold_proof_zip": {"status": "not_found"},
-                        "visual_sources": {"matching_promoted_count": 0},
-                    },
-                    "import_command": "python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
-                },
                 registry / "RELEASE_CHANNEL.generated.json": {
                     "status": "published",
                     "version": "run-test",
@@ -1389,319 +2069,11 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
                 mock.patch.object(module, "REGISTRY_ROOT", registry):
                 payload = module.build_payload()
 
-        self.assertEqual("pass", payload["status"])
-        self.assertEqual("NIGHTLY_HANDOFF_READY", payload["verdict"])
-        self.assertFalse(payload["release_readiness"]["full_release_ready"])
-        self.assertTrue(payload["release_readiness"]["nightly_handoff_ready"])
-        self.assertEqual(
-            ["windows_installer_visual_audit"],
-            payload["release_readiness"]["full_release_blockers"],
-        )
-        self.assertEqual([], payload["release_readiness"]["release_ready_truth_blockers"])
         self.assertIn("participate_billing_honesty", payload["checks"])
         self.assertTrue(payload["checks"]["participate_billing_honesty"]["pass"])
         self.assertIn("account_handoff_runtime_config", payload["checks"])
         self.assertTrue(payload["checks"]["account_handoff_runtime_config"]["pass"])
         self.assertEqual(payload["account_handoffs"]["billing_mode"], "external_handoff_configured")
-        self.assertIn("public_edge_postdeploy_gate", payload["checks"])
-        self.assertTrue(payload["checks"]["public_edge_postdeploy_gate"]["pass"])
-        self.assertEqual("2026-06-24T08:05:00Z", payload["checks"]["public_edge_postdeploy_gate"]["generated_at_utc"])
-        self.assertEqual(payload["public_edge"]["mobile_ledger_payload_status"], "opt_in_required")
-        self.assertIn("google_oauth_linking_proof", payload["checks"])
-        self.assertFalse(payload["checks"]["google_oauth_linking_proof"]["release_blocking"])
-        self.assertEqual("pass", payload["google_oauth_linking"]["status"])
-        self.assertIn("windows_installer_visual_audit", payload["checks"])
-        self.assertFalse(payload["checks"]["windows_installer_visual_audit"]["release_blocking"])
-        self.assertIn("windows_installer_visual_audit_intake_request", payload["checks"])
-        self.assertFalse(payload["checks"]["windows_installer_visual_audit_intake_request"]["release_blocking"])
-        self.assertTrue(payload["checks"]["windows_installer_visual_audit_intake_request"]["pass"])
-        self.assertEqual(payload["windows_installer_visual_audit"]["artifact_sha256"], "promoted-sha")
-        self.assertEqual(payload["windows_installer_visual_audit"]["visual_source_artifact_sha256"], "stale-sha")
-        self.assertEqual(payload["windows_installer_visual_audit"]["matching_promoted_visual_source_count"], 0)
-        self.assertEqual(
-            payload["windows_installer_visual_audit"]["import_command"],
-            "python3 scripts/import_windows_installer_gold_proof_artifact.py windows-installer-gold-proof.zip --verify",
-        )
-
-    def test_dashboard_surfaces_google_oauth_operator_handoff_context(self) -> None:
-        module = load_module()
-        with tempfile.TemporaryDirectory(prefix="operator-dashboard-google-oauth-") as temp_dir:
-            published = Path(temp_dir) / "published"
-            published.mkdir(parents=True, exist_ok=True)
-            completion = Path(temp_dir) / "completion"
-            completion.mkdir(parents=True, exist_ok=True)
-            registry = Path(temp_dir) / "registry"
-            registry.mkdir(parents=True, exist_ok=True)
-
-            receipts = {
-                published / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json": {"status": "pass"},
-                published / "RULESET_READINESS.generated.json": {"status": "pass", "rulesets": {}},
-                published / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json": {"status": "pass", "base_url": "https://chummer.run"},
-                completion / "UI_FRAME_INTEGRITY.generated.json": {"status": "pass", "base_url": "https://chummer.run", "summary": {"checked_pages": 1, "failure_count": 0}},
-                published / "DESIGN_QUALITY_GATE.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PUBLIC_COPY_LEAK_GATE.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PARTICIPATE_BILLING_HONESTY.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json": {"status": "pass"},
-                published / "RELEASE_READY.generated.json": {"status": "fail", "verdict": "NOT_RELEASE_READY"},
-                published / "FINAL_GOLD_JANITOR.generated.json": {"status": "fail", "verdict": "NOT_GOLD"},
-                published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json": {
-                    "status": "fail",
-                    "failures": [
-                        "operator_end_to_end_evidence: missing operator evidence receipt: /tmp/operator-evidence.json",
-                        "operator_request_artifacts: operator ask delivery is stale; resend current ask: python3 resend-google",
-                    ],
-                    "operator_end_to_end_evidence": {
-                        "pass": False,
-                        "exists": False,
-                        "path": "/tmp/operator-evidence.json",
-                    },
-                    "operator_request_artifacts": {
-                        "pass": True,
-                        "request_status": "operator_action_required",
-                        "request_receipt_path": "/tmp/operator-request.generated.json",
-                        "operator_ask_text_path": "/tmp/CURRENT_GOOGLE_OAUTH_LINKING_OPERATOR_ASK.txt",
-                        "operator_ask_metadata_path": "/tmp/CURRENT_GOOGLE_OAUTH_LINKING_OPERATOR_ASK.generated.json",
-                        "operator_evidence_template_path": "/tmp/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.template.generated.json",
-                        "operator_ask_receipt_name": "google-oauth-linking-operator-ask.receipt.json",
-                        "operator_ask_send_command": "python3 send-google",
-                        "operator_ask_resend_command": "python3 resend-google",
-                        "operator_ask_delivery_status": "sent",
-                        "operator_ask_delivery_generated_at_utc": "2026-07-05T09:35:52Z",
-                        "operator_ask_delivery_receipt_path": "/tmp/google-ask.receipt.json",
-                        "operator_ask_delivery_matches_current_text": False,
-                        "operator_ask_delivery_needs_resend": True,
-                        "preferred_drop_path": "/tmp/google-proof.zip",
-                        "import_command": "python3 scripts/import_google_oauth_linking_operator_evidence_artifact.py /tmp/google-proof.zip --verify",
-                        "auto_import_watch_command": "python3 scripts/auto_import_google_oauth_linking_operator_evidence.py --wait-seconds 900",
-                        "post_import_verify_command": "python3 scripts/verify_google_oauth_linking_proof.py --require-pass",
-                    },
-                },
-                published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json": {"status": "fail"},
-                published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json": {"status": "external_artifact_required"},
-                registry / "RELEASE_CHANNEL.generated.json": {
-                    "status": "published",
-                    "version": "run-20260705-040324",
-                    "publishedAt": "2026-07-05T04:05:30Z",
-                    "channel": "preview",
-                    "supportabilityState": "preview_supported",
-                },
-            }
-            for path, payload in receipts.items():
-                path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
-
-            with mock.patch.object(module, "PUBLISHED_ROOT", published), \
-                mock.patch.object(module, "COMPLETION_ROOT", completion), \
-                mock.patch.object(module, "REGISTRY_ROOT", registry):
-                payload = module.build_payload()
-                markdown = module.build_markdown(payload)
-
-        self.assertEqual("fail", payload["checks"]["google_oauth_linking_proof"]["status"])
-        self.assertFalse(payload["checks"]["google_oauth_linking_proof"]["release_blocking"])
-        self.assertEqual("operator_action_required", payload["google_oauth_linking"]["request_status"])
-        self.assertEqual("/tmp/operator-request.generated.json", payload["google_oauth_linking"]["request_receipt_path"])
-        self.assertEqual("/tmp/operator-evidence.json", payload["google_oauth_linking"]["operator_evidence_path"])
-        self.assertEqual("python3 send-google", payload["google_oauth_linking"]["operator_ask_send_command"])
-        self.assertEqual("python3 resend-google", payload["google_oauth_linking"]["operator_ask_resend_command"])
-        self.assertEqual("sent", payload["google_oauth_linking"]["operator_ask_delivery_status"])
-        self.assertFalse(payload["google_oauth_linking"]["operator_ask_delivery_matches_current_text"])
-        self.assertTrue(payload["google_oauth_linking"]["operator_ask_delivery_needs_resend"])
-        self.assertEqual("/tmp/google-proof.zip", payload["google_oauth_linking"]["preferred_drop_path"])
-        self.assertIn("import_google_oauth_linking_operator_evidence_artifact.py", payload["google_oauth_linking"]["import_command"])
-        self.assertIn("auto_import_google_oauth_linking_operator_evidence.py", payload["google_oauth_linking"]["auto_import_watch_command"])
-        self.assertIn("## Google OAuth Handoff", markdown)
-        self.assertIn("`python3 resend-google`", markdown)
-
-    def test_dashboard_full_release_blockers_include_release_ready_when_release_gate_fails(self) -> None:
-        module = load_module()
-        with tempfile.TemporaryDirectory(prefix="operator-dashboard-release-ready-") as temp_dir:
-            published = Path(temp_dir) / "published"
-            published.mkdir(parents=True, exist_ok=True)
-            completion = Path(temp_dir) / "completion"
-            completion.mkdir(parents=True, exist_ok=True)
-            registry = Path(temp_dir) / "registry"
-            registry.mkdir(parents=True, exist_ok=True)
-
-            receipts = {
-                published / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json": {"status": "pass"},
-                published / "RULESET_READINESS.generated.json": {"status": "pass", "rulesets": {}},
-                published / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json": {"status": "pass", "base_url": "https://chummer.run"},
-                completion / "UI_FRAME_INTEGRITY.generated.json": {"status": "pass", "base_url": "https://chummer.run", "summary": {"checked_pages": 1, "failure_count": 0}},
-                published / "DESIGN_QUALITY_GATE.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PUBLIC_COPY_LEAK_GATE.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PARTICIPATE_BILLING_HONESTY.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json": {"status": "pass"},
-                published / "RELEASE_READY.generated.json": {
-                    "status": "fail",
-                    "verdict": "NOT_RELEASE_READY",
-                    "failed_gates": ["verify_release_channel", "verify_google_oauth_linking_proof"],
-                    "release_truth_blockers": [
-                        "release channel channel is preview, not a flagship stable lane",
-                        "google oauth operator evidence is still missing: /tmp/operator-evidence.json",
-                    ],
-                },
-                published / "FINAL_GOLD_JANITOR.generated.json": {"status": "fail", "verdict": "NOT_GOLD"},
-                published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json": {"status": "pass"},
-                published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json": {"status": "fail"},
-                published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json": {"status": "external_artifact_required"},
-                registry / "RELEASE_CHANNEL.generated.json": {
-                    "status": "published",
-                    "version": "run-20260624-080000",
-                    "publishedAt": "2026-06-24T08:00:00Z",
-                    "channel": "preview",
-                    "supportabilityState": "preview_supported",
-                },
-            }
-            for path, payload in receipts.items():
-                path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
-
-            with mock.patch.object(module, "PUBLISHED_ROOT", published), \
-                mock.patch.object(module, "COMPLETION_ROOT", completion), \
-                mock.patch.object(module, "REGISTRY_ROOT", registry):
-                payload = module.build_payload()
-
-        self.assertEqual("pass", payload["status"])
-        self.assertEqual("NIGHTLY_HANDOFF_READY", payload["verdict"])
-        self.assertEqual(
-            ["release_ready", "windows_installer_visual_audit"],
-            payload["release_readiness"]["full_release_blockers"],
-        )
-        self.assertEqual(
-            [
-                "verify_release_channel",
-                "verify_google_oauth_linking_proof",
-            ],
-            payload["release_readiness"]["release_ready_failed_gates"],
-        )
-        self.assertEqual(
-            [
-                "release channel channel is preview, not a flagship stable lane",
-                "google oauth operator evidence is still missing: /tmp/operator-evidence.json",
-            ],
-            payload["release_readiness"]["release_ready_truth_blockers"],
-        )
-        self.assertEqual(
-            [
-                "release channel channel is preview, not a flagship stable lane",
-                "google oauth operator evidence is still missing: /tmp/operator-evidence.json",
-                "windows_installer_visual_audit",
-            ],
-            payload["release_readiness"]["full_release_blocker_details"],
-        )
-
-    def test_dashboard_release_ready_self_check_recovers_current_truth_when_receipt_is_stale(self) -> None:
-        module = load_module()
-        with tempfile.TemporaryDirectory(prefix="operator-dashboard-release-ready-self-check-") as temp_dir:
-            published = Path(temp_dir) / "published"
-            published.mkdir(parents=True, exist_ok=True)
-            completion = Path(temp_dir) / "completion"
-            completion.mkdir(parents=True, exist_ok=True)
-            registry = Path(temp_dir) / "registry"
-            registry.mkdir(parents=True, exist_ok=True)
-
-            receipts = {
-                published / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json": {"status": "pass"},
-                published / "RULESET_READINESS.generated.json": {"status": "pass", "rulesets": {}},
-                published / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json": {"status": "pass", "base_url": "https://chummer.run"},
-                completion / "UI_FRAME_INTEGRITY.generated.json": {"status": "pass", "base_url": "https://chummer.run", "summary": {"checked_pages": 1, "failure_count": 0}},
-                published / "DESIGN_QUALITY_GATE.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PUBLIC_COPY_LEAK_GATE.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PARTICIPATE_BILLING_HONESTY.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json": {"status": "pass"},
-                published / "RELEASE_READY.generated.json": {
-                    "status": "fail",
-                    "verdict": "NOT_RELEASE_READY",
-                    "failures": ["FAIL verify_windows_installer_visual_audit"],
-                },
-                published / "FINAL_GOLD_JANITOR.generated.json": {"status": "fail", "verdict": "NOT_GOLD"},
-                published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json": {"status": "pass"},
-                published / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json": {"status": "fail"},
-                published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json": {"status": "external_artifact_required"},
-                registry / "RELEASE_CHANNEL.generated.json": {
-                    "status": "published",
-                    "version": "run-20260624-080000",
-                    "publishedAt": "2026-06-24T08:00:00Z",
-                    "channel": "preview",
-                    "supportabilityState": "preview_supported",
-                },
-            }
-            for path, payload in receipts.items():
-                path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
-
-            with mock.patch.object(module, "PUBLISHED_ROOT", published), \
-                mock.patch.object(module, "COMPLETION_ROOT", completion), \
-                mock.patch.object(module, "REGISTRY_ROOT", registry), \
-                mock.patch.object(
-                    module,
-                    "current_release_truth_launch_blockers",
-                    return_value=[
-                        "release channel channel is preview, not a flagship stable lane",
-                        "release channel supportability is not gold_supported",
-                    ],
-                ):
-                payload = module.build_payload(release_ready_self_check=True)
-
-        self.assertTrue(payload["release_readiness"]["release_ready_self_check"])
-        self.assertEqual(
-            [
-                "release channel channel is preview, not a flagship stable lane",
-                "release channel supportability is not gold_supported",
-            ],
-            payload["release_readiness"]["release_ready_truth_blockers"],
-        )
-        self.assertEqual(
-            [
-                "release channel channel is preview, not a flagship stable lane",
-                "release channel supportability is not gold_supported",
-                "windows_installer_visual_audit",
-            ],
-            payload["release_readiness"]["full_release_blocker_details"],
-        )
-
-    def test_dashboard_requires_public_edge_postdeploy_gate(self) -> None:
-        module = load_module()
-        with tempfile.TemporaryDirectory(prefix="operator-dashboard-edge-") as temp_dir:
-            published = Path(temp_dir) / "published"
-            published.mkdir(parents=True, exist_ok=True)
-            completion = Path(temp_dir) / "completion"
-            completion.mkdir(parents=True, exist_ok=True)
-            registry = Path(temp_dir) / "registry"
-            registry.mkdir(parents=True, exist_ok=True)
-
-            receipts = {
-                published / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json": {"status": "pass"},
-                published / "RULESET_READINESS.generated.json": {"status": "pass", "rulesets": {}},
-                published / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json": {"status": "pass", "base_url": "https://chummer.run"},
-                completion / "UI_FRAME_INTEGRITY.generated.json": {"status": "pass", "base_url": "https://chummer.run", "summary": {"checked_pages": 1, "failure_count": 0}},
-                published / "DESIGN_QUALITY_GATE.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PUBLIC_COPY_LEAK_GATE.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "PARTICIPATE_BILLING_HONESTY.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "ACCOUNT_HANDOFF_RUNTIME_CONFIG.generated.json": {"status": "pass", "verdict": "READY"},
-                published / "RELEASE_READY.generated.json": {"status": "pass", "verdict": "RELEASE_READY"},
-                published / "FINAL_GOLD_JANITOR.generated.json": {"status": "pass", "verdict": "GOLD_READY"},
-                published / "GOOGLE_OAUTH_LINKING_PROOF.generated.json": {"status": "pass"},
-                registry / "RELEASE_CHANNEL.generated.json": {
-                    "status": "published",
-                    "version": "run-20260624-080000",
-                    "publishedAt": "2026-06-24T08:00:00Z",
-                    "channel": "preview",
-                    "supportabilityState": "preview_supported",
-                },
-            }
-            for path, payload in receipts.items():
-                path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
-
-            with mock.patch.object(module, "PUBLISHED_ROOT", published), \
-                mock.patch.object(module, "COMPLETION_ROOT", completion), \
-                mock.patch.object(module, "REGISTRY_ROOT", registry):
-                payload = module.build_payload()
-
-        self.assertEqual("fail", payload["status"])
-        self.assertEqual("OPERABLE_RELEASE_BLOCKED", payload["verdict"])
-        self.assertIn("public_edge_postdeploy_gate", payload["failures"])
-        self.assertFalse(payload["checks"]["public_edge_postdeploy_gate"]["pass"])
 
     def test_dashboard_blocks_participate_billing_honesty_unexpected_verdict(self) -> None:
         module = load_module()
@@ -1759,7 +2131,7 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
             with mock.patch.object(module, "PUBLISHED_ROOT", published), \
                 mock.patch.object(module, "COMPLETION_ROOT", completion), \
                 mock.patch.object(module, "REGISTRY_ROOT", registry):
-                payload = module.build_payload()
+                payload = module.build_payload(refresh_windows_runtime_receipts=False)
                 markdown = module.build_markdown(payload)
 
         participate = payload["checks"]["participate_billing_honesty"]
@@ -2586,9 +2958,9 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         )
         self.assertIn("role PWA manifests: count=2", markdown)
         self.assertIn("/manifest.player.webmanifest", markdown)
-        self.assertIn("/mobile/player?role=Player", markdown)
+        self.assertIn("/mobile/player", markdown)
         self.assertIn("/manifest.gm.webmanifest", markdown)
-        self.assertIn("/mobile/gm?role=GameMaster", markdown)
+        self.assertIn("/mobile/gm", markdown)
         self.assertIn("static_paths=['/manifest.player.webmanifest', '/manifest.gm.webmanifest', '/mobile.css', '/mobile-turn-companion.js']", markdown)
         self.assertIn("personalized_ledger_cached=False", markdown)
         self.assertIn(
@@ -4882,35 +5254,33 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
                         "discover_visual_source_command": "python3 discover-visual",
                         "preferred_extracted_visual_dir": "/tmp/windows-installer",
                         "watcher_launch_mode": "python_subprocess_start_new_session",
-                        "watcher_state_path": str(Path(temp_dir) / "state" / "windows_installer_gold_proof_watcher.generated.json"),
-                        "watcher_pid_file": str(Path(temp_dir) / "state" / "windows_installer_gold_proof_watcher.pid"),
-                        "watcher_log_path": str(Path(temp_dir) / "state" / "windows_installer_gold_proof_auto_import_watch.log"),
-                        "watcher_start_command": (
-                            "python3 watcher-start "
-                            f"--intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'}"
+                        "watcher_state_path": str(windows_intake.DEFAULT_WATCHER_STATE_PATH),
+                        "watcher_pid_file": str(windows_intake.DEFAULT_WATCHER_PID_FILE),
+                        "watcher_log_path": str(windows_intake.DEFAULT_WATCHER_LOG_FILE),
+                        "watcher_start_command": windows_intake.build_watcher_manager_command(
+                            "start",
+                            published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json",
                         ),
-                        "watcher_status_command": (
-                            "python3 watcher-status "
-                            f"--intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'}"
+                        "watcher_status_command": windows_intake.build_watcher_manager_command(
+                            "status",
+                            published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json",
                         ),
-                        "watcher_stop_command": (
-                            "python3 watcher-stop "
-                            f"--intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'}"
+                        "watcher_stop_command": windows_intake.build_watcher_manager_command(
+                            "stop",
+                            published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json",
                         ),
-                        "import_command": (
-                            "python3 scripts/import_windows_installer_gold_proof_artifact.py "
-                            "bundle.zip "
-                            f"--intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'} "
-                            "--verify"
+                        "import_command": windows_intake.build_import_command(
+                            Path("/tmp/windows-installer-gold-proof-a.zip"),
+                            published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json",
                         ),
-                        "auto_import_command": (
-                            "python3 scripts/auto_import_windows_installer_gold_proof.py "
-                            f"--intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'}"
+                        "auto_import_command": windows_intake.build_auto_import_command(
+                            published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
                         ),
-                        "auto_import_watch_command": (
-                            "python3 scripts/auto_import_windows_installer_gold_proof.py "
-                            f"--intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'} "
-                            "--wait-seconds 900"
+                        "auto_import_watch_command": windows_intake.build_auto_import_command(
+                            published / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json",
+                            wait_seconds=900,
+                            poll_seconds=10,
+                            refresh_intake_request=True,
                         ),
                         "auto_import_roots": [str(Path(temp_dir) / "drop")],
                         "post_import_verify_command": bound_visual_audit_verify_command,
@@ -5165,14 +5535,9 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
             visual_audit["operator_request_artifacts"]["auto_import_receipt_path"],
         )
         self.assertEqual(
-            str(Path(temp_dir) / "state" / "windows_installer_gold_proof_watcher.generated.json"),
+            str(windows_intake.DEFAULT_WATCHER_STATE_PATH),
             visual_audit["operator_request_artifacts"]["watcher_state_receipt_path"],
         )
-        self.assertEqual("running", visual_audit["operator_request_artifacts"]["watcher_status"])
-        self.assertEqual(1866861, visual_audit["operator_request_artifacts"]["watcher_pid"])
-        self.assertEqual(1, visual_audit["operator_request_artifacts"]["watcher_matching_process_count"])
-        self.assertEqual(0, visual_audit["operator_request_artifacts"]["watcher_duplicate_process_count"])
-        self.assertFalse(visual_audit["operator_request_artifacts"]["watcher_attention_required"])
         self.assertEqual(
             f"python3 scripts/send_telegram_message_via_ea.py --text-file {windows_ask_text_path} --receipt-name windows.receipt.json",
             visual_audit["operator_ask_send_command"],
@@ -5181,8 +5546,6 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
             f"python3 scripts/send_telegram_message_via_ea.py --text-file {windows_ask_text_path} --receipt-name windows.receipt.json",
             visual_audit["operator_ask_resend_command"],
         )
-        self.assertEqual(1866861, visual_audit["watcher_pid"])
-        self.assertEqual("running", visual_audit["watcher_status"])
         self.assertEqual(
             str(published / "WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json"),
             visual_audit["auto_import_receipt_path"],
@@ -5284,26 +5647,20 @@ class OperatorReleaseDashboardParticipateBillingTests(unittest.TestCase):
         self.assertIn("  - advisory actions:", markdown)
         self.assertIn(
             "windows proof intake: "
-            "import=python3 scripts/import_windows_installer_gold_proof_artifact.py "
-            "bundle.zip "
-            f"--intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'} "
-            "--verify "
-            "auto=python3 scripts/auto_import_windows_installer_gold_proof.py "
-            f"--intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'} "
-            "watch=python3 scripts/auto_import_windows_installer_gold_proof.py "
-            f"--intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'} --wait-seconds 900",
+            f"import={windows_intake.build_import_command(Path('/tmp/windows-installer-gold-proof-a.zip'), published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json')} "
+            f"auto={windows_intake.build_auto_import_command(published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json')} "
+            f"watch={windows_intake.build_auto_import_command(published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json', wait_seconds=900, poll_seconds=10, refresh_intake_request=True)}",
             markdown,
         )
         self.assertIn(
-            "windows watcher state: status=running pid=1866861 matches=1 duplicates=0 "
-            f"attention=false state={Path(temp_dir) / 'state' / 'windows_installer_gold_proof_watcher.generated.json'}",
+            f"state={windows_intake.DEFAULT_WATCHER_STATE_PATH}",
             markdown,
         )
         self.assertIn(
             "windows watcher control: "
-            f"start=python3 watcher-start --intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'} "
-            f"status=python3 watcher-status --intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'} "
-            f"stop=python3 watcher-stop --intake-request {published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json'}",
+            f"start={windows_intake.build_watcher_manager_command('start', published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json')} "
+            f"status={windows_intake.build_watcher_manager_command('status', published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json')} "
+            f"stop={windows_intake.build_watcher_manager_command('stop', published / 'WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json')}",
             markdown,
         )
         self.assertIn(

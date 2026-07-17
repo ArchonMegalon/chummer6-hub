@@ -158,7 +158,7 @@ def passing_public_edge_postdeploy_payload(module) -> dict[str, object]:
             ],
             "pwaOfflineCacheUnrelatedCachePreserved": True,
             "frontdoorNavigationStatus": "pass",
-            "frontdoorNavigationMobileArtifactContract": "chummer.frontdoor_mobile_launch.v2",
+            "frontdoorNavigationMobileArtifactContract": "chummer.frontdoor_mobile_install_boundary.v2",
             "frontdoorNavigationAnchorArtifactContract": "chummer.frontdoor_mobile_anchor_redirect.v2",
             "frontdoorNavigationFinalUrl": "https://chummer.run/mobile/player",
             "frontdoorNavigationGmRoute": "/mobile/gm",
@@ -5863,7 +5863,7 @@ launch()
             reasons,
         )
         self.assertIn(
-            "public_edge_postdeploy_gate frontdoorNavigationMobileArtifactContract is not chummer.frontdoor_mobile_launch.v2",
+            "public_edge_postdeploy_gate frontdoorNavigationMobileArtifactContract is not chummer.frontdoor_mobile_install_boundary.v2",
             reasons,
         )
         self.assertIn("public-edge postdeploy front-door evidence contains raw private identity", reasons)

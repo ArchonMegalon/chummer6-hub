@@ -23,54 +23,689 @@ def load_module():
     return module
 
 
-def valid_blazor_bridge_payload(module):
+def expected_release_ready_blockers_for_final_gold(module) -> list[str]:
+    blockers = ["release_lane_posture"]
+    if not module.IGNORE_WINDOWS_VISUAL_AUDIT_BLOCKING:
+        blockers.append("windows_native_visual_proof")
+    return blockers
+
+
+def has_windows_native_root_blocker(module) -> bool:
+    return not module.IGNORE_WINDOWS_VISUAL_AUDIT_BLOCKING
+
+
+def passing_operator_dashboard_payload(module):
+    generated_at = module.now_iso()
+    checks = {}
+    for name in module.OPERATOR_DASHBOARD_REQUIRED_CHECKS:
+        check = {
+            "status": "published" if name == "release_channel" else "pass",
+            "pass": True,
+        }
+        if name == "release_channel":
+            check.update(
+                {
+                    "version": "run-test",
+                    "channel": "stable",
+                    "supportability_state": "gold_supported",
+                    "rollout_state": "public_stable",
+                    "semantic_failures": [],
+                    "summary": {
+                        "status": "published",
+                        "version": "run-test",
+                        "channel": "stable",
+                        "supportability_state": "gold_supported",
+                        "rollout_state": "public_stable",
+                        "semantic_failures": [],
+                    },
+                }
+            )
+        if name in module.OPERATOR_DASHBOARD_FRESHNESS_REQUIRED_CHECKS:
+            check.update(
+                {
+                    "generated_at_utc": generated_at,
+                    "fresh_within_hours": module.RECRAWL_MAX_AGE_HOURS,
+                    "fresh": True,
+                }
+            )
+        checks[name] = check
     return {
+        "contract_name": module.OPERATOR_DASHBOARD_CONTRACT_NAME,
         "status": "pass",
-        "generated_at_utc": module.now_iso(),
-        "proofs": {
-            "hub_mobile_pwa_public_projection": {
-                "base_url": module.DEFAULT_BASE_URL,
+        "verdict": "OPERABLE_RELEASE_READY",
+        "generated_at_utc": generated_at,
+        "release": {
+            "version": "run-test",
+            "channel": "stable",
+            "supportability_state": "gold_supported",
+            "rollout_state": "public_stable",
+        },
+        "checks": checks,
+    }
+
+
+def test_expected_visible_version_candidates_allow_blank_status_for_stable_lane() -> None:
+    module = load_module()
+
+    assert module.expected_visible_version_candidates(
+        "run-20260630",
+        "",
+        "public_stable",
+        "gold_supported",
+        "public_stable",
+    ) == ["Version 2026.06.30", "Version run-20260630"]
+
+
+def passing_public_edge_postdeploy_payload(module):
+    return {
+        "contractName": module.PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME,
+        "status": "pass",
+        "generatedAtUtc": module.now_iso(),
+        "baseUrl": "https://chummer.run",
+        "coreChildContracts": {
+            "preflight": "chummer.public_edge_deploy_preflight.v1",
+            "downloads": "chummer.downloads_version_marker.v1",
+            "pwaStatic": "chummer.public_pwa_static_assets.v1",
+            "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
+            "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
+            "participateIframeShell": "chummer.participate_iframe_shell.v1",
+        },
+        "preflightStatus": "pass",
+        "preflightActiveLockCount": 0,
+        "preflightBlockingLockCount": 0,
+        "preflightStaleLookingLockCount": 0,
+        "preflightStaleForeignLockCount": 0,
+        "preflightStaleForeignLocksIgnored": False,
+        "downloadsStatus": "pass",
+        "downloadsHasMarker": True,
+        "statusRedirectHasMarker": True,
+        "statusRedirectHeading": "Stable downloads",
+        "statusRedirectHeadingRecognized": True,
+        "statusRedirectHeadingExpected": "Stable downloads",
+        "statusRedirectHeadingMatchesReleaseChannel": True,
+        "statusRedirectHeadingUsesGenericUpdatedCopy": False,
+        "visibleVersion": "Version run-test",
+        "statusRedirectVersion": "Version run-test",
+        "expectedReleaseVersion": "run-test",
+        "visibleVersionMatchesReleaseChannel": True,
+        "statusRedirectVersionMatchesReleaseChannel": True,
+        "expectedReleaseStatus": "published",
+        "expectedReleaseChannel": "public_stable",
+        "expectedReleaseSupportabilityState": "gold_supported",
+        "expectedReleaseRolloutState": "public_stable",
+        "releaseManifestHttpStatus": 200,
+        "releaseManifestStatus": "published",
+        "releaseManifestStatusMatchesReleaseChannel": True,
+        "releaseManifestChannel": "public_stable",
+        "releaseManifestChannelMatchesReleaseChannel": True,
+        "releaseManifestVersion": "run-test",
+        "releaseManifestVersionMatchesReleaseChannel": True,
+        "releaseManifestSupportabilityState": "gold_supported",
+        "releaseManifestSupportabilityMatchesReleaseChannel": True,
+        "releaseManifestRolloutState": "public_stable",
+        "releaseManifestRolloutMatchesReleaseChannel": True,
+        "pwaStaticStatus": "pass",
+        "pwaManifestCount": 3,
+        "rolePwaManifestCount": 2,
+        "rolePwaManifests": [
+            {
+                "path": "/manifest.player.webmanifest",
+                "role": "Player",
+                "id": "/mobile/player",
+                "start_url": "/mobile/player",
+        "display": "standalone",
+            },
+            {
+                "path": "/manifest.gm.webmanifest",
+                "role": "GameMaster",
+                "id": "/mobile/gm",
+                "start_url": "/mobile/gm",
+                "display": "standalone",
+            },
+        ],
+        "pwaAssetCount": 11,
+        "ledgerStreamNonCacheable": True,
+        "ledgerStreamPrecached": False,
+        "mobileLedgerStatus": "pass",
+        "mobileLedgerPayloadStatus": "opt_in_required",
+        "mobileLedgerCacheControl": "private, no-store, no-cache, max-age=0",
+        "mobileLedgerVary": "Cookie, Authorization",
+        "readyMobileHandoffStatus": "pass",
+        "readyMobileHandoffToolIds": ["inventory", "health", "ammo", "modifiers", "quick_rolls", "living_world"],
+        "readyMobileHandoffPacketRoles": ["player", "gm", "organizer"],
+        "readyMobileHandoffFrontdoorLaunchRoute": "/mobile/player",
+        "readyMobileHandoffRoleRoutes": [
+            {
+                "role": "Player",
+                "mode": "player",
+                "route": "/mobile/player",
+                "manifest_path": "/manifest.player.webmanifest",
+                "manifest_id": "/mobile/player",
+                "manifest_start_url": "/mobile/player",
+                "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player",
+                "frontdoor_default": True,
+            },
+            {
+                "role": "GameMaster",
+                "mode": "gm",
+                "route": "/mobile/gm",
+                "manifest_path": "/manifest.gm.webmanifest",
+                "manifest_id": "/mobile/gm",
+                "manifest_start_url": "/mobile/gm",
+                "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster",
+                "frontdoor_default": False,
+            },
+        ],
+        "downloadsStatusBrowserStatus": "pass",
+        "downloadsStatusBrowserArtifactContract": "chummer.downloads_status_e2e.v1",
+        "mobilePwaViewportStatus": "pass",
+        "mobilePwaViewportArtifactContract": "chummer.mobile_pwa_viewport_smoke.v1",
+        "mobilePwaViewportRouteCount": 6,
+        "mobilePwaViewportViewportCount": 3,
+        "mobilePwaViewportRoutes": ["/mobile", "/mobile/player", "/mobile/gm", "/mobile/observer", "/play", "/play/continuity"],
+        "mobilePwaViewportMissingRoutes": [],
+        "pwaOfflineCacheStatus": "pass",
+        "pwaOfflineCacheArtifactContract": "chummer.pwa_offline_cache.v2",
+        "pwaOfflineCacheCacheVersion": "v17",
+        "pwaOfflineCacheNavigationPolicy": "network_only",
+        "pwaOfflineCachePrivateStateScope": "open_tab_only",
+        "pwaOfflineCacheStaticPaths": [
+            "/manifest.player.webmanifest",
+            "/manifest.gm.webmanifest",
+            "/mobile.css",
+            "/mobile-turn-companion.js",
+        ],
+        "pwaOfflineCacheOfflineRoleFallbacks": [
+            {
+                "role": "Player",
+                "path": "/mobile/player",
+                "status": 503,
+                "cache_control": "private, no-store",
+                "private_projection_restored": False,
+            },
+            {
+                "role": "GameMaster",
+                "path": "/mobile/gm",
+                "status": 503,
+                "cache_control": "private, no-store",
+                "private_projection_restored": False,
+            },
+        ],
+        "pwaOfflineCacheQueryBearingRequestsCached": False,
+        "pwaOfflineCachePrivateNavigationCached": False,
+        "pwaOfflineCachePrivateApiCached": False,
+        "pwaOfflineCachePersonalizedLedgerCached": False,
+        "pwaOfflineCacheLegacyPrivateCachePrefixesPurged": [
+            "chummer-shell-play-shell-",
+            "chummer-media-play-shell-",
+            "chummer-media-meta-play-shell-",
+        ],
+        "pwaOfflineCacheUnrelatedCachePreserved": True,
+        "roleAliasRouteStatus": "pass",
+        "roleAliasRouteContract": "chummer.public_role_alias_routes.v1",
+        "roleAliasRouteResults": [
+            {
+                "aliasPath": "/player",
+                "requestedUrl": "https://chummer.run/player",
+                "httpStatus": 200,
+                "finalUrl": "https://chummer.run/mobile/player",
+                "finalRoute": "/mobile/player",
+                "expectedFinalRoute": "/mobile/player",
                 "pass": True,
-                "public_entry": {
-                    "home_open_chummer_dropdown_holds": True,
-                    "build_route_holds": True,
-                    "build_final_route": "/app?command=character_roster",
-                    "play_shell_holds": True,
-                    "play_final_route": "/play",
-                    "checks_pass": True,
+                "error": "",
+            },
+            {
+                "aliasPath": "/gm",
+                "requestedUrl": "https://chummer.run/gm",
+                "httpStatus": 200,
+                "finalUrl": "https://chummer.run/mobile/gm",
+                "finalRoute": "/mobile/gm",
+                "expectedFinalRoute": "/mobile/gm",
+                "pass": True,
+                "error": "",
+            },
+            {
+                "aliasPath": "/observer",
+                "requestedUrl": "https://chummer.run/observer",
+                "httpStatus": 200,
+                "finalUrl": "https://chummer.run/mobile/observer",
+                "finalRoute": "/mobile/observer",
+                "expectedFinalRoute": "/mobile/observer",
+                "pass": True,
+                "error": "",
+            },
+        ],
+        "roleAliasRouteDrift": [],
+        "participateIframeShellStatus": "pass",
+        "participateIframeRouteCount": 2,
+        "participateIframeRouteIframeCount": 2,
+        "participateIframeRouteOfflineFallbackCount": 0,
+        "frontdoorNavigationStatus": "pass",
+        "frontdoorNavigationMobileArtifactContract": "chummer.frontdoor_mobile_install_boundary.v2",
+        "frontdoorNavigationLedgerArtifactContract": "chummer.black_ledger_globe_frontdoor.v1",
+        "frontdoorNavigationAnchorArtifactContract": "chummer.frontdoor_mobile_anchor_redirect.v2",
+        "frontdoorNavigationGatedTargets": ["Build", "Play"],
+        "frontdoorNavigationPublicTargets": [],
+        "frontdoorNavigationPlayRoute": "/mobile/player",
+        "frontdoorNavigationPlaySignInRoute": "/login?next=%2Fmobile%2Fplayer",
+        "frontdoorNavigationDirectPlayerRoute": "/mobile/player",
+        "frontdoorNavigationDirectPlayerHttpStatus": 200,
+        "frontdoorNavigationFinalUrl": "https://chummer.run/mobile/player",
+        "frontdoorNavigationPrivateIdentityRedacted": True,
+        "frontdoorNavigationVisiblePlayerUrlPrivateIdentityAbsent": True,
+        "frontdoorNavigationPlayerSessionContextPresent": True,
+        "frontdoorNavigationPlayerDeviceContextPresent": True,
+        "frontdoorNavigationLiveTurnCompanionShell": True,
+        "frontdoorNavigationPwaManifestPath": "/manifest.player.webmanifest",
+        "frontdoorNavigationPwaRole": "Player",
+        "frontdoorNavigationBlazorShell": "interactive-server",
+        "frontdoorNavigationRybbitConfigured": True,
+        "frontdoorNavigationRybbitTag": "mobile_play_shell",
+        "frontdoorNavigationRybbitRoute": "/mobile/player",
+        "frontdoorNavigationRybbitMode": "player",
+        "frontdoorNavigationRybbitRole": "Player",
+        "frontdoorNavigationRybbitSiteIdPresent": True,
+        "frontdoorNavigationRybbitScriptUrlPresent": True,
+        "frontdoorNavigationRybbitScriptUrlAllowed": True,
+        "frontdoorNavigationRybbitSkipPatterns": ["/mobile/**"],
+        "frontdoorNavigationRybbitMaskPatterns": ["/api/play/**", "/mobile/**"],
+        "frontdoorNavigationRybbitSkipMobilePaths": True,
+        "frontdoorNavigationRybbitMaskMobilePaths": True,
+        "frontdoorNavigationRybbitMasksPrivatePlayRoutes": True,
+        "frontdoorNavigationRybbitReplayBlockSelector": "[data-turn-root]",
+        "frontdoorNavigationRybbitReplayBlocksTurnRoot": True,
+        "frontdoorNavigationPlayerSessionHandoffUrl": "https://chummer.run/mobile/player?sessionId=[redacted]&role=Player",
+        "frontdoorNavigationPlayerSessionHandoffStatus": "Session handoff is ready in the link above.",
+        "frontdoorNavigationPlayerSessionHandoffLinkText": "Open session handoff link",
+        "frontdoorNavigationPlayerSessionHandoffPreservesSession": True,
+        "frontdoorNavigationPlayerSessionHandoffPreservesRole": True,
+        "frontdoorNavigationPlayerSessionHandoffStripsDevice": True,
+        "frontdoorNavigationPlayerSessionHandoffSenderDeviceIdPresent": True,
+        "frontdoorNavigationPlayerSessionHandoffPrivateIdentityRedacted": True,
+        "frontdoorNavigationGmRoute": "/mobile/gm",
+        "frontdoorNavigationGmRouteSessionIdPresent": True,
+        "frontdoorNavigationGmRoutePrivateIdentityRedacted": True,
+        "frontdoorNavigationGmHttpStatus": 200,
+        "frontdoorNavigationGmFinalUrl": "https://chummer.run/mobile/gm",
+        "frontdoorNavigationVisibleGmUrlPrivateIdentityAbsent": True,
+        "frontdoorNavigationGmSessionContextPresent": True,
+        "frontdoorNavigationGmDeviceContextPresent": True,
+        "frontdoorNavigationGmLiveTurnCompanionShell": True,
+        "frontdoorNavigationGmPwaManifestPath": "/manifest.gm.webmanifest",
+        "frontdoorNavigationGmPwaRole": "GameMaster",
+        "frontdoorNavigationGmBlazorShell": "interactive-server",
+        "frontdoorNavigationGmRybbitConfigured": True,
+        "frontdoorNavigationGmRybbitTag": "mobile_play_shell",
+        "frontdoorNavigationGmRybbitRoute": "/mobile/gm",
+        "frontdoorNavigationGmRybbitMode": "gm",
+        "frontdoorNavigationGmRybbitRole": "GameMaster",
+        "frontdoorNavigationGmRybbitSiteIdPresent": True,
+        "frontdoorNavigationGmRybbitScriptUrlPresent": True,
+        "frontdoorNavigationGmRybbitScriptUrlAllowed": True,
+        "frontdoorNavigationGmRybbitSkipPatterns": ["/mobile/**"],
+        "frontdoorNavigationGmRybbitMaskPatterns": ["/api/play/**", "/mobile/**"],
+        "frontdoorNavigationGmRybbitSkipMobilePaths": True,
+        "frontdoorNavigationGmRybbitMaskMobilePaths": True,
+        "frontdoorNavigationGmRybbitMasksPrivatePlayRoutes": True,
+        "frontdoorNavigationGmRybbitReplayBlockSelector": "[data-turn-root]",
+        "frontdoorNavigationGmRybbitReplayBlocksTurnRoot": True,
+        "frontdoorNavigationGmSessionHandoffUrl": "https://chummer.run/mobile/gm?sessionId=[redacted]&role=GameMaster",
+        "frontdoorNavigationGmSessionHandoffStatus": "Session handoff is ready in the link above.",
+        "frontdoorNavigationGmSessionHandoffLinkText": "Open session handoff link",
+        "frontdoorNavigationGmSessionHandoffPreservesSession": True,
+        "frontdoorNavigationGmSessionHandoffPreservesRole": True,
+        "frontdoorNavigationGmSessionHandoffStripsDevice": True,
+        "frontdoorNavigationGmSessionHandoffSenderDeviceIdPresent": True,
+        "frontdoorNavigationGmSessionHandoffPrivateIdentityRedacted": True,
+        "frontdoorNavigationLedgerPrimary": False,
+        "frontdoorNavigationAnchorEntryUrl": "https://chummer.run/#turn-runsite-card",
+        "frontdoorNavigationAnchorFinalUrl": "https://chummer.run/mobile/player#turn-runsite-card",
+        "frontdoorNavigationAnchorFinalPath": "/mobile/player",
+        "frontdoorNavigationAnchorFinalHash": "#turn-runsite-card",
+        "frontdoorNavigationAnchorPwaManifestPath": "/manifest.player.webmanifest",
+        "frontdoorNavigationAnchorPwaRole": "Player",
+        "frontdoorNavigationAnchorBlazorShell": "interactive-server",
+        "frontdoorNavigationAnchorPrivateIdentityRedacted": True,
+        "frontdoorNavigationAnchorVisibleUrlPrivateIdentityAbsent": True,
+        "frontdoorNavigationAnchorSessionContextPresent": True,
+        "frontdoorNavigationAnchorDeviceContextPresent": True,
+        "frontdoorNavigationAnchorFailure": "",
+    }
+
+
+def test_normalized_release_ready_snapshot_truth_audit_rejects_pass_shaped_failed_gates() -> None:
+    module = load_module()
+
+    normalized = module.normalized_release_ready_snapshot_truth_audit(
+        {
+            "status": "pass",
+            "verdict": "SNAPSHOT_CONSISTENT_LAUNCH_READY",
+            "failed_gates": ["verify_public_release_snapshot_truth"],
+        },
+        Path("/tmp/PUBLIC_RELEASE_SNAPSHOT_READONLY_AUDIT.generated.json"),
+    )
+
+    assert normalized["pass"] is False
+    assert normalized["status"] == "fail"
+    assert normalized["raw_status"] == "pass"
+
+
+def passing_teable_important_work_payload(module):
+    return {
+        "contract_name": "chummer.teable_important_work.v1",
+        "generated_at_utc": module.now_iso(),
+        "status": "ready",
+        "table_name": "Chummer Important Work",
+        "row_count": 2,
+        "rows": [
+            {"item_id": "public-edge-postdeploy", "title": "Public edge postdeploy"},
+            {"item_id": "native-windows-proof", "title": "Native Windows proof"},
+        ],
+        "sync": {
+            "state": "passed",
+            "attempted": True,
+            "synced_count": 2,
+            "created_count": 0,
+            "updated_count": 2,
+            "failed_count": 0,
+            "errors": [],
+        },
+    }
+
+
+def passing_flagship_product_readiness_payload(module):
+    return {
+        "contract_name": "fleet.flagship_product_readiness",
+        "generated_at": module.now_iso(),
+        "status": "pass",
+        "completion_audit": {
+            "status": "pass",
+            "reason": "Flagship product readiness planes are green.",
+        },
+        "flagship_readiness_audit": {
+            "status": "pass",
+            "reason": "Flagship product readiness proof is green.",
+            "coverage_gap_keys": [],
+            "scoped_coverage_gap_keys": [],
+        },
+        "summary": {
+            "ready_count": 8,
+            "warning_count": 0,
+            "missing_count": 0,
+            "scoped_missing_count": 0,
+        },
+    }
+
+
+def passing_blazor_execution_horizon_bridge_payload(module):
+    return {
+        "contract_name": "chummer.blazor_execution_horizon_bridge",
+        "generated_at_utc": module.now_iso(),
+        "status": "pass",
+        "verdict": "mobile_pwa_and_blazor_smoke_integrated_full_matrix_not_proven",
+        "notes": [
+            "This Hub bridge keeps mobile/PWA readiness, Blazor PWA installability, and Blazor hosted execution horizons visible together.",
+            "A passing bridge does not mean the full live Blazor public-edge execution matrix is proven unless mid_term_full_matrix_status is proven.",
+            "Living-world opt-in and Black Ledger mobile projection remain Hub-owned; Blazor hosted execution breadth remains presentation-owned.",
+            "Long-term browser parity is only claimed if mid-term execution is proven and desktop workflow parity proof is currently passing.",
+        ],
+        "proofs": {
+            "blazor_hosted_execution_horizon": {
+                "contract_name": "chummer6-ui.blazor_public_edge_execution_horizon",
+                "long_term_full_browser_parity_path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_DESKTOP_WORKFLOW_PARITY.generated.json",
+                "long_term_full_browser_parity_proof_status": "pass",
+                "long_term_full_browser_parity_status": "not_proven",
+                "mid_term_full_covered_workflow_family_count": 9,
+                "mid_term_full_matrix_status": "not_proven",
+                "mid_term_full_required_workflow_family_count": 49,
+                "near_term_smoke_status": "proven",
+                "pass": True,
+                "path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/BLAZOR_PUBLIC_EDGE_EXECUTION_HORIZON.generated.json",
+                "status": "passed",
+            },
+            "blazor_hosted_pwa_public_edge": {
+                "contract_name": "chummer6-ui.blazor_pwa_public_edge_proof",
+                "pass": True,
+                "path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/BLAZOR_PWA_PUBLIC_EDGE_PROOF.generated.json",
+                "route_lane": "blazor_pwa_play_shell",
+                "status": "passed",
+            },
+            "hub_mobile_pwa_public_projection": {
+                "contract_name": "chummer.mobile_pwa_public_projection.v2",
+                "base_url": module.DEFAULT_BASE_URL,
+                "failures": [],
+                "pass": True,
+                "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json",
+                "source_contract": {
+                    "contractName": "chummer.mobile_pwa_public_projection.v2",
+                    "mode": "source",
+                    "pass": True,
                     "checks": {
-                        "home_open_chummer_dropdown_routes_build_and_play": {"present": True, "pass": True},
-                        "build_route_opens_character_roster": {"present": True, "pass": True},
-                        "play_route_opens_pwa_play_shell": {"present": True, "pass": True},
+                        "exactContract": True,
+                        "passingStatus": True,
+                        "noFailures": True,
+                        "recognizedMode": True,
+                        "staticAssetsPass": True,
+                        "sourceTopologyClosed": True,
+                        "sourceGatewayClosed": True,
+                        "sourceReadinessCombined": True,
+                        "sourceInstallOnlyRoleShell": True,
+                        "sourceRetiredEnvAbsent": True,
                     },
                 },
+                "frontdoor_postdeploy_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json",
+                "public_entry": {
+                    "contract_name": "chummer.mobile_pwa_frontdoor_install_entry.v2",
+                    "public_install_targets": ["/build", "/mobile/player"],
+                    "build_target": "/build",
+                    "play_target": "/mobile/player",
+                    "play_surface": "install-only",
+                    "play_authority": "none",
+                    "live_session": "unavailable",
+                    "pwa_manifest_path": "/manifest.player.webmanifest",
+                    "checks_pass": True,
+                    "checks": {
+                        "postdeployContract": True,
+                        "postdeployPass": True,
+                        "postdeployNoFailures": True,
+                        "canonicalBaseUrl": True,
+                        "browserProofsPass": True,
+                        "frontdoorProofPass": True,
+                        "frontdoorContractV2": True,
+                        "installContractSatisfied": True,
+                        "publicInstallTargets": True,
+                        "installOnlyBoundary": True,
+                        "privateRuntimeAbsent": True,
+                        "proofClosurePass": True,
+                    },
+                },
+                "status": "pass",
             },
         },
     }
 
 
-def write_required_receipt(module, published: Path, key: str, path: Path, payload: dict) -> None:
-    if (
-        key == "blazor_execution_horizon_bridge"
-        and payload.get("status") == "pass"
-        and not isinstance(payload.get("proofs"), dict)
-    ):
-        payload = valid_blazor_bridge_payload(module)
-    if (
-        key == "operator_release_dashboard"
-        and payload.get("status") == "pass"
-        and not isinstance(payload.get("release_readiness"), dict)
-    ):
-        payload = {
-            **payload,
-            "verdict": "OPERABLE_RELEASE_READY",
-            "release_readiness": {
-                "full_release_ready": True,
-                "nightly_handoff_ready": True,
-                "full_release_blockers": [],
+def passing_blazor_play_surface_horizon_payload():
+    return {
+        "contract_name": "chummer6-ui.blazor_play_surface_horizon",
+        "status": "passed",
+        "horizons": [
+            {
+                "id": "near_term_stabilization",
+                "title": "Near-term stabilization",
+                "status": "proven",
+                "evidence_tier": "runtime_proven",
             },
-        }
-    (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            {
+                "id": "mid_term_pwa_session_utility",
+                "title": "Mid-term PWA and session utility",
+                "status": "mixed",
+                "evidence_tier": "runtime_pwa_plus_source_staged_session_utility",
+                "server_bound_boundaries": [
+                    "runner data",
+                    "workspace data",
+                    "API traffic",
+                    "Black Ledger state",
+                    "heat state",
+                    "session state",
+                ],
+            },
+            {
+                "id": "long_term_living_world_expansion",
+                "title": "Long-term living-world expansion",
+                "status": "staged",
+                "evidence_tier": "source_staged_and_docs_only",
+                "unproven_claims": [
+                    "live Black Ledger mutation",
+                    "heat propagation runtime",
+                    "Runner Passport continuity runtime",
+                    "living-world inbox or newsroom runtime",
+                    "public-edge living-world execution parity",
+                ],
+            },
+        ],
+    }
+
+
+def failing_flagship_product_readiness_gate_payload(module):
+    return {
+        "contract_name": "chummer.flagship_product_readiness_gate.v1",
+        "generated_at_utc": module.now_iso(),
+        "status": "fail",
+        "verdict": "NOT_FLAGSHIP_PRODUCT_READY",
+        "readiness_path": ".codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json",
+        "summary": {
+            "contract_name": "fleet.flagship_product_readiness",
+            "status": "pass",
+            "generated_at": module.now_iso(),
+            "completion_audit_status": "pass",
+            "flagship_readiness_audit_status": "pass",
+            "reason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: final gold janitor state is 'fail', final gold janitor verdict is 'NOT_GOLD', live-backed gold claim is not allowed.",
+            "ready_count": 8,
+            "missing_count": 0,
+            "scoped_missing_count": 0,
+            "warning_count": 0,
+            "coverage_gap_keys": [],
+            "scoped_coverage_gap_keys": [],
+            "launch_critical_nested_blockers": [
+                "final gold janitor state is 'fail'",
+                "final gold janitor verdict is 'NOT_GOLD'",
+                "live-backed gold claim is not allowed",
+            ],
+            "launch_critical_nested_blocker_count": 3,
+            "pass": False,
+        },
+    }
+
+
+def failing_flagship_product_readiness_gate_payload_with_failed_nested_audits(module):
+    payload = failing_flagship_product_readiness_gate_payload(module)
+    payload["summary"]["completion_audit_status"] = "fail"
+    payload["summary"]["flagship_readiness_audit_status"] = "fail"
+    return payload
+
+
+def passing_required_receipt_payload(module, key: str, generated_at: str | None = None):
+    payload = {"status": "pass", "generated_at_utc": generated_at or module.now_iso()}
+    if key == "release_channel":
+        payload.update(
+            {
+                "status": "published",
+                "version": "run-test",
+                "channel": "stable",
+                "channelId": "public_stable",
+                "supportabilityState": "gold_supported",
+                "rolloutState": "public_stable",
+            }
+        )
+    if key == "desktop_native_model_depth":
+        payload["verdict"] = "DESKTOP_NATIVE_MODEL_READY"
+    if key == "live_surface_parity":
+        payload.update(
+            {
+                "contract_name": "chummer.live_surface_parity",
+                "verdict": "LIVE_SURFACE_PARITY_READY",
+                "failures": [],
+                "release_posture": {
+                    "status": "published",
+                    "version": "run-test",
+                    "channel": "public_stable",
+                    "supportability_state": "gold_supported",
+                    "rollout_state": "public_stable",
+                    "expected_status": "published",
+                    "expected_version": "run-test",
+                    "expected_channel": "public_stable",
+                    "expected_supportability_state": "gold_supported",
+                    "expected_rollout_state": "public_stable",
+                    "status_matches_expected": True,
+                    "version_matches_expected": True,
+                    "channel_matches_expected": True,
+                    "supportability_matches_expected": True,
+                    "rollout_matches_expected": True,
+                    "expected_failures": [],
+                },
+            }
+        )
+    if key == "live_public_windows_installer":
+        payload["verdict"] = "LIVE_PUBLIC_WINDOWS_INSTALLER_READY"
+    if key == "blazor_execution_horizon_bridge":
+        payload = passing_blazor_execution_horizon_bridge_payload(module)
+        if generated_at is not None:
+            payload["generated_at_utc"] = generated_at
+    if key == "ltd_optimization_stack":
+        payload["verdict"] = "LTD_OPTIMIZATION_STACK_READY"
+    if key == "participate_billing_honesty":
+        payload["verdict"] = "READY"
+    if key == "account_handoff_runtime_config":
+        payload["verdict"] = "READY"
+    if key == "design_quality_gate":
+        payload["verdict"] = "DESIGN_READY"
+    if key == "ui_layout_exit_gate":
+        payload["verdict"] = "UI_LAYOUT_EXIT_READY"
+    if key == "ui_frame_integrity":
+        payload["verdict"] = "READY"
+    if key == "release_ready":
+        payload.update(
+            {
+                "contract_name": module.RELEASE_READY_CONTRACT_NAME,
+                "verdict": module.RELEASE_READY_VERDICT,
+                "returncode": 0,
+                "timed_out": False,
+                "saw_release_ready_marker": True,
+                "not_release_ready_markers": [],
+                "failures": [],
+                "failed_gates": [],
+            }
+        )
+    if key == "windows_installer_visual_audit":
+        sha = "a" * 64
+        payload.update(
+            {
+                "contract_name": module.WINDOWS_INSTALLER_VISUAL_AUDIT_CONTRACT_NAME,
+                "artifact": {
+                    "sha256": sha,
+                    "actualSha256": sha,
+                },
+                "startupReceipt": {
+                    "status": "pass",
+                    "artifactDigest": f"sha256:{sha}",
+                },
+                "visualAuditSource": {
+                    "exists": True,
+                    "status": "pass",
+                    "platform": "windows",
+                    "hostClass": "native-windows-11",
+                    "artifactSha256": sha,
+                    "screenshotCount": 4,
+                    "defaultDpiScreenshotCount": 2,
+                    "scaledDpiScreenshotCount": 2,
+                    "requiredSurfaces": ["install-progress", "completion"],
+                },
+                "failures": [],
+                "nextActions": [],
+            }
+        )
+    return payload
 
 
 class FinalGoldJanitorTests(unittest.TestCase):
@@ -215,7 +850,11 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 return mock.Mock(returncode=0, stdout="", stderr="")
 
             with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
-                artifacts = module.windows_operator_request_artifacts(intake_request, payload)
+                artifacts = module.windows_operator_request_artifacts(
+                    intake_request,
+                    payload,
+                    runtime_refresh_authorized=True,
+                )
 
         self.assertEqual("2026-07-06T15:24:14Z", artifacts["watcher_state_receipt_generated_at_utc"])
         self.assertEqual(2086931, artifacts["watcher_pid"])
@@ -321,13 +960,45 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 return mock.Mock(returncode=0, stdout="", stderr="")
 
             with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
-                artifacts = module.windows_operator_request_artifacts(intake_request, payload)
+                artifacts = module.windows_operator_request_artifacts(
+                    intake_request,
+                    payload,
+                    runtime_refresh_authorized=True,
+                )
 
         self.assertEqual(str(auto_import_path), artifacts["auto_import_receipt_path"])
         self.assertEqual("2026-07-06T15:24:12Z", artifacts["auto_import_receipt_generated_at_utc"])
         self.assertEqual("2026-07-06T15:24:14Z", artifacts["watcher_state_receipt_generated_at_utc"])
         self.assertEqual(["python3", "auto-import"], run_calls[0][:2])
         self.assertEqual(["python3", "watcher-status"], run_calls[1][:2])
+
+    def test_windows_operator_request_artifacts_does_not_execute_unverified_commands(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="final-gold-windows-unverified-refresh-") as temp_dir:
+            root = Path(temp_dir)
+            intake_request = (
+                root
+                / "published"
+                / "WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json"
+            )
+            payload = {
+                "artifact_intake": {
+                    "auto_import_command": "python3 untrusted-auto-import",
+                    "watcher_status_command": "python3 untrusted-watcher-status",
+                }
+            }
+            intake_request.parent.mkdir(parents=True, exist_ok=True)
+            intake_request.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+            with mock.patch.object(module.subprocess, "run") as run:
+                module.windows_operator_request_artifacts(
+                    intake_request,
+                    payload,
+                    refresh_runtime_receipts=True,
+                    runtime_refresh_authorized=False,
+                )
+
+        run.assert_not_called()
 
     def test_windows_operator_request_artifacts_can_skip_runtime_refresh(self) -> None:
         module = load_module()
@@ -602,7 +1273,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("public-edge postdeploy homepage does not disclose current public lane", failures)
         self.assertIn("public-edge postdeploy receipt contains failures", failures)
         self.assertNotIn("public-edge postdeploy frontdoorNavigationStatus is not pass", failures)
-        self.assertNotIn("public-edge postdeploy frontdoorNavigationMobileArtifactContract is not chummer.frontdoor_mobile_launch.v2", failures)
+        self.assertNotIn("public-edge postdeploy frontdoorNavigationMobileArtifactContract is not chummer.frontdoor_mobile_install_boundary.v2", failures)
         self.assertNotIn("public-edge postdeploy frontdoorNavigationLedgerArtifactContract is not chummer.black_ledger_globe_frontdoor.v1", failures)
         self.assertNotIn("public-edge postdeploy front-door navigation does not gate Build", failures)
         self.assertNotIn("public-edge postdeploy front-door navigation Play route is not /mobile/player", failures)
@@ -627,7 +1298,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         failures = module.public_edge_postdeploy_semantic_failures(payload)
 
         self.assertIn("public-edge postdeploy pwaOfflineCacheArtifactContract is not chummer.pwa_offline_cache.v2", failures)
-        self.assertIn("public-edge postdeploy frontdoorNavigationMobileArtifactContract is not chummer.frontdoor_mobile_launch.v2", failures)
+        self.assertIn("public-edge postdeploy frontdoorNavigationMobileArtifactContract is not chummer.frontdoor_mobile_install_boundary.v2", failures)
         self.assertIn("public-edge postdeploy PWA offline static cache contains a private or query-bearing route", failures)
         self.assertIn("public-edge postdeploy PWA offline cache did not prove private navigation remain uncached", failures)
         self.assertIn("public-edge postdeploy front-door visible Player URL is not query-free /mobile/player", failures)
@@ -646,39 +1317,70 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("icanpreneur_discovery_lane", module.REQUIRED_RECEIPTS)
         self.assertIn("icanpreneur_discovery_lane", module.FRESHNESS_REQUIRED_GATES)
 
-    def test_materializers_require_full_public_edge_postdeploy_gate(self) -> None:
-        module = load_module()
-        commands = [" ".join(command) for command in module.MATERIALIZERS]
-        public_edge_command = next(command for command in commands if "scripts/verify_public_edge_postdeploy_gate.py" in command)
-        dashboard_command = next(command for command in commands if "scripts/materialize_operator_release_dashboard.py" in command)
-
-        live_windows_index = commands.index("python3 scripts/verify_live_public_windows_installer.py --base-url https://chummer.run")
-        public_edge_index = commands.index(public_edge_command)
-        blazor_index = commands.index("python3 scripts/verify_blazor_execution_horizon_bridge.py")
-
-        self.assertLess(live_windows_index, public_edge_index)
-        self.assertLess(public_edge_index, blazor_index)
-        self.assertIn("--expected-release-channel nightly", public_edge_command)
-        self.assertIn("--require-downloads-status-playwright", public_edge_command)
-        self.assertIn("--require-mobile-pwa-viewport-playwright", public_edge_command)
-        self.assertIn("--require-frontdoor-navigation-playwright", public_edge_command)
-        self.assertIn("--release-ready-self-check", dashboard_command)
-        self.assertIn("public_edge_postdeploy_gate", module.REQUIRED_RECEIPTS)
-        self.assertIn("public_edge_postdeploy_gate", module.FRESHNESS_REQUIRED_GATES)
-
     def test_materializers_build_minimal_experience_before_design_gate(self) -> None:
         module = load_module()
         commands = [" ".join(command) for command in module.MATERIALIZERS]
 
         minimal_index = next(index for index, command in enumerate(commands) if "scripts/verify_minimal_experience_gate.py" in command)
-        premium_index = commands.index("python3 scripts/verify_premium_ui_design_exit_gate.py --completion-dir /docker/chummercomplete/_completion/chummer_run_redesign_closure")
         design_index = commands.index("python3 scripts/materialize_design_quality_gate.py")
 
         self.assertLess(minimal_index, design_index)
-        self.assertLess(minimal_index, premium_index)
+
+    def test_materializers_refresh_premium_ui_before_design_gate(self) -> None:
+        module = load_module()
+        commands = [" ".join(command) for command in module.MATERIALIZERS]
+
+        premium_index = commands.index(
+            "python3 scripts/verify_premium_ui_design_exit_gate.py "
+            f"--completion-dir {module.UI_LAYOUT_COMPLETION_ROOT}"
+        )
+        design_index = commands.index(
+            "python3 scripts/materialize_design_quality_gate.py"
+        )
+
         self.assertLess(premium_index, design_index)
         self.assertIn("premium_ui_design_exit_gate", module.REQUIRED_RECEIPTS)
         self.assertIn("premium_ui_design_exit_gate", module.FRESHNESS_REQUIRED_GATES)
+
+    def test_materializers_self_check_dashboard_before_release_ready(self) -> None:
+        module = load_module()
+        commands = [" ".join(command) for command in module.MATERIALIZERS]
+
+        dashboard_index = commands.index(
+            "python3 scripts/materialize_operator_release_dashboard.py "
+            "--release-ready-self-check"
+        )
+        release_ready_index = commands.index(
+            "python3 scripts/materialize_release_ready_receipt.py"
+        )
+
+        self.assertLess(dashboard_index, release_ready_index)
+
+    def test_postdeploy_materializer_binds_expected_release_channel(self) -> None:
+        module = load_module()
+        command = next(
+            " ".join(item)
+            for item in module.MATERIALIZERS
+            if "scripts/verify_public_edge_postdeploy_gate.py" in item
+        )
+
+        self.assertIn(
+            f"--expected-release-channel {module.EXPECTED_PUBLIC_EDGE_RELEASE_CHANNEL}",
+            command,
+        )
+
+    def test_materializers_refresh_mobile_projection_before_blazor_bridge(self) -> None:
+        module = load_module()
+        commands = [" ".join(command) for command in module.MATERIALIZERS]
+
+        mobile_index = commands.index(
+            "python3 scripts/verify_mobile_pwa_public_projection.py"
+        )
+        bridge_index = commands.index(
+            "python3 scripts/verify_blazor_execution_horizon_bridge.py"
+        )
+
+        self.assertLess(mobile_index, bridge_index)
 
     def test_materializers_refresh_release_ready_before_operator_dashboard(self) -> None:
         module = load_module()
@@ -2172,12 +2874,9 @@ class FinalGoldJanitorTests(unittest.TestCase):
             published = Path(temp_dir) / "published"
             published.mkdir(parents=True, exist_ok=True)
             for key, path in module.REQUIRED_RECEIPTS.items():
-                write_required_receipt(
-                    module,
-                    published,
-                    key,
-                    path,
-                    {"status": "pass", "generated_at_utc": module.now_iso()},
+                (published / path.name).write_text(
+                    json.dumps(passing_required_receipt_payload(module, key)),
+                    encoding="utf-8",
                 )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
@@ -2185,7 +2884,6 @@ class FinalGoldJanitorTests(unittest.TestCase):
 
         self.assertEqual(payload["artifact_root"], "_completion/full_product_reaudit_v20")
         self.assertEqual(payload["scope"], "full_estate_v20")
-        self.assertTrue(payload["required_gates"]["blazor_execution_horizon_bridge"]["public_entry"]["pass"])
 
     def test_payload_fails_on_stale_recrawl(self) -> None:
         module = load_module()
@@ -2195,12 +2893,9 @@ class FinalGoldJanitorTests(unittest.TestCase):
             stale_time = "2020-01-01T00:00:00Z"
             for key, path in module.REQUIRED_RECEIPTS.items():
                 generated_at = stale_time if key == "live_public_web_recrawl" else module.now_iso()
-                write_required_receipt(
-                    module,
-                    published,
-                    key,
-                    path,
-                    {"status": "pass", "generated_at_utc": generated_at},
+                (published / path.name).write_text(
+                    json.dumps(passing_required_receipt_payload(module, key, generated_at)),
+                    encoding="utf-8",
                 )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
@@ -2252,7 +2947,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                write_required_receipt(module, published, key, path, payload)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -2261,13 +2956,19 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("public_route_proof failed", payload["failures"])
         self.assertFalse(payload["required_gates"]["public_route_proof"]["pass"])
 
-    def test_payload_fails_when_blazor_bridge_lacks_live_build_play_public_entry(self) -> None:
+    def test_payload_rejects_live_surface_parity_without_release_posture_match(self) -> None:
         module = load_module()
-        with tempfile.TemporaryDirectory(prefix="gold-janitor-blazor-public-entry-") as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-live-surface-posture-") as temp_dir:
             published = Path(temp_dir) / "published"
             published.mkdir(parents=True, exist_ok=True)
             for key, path in module.REQUIRED_RECEIPTS.items():
-                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
                 if key == "public_route_proof":
                     payload = {
                         "status": "pass",
@@ -2279,23 +2980,251 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                if key == "blazor_execution_horizon_bridge":
-                    payload = valid_blazor_bridge_payload(module)
-                    payload["proofs"]["hub_mobile_pwa_public_projection"]["public_entry"]["build_final_route"] = "/build"
-                write_required_receipt(module, published, key, path, payload)
+                if key == "live_surface_parity":
+                    payload["release_posture"].update(
+                        {
+                            "supportability_state": "review_required",
+                            "rollout_state": "coverage_incomplete",
+                            "supportability_matches_expected": False,
+                            "rollout_matches_expected": False,
+                            "expected_failures": [
+                                "live release manifest supportabilityState does not match expected release channel",
+                                "live release manifest rolloutState does not match expected release channel",
+                            ],
+                        }
+                    )
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["live_surface_parity"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("live_surface_parity semantic proof failed", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+        self.assertIn(
+            "live release manifest supportabilityState does not match expected release channel",
+            gate["semanticFailures"],
+        )
+        self.assertIn(
+            "live_surface_parity release rollout does not match expected release channel",
+            gate["semanticFailures"],
+        )
+        self.assertIn("live_surface_parity semantic proof failed", markdown)
+
+    def test_payload_rejects_live_surface_parity_against_non_gold_expected_release(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-live-surface-non-gold-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "live_surface_parity":
+                    payload["release_posture"].update(
+                        {
+                            "supportability_state": "review_required",
+                            "rollout_state": "coverage_incomplete",
+                            "expected_supportability_state": "review_required",
+                            "expected_rollout_state": "coverage_incomplete",
+                            "supportability_matches_expected": True,
+                            "rollout_matches_expected": True,
+                            "expected_failures": [],
+                        }
+                    )
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
 
-        gate = payload["required_gates"]["blazor_execution_horizon_bridge"]
+        gate = payload["required_gates"]["live_surface_parity"]
         self.assertEqual("fail", payload["status"])
-        self.assertIn(
-            "blazor_execution_horizon_bridge missing live Build/Play public-entry proof",
-            payload["failures"],
-        )
+        self.assertIn("live_surface_parity semantic proof failed", payload["failures"])
         self.assertFalse(gate["pass"])
-        self.assertFalse(gate["public_entry"]["pass"])
-        self.assertEqual("/build", gate["public_entry"]["build_final_route"])
+        self.assertIn("live_surface_parity expected release supportability is not gold_supported", gate["semanticFailures"])
+        self.assertIn("live_surface_parity expected release rollout is blocking: coverage_incomplete", gate["semanticFailures"])
+
+    def test_payload_rejects_live_surface_parity_against_preview_expected_release(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-live-surface-preview-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "live_surface_parity":
+                    payload["release_posture"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                            "expected_channel": "preview",
+                            "expected_supportability_state": "preview_supported",
+                            "expected_rollout_state": "promoted_preview",
+                            "channel_matches_expected": True,
+                            "supportability_matches_expected": True,
+                            "rollout_matches_expected": True,
+                            "expected_failures": [],
+                        }
+                    )
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["live_surface_parity"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("live_surface_parity semantic proof failed", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertIn("live_surface_parity expected release channel is preview, not a flagship stable lane", gate["semanticFailures"])
+        self.assertIn("live_surface_parity expected release supportability is not gold_supported", gate["semanticFailures"])
+        self.assertIn("live_surface_parity expected release rollout is promoted_preview, not public_stable", gate["semanticFailures"])
+
+    def test_payload_recovers_live_surface_parity_when_release_channel_truth_already_blocks_final_gold(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-live-surface-recovered-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "live_surface_parity":
+                    payload["release_posture"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                            "expected_channel": "preview",
+                            "expected_supportability_state": "preview_supported",
+                            "expected_rollout_state": "promoted_preview",
+                            "channel_matches_expected": True,
+                            "supportability_matches_expected": True,
+                            "rollout_matches_expected": True,
+                            "expected_failures": [],
+                        }
+                    )
+                if key == "release_ready":
+                    payload = {
+                        "status": "fail",
+                        "contract_name": module.RELEASE_READY_CONTRACT_NAME,
+                        "verdict": "NOT_RELEASE_READY",
+                        "generated_at_utc": module.now_iso(),
+                        "returncode": 1,
+                        "timed_out": False,
+                        "saw_release_ready_marker": False,
+                        "not_release_ready_markers": ["NOT_RELEASE_READY"],
+                        "failures": [
+                            "FAIL release_channel: release channel channel is preview, not a flagship stable lane",
+                            "FAIL release_channel: release channel supportability is not gold_supported",
+                            "FAIL release_channel: release channel rollout is promoted_preview, not public_stable",
+                        ],
+                        "failed_gates": ["release_channel"],
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["status"] = "fail"
+                    payload["verdict"] = "OPERABLE_RELEASE_BLOCKED"
+                    payload["failures"] = ["release_channel", "release_ready"]
+                    payload["release"]["channel"] = "preview"
+                    payload["release"]["supportability_state"] = "preview_supported"
+                    payload["release"]["rollout_state"] = "promoted_preview"
+                    payload["checks"]["release_channel"].update(
+                        {
+                            "status": "fail",
+                            "pass": False,
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                            "semantic_failures": [
+                                "release channel channel is preview, not a flagship stable lane",
+                                "release channel supportability is not gold_supported",
+                                "release channel rollout is promoted_preview, not public_stable",
+                            ],
+                        }
+                    )
+                    payload["checks"]["release_channel"]["summary"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                            "semantic_failures": list(payload["checks"]["release_channel"]["semantic_failures"]),
+                        }
+                    )
+                    payload["checks"]["release_ready"].update(
+                        {
+                            "status": "fail",
+                            "pass": False,
+                        }
+                    )
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["live_surface_parity"]
+        self.assertEqual("fail", payload["status"])
+        self.assertNotIn("live_surface_parity semantic proof failed", payload["failures"])
+        self.assertTrue(gate["pass"])
+        self.assertEqual("pass", gate["status"])
+        self.assertTrue(gate["recovered_for_final_gold"])
+        self.assertEqual(
+            ["operator_release_dashboard", "release_ready"],
+            gate["recovered_because_of_gates"],
+        )
+        self.assertIn(
+            "live_surface_parity expected release channel is preview, not a flagship stable lane",
+            gate["recovered_semantic_failures"],
+        )
 
     def test_payload_fails_required_receipts_that_report_structured_failures(self) -> None:
         module = load_module()
@@ -2323,7 +3252,30 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                write_required_receipt(module, published, key, path, payload)
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["release"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                    payload["checks"]["release_channel"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                    payload["checks"]["release_channel"]["summary"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -2334,91 +3286,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual(1, gate["structured_failures_count"])
         self.assertFalse(gate["pass"])
 
-    def test_payload_fails_when_operator_dashboard_is_only_nightly_handoff_ready(self) -> None:
-        module = load_module()
-        with tempfile.TemporaryDirectory(prefix="gold-janitor-nightly-dashboard-") as temp_dir:
-            published = Path(temp_dir) / "published"
-            published.mkdir(parents=True, exist_ok=True)
-            for key, path in module.REQUIRED_RECEIPTS.items():
-                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
-                if key == "operator_release_dashboard":
-                    payload = {
-                        "status": "pass",
-                        "verdict": "NIGHTLY_HANDOFF_READY",
-                        "generated_at_utc": module.now_iso(),
-                        "release_readiness": {
-                            "full_release_ready": False,
-                            "nightly_handoff_ready": True,
-                            "full_release_blockers": ["windows_installer_visual_audit"],
-                            "full_release_blocker_details": [
-                                "Windows installer visual audit source digest does not match promoted installer",
-                            ],
-                        },
-                    }
-                if key == "public_route_proof":
-                    payload = {
-                        "status": "pass",
-                        "generated_at_utc": module.now_iso(),
-                        "summary": {
-                            "route_count": 10,
-                            "passed_count": 10,
-                            "failed_count": 0,
-                            "negative_path_failed_count": 0,
-                        },
-                    }
-                write_required_receipt(module, published, key, path, payload)
-            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
-            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
-                payload = module.build_payload([])
-
-        gate = payload["required_gates"]["operator_release_dashboard"]
-        self.assertEqual("fail", payload["status"])
-        self.assertEqual("fail", gate["status"])
-        self.assertFalse(gate["pass"])
-        self.assertEqual("NIGHTLY_HANDOFF_READY", gate["verdict"])
-        self.assertFalse(gate["release_readiness"]["full_release_ready"])
-        self.assertIn("operator_release_dashboard is not full release ready", payload["failures"])
-
-    def test_verdict_markdown_surfaces_operator_release_blocker_details(self) -> None:
-        module = load_module()
-        payload = {
-            "verdict": "NOT_GOLD",
-            "generated_at_utc": module.now_iso(),
-            "scope": "full_estate_v20",
-            "required_gates": {
-                "operator_release_dashboard": {
-                    "pass": False,
-                    "status": "fail",
-                    "path": "/tmp/operator-dashboard.json",
-                    "release_readiness": {
-                        "full_release_ready": False,
-                        "nightly_handoff_ready": True,
-                        "full_release_blockers": ["release_ready", "windows_installer_visual_audit"],
-                        "full_release_blocker_details": [
-                            "release channel channel is preview, not a flagship stable lane",
-                            "Windows installer visual audit source digest does not match promoted installer",
-                        ],
-                    },
-                    "release": {
-                        "version": "run-20260705-040324",
-                        "channel": "preview",
-                    },
-                },
-            },
-            "caveats": [],
-            "failures": ["operator_release_dashboard is not full release ready"],
-        }
-
-        markdown = module.build_verdict_markdown(payload)
-
-        self.assertIn("  - full release blocker details:", markdown)
-        self.assertIn("    - release channel channel is preview, not a flagship stable lane", markdown)
-        self.assertIn(
-            "    - Windows installer visual audit source digest does not match promoted installer",
-            markdown,
-        )
-
-    def test_main_writes_identical_published_and_durable_v20_janitor_artifacts(self) -> None:
+    def test_payload_fails_required_receipts_that_report_failed_gates(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-failed-gates-") as temp_dir:
             published = Path(temp_dir) / "published"
@@ -2648,7 +3516,2676 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                write_required_receipt(module, published, key, path, payload)
+                if key == "release_ready":
+                    payload["contract_name"] = "chummer.release_ready.preview"
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["release_ready"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("release_ready has unexpected contract", payload["failures"])
+        self.assertEqual("chummer.release_ready.preview", gate["contract_name"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+
+    def test_payload_rejects_release_ready_unexpected_verdict(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-release-ready-verdict-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "release_ready":
+                    payload["verdict"] = "NOT_RELEASE_READY"
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["release_ready"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("release_ready has unexpected verdict", payload["failures"])
+        self.assertEqual("NOT_RELEASE_READY", gate["verdict"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+
+    def test_payload_rejects_release_ready_semantic_contradictions(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-release-ready-semantics-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "release_ready":
+                    payload.update(
+                        {
+                            "returncode": 1,
+                            "timed_out": True,
+                            "saw_release_ready_marker": False,
+                            "not_release_ready_markers": ["NOT_RELEASE_READY"],
+                            "failed_gates": ["verify_desktop_release_matrix"],
+                        }
+                    )
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["release_ready"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("release_ready semantic proof failed", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+        self.assertEqual(1, gate["returncode"])
+        self.assertTrue(gate["timed_out"])
+        self.assertEqual(["verify_desktop_release_matrix"], gate["failed_gates"])
+        self.assertIn("release_ready verifier returncode is not zero", gate["semanticFailures"])
+        self.assertIn("release_ready verifier timed_out is not false", gate["semanticFailures"])
+        self.assertIn("release_ready receipt did not record RELEASE_READY marker", gate["semanticFailures"])
+        self.assertIn("release_ready receipt contains NOT_RELEASE_READY markers", gate["semanticFailures"])
+        self.assertIn("release_ready receipt contains failed gates", gate["semanticFailures"])
+        self.assertIn("release failures: release_ready verifier returncode is not zero", markdown)
+        self.assertIn("release failed gates: verify_desktop_release_matrix", markdown)
+
+    def test_payload_surfaces_malformed_release_ready_structurally(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-release-ready-malformed-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            receipt_path = published / "RELEASE_READY.generated.json"
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            receipt_path.write_text("{not json", encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["release_ready"]
+        failure = f"release_ready receipt is malformed: {receipt_path}"
+        self.assertEqual("fail", payload["status"])
+        self.assertIn(failure, payload["failures"])
+        self.assertEqual("invalid", gate["load_status"])
+        self.assertEqual("invalid", gate["status"])
+        self.assertIn(failure, gate["failures"])
+        self.assertNotIn("semanticFailures", gate)
+        self.assertNotIn("release_ready semantic proof failed", payload["failures"])
+
+    def test_payload_surfaces_public_edge_postdeploy_failures(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-postdeploy-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "public_edge_postdeploy_gate":
+                    payload = {
+                        "status": "fail",
+                        "generatedAtUtc": module.now_iso(),
+                        "baseUrl": "https://chummer.run",
+                        "preflightStatus": "fail",
+                        "preflightActiveLockCount": 4,
+                        "preflightBlockingLockCount": 1,
+                        "preflightStaleLookingLockCount": 4,
+                        "preflightStaleForeignLockCount": 3,
+                        "preflightStaleForeignLocksIgnored": True,
+                        "downloadsStatus": "fail",
+                        "downloadsHasMarker": False,
+                        "statusRedirectHasMarker": False,
+                        "visibleVersion": "Version run-20260627-005402",
+                        "statusRedirectVersion": "Version run-20260627-005402",
+                        "expectedReleaseVersion": "run-20260624-080000",
+                        "visibleVersionMatchesReleaseChannel": False,
+                        "statusRedirectVersionMatchesReleaseChannel": False,
+                        "pwaStaticStatus": "pass",
+                        "mobileLedgerStatus": "pass",
+                        "readyMobileHandoffStatus": "pass",
+                        "downloadsStatusBrowserStatus": "fail",
+                        "mobilePwaViewportStatus": "fail",
+                        "mobilePwaViewportRouteCount": 3,
+                        "mobilePwaViewportViewportCount": 3,
+                        "participateIframeShellStatus": "fail",
+                        "participateIframeRouteCount": 2,
+                        "participateIframeRouteIframeCount": 2,
+                        "participateIframeRouteOfflineFallbackCount": 0,
+                        "frontdoorNavigationStatus": "fail",
+                        "frontdoorNavigationGatedTargets": ["Build", "Play"],
+                        "frontdoorNavigationPublicTargets": [],
+                        "frontdoorNavigationPlayRoute": "/mobile/player",
+                        "frontdoorNavigationPlaySignInRoute": "/login?next=%2Fmobile%2Fplayer",
+                        "frontdoorNavigationDirectPlayerRoute": "/mobile/player",
+                        "frontdoorNavigationLedgerPrimary": False,
+                        "failures": [
+                            "public-edge deploy preflight is not pass",
+                            "downloads version marker proof is not pass",
+                            "mobile PWA viewport Playwright proof is not pass",
+                            "Participate iframe shell proof is not pass",
+                            "front-door navigation Playwright proof is not pass",
+                        ],
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        markdown = module.build_verdict_markdown(payload)
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("public_edge_postdeploy_gate failed", payload["failures"])
+        self.assertEqual("fail", gate["preflightStatus"])
+        self.assertEqual(1, gate["preflightBlockingLockCount"])
+        self.assertEqual(4, gate["preflightStaleLookingLockCount"])
+        self.assertEqual(3, gate["preflightStaleForeignLockCount"])
+        self.assertTrue(gate["preflightStaleForeignLocksIgnored"])
+        self.assertFalse(gate["downloadsHasMarker"])
+        self.assertEqual("run-20260624-080000", gate["expectedReleaseVersion"])
+        self.assertFalse(gate["visibleVersionMatchesReleaseChannel"])
+        self.assertFalse(gate["statusRedirectVersionMatchesReleaseChannel"])
+        self.assertEqual("fail", gate["mobilePwaViewportStatus"])
+        self.assertIn("blocking_locks=1", markdown)
+        self.assertIn("stale_foreign=3", markdown)
+        self.assertIn(
+            "visible_version=Version run-20260627-005402 status_version=Version run-20260627-005402 expected_version=run-20260624-080000 version_match=False status_version_match=False",
+            markdown,
+        )
+        self.assertEqual(3, gate["mobilePwaViewportViewportCount"])
+        self.assertEqual("fail", gate["frontdoorNavigationStatus"])
+        self.assertEqual(["Build", "Play"], gate["frontdoorNavigationGatedTargets"])
+        self.assertEqual([], gate["frontdoorNavigationPublicTargets"])
+        self.assertEqual("/mobile/player", gate["frontdoorNavigationPlayRoute"])
+        self.assertEqual("/login?next=%2Fmobile%2Fplayer", gate["frontdoorNavigationPlaySignInRoute"])
+        self.assertEqual("/mobile/player", gate["frontdoorNavigationDirectPlayerRoute"])
+        self.assertEqual("fail", gate["participateIframeShellStatus"])
+        self.assertEqual(2, gate["participateIframeRouteIframeCount"])
+        self.assertIn("downloads version marker proof is not pass", gate["failures"])
+        self.assertIn("mobile_viewport=fail", markdown)
+        self.assertIn("frontdoor=fail", markdown)
+        self.assertIn("mobile PWA viewport: routes=3 viewports=3", markdown)
+        self.assertIn("role PWA manifests: count=None", markdown)
+        self.assertIn("front-door navigation: gated_targets=['Build', 'Play'] public_targets=[] play_route=/mobile/player play_sign_in_route=/login?next=%2Fmobile%2Fplayer direct_player_route=/mobile/player", markdown)
+        self.assertIn(
+            "player_http=None player_manifest=None player_role=None "
+            "player_rybbit_skip_mobile=None player_rybbit_mask_api=None player_rybbit_replay_block=None "
+            "gm_route=None gm_http=None gm_manifest=None gm_role=None "
+            "gm_rybbit_skip_mobile=None gm_rybbit_mask_api=None gm_rybbit_replay_block=None ledger_primary=False",
+            markdown,
+        )
+        self.assertIn("participate_iframe=fail", markdown)
+        self.assertIn("participate iframe shell: routes=2 iframe_routes=2 fallback_routes=0", markdown)
+        self.assertIn("edge failures: downloads version marker proof is not pass, mobile PWA viewport Playwright proof is not pass, Participate iframe shell proof is not pass, front-door navigation Playwright proof is not pass", markdown)
+
+    def test_payload_rejects_public_edge_postdeploy_unexpected_contract(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-contract-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                    payload["contractName"] = "chummer.public_edge_postdeploy_gate.preview"
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["release"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                    payload["checks"]["release_channel"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                    payload["checks"]["release_channel"]["summary"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("public_edge_postdeploy_gate has unexpected contract", payload["failures"])
+        self.assertEqual("chummer.public_edge_postdeploy_gate.preview", gate["contractName"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+
+    def test_payload_allows_preview_supported_public_edge_when_release_channel_is_preview(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-preview-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                    payload.update(
+                        {
+                            "statusRedirectHeading": "Preview downloads",
+                            "statusRedirectHeadingExpected": "Preview downloads",
+                            "statusRedirectHeadingMatchesReleaseChannel": True,
+                            "expectedReleaseChannel": "preview",
+                            "expectedReleaseSupportabilityState": "preview_supported",
+                            "expectedReleaseRolloutState": "promoted_preview",
+                            "releaseManifestChannel": "preview",
+                            "releaseManifestSupportabilityState": "preview_supported",
+                            "releaseManifestRolloutState": "promoted_preview",
+                            "releaseManifestChannelMatchesReleaseChannel": True,
+                            "releaseManifestSupportabilityMatchesReleaseChannel": True,
+                            "releaseManifestRolloutMatchesReleaseChannel": True,
+                        }
+                    )
+                if key == "release_channel":
+                    payload.update(
+                        {
+                            "channel": "preview",
+                            "channelId": "preview",
+                            "supportabilityState": "preview_supported",
+                            "rolloutState": "promoted_preview",
+                        }
+                    )
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["release"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                    payload["checks"]["release_channel"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                    payload["checks"]["release_channel"]["summary"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        self.assertTrue(gate["pass"])
+        self.assertEqual("pass", gate["status"])
+        self.assertEqual([], gate["semanticFailures"])
+        self.assertNotIn("public_edge_postdeploy_gate semantic proof failed", payload["failures"])
+
+    def test_payload_recovers_public_edge_release_posture_only_semantic_failures(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-release-posture-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                    payload.update(
+                        {
+                            "expectedReleaseSupportabilityState": "review_required",
+                            "expectedReleaseRolloutState": "public_release_review_required",
+                            "releaseManifestSupportabilityState": "review_required",
+                            "releaseManifestRolloutState": "public_release_review_required",
+                        }
+                    )
+                if key == "release_channel":
+                    payload.update(
+                        {
+                            "channel": "public_stable",
+                            "channelId": "public_stable",
+                            "supportabilityState": "review_required",
+                            "rolloutState": "public_release_review_required",
+                        }
+                    )
+                if key == "release_ready":
+                    payload = {
+                        "contract_name": module.RELEASE_READY_CONTRACT_NAME,
+                        "generated_at_utc": module.now_iso(),
+                        "status": "fail",
+                        "verdict": "NOT_RELEASE_READY",
+                        "returncode": 0,
+                        "timed_out": False,
+                        "failed_gates": [
+                            "release_channel",
+                            "flagship_product_readiness",
+                        ],
+                        "failures": [
+                            "FAIL release_channel: release channel supportability is not gold_supported",
+                            "FAIL release_channel: release channel rollout is public_release_review_required, not public_stable",
+                            "FAIL flagship_product_readiness: release channel supportability is not gold_supported",
+                            "FAIL flagship_product_readiness: release channel rollout is public_release_review_required, not public_stable",
+                        ],
+                    }
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["status"] = "fail"
+                    payload["verdict"] = "OPERABLE_RELEASE_BLOCKED"
+                    payload["release"].update(
+                        {
+                            "channel": "public_stable",
+                            "supportability_state": "review_required",
+                            "rollout_state": "public_release_review_required",
+                        }
+                    )
+                    payload["checks"]["release_channel"].update(
+                        {
+                            "status": "published",
+                            "pass": False,
+                            "channel": "public_stable",
+                            "supportability_state": "review_required",
+                            "rollout_state": "public_release_review_required",
+                            "semantic_failures": [
+                                "release channel supportability is not gold_supported",
+                                "release channel rollout is public_release_review_required, not public_stable",
+                            ],
+                        }
+                    )
+                    payload["checks"]["release_channel"]["summary"].update(
+                        {
+                            "status": "published",
+                            "channel": "public_stable",
+                            "supportability_state": "review_required",
+                            "rollout_state": "public_release_review_required",
+                            "semantic_failures": [
+                                "release channel supportability is not gold_supported",
+                                "release channel rollout is public_release_review_required, not public_stable",
+                            ],
+                        }
+                    )
+                    for failing_check in ("flagship_product_readiness", "release_ready"):
+                        payload["checks"][failing_check]["status"] = "fail"
+                        payload["checks"][failing_check]["pass"] = False
+                    payload["failures"] = [
+                        "flagship_product_readiness",
+                        "release_channel",
+                        "release_ready",
+                    ]
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        self.assertTrue(gate["pass"])
+        self.assertEqual("pass", gate["status"])
+        self.assertTrue(gate["recovered_for_final_gold"])
+        self.assertEqual(
+            ["operator_release_dashboard", "release_ready"],
+            gate["recovered_because_of_gates"],
+        )
+        self.assertIn(
+            "public-edge postdeploy expected release supportability is not supported for expected release channel",
+            gate["recovered_semantic_failures"],
+        )
+        self.assertNotIn("public_edge_postdeploy_gate semantic proof failed", payload["failures"])
+
+    def test_payload_recovers_public_edge_release_posture_only_semantic_failures_from_flagship_gate(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-flagship-release-posture-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            flagship_gate_payload = None
+            release_channel_payload = None
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                    payload.update(
+                        {
+                            "expectedReleaseSupportabilityState": "review_required",
+                            "expectedReleaseRolloutState": "public_release_review_required",
+                            "releaseManifestSupportabilityState": "review_required",
+                            "releaseManifestRolloutState": "public_release_review_required",
+                        }
+                    )
+                if key == "release_channel":
+                    payload.update(
+                        {
+                            "channel": "public_stable",
+                            "channelId": "public_stable",
+                            "supportabilityState": "review_required",
+                            "rolloutState": "public_release_review_required",
+                        }
+                    )
+                    release_channel_payload = dict(payload)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                    payload.update({"status": "fail", "verdict": "NOT_FLAGSHIP_PRODUCT_READY"})
+                    flagship_gate_payload = {
+                        "contract_name": module.FLAGSHIP_PRODUCT_READINESS_GATE_CONTRACT_NAME,
+                        "status": "fail",
+                        "verdict": "NOT_FLAGSHIP_PRODUCT_READY",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "contract_name": "fleet.flagship_product_readiness",
+                            "source_receipt": "gate",
+                            "status": "fail",
+                            "gate_status": "fail",
+                            "verdict": "NOT_FLAGSHIP_PRODUCT_READY",
+                            "completion_audit_status": "fail",
+                            "flagship_readiness_audit_status": "fail",
+                            "reason": "Launch-critical nested blockers remain.",
+                            "ready_count": 8,
+                            "missing_count": 0,
+                            "scoped_missing_count": 0,
+                            "warning_count": 0,
+                            "coverage_gap_keys": [],
+                            "scoped_coverage_gap_keys": [],
+                            "launch_critical_nested_blockers": [
+                                "release channel supportability is not gold_supported",
+                                "release channel rollout is public_release_review_required, not public_stable",
+                            ],
+                            "launch_critical_nested_blocker_count": 2,
+                            "structural_pass": False,
+                            "pass": False,
+                            "recovered_for_final_gold": False,
+                        },
+                    }
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                if key == "release_ready":
+                    payload = passing_required_receipt_payload(module, key)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            if flagship_gate_payload is not None:
+                (published / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json").write_text(
+                    json.dumps(flagship_gate_payload),
+                    encoding="utf-8",
+                )
+            if release_channel_payload is None:
+                release_channel_payload = {
+                    "status": "published",
+                    "version": "run-test",
+                    "channel": "public_stable",
+                    "channelId": "public_stable",
+                    "supportabilityState": "review_required",
+                    "rolloutState": "public_release_review_required",
+                    "publishedAt": module.now_iso(),
+                }
+            (published / "RELEASE_CHANNEL.generated.json").write_text(
+                json.dumps(release_channel_payload),
+                encoding="utf-8",
+            )
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        self.assertTrue(gate["pass"])
+        self.assertEqual("pass", gate["status"])
+        self.assertTrue(gate["recovered_for_final_gold"])
+        self.assertEqual(["flagship_product_readiness"], gate["recovered_because_of_gates"])
+        self.assertNotIn("public_edge_postdeploy_gate semantic proof failed", payload["failures"])
+
+    def test_payload_recovers_public_edge_preflight_only_failure(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-preflight-recovered-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                    payload.update(
+                        {
+                            "status": "fail",
+                            "preflightStatus": "fail",
+                            "preflightActiveLockCount": 4,
+                            "preflightBlockingLockCount": 1,
+                            "preflightStaleLookingLockCount": 4,
+                            "preflightStaleForeignLockCount": 3,
+                            "preflightStaleForeignLocksIgnored": True,
+                            "failures": ["public-edge deploy preflight is not pass"],
+                        }
+                    )
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload(
+                    [
+                        {
+                            "command": "python3 scripts/verify_public_edge_postdeploy_gate.py --base-url https://chummer.run",
+                            "returncode": 1,
+                            "stdout": "",
+                            "stderr": "",
+                            "timed_out": False,
+                            "timeout_seconds": 180,
+                        }
+                    ]
+                )
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        self.assertEqual("pass", payload["status"])
+        self.assertEqual("GOLD_READY", payload["verdict"])
+        self.assertTrue(gate["pass"])
+        self.assertEqual("pass", gate["status"])
+        self.assertTrue(gate["release_blocking_recovered_from_preflight"])
+        self.assertEqual([], gate["semanticFailures"])
+        self.assertEqual(["public-edge deploy preflight is not pass"], gate["receiptFailures"])
+        self.assertEqual([], gate["nonPreflightReceiptFailures"])
+        self.assertNotIn("public_edge_postdeploy_gate failed", payload["failures"])
+        self.assertNotIn("materializer failed: python3 scripts/verify_public_edge_postdeploy_gate.py --base-url https://chummer.run", payload["failures"])
+
+    def test_payload_surfaces_public_edge_release_truth_runtime_override(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-release-truth-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            snapshot_path = Path(temp_dir) / "PUBLIC_RELEASE_SNAPSHOT.generated.json"
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            public_edge_path = published / module.REQUIRED_RECEIPTS["public_edge_postdeploy_gate"].name
+            snapshot_path.write_text(
+                json.dumps(
+                    {
+                        "release_truth": {
+                            "public_edge_postdeploy_gate": {
+                                "path": str(public_edge_path),
+                                "status": "fail",
+                                "verdict": "RUNTIME_PREFLIGHT_FAIL",
+                                "generated_at": "2026-07-03T04:00:00Z",
+                                "pass": False,
+                                "runtime_override_applied": True,
+                                "runtime_override_reason": "Current mounted public-edge preflight status=fail.",
+                                "runtime_observation": {
+                                    "status": "fail",
+                                    "overlay_root": "/overlay/app",
+                                    "active_lock_count": 2,
+                                    "foreign_lock_count": 2,
+                                    "stale_foreign_lock_count": 2,
+                                    "blocking_findings": [
+                                        "active_build_lane: bash pid 1 matches build-chummer6-linux",
+                                    ],
+                                },
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with (
+                mock.patch.object(module, "PUBLISHED_ROOT", published),
+                mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"),
+                mock.patch.object(module, "REQUIRED_RECEIPTS", required),
+                mock.patch.object(module, "PUBLIC_RELEASE_SNAPSHOT_PATH", snapshot_path),
+            ):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("public_edge_postdeploy_gate release truth failed", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+        self.assertEqual("fail", gate["release_truth_status"])
+        self.assertEqual("RUNTIME_PREFLIGHT_FAIL", gate["release_truth_verdict"])
+        self.assertTrue(gate["release_truth_runtime_override_applied"])
+        self.assertEqual("/overlay/app", gate["release_truth_runtime_overlay_root"])
+        self.assertEqual(2, gate["release_truth_runtime_active_lock_count"])
+        self.assertEqual(2, gate["release_truth_runtime_foreign_lock_count"])
+        self.assertEqual(2, gate["release_truth_runtime_stale_foreign_lock_count"])
+        self.assertEqual(
+            ["active_build_lane: bash pid 1 matches build-chummer6-linux"],
+            gate["release_truth_runtime_blocking_findings"],
+        )
+        self.assertIn(
+            "public_edge_postdeploy_gate release truth verdict is RUNTIME_PREFLIGHT_FAIL",
+            gate["release_truth_runtime_failures"],
+        )
+        self.assertIn("Current mounted public-edge preflight status=fail.", gate["failures"])
+        self.assertIn("active_build_lane: bash pid 1 matches build-chummer6-linux", gate["failures"])
+        self.assertIn(
+            "edge release truth: status=fail verdict=RUNTIME_PREFLIGHT_FAIL runtime_override=True",
+            markdown,
+        )
+
+    def test_payload_rejects_public_edge_postdeploy_semantic_contradictions(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-semantics-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                    payload.update(
+                        {
+                            "downloadsHasMarker": False,
+                            "statusRedirectHasMarker": False,
+                            "visibleVersion": "",
+                            "statusRedirectVersion": "",
+                            "expectedReleaseVersion": "run-test",
+                            "visibleVersionMatchesReleaseChannel": False,
+                            "statusRedirectVersionMatchesReleaseChannel": False,
+                            "expectedReleaseStatus": "draft",
+                            "expectedReleaseChannel": "",
+                            "expectedReleaseSupportabilityState": "review_required",
+                            "expectedReleaseRolloutState": "coverage_incomplete",
+                            "releaseManifestStatus": "draft",
+                            "releaseManifestStatusMatchesReleaseChannel": False,
+                            "releaseManifestChannel": "preview",
+                            "releaseManifestChannelMatchesReleaseChannel": False,
+                            "releaseManifestSupportabilityState": "review_required",
+                            "releaseManifestSupportabilityMatchesReleaseChannel": False,
+                            "releaseManifestRolloutState": "coverage_incomplete",
+                            "releaseManifestRolloutMatchesReleaseChannel": False,
+                            "pwaManifestCount": 1,
+                            "ledgerStreamPrecached": True,
+                            "mobileLedgerPayloadStatus": "live",
+                            "readyMobileHandoffToolIds": ["inventory"],
+                            "readyMobileHandoffFrontdoorLaunchRoute": "/mobile",
+                            "readyMobileHandoffRoleRoutes": [
+                                {
+                                    "role": "Player",
+                                    "mode": "player",
+                                    "route": "/mobile/player",
+                                }
+                            ],
+                            "mobilePwaViewportRouteCount": 2,
+                            "mobilePwaViewportViewportCount": 1,
+                            "mobilePwaViewportRoutes": ["/mobile", "/play"],
+                            "mobilePwaViewportMissingRoutes": ["/mobile/gm"],
+                            "participateIframeRouteOfflineFallbackCount": 1,
+                            "frontdoorNavigationGatedTargets": ["Open"],
+                            "frontdoorNavigationPublicTargets": [],
+                            "frontdoorNavigationPlayRoute": "/play",
+                            "frontdoorNavigationPlaySignInRoute": "",
+                            "frontdoorNavigationDirectPlayerRoute": "/play",
+                        }
+                    )
+                    payload["roleAliasRouteStatus"] = "fail"
+                    payload["roleAliasRouteResults"][0].update(
+                        {
+                            "finalUrl": "https://chummer.run/play?role=player",
+                            "finalRoute": "/play?role=player",
+                            "pass": False,
+                        }
+                    )
+                    payload["roleAliasRouteDrift"] = [payload["roleAliasRouteResults"][0]]
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("public_edge_postdeploy_gate semantic proof failed", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+        self.assertIn("public-edge postdeploy downloads marker is not proven", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy visible Version text does not match release channel", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy status redirect Version text does not match release channel", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy expected release status is not published", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy expected release channel is missing", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy expected release supportability cannot be evaluated without a channel", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy expected release rollout is blocking: coverage_incomplete", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy live release manifest status does not match release channel", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy live release manifest channel does not match release channel", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy live release manifest supportability does not match release channel", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy live release manifest rollout does not match release channel", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy PWA manifest count is below required count", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy mobile ledger payload is not opt_in_required", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy Ready mobile handoff frontdoor launch route is not /mobile/player", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy Ready mobile handoff Player manifest path is not /manifest.player.webmanifest", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy Ready mobile handoff is missing the GameMaster role route", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy mobile PWA viewport routes are incomplete: /mobile/gm", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy roleAliasRouteStatus is not pass", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy role alias routes drifted", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy /player resolved to /play?role=player instead of /mobile/player", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy front-door navigation does not gate Build", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy front-door navigation does not gate Play", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy front-door navigation Play route is not /mobile/player", gate["semanticFailures"])
+        self.assertIn("public-edge postdeploy front-door navigation direct player route is not /mobile/player", gate["semanticFailures"])
+        self.assertIn("edge failures:", markdown)
+        self.assertIn("public-edge postdeploy downloads marker is not proven", markdown)
+
+    def test_payload_rejects_public_edge_postdeploy_receipt_when_release_channel_version_advances(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-version-drift-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                    payload["expectedReleaseVersion"] = "run-old"
+                    payload["visibleVersion"] = "Version run-old"
+                    payload["statusRedirectVersion"] = "Version run-old"
+                    payload["releaseManifestVersion"] = "run-old"
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+
+            (published / "RELEASE_CHANNEL.generated.json").write_text(
+                json.dumps(
+                    {
+                        "status": "published",
+                        "version": "run-new",
+                        "publishedAt": module.now_iso(),
+                        "channel": "public_stable",
+                        "supportabilityState": "gold_supported",
+                        "rolloutState": "public_stable",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), \
+                mock.patch.object(module, "REGISTRY_ROOT", published), \
+                mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), \
+                mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("public_edge_postdeploy_gate semantic proof failed", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+        self.assertEqual("run-new", gate["currentReleaseChannelVersion"])
+        self.assertIn(
+            "public-edge postdeploy expected release version does not match current release channel version",
+            gate["semanticFailures"],
+        )
+        self.assertIn(
+            "public-edge postdeploy release manifest version does not match current release channel version",
+            gate["semanticFailures"],
+        )
+
+    def test_payload_rejects_teable_important_work_without_passed_sync(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-teable-sync-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                if key == "teable_important_work":
+                    payload = {
+                        "contract_name": "chummer.teable_important_work.v1",
+                        "status": "ready",
+                        "generated_at_utc": module.now_iso(),
+                        "table_name": "Chummer Important Work",
+                        "row_count": 1,
+                        "rows": [{"item_id": "teable-important-work-sync"}],
+                        "sync": {
+                            "state": "not_requested",
+                            "attempted": False,
+                            "synced_count": 0,
+                            "failed_count": 0,
+                        },
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["teable_important_work"]
+        markdown = module.build_verdict_markdown(payload)
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("teable_important_work sync not passed", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("not_requested", gate["summary"]["sync_state"])
+        self.assertIn("teable: state=not_requested", markdown)
+
+    def test_payload_surfaces_blazor_execution_horizon_bridge_summary_in_final_gold_markdown(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-blazor-bridge-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            play_surface_horizon_path = Path(temp_dir) / "play-surface" / "BLAZOR_PLAY_SURFACE_HORIZON.generated.json"
+            play_surface_horizon_path.parent.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "blazor_execution_horizon_bridge":
+                    payload = passing_blazor_execution_horizon_bridge_payload(module)
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            play_surface_horizon_path.write_text(
+                json.dumps(passing_blazor_play_surface_horizon_payload()),
+                encoding="utf-8",
+            )
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch.object(module, "WORKSPACE_PLAY_SURFACE_HORIZON_CANDIDATES", (play_surface_horizon_path,)):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["blazor_execution_horizon_bridge"]
+        self.assertEqual("pass", payload["status"])
+        self.assertTrue(gate["pass"])
+        self.assertTrue(gate["public_entry"]["pass"])
+        self.assertEqual(
+            "mobile_pwa_and_blazor_smoke_integrated_full_matrix_not_proven",
+            gate["summary"]["verdict"],
+        )
+        self.assertEqual("proven", gate["summary"]["near_term_smoke_status"])
+        self.assertEqual("not_proven", gate["summary"]["mid_term_full_matrix_status"])
+        self.assertEqual("not_proven", gate["summary"]["long_term_full_browser_parity_status"])
+        self.assertEqual(
+            ["near_term_stabilization", "mid_term_pwa_session_utility", "long_term_living_world_expansion"],
+            [item["id"] for item in gate["summary"]["play_surface_horizon"]["horizons"]],
+        )
+        self.assertEqual(
+            ["runner data", "workspace data", "API traffic", "Black Ledger state", "heat state", "session state"],
+            gate["summary"]["play_surface_horizon"]["mid_term_server_bound_boundaries"],
+        )
+        self.assertIn(
+            "blazor bridge: verdict=mobile_pwa_and_blazor_smoke_integrated_full_matrix_not_proven "
+            "hub_mobile=pass blazor_pwa=passed near_term=proven mid_term=not_proven "
+            "mid_term_workflows=9/49 long_term=not_proven",
+            markdown,
+        )
+        self.assertIn(
+            "play-surface horizons: near_term_stabilization=proven, "
+            "mid_term_pwa_session_utility=mixed, long_term_living_world_expansion=staged",
+            markdown,
+        )
+        self.assertIn(
+            "mid-term server-bound boundaries: runner data, workspace data, API traffic, Black Ledger state, heat state, session state",
+            markdown,
+        )
+
+    def test_blazor_bridge_public_entry_summary_fails_closed_on_incomplete_v2_checks(self) -> None:
+        module = load_module()
+        payload = passing_blazor_execution_horizon_bridge_payload(module)
+        public_entry = payload["proofs"]["hub_mobile_pwa_public_projection"]["public_entry"]
+        del public_entry["checks"]["proofClosurePass"]
+
+        summary = module.blazor_bridge_public_entry_summary(payload)
+
+        self.assertFalse(summary["pass"])
+        self.assertFalse(summary["checks"]["proofClosurePass"]["present"])
+
+    def test_blazor_bridge_public_entry_summary_rejects_extra_public_check(self) -> None:
+        module = load_module()
+        payload = passing_blazor_execution_horizon_bridge_payload(module)
+        public_entry = payload["proofs"]["hub_mobile_pwa_public_projection"]["public_entry"]
+        public_entry["checks"]["unexpected"] = True
+
+        summary = module.blazor_bridge_public_entry_summary(payload)
+
+        self.assertFalse(summary["pass"])
+
+    def test_blazor_bridge_public_entry_summary_rejects_sparse_source_checks(self) -> None:
+        module = load_module()
+        payload = passing_blazor_execution_horizon_bridge_payload(module)
+        source_contract = payload["proofs"]["hub_mobile_pwa_public_projection"]["source_contract"]
+        source_contract["checks"] = {"passingStatus": True}
+
+        summary = module.blazor_bridge_public_entry_summary(payload)
+
+        self.assertFalse(summary["pass"])
+
+    def test_blazor_bridge_public_entry_summary_rejects_sparse_live_checks(self) -> None:
+        module = load_module()
+        payload = passing_blazor_execution_horizon_bridge_payload(module)
+        source_contract = payload["proofs"]["hub_mobile_pwa_public_projection"]["source_contract"]
+        source_contract["mode"] = "live"
+        source_contract["checks"] = {"passingStatus": True}
+
+        summary = module.blazor_bridge_public_entry_summary(payload)
+
+        self.assertFalse(summary["pass"])
+
+    def test_payload_rejects_flagship_product_readiness_gap(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-flagship-readiness-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                    payload["status"] = "fail"
+                    payload["completion_audit"] = {"status": "fail"}
+                    payload["flagship_readiness_audit"] = {
+                        "status": "fail",
+                        "reason": "missing coverage: desktop_client",
+                        "coverage_gap_keys": ["desktop_client"],
+                        "scoped_coverage_gap_keys": ["desktop_client"],
+                    }
+                    payload["summary"] = {"ready_count": 7, "missing_count": 1, "scoped_missing_count": 1}
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["flagship_product_readiness"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("flagship_product_readiness failed", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual(["desktop_client"], gate["summary"]["coverage_gap_keys"])
+        self.assertIn("flagship readiness:", markdown)
+        self.assertIn("missing coverage: desktop_client", markdown)
+
+    def test_payload_refreshes_default_flagship_gate_before_loading(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-flagship-gate-refresh-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            gate_path = published / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            gate_path.write_text(
+                json.dumps(
+                    {
+                        **failing_flagship_product_readiness_gate_payload(module),
+                        "generated_at_utc": "2026-07-06T05:00:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+
+            def fake_run(args, **_kwargs):
+                if args[:2] == ["python3", "scripts/verify_flagship_product_readiness_gate.py"]:
+                    refreshed = failing_flagship_product_readiness_gate_payload(module)
+                    refreshed["generated_at_utc"] = "2026-07-06T05:35:00Z"
+                    gate_path.write_text(json.dumps(refreshed), encoding="utf-8")
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with (
+                mock.patch.object(module, "PUBLISHED_ROOT", published),
+                mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"),
+                mock.patch.object(module, "REQUIRED_RECEIPTS", required),
+                mock.patch.object(module, "DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_PATH", gate_path),
+                mock.patch.object(
+                    module,
+                    "DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_REFRESH_COMMAND",
+                    [
+                        "python3",
+                        "scripts/verify_flagship_product_readiness_gate.py",
+                        "--summary-output",
+                        str(gate_path),
+                    ],
+                ),
+                mock.patch.object(module.subprocess, "run", side_effect=fake_run) as run,
+            ):
+                payload = module.build_payload([])
+
+        run.assert_called_once()
+        gate = payload["required_gates"]["flagship_product_readiness"]
+        self.assertEqual(str(gate_path), gate["path"])
+        self.assertEqual("gate", gate["source_receipt"])
+        self.assertEqual("2026-07-06T05:35:00Z", gate["generated_at_utc"])
+        self.assertEqual(3, gate["summary"]["launch_critical_nested_blocker_count"])
+        self.assertEqual([], gate["summary"]["coverage_gap_keys"])
+
+    def test_payload_recovers_flagship_gate_when_other_gates_already_block_gold(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-flagship-gate-recovered-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            gate_path = published / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "windows_installer_visual_audit":
+                    payload = passing_required_receipt_payload(module, key)
+                    payload["status"] = "fail"
+                    payload["failures"] = [
+                        "Windows startup receipt digest does not match promoted installer",
+                    ]
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["status"] = "fail"
+                    payload["checks"]["windows_installer_visual_audit"]["status"] = "fail"
+                    payload["checks"]["windows_installer_visual_audit"]["pass"] = False
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            gate_path.write_text(json.dumps(failing_flagship_product_readiness_gate_payload(module)), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["flagship_product_readiness"]
+        self.assertEqual("fail", payload["status"])
+        self.assertNotIn("flagship_product_readiness failed", payload["failures"])
+        self.assertEqual(str(gate_path), gate["path"])
+        self.assertEqual(str(published / "FLAGSHIP_PRODUCT_READINESS.generated.json"), gate["raw_path"])
+        self.assertEqual("NOT_FLAGSHIP_PRODUCT_READY", gate["verdict"])
+        self.assertTrue(gate["pass"])
+        self.assertTrue(gate["recovered_for_final_gold"])
+        self.assertIn("windows_installer_visual_audit", gate["recovered_because_of_gates"])
+        self.assertEqual("NOT_FLAGSHIP_PRODUCT_READY", gate["summary"]["verdict"])
+        self.assertTrue(gate["summary"]["recovered_for_final_gold"])
+        self.assertIn("source=gate verdict=NOT_FLAGSHIP_PRODUCT_READY", markdown)
+        self.assertIn("release-blocking recovered via:", markdown)
+
+    def test_payload_recovers_flagship_gate_with_failed_nested_audits_when_only_wrapper_echo_remains(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-flagship-gate-nested-audits-recovered-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            gate_path = published / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "windows_installer_visual_audit":
+                    payload = passing_required_receipt_payload(module, key)
+                    payload["status"] = "fail"
+                    payload["failures"] = [
+                        "Windows startup receipt digest does not match promoted installer",
+                    ]
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["status"] = "fail"
+                    payload["checks"]["windows_installer_visual_audit"]["status"] = "fail"
+                    payload["checks"]["windows_installer_visual_audit"]["pass"] = False
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            gate_path.write_text(
+                json.dumps(failing_flagship_product_readiness_gate_payload_with_failed_nested_audits(module)),
+                encoding="utf-8",
+            )
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["flagship_product_readiness"]
+        self.assertEqual("fail", payload["status"])
+        self.assertNotIn("flagship_product_readiness failed", payload["failures"])
+        self.assertEqual(str(gate_path), gate["path"])
+        self.assertTrue(gate["pass"])
+        self.assertTrue(gate["recovered_for_final_gold"])
+        self.assertTrue(gate["summary"]["structural_pass"])
+        self.assertTrue(gate["summary"]["recovered_for_final_gold"])
+        self.assertIn("windows_installer_visual_audit", gate["recovered_because_of_gates"])
+
+    def test_payload_rejects_flagship_gate_unexpected_ready_verdict(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-flagship-gate-verdict-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            gate_path = published / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            gate_path.write_text(
+                json.dumps(
+                    {
+                        "contract_name": "chummer.flagship_product_readiness_gate.v1",
+                        "generated_at_utc": module.now_iso(),
+                        "status": "pass",
+                        "verdict": "NOT_FLAGSHIP_PRODUCT_READY",
+                        "readiness_path": ".codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json",
+                        "summary": {
+                            "contract_name": "fleet.flagship_product_readiness",
+                            "status": "pass",
+                            "generated_at": module.now_iso(),
+                            "completion_audit_status": "pass",
+                            "flagship_readiness_audit_status": "pass",
+                            "reason": "Flagship product readiness proof is green.",
+                            "ready_count": 8,
+                            "missing_count": 0,
+                            "scoped_missing_count": 0,
+                            "warning_count": 0,
+                            "coverage_gap_keys": [],
+                            "scoped_coverage_gap_keys": [],
+                            "launch_critical_nested_blockers": [],
+                            "launch_critical_nested_blocker_count": 0,
+                            "pass": True,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["flagship_product_readiness"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("flagship_product_readiness failed", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertFalse(gate["summary"]["structural_pass"])
+        self.assertEqual(
+            ["flagship_product_readiness gate has unexpected verdict (expected FLAGSHIP_PRODUCT_READY)"],
+            gate["semanticFailures"],
+        )
+        self.assertIn(
+            "flagship_product_readiness gate has unexpected verdict (expected FLAGSHIP_PRODUCT_READY)",
+            gate["failures"],
+        )
+        self.assertIn("source=gate verdict=NOT_FLAGSHIP_PRODUCT_READY", markdown)
+
+    def test_payload_surfaces_malformed_flagship_gate_structurally(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-flagship-gate-malformed-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            gate_path = published / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
+            raw_path = published / "FLAGSHIP_PRODUCT_READINESS.generated.json"
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            gate_path.write_text("{not json", encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["flagship_product_readiness"]
+        failure = f"flagship_product_readiness receipt is malformed: {gate_path}"
+        self.assertEqual("fail", payload["status"])
+        self.assertIn(failure, payload["failures"])
+        self.assertEqual(str(gate_path), gate["path"])
+        self.assertEqual("gate", gate["source_receipt"])
+        self.assertEqual("invalid", gate["load_status"])
+        self.assertEqual(str(raw_path), gate["raw_path"])
+        self.assertEqual("loaded", gate["raw_load_status"])
+        self.assertIn(failure, gate["failures"])
+        self.assertNotIn("flagship_product_readiness failed", payload["failures"])
+
+    def test_payload_rejects_stale_public_edge_postdeploy_schema(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-stale-public-edge-postdeploy-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "public_edge_postdeploy_gate":
+                    payload = {
+                        "status": "pass",
+                        "generatedAtUtc": module.now_iso(),
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("public_edge_postdeploy_gate missing required fields", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+        self.assertIn("participateIframeShellStatus", gate["missingRequiredFields"])
+        self.assertIn("mobilePwaViewportStatus", gate["missingRequiredFields"])
+        self.assertIn("roleAliasRouteStatus", gate["missingRequiredFields"])
+        self.assertIn("frontdoorNavigationStatus", gate["missingRequiredFields"])
+        self.assertIn("missing postdeploy fields:", markdown)
+
+    def test_payload_rejects_stale_operator_dashboard_schema(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dashboard-schema-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = {
+                        "contract_name": "chummer.operator_release_dashboard",
+                        "status": "pass",
+                        "verdict": "OPERABLE_RELEASE_READY",
+                        "generated_at_utc": module.now_iso(),
+                        "checks": {
+                            "release_channel": {
+                                "status": "published",
+                                "pass": True,
+                                "supportability_state": "gold_supported",
+                                "rollout_state": "public_stable",
+                                "semantic_failures": [],
+                            },
+                            "release_ready": {"status": "fail", "pass": False, "release_blocking": False},
+                        },
+                    }
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["operator_release_dashboard"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("operator_release_dashboard missing required checks", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+        self.assertEqual(
+            sorted(module.OPERATOR_DASHBOARD_REQUIRED_CHECKS - {"release_channel", "release_ready"}),
+            gate["missing_required_checks"],
+        )
+        self.assertIn("release_ready", gate["failed_required_checks"])
+        self.assertIn("release_ready", gate["nonblocking_required_checks"])
+        self.assertIn("teable_important_work", gate["missing_required_checks"])
+        self.assertIn("ui_frame_integrity", gate["missing_required_checks"])
+        self.assertIn("missing dashboard checks:", markdown)
+        self.assertIn("teable_important_work", markdown)
+
+    def test_payload_rejects_operator_dashboard_missing_required_check_freshness_fields(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dashboard-freshness-fields-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = {
+                        "contract_name": "chummer.operator_release_dashboard",
+                        "status": "pass",
+                        "verdict": "OPERABLE_RELEASE_READY",
+                        "generated_at_utc": module.now_iso(),
+                        "release": {"version": "run-test", "channel": "stable"},
+                        "checks": {
+                            name: (
+                                {
+                                    "status": "published",
+                                    "pass": True,
+                                    "release_blocking": True,
+                                    "supportability_state": "gold_supported",
+                                    "rollout_state": "public_stable",
+                                    "semantic_failures": [],
+                                }
+                                if name == "release_channel"
+                                else {"status": "pass", "pass": True, "release_blocking": True}
+                            )
+                            for name in module.OPERATOR_DASHBOARD_REQUIRED_CHECKS
+                        },
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["operator_release_dashboard"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("operator_release_dashboard missing required check freshness fields", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+        self.assertIn("public_route_proof.fresh", gate["missing_required_check_fields"])
+        self.assertIn("release_ready.fresh", gate["missing_required_check_fields"])
+        self.assertNotIn("release_channel.fresh", gate["missing_required_check_fields"])
+        if has_windows_native_root_blocker(module):
+            self.assertIn("windows_installer_visual_audit.generated_at_utc", gate["missing_required_check_fields"])
+        else:
+            self.assertNotIn("windows_installer_visual_audit.generated_at_utc", gate["missing_required_check_fields"])
+        self.assertIn("missing dashboard check fields:", markdown)
+
+    def test_payload_rejects_operator_dashboard_stale_required_check(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dashboard-stale-check-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    stale_check = "windows_installer_visual_audit" if has_windows_native_root_blocker(module) else "public_route_proof"
+                    payload["checks"][stale_check]["fresh"] = False
+                    payload["checks"][stale_check]["generated_at_utc"] = "2020-01-01T00:00:00Z"
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["operator_release_dashboard"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("operator_release_dashboard has stale required checks", payload["failures"])
+        self.assertFalse(gate["pass"])
+        stale_check = "windows_installer_visual_audit" if has_windows_native_root_blocker(module) else "public_route_proof"
+        self.assertEqual([stale_check], gate["stale_required_checks"])
+        self.assertIn(f"stale dashboard checks: {stale_check}", markdown)
+
+    def test_payload_rejects_operator_dashboard_non_gold_release_channel(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dashboard-release-channel-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "flagship_product_readiness":
+                    payload = failing_flagship_product_readiness_gate_payload(module)
+                    payload["summary"]["launch_critical_nested_blockers"] = [
+                        "release channel supportability is not gold_supported",
+                        "release channel rollout is blocking: coverage_incomplete",
+                    ]
+                    payload["summary"]["launch_critical_nested_blocker_count"] = 2
+                    payload["summary"]["reason"] = (
+                        "Launch-critical nested blockers remain; release channel is not yet on the flagship stable lane."
+                    )
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["release"]["supportability_state"] = "review_required"
+                    payload["release"]["rollout_state"] = "coverage_incomplete"
+                    payload["checks"]["release_channel"]["supportability_state"] = "review_required"
+                    payload["checks"]["release_channel"]["rollout_state"] = "coverage_incomplete"
+                    payload["checks"]["release_channel"]["semantic_failures"] = [
+                        "release channel supportability is not gold_supported",
+                        "release channel rollout is blocking: coverage_incomplete",
+                    ]
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["operator_release_dashboard"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("operator_release_dashboard has failing required checks", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertIn("release_channel", gate["failed_required_checks"])
+        self.assertIn("release_channel", gate["contradictory_required_checks"])
+        self.assertIn(
+            "release_lane_posture",
+            [item["id"] for item in payload["root_blockers"]],
+        )
+        self.assertTrue(payload["local_surface_status"]["all_passing"])
+        self.assertIn("`release_lane_posture`: Live release channel is not yet on a flagship stable lane.", markdown)
+        self.assertIn("- local flagship surfaces: all_passing=True", markdown)
+        self.assertIn("contradictory dashboard checks: release_channel", markdown)
+
+    def test_payload_rejects_operator_dashboard_preview_release_channel_posture(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dashboard-preview-channel-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["release"]["channel"] = "preview"
+                    payload["release"]["supportability_state"] = "preview_supported"
+                    payload["release"]["rollout_state"] = "promoted_preview"
+                    payload["checks"]["release_channel"]["channel"] = "preview"
+                    payload["checks"]["release_channel"]["supportability_state"] = "preview_supported"
+                    payload["checks"]["release_channel"]["rollout_state"] = "promoted_preview"
+                    payload["checks"]["release_channel"]["summary"]["channel"] = "preview"
+                    payload["checks"]["release_channel"]["summary"]["supportability_state"] = "preview_supported"
+                    payload["checks"]["release_channel"]["summary"]["rollout_state"] = "promoted_preview"
+                    payload["checks"]["release_channel"]["semantic_failures"] = [
+                        "release channel channel is preview, not a flagship stable lane",
+                        "release channel supportability is not gold_supported",
+                        "release channel rollout is promoted_preview, not public_stable",
+                    ]
+                    payload["checks"]["release_channel"]["summary"]["semantic_failures"] = list(
+                        payload["checks"]["release_channel"]["semantic_failures"]
+                    )
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["operator_release_dashboard"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("operator_release_dashboard has failing required checks", payload["failures"])
+        self.assertFalse(gate["pass"])
+        self.assertIn("release_channel", gate["failed_required_checks"])
+        self.assertIn("release_channel", gate["contradictory_required_checks"])
+        self.assertIn(
+            "operator dashboard release_channel channel is preview, not a flagship stable lane",
+            gate["checks"]["release_channel"]["release_channel_semantic_failures"],
+        )
+        self.assertNotIn(
+            "operator dashboard release_channel status is not published",
+            gate["checks"]["release_channel"]["release_channel_semantic_failures"],
+        )
+        self.assertIn(
+            "operator dashboard release_channel rollout is promoted_preview, not public_stable",
+            gate["checks"]["release_channel"]["release_channel_semantic_failures"],
+        )
+
+    def test_payload_rejects_operator_dashboard_failed_or_nonblocking_required_check(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dashboard-required-check-state-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["checks"]["teable_important_work"]["status"] = "fail"
+                    payload["checks"]["teable_important_work"]["pass"] = False
+                    payload["checks"]["release_ready"]["semanticFailures"] = [
+                        "release_ready receipt contains failed gates",
+                    ]
+                    payload["checks"]["ui_frame_integrity"]["release_blocking"] = False
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["operator_release_dashboard"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("operator_release_dashboard has failing required checks", payload["failures"])
+        self.assertIn("operator_release_dashboard marks required checks nonblocking", payload["failures"])
+        self.assertEqual(["release_ready", "teable_important_work"], gate["failed_required_checks"])
+        self.assertEqual(["release_ready"], gate["contradictory_required_checks"])
+        self.assertEqual(["ui_frame_integrity"], gate["nonblocking_required_checks"])
+        self.assertIn("failing dashboard checks: release_ready, teable_important_work", markdown)
+        self.assertIn("contradictory dashboard checks: release_ready", markdown)
+        self.assertIn("nonblocking dashboard checks: ui_frame_integrity", markdown)
+
+    def test_payload_does_not_mark_failing_dashboard_checks_as_contradictory_when_failure_fields_match_fail_state(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dashboard-fail-not-contradictory-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["status"] = "fail"
+                    payload["verdict"] = "OPERABLE_RELEASE_BLOCKED"
+                    payload["checks"]["release_channel"]["status"] = "fail"
+                    payload["checks"]["release_channel"]["pass"] = False
+                    payload["checks"]["release_channel"]["channel"] = "preview"
+                    payload["checks"]["release_channel"]["supportability_state"] = "preview_supported"
+                    payload["checks"]["release_channel"]["rollout_state"] = "promoted_preview"
+                    payload["checks"]["release_channel"]["summary"]["channel"] = "preview"
+                    payload["checks"]["release_channel"]["summary"]["supportability_state"] = "preview_supported"
+                    payload["checks"]["release_channel"]["summary"]["rollout_state"] = "promoted_preview"
+                    payload["checks"]["release_channel"]["semantic_failures"] = [
+                        "release channel channel is preview, not a flagship stable lane",
+                        "release channel supportability is not gold_supported",
+                    ]
+                    payload["checks"]["release_ready"]["status"] = "fail"
+                    payload["checks"]["release_ready"]["pass"] = False
+                    payload["checks"]["release_ready"]["semanticFailures"] = [
+                        "release_ready receipt contains failed gates",
+                    ]
+                    payload["checks"]["release_ready"]["nextActions"] = [
+                        "Import the Windows proof bundle when it is ready.",
+                    ]
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        gate = payload["required_gates"]["operator_release_dashboard"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("operator_release_dashboard has failing required checks", payload["failures"])
+        self.assertIn("release_channel", gate["failed_required_checks"])
+        self.assertIn("release_ready", gate["failed_required_checks"])
+        self.assertEqual([], gate["contradictory_required_checks"])
+        self.assertIn("failing dashboard checks: release_channel, release_ready", markdown)
+        self.assertNotIn("contradictory dashboard checks:", markdown)
+
+    def test_payload_suppresses_dependent_release_summary_failures_when_only_root_blockers_remain(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dependent-summary-recovery-") as temp_dir:
+            root = Path(temp_dir)
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            root_release_blockers = root / "RELEASE_BLOCKERS.generated.json"
+            release_channel_failures = [
+                "release channel channel is preview, not a flagship stable lane",
+                "release channel supportability is not gold_supported",
+                "release channel rollout is promoted_preview, not public_stable",
+            ]
+            windows_summary_failure = "Windows installer visual audit source digest does not match promoted installer"
+            windows_detail_failure = (
+                "windows installer visual audit source still targets "
+                f"{'b' * 64} instead of promoted digest {'a' * 64}: /tmp/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+            )
+            windows_missing_artifact = "windows installer gold proof artifact is still missing: /tmp/windows-proof.zip"
+            stable_promotion_command = "RELEASE_CHANNEL=public_stable bash publish-download-bundle.sh"
+            post_promotion_verify_command = (
+                "python3 scripts/materialize_release_ready_receipt.py --force-global-verifier && "
+                "python3 scripts/materialize_operator_release_dashboard.py && "
+                "python3 scripts/final_gold_janitor.py && "
+                "python3 ../scripts/release/_release_gate_common.py && "
+                "python3 ../scripts/materialize_codex_flagship_handoff.py --timestamp "
+                "\"$(date --iso-8601=seconds)\""
+            )
+
+            root_release_blockers.write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-07-06T05:18:22Z",
+                        "root_blockers": [
+                            {
+                                "blocker_id": "release_posture:non_flagship_channel",
+                                "stable_promotion_command": stable_promotion_command,
+                                "post_promotion_verify_command": post_promotion_verify_command,
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "release_channel":
+                    payload["channel"] = "public_stable"
+                    payload["channelId"] = "public_stable"
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "flagship_product_readiness":
+                    payload = failing_flagship_product_readiness_gate_payload(module)
+                    payload["summary"]["status"] = "fail"
+                    payload["summary"]["completion_audit_status"] = "fail"
+                    payload["summary"]["flagship_readiness_audit_status"] = "fail"
+                    payload["summary"]["warning_count"] = 1
+                    payload["summary"]["launch_critical_nested_blockers"] = [
+                        *release_channel_failures,
+                        windows_summary_failure,
+                    ]
+                    payload["summary"]["launch_critical_nested_blocker_count"] = 4
+                    payload["summary"]["reason"] = (
+                        "Launch-critical nested blockers remain; release channel is not yet on the flagship stable lane "
+                        "and the promoted Windows installer still lacks matching visual proof."
+                    )
+                if key == "windows_installer_visual_audit":
+                    payload["status"] = "fail"
+                    payload["visualAuditSource"]["artifactSha256"] = "b" * 64
+                    payload["visualAuditSource"]["path"] = "/tmp/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+                    payload["failures"] = [
+                        windows_summary_failure,
+                        windows_detail_failure,
+                        windows_missing_artifact,
+                    ]
+                    payload["nextActions"] = [
+                        "Recapture the Windows installer visual audit for the promoted installer digest.",
+                        "Import the Windows gold proof bundle once it exists.",
+                    ]
+                if key == "release_ready":
+                    payload.update(
+                        {
+                            "status": "fail",
+                            "verdict": "NOT_RELEASE_READY",
+                            "returncode": None,
+                            "timed_out": False,
+                            "saw_release_ready_marker": False,
+                            "not_release_ready_markers": ["current receipt precheck found launch blockers"],
+                            "global_verifier_skipped_due_current_blockers": True,
+                            "failures": [
+                                *(f"FAIL release_channel: {item}" for item in release_channel_failures),
+                                *(f"FAIL flagship_product_readiness: {item}" for item in [*release_channel_failures, windows_summary_failure]),
+                                f"FAIL windows_installer_visual_audit: {windows_summary_failure}",
+                                f"FAIL windows_installer_visual_audit: {windows_detail_failure}",
+                                f"FAIL windows_installer_visual_audit: {windows_missing_artifact}",
+                            ],
+                            "failed_gates": [
+                                "release_channel",
+                                "flagship_product_readiness",
+                                "windows_installer_visual_audit",
+                            ],
+                        }
+                    )
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["status"] = "fail"
+                    payload["verdict"] = "NOT_OPERABLE_RELEASE_READY"
+                    payload["release"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                    payload["checks"]["release_channel"].update(
+                        {
+                            "pass": False,
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                            "semantic_failures": list(release_channel_failures),
+                        }
+                    )
+                    payload["checks"]["release_channel"]["summary"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                            "semantic_failures": list(release_channel_failures),
+                        }
+                    )
+                    for failing_check in ("flagship_product_readiness", "release_ready", "windows_installer_visual_audit"):
+                        payload["checks"][failing_check]["status"] = "fail"
+                        payload["checks"][failing_check]["pass"] = False
+                    payload["failures"] = [
+                        "flagship_product_readiness",
+                        "release_channel",
+                        "release_ready",
+                        "windows_installer_visual_audit",
+                        windows_missing_artifact,
+                        windows_detail_failure,
+                    ]
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with (
+                mock.patch.object(module, "PUBLISHED_ROOT", published),
+                mock.patch.object(module, "ARTIFACT_ROOT", root / "v20"),
+                mock.patch.object(module, "REQUIRED_RECEIPTS", required),
+                mock.patch.object(module, "ROOT_RELEASE_BLOCKERS_PATH", root_release_blockers),
+            ):
+                payload = module.build_payload([])
+                markdown = module.build_verdict_markdown(payload)
+
+        self.assertEqual("fail", payload["status"])
+        self.assertNotIn("flagship_product_readiness failed", payload["failures"])
+        self.assertIn("windows_installer_visual_audit failed", payload["failures"])
+        self.assertNotIn("release_ready failed", payload["failures"])
+        self.assertNotIn("operator_release_dashboard failed", payload["failures"])
+        self.assertNotIn("operator_release_dashboard has failing required checks", payload["failures"])
+        self.assertEqual(
+            ["release_posture:non_flagship_channel"],
+            payload["root_blocker_ids"],
+        )
+        self.assertEqual("2026-07-06T05:18:22Z", payload["root_blockers_generated_at"])
+        self.assertEqual(stable_promotion_command, payload["stable_promotion_command"])
+        self.assertEqual(post_promotion_verify_command, payload["post_promotion_verify_command"])
+        self.assertEqual(str(root_release_blockers), payload["root_release_truth_source"])
+        self.assertIn("release_lane_posture", [item["id"] for item in payload["root_blockers"]])
+        if has_windows_native_root_blocker(module):
+            self.assertIn("windows_native_visual_proof", [item["id"] for item in payload["root_blockers"]])
+        release_lane_posture = next(item for item in payload["root_blockers"] if item["id"] == "release_lane_posture")
+        self.assertEqual(stable_promotion_command, release_lane_posture["stable_promotion_command"])
+        self.assertEqual(post_promotion_verify_command, release_lane_posture["post_promotion_verify_command"])
+        self.assertEqual(
+            expected_release_ready_blockers_for_final_gold(module),
+            payload["required_gates"]["flagship_product_readiness"]["covered_by_root_blockers_for_final_gold"],
+        )
+        self.assertEqual(
+            expected_release_ready_blockers_for_final_gold(module),
+            payload["required_gates"]["release_ready"]["covered_by_root_blockers_for_final_gold"],
+        )
+        self.assertEqual(
+            expected_release_ready_blockers_for_final_gold(module),
+            payload["required_gates"]["operator_release_dashboard"]["covered_by_root_blockers_for_final_gold"],
+        )
+        self.assertIn("`release_lane_posture`: Live release channel is not yet on a flagship stable lane.", markdown)
+        self.assertIn(f"stable promotion command: `{stable_promotion_command}`", markdown)
+        self.assertIn(f"post-promotion verify command: `{post_promotion_verify_command}`", markdown)
+        if has_windows_native_root_blocker(module):
+            self.assertIn(
+                "`windows_native_visual_proof`: Native Windows installer execution is confirmed, but the matching visual proof is still missing or mismatched for the promoted bytes.",
+                markdown,
+            )
+
+    def test_payload_suppresses_dependent_dashboard_failures_when_google_only_fails_signed_in_preflight(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-google-signed-in-preflight-") as temp_dir:
+            root = Path(temp_dir)
+            published = root / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            root_release_blockers = root / "RELEASE_BLOCKERS.generated.json"
+            release_channel_failures = [
+                "release channel channel is preview, not a flagship stable lane",
+                "release channel supportability is not gold_supported",
+                "release channel rollout is promoted_preview, not public_stable",
+            ]
+            windows_summary_failure = "Windows installer visual audit source digest does not match promoted installer"
+            windows_detail_failure = (
+                "windows installer visual audit source still targets "
+                f"{'b' * 64} instead of promoted digest {'a' * 64}: /tmp/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+            )
+            windows_missing_artifact = "windows installer gold proof artifact is still missing: /tmp/windows-proof.zip"
+            stable_promotion_command = "RELEASE_CHANNEL=public_stable bash publish-download-bundle.sh"
+            post_promotion_verify_command = (
+                "python3 scripts/materialize_release_ready_receipt.py --force-global-verifier && "
+                "python3 scripts/materialize_operator_release_dashboard.py && "
+                "python3 scripts/final_gold_janitor.py && "
+                "python3 ../scripts/release/_release_gate_common.py && "
+                "python3 ../scripts/materialize_codex_flagship_handoff.py --timestamp "
+                "\"$(date --iso-8601=seconds)\""
+            )
+
+            root_release_blockers.write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-07-06T05:18:22Z",
+                        "root_blockers": [
+                            {
+                                "blocker_id": "release_posture:non_flagship_channel",
+                                "stable_promotion_command": stable_promotion_command,
+                                "post_promotion_verify_command": post_promotion_verify_command,
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "release_channel":
+                    payload["channel"] = "public_stable"
+                    payload["channelId"] = "public_stable"
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "flagship_product_readiness":
+                    payload = failing_flagship_product_readiness_gate_payload(module)
+                    payload["summary"]["status"] = "fail"
+                    payload["summary"]["completion_audit_status"] = "fail"
+                    payload["summary"]["flagship_readiness_audit_status"] = "fail"
+                    payload["summary"]["warning_count"] = 1
+                    payload["summary"]["launch_critical_nested_blockers"] = [
+                        *release_channel_failures,
+                        windows_summary_failure,
+                    ]
+                    payload["summary"]["launch_critical_nested_blocker_count"] = 4
+                    payload["summary"]["reason"] = (
+                        "Launch-critical nested blockers remain; release channel is not yet on the flagship stable lane "
+                        "and the promoted Windows installer still lacks matching visual proof."
+                    )
+                if key == "google_oauth_linking_proof":
+                    payload.update(
+                        {
+                            "status": "fail",
+                            "quick_handoff_probe": {"pass": True},
+                            "signed_in_link_handoff": {"status": "fail", "pass": False},
+                            "operator_request_artifacts": {
+                                "pass": True,
+                                "request_status": "not_required",
+                            },
+                            "operator_end_to_end_evidence": {"pass": True},
+                            "failures": [
+                                "signed_in_link_handoff: /home returned 302, expected 200",
+                                "signed_in_link_handoff: /auth/google/link did not produce a complete Google OAuth redirect contract",
+                            ],
+                        }
+                    )
+                if key == "windows_installer_visual_audit":
+                    payload["status"] = "fail"
+                    payload["visualAuditSource"]["artifactSha256"] = "b" * 64
+                    payload["visualAuditSource"]["path"] = "/tmp/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+                    payload["failures"] = [
+                        windows_summary_failure,
+                        windows_detail_failure,
+                        windows_missing_artifact,
+                    ]
+                    payload["nextActions"] = [
+                        "Recapture the Windows installer visual audit for the promoted installer digest.",
+                        "Import the Windows gold proof bundle once it exists.",
+                    ]
+                if key == "release_ready":
+                    payload.update(
+                        {
+                            "status": "fail",
+                            "verdict": "NOT_RELEASE_READY",
+                            "returncode": None,
+                            "timed_out": False,
+                            "saw_release_ready_marker": False,
+                            "not_release_ready_markers": ["current receipt precheck found launch blockers"],
+                            "global_verifier_skipped_due_current_blockers": True,
+                            "failures": [
+                                *(f"FAIL release_channel: {item}" for item in release_channel_failures),
+                                *(f"FAIL flagship_product_readiness: {item}" for item in [*release_channel_failures, windows_summary_failure]),
+                                f"FAIL windows_installer_visual_audit: {windows_summary_failure}",
+                                f"FAIL windows_installer_visual_audit: {windows_detail_failure}",
+                                f"FAIL windows_installer_visual_audit: {windows_missing_artifact}",
+                            ],
+                            "failed_gates": [
+                                "release_channel",
+                                "flagship_product_readiness",
+                                "windows_installer_visual_audit",
+                            ],
+                        }
+                    )
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["status"] = "fail"
+                    payload["verdict"] = "NOT_OPERABLE_RELEASE_READY"
+                    payload["release"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                        }
+                    )
+                    payload["checks"]["release_channel"].update(
+                        {
+                            "pass": False,
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                            "semantic_failures": list(release_channel_failures),
+                        }
+                    )
+                    payload["checks"]["release_channel"]["summary"].update(
+                        {
+                            "channel": "preview",
+                            "supportability_state": "preview_supported",
+                            "rollout_state": "promoted_preview",
+                            "semantic_failures": list(release_channel_failures),
+                        }
+                    )
+                    for failing_check in (
+                        "flagship_product_readiness",
+                        "google_oauth_linking_proof",
+                        "release_ready",
+                        "windows_installer_visual_audit",
+                    ):
+                        payload["checks"][failing_check]["status"] = "fail"
+                        payload["checks"][failing_check]["pass"] = False
+                    payload["checks"]["google_oauth_linking_proof"].update(
+                        {
+                            "quick_handoff_probe": {"pass": True},
+                            "signed_in_link_handoff": {"status": "fail", "pass": False},
+                            "operator_end_to_end_evidence": {"pass": True},
+                            "operator_request_artifacts": {
+                                "pass": True,
+                                "request_status": "not_required",
+                            },
+                            "failures": [
+                                "signed_in_link_handoff: /home returned 302, expected 200",
+                                "signed_in_link_handoff: /auth/google/link did not produce a complete Google OAuth redirect contract",
+                            ],
+                            "fresh": True,
+                            "release_blocking": False,
+                            "release_truth_effective_pass": True,
+                            "release_truth_effective_pass_reason": (
+                                "operator_evidence_green_signed_in_preflight_only_failure"
+                            ),
+                        }
+                    )
+                    payload["failures"] = [
+                        "flagship_product_readiness",
+                        "google_oauth_linking_proof",
+                        "release_channel",
+                        "release_ready",
+                        "windows_installer_visual_audit",
+                        windows_missing_artifact,
+                        windows_detail_failure,
+                    ]
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with (
+                mock.patch.object(module, "PUBLISHED_ROOT", published),
+                mock.patch.object(module, "ARTIFACT_ROOT", root / "v20"),
+                mock.patch.object(module, "REQUIRED_RECEIPTS", required),
+                mock.patch.object(module, "ROOT_RELEASE_BLOCKERS_PATH", root_release_blockers),
+            ):
+                payload = module.build_payload([])
+
+        self.assertEqual("fail", payload["status"])
+        self.assertNotIn("google_oauth_linking_proof failed", payload["failures"])
+        self.assertNotIn("operator_release_dashboard failed", payload["failures"])
+        self.assertNotIn("operator_release_dashboard has failing required checks", payload["failures"])
+        self.assertNotIn("operator_release_dashboard marks required checks nonblocking", payload["failures"])
+        self.assertNotIn("operator_release_dashboard has stale required checks", payload["failures"])
+        self.assertTrue(
+            payload["required_gates"]["google_oauth_linking_proof"]["release_truth_effective_pass"]
+        )
+        self.assertFalse(
+            payload["required_gates"]["google_oauth_linking_proof"]["release_blocking"]
+        )
+        self.assertEqual(
+            ["release_posture:non_flagship_channel"],
+            payload["root_blocker_ids"],
+        )
+        self.assertEqual(
+            expected_release_ready_blockers_for_final_gold(module),
+            payload["required_gates"]["operator_release_dashboard"]["covered_by_root_blockers_for_final_gold"],
+        )
+
+    def test_payload_suppresses_stale_release_ready_and_dashboard_failures_once_public_edge_gate_recovers(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-stale-public-edge-summary-") as temp_dir:
+            root = Path(temp_dir)
+            published = root / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            root_release_blockers = root / "RELEASE_BLOCKERS.generated.json"
+            root_release_blockers.write_text(
+                json.dumps(
+                    {
+                        "generated_at": "2026-07-09T04:48:27Z",
+                        "root_blocker_ids": [],
+                        "root_blockers": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "release_ready":
+                    payload = passing_required_receipt_payload(module, key)
+                    payload.update(
+                        {
+                            "status": "fail",
+                            "verdict": "NOT_RELEASE_READY",
+                            "failed_gates": ["public_edge_postdeploy_gate"],
+                            "failures": [
+                                "FAIL public_edge_postdeploy_gate: downloads-status Playwright proof is not pass",
+                                "FAIL public_edge_postdeploy_gate: downloads-status Playwright artifact contract is not chummer.downloads_status_e2e.v1",
+                            ],
+                        }
+                    )
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload.update(
+                        {
+                            "status": "fail",
+                            "verdict": "OPERABLE_RELEASE_BLOCKED",
+                            "failures": [
+                                "public_edge_postdeploy_gate",
+                                "release_ready",
+                            ],
+                            "failed_required_checks": [
+                                "public_edge_postdeploy_gate",
+                                "release_ready",
+                            ],
+                            "contradictory_required_checks": [],
+                            "missing_required_checks": [],
+                            "missing_required_check_fields": [],
+                            "stale_required_checks": [],
+                            "nonblocking_required_checks": [],
+                        }
+                    )
+                    payload["checks"]["public_edge_postdeploy_gate"]["status"] = "fail"
+                    payload["checks"]["public_edge_postdeploy_gate"]["pass"] = False
+                    payload["checks"]["release_ready"]["status"] = "fail"
+                    payload["checks"]["release_ready"]["pass"] = False
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with (
+                mock.patch.object(module, "PUBLISHED_ROOT", published),
+                mock.patch.object(module, "ARTIFACT_ROOT", root / "v20"),
+                mock.patch.object(module, "REQUIRED_RECEIPTS", required),
+                mock.patch.object(module, "ROOT_RELEASE_BLOCKERS_PATH", root_release_blockers),
+            ):
+                payload = module.build_payload([])
+
+        self.assertEqual("pass", payload["status"])
+        self.assertEqual("GOLD_READY", payload["verdict"])
+        self.assertNotIn("release_ready failed", payload["failures"])
+        self.assertNotIn("release_ready semantic proof failed", payload["failures"])
+        self.assertNotIn("operator_release_dashboard failed", payload["failures"])
+        self.assertNotIn("operator_release_dashboard has failing required checks", payload["failures"])
+        self.assertEqual(
+            expected_release_ready_blockers_for_final_gold(module),
+            payload["required_gates"]["release_ready"]["covered_by_root_blockers_for_final_gold"],
+        )
+        self.assertEqual(
+            expected_release_ready_blockers_for_final_gold(module),
+            payload["required_gates"]["operator_release_dashboard"]["covered_by_root_blockers_for_final_gold"],
+        )
+
+    def test_google_oauth_release_truth_effective_pass_rejects_pass_shaped_receipt_with_failures(self) -> None:
+        module = load_module()
+
+        self.assertFalse(
+            module.google_oauth_release_truth_effective_pass(
+                {
+                    "status": "pass",
+                    "failures": [
+                        "operator_end_to_end_evidence: missing operator evidence receipt: /tmp/operator-evidence.json",
+                    ],
+                    "operator_end_to_end_evidence": {"pass": True},
+                    "operator_request_artifacts": {"request_status": "not_required"},
+                    "quick_handoff_probe": {"pass": True},
+                    "signed_in_link_handoff": {"status": "fail", "pass": False},
+                }
+            )
+        )
+
+    def test_google_oauth_release_truth_effective_pass_accepts_effective_not_required_request_status(self) -> None:
+        module = load_module()
+
+        self.assertTrue(
+            module.google_oauth_release_truth_effective_pass(
+                {
+                    "status": "fail",
+                    "failures": [
+                        "signed_in_link_handoff: /home returned 302, expected 200",
+                        "signed_in_link_handoff: /auth/google/link did not produce a complete Google OAuth redirect contract",
+                    ],
+                    "operator_end_to_end_evidence": {"pass": True},
+                    "operator_request_artifacts": {
+                        "request_status": "operator_action_required",
+                        "request_effective_status": "not_required",
+                    },
+                    "quick_handoff_probe": {"pass": True},
+                    "signed_in_link_handoff": {"status": "fail", "pass": False},
+                }
+            )
+        )
+
+    def test_google_oauth_release_truth_effective_pass_accepts_user_paused_signin_automation(self) -> None:
+        module = load_module()
+
+        self.assertTrue(
+            module.google_oauth_release_truth_effective_pass(
+                {
+                    "status": "fail",
+                    "operator_request_artifacts": {
+                        "request_status": "not_required",
+                        "request_effective_status": "not_required",
+                        "operator_action_still_required": False,
+                    },
+                    "failures": [
+                        "auth_signin_automation_paused: paused by user request on 2026-07-08",
+                    ],
+                }
+            )
+        )
+
+    def test_payload_rejects_operator_dashboard_unexpected_verdict(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dashboard-verdict-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["verdict"] = "OPERABLE_RELEASE_BLOCKED"
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["operator_release_dashboard"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("operator_release_dashboard has unexpected verdict", payload["failures"])
+        self.assertEqual("OPERABLE_RELEASE_BLOCKED", gate["verdict"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+
+    def test_payload_rejects_operator_dashboard_unexpected_contract(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dashboard-contract-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                    payload["contract_name"] = "chummer.operator_release_dashboard.preview"
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        gate = payload["required_gates"]["operator_release_dashboard"]
+        self.assertEqual("fail", payload["status"])
+        self.assertIn("operator_release_dashboard has unexpected contract", payload["failures"])
+        self.assertEqual("chummer.operator_release_dashboard.preview", gate["contract_name"])
+        self.assertFalse(gate["pass"])
+        self.assertEqual("fail", gate["status"])
+
+    def test_main_writes_identical_published_and_durable_v20_janitor_artifacts(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-dual-write-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            artifact_root = Path(temp_dir) / "full_product_reaudit_v20"
+            legacy_root = Path(temp_dir) / "gold_readiness_closure"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = passing_required_receipt_payload(module, key)
+                if key == "public_edge_postdeploy_gate":
+                    payload = passing_public_edge_postdeploy_payload(module)
+                if key == "public_route_proof":
+                    payload = {
+                        "status": "pass",
+                        "generated_at_utc": module.now_iso(),
+                        "summary": {
+                            "route_count": 10,
+                            "passed_count": 10,
+                            "failed_count": 0,
+                            "negative_path_failed_count": 0,
+                        },
+                    }
+                if key == "teable_important_work":
+                    payload = passing_teable_important_work_payload(module)
+                if key == "flagship_product_readiness":
+                    payload = passing_flagship_product_readiness_payload(module)
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             stdout = io.StringIO()
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
@@ -2673,9 +6210,9 @@ class FinalGoldJanitorTests(unittest.TestCase):
         markdown = module.build_verdict_markdown(durable_payload)
         self.assertIn("role PWA manifests: count=2", markdown)
         self.assertIn("/manifest.player.webmanifest", markdown)
-        self.assertIn("/mobile/player?role=Player", markdown)
+        self.assertIn("/mobile/player", markdown)
         self.assertIn("/manifest.gm.webmanifest", markdown)
-        self.assertIn("/mobile/gm?role=GameMaster", markdown)
+        self.assertIn("/mobile/gm", markdown)
 
     def test_main_writes_optional_fleet_completion_mirror_when_default_roots_are_active(self) -> None:
         module = load_module()
@@ -2850,55 +6387,6 @@ class FinalGoldJanitorTests(unittest.TestCase):
             refresh_flagship_product_readiness_gate_receipt=True,
         )
 
-    def test_skip_materializers_does_not_preserve_stale_failed_materializer_rows(self) -> None:
-        module = load_module()
-        with tempfile.TemporaryDirectory(prefix="gold-janitor-skip-materializers-") as temp_dir:
-            published = Path(temp_dir) / "published"
-            artifact_root = Path(temp_dir) / "full_product_reaudit_v20"
-            legacy_root = Path(temp_dir) / "gold_readiness_closure"
-            published.mkdir(parents=True, exist_ok=True)
-            (published / "FINAL_GOLD_JANITOR.generated.json").write_text(
-                json.dumps(
-                    {
-                        "status": "fail",
-                        "materializers": [
-                            {
-                                "command": "python3 old_broken_materializer.py",
-                                "returncode": 1,
-                            }
-                        ],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            for key, path in module.REQUIRED_RECEIPTS.items():
-                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
-                if key == "public_route_proof":
-                    payload = {
-                        "status": "pass",
-                        "generated_at_utc": module.now_iso(),
-                        "summary": {
-                            "route_count": 10,
-                            "passed_count": 10,
-                            "failed_count": 0,
-                            "negative_path_failed_count": 0,
-                        },
-                    }
-                write_required_receipt(module, published, key, path, payload)
-            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
-            with (
-                mock.patch.object(module, "PUBLISHED_ROOT", published),
-                mock.patch.object(module, "ARTIFACT_ROOT", artifact_root),
-                mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root),
-                mock.patch.object(module, "REQUIRED_RECEIPTS", required),
-                mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]),
-            ):
-                self.assertEqual(0, module.main())
-
-            payload = json.loads((published / "FINAL_GOLD_JANITOR.generated.json").read_text(encoding="utf-8"))
-
-        self.assertEqual([], payload["materializers"])
-
     def test_payload_fails_on_stale_rule_authority_receipt(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="gold-janitor-stale-rules-") as temp_dir:
@@ -2907,12 +6395,9 @@ class FinalGoldJanitorTests(unittest.TestCase):
             stale_time = "2020-01-01T00:00:00Z"
             for key, path in module.REQUIRED_RECEIPTS.items():
                 generated_at = stale_time if key == "rule_authority_minimum_coverage" else module.now_iso()
-                write_required_receipt(
-                    module,
-                    published,
-                    key,
-                    path,
-                    {"status": "pass", "generated_at_utc": generated_at},
+                (published / path.name).write_text(
+                    json.dumps(passing_required_receipt_payload(module, key, generated_at)),
+                    encoding="utf-8",
                 )
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
@@ -2920,70 +6405,6 @@ class FinalGoldJanitorTests(unittest.TestCase):
 
         self.assertEqual(payload["status"], "fail")
         self.assertIn("rule_authority_minimum_coverage stale", payload["failures"])
-
-    def test_payload_accepts_generated_at_utc_camel_case_for_public_edge_gate(self) -> None:
-        module = load_module()
-        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-fresh-") as temp_dir:
-            published = Path(temp_dir) / "published"
-            published.mkdir(parents=True, exist_ok=True)
-            for key, path in module.REQUIRED_RECEIPTS.items():
-                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
-                if key == "public_edge_postdeploy_gate":
-                    payload = {
-                        "status": "pass",
-                        "generatedAtUtc": module.now_iso(),
-                        "releaseManifestVersion": "run-20260701-124648",
-                        "visibleVersion": "Version run-20260701-124648",
-                        "browserPlaywrightStatus": "pass",
-                        "flagshipHorizonsBrowserProofCoverage": "full",
-                        "mobileLedgerPayloadStatus": "opt_in_required",
-                    }
-                if key == "public_route_proof":
-                    payload = {
-                        "status": "pass",
-                        "generated_at_utc": module.now_iso(),
-                        "summary": {
-                            "route_count": 10,
-                            "failed_count": 0,
-                            "negative_path_failed_count": 0,
-                        },
-                    }
-                write_required_receipt(module, published, key, path, payload)
-            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
-            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
-                payload = module.build_payload([])
-
-        gate = payload["required_gates"]["public_edge_postdeploy_gate"]
-        self.assertEqual("pass", payload["status"])
-        self.assertEqual("Version run-20260701-124648", gate["visibleVersion"])
-        self.assertEqual("full", gate["flagshipHorizonsBrowserProofCoverage"])
-
-    def test_payload_fails_when_public_edge_postdeploy_gate_is_missing(self) -> None:
-        module = load_module()
-        with tempfile.TemporaryDirectory(prefix="gold-janitor-public-edge-missing-") as temp_dir:
-            published = Path(temp_dir) / "published"
-            published.mkdir(parents=True, exist_ok=True)
-            for key, path in module.REQUIRED_RECEIPTS.items():
-                if key == "public_edge_postdeploy_gate":
-                    continue
-                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
-                if key == "public_route_proof":
-                    payload = {
-                        "status": "pass",
-                        "generated_at_utc": module.now_iso(),
-                        "summary": {
-                            "route_count": 10,
-                            "failed_count": 0,
-                            "negative_path_failed_count": 0,
-                        },
-                    }
-                write_required_receipt(module, published, key, path, payload)
-            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
-            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
-                payload = module.build_payload([])
-
-        self.assertEqual("fail", payload["status"])
-        self.assertIn("public_edge_postdeploy_gate missing", payload["failures"])
 
     def test_payload_surfaces_rule_authority_blocker_details(self) -> None:
         module = load_module()
@@ -3007,7 +6428,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                         },
                         "failures": ["sr4 final_verdict is not ready"],
                     }
-                write_required_receipt(module, published, key, path, payload)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -3046,7 +6467,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "exists": False,
                         },
                     }
-                write_required_receipt(module, published, key, path, payload)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -3190,7 +6611,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                         },
                         "failures": ["sr4 final_verdict is not ready"],
                     }
-                write_required_receipt(module, published, key, path, payload)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             stderr = io.StringIO()
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
@@ -3239,7 +6660,9 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                write_required_receipt(module, published, key, path, payload)
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -3300,7 +6723,9 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                write_required_receipt(module, published, key, path, payload)
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])
@@ -3344,7 +6769,9 @@ class FinalGoldJanitorTests(unittest.TestCase):
                             "negative_path_failed_count": 0,
                         },
                     }
-                write_required_receipt(module, published, key, path, payload)
+                if key == "operator_release_dashboard":
+                    payload = passing_operator_dashboard_payload(module)
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
                 payload = module.build_payload([])

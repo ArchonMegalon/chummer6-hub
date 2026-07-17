@@ -18,10 +18,36 @@ from scripts import publish_public_edge_portal_overlay as overlay_publisher
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_public_edge_postdeploy_gate.py"
+BRIDGE_SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_blazor_execution_horizon_bridge.py"
+READY_HANDOFF_SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_ready_mobile_handoff_contract.py"
 
 
 def load_module():
     spec = importlib.util.spec_from_file_location("verify_public_edge_postdeploy_gate", SCRIPT_PATH)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_bridge_module():
+    spec = importlib.util.spec_from_file_location(
+        "verify_blazor_execution_horizon_bridge_for_postdeploy_test",
+        BRIDGE_SCRIPT_PATH,
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_ready_handoff_module():
+    spec = importlib.util.spec_from_file_location(
+        "verify_ready_mobile_handoff_contract_for_postdeploy_test",
+        READY_HANDOFF_SCRIPT_PATH,
+    )
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     sys.modules[spec.name] = module
@@ -294,7 +320,7 @@ def test_service_worker_declared_fetchable_paths_excludes_non_cacheable_and_exte
     assert module.service_worker_declared_fetchable_paths(service_worker) == [
         "/mobile",
         "/mobile.css",
-        "/mobile/player?role=Player",
+        "/mobile/player",
     ]
 
 
@@ -340,6 +366,7 @@ def test_ready_mobile_handoff_binds_living_world_tool_to_black_ledger_heat(monke
         "status": "ready",
         "pwa_route": "/mobile",
         "continuity_route": "/play/continuity",
+        "frontdoor_launch_route": "/mobile/player",
         "boundaries": [
             "Character building stays before or after the session.",
             "Living-world updates require account opt-in and followed-world selection.",
@@ -360,6 +387,10 @@ def test_ready_mobile_handoff_binds_living_world_tool_to_black_ledger_heat(monke
             {"roleId": "player", "markdown": "/ready/packet/player.md", "json": "/ready/packet/player.json"},
             {"roleId": "gm", "markdown": "/ready/packet/gm.md", "json": "/ready/packet/gm.json"},
             {"roleId": "organizer", "markdown": "/ready/packet/organizer.md", "json": "/ready/packet/organizer.json"},
+        ],
+        "role_routes": [
+            {"role": role, **route}
+            for role, route in module.REQUIRED_READY_MOBILE_ROLE_ROUTES.items()
         ],
     }
 
@@ -930,7 +961,7 @@ def passing_receipts():
                     "route": "/mobile/player",
                     "manifest_path": "/manifest.player.webmanifest",
                     "manifest_id": "/mobile/player",
-                    "manifest_start_url": "/mobile/player?role=Player",
+                    "manifest_start_url": "/mobile/player",
                     "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player",
                     "frontdoor_default": True,
                 },
@@ -940,7 +971,7 @@ def passing_receipts():
                     "route": "/mobile/gm",
                     "manifest_path": "/manifest.gm.webmanifest",
                     "manifest_id": "/mobile/gm",
-                    "manifest_start_url": "/mobile/gm?role=GameMaster",
+                    "manifest_start_url": "/mobile/gm",
                     "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster",
                     "frontdoor_default": False,
                 },
@@ -955,6 +986,109 @@ def passing_receipts():
             "offline_fallback_route_count": 0,
         },
     )
+
+
+def test_ready_handoff_producer_is_accepted_by_postdeploy_consumers(monkeypatch) -> None:
+    postdeploy = load_module()
+    producer = load_ready_handoff_module()
+    packet_routes = [
+        {
+            "roleId": role_id,
+            "markdown": f"/ready/packet/{role_id}.md",
+            "json": f"/ready/packet/{role_id}.json",
+        }
+        for role_id in ("player", "gm", "organizer")
+    ]
+    payload = {
+        "mode": "ready_for_tonight",
+        "status": "ready",
+        "next_best_screen": "/mobile",
+        "pwa_route": "/mobile",
+        "continuity_route": "/play/continuity",
+        "frontdoor_launch_route": "/mobile/player",
+        "boundaries": [
+            "Character building stays before or after the session.",
+            "Living-world participation requires account opt-in and followed-world selection.",
+            "GM remains final authority.",
+        ],
+        "playtime_tools": [
+            {
+                "id": tool_id,
+                "summary": (
+                    "Black Ledger heat, followed-world selection, and account opt-in."
+                    if tool_id == "living_world"
+                    else f"Session utility: {tool_id}."
+                ),
+            }
+            for tool_id in sorted(producer.REQUIRED_TOOLS)
+        ],
+        "packet_routes": packet_routes,
+        "role_routes": [
+            {"role": role_name, **route}
+            for role_name, route in producer.REQUIRED_ROLE_ROUTES.items()
+        ],
+        "generated_at_utc": "2026-07-17T08:00:00+00:00",
+    }
+    serialized = json.dumps(payload).encode("utf-8")
+
+    monkeypatch.setattr(
+        producer,
+        "fetch",
+        lambda base_url, timeout_seconds: (
+            200,
+            {"content-type": "application/json"},
+            serialized,
+            f"{base_url.rstrip('/')}/ready/handoff/mobile.json",
+        ),
+    )
+    producer_receipt = producer.verify_live("https://chummer.run", 1.0)
+    assert producer_receipt["status"] == "pass"
+
+    def fake_fetch(base_url, path, timeout_seconds):
+        if path == "/ready/handoff/mobile.json":
+            body = serialized.decode("utf-8")
+            content_type = "application/json"
+        elif path.endswith(".md"):
+            role_id = Path(path).stem
+            body = f"# {role_id}\n\nReady packet.\n"
+            content_type = "text/markdown"
+        elif path.endswith(".json"):
+            role_id = Path(path).stem
+            body = json.dumps(
+                {
+                    "verdict": {"roleId": role_id},
+                    "packet": {"roleId": role_id},
+                }
+            )
+            content_type = "application/json"
+        else:
+            raise AssertionError(f"unexpected handoff path: {path}")
+        return postdeploy.FetchResult(
+            path,
+            200,
+            {"content-type": content_type},
+            body,
+            f"{base_url.rstrip('/')}{path}",
+        )
+
+    monkeypatch.setattr(postdeploy, "fetch", fake_fetch)
+    direct_receipt = postdeploy.verify_ready_mobile_handoff("https://chummer.run", 1.0)
+
+    assert direct_receipt["status"] == "pass"
+    assert direct_receipt["frontdoor_launch_route"] == "/mobile/player"
+    assert {row["manifest_start_url"] for row in direct_receipt["role_routes"]} == {
+        "/mobile/player",
+        "/mobile/gm",
+    }
+    assert all("?" not in row["manifest_start_url"] for row in direct_receipt["role_routes"])
+
+    receipts = list(passing_receipts())
+    receipts[4] = {
+        "contractName": "chummer.ready_mobile_handoff_contract.v1",
+        **producer_receipt,
+    }
+    composed = postdeploy.compose_status(*receipts)
+    assert composed["status"] == "pass"
 
 
 def passing_role_alias_routes() -> dict[str, object]:
@@ -3748,6 +3882,8 @@ def test_postdeploy_gate_can_require_frontdoor_navigation_browser_proof() -> Non
     assert result["frontdoorNavigationPlaySurface"] == "install-only"
     assert result["frontdoorNavigationPlayAuthority"] == "none"
     assert result["frontdoorNavigationLiveSession"] == "unavailable"
+    bridge_summary = load_bridge_module().frontdoor_install_entry_summary(result)
+    assert bridge_summary["checks_pass"] is True
     assert result["frontdoorNavigationPwaManifestPath"] == "/manifest.player.webmanifest"
     assert result["frontdoorNavigationLiveTurnCompanionShell"] is False
     assert result["frontdoorNavigationPrivateBrowserStateKeys"] == 0
@@ -4117,7 +4253,7 @@ def test_postdeploy_gate_surfaces_frontdoor_playwright_stderr_without_cascading_
         "Error: Homepage still serves legacy release posture copy: Current release: Preview build."
     ) in result["failures"]
     assert "front-door navigation does not gate Build" not in result["failures"]
-    assert "front-door navigation mobile artifact contract is not chummer.frontdoor_mobile_launch.v2" not in result["failures"]
+    assert "front-door navigation mobile artifact contract is not chummer.frontdoor_mobile_install_boundary.v2" not in result["failures"]
 
 
 def test_postdeploy_gate_rejects_frontdoor_navigation_wrong_artifact_contracts() -> None:
