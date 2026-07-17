@@ -19,7 +19,7 @@ SCRIPT = Path("/docker/chummercomplete/scripts/release/verify_supply_chain_evide
 PROVENANCE_SCRIPT = Path("/docker/chummercomplete/scripts/release/materialize_build_provenance.py")
 COLLECTOR_SCRIPT = Path("/docker/chummercomplete/scripts/release/collect_build_provenance.py")
 RELEASE_READY_MATERIALIZER = Path(
-    "/docker/chummercomplete/chummer.run-services/scripts/materialize_release_ready_receipt.py"
+    Path(__file__).resolve().parents[1] / "scripts" / "materialize_release_ready_receipt.py"
 )
 SPEC = importlib.util.spec_from_file_location("verify_supply_chain_evidence", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -2339,17 +2339,41 @@ def test_supply_chain_next_actions_name_real_offline_and_oci_recovery_paths() ->
     assert any("--artifact-image" in action and "--docker-binary" in action for action in actions)
 
 
-def root_release_ready_supply_chain_gate_command() -> tuple[list[str], dict[str, object], str, str]:
-    controller = load_release_ready_materializer()
-    environment = controller.authoritative_controller_environment(
-        {"PATH": controller.TRUSTED_PATH}
+def release_ready_test_environment(controller) -> dict[str, str]:  # noqa: ANN001
+    environment = {key: "" for key in controller.RELEASE_EXECUTION_ENV_KEYS}
+    environment.update(
+        {
+            "CHUMMER_PUBLIC_BASE_URL": "https://chummer.run",
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "a" * 40,
+            "CHUMMER_RUN_SERVICES_ROOT": str(controller.RUN_SERVICES_ROOT),
+            "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "0",
+            "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "0",
+            "CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH": "0",
+            "CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH": "0",
+            "CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS": "900",
+            "CHUMMER_RELEASE_READY_GUIDE_GATE_TIMEOUT_SECONDS": "1800",
+            "CHUMMER_RELEASE_READY_GATE_KILL_AFTER_SECONDS": "30",
+            "CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS": "24",
+            "CHUMMER_PUBLIC_EDGE_TIMEOUT_SECONDS": "60",
+            "PATH": controller.TRUSTED_PATH,
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONNOUSERSITE": "1",
+        }
     )
+    return controller.validate_release_execution_environment(environment)
+
+
+def root_release_ready_supply_chain_gate_command() -> tuple[
+    list[str], dict[str, object], str, object
+]:
+    controller = load_release_ready_materializer()
+    environment = release_ready_test_environment(controller)
     specs = controller.canonical_release_gate_specs(environment)
     names = [str(spec["name"]) for spec in specs]
     supply_spec = next(
         spec for spec in specs if spec["name"] == "verify_supply_chain_evidence"
     )
-    return names, supply_spec, str(supply_spec["command"]), str(controller.TRUSTED_PYTHON)
+    return names, supply_spec, str(supply_spec["command"]), controller
 
 
 def test_root_release_ready_wrapper_runs_supply_chain_gate_after_package_boundaries() -> None:
@@ -2375,7 +2399,7 @@ def test_root_release_ready_wrapper_runs_supply_chain_gate_after_package_boundar
 def test_root_release_ready_supply_chain_gate_keeps_collector_failure_after_verifier_runs(
     tmp_path: Path,
 ) -> None:
-    _, _, supply_chain_command, trusted_python = root_release_ready_supply_chain_gate_command()
+    _, _, supply_chain_command, controller = root_release_ready_supply_chain_gate_command()
     collector_marker = tmp_path / "collector-ran"
     verifier_marker = tmp_path / "verifier-ran"
     collector = tmp_path / "collector.py"
@@ -2392,11 +2416,23 @@ def test_root_release_ready_supply_chain_gate_keeps_collector_failure_after_veri
         "raise SystemExit(0)\n",
         encoding="utf-8",
     )
+    collector_command = controller.isolated_python_command(
+        COLLECTOR_SCRIPT,
+        "--workspace-root",
+        controller.ROOT,
+    )
+    verifier_command = controller.isolated_python_command(
+        SCRIPT,
+        "--workspace-root",
+        controller.ROOT,
+    )
+    assert collector_command in supply_chain_command
+    assert verifier_command in supply_chain_command
     command = supply_chain_command.replace(
-        f"{trusted_python} /docker/chummercomplete/scripts/release/collect_build_provenance.py --workspace-root /docker/chummercomplete",
+        collector_command,
         f"{shlex.quote(sys.executable)} {shlex.quote(str(collector))}",
     ).replace(
-        f"{trusted_python} /docker/chummercomplete/scripts/release/verify_supply_chain_evidence.py --workspace-root /docker/chummercomplete",
+        verifier_command,
         f"{shlex.quote(sys.executable)} {shlex.quote(str(verifier))}",
     )
     assert "/docker/chummercomplete/scripts/release/" not in command
