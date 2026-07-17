@@ -75,6 +75,10 @@ def test_boundary_receipt_advances_sequentially_and_records_recovery_truth(
     }
     assert len(persisted["activeBuildInfoSha256"]) == 64
     assert persisted["candidateToolImageId"] == CANDIDATE_TOOL_IMAGE
+    assert persisted["importDisposition"] == "completed"
+    assert persisted["importCompleted"] is True
+    assert persisted["importSkippedNoLocalStore"] is False
+    assert persisted["localStorePresentAtCutover"] is True
     assert persisted["sequence"] == len(module.PHASES)
     assert persisted["previousPhase"] == "validate_completed"
     assert len(persisted["previousReceiptSha256"]) == 64
@@ -90,6 +94,48 @@ def test_boundary_receipt_advances_sequentially_and_records_recovery_truth(
         else:
             prior_bytes = phase_receipts[index - 1].read_bytes()
             assert journal["previousReceiptSha256"] == hashlib.sha256(prior_bytes).hexdigest()
+
+
+def test_boundary_receipt_records_no_local_store_branch_before_validation(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    output = tmp_path / "boundary.json"
+    active_build_info = build_info(tmp_path)
+
+    for phase in (
+        "prepare_starting",
+        "prepare_completed",
+        module.IMPORT_SKIPPED_PHASE,
+        "validate_completed",
+        "public_acceptance_completed",
+    ):
+        receipt = advance(module, output, active_build_info, phase)
+
+    assert receipt["status"] == "pass"
+    assert receipt["sequence"] == 5
+    assert receipt["importDisposition"] == "skipped_no_local_store"
+    assert receipt["importCompleted"] is False
+    assert receipt["importSkippedNoLocalStore"] is True
+    assert receipt["localStorePresentAtCutover"] is False
+    assert receipt["validateCompleted"] is True
+    skipped_receipt = output.with_name(
+        f"{output.name}.{module.IMPORT_SKIPPED_PHASE}.json"
+    )
+    assert skipped_receipt.is_file()
+
+
+def test_boundary_receipt_requires_import_or_explicit_no_store_checkpoint(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    output = tmp_path / "boundary.json"
+    active_build_info = build_info(tmp_path)
+    advance(module, output, active_build_info, "prepare_starting")
+    advance(module, output, active_build_info, "prepare_completed")
+
+    with pytest.raises(ValueError, match="cannot skip"):
+        advance(module, output, active_build_info, "validate_completed")
 
 
 def test_boundary_receipt_rejects_skipped_or_reversed_phase(tmp_path: Path) -> None:

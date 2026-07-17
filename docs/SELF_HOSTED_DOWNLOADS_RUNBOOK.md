@@ -57,7 +57,7 @@ trust store. The runtime LOGIN role named by `CHUMMER_INSTALL_LINKING_POSTGRES_R
 already exist. `prepare` migrates the schema and grants that existing role; it never creates a LOGIN.
 
 Stage and verify the replacement overlay, build both current images, then perform the cutover in
-this exact drain/stop/activate/prepare/import/validate/start/prove/restore order. Staging does not
+this exact drain/stop/activate/probe/prepare/conditional-import/validate/start/prove/restore order. Staging does not
 change the active overlay. Activation happens only after the currently bind-mounted portal is
 stopped. Keep Cloudflare Tunnel and the portal stopped for the whole database-administration window
 so public traffic cannot reach a partially cut-over instance and the portal's local writer lease
@@ -449,6 +449,45 @@ run_operator_job_and_verify_image() {
   printf '%s' "$operator_container_image_id"
 }
 
+probe_local_install_linking_store_presence() {
+  operator_service="$1"
+  operator_name="$2"
+  operator_log="$3"
+  if /usr/bin/timeout --kill-after=10s 180s \
+    "${docker_command[@]}" compose --env-file "$canonical_env_file" -p chummer6-hub \
+    -f docker-compose.public-edge.yml --profile install-linking-postgres-admin \
+    run --name "$operator_name" --entrypoint /bin/sh "$operator_service" -c \
+    'store=/app/state/install-linking/install-linking-store.json; if test -e "$store" || test -L "$store" || test -e "$store.floor" || test -L "$store.floor"; then exit 0; else exit 42; fi' \
+    >"$operator_log" 2>&1; then
+    operator_run_status=0
+  else
+    operator_run_status=$?
+  fi
+  operator_container_id="$(/usr/bin/timeout --kill-after=5s 30s \
+    "${docker_command[@]}" container inspect --format '{{.Id}}' "$operator_name")" || return
+  case "$operator_container_id" in ""|*$'\n'*) return 1 ;; esac
+  operator_container_image_id="$(/usr/bin/timeout --kill-after=5s 30s \
+    "${docker_command[@]}" container inspect --format '{{.Image}}' "$operator_container_id")" || return
+  operator_container_exit_code="$(/usr/bin/timeout --kill-after=5s 30s \
+    "${docker_command[@]}" container inspect --format '{{.State.ExitCode}}' \
+    "$operator_container_id")" || return
+  test "$operator_container_image_id" = "$candidate_postgres_tool_image_id" || return
+  test "$operator_container_exit_code" = "$operator_run_status" || return
+  test "$(/usr/bin/timeout --kill-after=5s 30s "${docker_command[@]}" container inspect \
+    --format '{{ index .Config.Labels "com.docker.compose.project" }}' \
+    "$operator_container_id")" = chummer6-hub || return
+  test "$(/usr/bin/timeout --kill-after=5s 30s "${docker_command[@]}" container inspect \
+    --format '{{ index .Config.Labels "com.docker.compose.service" }}' \
+    "$operator_container_id")" = "$operator_service" || return
+  /usr/bin/timeout --kill-after=5s 30s \
+    "${docker_command[@]}" rm "$operator_container_id" >/dev/null || return
+  case "$operator_run_status" in
+    0) printf present ;;
+    42) printf absent ;;
+    *) return 1 ;;
+  esac
+}
+
 resolve_mutable_image_tag_id() {
   image_tag="$1"
   resolved_ids="$(/usr/bin/timeout --kill-after=5s 30s "${docker_command[@]}" image ls --quiet --no-trunc \
@@ -633,12 +672,26 @@ postgres_boundary_receipt="$(mktemp \
   "${RUNBOOK_LOG_DIR}/chummer-install-linking-postgres-boundary.XXXXXX.json")"
 prepare_operator_log="$(mktemp \
   "${RUNBOOK_LOG_DIR}/chummer-install-linking-prepare.XXXXXX.log")"
+local_store_probe_log="$(mktemp \
+  "${RUNBOOK_LOG_DIR}/chummer-install-linking-local-store-probe.XXXXXX.log")"
 import_operator_log="$(mktemp \
   "${RUNBOOK_LOG_DIR}/chummer-install-linking-import.XXXXXX.log")"
 validate_operator_log="$(mktemp \
   "${RUNBOOK_LOG_DIR}/chummer-install-linking-validate.XXXXXX.log")"
 chmod 600 "$postgres_boundary_receipt" "$prepare_operator_log" \
+  "$local_store_probe_log" \
   "$import_operator_log" "$validate_operator_log"
+local_install_linking_store_presence="$(probe_local_install_linking_store_presence \
+  chummer-install-linking-postgres-import \
+  "chummer6-hub-${cutover_id}-local-store-probe" "$local_store_probe_log")" || {
+  echo "Could not prove whether a protected local install-linking store exists." >&2
+  exit 78
+}
+case "$local_install_linking_store_presence" in
+  present|absent) ;;
+  *) echo "The local install-linking store probe returned an invalid disposition." >&2; exit 78 ;;
+esac
+assert_no_operator_jobs
 /usr/bin/python3 -I scripts/materialize_install_linking_cutover_boundary.py \
   --output "$postgres_boundary_receipt" --phase prepare_starting \
   --cutover-id "$cutover_id" --candidate-image-id "$candidate_portal_image_id" \
@@ -656,18 +709,27 @@ prepare_operator_image_id="$(run_operator_job_and_verify_image \
   --active-build-info "$active_build_info" >/dev/null
 assert_no_operator_jobs
 
-# Run this import exactly once only when migrating an existing protected local store into an
-# empty PostgreSQL authority. Omit it for a fresh deployment. The explicit flag is mandatory.
-import_operator_image_id="$(run_operator_job_and_verify_image \
-  chummer-install-linking-postgres-import \
-  "chummer6-hub-${cutover_id}-import" "$import_operator_log" \
-  import-local --confirm-empty-authority)"
-/usr/bin/python3 -I scripts/materialize_install_linking_cutover_boundary.py \
-  --output "$postgres_boundary_receipt" --phase import_completed \
-  --cutover-id "$cutover_id" --candidate-image-id "$candidate_portal_image_id" \
-  --candidate-tool-image-id "$candidate_postgres_tool_image_id" \
-  --operator-container-image-id "$import_operator_image_id" \
-  --active-build-info "$active_build_info" >/dev/null
+# Import exactly once when the non-mutating probe proved that protected local store or floor state is
+# present. A fresh deployment records the explicit no-local-store branch and proceeds directly to
+# authority validation; it must never invoke import-local against a missing store.
+if test "$local_install_linking_store_presence" = present; then
+  import_operator_image_id="$(run_operator_job_and_verify_image \
+    chummer-install-linking-postgres-import \
+    "chummer6-hub-${cutover_id}-import" "$import_operator_log" \
+    import-local --confirm-empty-authority)"
+  /usr/bin/python3 -I scripts/materialize_install_linking_cutover_boundary.py \
+    --output "$postgres_boundary_receipt" --phase import_completed \
+    --cutover-id "$cutover_id" --candidate-image-id "$candidate_portal_image_id" \
+    --candidate-tool-image-id "$candidate_postgres_tool_image_id" \
+    --operator-container-image-id "$import_operator_image_id" \
+    --active-build-info "$active_build_info" >/dev/null
+else
+  /usr/bin/python3 -I scripts/materialize_install_linking_cutover_boundary.py \
+    --output "$postgres_boundary_receipt" --phase import_skipped_no_local_store \
+    --cutover-id "$cutover_id" --candidate-image-id "$candidate_portal_image_id" \
+    --candidate-tool-image-id "$candidate_postgres_tool_image_id" \
+    --active-build-info "$active_build_info" >/dev/null
+fi
 assert_no_operator_jobs
 
 validate_operator_image_id="$(run_operator_job_and_verify_image \
@@ -791,6 +853,8 @@ echo "Local readiness receipt: $readiness_receipt"
 echo "Public readiness receipt: $public_readiness_receipt"
 echo "Browser-backed postdeploy receipt: $postdeploy_receipt"
 echo "Irreversible PostgreSQL boundary receipt: $postgres_boundary_receipt"
+echo "Local install-linking store disposition: $local_install_linking_store_presence"
+echo "Local install-linking store probe log: $local_store_probe_log"
 echo "Prepare operator log: $prepare_operator_log"
 echo "Import operator log: $import_operator_log"
 echo "Validate operator log: $validate_operator_log"

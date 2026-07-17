@@ -96,6 +96,7 @@ EXPECTED_PORTAL_DEPENDENCIES = {
 EXPECTED_CORE_ULIMIT = {"core": {}}
 EXPECTED_TOOL_PROFILE = ["install-linking-postgres-admin"]
 EXPECTED_TOOL_TMPFS = ["/tmp:rw,noexec,nosuid,nodev,mode=1777"]
+POSTGRES_RUNTIME_ROLE_PATTERN = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 EXPECTED_PORTAL_RESOURCES = {
     "cpu_shares": 256,
     "cpus": 1,
@@ -766,11 +767,12 @@ def validate_runtime(
     runtime_role = admin_environment.get("CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE")
     if (
         not isinstance(runtime_role, str)
-        or not runtime_role
-        or len(runtime_role) > 128
-        or any(ord(character) < 32 for character in runtime_role)
+        or POSTGRES_RUNTIME_ROLE_PATTERN.fullmatch(runtime_role) is None
     ):
-        raise ValueError("rendered PostgreSQL runtime role must be a bounded literal")
+        raise ValueError(
+            "rendered PostgreSQL runtime role must match "
+            "^[a-z_][a-z0-9_]{0,62}$"
+        )
 
     require_exact_mapping(
         importer.get("environment"),

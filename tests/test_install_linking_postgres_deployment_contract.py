@@ -188,8 +188,11 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             "stop chummer-portal",
             "publish_public_edge_portal_overlay.py --activate --reuse-staging",
             '--output "$overlay_preflight_receipt"',
+            '"chummer6-hub-${cutover_id}-local-store-probe"',
             '"chummer6-hub-${cutover_id}-prepare"',
+            'if test "$local_install_linking_store_presence" = present; then',
             '"chummer6-hub-${cutover_id}-import"',
+            "--phase import_skipped_no_local_store",
             '"chummer6-hub-${cutover_id}-validate"',
             "up -d --no-deps --force-recreate \\\n  --wait --wait-timeout 180 chummer-portal",
             "http://127.0.0.1:8080/api/ready",
@@ -228,8 +231,14 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         self.assertIn("image_tags_committed=1", section)
         self.assertIn("image_tag_rollback_active=1", section)
         self.assertIn("chummer-install-linking-postgres-tool:local", section)
-        self.assertEqual(5, section.count('--candidate-tool-image-id "$candidate_postgres_tool_image_id"'))
+        self.assertEqual(6, section.count('--candidate-tool-image-id "$candidate_postgres_tool_image_id"'))
         self.assertEqual(3, section.count("--operator-container-image-id"))
+        self.assertIn("else exit 42; fi", section)
+        self.assertIn('test -e "$store.floor" || test -L "$store.floor"', section)
+        self.assertIn("local_install_linking_store_presence", section)
+        self.assertIn("importSkippedNoLocalStore", (
+            ROOT / "scripts" / "materialize_install_linking_cutover_boundary.py"
+        ).read_text(encoding="utf-8"))
         self.assertIn('>"$operator_log" 2>&1 || return', section)
         self.assertNotIn("CHUMMER_INSTALL_LINKING_POSTGRES_OPERATOR_TIMEOUT_SECONDS", section)
         self.assertIn("set -eu", section)
@@ -398,11 +407,41 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         active_preflight_position = shell.index(
             '--output "$overlay_preflight_receipt"', activation_position
         )
+        local_store_probe_position = shell.index(
+            '"chummer6-hub-${cutover_id}-local-store-probe"',
+            active_preflight_position,
+        )
+        prepare_position = shell.index(
+            '"chummer6-hub-${cutover_id}-prepare"',
+            local_store_probe_position,
+        )
+        conditional_import_position = shell.index(
+            'if test "$local_install_linking_store_presence" = present; then',
+            prepare_position,
+        )
+        import_position = shell.index(
+            '"chummer6-hub-${cutover_id}-import"',
+            conditional_import_position,
+        )
+        skipped_import_position = shell.index(
+            "--phase import_skipped_no_local_store",
+            import_position,
+        )
+        validate_position = shell.index(
+            '"chummer6-hub-${cutover_id}-validate"',
+            skipped_import_position,
+        )
         self.assertLess(staged_position, build_position)
         self.assertLess(build_position, postbuild_position)
         self.assertLess(postbuild_position, stop_position)
         self.assertLess(stop_position, activation_position)
         self.assertLess(activation_position, active_preflight_position)
+        self.assertLess(active_preflight_position, local_store_probe_position)
+        self.assertLess(local_store_probe_position, prepare_position)
+        self.assertLess(prepare_position, conditional_import_position)
+        self.assertLess(conditional_import_position, import_position)
+        self.assertLess(import_position, skipped_import_position)
+        self.assertLess(skipped_import_position, validate_position)
         self.assertIn('--header "@$cf_access_header_file"', shell)
         public_readiness_position = shell.index(
             'https://chummer.run/api/ready >"$public_readiness_receipt"'
