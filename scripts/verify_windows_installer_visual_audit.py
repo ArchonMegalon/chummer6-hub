@@ -5,6 +5,9 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
+import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -15,9 +18,13 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from writable_temp_root import subprocess_env
+from verify_windows_installer_visual_audit_intake_request import (
+    verify as verify_windows_visual_intake_request_receipt,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = ROOT.parent
 VERIFIER_PATH = Path(__file__).resolve()
 PUBLISHED_ROOT = ROOT / ".codex-studio" / "published"
 
@@ -352,13 +359,38 @@ def windows_operator_request_artifacts(*, refresh_operator_state: bool = False) 
     watcher_status_command = str(artifact_intake.get("watcher_status_command") or "").strip()
     watcher_stop_command = str(artifact_intake.get("watcher_stop_command") or "").strip()
     watcher_path = Path(watcher_state_path) if watcher_state_path else DEFAULT_WINDOWS_WATCHER_STATE
-    if refresh_operator_state:
+    intake_verifier: dict[str, Any] = {}
+    if request_receipt_exists:
+        try:
+            _ok, verified = verify_windows_visual_intake_request_receipt(
+                DEFAULT_WINDOWS_VISUAL_AUDIT_INTAKE_REQUEST,
+                require_pass=False,
+            )
+            intake_verifier = dict(verified) if isinstance(verified, dict) else {}
+        except Exception as exc:
+            intake_verifier = {
+                "status": "fail",
+                "recovery_pack_pass": False,
+                "runtime_refresh_commands_trusted": False,
+                "issues": [f"windows_visual_intake_request_verifier_failed:{type(exc).__name__}"],
+            }
+    runtime_refresh_authorized = (
+        str(intake_verifier.get("status") or "").strip().lower() == "pass"
+        and intake_verifier.get("recovery_pack_pass") is True
+        and intake_verifier.get("runtime_refresh_commands_trusted") is True
+        and not list(intake_verifier.get("issues") or [])
+    )
+    if refresh_operator_state and runtime_refresh_authorized:
         auto_import_payload, auto_import_load_status = refresh_auto_import_state(
             auto_import_command,
             DEFAULT_WINDOWS_VISUAL_AUDIT_AUTO_IMPORT,
         )
         watcher_state = refresh_watcher_state(watcher_status_command, watcher_path)
     else:
+        if refresh_operator_state:
+            failures.append(
+                "operator state refresh refused because intake receipt commands are not trusted"
+            )
         auto_import_payload, auto_import_load_status = load_json(DEFAULT_WINDOWS_VISUAL_AUDIT_AUTO_IMPORT)
         watcher_state = watcher_state_details(watcher_path)
     discover_command = str(artifact_intake.get("discover_command") or "").strip()
@@ -437,6 +469,8 @@ def windows_operator_request_artifacts(*, refresh_operator_state: bool = False) 
         "promoted_installer_sha256": promoted_installer_sha256,
         "auto_import_receipt_path": str(DEFAULT_WINDOWS_VISUAL_AUDIT_AUTO_IMPORT),
         "operator_state_refresh_requested": refresh_operator_state,
+        "runtime_refresh_authorized": runtime_refresh_authorized,
+        "intake_receipt_verifier": intake_verifier,
         "auto_import_receipt_exists": DEFAULT_WINDOWS_VISUAL_AUDIT_AUTO_IMPORT.is_file(),
         "auto_import_receipt_load_status": auto_import_load_status,
         "auto_import_receipt_generated_at_utc": str(auto_import_payload.get("generated_at_utc") or "").strip(),
@@ -492,13 +526,10 @@ def windows_installer_artifact(release_channel: dict[str, Any]) -> dict[str, Any
 
 
 def effective_promoted_artifact_sha256(artifact: dict[str, Any], actual_artifact_sha: str) -> str:
-    manifest_sha = str(artifact.get("sha256") or "").strip().lower()
-    actual_sha = str(actual_artifact_sha or "").strip().lower()
+    manifest_sha = normalized(artifact.get("sha256")).removeprefix("sha256:")
     # RELEASE_CHANNEL is the promotion authority. Shelf bytes are verification
     # evidence and must never silently replace the manifest's promoted binding.
-    if manifest_sha:
-        return manifest_sha
-    return actual_sha
+    return manifest_sha if is_sha256(manifest_sha) else ""
 
 
 def release_windows_binding(release_channel: dict[str, Any]) -> dict[str, Any]:
@@ -664,15 +695,17 @@ def build_payload(
         failures.append(f"Release channel receipt is malformed: {release_channel_path}")
 
     artifact_path = downloads_root / "files" / str(artifact.get("fileName") or "")
-    artifact_sha = str(artifact.get("sha256") or "").strip().lower()
+    artifact_sha = normalized(artifact.get("sha256")).removeprefix("sha256:")
     actual_artifact_sha = sha256_file(artifact_path) if artifact_path.is_file() else ""
     effective_artifact_sha = effective_promoted_artifact_sha256(artifact, actual_artifact_sha)
 
     if not artifact:
         failures.append("promoted Windows installer artifact is missing from release channel")
+    elif not is_sha256(artifact_sha):
+        failures.append("promoted Windows installer manifest sha256 is missing or invalid")
     if not artifact_path.is_file():
         failures.append("promoted Windows installer artifact file is missing")
-    if artifact_sha and actual_artifact_sha and artifact_sha != actual_artifact_sha:
+    if is_sha256(artifact_sha) and actual_artifact_sha and artifact_sha != actual_artifact_sha:
         failures.append("promoted Windows installer manifest sha256 does not match artifact bytes")
 
     startup_status = normalized(startup_receipt.get("status"))
@@ -680,13 +713,17 @@ def build_payload(
     startup_skip_class = normalized(startup_receipt.get("skipClass"))
     startup_digest = normalized(startup_receipt.get("artifactDigest")).removeprefix("sha256:")
     startup_incompatible_host = startup_disposition == "incompatible_host" or startup_skip_class == "incompatible_host"
-    if not startup_receipt:
+    if startup_receipt_load_status == "missing":
         failures.append("Windows startup receipt is missing")
+    elif startup_receipt_load_status == "invalid":
+        failures.append("Windows startup receipt is malformed")
     elif startup_incompatible_host:
         failures.append("Windows startup receipt is an incompatible-host skip, not native proof")
     elif startup_status != "pass":
         failures.append("Windows startup receipt is not a native pass")
-    if artifact_sha and startup_digest and startup_digest != artifact_sha:
+    elif not is_sha256(startup_digest):
+        failures.append("Windows startup receipt artifact digest is missing or invalid")
+    if effective_artifact_sha and is_sha256(startup_digest) and startup_digest != effective_artifact_sha:
         failures.append("Windows startup receipt digest does not match promoted installer")
 
     source_status = normalized(source.get("status"))
@@ -714,7 +751,9 @@ def build_payload(
         failures.append("Windows installer visual audit source platform is not windows")
     if source and "windows" not in source_host_class and source_host_class != "native":
         failures.append("Windows installer visual audit source is not marked as a native Windows host")
-    if effective_artifact_sha and source_artifact_sha and source_artifact_sha != effective_artifact_sha:
+    if source and not is_sha256(source_artifact_sha):
+        failures.append("Windows installer visual audit source artifact digest is missing or invalid")
+    if effective_artifact_sha and is_sha256(source_artifact_sha) and source_artifact_sha != effective_artifact_sha:
         failures.append("Windows installer visual audit source digest does not match promoted installer")
         failures.append(
             "windows installer visual audit source still targets "
@@ -881,18 +920,40 @@ def build_payload(
         else "Native Windows visual audit still failing: " + failures[0]
     )
 
-    summary = (
-        "Native Windows visual audit matches the promoted installer."
-        if not failures
-        else "Native Windows visual audit still failing: " + failures[0]
-    )
-
     return {
         "contract_name": CONTRACT_NAME,
         "verifier_binding": current_verifier_binding,
         "generated_at_utc": now_iso(),
         "status": "pass" if not failures else "fail",
         "summary": summary,
+        "required_promoted_digest": effective_artifact_sha,
+        "actual_artifact_sha256": actual_artifact_sha,
+        "manifest_promoted_digest": artifact_sha,
+        "source_digest": source_artifact_sha,
+        "source_digest_matches_promoted": source_digest_matches_promoted,
+        "expected_bundle_path": preferred_drop_path,
+        "expected_bundle_path_exists": bool(operator_request_artifacts.get("preferred_drop_path_exists")),
+        "required_zip_filename": str(operator_request_artifacts.get("required_zip_filename") or "").strip(),
+        "preferred_zip_name": str(operator_request_artifacts.get("preferred_zip_name") or "").strip(),
+        "proof_request_status": operator_request_effective_status,
+        "proof_request_raw_status": operator_request_raw_status,
+        "operator_ask_delivery_receipt_path": str(operator_request_artifacts.get("operator_ask_delivery_receipt_path") or "").strip(),
+        "operator_ask_delivery_receipt_exists": bool(operator_request_artifacts.get("operator_ask_delivery_receipt_exists")),
+        "operator_ask_delivery_status": str(operator_request_artifacts.get("operator_ask_delivery_status") or "").strip(),
+        "operator_ask_delivery_generated_at_utc": str(
+            operator_request_artifacts.get("operator_ask_delivery_generated_at_utc") or ""
+        ).strip(),
+        "operator_ask_delivery_message_ids": list(operator_request_artifacts.get("operator_ask_delivery_message_ids") or []),
+        "operator_ask_delivery_current_text_comparable": bool(
+            operator_request_artifacts.get("operator_ask_delivery_current_text_comparable")
+        ),
+        "operator_ask_delivery_matches_current_text": bool(
+            operator_request_artifacts.get("operator_ask_delivery_matches_current_text")
+        ),
+        "operator_ask_delivery_needs_resend": bool(
+            operator_request_artifacts.get("operator_ask_delivery_needs_resend")
+        ),
+        "operator_ask_resend_command": str(operator_request_artifacts.get("operator_ask_resend_command") or "").strip(),
         "release": {
             "path": str(release_channel_path),
             "loadStatus": release_channel_load_status,

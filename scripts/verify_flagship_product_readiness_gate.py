@@ -10,6 +10,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Sequence
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from public_edge_postdeploy_contract import release_channel_trust_invariant_failures
+
 
 ROOT = Path("/docker/chummercomplete")
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
@@ -384,7 +390,8 @@ def current_release_channel_failures(payload: dict[str, Any]) -> list[str]:
         failures.extend(release_channel_rollout_blocker_details(payload))
     elif rollout_state and rollout_state != FLAGSHIP_PUBLIC_STABLE_ROLLOUT_STATE:
         failures.append(f"release channel rollout is {rollout_state}, not public_stable")
-    return failures
+    failures.extend(release_channel_trust_invariant_failures(payload))
+    return normalized_strings(failures)
 
 
 def release_channel_rollout_blocker_details(payload: dict[str, Any]) -> list[str]:

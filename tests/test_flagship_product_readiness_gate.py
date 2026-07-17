@@ -432,6 +432,36 @@ def test_current_release_channel_failures_surface_missing_tuple_details() -> Non
     ]
 
 
+def test_current_release_channel_rejects_optimistic_posture_with_stale_proof() -> None:
+    module = load_module()
+
+    failures = module.current_release_channel_failures(
+        {
+            "status": "published",
+            "version": "run-20260714-191136",
+            "channel": "public_stable",
+            "supportabilityState": "gold_supported",
+            "rolloutState": "public_stable",
+            "publicTrustMetrics": {
+                "releaseChannel": {
+                    "supportabilityState": "review_required",
+                    "posture": "blocked",
+                },
+                "proofFreshness": {"status": "stale"},
+            },
+            "registryBoundaryCoverage": {
+                "releaseChannel": {
+                    "supportabilityState": "review_required",
+                    "publicTrustPosture": "blocked",
+                }
+            },
+        }
+    )
+
+    assert "release channel flagship stable posture requires fresh proof receipts" in failures
+    assert any("supportability contradicts" in failure for failure in failures)
+
+
 def test_main_skip_materialize_fails_closed_and_writes_summary(tmp_path, monkeypatch) -> None:
     module = load_module()
     readiness = tmp_path / "FLAGSHIP_PRODUCT_READINESS.generated.json"
@@ -594,6 +624,19 @@ def test_summary_surfaces_malformed_google_oauth_linking_proof_receipt(tmp_path,
                 "channel": "stable",
                 "supportabilityState": "gold_supported",
                 "rolloutState": "public_stable",
+                "publicTrustMetrics": {
+                    "releaseChannel": {
+                        "supportabilityState": "gold_supported",
+                        "posture": "live",
+                    },
+                    "proofFreshness": {"status": "fresh"},
+                },
+                "registryBoundaryCoverage": {
+                    "releaseChannel": {
+                        "supportabilityState": "gold_supported",
+                        "publicTrustPosture": "live",
+                    }
+                },
             }
         ),
         encoding="utf-8",

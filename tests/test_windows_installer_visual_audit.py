@@ -66,6 +66,182 @@ def load_verify_intake_module():
     return module
 
 
+def write_windows_gold_proof_fixture(
+    root: Path,
+    screenshot_rows: list[dict[str, object]],
+) -> tuple[Path, Path]:
+    artifact = root / "artifact"
+    visual_root = artifact / "Chummer.Portal" / "downloads" / "visual-audit" / "windows-installer"
+    startup_root = artifact / "Chummer.Portal" / "downloads" / "startup-smoke"
+    visual_root.mkdir(parents=True)
+    startup_root.mkdir(parents=True)
+    artifact_digest = "a" * 64
+    (startup_root / "startup-smoke-avalonia-win-x64.receipt.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "platform": "windows",
+                "hostClass": "native-windows-11",
+                "artifactDigest": f"sha256:{artifact_digest}",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (visual_root / "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json").write_text(
+        json.dumps(
+            {
+                "status": "pass",
+                "platform": "windows",
+                "hostClass": "native-windows-11",
+                "artifactSha256": artifact_digest,
+                "screenshots": screenshot_rows,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return artifact, visual_root
+
+
+def valid_png_bytes(
+    *,
+    width: int = 320,
+    height: int = 180,
+    token: int = 1,
+    rgba: bool = False,
+) -> bytes:
+    color = bytes(
+        (
+            (token * 31) % 251,
+            (token * 67) % 251,
+            (token * 97) % 251,
+            *([255] if rgba else []),
+        )
+    )
+    raw = b"".join(b"\x00" + color * width for _ in range(height))
+
+    def chunk(chunk_type: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + chunk_type
+            + data
+            + struct.pack(">I", zlib.crc32(chunk_type + data) & 0xFFFFFFFF)
+        )
+
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(
+            b"IHDR",
+            struct.pack(">IIBBBBB", width, height, 8, 6 if rgba else 2, 0, 0, 0),
+        )
+        + chunk(b"IDAT", zlib.compress(raw, 9))
+        + chunk(b"IEND", b"")
+    )
+
+
+def write_valid_png(path: Path, *, token: int = 1) -> None:
+    path.write_bytes(valid_png_bytes(token=token))
+
+
+def valid_jpeg_bytes(*, width: int = 320, height: int = 180, token: int = 1) -> bytes:
+    frame = (
+        b"\xff\xc0"
+        + struct.pack(">H", 17)
+        + bytes([8])
+        + struct.pack(">HH", height, width)
+        + bytes([3, 1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0])
+    )
+    scan = (
+        b"\xff\xda"
+        + struct.pack(">H", 12)
+        + bytes([3, 1, 0, 2, 0, 3, 0, 0, 63, 0])
+        + bytes([token & 0x7F, (token * 3) & 0x7F, (token * 7) & 0x7F])
+    )
+    return b"\xff\xd8" + frame + scan + b"\xff\xd9"
+
+
+def proof_generation_entries(
+    module,
+    downloads_root: Path,
+    *,
+    token: int,
+) -> list[tuple[dict[str, object], Path]]:
+    artifact_digest = f"{token:064x}"[-64:]
+    startup_data = json.dumps(
+        {
+            "status": "pass",
+            "platform": "windows",
+            "hostClass": "native-windows-11",
+            "artifactDigest": f"sha256:{artifact_digest}",
+            "token": token,
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+    screenshot_specs = [
+        ("capture.png", "install-progress", 1.0, token),
+        ("capture-progress-scaled.png", "install-progress", 1.5, token + 1),
+        ("capture-completion-default.png", "completion", 1.0, token + 2),
+        ("capture-completion-scaled.png", "completion", 1.5, token + 3),
+    ]
+    visual_data = json.dumps(
+        {
+            "status": "pass",
+            "pass": True,
+            "failures": [],
+            "failed_gates": [],
+            "platform": "windows",
+            "hostClass": "native-windows-11",
+            "artifactSha256": artifact_digest,
+            "token": token,
+            "screenshots": [
+                {
+                    "path": name,
+                    "surface": surface,
+                    "dpiScale": dpi_scale,
+                    "clippingStatus": "pass",
+                    "readabilityStatus": "pass",
+                }
+                for name, surface, dpi_scale, _image_token in screenshot_specs
+            ],
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+
+    def snapshot(data: bytes, **extra: object) -> dict[str, object]:
+        return {
+            "data": data,
+            "sha256": module.hashlib.sha256(data).hexdigest(),
+            **extra,
+        }
+
+    entries = [
+        (
+            snapshot(startup_data),
+            downloads_root / "startup-smoke" / module.STARTUP_RECEIPT_NAME,
+        ),
+        (
+            snapshot(visual_data),
+            downloads_root / "visual-audit" / "windows-installer" / module.VISUAL_SOURCE_NAME,
+        ),
+    ]
+    for name, _surface, _dpi_scale, image_token in screenshot_specs:
+        image_data = valid_png_bytes(token=image_token)
+        entries.append(
+            (
+                snapshot(
+                    image_data,
+                    image_metadata={
+                        "format": "png",
+                        "width": 320,
+                        "height": 180,
+                        "size_bytes": len(image_data),
+                    },
+                ),
+                downloads_root / "visual-audit" / "windows-installer" / name,
+            )
+        )
+    return entries
+
+
 class WindowsInstallerVisualAuditTests(unittest.TestCase):
     def test_intake_default_discovery_roots_are_portable(self) -> None:
         intake = load_intake_module()
@@ -650,6 +826,65 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertEqual([], payload["nextActions"])
         self.assertEqual(["install-progress", "completion"], payload["visualAuditSource"]["requiredSurfaces"])
         self.assertTrue(all(row["sha256"] for row in payload["screenshots"]))
+
+    def test_missing_manifest_installer_digest_fails_closed(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="windows-installer-manifest-digest-") as temp_dir:
+            root = Path(temp_dir)
+            downloads_root, release_channel, sha = self._write_release_fixture(root)
+            manifest = json.loads(release_channel.read_text(encoding="utf-8"))
+            manifest["artifacts"][0].pop("sha256")
+            release_channel.write_text(json.dumps(manifest), encoding="utf-8")
+            startup = downloads_root / "startup-smoke" / "startup-smoke-avalonia-win-x64.receipt.json"
+            startup.parent.mkdir(parents=True)
+            startup.write_text(
+                json.dumps({"status": "pass", "artifactDigest": f"sha256:{sha}"}),
+                encoding="utf-8",
+            )
+            source = self._write_valid_windows_visual_source_fixture(
+                downloads_root,
+                source_artifact_sha=sha,
+            )
+
+            payload = module.build_payload(
+                release_channel_path=release_channel,
+                downloads_root=downloads_root,
+                startup_receipt_path=startup,
+                source_path=source,
+            )
+
+        self.assertEqual("fail", payload["status"])
+        self.assertIn(
+            "promoted Windows installer manifest sha256 is missing or invalid",
+            payload["failures"],
+        )
+
+    def test_missing_startup_receipt_digest_fails_closed(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="windows-installer-startup-digest-") as temp_dir:
+            root = Path(temp_dir)
+            downloads_root, release_channel, sha = self._write_release_fixture(root)
+            startup = downloads_root / "startup-smoke" / "startup-smoke-avalonia-win-x64.receipt.json"
+            startup.parent.mkdir(parents=True)
+            startup.write_text(json.dumps({"status": "pass"}), encoding="utf-8")
+            source = self._write_valid_windows_visual_source_fixture(
+                downloads_root,
+                source_artifact_sha=sha,
+            )
+
+            payload = module.build_payload(
+                release_channel_path=release_channel,
+                downloads_root=downloads_root,
+                startup_receipt_path=startup,
+                source_path=source,
+            )
+
+        self.assertEqual("fail", payload["status"])
+        self.assertIn(
+            "Windows startup receipt artifact digest is missing or invalid",
+            payload["failures"],
+        )
+        self.assertFalse(payload["startupReceipt"]["artifactDigestMatchesPromoted"])
 
     def test_digest_mismatch_surfaces_missing_bundle_and_auto_import_hint_details(self) -> None:
         module = load_module()
@@ -2535,12 +2770,11 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
                     downloads_root=downloads_root,
                     startup_receipt=startup,
                     source=source,
+                    request_output=output_path,
                     discovery_roots=[root / "drop"],
                     nightly_root=root / "nightly",
                     dedicated_drop_root=root / "drop",
                 )
-                payload["request_receipt_path"] = str(output_path)
-                payload["operator_telegram_draft"]["request_receipt_path"] = str(output_path)
                 payload["operator_telegram_draft_materialized"] = intake.materialize_operator_telegram_draft(
                     payload["operator_telegram_draft"]
                 )
@@ -2561,6 +2795,41 @@ class WindowsInstallerVisualAuditTests(unittest.TestCase):
         self.assertIn(
             "python3 scripts/materialize_operator_release_dashboard.py --release-ready-self-check",
             payload["post_import_gates"],
+        )
+
+    def test_operator_refresh_refuses_tampered_intake_command_without_execution(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="windows-proof-intake-command-tamper-") as temp_dir:
+            root = Path(temp_dir)
+            payload, receipt_path, _sha = self._build_windows_visual_intake_request_payload(root)
+            payload["artifact_intake"]["auto_import_command"] = (
+                "python3 -c 'raise SystemExit(99)' --intake-request " + str(receipt_path)
+            )
+            receipt_path.parent.mkdir(parents=True, exist_ok=True)
+            receipt_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            with mock.patch.object(
+                module,
+                "DEFAULT_WINDOWS_VISUAL_AUDIT_INTAKE_REQUEST",
+                receipt_path,
+            ), mock.patch.object(
+                module,
+                "DEFAULT_WINDOWS_VISUAL_AUDIT_AUTO_IMPORT",
+                root / "missing-auto-import.json",
+            ), mock.patch.object(module.subprocess, "run") as subprocess_run:
+                result = module.windows_operator_request_artifacts(
+                    refresh_operator_state=True
+                )
+
+        subprocess_run.assert_not_called()
+        self.assertFalse(result["runtime_refresh_authorized"])
+        self.assertIn(
+            "artifact_intake_auto_import_command_binding_mismatch",
+            result["intake_receipt_verifier"]["issues"],
+        )
+        self.assertIn(
+            "operator state refresh refused because intake receipt commands are not trusted",
+            result["failures"],
         )
 
     def test_auto_import_windows_installer_gold_proof_waiting_payload_surfaces_expected_bundle_details(self) -> None:
