@@ -867,6 +867,7 @@ public sealed class ReleaseShelfGenerationStore
             releaseVersion,
             channel,
             publishedAt,
+            generationId,
             canonical: true);
         ReleaseShelfManifestIdentity compatibilityIdentity = ValidateManifest(
             compatibilityPath,
@@ -874,6 +875,7 @@ public sealed class ReleaseShelfGenerationStore
             releaseVersion,
             channel,
             publishedAt,
+            generationId,
             canonical: false);
 
         IReadOnlyDictionary<string, ReleaseShelfInventoryEntry> inventory = ValidateInventory(
@@ -972,6 +974,7 @@ public sealed class ReleaseShelfGenerationStore
             releaseVersion,
             channel,
             publishedAt,
+            generationId,
             canonical: true);
         ReleaseShelfManifestIdentity compatibilityIdentity = ValidateManifest(
             Path.Combine(generationRoot, CompatibilityManifestFileName),
@@ -979,6 +982,7 @@ public sealed class ReleaseShelfGenerationStore
             releaseVersion,
             channel,
             publishedAt,
+            generationId,
             canonical: false);
 
         IReadOnlyDictionary<string, ReleaseShelfInventoryEntry> inventory = ValidateInventory(
@@ -1068,9 +1072,13 @@ public sealed class ReleaseShelfGenerationStore
         string expectedReleaseVersion,
         string expectedChannel,
         DateTimeOffset expectedPublishedAt,
+        string expectedGenerationId,
         bool canonical)
     {
-        ReleaseShelfManifestIdentity identity = ReadManifestIdentity(path, canonical);
+        ReleaseShelfManifestIdentity identity = ReadManifestIdentity(
+            path,
+            expectedGenerationId,
+            canonical);
         if (!FixedTimeSha256Equals(expectedSha256, identity.Sha256))
         {
             throw new InvalidDataException($"Release shelf manifest '{Path.GetFileName(path)}' digest does not match current.json.");
@@ -1087,7 +1095,10 @@ public sealed class ReleaseShelfGenerationStore
         return identity;
     }
 
-    private static ReleaseShelfManifestIdentity ReadManifestIdentity(string path, bool canonical)
+    private static ReleaseShelfManifestIdentity ReadManifestIdentity(
+        string path,
+        string expectedGenerationId,
+        bool canonical)
     {
         byte[] manifestBytes = ReadBoundedFile(
             path,
@@ -1096,6 +1107,20 @@ public sealed class ReleaseShelfGenerationStore
         JsonElement manifest = ParseJsonObject(
             manifestBytes,
             $"release shelf manifest '{Path.GetFileName(path)}'");
+        string manifestGenerationId = RequireString(manifest, "generationId");
+        if (!string.Equals(
+                manifestGenerationId,
+                expectedGenerationId,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Release shelf manifest '{Path.GetFileName(path)}' generationId does not match the active generation.");
+        }
+
+        ValidateGenerationRoutes(
+            manifest,
+            expectedGenerationId,
+            $"Release shelf manifest '{Path.GetFileName(path)}'");
         string releaseVersion = ReadFirstRequiredString(manifest, "releaseVersion", "version");
         string channel = ReadFirstRequiredString(manifest, "channelId", "channel");
         DateTimeOffset? publishedAt = TryReadTimestamp(manifest, "publishedAt")
@@ -1474,6 +1499,12 @@ public sealed class ReleaseShelfGenerationStore
             case JsonValueKind.Object:
                 foreach (JsonProperty property in element.EnumerateObject())
                 {
+                    if (property.NameEquals("proof_routes"))
+                    {
+                        throw new InvalidDataException(
+                            $"{label} contains a noncanonical proof-route alias.");
+                    }
+
                     // Only the exact top-level releaseProof.proofRoutes array is
                     // immutable Registry evidence. Nested lookalikes remain subject
                     // to the generation-bound live-route invariant.
@@ -1484,10 +1515,18 @@ public sealed class ReleaseShelfGenerationStore
                         continue;
                     }
 
+                    if (context == GenerationRouteTraversalContext.NestedReleaseProof
+                        && property.NameEquals("proofRoutes"))
+                    {
+                        throw new InvalidDataException(
+                            $"{label} contains a nested releaseProof.proofRoutes lookalike.");
+                    }
+
                     GenerationRouteTraversalContext childContext =
-                        context == GenerationRouteTraversalContext.ManifestRoot
-                        && property.NameEquals("releaseProof")
-                            ? GenerationRouteTraversalContext.TopLevelReleaseProof
+                        property.NameEquals("releaseProof")
+                            ? context == GenerationRouteTraversalContext.ManifestRoot
+                                ? GenerationRouteTraversalContext.TopLevelReleaseProof
+                                : GenerationRouteTraversalContext.NestedReleaseProof
                             : GenerationRouteTraversalContext.Other;
                     ValidateGenerationRoutes(property.Value, generationId, label, childContext);
                 }
@@ -1511,8 +1550,19 @@ public sealed class ReleaseShelfGenerationStore
 
                 if (!value.StartsWith("/downloads/", StringComparison.Ordinal))
                 {
-                    if (Uri.TryCreate(value, UriKind.Absolute, out Uri? absolute)
-                        && absolute.AbsolutePath.StartsWith("/downloads/", StringComparison.Ordinal))
+                    bool absoluteReleaseUrl = Uri.TryCreate(
+                                                  value,
+                                                  UriKind.Absolute,
+                                                  out Uri? absolute)
+                                              && absolute.AbsolutePath.StartsWith(
+                                                  "/downloads/",
+                                                  StringComparison.Ordinal);
+                    bool schemeRelativeReleaseUrl = value.StartsWith("//", StringComparison.Ordinal)
+                                                    && value.IndexOf(
+                                                        "/downloads/",
+                                                        2,
+                                                        StringComparison.Ordinal) >= 2;
+                    if (absoluteReleaseUrl || schemeRelativeReleaseUrl)
                     {
                         throw new InvalidDataException($"{label} release URLs must be plain generation-bound site paths.");
                     }
@@ -1523,27 +1573,35 @@ public sealed class ReleaseShelfGenerationStore
                 string expectedPrefix = $"/downloads/g/{generationId}/";
                 if (value.Contains('?')
                     || value.Contains('#')
-                    || !Uri.UnescapeDataString(value).StartsWith(expectedPrefix, StringComparison.Ordinal))
+                    || value.Contains('\\')
+                    || value.Contains('%')
+                    || !value.StartsWith(expectedPrefix, StringComparison.Ordinal))
                 {
                     throw new InvalidDataException($"{label} contains a non-generation-bound release URL.");
                 }
 
-                string relative = Uri.UnescapeDataString(value)[expectedPrefix.Length..];
+                string relative = value[expectedPrefix.Length..];
                 string[] parts = relative.Split('/', StringSplitOptions.None);
-                bool validInstallDispatch = parts.Length == 2
-                    && string.Equals(parts[0], "install", StringComparison.Ordinal)
-                    && !string.IsNullOrWhiteSpace(parts[1]);
-                bool validImmutableObject = parts[0] is CanonicalManifestFileName
-                    or CompatibilityManifestFileName
-                    or "files"
-                    or "proof"
-                    or "startup-smoke"
-                    or "release-evidence";
                 if (parts.Length == 0
-                    || parts.Any(static part => string.IsNullOrEmpty(part) || part is "." or "..")
-                    || (!validInstallDispatch && !validImmutableObject))
+                    || parts.Any(static part => !PortableInventorySegmentPattern.IsMatch(part)))
                 {
                     throw new InvalidDataException($"{label} contains an unsafe generation-bound release URL.");
+                }
+
+                bool validShape = parts[0] switch
+                {
+                    CanonicalManifestFileName or CompatibilityManifestFileName => parts.Length == 1,
+                    "files" => parts.Length == 2,
+                    "install" => parts.Length == 2
+                                 || (parts.Length == 3
+                                     && parts[2] is "payload" or "metadata"),
+                    "proof" or "startup-smoke" or "release-evidence" => parts.Length >= 2,
+                    _ => false
+                };
+                if (!validShape)
+                {
+                    throw new InvalidDataException(
+                        $"{label} contains a noncanonical generation-bound release URL shape.");
                 }
                 return;
         }
@@ -1553,6 +1611,7 @@ public sealed class ReleaseShelfGenerationStore
     {
         ManifestRoot,
         TopLevelReleaseProof,
+        NestedReleaseProof,
         Other
     }
 

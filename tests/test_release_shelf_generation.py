@@ -96,7 +96,26 @@ if args[:2] == ["s3api", "head-object"]:
 if args[:2] == ["s3api", "list-objects-v2"]:
     bucket = option("--bucket")
     prefix = option("--prefix")
+    max_keys = int(option("--max-keys"))
     bucket_root = remote / bucket
+    inject_key = os.environ.get("FAKE_AWS_INJECT_ON_SECOND_ROOT_LIST", "")
+    inject_prefix = os.environ.get("FAKE_AWS_ROOT_INVENTORY_PREFIX", "downloads")
+    if inject_key and prefix == inject_prefix:
+        counter_path = remote / ".root-inventory-count"
+        with counter_path.open("a+b") as counter:
+            fcntl.flock(counter.fileno(), fcntl.LOCK_EX)
+            counter.seek(0)
+            raw_count = counter.read().decode("ascii")
+            count = int(raw_count or "0") + 1
+            counter.seek(0)
+            counter.truncate()
+            counter.write(str(count).encode("ascii"))
+            counter.flush()
+            if count == 2:
+                injected = remote / bucket / inject_key
+                injected.parent.mkdir(parents=True, exist_ok=True)
+                injected.write_bytes(b"concurrent legacy object")
+            fcntl.flock(counter.fileno(), fcntl.LOCK_UN)
     contents = []
     if bucket_root.is_dir():
         for child in sorted(bucket_root.rglob("*")):
@@ -106,7 +125,12 @@ if args[:2] == ["s3api", "list-objects-v2"]:
             if key.startswith(prefix):
                 contents.append({"Key": key})
     record(f"LIST {prefix}")
-    print(json.dumps({"Contents": contents[:2]}))
+    selected = contents[:max_keys]
+    print(json.dumps({
+        "Contents": selected,
+        "IsTruncated": len(contents) > len(selected),
+        "KeyCount": len(selected),
+    }))
     raise SystemExit(0)
 
 if args[:2] == ["s3api", "put-object"]:
@@ -1000,6 +1024,132 @@ def test_s3_publisher_uploads_immutable_objects_before_single_pointer_put_withou
     )
     pointer = json.loads((public_root / "current.json").read_text(encoding="utf-8"))
     assert pointer["generationId"] == "generation-s3"
+
+
+@pytest.mark.parametrize(
+    "existing_keys",
+    (
+        ("downloads",),
+        ("downloads/releases.json",),
+        ("downloads/files/legacy-installer.exe",),
+        ("downloads/generations/orphan/activation-candidate.json",),
+        ("downloads/.partial-upload",),
+        ("downloads-a", "downloads-b", "downloads-c"),
+    ),
+    ids=(
+        "root-object",
+        "legacy-manifest",
+        "legacy-file",
+        "orphan-generation",
+        "partial-object",
+        "truncated-ambiguous-prefix",
+    ),
+)
+def test_s3_first_generation_requires_bounded_empty_root_inventory(
+    tmp_path: Path,
+    existing_keys: tuple[str, ...],
+) -> None:
+    bundle = write_s3_publish_bundle(
+        tmp_path / "bundle",
+        version="release-nonempty-root",
+        published_at="2026-07-15T12:30:00Z",
+        payload=b"nonempty root artifact",
+    )
+    fake_bin, remote_root, public_root, latest_public_root, log_path = (
+        install_fake_conditional_s3_cli(tmp_path)
+    )
+    for key in existing_keys:
+        path = remote_root / "fixture" / key
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"preexisting object")
+    missing_existing = tmp_path / "missing-existing.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_AWS_ROOT": str(remote_root),
+            "FAKE_PUBLIC_ROOT": str(public_root),
+            "FAKE_LATEST_PUBLIC_ROOT": str(latest_public_root),
+            "FAKE_AWS_LOG": str(log_path),
+            "CHUMMER_PORTAL_DOWNLOADS_S3_URI": "s3://fixture/downloads",
+            "CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL": str(missing_existing),
+            "CHUMMER_PORTAL_DOWNLOADS_CURRENT_VERIFY_URL": (
+                public_root / "current.json"
+            ).as_uri(),
+            "CHUMMER_PORTAL_DOWNLOADS_GENERATION_VERIFY_BASE_URL": (
+                public_root / "g"
+            ).as_uri(),
+            "CHUMMER_RELEASE_GENERATION_ID": "generation-nonempty-root",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts" / "publish-download-bundle-s3.sh"), str(bundle)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "non-empty or ambiguous" in result.stderr
+    assert "PRIMARY_RELEASE_NOT_COMMITTED" in result.stderr
+    operations = log_path.read_text(encoding="utf-8").splitlines()
+    assert not any(row.startswith("PUT ") for row in operations)
+
+
+def test_s3_first_generation_rechecks_empty_root_before_first_upload(
+    tmp_path: Path,
+) -> None:
+    bundle = write_s3_publish_bundle(
+        tmp_path / "bundle",
+        version="release-root-race",
+        published_at="2026-07-15T12:45:00Z",
+        payload=b"root race artifact",
+    )
+    fake_bin, remote_root, public_root, latest_public_root, log_path = (
+        install_fake_conditional_s3_cli(tmp_path)
+    )
+    missing_existing = tmp_path / "missing-existing.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_AWS_ROOT": str(remote_root),
+            "FAKE_PUBLIC_ROOT": str(public_root),
+            "FAKE_LATEST_PUBLIC_ROOT": str(latest_public_root),
+            "FAKE_AWS_LOG": str(log_path),
+            "FAKE_AWS_INJECT_ON_SECOND_ROOT_LIST": "downloads/releases.json",
+            "CHUMMER_PORTAL_DOWNLOADS_S3_URI": "s3://fixture/downloads",
+            "CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL": str(missing_existing),
+            "CHUMMER_PORTAL_DOWNLOADS_CURRENT_VERIFY_URL": (
+                public_root / "current.json"
+            ).as_uri(),
+            "CHUMMER_PORTAL_DOWNLOADS_GENERATION_VERIFY_BASE_URL": (
+                public_root / "g"
+            ).as_uri(),
+            "CHUMMER_RELEASE_GENERATION_ID": "generation-root-race",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(ROOT / "scripts" / "publish-download-bundle-s3.sh"), str(bundle)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "non-empty or ambiguous" in result.stderr
+    assert (remote_root / "fixture" / "downloads" / "releases.json").is_file()
+    operations = log_path.read_text(encoding="utf-8").splitlines()
+    assert operations.count("LIST downloads") == 2
+    assert not any(row.startswith("PUT ") for row in operations)
 
 
 def test_s3_concurrent_publishers_cannot_overwrite_current_pointer(

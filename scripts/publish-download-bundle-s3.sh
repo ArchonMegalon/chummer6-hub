@@ -200,6 +200,63 @@ s3_head_or_absent() {
   return 1
 }
 
+s3_require_empty_target_root() {
+  local target_uri="$1"
+  local listing_json=""
+  local inventory_prefix=""
+  parse_s3_uri "$target_uri"
+  inventory_prefix="$S3_PREFIX"
+  if ! listing_json="$(aws_cli s3api list-objects-v2 \
+      --bucket "$S3_BUCKET" \
+      --prefix "$inventory_prefix" \
+      --max-keys 2)"; then
+    echo "Unable to inventory first-generation S3 target root: $target_uri" >&2
+    return 1
+  fi
+
+  if ! python3 - "$inventory_prefix" "$target_uri" "$listing_json" <<'PY'
+import json
+import sys
+
+prefix, label, raw = sys.argv[1:]
+try:
+    payload = json.loads(raw)
+except json.JSONDecodeError as exc:
+    raise SystemExit(f"{label} returned malformed bounded root inventory: {exc}")
+if not isinstance(payload, dict):
+    raise SystemExit(f"{label} bounded root inventory must be an object")
+contents = payload.get("Contents", [])
+truncated = payload.get("IsTruncated")
+key_count = payload.get("KeyCount")
+if not isinstance(contents, list) or not isinstance(truncated, bool):
+    raise SystemExit(f"{label} bounded root inventory is missing Contents/IsTruncated truth")
+if not isinstance(key_count, int) or isinstance(key_count, bool) or key_count != len(contents):
+    raise SystemExit(f"{label} bounded root inventory has an invalid KeyCount")
+keys = []
+for row in contents:
+    if not isinstance(row, dict) or not isinstance(row.get("Key"), str):
+        raise SystemExit(f"{label} bounded root inventory contains a malformed object row")
+    keys.append(row["Key"])
+root_keys = (
+    keys
+    if not prefix
+    else [key for key in keys if key == prefix or key.startswith(prefix + "/")]
+)
+if root_keys:
+    raise SystemExit(
+        f"{label} is not empty; first governed object is {root_keys[0]!r}"
+    )
+if truncated:
+    raise SystemExit(
+        f"{label} bounded inventory is truncated before emptiness can be proved"
+    )
+PY
+  then
+    echo "Refusing first-generation activation because the S3 target root is non-empty or ambiguous: $target_uri" >&2
+    return 1
+  fi
+}
+
 s3_put_immutable_file() {
   local target_uri="$1"
   local relative_path="$2"
@@ -365,7 +422,10 @@ remote_layout_mode() {
   # Layout-v1 is the only supported S3 writer protocol. An empty target is an
   # explicit first-generation initialization; there is no legacy top-level
   # publication fallback or opt-in switch.
-  printf 'generation\n'
+  if ! s3_require_empty_target_root "$target_uri"; then
+    return 1
+  fi
+  printf 'generation-empty\n'
 }
 
 stage_release_shelf_generation() {
@@ -420,7 +480,7 @@ activate_release_shelf_generation() {
   local expect_absent=false
   local marker_head=""
   local marker_tmp=""
-  if [[ "$target_mode" != "generation" ]]; then
+  if [[ "$target_mode" != "generation" && "$target_mode" != "generation-empty" ]]; then
     echo "internal error: generation upload selected for legacy target $target_uri" >&2
     return 1
   fi
@@ -465,6 +525,11 @@ PY
       rm -f "$pointer_tmp"
       return "$presence_status"
     fi
+    if [[ "$target_mode" != "generation-empty" ]]; then
+      rm -f "$pointer_tmp"
+      echo "$target_uri current.json disappeared after validated layout discovery; refusing first-generation fallback" >&2
+      return 1
+    fi
     expect_absent=true
     if marker_head="$(s3_head_or_absent "$target_uri" "$SHELF_LAYOUT_MARKER")"; then
       rm -f "$pointer_tmp"
@@ -476,6 +541,10 @@ PY
         rm -f "$pointer_tmp"
         return "$presence_status"
       fi
+    fi
+    if ! s3_require_empty_target_root "$target_uri"; then
+      rm -f "$pointer_tmp"
+      return 1
     fi
   fi
 
