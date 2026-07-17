@@ -40,6 +40,10 @@ builder.Services.AddSingleton<WindowsProofUploadSessionService>();
 builder.Services.AddSingleton<IReleaseUploadStorageProbe, ReleaseUploadStorageProbe>();
 builder.Services.AddSingleton<ReleaseUploadAuthorizationEvaluator>();
 builder.Services.AddSingleton<ReleaseUploadAdmissionService>();
+builder.Services.AddHostedService<ReleaseUploadExpiryJanitor>();
+builder.Services.AddHostedService<ReleaseShelfInitialMigrationHostedService>();
+builder.Services.AddSingleton<IReleaseShelfPublicationReadinessProbe, ReleaseShelfActivationProtocolReadinessProbe>();
+builder.Services.AddSingleton<IReleaseShelfPublicationReadinessProbe, ReleaseUploadStoragePublicationReadinessProbe>();
 builder.Services.AddHostedService<ReleaseShelfPublicationReadinessRefreshService>();
 builder.Services
     .AddControllersWithViews()

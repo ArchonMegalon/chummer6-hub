@@ -864,7 +864,6 @@ public sealed class ReleaseShelfGenerationStore
         ReleaseShelfManifestIdentity canonicalIdentity = ValidateManifest(
             canonicalPath,
             canonicalSha256,
-            generationId,
             releaseVersion,
             channel,
             publishedAt,
@@ -872,7 +871,6 @@ public sealed class ReleaseShelfGenerationStore
         ReleaseShelfManifestIdentity compatibilityIdentity = ValidateManifest(
             compatibilityPath,
             compatibilitySha256,
-            generationId,
             releaseVersion,
             channel,
             publishedAt,
@@ -971,7 +969,6 @@ public sealed class ReleaseShelfGenerationStore
         ReleaseShelfManifestIdentity canonicalIdentity = ValidateManifest(
             Path.Combine(generationRoot, CanonicalManifestFileName),
             canonicalSha256,
-            generationId,
             releaseVersion,
             channel,
             publishedAt,
@@ -979,7 +976,6 @@ public sealed class ReleaseShelfGenerationStore
         ReleaseShelfManifestIdentity compatibilityIdentity = ValidateManifest(
             Path.Combine(generationRoot, CompatibilityManifestFileName),
             compatibilitySha256,
-            generationId,
             releaseVersion,
             channel,
             publishedAt,
@@ -1069,7 +1065,6 @@ public sealed class ReleaseShelfGenerationStore
     private static ReleaseShelfManifestIdentity ValidateManifest(
         string path,
         string expectedSha256,
-        string expectedGenerationId,
         string expectedReleaseVersion,
         string expectedChannel,
         DateTimeOffset expectedPublishedAt,
@@ -1081,8 +1076,7 @@ public sealed class ReleaseShelfGenerationStore
             throw new InvalidDataException($"Release shelf manifest '{Path.GetFileName(path)}' digest does not match current.json.");
         }
 
-        if (!string.Equals(identity.GenerationId, expectedGenerationId, StringComparison.Ordinal)
-            || !string.Equals(identity.ReleaseVersion, expectedReleaseVersion, StringComparison.Ordinal)
+        if (!string.Equals(identity.ReleaseVersion, expectedReleaseVersion, StringComparison.Ordinal)
             || !string.Equals(identity.Channel, expectedChannel, StringComparison.Ordinal)
             || (identity.PublishedAt is not null
                 && identity.PublishedAt.Value.ToUniversalTime() != expectedPublishedAt.ToUniversalTime()))
@@ -1102,7 +1096,6 @@ public sealed class ReleaseShelfGenerationStore
         JsonElement manifest = ParseJsonObject(
             manifestBytes,
             $"release shelf manifest '{Path.GetFileName(path)}'");
-        string generationId = RequireString(manifest, "generationId");
         string releaseVersion = ReadFirstRequiredString(manifest, "releaseVersion", "version");
         string channel = ReadFirstRequiredString(manifest, "channelId", "channel");
         DateTimeOffset? publishedAt = TryReadTimestamp(manifest, "publishedAt")
@@ -1112,10 +1105,8 @@ public sealed class ReleaseShelfGenerationStore
             throw new InvalidDataException("Canonical release shelf manifest must expose publishedAt.");
         }
 
-        ValidateGenerationRoutes(manifest, generationId, Path.GetFileName(path));
         return new ReleaseShelfManifestIdentity(
             Path.GetFileName(path),
-            generationId,
             releaseVersion,
             channel,
             publishedAt,
@@ -1801,7 +1792,6 @@ public sealed class ReleaseShelfGenerationStore
 
     private sealed record ReleaseShelfManifestIdentity(
         string FileName,
-        string GenerationId,
         string ReleaseVersion,
         string Channel,
         DateTimeOffset? PublishedAt,

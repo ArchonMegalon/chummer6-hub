@@ -656,3 +656,69 @@ public sealed class ReleaseUploadRequestGateMiddleware
         Reconcile
     }
 }
+
+public sealed class ReleaseUploadExpiryJanitor : BackgroundService
+{
+    private readonly ReleaseBundleUploadSessionService _sessions;
+    private readonly ReleaseUploadQuotaOptions _options;
+    private readonly ILogger<ReleaseUploadExpiryJanitor> _logger;
+
+    public ReleaseUploadExpiryJanitor(
+        ReleaseBundleUploadSessionService sessions,
+        ReleaseUploadQuotaOptions options,
+        ILogger<ReleaseUploadExpiryJanitor> logger)
+    {
+        _sessions = sessions;
+        _options = options;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(_options.JanitorInterval);
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+        {
+            try
+            {
+                _sessions.PurgeExpiredSessions();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    "Release upload expiry reconciliation failed ({ExceptionType}).",
+                    ex.GetType().Name);
+            }
+        }
+    }
+}
+
+public sealed class ReleaseUploadStoragePublicationReadinessProbe
+    : IReleaseShelfPublicationReadinessProbe
+{
+    private readonly ReleaseBundleUploadSessionService _sessions;
+
+    public ReleaseUploadStoragePublicationReadinessProbe(ReleaseBundleUploadSessionService sessions)
+    {
+        _sessions = sessions;
+    }
+
+    public string Name => HubDeepReadinessService.StorageAdmissionProbeName;
+
+    public ValueTask<ReleaseShelfPublicationReadinessProbeResult> EvaluateAsync(
+        ReleaseShelfSnapshot snapshot,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ReleaseUploadStorageReadiness readiness = _sessions.EvaluateStorageReadiness(cancellationToken);
+        if (readiness.Ready)
+        {
+            readiness = _sessions.EvaluatePublicationDestinationReadiness(
+                snapshot,
+                completionBundleRoot: null,
+                cancellationToken);
+        }
+        return ValueTask.FromResult(new ReleaseShelfPublicationReadinessProbeResult(
+            readiness.Ready,
+            readiness.Code));
+    }
+}

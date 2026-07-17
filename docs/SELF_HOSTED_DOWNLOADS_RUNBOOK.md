@@ -1209,6 +1209,12 @@ Manifest-driven public route proof:
 Canonical domain posture:
 1. `https://chummer.run` is the only hostname this runbook treats as publicly canonical and release-claimable.
 
+## Release shelf layout-v1 cutover
+
+1. Treat `.release-shelf-layout-v1` as a production downgrade sentinel: after layout-v1 has been activated, legacy flat-shelf readers and writers must fail closed.
+2. For the one-time migration only, set `CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=true`, activate the first immutable generation, and verify `current.json` plus its matching committed activation receipt.
+3. Immediately restore `CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=false`; normal publication must use the generation pointer and durable activation journal.
+
 ## Strict Test Gate Commands (host-side)
 
 Use these when you want hard failures instead of soft-skips.

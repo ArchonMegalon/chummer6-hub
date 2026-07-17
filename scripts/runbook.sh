@@ -23,6 +23,38 @@ UPSTREAM_LEGACY="${UPSTREAM_LEGACY:-http://chummer-web:8080}"
 UPSTREAM_UI_SERVICE="${UPSTREAM_UI_SERVICE:-http://chummer-blazor:8080}"
 UPSTREAM_HOST_INTERNAL="${UPSTREAM_HOST_INTERNAL:-http://host.docker.internal:8088}"
 
+print_release_shelf_cutover_runbook() {
+  echo "Controlled first release-shelf activation:"
+  echo "  1. Explicitly set CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED=false."
+  echo "  2. Explicitly set CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=true."
+  echo "  3. Perform exactly one governed activation; do not retry an unknown outcome."
+  echo "  4. Verify current.json, .release-shelf-layout-v1, and the matching committed activation receipt."
+  echo "  5. Permanently set CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED=true."
+  echo "  6. Permanently set CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED=false."
+  echo "  7. Restart the public edge and verify /api/ready/publication before serving downloads."
+}
+
+if [[ "$RUNBOOK_MODE" == "release-shelf-cutover-help" ]]; then
+  print_release_shelf_cutover_runbook
+  exit 0
+fi
+
+assert_legacy_release_shelf_target() {
+  local target_root="${1:-}"
+  if [[ -z "$target_root" ]]; then
+    echo "legacy release shelf target is required" >&2
+    return 1
+  fi
+  if [[ -e "$target_root/.release-shelf-writer-policy.json" ]]; then
+    echo "Refusing runbook mutation into server-journal-v1 release shelf: $target_root" >&2
+    return 1
+  fi
+  if [[ -e "$target_root/.release-shelf-layout-v1" || -e "$target_root/current.json" ]]; then
+    echo "Refusing legacy runbook manifest mutation into generation-aware shelf: $target_root" >&2
+    return 1
+  fi
+}
+
 if ! command -v rg >/dev/null 2>&1; then
   echo "ripgrep (rg) is required for this runbook." >&2
   exit 1
@@ -469,6 +501,10 @@ if [[ "$RUNBOOK_MODE" == "parity-checklist" ]]; then
 fi
 
 if [[ "$RUNBOOK_MODE" == "downloads-manifest" ]]; then
+  RUNBOOK_MANIFEST_PATH="${MANIFEST_PATH:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads/releases.json}"
+  RUNBOOK_PORTAL_MANIFEST_PATH="${PORTAL_MANIFEST_PATH:-$REPO_ROOT/Chummer.Portal/downloads/releases.json}"
+  assert_legacy_release_shelf_target "$(dirname "$RUNBOOK_MANIFEST_PATH")"
+  assert_legacy_release_shelf_target "$(dirname "$RUNBOOK_PORTAL_MANIFEST_PATH")"
   MANIFEST_LOG_FILE="${MANIFEST_LOG_FILE:-$(resolve_runbook_log_file chummer-downloads-manifest)}"
   set +e
   bash scripts/generate-releases-manifest.sh 2>&1 | tee "$MANIFEST_LOG_FILE"

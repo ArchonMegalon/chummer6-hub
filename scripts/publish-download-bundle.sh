@@ -10,12 +10,34 @@ PORTAL_MANIFEST_PATH="${PORTAL_MANIFEST_PATH:-}"
 PORTAL_DOWNLOADS_DIR="${PORTAL_DOWNLOADS_DIR:-}"
 DEPLOY_MODE="${CHUMMER_PORTAL_DOWNLOADS_DEPLOY_ENABLED:-false}"
 LIVE_VERIFY_TARGET="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-}"
+CURRENT_VERIFY_URL="${CHUMMER_PORTAL_DOWNLOADS_CURRENT_VERIFY_URL:-}"
+GENERATION_VERIFY_BASE_URL="${CHUMMER_PORTAL_DOWNLOADS_GENERATION_VERIFY_BASE_URL:-}"
 MANIFEST_SOURCE="$BUNDLE_DIR/releases.json"
+CANONICAL_MANIFEST_SOURCE="$BUNDLE_DIR/RELEASE_CHANNEL.generated.json"
 FILES_SOURCE="$BUNDLE_DIR/files"
 RELEASE_PROOF_PATH="${RELEASE_PROOF_PATH:-}"
 STARTUP_SMOKE_SOURCE="${STARTUP_SMOKE_SOURCE:-$BUNDLE_DIR/startup-smoke}"
 PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-}"
 CHUMMER_MACOS_PUBLIC_SHELF_ENABLED="${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}"
+RELEASE_SHELF_HELPER="$SCRIPT_DIR/release_shelf_generation.py"
+SHELF_LAYOUT_MARKER=".release-shelf-layout-v1"
+SHELF_LAYOUT_V1_ENABLED="${CHUMMER_RELEASE_SHELF_LAYOUT_V1_ENABLED:-false}"
+SHELF_GENERATION_ID="${CHUMMER_RELEASE_GENERATION_ID:-}"
+AUTHORITATIVE_DEPLOY_DIR="$DEPLOY_DIR"
+PUBLICATION_MODE="legacy"
+GENERATION_CANDIDATE_DIR=""
+GENERATION_PREPARED_DIR=""
+EXISTING_SHELF_ROOT="$AUTHORITATIVE_DEPLOY_DIR"
+ACTIVE_GENERATION_ID=""
+ACTIVE_POINTER_JSON=""
+
+assert_not_server_journal_shelf() {
+  local target_root="${1:-}"
+  if [[ -n "$target_root" && -e "$target_root/.release-shelf-writer-policy.json" ]]; then
+    echo "Refusing filesystem publication into server-journal-v1 shelf; use the staged HTTP upload API: $target_root" >&2
+    return 1
+  fi
+}
 
 to_bool() {
   local value
@@ -46,6 +68,54 @@ array_count() {
   fi
 
   printf '%s\n' "$count"
+}
+
+array_values_nul() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || return 0
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  eval "printf '%s\\0' \"\${${array_name}[@]}\""
+  local status="$?"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  return "$status"
+}
+
+stage_release_shelf_generation() {
+  local candidate_root="$1"
+  local -a prepare_args=(
+    prepare
+    --candidate-root "$candidate_root"
+    --output-root "$GENERATION_PREPARED_DIR"
+  )
+  if [[ -n "$SHELF_GENERATION_ID" ]]; then
+    prepare_args+=(--generation-id "$SHELF_GENERATION_ID")
+  fi
+  ACTIVE_POINTER_JSON="$(python3 "$RELEASE_SHELF_HELPER" "${prepare_args[@]}")"
+  ACTIVE_GENERATION_ID="$(python3 -c 'import json, sys; print(json.load(sys.stdin)["generationId"])' <<<"$ACTIVE_POINTER_JSON")"
+}
+
+activate_release_shelf_generation() {
+  local -a activation_args=(
+    activate-prepared-filesystem
+    --prepared-root "$GENERATION_PREPARED_DIR"
+    --shelf-root "$AUTHORITATIVE_DEPLOY_DIR"
+  )
+  if to_bool "$SHELF_LAYOUT_V1_ENABLED"; then
+    activation_args+=(--initialize-layout)
+  fi
+  ACTIVE_POINTER_JSON="$(python3 "$RELEASE_SHELF_HELPER" "${activation_args[@]}")"
 }
 
 if [[ -z "$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" ]]; then
@@ -199,6 +269,31 @@ else:
 PY
 }
 
+if [[ ! -f "$RELEASE_SHELF_HELPER" ]]; then
+  echo "Missing immutable release shelf helper: $RELEASE_SHELF_HELPER" >&2
+  exit 1
+fi
+
+assert_not_server_journal_shelf "$AUTHORITATIVE_DEPLOY_DIR"
+layout_mode_args=(mode --shelf-root "$AUTHORITATIVE_DEPLOY_DIR")
+if to_bool "$SHELF_LAYOUT_V1_ENABLED"; then
+  layout_mode_args+=(--initialize-layout)
+fi
+PUBLICATION_MODE="$(python3 "$RELEASE_SHELF_HELPER" "${layout_mode_args[@]}")"
+if [[ "$PUBLICATION_MODE" == "generation" ]]; then
+  mkdir -p "$AUTHORITATIVE_DEPLOY_DIR"
+  if [[ -f "$AUTHORITATIVE_DEPLOY_DIR/$SHELF_LAYOUT_MARKER" ]]; then
+    resolved_shelf_json="$(python3 "$RELEASE_SHELF_HELPER" resolve --shelf-root "$AUTHORITATIVE_DEPLOY_DIR")"
+    EXISTING_SHELF_ROOT="$(python3 -c 'import json, sys; print(json.load(sys.stdin)["root"])' <<<"$resolved_shelf_json")"
+  fi
+  GENERATION_CANDIDATE_DIR="$(mktemp -d "$AUTHORITATIVE_DEPLOY_DIR/.release-shelf-candidate.XXXXXX")"
+  DEPLOY_DIR="$GENERATION_CANDIDATE_DIR"
+  # A generation candidate must be the generator's only output. Compatibility
+  # mirrors are updated after pointer activation, never during materialization.
+  PORTAL_MANIFEST_PATH="$DEPLOY_DIR/releases.json"
+  PORTAL_DOWNLOADS_DIR="$DEPLOY_DIR"
+fi
+
 if [[ -z "$PORTAL_MANIFEST_PATH" ]]; then
   if [[ "$(realpath -m "$DEPLOY_DIR")" == "$(realpath -m "$REPO_ROOT/Docker/Downloads")" ]]; then
     PORTAL_MANIFEST_PATH="$REPO_ROOT/Chummer.Portal/downloads/releases.json"
@@ -241,6 +336,12 @@ verify_windows_installer_visual_proof_gate
 sync_source_dir="$(mktemp -d)"
 cleanup() {
   rm -rf "$sync_source_dir"
+  if [[ -n "$GENERATION_CANDIDATE_DIR" ]]; then
+    rm -rf "$GENERATION_CANDIDATE_DIR"
+  fi
+  if [[ -n "$GENERATION_PREPARED_DIR" ]]; then
+    rm -rf "$GENERATION_PREPARED_DIR"
+  fi
 }
 trap cleanup EXIT
 
@@ -252,11 +353,11 @@ append_unique_downloads_mirror_dir() {
   [[ -n "$candidate" ]] || return 0
   resolved_candidate="$(realpath -m "$candidate")"
   if (( $(array_count live_downloads_mirror_dirs) > 0 )); then
-    for existing in "${live_downloads_mirror_dirs[@]}"; do
+    while IFS= read -r -d '' existing; do
       if [[ "$(realpath -m "$existing")" == "$resolved_candidate" ]]; then
         return 0
       fi
-    done
+    done < <(array_values_nul live_downloads_mirror_dirs)
   fi
   live_downloads_mirror_dirs+=("$candidate")
 }
@@ -301,6 +402,39 @@ sync_live_downloads_mirror_dir() {
   local startup_smoke_dir=""
   local source_path=""
   local file_name=""
+  local mirror_mode=""
+  local mirror_resolved_json=""
+  local mirror_generation_id=""
+  local mirror_inventory_digest=""
+  local active_inventory_digest=""
+
+  assert_not_server_journal_shelf "$target_dir"
+
+  mirror_mode="$(python3 "$RELEASE_SHELF_HELPER" mode --shelf-root "$target_dir")"
+  if [[ "$mirror_mode" == "generation" ]]; then
+    if [[ -z "$ACTIVE_GENERATION_ID" || -z "$ACTIVE_POINTER_JSON" ]]; then
+      echo "cannot update generation-aware $target_label mirror before primary activation" >&2
+      exit 1
+    fi
+    mirror_resolved_json="$(python3 "$RELEASE_SHELF_HELPER" resolve --shelf-root "$target_dir")"
+    mirror_generation_id="$(python3 -c 'import json, sys; payload=json.load(sys.stdin); print(payload["pointer"]["generationId"])' <<<"$mirror_resolved_json")"
+    if [[ "$mirror_generation_id" == "$ACTIVE_GENERATION_ID" ]]; then
+      mirror_inventory_digest="$(python3 -c 'import json, sys; payload=json.load(sys.stdin); print(payload["pointer"]["inventoryDigest"])' <<<"$mirror_resolved_json")"
+      active_inventory_digest="$(python3 -c 'import json, sys; print(json.load(sys.stdin)["inventoryDigest"])' <<<"$ACTIVE_POINTER_JSON")"
+      if [[ "$mirror_inventory_digest" != "$active_inventory_digest" ]]; then
+        echo "$target_label mirror reuses generation ID $ACTIVE_GENERATION_ID with different bytes" >&2
+        exit 1
+      fi
+      echo "verified existing generation $ACTIVE_GENERATION_ID -> $target_label mirror $target_dir"
+      return 0
+    fi
+    python3 "$RELEASE_SHELF_HELPER" activate-filesystem \
+      --candidate-root "$DEPLOY_DIR" \
+      --shelf-root "$target_dir" \
+      --generation-id "$ACTIVE_GENERATION_ID" >/dev/null
+    echo "activated generation $ACTIVE_GENERATION_ID -> $target_label mirror $target_dir"
+    return 0
+  fi
 
   resolved_target_dir="$(realpath -m "$target_dir")"
   resolved_deploy_dir="$(realpath -m "$DEPLOY_DIR")"
@@ -334,14 +468,14 @@ sync_live_downloads_mirror_dir() {
     "$files_dir"/chummer6-bin.SRCINFO
   cleanup_desktop_artifacts "$files_dir"
 
-  for file_name in "${promoted_file_names[@]}"; do
+  while IFS= read -r -d '' file_name; do
     source_path="$DEPLOY_DIR/files/$file_name"
     if [[ ! -f "$source_path" ]]; then
       echo "promoted artifact missing from deploy root for $target_label mirror: $source_path" >&2
       exit 1
     fi
     cp "$source_path" "$files_dir/"
-  done
+  done < <(array_values_nul promoted_file_names)
   for file_name in chummer6-bin-aur-source.tar.gz chummer6-bin.PKGBUILD chummer6-bin.SRCINFO; do
     source_path="$DEPLOY_DIR/files/$file_name"
     if [[ -f "$source_path" ]]; then
@@ -353,11 +487,23 @@ sync_live_downloads_mirror_dir() {
   echo "synced $(array_count promoted_file_names) promoted artifact(s) -> $target_label mirror $target_dir"
 }
 
-for artifact in "${artifacts[@]}"; do
+while IFS= read -r -d '' artifact; do
   if is_public_artifact "$artifact"; then
     cp "$artifact" "$sync_source_dir/"
   fi
-done
+done < <(array_values_nul artifacts)
+
+existing_canonical_manifest="$EXISTING_SHELF_ROOT/RELEASE_CHANNEL.generated.json"
+if [[ -f "$existing_canonical_manifest" ]]; then
+  if [[ ! -f "$CANONICAL_MANIFEST_SOURCE" ]]; then
+    echo "Existing authoritative shelf requires incoming canonical manifest: $CANONICAL_MANIFEST_SOURCE" >&2
+    exit 1
+  fi
+  python3 "$SCRIPT_DIR/verify_release_shelf_replacement.py" \
+    --existing "$existing_canonical_manifest" \
+    --incoming "$CANONICAL_MANIFEST_SOURCE" \
+    --selected-files-dir "$sync_source_dir"
+fi
 
 release_version="${RELEASE_VERSION:-}"
 release_channel="${RELEASE_CHANNEL:-}"
@@ -429,6 +575,7 @@ STARTUP_SMOKE_DIR="$STARTUP_SMOKE_SOURCE" \
 CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-}" \
 CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-$PUBLIC_SKIP_STARTUP_SMOKE_FILTER}" \
 CHUMMER_EXTERNAL_PROOF_BASE_URL="${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}" \
+CHUMMER_RELEASE_MANIFEST_SOURCE_ONLY="$([[ "$PUBLICATION_MODE" == "generation" ]] && printf true || printf false)" \
 bash "$SCRIPT_DIR/generate-releases-manifest.sh"
 
 promoted_file_names=()
@@ -458,7 +605,7 @@ for artifact in payload.get("artifacts") or []:
 PY
 )
 
-for file_name in "${promoted_file_names[@]}"; do
+while IFS= read -r -d '' file_name; do
   if [[ "$file_name" == chummer-*-win-*-installer.exe ]]; then
     payload_name="${file_name%-installer.exe}-payload.zip"
     if [[ -f "$sync_source_dir/$payload_name" ]]; then
@@ -472,7 +619,7 @@ for file_name in "${promoted_file_names[@]}"; do
       promoted_file_names+=("$file_name.json")
     fi
   fi
-done
+done < <(array_values_nul promoted_file_names)
 
 if (( $(array_count promoted_file_names) > 0 )); then
   deduped_promoted_file_names=()
@@ -486,14 +633,14 @@ fi
 mkdir -p "$DEPLOY_DIR/files"
 cleanup_desktop_artifacts "$DEPLOY_DIR/files"
 
-for file_name in "${promoted_file_names[@]}"; do
+while IFS= read -r -d '' file_name; do
   source_path="$sync_source_dir/$file_name"
   if [[ ! -f "$source_path" ]]; then
     echo "promoted artifact missing from bundle source: $source_path" >&2
     exit 1
   fi
   cp "$source_path" "$DEPLOY_DIR/files/"
-done
+done < <(array_values_nul promoted_file_names)
 
 if [[ -d "$STARTUP_SMOKE_SOURCE" ]]; then
   verified_startup_smoke_tmp="$(mktemp)"
@@ -811,12 +958,6 @@ PY
   rm -rf "$startup_smoke_stage_dir"
 fi
 
-if (( $(array_count live_downloads_mirror_dirs) > 0 )); then
-  for mirror_dir in "${live_downloads_mirror_dirs[@]}"; do
-    sync_live_downloads_mirror_dir "$mirror_dir" "public-edge"
-  done
-fi
-
 if to_bool "$DEPLOY_MODE"; then
   export CHUMMER_PORTAL_DOWNLOADS_REQUIRE_PUBLISHED_VERSION="${CHUMMER_PORTAL_DOWNLOADS_REQUIRE_PUBLISHED_VERSION:-true}"
   export CHUMMER_PORTAL_DOWNLOADS_VERIFY_LINKS="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_LINKS:-true}"
@@ -828,8 +969,37 @@ fi
 
 bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$DEPLOY_DIR"
 
-if [[ -n "$LIVE_VERIFY_TARGET" ]]; then
-  bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$LIVE_VERIFY_TARGET"
+if [[ "$PUBLICATION_MODE" == "generation" ]]; then
+  GENERATION_PREPARED_DIR="$(mktemp -d "$AUTHORITATIVE_DEPLOY_DIR/.release-shelf-prepared.XXXXXX")"
+  stage_release_shelf_generation "$DEPLOY_DIR"
+  activate_release_shelf_generation
+  DEPLOY_DIR="$AUTHORITATIVE_DEPLOY_DIR/generations/$ACTIVE_GENERATION_ID"
+  echo "Activated immutable release shelf generation $ACTIVE_GENERATION_ID"
 fi
 
-echo "Published $(array_count promoted_file_names) desktop artifact(s) into $DEPLOY_DIR"
+if (( $(array_count live_downloads_mirror_dirs) > 0 )); then
+  while IFS= read -r -d '' mirror_dir; do
+    sync_live_downloads_mirror_dir "$mirror_dir" "public-edge"
+  done < <(array_values_nul live_downloads_mirror_dirs)
+fi
+
+if [[ -n "$LIVE_VERIFY_TARGET" ]]; then
+  if [[ "$PUBLICATION_MODE" == "generation" ]]; then
+    verify_base="${LIVE_VERIFY_TARGET%/}"
+    case "$verify_base" in
+      */RELEASE_CHANNEL.generated.json|*/releases.json|*/current.json)
+        verify_base="${verify_base%/*}"
+        ;;
+    esac
+    CURRENT_VERIFY_URL="${CURRENT_VERIFY_URL:-$verify_base/current.json}"
+    GENERATION_VERIFY_BASE_URL="${GENERATION_VERIFY_BASE_URL:-$verify_base/g}"
+    python3 "$RELEASE_SHELF_HELPER" verify-http \
+      --pointer-url "$CURRENT_VERIFY_URL" \
+      --generation-base-url "$GENERATION_VERIFY_BASE_URL" \
+      --expected-generation-id "$ACTIVE_GENERATION_ID"
+  else
+    bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$LIVE_VERIFY_TARGET"
+  fi
+fi
+
+echo "Published $(array_count promoted_file_names) desktop artifact(s) into $AUTHORITATIVE_DEPLOY_DIR"

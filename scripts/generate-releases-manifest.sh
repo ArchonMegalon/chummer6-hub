@@ -225,6 +225,32 @@ PY
 
 SANITIZED_UI_LOCALIZATION_RELEASE_GATE_PATH=""
 
+assert_legacy_release_shelf_target() {
+  local target_root="${1:-}"
+  local target_label="${2:-release manifest target}"
+  [[ -n "$target_root" ]] || {
+    echo "$target_label is empty" >&2
+    exit 1
+  }
+  if [[ -e "$target_root/.release-shelf-writer-policy.json" ]]; then
+    echo "$target_label is owned by server-journal-v1; direct manifest generation is forbidden: $target_root" >&2
+    exit 1
+  fi
+  if [[ -e "$target_root/.release-shelf-layout-v1" || -e "$target_root/current.json" ]]; then
+    echo "$target_label uses immutable release-shelf layout v1; direct manifest generation is forbidden: $target_root" >&2
+    exit 1
+  fi
+}
+
+# This generator produces a candidate. It must never mutate a server-managed or
+# already activated generation shelf through legacy top-level paths.
+assert_legacy_release_shelf_target "$(dirname "$MANIFEST_PATH")" "manifest output root"
+assert_legacy_release_shelf_target "$(dirname "$CANONICAL_MANIFEST_PATH")" "canonical manifest output root"
+assert_legacy_release_shelf_target "$(dirname "$PORTAL_MANIFEST_PATH")" "portal manifest output root"
+assert_legacy_release_shelf_target "$(dirname "$PORTAL_CANONICAL_MANIFEST_PATH")" "portal canonical manifest output root"
+assert_legacy_release_shelf_target "$(dirname "$DOWNLOADS_DIR")" "downloads output root"
+assert_legacy_release_shelf_target "$PORTAL_DOWNLOADS_DIR" "portal downloads output root"
+
 mkdir -p "$(dirname "$MANIFEST_PATH")"
 mkdir -p "$(dirname "$PORTAL_MANIFEST_PATH")"
 mkdir -p "$DOWNLOADS_DIR"
