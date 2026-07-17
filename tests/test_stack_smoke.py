@@ -310,6 +310,44 @@ class StackConfigSmokeTests(unittest.TestCase):
             msg="public edge should not keep a live repo mount once canonical product truth is baked into /app",
         )
 
+    def test_windows_proof_upload_lane_is_durable_separate_and_opt_in(self):
+        public_edge_path = REPO_ROOT / "docker-compose.public-edge.yml"
+        if not public_edge_path.exists():
+            self.skipTest("docker-compose.public-edge.yml is not present for this repository slice")
+
+        payload = load_compose_payload(public_edge_path)
+        portal = ((payload.get("services") or {}).get("chummer-portal") or {})
+        environment = portal.get("environment") or {}
+
+        self.assertEqual(
+            environment.get("CHUMMER_WINDOWS_PROOF_UPLOAD_ENABLED"),
+            "${CHUMMER_WINDOWS_PROOF_UPLOAD_ENABLED:-false}",
+        )
+        self.assertEqual(
+            environment.get("CHUMMER_WINDOWS_PROOF_CF_ACCESS_GATED"),
+            "${CHUMMER_WINDOWS_PROOF_CF_ACCESS_GATED:-false}",
+        )
+        self.assertEqual(environment.get("CHUMMER_WINDOWS_PROOF_ROOT"), "/windows-proof-store")
+        self.assertEqual(
+            environment.get("CHUMMER_WINDOWS_PROOF_UPLOAD_SESSION_ROOT"),
+            "/windows-proof-upload-sessions",
+        )
+        self.assertNotEqual(
+            environment.get("CHUMMER_WINDOWS_PROOF_ROOT"),
+            environment.get("CHUMMER_DOWNLOADS_SOURCE_ROOT"),
+            msg="the proof shelf must not overlap the canonical downloads authority",
+        )
+
+        volumes = portal.get("volumes") or []
+        self.assertIn("chummer-windows-proof-store:/windows-proof-store", volumes)
+        self.assertIn(
+            "chummer-windows-proof-upload-sessions:/windows-proof-upload-sessions",
+            volumes,
+        )
+        named_volumes = payload.get("volumes") or {}
+        self.assertIn("chummer-windows-proof-store", named_volumes)
+        self.assertIn("chummer-windows-proof-upload-sessions", named_volumes)
+
     def test_public_edge_dockerfile_bakes_design_canon_into_app_product_root(self):
         dockerfile_path = REPO_ROOT / "Chummer.Run.Api" / "Dockerfile"
         if not dockerfile_path.exists():

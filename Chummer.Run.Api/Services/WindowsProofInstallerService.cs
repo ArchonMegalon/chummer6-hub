@@ -610,7 +610,7 @@ public sealed class WindowsProofInstallerService
                 Sha256: verified.ExpectedSha256!,
                 SizeBytes: verified.SizeBytes,
                 UpdatedAtUtc: snapshot.PublishedAt?.UtcDateTime ?? DateTime.UnixEpoch,
-                DownloadUrl: $"/downloads/g/{Uri.EscapeDataString(snapshot.GenerationId!)}/proof/windows/{Uri.EscapeDataString(allowedFileName)}",
+                DownloadUrl: $"/downloads/proof/windows/generations/{Uri.EscapeDataString(snapshot.GenerationId!)}/files/{Uri.EscapeDataString(allowedFileName)}",
                 ArtifactId: artifactId);
         }
 
@@ -634,7 +634,7 @@ public sealed class WindowsProofInstallerService
             Sha256: sha256,
             SizeBytes: info.Length,
             UpdatedAtUtc: info.LastWriteTimeUtc,
-            DownloadUrl: $"/downloads/supplemental/windows/{Uri.EscapeDataString(allowedFileName)}",
+            DownloadUrl: $"/downloads/proof/windows/{Uri.EscapeDataString(allowedFileName)}",
             ArtifactId: artifactId);
     }
 
