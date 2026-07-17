@@ -645,8 +645,8 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF='refs/remotes/origin/main'" in runbook
     assert "CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256='5f9b25d9d2ce75e35542834cca9041eb373f2ff7aded5c21801d97b835bb5290'" in runbook
     assert "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" in runbook
-    assert "--runtime-proof-bind-source-sha256" in runbook
-    assert "--release-channel-receipt-sha256" in runbook
+    assert "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT" in runbook
+    assert "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256" in runbook
     assert "/usr/bin/bash --noprofile --norc" in runbook
     assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD=\"$(git rev-parse HEAD)\"" not in runbook
     assert "bash scripts/deploy_public_edge_portal.sh" not in runbook
@@ -680,7 +680,7 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml" in runbook
     assert "/docker/chummercomplete/chummer.run-services/.env" in runbook
     assert "Public-edge mutable storage preflight" in runbook
-    assert "docker compose run --rm --no-deps chummer-portal-volume-init" in runbook
+    assert "runs the protected volume initializer" in runbook
     assert "never changes host ownership or modes" in runbook
     assert "sudo setfacl -Rm u:1654:rwX,d:u:1654:rwX" in runbook
     assert "data-protection certificate" in runbook
@@ -689,7 +689,7 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "--include-image-tags-matching '^chummer-run-api:current-source'" in runbook
     assert "--include-image-tags-matching '^chummer-run-api:fixed-alias'" in runbook
     assert "PUBLIC_EDGE_PORTAL_IMAGE_RESTORE.generated.json" in runbook
-    assert "docker compose up -d --no-build --no-deps --force-recreate" in runbook
+    assert "docker compose up -d --no-build --no-deps --force-recreate" not in runbook
     assert "--stability-window-seconds 120" in runbook
     assert "--require-all-browser-proofs" in runbook
     assert "public-edge-browser-proofs" in runbook

@@ -1,24 +1,23 @@
 # Atomic release shelf publication contract
 
-Status: **P1 launch blocker**
-Date: 2026-07-15
+Status: **Implemented production contract**
+Date: 2026-07-18
 
 ## Decision
 
-Do not patch `ReleaseBundlePromotionService` with an app-only current-generation pointer.
-That would make the HTTP upload lane atomic while silently orphaning the existing
-filesystem, object-storage, nightly, workspace-mirror, and audit lanes that still
-read or write the top-level downloads tree.
+`ReleaseBundlePromotionService` and every governed release writer now share the
+cross-repository current-generation contract. The HTTP upload lane owns local production
+publication; filesystem, object-storage, nightly, workspace-mirror, and audit lanes either
+use the same generation protocol or fail closed before mutating an authoritative shelf.
 
 The release shelf needs one versioned, cross-repository publication contract. The
 unit of publication is the complete shelf generation, and activation is one atomic
 pointer change after all bytes and contracts have passed validation.
 
-## Current deterministic gap
+## Closed deterministic gap
 
-`Chummer.Run.Api/Services/ReleaseBundlePromotionService.cs` validates a complete
-candidate under `.release-promotion-transaction-*`, then replaces these live entries
-sequentially:
+The retired implementation validated a complete candidate under
+`.release-promotion-transaction-*` and then replaced these live entries sequentially:
 
 1. `files/`
 2. `startup-smoke/`
@@ -26,14 +25,17 @@ sequentially:
 4. `RELEASE_CHANNEL.generated.json`
 5. `releases.json`
 
-Rollback repairs the final filesystem state, but it cannot retract mixed bytes that
-a concurrent reader already observed. The promotion lock serializes writers only.
+That sequence could repair final filesystem state during rollback, but it could not retract
+mixed bytes already observed by a concurrent reader. The production implementation no longer
+uses it: `server-journal-v1` stages and validates one immutable generation, persists its exact
+activation intent and barriers, and atomically commits `current.json` as the sole publication
+point.
 
 The mounted downloads tree is not served by `UseStaticFiles`. Public reads go through
-controllers and services, so generation-aware reads are feasible. They still require
-version-bound URLs: a client can fetch an old manifest immediately before activation
-and fetch a fixed `/downloads/files/<name>` URL immediately afterward. A per-request
-pointer snapshot alone cannot keep those two HTTP requests coherent.
+generation-aware controllers and services and authoritative manifests use version-bound URLs.
+A client that fetches an old manifest immediately before activation therefore continues through
+immutable routes for that same generation rather than pairing it with same-named bytes from the
+new current generation.
 
 ## Required generation layout
 
@@ -153,11 +155,11 @@ requires a claim or ticket bound to that exact generation and digest.
   - `/downloads/files/{**path}`;
   - `/downloads/install/{artifactId}` and proof/supplemental variants.
 - `Chummer.Run.Api/Services/WindowsProofInstallerService.cs`
-  - currently reads `proof/windows` and `files` directly and must resolve the captured
-    generation or an explicitly separate, versioned supplemental-proof authority.
+  - resolves `proof/windows` and `files` through the captured generation or an explicitly
+    separate, versioned supplemental-proof authority.
 - `Chummer.Run.Api/Services/AurPackageCatalogService.cs`
-  - currently reads `aur-packages.json` and AUR sidecars directly; it must either join
-    the generation or be declared a separate atomic catalog with its own pointer.
+  - resolves generation-owned `aur-packages.json` and AUR sidecars through the shelf; any
+    separate catalog remains independently atomic under its own pointer.
 - `Chummer.Run.Api/Program.cs`
   - `/downloads/release-evidence/{**path}` must be generation-bound.
 - All services/controllers that consume the singleton `PublicReleaseManifestService`,
@@ -170,8 +172,8 @@ requires a claim or ticket bound to that exact generation and digest.
 
 ### Filesystem and operational readers
 
-The following currently treat top-level paths as authoritative and must use a shared
-`resolve-current-release-shelf` helper or the live HTTP canonical endpoint:
+The following resolve authoritative state through the shared current-shelf contract or the live
+HTTP canonical endpoint; top-level paths are compatibility mirrors only:
 
 - `scripts/verify-releases-manifest.sh`;
 - `scripts/verify_release_shelf_replacement.py`;
@@ -201,24 +203,23 @@ Their manifests must say which generation they mirror.
 - The legacy `POST /api/internal/releases/bundles` route is permanently rejected; it
   cannot bypass staged-session admission, reconciliation, or completion receipts.
 
-The server writer must build and validate the entire immutable generation, fsync as
-required by the storage contract, atomically activate `current.json`, and then return
+The server writer builds and validates the entire immutable generation, fsyncs as
+required by the storage contract, atomically activates `current.json`, and then returns
 success. Cancellation and test checkpoints are honored only before activation. Once
 the pointer rename succeeds, the publication is committed; no fallible post-activation
 verification may turn the HTTP result into a retryable failure.
 
 ### Filesystem, S3, and mirror writers
 
-- `scripts/publish-download-bundle-http.sh` already uses the server lane; it must verify
-  the activation receipt and generation ID, not merely compare a mutable manifest. Before
+- `scripts/publish-download-bundle-http.sh` uses the server lane and verifies the activation
+  receipt and generation ID rather than merely comparing a mutable manifest. Before
   the first file upload it persists an owner-only, non-secret session handoff bound to the
   canonical manifest and exact inventory. It fsyncs `request_started` before the one-shot
   completion request and `completed` only after the successful response is durable. Any
   ambiguous outcome is reconcile-only and blocks a replacement session.
-- `scripts/publish-download-bundle.sh` currently mutates deploy and mirror roots in
-  place. Its mirror helper copies manifests before smoke/proof/artifacts. It must call
-  the shared stage/validate/activate primitive and must refuse a layout-v1 root when
-  running in legacy copy mode.
+- `scripts/publish-download-bundle.sh` is limited to legacy/dev/source-candidate roots and
+  refuses a `server-journal-v1` or layout-v1 authority when running in copy mode. It cannot
+  mutate the live production shelf; production local publication uses the staged HTTP lane.
 - `scripts/publish-download-bundle-s3.sh` implements only layout-v1. It writes every
   immutable generation object with conditional `PutObject` (`If-None-Match: *`), verifies
   its digest metadata, and commits `current.json` with a captured ETag CAS (or a
@@ -236,13 +237,13 @@ verification may turn the HTTP result into a retryable failure.
 - `scripts/materialize-public-downloads-bundle.sh` and
   `scripts/sync_workspace_portal_manifest_mirrors.py` may create source/mirror copies
   only after activation and must preserve generation metadata.
-- `scripts/runbook.sh` must route release mode through one of the generation-aware
-  publishers and reject legacy direct mutation.
+- `scripts/runbook.sh` routes release mode through a generation-aware publisher and rejects
+  legacy direct mutation of an authoritative shelf.
 
 Equivalent publisher copies in `chummer6-ui` and `chummer-presentation`, plus the
-duplicated Hub upload service in `chummer6-hub`, must move in the same contract change.
-`chummer-presentation/scripts/publish-latest-nightly-to-downloads.sh` is also a writer
-and may not target the live top-level shelf directly after layout-v1 activation.
+duplicated Hub upload service in `chummer6-hub`, enforce the same contract.
+`chummer-presentation/scripts/publish-latest-nightly-to-downloads.sh` is inventoried as a writer
+and cannot target the live top-level shelf directly after layout-v1 activation.
 
 Registry producers in `chummer-hub-registry/scripts/release/` own the release-truth
 document. The activating writer owns the deterministic generation projection described
@@ -364,7 +365,8 @@ it must never delete the pointer and expose a partially updated mirror.
 
 ## Launch gate
 
-Do not claim atomic release publication, and do not unfreeze blind nightly retries,
-until all authoritative writers use the generation contract, all public manifest URLs
-are generation-bound, and the concurrency/failure matrix passes in the deployed storage
-topology. Pre-publication validation and rollback alone are necessary but insufficient.
+Atomic release publication remains claimable only while all authoritative writers enforce the
+generation contract, all public manifest URLs are generation-bound, and the concurrency/failure
+matrix passes in the deployed storage topology. Any regression closes the gate and keeps blind
+nightly retries disabled. Pre-publication validation and rollback alone remain necessary but
+insufficient.

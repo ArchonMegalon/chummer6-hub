@@ -15,6 +15,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = REPO_ROOT.parent
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "atomic_release_shelf_v1"
+ATOMIC_CONTRACT_DOC = REPO_ROOT / "docs" / "ATOMIC_RELEASE_SHELF_PUBLICATION.md"
+DOWNLOADS_RUNBOOK = REPO_ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
 GENERATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 POINTER_SCHEMA = "chummer.release-shelf.current/v1"
@@ -231,6 +233,50 @@ def copy_fixture(tmp_path: Path) -> Path:
     destination = tmp_path / "downloads"
     shutil.copytree(FIXTURE_ROOT, destination)
     return destination
+
+
+def test_release_publication_docs_describe_the_implemented_authority() -> None:
+    contract_doc = ATOMIC_CONTRACT_DOC.read_text(encoding="utf-8")
+    runbook = DOWNLOADS_RUNBOOK.read_text(encoding="utf-8")
+
+    for implemented_truth in (
+        "Status: **Implemented production contract**",
+        "## Closed deterministic gap",
+        "`server-journal-v1` stages and validates one immutable generation",
+        "atomically commits `current.json` as the sole publication",
+        "production local publication uses the staged HTTP lane",
+        "Any regression closes the gate",
+    ):
+        assert implemented_truth in contract_doc
+
+    for retired_claim in (
+        "Status: **P1 launch blocker**",
+        "## Current deterministic gap",
+        "currently reads `proof/windows`",
+        "currently reads `aur-packages.json`",
+        "currently treat top-level paths as authoritative",
+        "currently mutates deploy and mirror roots",
+        "must call the shared stage/validate/activate primitive",
+        "must route release mode",
+        "must move in the same contract change",
+        "Do not claim atomic release publication",
+    ):
+        assert retired_claim not in contract_doc
+
+    topology = runbook[
+        runbook.index("## Recommended Production Topology") :
+        runbook.index("## Install-linking PostgreSQL authority cutover")
+    ]
+    filesystem_lane = runbook[
+        runbook.index("## Mode A: Legacy/dev filesystem source candidate") :
+        runbook.index("## Mode B: Object Storage Deploy")
+    ]
+    assert "canonical local-production lane is Mode C" in topology
+    assert "server-journal-v1" in topology
+    assert "limited to legacy development or source-candidate trees" in topology
+    assert "never production" in filesystem_lane.splitlines()[0]
+    assert "must not be the live production shelf" in filesystem_lane
+    assert "production uses\nMode C staged HTTP publication" in filesystem_lane
 
 
 def test_layout_v1_fixture_pointer_binds_complete_generation() -> None:
