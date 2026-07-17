@@ -10,7 +10,7 @@ PROGRAM = REPO_ROOT / "Chummer.Run.Api" / "Program.cs"
 def test_public_edge_serves_health_and_self_hosted_docs_without_external_assets() -> None:
     source = PROGRAM.read_text(encoding="utf-8")
 
-    assert 'app.MapGet("/api/health"' in source
+    assert 'app.MapMethods("/api/health", new[] { HttpMethods.Get, HttpMethods.Head }' in source
     assert 'app.MapGet("/openapi/", GetSelfHostedDocs);' in source
     assert "Self-hosted OpenAPI explorer" in source
     assert "Release details" in source
