@@ -147,6 +147,11 @@ case "$(printf '%s' "$ALLOW_PROOF_ONLY_VISUAL_HANDOFF" | tr '[:upper:]' '[:lower
     ;;
 esac
 
+if [[ ! -f "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" ]]; then
+  echo "Missing registry verifier: $REGISTRY_ROOT/scripts/verify_public_release_channel.py" >&2
+  exit 1
+fi
+
 to_bool() {
   local value
   value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
@@ -176,6 +181,39 @@ array_count() {
   fi
 
   printf '%s\n' "$count"
+}
+
+array_values_nul() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || return 0
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  eval "printf '%s\\0' \"\${${array_name}[@]}\""
+  local status="$?"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  return "$status"
+}
+
+artifact_factory_failure() {
+  local message="${1:-artifact-factory autolaunch failed.}"
+  if to_bool "$ARTIFACT_FACTORY_REQUIRED"; then
+    echo "$message" >&2
+    exit 1
+  fi
+
+  echo "Artifact-factory autolaunch warning: $message set CHUMMER_ARTIFACT_FACTORY_AUTOLAUNCH_REQUIRED=1 to make this fatal." >&2
+  return 0
 }
 
 canonicalize_release_channel_registries() {
@@ -247,14 +285,26 @@ release_version = str(payload.get("version") or "").strip()
 
 def derive_verifier_owned_value(name: str, current_value: object) -> object:
     helper = getattr(module, name, None)
-    if callable(helper):
-        try:
-            return helper(payload)
-        except TypeError:
-            pass
+    artifact_bound_registry_names = {
+        "expected_desktop_route_truth_rows",
+        "expected_install_aware_artifact_registry_rows",
+        "expected_desktop_surface_ref_rows",
+        "expected_artifact_identity_registry_rows",
+        "expected_artifact_publication_binding_rows",
+    }
+    if callable(helper) and name not in artifact_bound_registry_names:
+        return helper(payload)
+    if materializer is None:
+        if callable(helper):
+            try:
+                return helper(payload)
+            except TypeError:
+                return current_value
+        return current_value
     fallback_helpers = {
         "expected_install_aware_artifact_registry_rows": lambda: (
             materializer.install_aware_artifact_registry(
+                payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else [],
                 tuple_coverage,
                 channel_id=channel_id,
                 release_version=release_version,
@@ -274,6 +324,46 @@ def derive_verifier_owned_value(name: str, current_value: object) -> object:
         "expected_external_proof_request_rows": lambda: (
             materializer.external_proof_requests(tuple_coverage)
             if tuple_coverage is not None and hasattr(materializer, "external_proof_requests")
+            else current_value
+        ),
+        "expected_desktop_surface_ref_rows": lambda: (
+            materializer.desktop_surface_refs(
+                payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else [],
+                tuple_coverage,
+                channel_id=channel_id,
+                release_version=release_version,
+            )
+            if tuple_coverage is not None and hasattr(materializer, "desktop_surface_refs")
+            else current_value
+        ),
+        "expected_artifact_identity_registry_rows": lambda: (
+            materializer.artifact_identity_registry(
+                tuple_coverage,
+                payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else [],
+                channel_id=channel_id,
+                release_version=release_version,
+            )
+            if tuple_coverage is not None and hasattr(materializer, "artifact_identity_registry")
+            else current_value
+        ),
+        "expected_artifact_publication_binding_rows": lambda: (
+            materializer.artifact_publication_bindings(
+                tuple_coverage,
+                payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else [],
+                channel_id=channel_id,
+                release_version=release_version,
+            )
+            if tuple_coverage is not None and hasattr(materializer, "artifact_publication_bindings")
+            else current_value
+        ),
+        "expected_public_trust_metrics": lambda: (
+            materializer.expected_public_trust_metrics(payload)
+            if hasattr(materializer, "expected_public_trust_metrics")
+            else current_value
+        ),
+        "expected_registry_boundary_coverage": lambda: (
+            materializer.expected_registry_boundary_coverage(payload)
+            if hasattr(materializer, "expected_registry_boundary_coverage")
             else current_value
         ),
     }
@@ -306,6 +396,20 @@ payload["artifactPublicationBindings"] = derive_verifier_owned_value(
     "expected_artifact_publication_binding_rows",
     payload.get("artifactPublicationBindings") or [],
 )
+payload["publicTrustMetrics"] = derive_verifier_owned_value(
+    "expected_public_trust_metrics",
+    payload.get("publicTrustMetrics") or {},
+)
+
+trust_release_channel = payload.get("publicTrustMetrics", {}).get("releaseChannel", {})
+trust_supportability_state = normalized_token(trust_release_channel.get("supportabilityState"))
+trust_rollout_state = normalized_token(trust_release_channel.get("rolloutState"))
+if normalized_token(payload.get("status")) == "published":
+    if trust_supportability_state:
+        payload["supportabilityState"] = trust_supportability_state
+    if trust_rollout_state:
+        payload["rolloutState"] = trust_rollout_state
+
 payload["registryBoundaryCoverage"] = derive_verifier_owned_value(
     "expected_registry_boundary_coverage",
     payload.get("registryBoundaryCoverage") or {},
@@ -943,6 +1047,18 @@ if (( upload_file_count == 0 )); then
   exit 1
 fi
 
+candidate_summary="$tmp_root/upload-candidate-summary.json"
+candidate_summary_command=(
+  python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" summarize
+  --bundle-root "$BUNDLE_DIR"
+  --canonical-manifest "$CANONICAL_MANIFEST_PATH"
+  --output "$candidate_summary"
+)
+while IFS= read -r -d '' file_path; do
+  candidate_summary_command+=(--file "$file_path")
+done < <(array_values_nul upload_files)
+"${candidate_summary_command[@]}"
+
 echo "Publishing ${upload_file_count} bundle files from $BUNDLE_DIR"
 
 session_json="$tmp_root/session.json"
@@ -1024,10 +1140,14 @@ echo "Upload accepted."
 print_sanitized_response "$response_json" || echo "(release response display suppressed)"
 echo
 
-python3 "$SCRIPT_DIR/verify_release_upload_response_truth.py" \
-  --local-manifest "$MANIFEST_PATH" \
-  --local-canonical-manifest "$CANONICAL_MANIFEST_PATH" \
-  --upload-response "$response_json"
+if [[ -f "$SCRIPT_DIR/verify_release_upload_response_truth.py" ]]; then
+  if ! python3 "$SCRIPT_DIR/verify_release_upload_response_truth.py" \
+    --local-manifest "$MANIFEST_PATH" \
+    --local-canonical-manifest "$CANONICAL_MANIFEST_PATH" \
+    --upload-response "$response_json"; then
+    echo "Upload response truth verification was inconclusive after publication; the accepted release remains authoritative and must not be retried blindly." >&2
+  fi
+fi
 
 if to_bool "$VERIFY_MANIFEST"; then
   CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
@@ -1105,13 +1225,20 @@ if to_bool "$VERIFY_ROUTES"; then
 fi
 
 if to_bool "$VERIFY_SHELF_TRUTH"; then
-  python3 "$SCRIPT_DIR/public_download_shelf_truth_gate.py" \
+  shelf_truth_args=(
     --base-url "$PUBLIC_BASE_URL" \
     --local-manifest "$MANIFEST_PATH" \
-    --local-canonical-manifest "$CANONICAL_MANIFEST_PATH" \
-    --live-confirmation-count "$VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_COUNT" \
-    --live-confirmation-delay-seconds "$VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_DELAY_SECONDS" \
-    --live-max-samples "$VERIFY_SHELF_TRUTH_LIVE_MAX_SAMPLES"
+    --local-canonical-manifest "$CANONICAL_MANIFEST_PATH"
+  )
+  if python3 "$SCRIPT_DIR/public_download_shelf_truth_gate.py" --help 2>&1 \
+      | grep -q -- '--live-confirmation-count'; then
+    shelf_truth_args+=(
+      --live-confirmation-count "$VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_COUNT"
+      --live-confirmation-delay-seconds "$VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_DELAY_SECONDS"
+      --live-max-samples "$VERIFY_SHELF_TRUTH_LIVE_MAX_SAMPLES"
+    )
+  fi
+  python3 "$SCRIPT_DIR/public_download_shelf_truth_gate.py" "${shelf_truth_args[@]}"
 fi
 
 if to_bool "$VERIFY_PUBLIC_SHELL_TRUTH"; then

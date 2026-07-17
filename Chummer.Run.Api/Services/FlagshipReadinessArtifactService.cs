@@ -35,6 +35,7 @@ public sealed class FlagshipReadinessArtifactService
             }
 
             string? reason = ResolveReason(payload);
+            IReadOnlyList<string> blockedJourneyEvidence = CollectBlockedJourneyEvidence(path);
 
             return new FlagshipReadinessSnapshot(
                 Status: payload.Status,
@@ -42,7 +43,9 @@ public sealed class FlagshipReadinessArtifactService
                 WarningCoverageKeys: payload.FlagshipReadinessAudit?.WarningCoverageKeys ?? Array.Empty<string>(),
                 ScopedWarningCoverageKeys: payload.FlagshipReadinessAudit?.ScopedWarningCoverageKeys ?? Array.Empty<string>(),
                 MissingCoverageKeys: payload.FlagshipReadinessAudit?.MissingCoverageKeys ?? Array.Empty<string>(),
-                ScopedMissingCoverageKeys: payload.FlagshipReadinessAudit?.ScopedMissingCoverageKeys ?? Array.Empty<string>());
+                ScopedMissingCoverageKeys: payload.FlagshipReadinessAudit?.ScopedMissingCoverageKeys ?? Array.Empty<string>(),
+                BlockedJourneyEvidenceCount: blockedJourneyEvidence.Count,
+                BlockedJourneyEvidenceSamples: blockedJourneyEvidence.Take(5).ToArray());
         }
         catch
         {
@@ -96,14 +99,14 @@ public sealed class FlagshipReadinessArtifactService
                 });
         }
 
-        candidates.AddRange(
-            new string?[]
-            {
-                !string.IsNullOrWhiteSpace(configuredFallbackPath) ? Path.GetFullPath(configuredFallbackPath) : null,
-                DefaultFleetReadinessPath
-            }
-            .OfType<string>()
-            .Where(static candidate => !string.IsNullOrWhiteSpace(candidate)));
+        if (!string.IsNullOrWhiteSpace(configuredFallbackPath))
+        {
+            candidates.Add(Path.GetFullPath(configuredFallbackPath));
+        }
+        else
+        {
+            candidates.Add(DefaultFleetReadinessPath);
+        }
 
         string[] distinctCandidates = candidates
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -268,6 +271,65 @@ public sealed class FlagshipReadinessArtifactService
         return normalizedBase + " " + string.Join(" ", normalizedDetails.Select(static detail => detail + "."));
     }
 
+    private static IReadOnlyList<string> CollectBlockedJourneyEvidence(string path)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+            List<string> evidence = [];
+            CollectBlockedJourneyEvidence(document.RootElement, "$", evidence);
+            return evidence;
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    private static void CollectBlockedJourneyEvidence(JsonElement element, string path, ICollection<string> evidence)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (JsonProperty property in element.EnumerateObject())
+                {
+                    string propertyPath = $"{path}.{property.Name}";
+                    if (property.Value.ValueKind == JsonValueKind.String
+                        && string.Equals(property.Value.GetString(), "blocked", StringComparison.OrdinalIgnoreCase)
+                        && IsJourneyEvidenceProperty(property.Name))
+                    {
+                        evidence.Add(propertyPath);
+                    }
+
+                    CollectBlockedJourneyEvidence(property.Value, propertyPath, evidence);
+                }
+
+                break;
+            case JsonValueKind.Array:
+                int index = 0;
+                foreach (JsonElement child in element.EnumerateArray())
+                {
+                    CollectBlockedJourneyEvidence(child, $"{path}[{index}]", evidence);
+                    index++;
+                }
+
+                break;
+        }
+    }
+
+    private static bool IsJourneyEvidenceProperty(string propertyName)
+    {
+        string normalized = propertyName.Trim();
+        return normalized.Equals("journey_state", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("journey_overall_state", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("install_claim_restore_continue", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("build_explain_publish", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("report_cluster_release_notify", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("organize_community_and_close_loop", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("campaign_session_recover_recap", StringComparison.OrdinalIgnoreCase)
+               || normalized.Equals("recover_from_sync_conflict", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string[] UniqueNonEmpty(params IReadOnlyList<string>?[] values)
     {
         List<string> result = [];
@@ -324,7 +386,9 @@ public sealed record FlagshipReadinessSnapshot(
     IReadOnlyList<string> WarningCoverageKeys,
     IReadOnlyList<string> ScopedWarningCoverageKeys,
     IReadOnlyList<string> MissingCoverageKeys,
-    IReadOnlyList<string> ScopedMissingCoverageKeys)
+    IReadOnlyList<string> ScopedMissingCoverageKeys,
+    int BlockedJourneyEvidenceCount,
+    IReadOnlyList<string> BlockedJourneyEvidenceSamples)
 {
     public bool MissingDesktopClientCoverage
         => WarningCoverageKeys.Contains("desktop_client", StringComparer.OrdinalIgnoreCase)
@@ -344,8 +408,19 @@ public sealed record FlagshipReadinessSnapshot(
            && Reason.Contains("final gold janitor state is 'fail'", StringComparison.OrdinalIgnoreCase)
            && Reason.Contains("final gold janitor verdict is 'NOT_GOLD'", StringComparison.OrdinalIgnoreCase);
 
+    public bool HasBlockedJourneyEvidence => BlockedJourneyEvidenceCount > 0;
+
+    public bool RequiresReview => MissingDesktopClientCoverage || HasBlockedJourneyEvidence;
+
     public string DesktopClientGapSummary
         => !string.IsNullOrWhiteSpace(Reason)
             ? Reason!
             : "desktop client coverage is still missing from the current flagship readiness proof";
+
+    public string ReviewRequiredSummary
+        => MissingDesktopClientCoverage
+            ? DesktopClientGapSummary
+            : HasBlockedJourneyEvidence
+                ? $"{BlockedJourneyEvidenceCount} flagship journey blocker{(BlockedJourneyEvidenceCount == 1 ? "" : "s")} remain"
+                : Reason ?? "flagship readiness is not fully proven";
 }
