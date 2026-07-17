@@ -164,11 +164,19 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
 
     for expected in (
         "static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
-        "@PublicDownloadText(Model.Manifest.Message)",
+        "var emptyDownloadMessage = requestedPlatformUnavailable",
+        "Nothing stale will be offered as a substitute.",
+        "No current build has passed release verification yet. Please check again later.",
+        "@PublicDownloadText(string.IsNullOrWhiteSpace(Model.Manifest.Message) ? emptyDownloadMessage : Model.Manifest.Message)",
+        "var releaseNeedsReview = NeedsReview(Model.Manifest) || !isStableRelease;",
+        "var nightly = releaseNeedsReview",
         "stableAndNightlyMatch",
         "No newer Nightly right now.",
-        "static bool IsNightlyHandoff(string? channel, string? version, string? rolloutState)",
-        "static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
+        "static bool NeedsReview(PublicReleaseManifestDto manifest)",
+        "static bool IsPublicStableRelease(PublicReleaseManifestDto manifest)",
+        "static string PublicStatusText(string? value)",
+        "var humanized = UndetectableHumanizerCopyAdapter.Humanize(value);",
+        'return humanized.Replace("Open help", "Use Help", StringComparison.OrdinalIgnoreCase);',
         "var statusLine = Model.ReleaseExperience.Recommended is null",
         'Stable is still unavailable.',
         "@PublicStatusText(statusLine)",
@@ -351,6 +359,7 @@ def test_pwa_install_assets_do_not_use_internal_release_language() -> None:
 def test_static_receipts_and_proofs_are_never_indexable() -> None:
     program = read("Chummer.Run.Api/Program.cs")
     indexable_function = program.split("static bool IsIndexablePublicPath(PathString path)", 1)[1].split("static bool IsLegacyMacReleaseBootstrapArtifactPath", 1)[0]
+    governed_static_function = program.split("static bool IsGovernedReleaseStaticPath(PathString path)", 1)[1].split("static bool IsPrivatePlayDocumentPath", 1)[0]
     wwwroot = REPO_ROOT / "Chummer.Run.Api" / "wwwroot"
     internal_static_assets = sorted(
         path
@@ -367,11 +376,26 @@ def test_static_receipts_and_proofs_are_never_indexable() -> None:
         )
     )
 
-    assert "app.UseStaticFiles(new StaticFileOptions" in program
+    assert "app.UseWhen(" in program
+    assert "static context => !IsGovernedReleaseStaticPath(context.Request.Path)" in program
+    assert "staticFiles => staticFiles.UseStaticFiles(new StaticFileOptions" in program
     assert "OnPrepareResponse = fileContext =>" in program
     assert 'fileContext.Context.Response.Headers["X-Robots-Tag"] = ResolveRobotsPolicy' in program
     assert 'const string NoIndexRobotsPolicy = "noindex, nofollow, noarchive, nosnippet, noimageindex";' in program
     assert internal_static_assets
+
+    for governed_path in (
+        'path.Equals("/downloads/current.json", StringComparison.OrdinalIgnoreCase)',
+        'path.Equals("/downloads/releases.json", StringComparison.OrdinalIgnoreCase)',
+        'path.Equals("/downloads/RELEASE_CHANNEL.generated.json", StringComparison.OrdinalIgnoreCase)',
+        'path.StartsWithSegments("/downloads/g", StringComparison.OrdinalIgnoreCase)',
+        'path.StartsWithSegments("/downloads/files", StringComparison.OrdinalIgnoreCase)',
+        'path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)',
+        'path.StartsWithSegments("/downloads/proof", StringComparison.OrdinalIgnoreCase)',
+        'path.StartsWithSegments("/downloads/startup-smoke", StringComparison.OrdinalIgnoreCase)',
+        'path.StartsWithSegments("/downloads/release-evidence", StringComparison.OrdinalIgnoreCase)',
+    ):
+        assert governed_path in governed_static_function
 
     for path in internal_static_assets:
         public_path = "/" + path.relative_to(wwwroot).as_posix()
@@ -413,8 +437,23 @@ def test_public_mobile_and_changelog_hide_implementation_terms() -> None:
     ):
         assert forbidden not in combined
 
-    assert "Open mobile view" in mobile
-    assert "Open setup help" in mobile
+    for expected in (
+        'class="turn-shell install-only-shell"',
+        'data-play-surface="install-only"',
+        'data-live-session="unavailable"',
+        'data-authority="none"',
+        "Public shell only",
+        "No table data loaded",
+        "No role granted",
+        ">Install app</button>",
+        "data-mobile-app-inline-open",
+        '>How to join</a>',
+        'id="turn-manual-install-help"',
+    ):
+        assert expected in mobile
+
+    assert "Open mobile view" not in mobile
+    assert "Open setup help" not in mobile
     assert "campaign-only details" in ledger_workspace
     assert "Get the app" not in landing
     assert "minimal-inline-links" in landing
@@ -1013,19 +1052,20 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "Chummer selects the best installer when it can. Other downloads stay below." in downloads
     assert "attach this installed copy to your account" in downloads
     assert "Stable release." in downloads
-    assert "Stable release is unchanged while this nightly handoff is under review." in downloads
-    assert "Nightly handoff. Stable release is unchanged." in downloads
-    assert "Stable release is not available for this platform yet." in downloads
+    assert "var releaseNeedsReview = NeedsReview(Model.Manifest) || !isStableRelease;" in downloads
+    assert "var stable = isStableRelease && !requestedPlatformUnavailable ? recommended : null;" in downloads
+    assert "var nightly = releaseNeedsReview" in downloads
+    assert "static bool NeedsReview(PublicReleaseManifestDto manifest)" in downloads
+    assert "static bool IsPublicStableRelease(PublicReleaseManifestDto manifest)" in downloads
+    assert "No Stable build on this shelf." in downloads
     assert "<summary>Other downloads</summary>" in downloads
     assert "showLinuxSourcePrimary" in downloads
     assert "No sudo. Updates default to notify." in downloads
     assert "/downloads/build-chummer6-linux.sh" in downloads
     assert "stableAndNightlyMatch" in downloads
-    assert "currentReleaseIsNightlyHandoff" in downloads
     assert "release.Alternatives.Concat(release.OtherPlatforms)" not in downloads
     assert "FirstOrDefault(IsNightly)" in downloads
     assert "static bool IsNightly(ReleaseOptionViewModel option)" in downloads
-    assert "static bool IsNightlyHandoff(string? channel, string? version, string? rolloutState)" in downloads
     assert 'value.Contains("nightly", StringComparison.OrdinalIgnoreCase)' in downloads
     assert "No newer Nightly right now." in downloads
     assert "Preview build. Review required." in downloads
@@ -1048,6 +1088,8 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
         "receipt",
         "Checked",
         "public shelf",
+        "Stable release is unchanged while this nightly handoff is under review.",
+        "Nightly handoff. Stable release is unchanged.",
     ):
         assert forbidden not in downloads
 
@@ -1061,8 +1103,12 @@ def test_status_surface_uses_single_update_label() -> None:
     status = read("Chummer.Run.Api/Views/PublicLanding/Status.cshtml")
 
     assert 'ViewData["Title"] = "Status";' in status
-    assert "<h1>Updated</h1>" in status
+    assert "var heading = Model.ReleaseExperience.Recommended is null" in status
+    assert '? "Downloads paused"' in status
+    assert ': isStableRelease ? "Stable downloads" : "Preview downloads";' in status
+    assert "<h1>@heading</h1>" in status
     assert "<h1>Current release</h1>" not in status
+    assert "<h1>Updated</h1>" not in status
     assert 'ViewData["Title"] = "Updated";' not in status
 
 
@@ -2704,9 +2750,23 @@ def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
     ):
         assert forbidden not in combined
 
-    assert "offline return path" in mobile
+    assert 'data-play-surface="install-only"' in mobile
+    assert 'data-live-session="unavailable"' in mobile
+    assert 'data-authority="none"' in mobile
+    assert 'data-role-privacy-warning="@roleProfile.RoleKey"' in mobile
+    assert 'data-role-authority-warning="@roleProfile.RoleKey"' in mobile
+    assert "@roleProfile.PrivacySummary" in mobile
+    assert "@roleProfile.AuthoritySummary" in mobile
+    assert "No table data loaded" in mobile
+    assert "No role granted" in mobile
     assert "continuity page" not in mobile
-    assert "entry points meet in one shell" in mobile
+    for forbidden_live_authority in (
+        "sessionId",
+        "continuityToken",
+        "tableId",
+        "grant=",
+    ):
+        assert forbidden_live_authority not in mobile
     assert "This page keeps rule answers short" in knowledge
     assert "Chummer export, not book text" in anarchy
     assert "This page reads Chummer dispatches" in anarchy
@@ -2725,9 +2785,11 @@ def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
         "UndetectableHumanizerCopyAdapter.Humanize(receipt.Topic)",
         "UndetectableHumanizerCopyAdapter.Humanize(receipt.Summary)",
         "UndetectableHumanizerCopyAdapter.Humanize(receipt.Route)",
-        "PublicMobileText(Model.Heading)",
-        "PublicMobileText(Model.InstallabilitySummary)",
-        "PublicMobileText(role.Label)",
+        "@roleProfile.PurposeHeading",
+        "@roleProfile.PurposeSummary",
+        "@roleProfile.OpenTargetLabel",
+        "@capability.Label",
+        "@capability.Summary",
         "PublicAnarchyText(Model.Heading)",
         "PublicAnarchyText(Model.ScopeLabel)",
         "PublicAnarchyText(Model.FeaturedProfile.Notes)",
