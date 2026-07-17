@@ -2049,7 +2049,14 @@ launch()
             return_value={"plan": "captured"},
         ) as build_plan:
             captured = module.authoritative_release_execution_plan(
-                module._test_release_execution_environment,
+                {
+                    **module._test_release_execution_environment,
+                    module.RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV: json.dumps(
+                        module._test_release_launcher_identity,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                },
                 external_write_authorized=True,
                 process_containment={
                     "mode": module.PROCESS_CONTAINMENT_MODE,

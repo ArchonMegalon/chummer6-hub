@@ -532,8 +532,18 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
 
     def test_root_release_ready_wrapper_runs_observability_after_compose_operability(self) -> None:
         controller = load_release_ready_materializer()
+        launcher_stat = controller.VERIFY_SCRIPT.stat()
+        launcher_identity = {
+            **controller.regular_file_execution_identity(controller.VERIFY_SCRIPT),
+            "uid": launcher_stat.st_uid,
+            "gid": launcher_stat.st_gid,
+        }
         with (
-            mock.patch.object(controller, "source_binding_failures", return_value=[]),
+            mock.patch.object(
+                controller,
+                "authoritative_release_launcher_identity",
+                return_value=launcher_identity,
+            ),
             mock.patch.object(controller, "current_git_head", return_value="a" * 40),
         ):
             environment = controller.authoritative_controller_environment(
