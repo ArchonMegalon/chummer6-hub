@@ -78,6 +78,7 @@ with startup files disabled, passing only the variables named by the body. The l
   CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256="$CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256" \
   CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT="$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT" \
   CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256="$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256" \
+  CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256="$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" \
   CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL="$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL" \
   CHUMMER_RUN_SERVICES_SOURCE="$CHUMMER_RUN_SERVICES_SOURCE" \
   CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT="$CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" \
@@ -105,6 +106,7 @@ test "$CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH" = 1 || exit 78
 : "${CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256:?Export the independently selected verifier SHA-256}"
 : "${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT:?Export the selected release-channel receipt path}"
 : "${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256:?Export its independently selected SHA-256}"
+: "${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256:?Export the independently selected canonical runtime-proof SHA-256}"
 : "${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL:?Export public_stable, stable, preview, or nightly}"
 : "${CHUMMER_RUN_SERVICES_SOURCE:?Export the absolute run-services source root used by Compose}"
 : "${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:?Export the absolute public-edge Docker build context}"
@@ -146,6 +148,14 @@ export PATH
 
 [[ "$CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
   echo "The independently selected trusted-verifier digest must be a full lowercase SHA-256." >&2
+  exit 78
+}
+[[ "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+  echo "The independently selected release-channel receipt digest must be a full lowercase SHA-256." >&2
+  exit 78
+}
+[[ "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+  echo "The independently selected runtime-proof digest must be a full lowercase SHA-256." >&2
   exit 78
 }
 trusted_verifier_actual_sha256="$(/usr/bin/sha256sum -- "$trusted_source_verifier")"
@@ -529,6 +539,9 @@ chmod 600 "$source_preflight_receipt" "$overlay_publish_receipt" \
 timeout --kill-after=10s 180s \
   python3 scripts/check_public_edge_deploy_preflight.py \
   --source-root "$source_root" --skip-overlay-marker-check \
+  --runtime-proof-bind-source-sha256 "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" \
+  --release-channel-receipt "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT" \
+  --release-channel-receipt-sha256 "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256" \
   --output "$source_preflight_receipt"
 
 # Build and verify a candidate under the staging root. This command deliberately does not select
@@ -577,6 +590,9 @@ require_full_image_id "$candidate_postgres_tool_image_id" || exit 78
 timeout --kill-after=10s 180s \
   python3 scripts/check_public_edge_deploy_preflight.py \
   --source-root "$source_root" --skip-overlay-marker-check \
+  --runtime-proof-bind-source-sha256 "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" \
+  --release-channel-receipt "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT" \
+  --release-channel-receipt-sha256 "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256" \
   --output "$prebuild_overlay_preflight_receipt"
 
 cutover_drained=1
@@ -606,6 +622,9 @@ timeout --kill-after=30s 1800s \
 timeout --kill-after=10s 180s \
   python3 scripts/check_public_edge_deploy_preflight.py \
   --source-root "$source_root" --overlay-root "$active_root" \
+  --runtime-proof-bind-source-sha256 "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" \
+  --release-channel-receipt "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT" \
+  --release-channel-receipt-sha256 "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256" \
   --output "$overlay_preflight_receipt"
 
 assert_no_operator_jobs

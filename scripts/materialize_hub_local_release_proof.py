@@ -639,41 +639,40 @@ def _publish_runtime_proof_artifacts(
     proof_max_age_seconds: int,
     proof_max_future_skew_seconds: int,
 ) -> bool:
-    """Write the canonical and served proof under shared deploy mutation authority."""
+    """Write proof artifacts while the caller owns shared mutation authority."""
 
-    with _public_edge_proof_mutation_lock():
-        existing_payload = _load_existing_payload(out_path)
-        if (
-            existing_payload is not None
-            and _stable_payload(existing_payload) == _stable_payload(payload)
-            and _payload_is_fresh(
-                existing_payload,
-                max_age_seconds=proof_max_age_seconds,
-                max_future_skew_seconds=proof_max_future_skew_seconds,
-            )
-        ):
-            _write_public_json_artifact(
-                out_path,
-                canonical_json_bytes(
-                    existing_payload,
-                    label="hub local release proof",
-                ).decode("utf-8"),
-            )
-            _sync_served_release_proof_if_needed(out_path=out_path)
-            return False
-
-        generated_at = iso_now()
-        payload["generated_at"] = generated_at
-        payload["generatedAt"] = generated_at
+    existing_payload = _load_existing_payload(out_path)
+    if (
+        existing_payload is not None
+        and _stable_payload(existing_payload) == _stable_payload(payload)
+        and _payload_is_fresh(
+            existing_payload,
+            max_age_seconds=proof_max_age_seconds,
+            max_future_skew_seconds=proof_max_future_skew_seconds,
+        )
+    ):
         _write_public_json_artifact(
             out_path,
             canonical_json_bytes(
-                payload,
+                existing_payload,
                 label="hub local release proof",
             ).decode("utf-8"),
         )
         _sync_served_release_proof_if_needed(out_path=out_path)
-        return True
+        return False
+
+    generated_at = iso_now()
+    payload["generated_at"] = generated_at
+    payload["generatedAt"] = generated_at
+    _write_public_json_artifact(
+        out_path,
+        canonical_json_bytes(
+            payload,
+            label="hub local release proof",
+        ).decode("utf-8"),
+    )
+    _sync_served_release_proof_if_needed(out_path=out_path)
+    return True
 
 
 def _m141_direct_import_route_receipts() -> list[dict]:
@@ -768,15 +767,13 @@ def _m141_direct_import_route_receipts() -> list[dict]:
     ]
 
 
-def main() -> int:
-    if len(sys.argv) != 6:
-        print(
-            "usage: materialize_hub_local_release_proof.py <out_path> <base_url> <compose_file> <timeout_seconds> <skip_rebuild>",
-            file=sys.stderr,
-        )
-        return 1
-
-    out_path_text, base_url, compose_file, timeout_seconds, skip_rebuild = sys.argv[1:]
+def _materialize_under_shared_mutation_lock(
+    out_path_text: str,
+    base_url: str,
+    compose_file: str,
+    timeout_seconds: str,
+    skip_rebuild: str,
+) -> int:
     out_path = Path(out_path_text)
     proof_max_age_seconds = _parse_int_env(
         "CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS",
@@ -1930,10 +1927,10 @@ def main() -> int:
         source_path=str(desktop_client_readiness.get("source_path") or "").strip(),
     )
 
-    # The proof path is bind-mounted into the public portal. Serialize the final
-    # local + served replacement with the same fixed host mutation authority used
-    # by standalone deploy and recovery so an atomic rename cannot race container
-    # recreation or rollback verification.
+    # The caller owns the same fixed host mutation authority used by standalone
+    # deploy and recovery. All input reads and payload construction above therefore
+    # describe one post-lock snapshot, and these replacements cannot race container
+    # recreation, rollback verification, or a newer materializer invocation.
     changed = _publish_runtime_proof_artifacts(
         out_path=out_path,
         payload=payload,
@@ -1945,6 +1942,36 @@ def main() -> int:
     else:
         print(f"hub local proof unchanged and still fresh: {out_path}")
     return 0
+
+
+def materialize_with_shared_mutation_lock(
+    out_path_text: str,
+    base_url: str,
+    compose_file: str,
+    timeout_seconds: str,
+    skip_rebuild: str,
+) -> int:
+    """Capture inputs, build the projection, and publish under one shared lock."""
+
+    with _public_edge_proof_mutation_lock():
+        return _materialize_under_shared_mutation_lock(
+            out_path_text,
+            base_url,
+            compose_file,
+            timeout_seconds,
+            skip_rebuild,
+        )
+
+
+def main() -> int:
+    if len(sys.argv) != 6:
+        print(
+            "usage: materialize_hub_local_release_proof.py <out_path> <base_url> <compose_file> <timeout_seconds> <skip_rebuild>",
+            file=sys.stderr,
+        )
+        return 1
+
+    return materialize_with_shared_mutation_lock(*sys.argv[1:])
 
 
 if __name__ == "__main__":

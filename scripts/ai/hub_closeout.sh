@@ -19,6 +19,10 @@ PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE:-
 PUBLIC_EDGE_DEPLOY_SOURCE_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE:-1}"
 PUBLIC_EDGE_EXPECTED_HEAD="${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}"
 PUBLIC_EDGE_DEPLOY_REPO_ROOT="${CHUMMER_PUBLIC_EDGE_DEPLOY_REPO_ROOT:-${CHUMMER_RUN_SERVICES_SOURCE:-$ROOT_DIR}}"
+CANONICAL_RELEASE_CHANNEL_RECEIPT="/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json"
+PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT:-$CANONICAL_RELEASE_CHANNEL_RECEIPT}"
+PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256-}"
+PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256="${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256-}"
 
 if [[ -z "$HUB_ENV_FILE" ]]; then
   if [[ -f "$ROOT_DIR/.env" ]]; then
@@ -73,8 +77,23 @@ if [[ "$HUB_CLOSEOUT_BUILD" == "1" || "$HUB_CLOSEOUT_BUILD" == "true" || "$HUB_C
     echo "Public-edge deploy preflight is mandatory and cannot be disabled." >&2
     exit 2
   fi
+  if [[ "$PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT" != "$CANONICAL_RELEASE_CHANNEL_RECEIPT" ]]; then
+    echo "public-edge preflight refuses a non-canonical release-channel receipt" >&2
+    exit 2
+  fi
+  if [[ ! "$PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256 must be independently supplied as a lowercase SHA-256" >&2
+    exit 2
+  fi
+  if [[ ! "$PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256 must be independently supplied as a lowercase SHA-256" >&2
+    exit 2
+  fi
   python3 scripts/check_public_edge_deploy_preflight.py \
-    --source-root "$PUBLIC_EDGE_DEPLOY_REPO_ROOT"
+    --source-root "$PUBLIC_EDGE_DEPLOY_REPO_ROOT" \
+    --runtime-proof-bind-source-sha256 "$PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" \
+    --release-channel-receipt "$PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT" \
+    --release-channel-receipt-sha256 "$PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256"
   verify_public_edge_deploy_source() {
     local compose_service="$1"
     if [[ "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" == "0" || "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" == "false" || "$PUBLIC_EDGE_DEPLOY_SOURCE_GATE" == "FALSE" ]]; then

@@ -119,6 +119,24 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
             (ROOT / "scripts" / "verify_public_edge_deploy_authority.py").read_bytes()
         ).hexdigest(),
     )
+    release_channel_receipt = Path(
+        "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json"
+    )
+    runtime_proof = Path(
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT",
+        str(release_channel_receipt),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256",
+        hashlib.sha256(release_channel_receipt.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256",
+        hashlib.sha256(runtime_proof.read_bytes()).hexdigest(),
+    )
 
     build = {
         "context": "/docker/chummercomplete",
@@ -212,6 +230,14 @@ def make_fake_authority_source(tmp_path: Path) -> Path:
         (
             "CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256",
             "independently supplied full SHA-256",
+        ),
+        (
+            "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256",
+            "independently supplied as a lowercase SHA-256",
+        ),
+        (
+            "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256",
+            "independently supplied as a lowercase SHA-256",
         ),
     ),
 )

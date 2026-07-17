@@ -149,14 +149,29 @@ def test_runtime_proof_materializer_writes_under_shared_mutation_lock(
 
     monkeypatch.setattr(materializer, "_write_public_json_artifact", locked_write)
 
-    changed = materializer._publish_runtime_proof_artifacts(
-        out_path=output,
-        payload={"status": "passed"},
-        proof_max_age_seconds=3600,
-        proof_max_future_skew_seconds=300,
+    def materialize_locked(*_args: str) -> int:
+        materializer._publish_runtime_proof_artifacts(
+            out_path=output,
+            payload={"status": "passed"},
+            proof_max_age_seconds=3600,
+            proof_max_future_skew_seconds=300,
+        )
+        return 0
+
+    monkeypatch.setattr(
+        materializer,
+        "_materialize_under_shared_mutation_lock",
+        materialize_locked,
+    )
+    exit_code = materializer.materialize_with_shared_mutation_lock(
+        str(output),
+        "https://chummer.run",
+        "docker-compose.public-edge.yml",
+        "300",
+        "true",
     )
 
-    assert changed is True
+    assert exit_code == 0
     assert events == ["enter", "exit"]
     assert lock_active is False
     assert json.loads(output.read_text(encoding="utf-8"))["status"] == "passed"
@@ -2762,6 +2777,113 @@ def test_full_preflight_cli_requires_independent_release_receipt_binding(
             ]
         )
     assert malformed_digest.value.code == 2
+
+
+@pytest.mark.parametrize("include_overlay", [False, True])
+def test_deployment_preflight_argument_shapes_bind_exact_proof_and_receipt_pins(
+    tmp_path: Path,
+    include_overlay: bool,
+) -> None:
+    module = load_module()
+    source_root = tmp_path / "source"
+    overlay_root = tmp_path / "overlay"
+    source_root.mkdir()
+    overlay_root.mkdir()
+    release_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
+    runtime_digest = "1" * 64
+    receipt_digest = "2" * 64
+    output = tmp_path / ("full-overlay.json" if include_overlay else "source-only.json")
+    captured: list[dict[str, object]] = []
+
+    module.process_lines_from_system = lambda: []
+    module.source_marker_findings = lambda _source: ([], [])
+    module.execute_public_pwa_static_proof = lambda _source: {"status": "pass"}
+    module.source_requires_operational_mirror_check = lambda _source: False
+    module.operational_mirror_root_findings = lambda: ([], [])
+    module.overlay_marker_findings = lambda _overlay: ([], [])
+    module.overlay_build_info_source_fingerprint_check = (
+        lambda _source, _overlay: ([], {})
+    )
+
+    def capture_runtime_binding(
+        path: Path,
+        **kwargs: object,
+    ) -> dict[str, object]:
+        captured.append({"path": path, **kwargs})
+        return {
+            "status": "pass",
+            "sourcePath": str(path),
+            "sha256": runtime_digest,
+            "expectedSha256": kwargs["runtime_proof_bind_source_sha256"],
+            "releaseChannelReceiptPath": str(kwargs["release_channel_receipt"]),
+            "releaseChannelReceiptExpectedSha256": kwargs[
+                "release_channel_receipt_sha256"
+            ],
+            "releaseChannelReceiptActualSha256": receipt_digest,
+            "checks": {
+                "digestMatchesExpected": True,
+                "releaseChannelReceiptDigestMatches": True,
+            },
+            "failures": [],
+        }
+
+    module.runtime_proof_bind_source_check = capture_runtime_binding
+    arguments = [
+        "--source-root",
+        str(source_root),
+        "--runtime-proof-bind-source-sha256",
+        runtime_digest,
+        "--release-channel-receipt",
+        str(release_receipt),
+        "--release-channel-receipt-sha256",
+        receipt_digest,
+        "--output",
+        str(output),
+    ]
+    if include_overlay:
+        arguments.extend(["--overlay-root", str(overlay_root)])
+    else:
+        arguments.append("--skip-overlay-marker-check")
+
+    assert module.main(arguments) == 0
+    assert captured == [
+        {
+            "path": module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE,
+            "runtime_proof_bind_source_sha256": runtime_digest,
+            "release_channel_receipt": release_receipt,
+            "release_channel_receipt_sha256": receipt_digest,
+        }
+    ]
+    receipt = json.loads(output.read_text(encoding="utf-8"))
+    proof_binding = receipt["runtimeProofBindSource"]
+    assert proof_binding["sha256"] == runtime_digest
+    assert proof_binding["expectedSha256"] == runtime_digest
+    assert proof_binding["releaseChannelReceiptExpectedSha256"] == receipt_digest
+    assert proof_binding["releaseChannelReceiptActualSha256"] == receipt_digest
+    assert receipt["overlayRoot"] == (str(overlay_root) if include_overlay else "")
+
+
+def test_lock_only_cli_remains_available_without_runtime_proof_pins(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    output_path = tmp_path / "lock-only-preflight.json"
+    module.process_lines_from_system = lambda: []
+
+    exit_code = module.main(
+        [
+            "--skip-source-marker-check",
+            "--skip-overlay-marker-check",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    assert exit_code == 0
+    receipt = json.loads(output_path.read_text(encoding="utf-8"))
+    assert receipt["status"] == "pass"
+    assert receipt["sourceMarkerChecks"] == []
+    assert receipt["runtimeProofBindSource"] == {}
 
 
 def test_runtime_proof_default_matches_canonical_compose_bind_source() -> None:

@@ -463,6 +463,12 @@ def test_public_edge_rebuild_scripts_call_source_gate() -> None:
         script = script_path.read_text(encoding="utf-8")
         assert "CHUMMER_PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" in script
         assert "scripts/check_public_edge_deploy_preflight.py" in script
+        assert "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" in script
+        assert "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256" in script
+        assert "--runtime-proof-bind-source-sha256" in script
+        assert "--release-channel-receipt" in script
+        assert "--release-channel-receipt-sha256" in script
+        assert "sha256sum" not in script
         rebuild_position = script.index("up -d --build")
         assert script.index("scripts/check_public_edge_deploy_preflight.py") < rebuild_position
         if script_path.name != "e2e-portal.sh":
@@ -527,6 +533,8 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD" in script
     assert "CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF" in script
     assert "CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256" in script
+    assert "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" in script
+    assert "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256" in script
     assert 'readonly TRUSTED_SHA256SUM="/usr/bin/sha256sum"' in script
     assert '"$TRUSTED_SHA256SUM" -- "$TRUSTED_AUTHORITY_VERIFIER"' in script
     assert "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM" in script
@@ -577,6 +585,8 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "scripts/verify_public_edge_postdeploy_gate.py" in script
     assert "--strict-preflight" in script
     assert "--release-channel-receipt \"$RELEASE_CHANNEL_RECEIPT\"" in script
+    assert "--runtime-proof-bind-source-sha256 \"$RUNTIME_PROOF_BIND_SOURCE_SHA256\"" in script
+    assert "--release-channel-receipt-sha256 \"$RELEASE_CHANNEL_RECEIPT_SHA256\"" in script
     assert "--overlay-root \"$OVERLAY_ROOT\"" in script
     assert "--expected-build-info \"$OVERLAY_ROOT/.codex-studio/runtime/PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json\"" in script
     assert "verify_candidate_runtime_identity" in script
@@ -618,6 +628,9 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH=1" in runbook
     assert "CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF='refs/remotes/origin/main'" in runbook
     assert "CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256='5f9b25d9d2ce75e35542834cca9041eb373f2ff7aded5c21801d97b835bb5290'" in runbook
+    assert "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" in runbook
+    assert "--runtime-proof-bind-source-sha256" in runbook
+    assert "--release-channel-receipt-sha256" in runbook
     assert "/usr/bin/bash --noprofile --norc" in runbook
     assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD=\"$(git rev-parse HEAD)\"" not in runbook
     assert "bash scripts/deploy_public_edge_portal.sh" not in runbook
