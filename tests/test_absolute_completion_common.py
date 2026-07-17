@@ -55,6 +55,67 @@ class AbsoluteCompletionCommonTests(unittest.TestCase):
             ):
                 self.assertTrue(module.LocalHubApp(no_build=True)._should_skip_build())
 
+    def test_local_hub_context_exit_stops_process_and_cleans_temp_root(self) -> None:
+        module = load_module()
+
+        with tempfile.TemporaryDirectory(prefix="absolute-completion-local-hub-parent-") as parent_dir:
+            temp_root = Path(parent_dir) / "hub"
+            temp_root.mkdir()
+            process = mock.Mock()
+            process.poll.return_value = None
+
+            with (
+                mock.patch.object(module, "ensure_local_hub_build") as ensure_build,
+                mock.patch.object(module.tempfile, "mkdtemp", return_value=str(temp_root)),
+                mock.patch.object(module.subprocess, "Popen", return_value=process),
+                mock.patch.object(module, "wait_for_http") as wait_for_http,
+            ):
+                app = module.LocalHubApp()
+                with app:
+                    log_handle = app._log_handle
+                    self.assertIsNotNone(log_handle)
+                    self.assertTrue(temp_root.is_dir())
+
+            ensure_build.assert_called_once_with()
+            wait_for_http.assert_called_once()
+            process.terminate.assert_called_once_with()
+            process.wait.assert_called_once_with(timeout=10)
+            process.kill.assert_not_called()
+            self.assertTrue(log_handle.closed)
+            self.assertIsNone(app._process)
+            self.assertIsNone(app._log_handle)
+            self.assertIsNone(app._temp_root)
+            self.assertFalse(temp_root.exists())
+
+    def test_local_hub_startup_failure_stops_process_and_cleans_temp_root(self) -> None:
+        module = load_module()
+
+        with tempfile.TemporaryDirectory(prefix="absolute-completion-local-hub-parent-") as parent_dir:
+            temp_root = Path(parent_dir) / "hub"
+            temp_root.mkdir()
+            process = mock.Mock()
+            process.poll.return_value = None
+
+            with (
+                mock.patch.object(module, "ensure_local_hub_build"),
+                mock.patch.object(module.tempfile, "mkdtemp", return_value=str(temp_root)),
+                mock.patch.object(module.subprocess, "Popen", return_value=process) as popen,
+                mock.patch.object(module, "wait_for_http", side_effect=RuntimeError("startup unavailable")),
+            ):
+                app = module.LocalHubApp()
+                with self.assertRaisesRegex(RuntimeError, "startup unavailable"):
+                    app.__enter__()
+
+            log_handle = popen.call_args.kwargs["stdout"]
+            process.terminate.assert_called_once_with()
+            process.wait.assert_called_once_with(timeout=10)
+            process.kill.assert_not_called()
+            self.assertTrue(log_handle.closed)
+            self.assertIsNone(app._process)
+            self.assertIsNone(app._log_handle)
+            self.assertIsNone(app._temp_root)
+            self.assertFalse(temp_root.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
