@@ -70,7 +70,6 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "esac\n"
         "if [ \"${1:-}\" = -I ] && [ \"${2:-}\" = -c ]; then\n"
         "  /usr/bin/cat >/dev/null\n"
-        "  printf '%s\\n' 'default|docker|default|running'\n"
         "  exit 0\n"
         "fi\n"
         "exec /usr/bin/env python3 \"$@\"\n",
@@ -97,6 +96,11 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     release_channel_receipt.write_text('{"status":"test"}\n', encoding="utf-8")
     runtime_proof = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
     runtime_proof.write_text('{"status":"test"}\n', encoding="utf-8")
+    fake_event_log = tmp_path / "fake-runtime-events.log"
+    fake_auto_remove_state = tmp_path / "fake-candidate-auto-remove.state"
+    fake_prior_portal_running_state = tmp_path / "fake-prior-portal-running.state"
+    fake_auto_remove_state.write_text("false\n", encoding="utf-8")
+    fake_prior_portal_running_state.write_text("true\n", encoding="utf-8")
     deploy_under_test = tmp_path / "deploy_public_edge_portal.sh"
     deploy_script = DEPLOY.read_text(encoding="utf-8")
     deploy_script = deploy_script.replace(
@@ -151,6 +155,11 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         hashlib.sha256(runtime_proof.read_bytes()).hexdigest(),
     )
     monkeypatch.setenv("FAKE_RUNTIME_PROOF_FILE", str(runtime_proof))
+    monkeypatch.setenv("FAKE_EVENT_LOG", str(fake_event_log))
+    monkeypatch.setenv("FAKE_AUTO_REMOVE_STATE", str(fake_auto_remove_state))
+    monkeypatch.setenv(
+        "FAKE_PRIOR_PORTAL_RUNNING_STATE", str(fake_prior_portal_running_state)
+    )
     monkeypatch.setenv("FAKE_PRIOR_PORTAL_IMAGE_ID", PRIOR_PORTAL_IMAGE_ID)
     monkeypatch.setenv("FAKE_CANDIDATE_PORTAL_IMAGE_ID", CANDIDATE_PORTAL_IMAGE_ID)
     monkeypatch.setenv("FAKE_MISMATCH_PORTAL_IMAGE_ID", MISMATCH_PORTAL_IMAGE_ID)
@@ -238,13 +247,50 @@ def make_fake_authority_source(tmp_path: Path) -> Path:
 
 def write_fake_transaction_python(path: Path) -> None:
     path.write_text(
-        "#!/bin/sh\n"
-        "set -eu\n"
-        "if [ -n \"${FAKE_PYTHON_LOG:-}\" ]; then printf '%s\\n' \"$*\" >> \"$FAKE_PYTHON_LOG\"; fi\n"
-        "case \"$*\" in\n"
-        "  *runtimeProofBindSource*) printf '%s\\n' \"$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256\";;\n"
-        "esac\n"
-        "exit 0\n",
+        r'''#!/bin/sh
+set -eu
+if [ -n "${FAKE_PYTHON_LOG:-}" ]; then printf '%s\n' "$*" >> "$FAKE_PYTHON_LOG"; fi
+
+arg_value() {
+  key="$1"
+  shift
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "$key" ]; then
+      shift
+      [ "$#" -gt 0 ] || return 1
+      printf '%s' "$1"
+      return 0
+    fi
+    shift
+  done
+  return 1
+}
+
+case "$*" in
+  *runtimeProofBindSource*)
+    printf '%s\n' "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256";;
+  *"public_edge_overlay_transaction.py snapshot"*)
+    output="$(arg_value --output "$@")"
+    printf '%s\n' '{"phase":"prepared"}' > "$output"
+    printf '%s\n' 'journal:snapshot' >> "$FAKE_EVENT_LOG";;
+  *"public_edge_overlay_transaction.py mark-phase"*)
+    output="$(arg_value --output "$@")"
+    phase="$(arg_value --phase "$@")"
+    [ -f "$output" ] || exit 91
+    printf '{"phase":"%s"}\n' "$phase" > "$output"
+    printf 'journal:phase:%s\n' "$phase" >> "$FAKE_EVENT_LOG";;
+  *"public_edge_overlay_transaction.py complete"*)
+    output="$(arg_value --output "$@")"
+    [ -f "$output" ] || exit 92
+    /usr/bin/rm -f -- "$output"
+    printf '%s\n' 'journal:complete' >> "$FAKE_EVENT_LOG";;
+  *public_edge_deploy_recovery.py*)
+    snapshot="$(arg_value --snapshot "$@")"
+    /usr/bin/rm -f -- "$snapshot"
+    printf '%s\n' 'journal:recovered' >> "$FAKE_EVENT_LOG";;
+esac
+exit 0
+''',
         encoding="utf-8",
     )
     path.chmod(0o755)
@@ -255,6 +301,7 @@ def write_fake_blue_green_docker(path: Path) -> None:
         r'''#!/bin/sh
 set -eu
 printf '%s\n' "$*" >> "$FAKE_DOCKER_LOG"
+printf 'docker:%s\n' "$*" >> "$FAKE_EVENT_LOG"
 case "$*" in
   *" config --format json") cat "$FAKE_COMPOSE_CONFIG_JSON"; exit 0;;
   "image ls --quiet --no-trunc --filter reference=chummer-run-api:local")
@@ -280,7 +327,11 @@ case "$*" in
   "container inspect --format {{.Name}} $FAKE_PRIOR_PORTAL_CONTAINER_ID")
     printf '%s\n' '/chummer6-hub-chummer-portal-1';;
   "container inspect --format {{.State.Running}} $FAKE_PRIOR_PORTAL_CONTAINER_ID")
-    printf '%s\n' "${FAKE_PRIOR_PORTAL_RUNNING:-true}";;
+    if [ -n "${FAKE_PRIOR_PORTAL_RUNNING:-}" ]; then
+      printf '%s\n' "$FAKE_PRIOR_PORTAL_RUNNING"
+    else
+      /usr/bin/cat "$FAKE_PRIOR_PORTAL_RUNNING_STATE"
+    fi;;
   "container exec $FAKE_PRIOR_PORTAL_CONTAINER_ID /usr/bin/sha256sum -- "*)
     printf '%s  %s\n' "$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" "${*##* }";;
   "container cp $FAKE_PRIOR_PORTAL_CONTAINER_ID:"*)
@@ -301,11 +352,16 @@ case "$*" in
   *" stop chummer-run-cloudflared")
     if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = tunnel_stop ]; then exit 43; fi;;
   "container stop $FAKE_PRIOR_PORTAL_CONTAINER_ID")
-    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = portal_stop ]; then exit 43; fi;;
+    if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = portal_stop ]; then exit 43; fi
+    printf '%s\n' false > "$FAKE_PRIOR_PORTAL_RUNNING_STATE";;
   *" run --rm --no-deps chummer-portal-volume-init")
     if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = initializer ]; then exit 37; fi;;
-  *" run -T -d --no-deps --service-ports --use-aliases --name chummer-public-edge-candidate-"*)
+  *" run -T -d "*"chummer-public-edge-candidate-"*)
     if [ "${FAKE_DOCKER_FAILURE_PHASE:-}" = candidate_creation ]; then exit 41; fi
+    case " $* " in
+      *" --rm "*) printf '%s\n' true > "$FAKE_AUTO_REMOVE_STATE";;
+      *) printf '%s\n' false > "$FAKE_AUTO_REMOVE_STATE";;
+    esac
     printf '%s\n' "$FAKE_CANDIDATE_PORTAL_CONTAINER_ID";;
   "container inspect --format {{.Id}} $FAKE_CANDIDATE_PORTAL_CONTAINER_ID")
     printf '%s\n' "$FAKE_CANDIDATE_PORTAL_CONTAINER_ID";;
@@ -326,7 +382,9 @@ case "$*" in
   "container inspect --format {{json .NetworkSettings.Networks}} $FAKE_CANDIDATE_PORTAL_CONTAINER_ID")
     printf '%s\n' '{"default":{"Aliases":["chummer-portal"]}}';;
   "container start $FAKE_PRIOR_TUNNEL_CONTAINER_ID") ;;
-  "container update --restart unless-stopped $FAKE_CANDIDATE_PORTAL_CONTAINER_ID") ;;
+  "container update --restart unless-stopped $FAKE_CANDIDATE_PORTAL_CONTAINER_ID")
+    if [ "$(/usr/bin/cat "$FAKE_AUTO_REMOVE_STATE")" = true ]; then exit 64; fi
+    printf '%s\n' 'candidate:restart-policy:unless-stopped' >> "$FAKE_EVENT_LOG";;
   "container rm $FAKE_PRIOR_PORTAL_CONTAINER_ID") ;;
 esac
 exit 0
@@ -334,6 +392,142 @@ exit 0
         encoding="utf-8",
     )
     path.chmod(0o755)
+
+
+def test_fake_daemon_rejects_restart_policy_for_auto_remove_candidate(
+    tmp_path: Path,
+) -> None:
+    fake_docker = tmp_path / "docker"
+    write_fake_blue_green_docker(fake_docker)
+    env = os.environ.copy()
+    env["FAKE_DOCKER_LOG"] = str(tmp_path / "docker.log")
+
+    create = subprocess.run(
+        [
+            str(fake_docker),
+            "compose",
+            "run",
+            "-T",
+            "-d",
+            "--rm",
+            "--no-deps",
+            "--service-ports",
+            "--use-aliases",
+            "--name",
+            "chummer-public-edge-candidate-autoremove",
+            "chummer-portal",
+        ],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    promote = subprocess.run(
+        [
+            str(fake_docker),
+            "container",
+            "update",
+            "--restart",
+            "unless-stopped",
+            CANDIDATE_PORTAL_CONTAINER_ID,
+        ],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert create.returncode == 0
+    assert create.stdout.strip() == CANDIDATE_PORTAL_CONTAINER_ID
+    assert Path(env["FAKE_AUTO_REMOVE_STATE"]).read_text(encoding="utf-8") == "true\n"
+    assert promote.returncode == 64
+
+
+def test_guarded_deploy_happy_path_promotes_candidate_then_commits_and_cleans_up(
+    tmp_path: Path,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    postdeploy_log = tmp_path / "postdeploy.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(docker_log),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_POSTDEPLOY_LOG": str(postdeploy_log),
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
+            "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == f"public_edge_portal_deployed {CANDIDATE_PORTAL_IMAGE_ID}"
+    commands = docker_log.read_text(encoding="utf-8").splitlines()
+    candidate_create = next(
+        command
+        for command in commands
+        if " run -T -d " in command
+        and " --name chummer-public-edge-candidate-" in command
+    )
+    assert " --rm " not in f" {candidate_create} "
+    assert candidate_create.endswith(" chummer-portal")
+    assert (
+        f"container update --restart unless-stopped {CANDIDATE_PORTAL_CONTAINER_ID}"
+        in commands
+    )
+    assert Path(env["FAKE_AUTO_REMOVE_STATE"]).read_text(encoding="utf-8") == "false\n"
+
+    events = Path(env["FAKE_EVENT_LOG"]).read_text(encoding="utf-8").splitlines()
+    journal_events = [event for event in events if event.startswith("journal:")]
+    assert journal_events == [
+        "journal:snapshot",
+        "journal:phase:image_build_started",
+        "journal:phase:image_built",
+        "journal:phase:tunnel_drained",
+        "journal:phase:portal_stopped",
+        "journal:phase:overlay_activated",
+        "journal:phase:portal_candidate_started",
+        "journal:phase:tunnel_started",
+        "journal:complete",
+    ]
+    complete_index = events.index("journal:complete")
+    restart_policy_index = events.index("candidate:restart-policy:unless-stopped")
+    final_prior_inspect_index = max(
+        index
+        for index, event in enumerate(events)
+        if event
+        == "docker:container inspect --format {{.State.Running}} "
+        f"{PRIOR_PORTAL_CONTAINER_ID}"
+    )
+    cleanup_index = events.index(f"docker:container rm {PRIOR_PORTAL_CONTAINER_ID}")
+    assert restart_policy_index < complete_index < final_prior_inspect_index < cleanup_index
+    assert not (
+        tmp_path
+        / "lock-state"
+        / "public-edge-deploy-receipts"
+        / "active-overlay-transaction.json"
+    ).exists()
+    assert postdeploy_log.is_file()
 
 
 @pytest.mark.parametrize(

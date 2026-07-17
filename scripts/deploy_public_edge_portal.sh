@@ -1359,6 +1359,9 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_prefli
   abort_portal_recreate "active overlay preflight" 1
 fi
 
+# The candidate remains recoverable until commit. Do not add --rm here: Docker
+# refuses restart-policy promotion for AutoRemove containers, and the durable
+# reconciliation journal already owns exact candidate cleanup on every failure.
 if ! candidate_portal_create_output="$(
   compose_cli run -T -d --no-deps --service-ports --use-aliases \
     --name "$CANDIDATE_PORTAL_CONTAINER_NAME" chummer-portal
