@@ -504,11 +504,23 @@ def isolated_python_command(
     return shlex.join(isolated_python_argv(script, *arguments))
 
 
-def supported_release_controller_command(*arguments: object) -> str:
+def supported_release_controller_command(
+    *arguments: object,
+    external_write_authorized: bool = False,
+    skip_google_oauth_runtime_refresh: bool = False,
+    skip_windows_runtime_refresh: bool = False,
+) -> str:
     """Return the executable launcher invocation recorded in release receipts."""
 
+    effective_arguments = [str(argument) for argument in arguments]
+    if external_write_authorized:
+        effective_arguments.append(EXTERNAL_WRITE_AUTHORIZATION_FLAG)
+    if skip_google_oauth_runtime_refresh:
+        effective_arguments.append("--skip-google-oauth-runtime-refresh")
+    if skip_windows_runtime_refresh:
+        effective_arguments.append("--skip-windows-runtime-refresh")
     invocation = shlex.join(
-        [str(VERIFY_SCRIPT), *(str(argument) for argument in arguments)]
+        [str(VERIFY_SCRIPT), *effective_arguments]
     )
     return (
         f"CHUMMER_RUN_SERVICES_ROOT={shlex.quote(str(RUN_SERVICES_ROOT))} "
@@ -534,6 +546,184 @@ def _module_assignment(tree: ast.Module, name: str) -> ast.expr | None:
     return assignments[0] if len(assignments) == 1 else None
 
 
+def _is_environment_selected_run_services_root(value: ast.expr) -> bool:
+    if not (
+        isinstance(value, ast.Call)
+        and not value.args
+        and not value.keywords
+        and isinstance(value.func, ast.Attribute)
+        and value.func.attr == "resolve"
+    ):
+        return False
+    path_call = value.func.value
+    if not (
+        isinstance(path_call, ast.Call)
+        and len(path_call.args) == 1
+        and not path_call.keywords
+        and isinstance(path_call.func, ast.Name)
+        and path_call.func.id == "Path"
+    ):
+        return False
+    lookup = path_call.args[0]
+    return (
+        isinstance(lookup, ast.Subscript)
+        and isinstance(lookup.value, ast.Attribute)
+        and lookup.value.attr == "environ"
+        and isinstance(lookup.value.value, ast.Name)
+        and lookup.value.value.id == "os"
+        and isinstance(lookup.slice, ast.Constant)
+        and lookup.slice.value == "CHUMMER_RUN_SERVICES_ROOT"
+    )
+
+
+def _materializer_path_parts(value: ast.expr) -> tuple[str, ...] | None:
+    if isinstance(value, ast.Name):
+        return (value.id,)
+    if (
+        isinstance(value, ast.BinOp)
+        and isinstance(value.op, ast.Div)
+        and isinstance(value.right, ast.Constant)
+        and isinstance(value.right.value, str)
+    ):
+        left = _materializer_path_parts(value.left)
+        if left is not None:
+            return (*left, value.right.value)
+    return None
+
+
+def _protected_name_binding_count(tree: ast.AST, name: str) -> int:
+    stored_names = sum(
+        1
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Name)
+        and isinstance(node.ctx, ast.Store)
+        and node.id == name
+    )
+    arguments = sum(
+        1 for node in ast.walk(tree) if isinstance(node, ast.arg) and node.arg == name
+    )
+    return stored_names + arguments
+
+
+def _is_name(value: ast.expr, name: str) -> bool:
+    return isinstance(value, ast.Name) and value.id == name
+
+
+def _is_str_of_name(value: ast.expr, name: str) -> bool:
+    return (
+        isinstance(value, ast.Call)
+        and len(value.args) == 1
+        and not value.keywords
+        and _is_name(value.func, "str")
+        and _is_name(value.args[0], name)
+    )
+
+
+def _is_forwarded_argv(value: ast.expr) -> bool:
+    if not isinstance(value, ast.Starred) or not isinstance(value.value, ast.Subscript):
+        return False
+    subscript = value.value
+    argv = subscript.value
+    slice_value = subscript.slice
+    return (
+        isinstance(argv, ast.Attribute)
+        and argv.attr == "argv"
+        and _is_name(argv.value, "sys")
+        and isinstance(slice_value, ast.Slice)
+        and isinstance(slice_value.lower, ast.Constant)
+        and slice_value.lower.value == 1
+        and slice_value.upper is None
+        and slice_value.step is None
+    )
+
+
+AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE = '''#!/usr/bin/python3 -I
+__python_launcher__ = ("chummer-release-controller",)
+
+import os
+import sys
+from pathlib import Path
+
+
+if sys.flags.isolated != 1:
+    raise RuntimeError("NOT RELEASE READY: release launcher requires isolated Python startup")
+
+
+RUN_SERVICES_ROOT = Path(os.environ["CHUMMER_RUN_SERVICES_ROOT"]).resolve()
+MATERIALIZER = RUN_SERVICES_ROOT / "scripts" / "materialize_release_ready_receipt.py"
+TRUSTED_PYTHON = "/usr/bin/python3"
+TRUSTED_PATH = "/usr/bin:/bin"
+FORBIDDEN_CODE_LOADING_ENV = (
+    "BASH_ENV",
+    "ENV",
+    "CDPATH",
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "NODE_PATH",
+    "NODE_OPTIONS",
+    "PYTHONSTARTUP",
+    "PYTHONINSPECT",
+    "LD_PRELOAD",
+    "LD_LIBRARY_PATH",
+)
+
+
+def controller_environment() -> dict[str, str]:
+    ambient = dict(os.environ)
+    inherited_functions = sorted(
+        name for name in ambient if name.startswith("BASH_FUNC_")
+    )
+    if inherited_functions:
+        raise RuntimeError(
+            "NOT RELEASE READY: inherited Bash functions are forbidden: "
+            + ", ".join(inherited_functions)
+        )
+    inherited_hooks = sorted(
+        name for name in FORBIDDEN_CODE_LOADING_ENV if ambient.get(name)
+    )
+    if inherited_hooks:
+        raise RuntimeError(
+            "NOT RELEASE READY: inherited code-loading hooks are forbidden: "
+            + ", ".join(inherited_hooks)
+        )
+    for name in FORBIDDEN_CODE_LOADING_ENV:
+        ambient.pop(name, None)
+    ambient["PATH"] = TRUSTED_PATH
+    ambient["PYTHONDONTWRITEBYTECODE"] = "1"
+    ambient["PYTHONNOUSERSITE"] = "1"
+    return ambient
+
+
+def launch() -> None:
+    environment = controller_environment()
+    os.chdir(RUN_SERVICES_ROOT)
+    os.execve(
+        TRUSTED_PYTHON,
+        [
+            TRUSTED_PYTHON,
+            "-I",
+            str(MATERIALIZER),
+            "--run-authoritative-controller",
+            *sys.argv[1:],
+        ],
+        environment,
+    )
+
+
+launch()
+'''
+
+
+def _matches_authoritative_release_launcher_template(tree: ast.Module) -> bool:
+    """Compare executable syntax while allowing comments and formatting changes."""
+
+    expected = ast.parse(AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE)
+    return ast.dump(tree, include_attributes=False) == ast.dump(
+        expected,
+        include_attributes=False,
+    )
+
+
 def source_binding_failures(launcher_path: Path | None = None) -> list[str]:
     """Prove the shared launcher dispatches this checkout's materializer."""
 
@@ -550,61 +740,200 @@ def source_binding_failures(launcher_path: Path | None = None) -> list[str]:
         return [f"shared release launcher is not valid UTF-8 Python: {exc}"]
 
     failures: list[str] = []
+    if not _matches_authoritative_release_launcher_template(tree):
+        failures.append(
+            "shared release launcher executable syntax must match the governed "
+            "authoritative launcher template exactly (comments and formatting may differ)"
+        )
     run_services_root = _module_assignment(tree, "RUN_SERVICES_ROOT")
     if run_services_root is None:
         failures.append("shared release launcher must assign RUN_SERVICES_ROOT exactly once")
-    else:
-        nodes = tuple(ast.walk(run_services_root))
-        constants = {
-            node.value
-            for node in nodes
-            if isinstance(node, ast.Constant) and isinstance(node.value, str)
-        }
-        has_environment_lookup = any(
-            isinstance(node, ast.Attribute)
-            and node.attr == "environ"
-            and isinstance(node.value, ast.Name)
-            and node.value.id == "os"
-            for node in nodes
+    elif not _is_environment_selected_run_services_root(run_services_root):
+        failures.append(
+            "shared release launcher RUN_SERVICES_ROOT must exactly resolve "
+            "Path(os.environ['CHUMMER_RUN_SERVICES_ROOT'])"
         )
-        if "CHUMMER_RUN_SERVICES_ROOT" not in constants or not has_environment_lookup:
-            failures.append(
-                "shared release launcher RUN_SERVICES_ROOT must come from "
-                "CHUMMER_RUN_SERVICES_ROOT"
-            )
-        if not any(isinstance(node, ast.Name) and node.id == "Path" for node in nodes):
-            failures.append("shared release launcher must normalize RUN_SERVICES_ROOT with Path")
-        if not any(
-            isinstance(node, ast.Attribute) and node.attr == "resolve" for node in nodes
-        ):
-            failures.append("shared release launcher must resolve RUN_SERVICES_ROOT")
+    if _protected_name_binding_count(tree, "RUN_SERVICES_ROOT") != 1:
+        failures.append(
+            "shared release launcher RUN_SERVICES_ROOT must not be shadowed or reassigned"
+        )
 
     materializer = _module_assignment(tree, "MATERIALIZER")
     if materializer is None:
         failures.append("shared release launcher must assign MATERIALIZER exactly once")
     else:
-        nodes = tuple(ast.walk(materializer))
-        constants = {
-            node.value
-            for node in nodes
-            if isinstance(node, ast.Constant) and isinstance(node.value, str)
-        }
-        if not any(
-            isinstance(node, ast.Name) and node.id == "RUN_SERVICES_ROOT"
-            for node in nodes
-        ):
-            failures.append("shared release launcher MATERIALIZER must use RUN_SERVICES_ROOT")
-        has_relative_materializer = (
-            {"scripts", "materialize_release_ready_receipt.py"} <= constants
-            or "scripts/materialize_release_ready_receipt.py" in constants
-        )
-        if not has_relative_materializer:
+        path_parts = _materializer_path_parts(materializer)
+        if path_parts not in {
+            ("RUN_SERVICES_ROOT", "scripts", "materialize_release_ready_receipt.py"),
+            ("RUN_SERVICES_ROOT", "scripts/materialize_release_ready_receipt.py"),
+        }:
             failures.append(
-                "shared release launcher MATERIALIZER must target "
-                "scripts/materialize_release_ready_receipt.py"
+                "shared release launcher MATERIALIZER must exactly target "
+                "RUN_SERVICES_ROOT/scripts/materialize_release_ready_receipt.py"
             )
-        if any("chummer.run-services" in value for value in constants):
+        if any(
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and "chummer.run-services" in node.value
+            for node in ast.walk(materializer)
+        ):
             failures.append("shared release launcher MATERIALIZER is legacy-checkout-bound")
+    if _protected_name_binding_count(tree, "MATERIALIZER") != 1:
+        failures.append(
+            "shared release launcher MATERIALIZER must not be shadowed or reassigned"
+        )
+
+    trusted_python = _module_assignment(tree, "TRUSTED_PYTHON")
+    if not (
+        isinstance(trusted_python, ast.Constant)
+        and trusted_python.value == "/usr/bin/python3"
+    ):
+        failures.append(
+            "shared release launcher TRUSTED_PYTHON must be exactly /usr/bin/python3"
+        )
+    if _protected_name_binding_count(tree, "TRUSTED_PYTHON") != 1:
+        failures.append(
+            "shared release launcher TRUSTED_PYTHON must not be shadowed or reassigned"
+        )
+
+    controller_environment_functions = [
+        statement
+        for statement in tree.body
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and statement.name == "controller_environment"
+    ]
+    if len(controller_environment_functions) != 1:
+        failures.append(
+            "shared release launcher must define controller_environment exactly once"
+        )
+
+    launch_functions = [
+        statement
+        for statement in tree.body
+        if isinstance(statement, ast.FunctionDef) and statement.name == "launch"
+    ]
+    launch = launch_functions[0] if len(launch_functions) == 1 else None
+    if launch is None:
+        failures.append("shared release launcher must define launch exactly once")
+
+    exec_calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "execve"
+        and _is_name(node.func.value, "os")
+    ]
+    exec_call = exec_calls[0] if len(exec_calls) == 1 else None
+    if exec_call is None:
+        failures.append("shared release launcher must contain exactly one os.execve dispatch")
+
+    if launch is not None and exec_call is not None:
+        direct_dispatch = (
+            bool(launch.body)
+            and isinstance(launch.body[-1], ast.Expr)
+            and launch.body[-1].value is exec_call
+        )
+        if not direct_dispatch:
+            failures.append(
+                "shared release launcher os.execve must be the final direct launch statement"
+            )
+        legacy_dispatch_literals = sorted(
+            {
+                node.value
+                for node in ast.walk(launch)
+                if isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and "chummer.run-services" in node.value
+            }
+        )
+        if legacy_dispatch_literals:
+            failures.append("shared release launcher executable dispatch is legacy-checkout-bound")
+
+        if len(exec_call.args) != 3 or exec_call.keywords:
+            failures.append(
+                "shared release launcher os.execve must have executable, argv, and environment"
+            )
+        else:
+            executable, argv, environment = exec_call.args
+            if not _is_name(executable, "TRUSTED_PYTHON"):
+                failures.append(
+                    "shared release launcher os.execve must execute TRUSTED_PYTHON"
+                )
+            expected_argv = (
+                isinstance(argv, ast.List)
+                and len(argv.elts) == 5
+                and _is_name(argv.elts[0], "TRUSTED_PYTHON")
+                and isinstance(argv.elts[1], ast.Constant)
+                and argv.elts[1].value == "-I"
+                and _is_str_of_name(argv.elts[2], "MATERIALIZER")
+                and isinstance(argv.elts[3], ast.Constant)
+                and argv.elts[3].value == "--run-authoritative-controller"
+                and _is_forwarded_argv(argv.elts[4])
+            )
+            if not expected_argv:
+                failures.append(
+                    "shared release launcher os.execve argv must use isolated trusted Python, "
+                    "str(MATERIALIZER), --run-authoritative-controller, and forwarded argv"
+                )
+            if not _is_name(environment, "environment"):
+                failures.append(
+                    "shared release launcher os.execve must use the sanitized environment"
+                )
+            environment_assignments = [
+                node
+                for node in ast.walk(launch)
+                if isinstance(node, (ast.Assign, ast.AnnAssign))
+                and (
+                    (
+                        isinstance(node, ast.Assign)
+                        and any(
+                            isinstance(target, ast.Name)
+                            and target.id == "environment"
+                            for target in node.targets
+                        )
+                    )
+                    or (
+                        isinstance(node, ast.AnnAssign)
+                        and isinstance(node.target, ast.Name)
+                        and node.target.id == "environment"
+                    )
+                )
+            ]
+            environment_value = (
+                environment_assignments[0].value
+                if len(environment_assignments) == 1
+                else None
+            )
+            if not (
+                isinstance(environment_value, ast.Call)
+                and _is_name(environment_value.func, "controller_environment")
+                and not environment_value.args
+                and not environment_value.keywords
+                and environment_assignments[0].lineno < exec_call.lineno
+            ):
+                failures.append(
+                    "shared release launcher environment must come directly from "
+                    "controller_environment()"
+                )
+
+    top_level_launch_calls = [
+        statement
+        for statement in tree.body
+        if isinstance(statement, ast.Expr)
+        and isinstance(statement.value, ast.Call)
+        and _is_name(statement.value.func, "launch")
+        and not statement.value.args
+        and not statement.value.keywords
+    ]
+    if (
+        len(top_level_launch_calls) != 1
+        or not tree.body
+        or tree.body[-1] is not top_level_launch_calls[0]
+    ):
+        failures.append(
+            "shared release launcher must invoke launch() exactly once as its final statement"
+        )
     return failures
 
 
@@ -3479,6 +3808,7 @@ def release_ready_materialization_failure_payload(
     returncode: int | None,
     timed_out: bool = False,
     proof_refresh_policy: dict[str, str] | None = None,
+    command: str | None = None,
 ) -> dict[str, object]:
     """Build a current, explicitly non-authoritative receipt for producer failure.
 
@@ -3496,7 +3826,7 @@ def release_ready_materialization_failure_payload(
         "generated_at_utc": now_iso(),
         "status": "fail",
         "verdict": "NOT_RELEASE_READY",
-        "command": supported_release_controller_command(),
+        "command": command or supported_release_controller_command(),
         "returncode": returncode,
         "timed_out": bool(timed_out),
         "timeout_seconds": TIMEOUT_SECONDS,
@@ -3535,6 +3865,7 @@ def publish_release_ready_materialization_failure(
     returncode: int | None,
     timed_out: bool = False,
     proof_refresh_policy: dict[str, str] | None = None,
+    command: str | None = None,
 ) -> dict[str, object]:
     payload = release_ready_materialization_failure_payload(
         phase=phase,
@@ -3542,6 +3873,7 @@ def publish_release_ready_materialization_failure(
         returncode=returncode,
         timed_out=timed_out,
         proof_refresh_policy=proof_refresh_policy,
+        command=command,
     )
     atomic_write_json(OUTPUT_PATH, payload)
     return payload
@@ -4094,7 +4426,19 @@ def current_governed_code_snapshot(
     repository_snapshots: list[dict[str, object]] = []
     for repository in repositories:
         root = absolute_nonsymlink_path(repository, require_directory=True)
-        head = run_governed_git(root, ["rev-parse", "--verify", "HEAD"], environment).decode().strip()
+        try:
+            head = run_governed_git(
+                root,
+                ["rev-parse", "--verify", "HEAD"],
+                environment,
+            ).decode().strip()
+        except ValueError as exc:
+            raise ValueError(
+                f"governed repository has no enrolled Git HEAD at {root}; "
+                "commit the external workspace release authority into a governed "
+                "repository before running the authoritative controller (live untracked "
+                "digest fallback is not accepted)"
+            ) from exc
         tree = run_governed_git(root, ["rev-parse", "--verify", "HEAD^{tree}"], environment).decode().strip()
         dirty_values: list[str] = []
         for arguments in (
@@ -6966,6 +7310,11 @@ def converge_release_truth_projection(
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args([] if argv is None else argv)
+    receipt_command = supported_release_controller_command(
+        external_write_authorized=args.authorize_external_release_writes,
+        skip_google_oauth_runtime_refresh=args.skip_google_oauth_runtime_refresh,
+        skip_windows_runtime_refresh=args.skip_windows_runtime_refresh,
+    )
 
     def parsed_json_object(value: str, label: str) -> dict[str, object]:
         try:
@@ -7271,6 +7620,7 @@ def main(argv: list[str] | None = None) -> int:
                     else "refresh_runtime_receipts"
                 ),
             },
+            command=receipt_command,
         )
         print(f"release controller environment rejected: {exc}", file=sys.stderr)
         return 78
@@ -7365,7 +7715,7 @@ def main(argv: list[str] | None = None) -> int:
             "generated_at_utc": now_iso(),
             "status": "fail",
             "verdict": "NOT_RELEASE_READY",
-            "command": supported_release_controller_command(),
+            "command": receipt_command,
             "returncode": None,
             "timed_out": False,
             "timeout_seconds": TIMEOUT_SECONDS,
@@ -7468,7 +7818,7 @@ def main(argv: list[str] | None = None) -> int:
         "generated_at_utc": now_iso(),
         "status": "pass" if release_ready else "fail",
         "verdict": "RELEASE_READY" if release_ready else "NOT_RELEASE_READY",
-        "command": supported_release_controller_command(),
+        "command": receipt_command,
         "returncode": returncode,
         "timed_out": timed_out,
         "timeout_seconds": TIMEOUT_SECONDS,

@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "verify_release_bundle_transaction_gate.sh"
+TEST_PROJECT = ROOT / "Chummer.Tests" / "Chummer.Tests.csproj"
 EXPECTED_FILTER = "|".join(
     (
         "FullyQualifiedName~Chummer.Tests.ReleaseBundlePromotionServiceTests",
@@ -76,6 +77,7 @@ cp -- "$FAKE_TRX" "$results_dir/release-bundle-transaction.trx"
 
 def test_transaction_gate_has_a_closed_four_boundary_filter() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
+    project = TEST_PROJECT.read_text(encoding="utf-8")
 
     assert f"transaction_filter='{EXPECTED_FILTER}'" in source
     assert source.count("FullyQualifiedName~Chummer.Tests.") == 4
@@ -86,6 +88,7 @@ def test_transaction_gate_has_a_closed_four_boundary_filter() -> None:
     assert "${CHUMMER_RELEASE_BUNDLE_TRANSACTION_GATE_FRAMEWORK:-net10.0}" in source
     assert "CHUMMER_RELEASE_BUNDLE_TRANSACTION_TRX_VERIFIER" in source
     assert '"$trx_verifier"' in source
+    assert "<IsTestProject>true</IsTestProject>" in project
 
 
 def test_transaction_gate_passes_the_exact_filter_to_dotnet() -> None:
@@ -125,7 +128,7 @@ def test_transaction_gate_passes_the_exact_filter_to_dotnet() -> None:
     filter_index = arguments.index("--filter")
     assert arguments[filter_index + 1] == EXPECTED_FILTER
     assert arguments.count("--filter") == 1
-    assert arguments[:2] == ["test", str(ROOT / "Chummer.Tests" / "Chummer.Tests.csproj")]
+    assert arguments[:2] == ["test", str(TEST_PROJECT)]
 
 
 def test_transaction_gate_propagates_dotnet_failure_without_a_pass_marker() -> None:
@@ -150,6 +153,33 @@ def test_transaction_gate_propagates_dotnet_failure_without_a_pass_marker() -> N
         )
 
     assert result.returncode == 42
+    assert "release_bundle_transaction_gate:pass" not in result.stdout
+
+
+def test_transaction_gate_rejects_dotnet_success_without_a_declared_trx() -> None:
+    with tempfile.TemporaryDirectory(prefix="release-bundle-transaction-no-trx-") as temp_dir:
+        bin_dir = Path(temp_dir) / "bin"
+        bin_dir.mkdir()
+        dotnet = bin_dir / "dotnet"
+        dotnet.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+        dotnet.chmod(0o700)
+        environment = {
+            **os.environ,
+            "PATH": f"{bin_dir}:/usr/bin:/bin",
+        }
+
+        result = subprocess.run(
+            ["/usr/bin/bash", "--noprofile", "--norc", str(SCRIPT)],
+            cwd=ROOT,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert result.returncode != 0
+    assert "release bundle transaction TRX is invalid" in result.stderr
+    assert "No such file" in result.stderr
     assert "release_bundle_transaction_gate:pass" not in result.stdout
 
 

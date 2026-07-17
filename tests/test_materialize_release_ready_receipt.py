@@ -36,9 +36,7 @@ def load_module():
     )
     module.google_oauth_receipt_validation_failures = lambda _path: []
     module._production_source_binding_failures = module.source_binding_failures
-    module.source_binding_failures = lambda *_args, **_kwargs: []
     module._production_current_git_head = module.current_git_head
-    module.current_git_head = lambda: "a" * 40
     module._test_release_execution_environment = {
         "CHUMMER_PUBLIC_BASE_URL": "https://chummer.run",
         "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "a" * 40,
@@ -283,6 +281,7 @@ def live_controller_result(
     stderr: str = "",
     returncode: int = 0,
     timed_out: bool = False,
+    external_write_authorized: bool = False,
 ) -> dict[str, object]:
     """Test-only in-memory controller boundary; never a replay authority path."""
 
@@ -308,7 +307,7 @@ def live_controller_result(
         "stdout": selected_stdout,
         "stderr": stderr,
         "validated_release_binding": validated,
-        "external_write_authorized": False,
+        "external_write_authorized": external_write_authorized,
     }
 
 
@@ -341,12 +340,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="release-controller-source-binding-") as temp_dir:
             launcher = Path(temp_dir) / "verify_chummer6_release_ready.sh"
             launcher.write_text(
-                """#!/usr/bin/python3 -I
-import os
-from pathlib import Path
-RUN_SERVICES_ROOT = Path(os.environ["CHUMMER_RUN_SERVICES_ROOT"]).resolve()
-MATERIALIZER = RUN_SERVICES_ROOT / "scripts" / "materialize_release_ready_receipt.py"
-""",
+                module.AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE,
                 encoding="utf-8",
             )
             self.assertEqual([], verify(launcher))
@@ -364,14 +358,178 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
         self.assertTrue(any("RUN_SERVICES_ROOT" in failure for failure in failures))
         self.assertTrue(any("legacy-checkout-bound" in failure for failure in failures))
 
+    def test_shared_launcher_rejects_unsafe_sanitizer_body(self) -> None:
+        module = load_module()
+        verify = module._production_source_binding_failures
+        with tempfile.TemporaryDirectory(prefix="release-controller-unsafe-sanitizer-") as temp_dir:
+            launcher = Path(temp_dir) / "verify_chummer6_release_ready.sh"
+            unsafe = module.AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE.replace(
+                "    ambient = dict(os.environ)\n",
+                "    return dict(os.environ)\n    ambient = dict(os.environ)\n",
+                1,
+            )
+            launcher.write_text(unsafe, encoding="utf-8")
+
+            failures = verify(launcher)
+
+        self.assertTrue(any("template exactly" in failure for failure in failures))
+
+    def test_shared_launcher_rejects_shadowed_imports_and_builtins(self) -> None:
+        module = load_module()
+        verify = module._production_source_binding_failures
+        with tempfile.TemporaryDirectory(prefix="release-controller-shadowed-import-") as temp_dir:
+            launcher = Path(temp_dir) / "verify_chummer6_release_ready.sh"
+            shadowed = module.AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE.replace(
+                "from pathlib import Path\n",
+                "from pathlib import Path\nos = object()\nsys = object()\nPath = object\nstr = repr\n",
+                1,
+            )
+            launcher.write_text(shadowed, encoding="utf-8")
+
+            failures = verify(launcher)
+
+        self.assertTrue(any("template exactly" in failure for failure in failures))
+
+    def test_shared_launcher_rejects_extra_launch_side_effects(self) -> None:
+        module = load_module()
+        verify = module._production_source_binding_failures
+        with tempfile.TemporaryDirectory(prefix="release-controller-extra-launch-") as temp_dir:
+            launcher = Path(temp_dir) / "verify_chummer6_release_ready.sh"
+            mutated = module.AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE.replace(
+                "    os.chdir(RUN_SERVICES_ROOT)\n",
+                "    environment.update(os.environ)\n    os.chdir(RUN_SERVICES_ROOT)\n",
+                1,
+            )
+            launcher.write_text(mutated, encoding="utf-8")
+
+            failures = verify(launcher)
+
+        self.assertTrue(any("template exactly" in failure for failure in failures))
+
+    def test_shared_launcher_rejects_decoy_bindings_around_a_legacy_execve(self) -> None:
+        module = load_module()
+        verify = module._production_source_binding_failures
+        with tempfile.TemporaryDirectory(prefix="release-controller-decoy-dispatch-") as temp_dir:
+            launcher = Path(temp_dir) / "verify_chummer6_release_ready.sh"
+            launcher.write_text(
+                """#!/usr/bin/python3 -I
+import os
+import sys
+from pathlib import Path
+RUN_SERVICES_ROOT = Path(os.environ["CHUMMER_RUN_SERVICES_ROOT"]).resolve()
+MATERIALIZER = RUN_SERVICES_ROOT / "scripts" / "materialize_release_ready_receipt.py"
+TRUSTED_PYTHON = "/usr/bin/python3"
+def controller_environment():
+    return {}
+def launch():
+    environment = controller_environment()
+    os.execve(
+        TRUSTED_PYTHON,
+        [
+            TRUSTED_PYTHON,
+            "-I",
+            "/docker/chummercomplete/chummer.run-services/scripts/materialize_release_ready_receipt.py",
+            "--run-authoritative-controller",
+            *sys.argv[1:],
+        ],
+        environment,
+    )
+launch()
+""",
+                encoding="utf-8",
+            )
+
+            failures = verify(launcher)
+
+        self.assertTrue(any("str(MATERIALIZER)" in failure for failure in failures))
+        self.assertTrue(
+            any("executable dispatch is legacy-checkout-bound" in failure for failure in failures)
+        )
+
+    def test_shared_launcher_rejects_unsanitized_or_non_authoritative_execve(self) -> None:
+        module = load_module()
+        verify = module._production_source_binding_failures
+        with tempfile.TemporaryDirectory(prefix="release-controller-unsafe-dispatch-") as temp_dir:
+            launcher = Path(temp_dir) / "verify_chummer6_release_ready.sh"
+            launcher.write_text(
+                """#!/usr/bin/python3 -I
+import os
+import sys
+from pathlib import Path
+RUN_SERVICES_ROOT = Path(os.environ["CHUMMER_RUN_SERVICES_ROOT"]).resolve()
+MATERIALIZER = RUN_SERVICES_ROOT / "scripts" / "materialize_release_ready_receipt.py"
+TRUSTED_PYTHON = "/usr/bin/python3"
+def controller_environment():
+    return {}
+def launch():
+    environment = dict(os.environ)
+    os.execve(
+        TRUSTED_PYTHON,
+        [TRUSTED_PYTHON, "-I", str(MATERIALIZER), *sys.argv[1:]],
+        environment,
+    )
+launch()
+""",
+                encoding="utf-8",
+            )
+
+            failures = verify(launcher)
+
+        self.assertTrue(any("--run-authoritative-controller" in failure for failure in failures))
+        self.assertTrue(
+            any("environment must come directly" in failure for failure in failures)
+        )
+
+    def test_shared_launcher_rejects_materializer_shadowing_in_launch(self) -> None:
+        module = load_module()
+        verify = module._production_source_binding_failures
+        with tempfile.TemporaryDirectory(prefix="release-controller-shadowed-dispatch-") as temp_dir:
+            launcher = Path(temp_dir) / "verify_chummer6_release_ready.sh"
+            launcher.write_text(
+                """#!/usr/bin/python3 -I
+import os
+import sys
+from pathlib import Path
+RUN_SERVICES_ROOT = Path(os.environ["CHUMMER_RUN_SERVICES_ROOT"]).resolve()
+MATERIALIZER = RUN_SERVICES_ROOT / "scripts" / "materialize_release_ready_receipt.py"
+TRUSTED_PYTHON = "/usr/bin/python3"
+def controller_environment():
+    return {}
+def launch(MATERIALIZER="/docker/chummercomplete/chummer.run-services/scripts/materialize_release_ready_receipt.py"):
+    environment = controller_environment()
+    os.execve(
+        TRUSTED_PYTHON,
+        [
+            TRUSTED_PYTHON,
+            "-I",
+            str(MATERIALIZER),
+            "--run-authoritative-controller",
+            *sys.argv[1:],
+        ],
+        environment,
+    )
+launch()
+""",
+                encoding="utf-8",
+            )
+
+            failures = verify(launcher)
+
+        self.assertTrue(any("must not be shadowed" in failure for failure in failures))
+        self.assertTrue(any("legacy-checkout-bound" in failure for failure in failures))
+
     def test_controller_environment_binds_current_checkout_and_git_head(self) -> None:
         module = load_module()
-        sanitized = module._production_authoritative_controller_environment(
-            {
-                "PATH": module.TRUSTED_PATH,
-                "PYTHONDONTWRITEBYTECODE": "1",
-            }
-        )
+        with (
+            mock.patch.object(module, "source_binding_failures", return_value=[]),
+            mock.patch.object(module, "current_git_head", return_value="a" * 40),
+        ):
+            sanitized = module._production_authoritative_controller_environment(
+                {
+                    "PATH": module.TRUSTED_PATH,
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                }
+            )
 
         self.assertEqual(
             str(module.RUN_SERVICES_ROOT),
@@ -384,6 +542,44 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
                 "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD"
             ],
         )
+
+    def test_bad_launcher_fails_before_head_or_controller_plan_construction(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-controller-early-binding-") as temp_dir:
+            output_path = Path(temp_dir) / "RELEASE_READY.generated.json"
+            with (
+                mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(
+                    module,
+                    "authoritative_controller_environment",
+                    side_effect=lambda **kwargs: (
+                        module._production_authoritative_controller_environment(
+                            {"PATH": module.TRUSTED_PATH},
+                            **kwargs,
+                        )
+                    ),
+                ),
+                mock.patch.object(
+                    module,
+                    "source_binding_failures",
+                    return_value=["shared release launcher executable dispatch is legacy-checkout-bound"],
+                ),
+                mock.patch.object(module, "current_git_head") as current_head,
+                mock.patch.object(
+                    module,
+                    "run_authoritative_release_controller",
+                ) as controller,
+            ):
+                result = module.main()
+
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(78, result)
+        current_head.assert_not_called()
+        controller.assert_not_called()
+        self.assertEqual("fail", payload["status"])
+        self.assertFalse(payload["authoritative"])
+        self.assertIn("legacy-checkout-bound", payload["materialization_error"]["reason"])
 
     def test_public_edge_activation_blocker_is_projected_as_deployment_artifact_and_next_action(self) -> None:
         module = load_module()
@@ -708,7 +904,11 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
         with self.assertRaisesRegex(ValueError, "rejects inherited Bash functions"):
             sanitize({**base, "BASH_FUNC_injected%%": "() { exit 0; }"})
 
-        sanitized = sanitize(base)
+        with (
+            mock.patch.object(module, "source_binding_failures", return_value=[]),
+            mock.patch.object(module, "current_git_head", return_value="a" * 40),
+        ):
+            sanitized = sanitize(base)
         self.assertEqual(module.TRUSTED_PATH, sanitized["PATH"])
         self.assertNotIn("UNLISTED_SECRET", sanitized)
         self.assertEqual("test-secret-value", sanitized["TEABLE_API_TOKEN"])
@@ -1113,6 +1313,35 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
                     git_env,
                 )
 
+    def test_governed_snapshot_rejects_unborn_external_authority_without_fallback(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-unborn-authority-") as temp_dir:
+            repository = Path(temp_dir) / "external-authority"
+            repository.mkdir()
+            home = Path(temp_dir) / "home"
+            home.mkdir()
+            environment = {"PATH": module.TRUSTED_PATH, "HOME": str(home)}
+            completed = module.subprocess.run(
+                [str(module.TRUSTED_GIT), "init", "--quiet", str(repository)],
+                env=environment,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, completed.returncode, completed.stderr.decode())
+            (repository / "release_gate.py").write_text(
+                "print('untracked authority')\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "no enrolled Git HEAD.*live untracked digest fallback is not accepted",
+            ):
+                module.current_governed_code_snapshot(
+                    (repository,),
+                    environment,
+                )
+
     def test_governed_snapshot_rejects_deep_directory_swap_execute_and_restore(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory(prefix="release-governed-directory-swap-") as temp_dir:
@@ -1317,15 +1546,19 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
             "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "1",
             "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "1",
         }
-        sanitized_conditional_environment = (
-            module._production_authoritative_controller_environment(
-                {
-                    "PATH": module.TRUSTED_PATH,
-                    "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "1",
-                    "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "1",
-                }
+        with (
+            mock.patch.object(module, "source_binding_failures", return_value=[]),
+            mock.patch.object(module, "current_git_head", return_value="a" * 40),
+        ):
+            sanitized_conditional_environment = (
+                module._production_authoritative_controller_environment(
+                    {
+                        "PATH": module.TRUSTED_PATH,
+                        "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "1",
+                        "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "1",
+                    }
+                )
             )
-        )
         self.assertEqual("1", sanitized_conditional_environment["CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E"])
         self.assertEqual(
             "1",
@@ -2647,7 +2880,10 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
                 mock.patch.object(
                     module,
                     "run_authoritative_release_controller",
-                    return_value=live_controller_result(module),
+                    return_value=live_controller_result(
+                        module,
+                        external_write_authorized=True,
+                    ),
                 ) as controller_mock,
                 mock.patch.object(module, "current_blocking_gate_artifacts", return_value={}),
                 mock.patch.object(module, "current_receipt_states", return_value={}),
@@ -2668,6 +2904,7 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
             ):
                 result = module.main(
                     [
+                        module.EXTERNAL_WRITE_AUTHORIZATION_FLAG,
                         "--skip-google-oauth-runtime-refresh",
                         "--skip-windows-runtime-refresh",
                     ]
@@ -2677,7 +2914,22 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
             env = controller_mock.call_args.args[0]
             self.assertEqual("1", env[module.SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH_ENV])
             self.assertEqual("1", env[module.SKIP_WINDOWS_RUNTIME_REFRESH_ENV])
+            self.assertTrue(
+                controller_mock.call_args.kwargs["external_write_authorized"]
+            )
             payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                module.supported_release_controller_command(
+                    external_write_authorized=True,
+                    skip_google_oauth_runtime_refresh=True,
+                    skip_windows_runtime_refresh=True,
+                ),
+                payload["command"],
+            )
+            self.assertIn(module.EXTERNAL_WRITE_AUTHORIZATION_FLAG, payload["command"])
+            self.assertIn("--skip-google-oauth-runtime-refresh", payload["command"])
+            self.assertIn("--skip-windows-runtime-refresh", payload["command"])
+            self.assertTrue(payload["external_release_writes_authorized"])
             self.assertEqual(
                 {
                     "google_oauth": "verify_existing_receipts",
@@ -6050,7 +6302,12 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
         self.assertEqual("fail", payload["status"])
         self.assertEqual("NOT_RELEASE_READY", payload["verdict"])
         self.assertEqual(78, payload["returncode"])
-        self.assertEqual(module.supported_release_controller_command(), payload["command"])
+        self.assertEqual(
+            module.supported_release_controller_command(
+                skip_windows_runtime_refresh=True,
+            ),
+            payload["command"],
+        )
         self.assertNotIn("bash", payload["command"])
         self.assertFalse(payload["authoritative"])
         self.assertTrue(payload["diagnostic"])
