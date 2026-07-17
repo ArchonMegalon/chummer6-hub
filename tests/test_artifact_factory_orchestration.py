@@ -2268,6 +2268,43 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("AddSingleton<ArtifactFactoryOrchestrationService>", result.stderr)
 
+    def test_verifier_fails_closed_when_default_orchestration_adapter_overload_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-default-wiring-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_collection_path = temp_root / "Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs"
+            service_collection_text = service_collection_path.read_text(encoding="utf-8")
+            service_collection_path.write_text(
+                service_collection_text.replace(
+                    "public static IServiceCollection AddHubInstallAndOrchestrationAdapters(\n"
+                    "        this IServiceCollection services)",
+                    "public static IServiceCollection AddHubInstallAndOrchestrationAdaptersRemoved(\n"
+                    "        this IServiceCollection services)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("AddHubInstallAndOrchestrationAdapters", result.stderr)
+
     def test_verifier_fails_closed_when_successor_registry_drops_closeout_evidence(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-registry-proof-") as temp_dir:
             registry_path = Path(temp_dir) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
