@@ -70,7 +70,9 @@ ARG CHUMMER_RUNTIME_GID=1654
 WORKDIR /app
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && command -v setpriv >/dev/null
+COPY --from=run-services-source --chmod=0555 scripts/initialize-public-edge-volumes.sh /usr/local/libexec/chummer/initialize-public-edge-volumes.sh
 COPY --from=build /app/publish .
 COPY --from=build /src/chummer.run-services/.codex-design /app/.codex-design
 COPY --from=build /src/chummer-hub-registry/black-ledger /app/black-ledger

@@ -178,6 +178,36 @@ services:
           - chummer-run-identity
       fleet-origin: {}
 
+  chummer-portal-volume-init:
+    image: chummer-run-api:local
+    restart: "no"
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    security_opt:
+      - no-new-privileges:true
+    network_mode: "none"
+    ulimits:
+      core: 0
+    pids_limit: 32
+    environment:
+      CHUMMER_PORTAL_UID: "${CHUMMER_PORTAL_UID:-1654}"
+      CHUMMER_PORTAL_GID: "${CHUMMER_PORTAL_GID:-1654}"
+    entrypoint:
+      - /usr/local/libexec/chummer/initialize-public-edge-volumes.sh
+    volumes:
+      - chummer-run-api-state:/app/state
+      - chummer-release-upload-sessions:/release-upload-sessions
+      - chummer-windows-proof-store:/windows-proof-store
+      - chummer-windows-proof-upload-sessions:/windows-proof-upload-sessions
+      # This host bind is probed as the portal identity but is never chowned by the initializer.
+      - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
+
   chummer-portal:
     image: chummer-run-api:local
     restart: unless-stopped
@@ -202,6 +232,8 @@ services:
     env_file:
       - /docker/fleet/secrets/codexliz-cf-access.env
     depends_on:
+      chummer-portal-volume-init:
+        condition: service_completed_successfully
       chummer-public-blazor:
         condition: service_healthy
       chummer-run-identity:

@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "restore_public_edge_portal_image.py"
@@ -38,6 +40,7 @@ def test_restore_retages_and_recreates_when_container_or_tag_drift(monkeypatch, 
                 json.dumps(
                     [
                         {
+                            "Id": "prior-portal-container",
                             "Image": dirty,
                             "Config": {"Image": "chummer-run-api:local"},
                             "State": {"Status": "running", "Running": True, "ExitCode": 0},
@@ -63,6 +66,50 @@ def test_restore_retages_and_recreates_when_container_or_tag_drift(monkeypatch, 
     )
 
     assert ["docker", "tag", expected, "chummer-run-api:local"] in commands
+    stop_command = [
+        "docker",
+        "compose",
+        "--env-file",
+        str(tmp_path / ".env"),
+        "-p",
+        "chummer6-hub",
+        "-f",
+        str(tmp_path / "docker-compose.public-edge.yml"),
+        "stop",
+        "chummer-portal",
+    ]
+    assert stop_command in commands
+    initializer_command = [
+        "docker",
+        "compose",
+        "--env-file",
+        str(tmp_path / ".env"),
+        "-p",
+        "chummer6-hub",
+        "-f",
+        str(tmp_path / "docker-compose.public-edge.yml"),
+        "run",
+        "--rm",
+        "--no-deps",
+        "chummer-portal-volume-init",
+    ]
+    assert initializer_command in commands
+    portal_command = [
+        "docker",
+        "compose",
+        "--env-file",
+        str(tmp_path / ".env"),
+        "-p",
+        "chummer6-hub",
+        "-f",
+        str(tmp_path / "docker-compose.public-edge.yml"),
+        "up",
+        "-d",
+        "--no-build",
+        "--no-deps",
+        "--force-recreate",
+        "chummer-portal",
+    ]
     assert [
         "docker",
         "compose",
@@ -79,7 +126,10 @@ def test_restore_retages_and_recreates_when_container_or_tag_drift(monkeypatch, 
         "--force-recreate",
         "chummer-portal",
     ] in commands
+    assert commands.index(stop_command) < commands.index(initializer_command) < commands.index(portal_command)
     assert result["containerRecreated"] is True
+    assert result["portalQuiesceCommand"] == stop_command
+    assert result["volumeInitializerCommand"] == initializer_command
     assert result["imageTags"][0]["retagged"] is True
 
 
@@ -126,6 +176,7 @@ def test_restore_skips_recreate_when_container_and_tag_match(monkeypatch, tmp_pa
     assert not any(command[:2] == ["docker", "tag"] for command in commands)
     assert not any(command[:2] == ["docker", "compose"] for command in commands)
     assert result["containerRecreated"] is False
+    assert result["volumeInitializerCommand"] == []
     assert result["imageTags"][0]["retagged"] is False
 
 
@@ -177,10 +228,131 @@ def test_restore_recreates_when_container_matches_but_is_not_running(monkeypatch
         False,
     )
 
-    assert any(command[:2] == ["docker", "compose"] for command in commands)
+    compose_commands = [command for command in commands if command[:2] == ["docker", "compose"]]
+    assert ["stop", "chummer-portal"] == compose_commands[0][-2:]
+    assert compose_commands[1][-1] == "chummer-portal-volume-init"
+    assert compose_commands[2][-1] == "chummer-portal"
     assert result["containerRecreated"] is True
     assert result["containerStatusBefore"] == "exited"
     assert result["containerRunningBefore"] is False
+
+
+def test_initializer_failure_restarts_quiesced_prior_container(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    expected = "sha256:" + "1" * 64
+    dirty = "sha256:" + "2" * 64
+    prior_container = "prior-portal-container"
+    commands: list[list[str]] = []
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        commands.append(command)
+        if command == ["docker", "image", "inspect", "--format", "{{.Id}}", expected]:
+            return module.CommandResult(command, 0, expected, "")
+        if command == ["docker", "image", "inspect", "--format", "{{.Id}}", "chummer-run-api:local"]:
+            return module.CommandResult(command, 0, dirty, "")
+        if command == ["docker", "inspect", "portal"]:
+            return module.CommandResult(
+                command,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Id": prior_container,
+                            "Image": dirty,
+                            "Config": {"Image": "chummer-run-api:local"},
+                            "State": {"Status": "running", "Running": True, "ExitCode": 0},
+                        }
+                    ]
+                ),
+                "",
+            )
+        if command[:2] == ["docker", "compose"] and command[-1] == "chummer-portal-volume-init":
+            return module.CommandResult(command, 37, "", "initializer failed")
+        return module.CommandResult(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+
+    with pytest.raises(RuntimeError, match="initializer failed"):
+        module.restore_portal_image(
+            expected,
+            ["chummer-run-api:local"],
+            tmp_path / "docker-compose.public-edge.yml",
+            None,
+            "chummer6-hub",
+            "chummer-portal",
+            "portal",
+            False,
+            False,
+        )
+
+    stop_index = next(index for index, command in enumerate(commands) if command[-2:] == ["stop", "chummer-portal"])
+    init_index = next(index for index, command in enumerate(commands) if command[-1] == "chummer-portal-volume-init")
+    restart_index = commands.index(["docker", "start", prior_container])
+    assert stop_index < init_index < restart_index
+    assert not any(command[:2] == ["docker", "compose"] and "up" in command for command in commands)
+
+
+def test_recreate_failure_falls_back_to_prior_image_when_prior_container_is_gone(monkeypatch, tmp_path) -> None:
+    module = load_module()
+    expected = "sha256:" + "3" * 64
+    dirty = "sha256:" + "4" * 64
+    prior_container = "prior-portal-container"
+    commands: list[list[str]] = []
+    portal_up_attempts = 0
+
+    def fake_run_command(command, cwd=module.ROOT, dry_run=False):
+        nonlocal portal_up_attempts
+        commands.append(command)
+        if command == ["docker", "image", "inspect", "--format", "{{.Id}}", expected]:
+            return module.CommandResult(command, 0, expected, "")
+        if command == ["docker", "image", "inspect", "--format", "{{.Id}}", "chummer-run-api:local"]:
+            return module.CommandResult(command, 0, dirty, "")
+        if command == ["docker", "inspect", "portal"]:
+            return module.CommandResult(
+                command,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "Id": prior_container,
+                            "Image": dirty,
+                            "Config": {"Image": "chummer-run-api:local"},
+                            "State": {"Status": "running", "Running": True, "ExitCode": 0},
+                        }
+                    ]
+                ),
+                "",
+            )
+        if command == ["docker", "start", prior_container]:
+            return module.CommandResult(command, 1, "", "container was removed")
+        if command[:2] == ["docker", "compose"] and "up" in command:
+            portal_up_attempts += 1
+            if portal_up_attempts == 1:
+                return module.CommandResult(command, 41, "", "recreate failed")
+        return module.CommandResult(command, 0, "", "")
+
+    monkeypatch.setattr(module, "run_command", fake_run_command)
+
+    with pytest.raises(RuntimeError, match="recreate failed"):
+        module.restore_portal_image(
+            expected,
+            ["chummer-run-api:local"],
+            tmp_path / "docker-compose.public-edge.yml",
+            None,
+            "chummer6-hub",
+            "chummer-portal",
+            "portal",
+            False,
+            False,
+        )
+
+    stop_index = next(index for index, command in enumerate(commands) if command[-2:] == ["stop", "chummer-portal"])
+    init_index = next(index for index, command in enumerate(commands) if command[-1] == "chummer-portal-volume-init")
+    up_indexes = [index for index, command in enumerate(commands) if command[:2] == ["docker", "compose"] and "up" in command]
+    start_index = commands.index(["docker", "start", prior_container])
+    rollback_tag_index = commands.index(["docker", "tag", dirty, "chummer-run-api:local"])
+    assert stop_index < init_index < up_indexes[0] < start_index < rollback_tag_index < up_indexes[1]
+    assert portal_up_attempts == 2
 
 
 def test_restore_receipt_captures_drift_image_details(monkeypatch, tmp_path) -> None:

@@ -19,6 +19,24 @@ registry-generated `RELEASE_CHANNEL.generated.json`, compatibility `releases.jso
 4. Optional unattended overrides:
 `RUNBOOK_LOG_DIR` pins runbook log files to a known writable directory and `RUNBOOK_STATE_DIR` pins writable state (for example `DOTNET_CLI_HOME`) to a known writable directory.
 
+## Public-edge mutable storage preflight
+
+The portal process remains non-root and defaults to UID/GID `1654:1654`. The governed deploy and restore paths first stop the prior portal writer, then run `chummer-portal-volume-init` from the same local app image, and only recreate the portal after initialization succeeds. If initialization or recreation fails, they attempt to restart the exact prior container and fall back to its immutable image when Compose has already removed it. The Compose service dependency still requires successful initialization during normal startup. This one-shot service has no network, a read-only root filesystem, `no-new-privileges`, all capabilities dropped except `CHOWN`, `SETUID`, and `SETGID`, and no secret mounts. It migrates the four named mutable roots (`chummer-run-api-state`, `chummer-release-upload-sessions`, `chummer-windows-proof-store`, and `chummer-windows-proof-upload-sessions`) and then creates and removes an owner-only probe as the configured portal identity. Symlinks and special files in those roots fail the preflight.
+
+`/downloads-source` is a host bind, not a named volume. The initializer only creates and removes a probe there; it never changes host ownership or modes. Before deployment, the operator must grant the configured portal identity create, write, and delete access. Choose one governed host-side policy and verify it locally, for example:
+
+```bash
+# Simple dedicated-owner policy.
+sudo chown -R 1654:1654 /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads
+
+# Or preserve the current owner and grant an access/default ACL.
+sudo setfacl -Rm u:1654:rwX,d:u:1654:rwX /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads
+```
+
+Do not make the downloads tree world-writable. If `CHUMMER_PORTAL_UID` or `CHUMMER_PORTAL_GID` changes, rebuild the app image with the matching Docker build arguments and update the host ownership/ACL before recreating the portal.
+
+The read-only data-protection certificate, certificate-password file, and InstallLinking PostgreSQL runtime connection file are also outside the initializer's authority. On the host, each must be explicitly readable by the configured UID/GID while remaining inaccessible to other users (normally portal-owned mode `0400`, or a narrowly scoped ACL on a root-owned mode `0600` file). Never mount these files into the initializer. The guarded deploy wrapper and image-restore tool abort before portal recreation if the volume preflight fails.
+
 ## Recommended Production Topology
 
 1. Default recommendation: use `CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR` with a self-hosted runner that can write directly into the portal downloads storage mount.
@@ -93,7 +111,7 @@ Repository variables:
 Required live sequence:
 1. Deploy the updated public edge app first so the proof routes exist:
 `CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD="$(git rev-parse HEAD)" CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM=1 bash scripts/deploy_public_edge_portal.sh`
-   - Do not use raw `docker compose ... up -d --build chummer-portal` for release publication. The guarded wrapper source-gates the audited checkout, builds `chummer-run-api:local` from explicit contexts, recreates `chummer-portal` with `--no-build`, and postdeploy-gates the exact image id before the deploy is considered publishable.
+   - Do not use raw `docker compose ... up -d --build chummer-portal` for release publication. The guarded wrapper source-gates the audited checkout, builds `chummer-run-api:local` from explicit contexts, runs the volume initializer, recreates `chummer-portal` with `--no-build`, and postdeploy-gates the exact image id before the deploy is considered publishable.
 2. Verify the live bootstrap matches the deployed source and the legacy path redirects cleanly:
 `bash scripts/verify-live-mac-bootstrap.sh`
 3. For a Mac release runner, open `https://chummer.run/downloads/release-upload` in a signed-in browser, copy the generated `Command` block, and paste that exact command into the Mac shell. That generated command includes the short-lived upload ticket; do not run the raw `bootstrap.sh` URL for promotion because it has no upload credential.
@@ -122,7 +140,7 @@ This catches local `chummer-run-api:local` retags that can otherwise restore sta
 9. The same aggregate emits the `flagshipHorizons` child receipt documented in `docs/FLAGSHIP_HORIZONS_GATE.md`; release evidence should show `flagshipHorizonsStatus=pass` and `flagshipHorizonsBrowserProofCoverage=full`.
 10. If the runtime image guard fails, restore the portal without rebuilding it, then rerun the same postdeploy gate:
 `python3 scripts/restore_public_edge_portal_image.py --expected-portal-image-id sha256:<approved-portal-image-id> --image-tag chummer-run-api:local --include-image-tags-matching '^chummer-run-api:pwa-direct' --include-image-tags-matching '^chummer-run-api:current-source' --include-image-tags-matching '^chummer-run-api:fixed-alias' --compose-file docker-compose.public-edge.yml --env-file .env --project-name chummer6-hub --portal-container chummer6-hub-chummer-portal-1 --base-url https://chummer.run --stability-window-seconds 120 --stability-poll-seconds 10 --require-all-browser-proofs --playwright-artifact-dir .codex-studio/published/public-edge-browser-proofs --output .codex-studio/published/PUBLIC_EDGE_PORTAL_IMAGE_RESTORE.generated.json`
-The restore command validates the approved image id, records Docker created time, tags, digests, and labels for any drifted image it replaces, repoints the configured mutable tag plus explicitly matched local aliases, recreates only `chummer-portal` with `docker compose up -d --no-build --no-deps --force-recreate`, repairs bounded image drift during the optional stability window, and retries the runtime image guard plus the downloads/status, mobile viewport, and Open Chummer navigation browser proofs in its postdeploy receipt while the container warms up.
+The restore command validates the approved image id, records Docker created time, tags, digests, and labels for any drifted image it replaces, repoints the configured mutable tag plus explicitly matched local aliases, runs `docker compose run --rm --no-deps chummer-portal-volume-init`, and only after that succeeds recreates `chummer-portal` with `docker compose up -d --no-build --no-deps --force-recreate`. It repairs bounded image drift during the optional stability window and retries the runtime image guard plus the downloads/status, mobile viewport, and Open Chummer navigation browser proofs in its postdeploy receipt while the container warms up.
 
 Mac release bootstrap note:
 1. The hosted mac bootstrap now defaults temporary packaging work to the run workspace and exports:

@@ -117,6 +117,7 @@ def inspect_container_image_id(container: str, dry_run: bool = False) -> tuple[s
 def inspect_container_runtime(container: str, dry_run: bool = False) -> dict[str, Any]:
     if dry_run:
         return {
+            "containerId": container,
             "imageId": "",
             "imageRef": "",
             "status": "running",
@@ -131,6 +132,7 @@ def inspect_container_runtime(container: str, dry_run: bool = False) -> dict[str
     state = container_payload.get("State") if isinstance(container_payload.get("State"), dict) else {}
     config = container_payload.get("Config") if isinstance(container_payload.get("Config"), dict) else {}
     return {
+        "containerId": str(container_payload.get("Id") or "").strip(),
         "imageId": normalize_image_id(str(container_payload.get("Image") or "")),
         "imageRef": str(config.get("Image") or "").strip(),
         "status": str(state.get("Status") or "").strip(),
@@ -235,6 +237,79 @@ def compose_command(
     return command
 
 
+def compose_volume_initializer_command(
+    compose_file: Path,
+    env_file: Path | None,
+    project_name: str,
+) -> list[str]:
+    command = ["docker", "compose"]
+    if env_file is not None:
+        command.extend(["--env-file", str(env_file)])
+    command.extend(
+        [
+            "-p",
+            project_name,
+            "-f",
+            str(compose_file),
+            "run",
+            "--rm",
+            "--no-deps",
+            "chummer-portal-volume-init",
+        ]
+    )
+    return command
+
+
+def compose_stop_command(
+    compose_file: Path,
+    env_file: Path | None,
+    project_name: str,
+    service: str,
+) -> list[str]:
+    command = ["docker", "compose"]
+    if env_file is not None:
+        command.extend(["--env-file", str(env_file)])
+    command.extend(["-p", project_name, "-f", str(compose_file), "stop", service])
+    return command
+
+
+def attempt_previous_portal_restore(
+    *,
+    prior_container_id: str,
+    prior_image_id: str,
+    prior_image_tag: str,
+    prior_was_running: bool,
+    compose_file: Path,
+    env_file: Path | None,
+    project_name: str,
+    service: str,
+    dry_run: bool,
+) -> dict[str, Any]:
+    attempts: list[dict[str, Any]] = []
+    if not prior_was_running:
+        return {"required": False, "status": "not_required", "attempts": attempts}
+
+    if prior_container_id:
+        start_command = ["docker", "start", prior_container_id]
+        start_result = run_command(start_command, dry_run=dry_run)
+        attempts.append({"command": start_command, "returncode": start_result.returncode})
+        if start_result.returncode == 0:
+            return {"required": True, "status": "prior_container_started", "attempts": attempts}
+
+    if prior_image_id and prior_image_tag:
+        tag_command = ["docker", "tag", prior_image_id, prior_image_tag]
+        tag_result = run_command(tag_command, dry_run=dry_run)
+        attempts.append({"command": tag_command, "returncode": tag_result.returncode})
+        if tag_result.returncode == 0:
+            recreate_command = compose_command(compose_file, env_file, project_name, service)
+            recreate_result = run_command(recreate_command, dry_run=dry_run)
+            attempts.append({"command": recreate_command, "returncode": recreate_result.returncode})
+            if recreate_result.returncode == 0:
+                return {"required": True, "status": "prior_image_recreated", "attempts": attempts}
+
+    return {"required": True, "status": "failed", "attempts": attempts}
+
+
 def resolve_env_file(value: str, repo_root: Path) -> Path | None:
     if not value:
         candidate = repo_root / ".env"
@@ -291,24 +366,53 @@ def restore_portal_image(
 
     try:
         container_runtime = inspect_container_runtime(portal_container, dry_run=dry_run)
+        container_id = str(container_runtime.get("containerId") or "")
         container_image_id = str(container_runtime.get("imageId") or "")
         container_image_ref = str(container_runtime.get("imageRef") or "")
     except RuntimeError:
         container_runtime = {}
-        container_image_id, container_image_ref = "", ""
+        container_id, container_image_id, container_image_ref = "", "", ""
 
     container_running = container_runtime.get("running") is True
     should_recreate = force_recreate or container_image_id != expected or not container_running
+    portal_quiesce_run: list[str] = []
     compose_run: list[str] = []
+    volume_initializer_run: list[str] = []
     if should_recreate:
+        portal_quiesce_run = compose_stop_command(compose_file, env_file, project_name, service)
+        volume_initializer_run = compose_volume_initializer_command(compose_file, env_file, project_name)
         compose_run = compose_command(compose_file, env_file, project_name, service)
-        run_checked(compose_run, dry_run=dry_run)
+        try:
+            run_checked(portal_quiesce_run, dry_run=dry_run)
+            run_checked(volume_initializer_run, dry_run=dry_run)
+            run_checked(compose_run, dry_run=dry_run)
+        except BaseException as error:
+            prior_image_tag = (
+                container_image_ref
+                if container_image_ref and not container_image_ref.startswith("sha256:")
+                else unique_tags[0]
+            )
+            rollback = attempt_previous_portal_restore(
+                prior_container_id=container_id,
+                prior_image_id=container_image_id,
+                prior_image_tag=prior_image_tag,
+                prior_was_running=container_running,
+                compose_file=compose_file,
+                env_file=env_file,
+                project_name=project_name,
+                service=service,
+                dry_run=dry_run,
+            )
+            if rollback["status"] == "failed":
+                raise RuntimeError(f"{error}; prior portal restore also failed: {rollback['attempts']}") from error
+            raise
 
     return {
         "expectedImageId": expected,
         "sourceImageId": source_image_id or expected,
         "sourceImageDetails": source_image_details,
         "portalContainer": portal_container,
+        "containerIdBefore": container_id,
         "containerImageIdBefore": container_image_id,
         "containerImageRefBefore": container_image_ref,
         "containerStatusBefore": container_runtime.get("status", ""),
@@ -317,6 +421,8 @@ def restore_portal_image(
         "containerRecreated": should_recreate,
         "imageTags": tag_states,
         "retagCommands": tag_commands,
+        "portalQuiesceCommand": portal_quiesce_run,
+        "volumeInitializerCommand": volume_initializer_run,
         "composeCommand": compose_run,
         "dryRun": dry_run,
     }

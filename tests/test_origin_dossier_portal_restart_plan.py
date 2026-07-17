@@ -53,7 +53,11 @@ def test_restart_plan_waits_for_explicit_approval_without_deploying(tmp_path: Pa
     assert result["safeToExecuteAfterApproval"] is True
     assert result["deploymentPerformed"] is False
     assert result["approvalGate"] == "explicit_user_deploy_or_restart_approval_required"
-    assert "docker compose -f docker-compose.public-edge.yml up -d --no-deps --force-recreate chummer-portal" in result["restartCommands"]
+    assert result["restartCommands"][0] == (
+        'CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD="$(git rev-parse HEAD)" CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM=1 '
+        "bash scripts/deploy_public_edge_portal.sh"
+    )
+    assert not any("docker compose" in command for command in result["restartCommands"])
     assert any("verify_downloads_version_marker.py --base-url http://127.0.0.1:8091 --output " in command for command in result["restartCommands"])
     assert "local_public_edge_downloads_version_marker_status_pass" in result["postRestartRequiredEvidence"]
     assert "materialize_origin_dossier_deployed_browser_probe.py" in serialized

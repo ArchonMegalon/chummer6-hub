@@ -447,7 +447,19 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "--build-context \"fleet-media-factory-contracts=$FLEET_MEDIA_CONTRACTS\"" in script
     assert "--build-context \"design-product=$DESIGN_PRODUCT_ROOT\"" in script
     assert "docker image inspect \"$IMAGE_TAG\" --format '{{.Id}}'" in script
+    assert 'stop chummer-portal' in script
+    assert "run --rm --no-deps chummer-portal-volume-init" in script
     assert "up -d --no-build --no-deps --force-recreate chummer-portal" in script
+    stop_index = script.index("stop chummer-portal")
+    init_index = script.index("run --rm --no-deps chummer-portal-volume-init")
+    recreate_index = script.index(
+        "up -d --no-build --no-deps --force-recreate chummer-portal",
+        init_index,
+    )
+    assert stop_index < init_index < recreate_index
+    assert "restore_prior_portal()" in script
+    assert 'docker start "$prior_portal_container_id"' in script
+    assert 'docker tag "$prior_portal_image_id" "$IMAGE_TAG"' in script
     assert "scripts/verify_public_edge_postdeploy_gate.py" in script
     assert "--expected-portal-image-id \"$image_id\"" in script
     assert "--require-downloads-status-playwright" in script
@@ -504,6 +516,12 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "--portal-container chummer6-hub-chummer-portal-1" in runbook
     assert "--portal-image-tag chummer-run-api:local" in runbook
     assert "scripts/restore_public_edge_portal_image.py" in runbook
+    assert "Public-edge mutable storage preflight" in runbook
+    assert "docker compose run --rm --no-deps chummer-portal-volume-init" in runbook
+    assert "never changes host ownership or modes" in runbook
+    assert "sudo setfacl -Rm u:1654:rwX,d:u:1654:rwX" in runbook
+    assert "data-protection certificate" in runbook
+    assert "InstallLinking PostgreSQL runtime connection file" in runbook
     assert "--include-image-tags-matching '^chummer-run-api:pwa-direct'" in runbook
     assert "--include-image-tags-matching '^chummer-run-api:current-source'" in runbook
     assert "--include-image-tags-matching '^chummer-run-api:fixed-alias'" in runbook
