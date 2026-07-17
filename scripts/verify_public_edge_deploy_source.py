@@ -16,6 +16,18 @@ import yaml
 ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 GENERATED_PROOF_PREFIXES = (".codex-studio/published/",)
 TRUSTED_GIT = "/usr/bin/git"
+PORTAL_SERVICE_WORKER_GUARD_MARKERS = (
+    "RUN test -f /app/publish/wwwroot/service-worker.js",
+    "grep -Fq 'const CACHE_VERSION = \"v19\";' /app/publish/wwwroot/service-worker.js",
+    "grep -Fq 'const CACHE_CONTRACT = \"run-api-projection-v2\";' /app/publish/wwwroot/service-worker.js",
+    "grep -Fq 'const CRITICAL_SHELL_ASSETS = [' /app/publish/wwwroot/service-worker.js",
+    "grep -Fq '\"/manifest.play.webmanifest\"' /app/publish/wwwroot/service-worker.js",
+    "grep -Fq 'play_public_route_network_unavailable' /app/publish/wwwroot/service-worker.js",
+    "grep -Fq 'url.pathname.startsWith(\"/api/play/\")' /app/publish/wwwroot/service-worker.js",
+    "! grep -Fq 'self.skipWaiting()' /app/publish/wwwroot/service-worker.js",
+    "! grep -Fq 'self.clients.claim()' /app/publish/wwwroot/service-worker.js",
+    "! grep -Fq '\"/mobile-turn-companion.js\"' /app/publish/wwwroot/service-worker.js",
+)
 
 
 def expand_compose_value(value: str) -> str:
@@ -128,11 +140,7 @@ def resolve_compose_source_paths(compose_file: Path, service_name: str) -> tuple
 
 def dockerfile_has_portal_service_worker_guard(dockerfile_path: Path) -> bool:
     text = dockerfile_path.read_text(encoding="utf-8")
-    return (
-        "/app/publish/wwwroot/service-worker.js" in text
-        and 'const CACHE_NAME = "chummer-public-v4";' in text
-        and "play-shell-v" in text
-    )
+    return all(marker in text for marker in PORTAL_SERVICE_WORKER_GUARD_MARKERS)
 
 
 def dirty_line_paths(line: str) -> list[str]:
@@ -210,7 +218,7 @@ def verify(
                     "severity": "blocker",
                     "detail": (
                         f"compose service {compose_service} Dockerfile {dockerfile_path} does not fail closed "
-                        "when the published root service worker is not the portal public worker"
+                        "when the published root service worker is not the canonical Run API projection"
                     ),
                 }
             )

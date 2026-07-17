@@ -17,6 +17,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Iterator
 
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+if str(SCRIPT_DIRECTORY) not in sys.path:
+    # Isolated-mode deploys do not inherit the repository root or PYTHONPATH.
+    sys.path.insert(0, str(SCRIPT_DIRECTORY))
+
 try:
     from scripts.strict_json_contract import (
         StrictJsonContractError,

@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -25,6 +26,25 @@ def load_module():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def test_cli_imports_sibling_contract_under_isolated_python(tmp_path: Path) -> None:
+    result = subprocess.run(
+        ["/usr/bin/python3", "-I", str(SCRIPT), "--help"],
+        cwd=tmp_path,
+        env={
+            "PATH": "/usr/bin:/bin",
+            "HOME": "/nonexistent",
+            "LANG": "C",
+            "LC_ALL": "C",
+        },
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Fail closed when public-edge rebuild" in result.stdout
 
 
 def configure_fake_public_pwa_identities(module, source_root: Path) -> dict[str, tuple[str, str]]:
