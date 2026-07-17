@@ -467,6 +467,96 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task PromoteAsyncPreservesCompleteStaleProofReviewPostureAndManifestBytes()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260717-stale-proof",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-linux-x64-installer",
+                    Head: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    Bytes: "linux-stale-proof"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false),
+                new BundleArtifact(
+                    ArtifactId: "avalonia-win-x64-installer",
+                    Head: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    Bytes: "windows-stale-proof"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview"),
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "macos-stale-proof"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ],
+            mutateManifestPair: static (compatibility, canonical) =>
+            {
+                const string rolloutReason =
+                    "Current shelf is published, but release posture stays review-required because "
+                    + "stale or incomplete proof receipts must be refreshed before widening launch-readiness claims.";
+                const string supportabilitySummary =
+                    "Current preview artifacts remain downloadable, but stale or incomplete proof receipts "
+                    + "keep supportability review-required.";
+                const string knownIssueSummary =
+                    "Known issue: stale or incomplete proof receipts still block launch-readiness claims.";
+                const string fixAvailabilitySummary =
+                    "Refresh stale or incomplete proof receipts before sending fixed notices.";
+
+                foreach (JsonObject manifest in new[] { compatibility, canonical })
+                {
+                    manifest["rolloutState"] = "public_release_review_required";
+                    manifest["rolloutReason"] = rolloutReason;
+                    manifest["supportabilityState"] = "review_required";
+                    manifest["supportabilitySummary"] = supportabilitySummary;
+                    manifest["knownIssueSummary"] = knownIssueSummary;
+                    manifest["fixAvailabilitySummary"] = fixAvailabilitySummary;
+                }
+
+                canonical["publicTrustMetrics"]!["proofFreshness"]!["status"] = "stale";
+                canonical["publicTrustMetrics"]!["releaseChannel"]!["posture"] = "blocked";
+                canonical["publicTrustMetrics"]!["releaseChannel"]!["supportabilityState"] = "review_required";
+                canonical["registryBoundaryCoverage"]!["releaseChannel"]!["supportabilityState"] = "review_required";
+                canonical["registryBoundaryCoverage"]!["releaseChannel"]!["publicTrustPosture"] = "blocked";
+            });
+
+        byte[] expectedCompatibility = fixture.ReadBundleEntryBytes(bundlePath, "releases.json");
+        byte[] expectedCanonical = fixture.ReadBundleEntryBytes(bundlePath, "RELEASE_CHANNEL.generated.json");
+
+        await fixture.PromoteAsync(bundlePath);
+
+        Assert.Equal(expectedCompatibility, File.ReadAllBytes(Path.Combine(fixture.DownloadsRoot, "releases.json")));
+        Assert.Equal(expectedCanonical, File.ReadAllBytes(Path.Combine(fixture.DownloadsRoot, "RELEASE_CHANNEL.generated.json")));
+        using JsonDocument canonical = fixture.ReadCanonicalManifest();
+        JsonElement root = canonical.RootElement;
+        Assert.True(root.GetProperty("desktopTupleCoverage").GetProperty("complete").GetBoolean());
+        Assert.Equal("stale", root.GetProperty("publicTrustMetrics").GetProperty("proofFreshness").GetProperty("status").GetString());
+        Assert.Equal("review_required", root.GetProperty("supportabilityState").GetString());
+        Assert.Equal("review_required", root.GetProperty("publicTrustMetrics").GetProperty("releaseChannel").GetProperty("supportabilityState").GetString());
+        Assert.Equal("blocked", root.GetProperty("publicTrustMetrics").GetProperty("releaseChannel").GetProperty("posture").GetString());
+        Assert.Equal("review_required", root.GetProperty("registryBoundaryCoverage").GetProperty("releaseChannel").GetProperty("supportabilityState").GetString());
+        Assert.Equal("blocked", root.GetProperty("registryBoundaryCoverage").GetProperty("releaseChannel").GetProperty("publicTrustPosture").GetString());
+    }
+
+    [Fact]
     public async Task PromoteAsyncKeepsMacOnlyRegistryShelfIncompleteAndReviewRequired()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
