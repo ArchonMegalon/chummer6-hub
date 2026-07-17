@@ -931,6 +931,16 @@ if [[ "$RUNBOOK_MODE" == "hub-ship" ]]; then
   exit 0
 fi
 
+if [[ "$RUNBOOK_MODE" != "tunnel" ]]; then
+  echo "Unsupported RUNBOOK_MODE: $RUNBOOK_MODE" >&2
+  case "$RUNBOOK_MODE" in
+    *publish*|*upload*|*release*)
+      echo "Live release publication uses RUNBOOK_MODE=downloads-upload-http with CHUMMER_RELEASE_UPLOAD_SESSIONS_URL and the staged upload-session workflow." >&2
+      ;;
+  esac
+  exit 2
+fi
+
 echo "== docker ps (chummer/cloudflared) =="
 docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | rg -i 'chummer|cloudflared' || true
 

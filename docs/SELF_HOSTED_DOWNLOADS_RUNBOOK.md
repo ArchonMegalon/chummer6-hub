@@ -250,9 +250,14 @@ Use this path for the normal Windows/Linux rolling shelf:
 
 1. Build only the platform artifacts required for the current verification pass.
 2. Stage the downloads bundle.
-3. Publish with `RUNBOOK_MODE=publish-latest-nightly bash scripts/runbook.sh`.
+3. Follow the complete Mode C authority and verification sequence below. Its implemented
+   publication command is the staged upload-session lane:
+   `CHUMMER_RELEASE_UPLOAD_SESSIONS_URL=https://chummer.run/api/internal/releases/upload-sessions RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`.
+4. Preserve the upload-session handoff and committed activation receipt. An ambiguous completion
+   is reconcile-only and is never authority to start another session.
 
-The command is guarded by the 08:00 Europe/Vienna release window and by the once-per-day shelf rule. Use an explicit emergency override only when the release owner accepts the extra publish.
+This runbook does not create channel, cadence, or emergency-override authority. Those decisions
+remain external release-authority inputs; do not substitute an undocumented publish mode.
 
 ## Mode C: Live `chummer.run` HTTP Publish
 
@@ -260,12 +265,11 @@ Use this mode when the public site must expose both the rebuilt downloads shelf 
 
 Repository variables:
 1. `CHUMMER_RELEASE_UPLOAD_TOKEN`
-2. `CHUMMER_RELEASE_UPLOAD_URL` (optional; defaults to `https://chummer.run/api/internal/releases/bundles`)
-3. `CHUMMER_RELEASE_UPLOAD_SESSIONS_URL` (optional; defaults to `https://chummer.run/api/internal/releases/upload-sessions`)
-4. `CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL` (optional; defaults to `https://chummer.run/downloads/RELEASE_CHANNEL.generated.json`)
-5. `CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_COUNT` (optional; defaults to `3`)
-6. `CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_DELAY_SECONDS` (optional; defaults to `2`)
-7. `CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_MAX_SAMPLES` (optional; defaults to `6`)
+2. `CHUMMER_RELEASE_UPLOAD_SESSIONS_URL` (the only upload endpoint authority; defaults to `https://chummer.run/api/internal/releases/upload-sessions`)
+3. `CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL` (optional; defaults to `https://chummer.run/downloads/RELEASE_CHANNEL.generated.json`)
+4. `CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_COUNT` (optional; defaults to `3`)
+5. `CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_CONFIRMATION_DELAY_SECONDS` (optional; defaults to `2`)
+6. `CHUMMER_RELEASE_UPLOAD_VERIFY_SHELF_TRUTH_LIVE_MAX_SAMPLES` (optional; defaults to `6`)
 
 Required live sequence:
 1. Deploy the updated public edge app first so the proof routes exist. The release authority must
@@ -329,7 +333,7 @@ unset approved_runtime_proof_sha256
 4. Rebuild the current unified shelf bundle:
 `bash scripts/materialize-public-downloads-bundle.sh`
 5. Upload the rebuilt bundle to the live shelf:
-`RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
+`CHUMMER_RELEASE_UPLOAD_SESSIONS_URL=https://chummer.run/api/internal/releases/upload-sessions RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
    - If `CHUMMER_RELEASE_UPLOAD_TOKEN` is unset, the upload step now prompts for it with hidden input instead of requiring an inline shell assignment.
    - Canonical post-publish success is gated on stable public truth, not one transient read. `scripts/public_download_shelf_truth_gate.py` now cache-busts the live shelf and requires repeated consecutive matches against the local `releases.json` and `RELEASE_CHANNEL.generated.json` before the publish lane can pass.
    - Keep the default `3` consecutive live matches unless you are intentionally relaxing the guard for a non-canonical environment. Set `CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION=1` only if you intentionally want `releases.json` compatibility drift to fail the run.
@@ -384,7 +388,7 @@ Mac release bootstrap note:
 4. If a release ticket still fails with `hdiutil: create failed - No space left on device`, point `CHUMMER_MAC_RELEASE_TMPDIR` at a workspace-backed path on the target SSD and clear unneeded old `run-*` directories under the same parent before rerunning.
 
 Dry run:
-1. `CHUMMER_RELEASE_UPLOAD_DRY_RUN=1 RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
+1. `CHUMMER_RELEASE_UPLOAD_DRY_RUN=1 CHUMMER_RELEASE_UPLOAD_SESSIONS_URL=https://chummer.run/api/internal/releases/upload-sessions RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
 
 Required post-publish checks:
 1. `https://chummer.run/downloads/RELEASE_CHANNEL.generated.json`

@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterator
 from urllib.parse import unquote, urlsplit
@@ -17,6 +18,8 @@ WORKSPACE_ROOT = REPO_ROOT.parent
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "atomic_release_shelf_v1"
 ATOMIC_CONTRACT_DOC = REPO_ROOT / "docs" / "ATOMIC_RELEASE_SHELF_PUBLICATION.md"
 DOWNLOADS_RUNBOOK = REPO_ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
+RUNBOOK_SCRIPT = REPO_ROOT / "scripts" / "runbook.sh"
+HTTP_PUBLISHER = REPO_ROOT / "scripts" / "publish-download-bundle-http.sh"
 GENERATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 POINTER_SCHEMA = "chummer.release-shelf.current/v1"
@@ -238,6 +241,8 @@ def copy_fixture(tmp_path: Path) -> Path:
 def test_release_publication_docs_describe_the_implemented_authority() -> None:
     contract_doc = ATOMIC_CONTRACT_DOC.read_text(encoding="utf-8")
     runbook = DOWNLOADS_RUNBOOK.read_text(encoding="utf-8")
+    runbook_script = RUNBOOK_SCRIPT.read_text(encoding="utf-8")
+    publisher = HTTP_PUBLISHER.read_text(encoding="utf-8")
 
     for implemented_truth in (
         "Status: **Implemented production contract**",
@@ -277,6 +282,44 @@ def test_release_publication_docs_describe_the_implemented_authority() -> None:
     assert "never production" in filesystem_lane.splitlines()[0]
     assert "must not be the live production shelf" in filesystem_lane
     assert "production uses\nMode C staged HTTP publication" in filesystem_lane
+
+    rolling_shelf = runbook[
+        runbook.index("## Daily Rolling Shelf") :
+        runbook.index("## Mode C: Live")
+    ]
+    assert "RUNBOOK_MODE=downloads-upload-http" in rolling_shelf
+    assert "CHUMMER_RELEASE_UPLOAD_SESSIONS_URL=" in rolling_shelf
+    assert "/api/internal/releases/upload-sessions" in rolling_shelf
+    assert "staged upload-session lane" in rolling_shelf
+    for retired_guidance in (
+        "RUNBOOK_MODE=publish-latest-nightly",
+        "CHUMMER_RELEASE_UPLOAD_URL",
+        "/api/internal/releases/bundles",
+    ):
+        assert retired_guidance not in runbook
+
+    assert (
+        'SESSIONS_URL="${CHUMMER_RELEASE_UPLOAD_SESSIONS_URL:'
+        '-https://chummer.run/api/internal/releases/upload-sessions}"'
+    ) in publisher
+    assert 'if [[ "$RUNBOOK_MODE" != "tunnel" ]]' in runbook_script
+    assert 'RUNBOOK_MODE" == "publish-latest-nightly"' not in runbook_script
+
+
+def test_runbook_rejects_unhandled_publish_mode_before_diagnostics() -> None:
+    result = subprocess.run(
+        ["bash", str(RUNBOOK_SCRIPT), "publish-latest-nightly"],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "Unsupported RUNBOOK_MODE: publish-latest-nightly" in result.stderr
+    assert "RUNBOOK_MODE=downloads-upload-http" in result.stderr
+    assert "CHUMMER_RELEASE_UPLOAD_SESSIONS_URL" in result.stderr
+    assert "== docker ps (chummer/cloudflared) ==" not in result.stdout
 
 
 def test_layout_v1_fixture_pointer_binds_complete_generation() -> None:
