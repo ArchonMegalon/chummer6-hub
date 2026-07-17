@@ -119,6 +119,14 @@ def build_payload() -> dict[str, Any]:
     }
 
     rybbit_receipt = load_json(RYBBIT_RECEIPT_PATH)
+    landing_play_event_wired = (
+        'data-analytics-event="homepage_open_play"' in landing
+        or (
+            'var playAnalyticsEvent = "homepage_open_play";' in landing
+            and 'data-analytics-event="@playAnalyticsEvent"' in landing
+        )
+    )
+
     rybbit_pass = (
         status_pass(rybbit_receipt)
         and bool(rybbit_receipt.get("runtime_ready"))
@@ -127,7 +135,7 @@ def build_payload() -> dict[str, Any]:
         and "window.ChummerAnalyticsQueue" in site_js
         and 'data-analytics-event="homepage_open_downloads"' in landing
         and 'data-analytics-event="homepage_open_build"' in landing
-        and 'data-analytics-event="homepage_open_play"' in landing
+        and landing_play_event_wired
         and 'homepage_open_stable' not in landing
         and 'homepage_open_nightly' not in landing
         and 'data-analytics-event="downloads_stable_install"' in downloads

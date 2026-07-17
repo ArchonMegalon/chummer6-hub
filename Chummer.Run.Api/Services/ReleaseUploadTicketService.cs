@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 
@@ -8,7 +10,8 @@ public sealed record ReleaseUploadTicketClaims(
     string? DisplayName,
     string? Email,
     DateTimeOffset IssuedAtUtc,
-    DateTimeOffset ExpiresAtUtc);
+    DateTimeOffset ExpiresAtUtc,
+    string TicketId);
 
 public sealed record ReleaseUploadTicketIssueResult(
     string Ticket,
@@ -17,6 +20,8 @@ public sealed record ReleaseUploadTicketIssueResult(
 public sealed class ReleaseUploadTicketService
 {
     private const string Purpose = "chummer.run.release-upload-ticket.v1";
+    private const string RevocationEpochKey = "CHUMMER_RELEASE_UPLOAD_TICKET_REVOCATION_EPOCH";
+    private const string DefaultRevocationEpoch = "1";
     private static readonly TimeSpan DefaultLifetime = TimeSpan.FromHours(12);
     private readonly IDataProtector _protector;
     private readonly TimeSpan _ticketLifetime;
@@ -25,7 +30,12 @@ public sealed class ReleaseUploadTicketService
         IDataProtectionProvider dataProtectionProvider,
         IConfiguration configuration)
     {
-        _protector = dataProtectionProvider.CreateProtector(Purpose);
+        ArgumentNullException.ThrowIfNull(dataProtectionProvider);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        _protector = dataProtectionProvider.CreateProtector(
+            Purpose,
+            $"revocation-epoch:{HashRevocationEpoch(configuration[RevocationEpochKey])}");
         _ticketLifetime = ResolveTicketLifetime(configuration);
     }
 
@@ -34,12 +44,14 @@ public sealed class ReleaseUploadTicketService
         ArgumentNullException.ThrowIfNull(subject);
 
         DateTimeOffset issuedAtUtc = DateTimeOffset.UtcNow;
+        string ticketId = Guid.NewGuid().ToString("N");
         ReleaseUploadTicketClaims claims = new(
             SubjectId: subject.SubjectId,
             DisplayName: NormalizeOptional(subject.DisplayName),
             Email: NormalizeOptional(subject.Email),
             IssuedAtUtc: issuedAtUtc,
-            ExpiresAtUtc: issuedAtUtc.Add(_ticketLifetime));
+            ExpiresAtUtc: issuedAtUtc.Add(_ticketLifetime),
+            TicketId: ticketId);
 
         ReleaseUploadTicketPayload payload = new(
             SubjectId: claims.SubjectId,
@@ -48,7 +60,7 @@ public sealed class ReleaseUploadTicketService
             IssuedAtUtc: claims.IssuedAtUtc,
             ExpiresAtUtc: claims.ExpiresAtUtc,
             Scope: "release_bundle_upload",
-            Nonce: Guid.NewGuid().ToString("N"));
+            Nonce: ticketId);
 
         string ticket = _protector.Protect(JsonSerializer.Serialize(payload));
         return new ReleaseUploadTicketIssueResult(ticket, claims);
@@ -75,6 +87,7 @@ public sealed class ReleaseUploadTicketService
         if (payload is null
             || !string.Equals(payload.Scope, "release_bundle_upload", StringComparison.Ordinal)
             || string.IsNullOrWhiteSpace(payload.SubjectId)
+            || !Guid.TryParseExact(payload.Nonce, "N", out _)
             || payload.ExpiresAtUtc <= DateTimeOffset.UtcNow)
         {
             return false;
@@ -85,7 +98,8 @@ public sealed class ReleaseUploadTicketService
             DisplayName: NormalizeOptional(payload.DisplayName),
             Email: NormalizeOptional(payload.Email),
             IssuedAtUtc: payload.IssuedAtUtc,
-            ExpiresAtUtc: payload.ExpiresAtUtc);
+            ExpiresAtUtc: payload.ExpiresAtUtc,
+            TicketId: payload.Nonce);
         return true;
     }
 
@@ -99,6 +113,14 @@ public sealed class ReleaseUploadTicketService
         }
 
         return DefaultLifetime;
+    }
+
+    private static string HashRevocationEpoch(string? configuredEpoch)
+    {
+        string epoch = string.IsNullOrWhiteSpace(configuredEpoch)
+            ? DefaultRevocationEpoch
+            : configuredEpoch.Trim();
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(epoch))).ToLowerInvariant();
     }
 
     private static string? NormalizeOptional(string? value)

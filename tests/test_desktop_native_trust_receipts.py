@@ -175,6 +175,35 @@ QUEUE_PROOF_LINES = [
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test --project Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
 ]
+
+
+def expected_current_proof_routes() -> list[str]:
+    release_channel_path = REPO_ROOT / "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
+    payload = json.loads(release_channel_path.read_text(encoding="utf-8"))
+    install_routes = sorted(
+        {
+            f"/downloads/install/{str(item.get('artifactId') or item.get('id') or '').strip()}"
+            for collection_name in ("artifacts", "downloads")
+            for item in payload.get(collection_name, [])
+            if isinstance(item, dict)
+            and str(item.get("kind") or "").strip().lower() == "installer"
+            and str(item.get("artifactId") or item.get("id") or "").strip()
+        }
+    )
+    additional_install_routes = [
+        route for route in install_routes if route != "/downloads/install/avalonia-linux-x64-installer"
+    ]
+    return [
+        "/downloads/install/avalonia-linux-x64-installer",
+        "/home/access",
+        "/home/work",
+        "/account/access",
+        "/account/work",
+        "/account/support",
+        "/contact",
+        "/downloads",
+        *additional_install_routes,
+    ]
 REGISTRY_102_1_LINES = [
     "milestones:",
     "  - id: 102",

@@ -1,0 +1,68 @@
+{
+  "contract_name": "chummer.public_edge_observability_policy.v1",
+  "service": "chummer.run.api",
+  "measurement_window_days": 28,
+  "slis": {
+    "availability": {
+      "metric": "chummer.run.api.requests.completed",
+      "good_event": "http.status_code < 500",
+      "total_event": "completed public requests excluding /api/health and /api/ready"
+    },
+    "latency": {
+      "metric": "chummer.run.api.requests.duration.ms",
+      "threshold_ms": 1000,
+      "good_event": "duration <= threshold_ms",
+      "total_event": "completed public requests excluding /api/health and /api/ready"
+    },
+    "readiness": {
+      "route": "/api/ready",
+      "success_status": 200
+    }
+  },
+  "metric_dimensions": {
+    "allowed_labels": [
+      "http.method",
+      "http.route",
+      "http.status_code"
+    ],
+    "route_source": "matched_route_template",
+    "unmatched_route_value": "__unmatched__",
+    "method_fallback_value": "OTHER",
+    "include_correlation_id": false,
+    "include_raw_path": false,
+    "include_query": false
+  },
+  "evidence_binding": {
+    "operator_proof_digest_algorithm": "sha256",
+    "release_candidate_digest_source": "release_channel_manifest_bytes",
+    "runtime_source_fingerprint_algorithm": "sha256-canonical-json-v1"
+  },
+  "slo": {
+    "availability_percent": 99.9,
+    "latency_good_event_percent": 95.0
+  },
+  "error_budget": {
+    "availability_percent": 0.1,
+    "promotion_policy": "block public-stable promotion while the rolling error budget is exhausted"
+  },
+  "burn_rate_alerts": [
+    {
+      "severity": "page",
+      "short_window_minutes": 5,
+      "long_window_minutes": 60,
+      "burn_rate_threshold": 14.4
+    },
+    {
+      "severity": "ticket",
+      "short_window_minutes": 30,
+      "long_window_minutes": 360,
+      "burn_rate_threshold": 6.0
+    }
+  ],
+  "alert_routing": {
+    "owner": "Chummer6 operations",
+    "receiver_class": "primary_on_call",
+    "operator_proof_max_age_hours": 24,
+    "delivery_test_max_age_hours": 168
+  }
+}

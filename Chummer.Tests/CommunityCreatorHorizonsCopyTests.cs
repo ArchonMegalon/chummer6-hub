@@ -2,6 +2,7 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Registry.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -94,7 +95,10 @@ public sealed class CommunityCreatorHorizonsCopyTests : IDisposable
             .Build();
 
         CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
-        InstallLinkingStore installLinkingStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
+        InstallLinkingStore installLinkingStore = new(
+            configuration,
+            DataProtectionProvider.Create(Path.Combine(_root, "install-linking-keys")),
+            NullLogger<InstallLinkingStore>.Instance);
         AccountService accounts = new(communityStore);
         WorkspaceLifecyclePolicyService workspaceLifecycle = new(configuration);
         CampaignArtifactRegistryBridge artifactRegistry = new(communityStore);

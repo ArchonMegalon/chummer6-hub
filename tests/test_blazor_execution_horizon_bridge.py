@@ -73,9 +73,19 @@ def test_blazor_execution_horizon_bridge_receipt_is_honest_about_full_matrix() -
     assert horizon["near_term_smoke_status"] == "proven"
     assert payload["boundaries"]["does_not_upgrade_smoke_to_full"] is True
     assert payload["boundaries"]["full_matrix_requires_current_passing_full_scope_receipt"] is True
+    assert payload["proofs"]["blazor_hosted_execution_horizon"]["long_term_full_browser_parity_path"]
+    assert payload["proofs"]["blazor_hosted_execution_horizon"]["long_term_full_browser_parity_status"] in {"not_proven", "proven"}
+    assert payload["boundaries"]["does_not_upgrade_full_matrix_to_long_term_browser_parity"] is True
     if horizon["mid_term_full_matrix_status"] != "proven":
         assert payload["verdict"] == "mobile_pwa_and_blazor_smoke_integrated_full_matrix_not_proven"
         assert horizon["mid_term_full_covered_workflow_family_count"] < horizon["mid_term_full_required_workflow_family_count"]
+        assert horizon["long_term_full_browser_parity_status"] == "not_proven"
+        assert horizon["long_term_full_browser_parity_proof_status"] in {"pass", "passed", "ready", "fail", "missing"}
+    else:
+        if horizon["long_term_full_browser_parity_status"] == "proven":
+            assert payload["verdict"] == "mobile_pwa_and_blazor_full_matrix_and_long_term_browser_parity_integrated"
+        else:
+            assert payload["verdict"] == "mobile_pwa_and_blazor_full_matrix_integrated"
 
 
 def test_blazor_execution_horizon_bridge_is_indexed_and_refreshable() -> None:

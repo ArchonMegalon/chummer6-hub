@@ -1,17 +1,17 @@
 {
-  "name": "Chummer",
-  "short_name": "Chummer",
+  "name": "Chummer Turn Companion",
+  "short_name": "Chummer Play",
   "id": "/mobile",
   "description": "Mobile play companion for Shadowrun sessions: track continuity, heat, roles, reconnects, and safe Black Ledger updates.",
   "lang": "en",
   "dir": "ltr",
-  "start_url": "/mobile",
-  "scope": "/",
+  "start_url": "/mobile/player",
+  "scope": "/mobile/",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
-  "orientation": "portrait-primary",
-  "background_color": "#0f1110",
-  "theme_color": "#0f1110",
+  "orientation": "any",
+  "background_color": "#0f1b26",
+  "theme_color": "#0f1b26",
   "categories": [
     "games",
     "productivity",
@@ -19,16 +19,28 @@
   ],
   "icons": [
     {
-      "src": "/pwa-icon.svg",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "/pwa-maskable.svg",
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
   "screenshots": [
@@ -49,24 +61,16 @@
   ],
   "shortcuts": [
     {
-      "name": "Open mobile workspace",
-      "short_name": "Mobile",
-      "url": "/mobile"
+      "name": "Player Companion",
+      "short_name": "Player",
+      "description": "Open the public player install shell.",
+      "url": "/mobile/player"
     },
     {
-      "name": "Open play",
-      "short_name": "Play",
-      "url": "/play"
-    },
-    {
-      "name": "Open continuity",
-      "short_name": "Continuity",
-      "url": "/play/continuity"
-    },
-    {
-      "name": "Open packages",
-      "short_name": "Packages",
-      "url": "/packages"
+      "name": "GM Companion",
+      "short_name": "GM",
+      "description": "Open the public GM install shell. This shortcut grants no GM authority.",
+      "url": "/mobile/gm"
     }
   ]
 }

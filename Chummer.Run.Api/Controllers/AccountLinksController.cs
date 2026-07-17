@@ -2,6 +2,8 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -73,6 +75,14 @@ public sealed class AccountLinksController : ControllerBase
         if (request is null)
         {
             return BadRequest("recovery email payload is required.");
+        }
+
+        HubEmailSignInAvailability emailEntryAvailability = HubEmailSignInPolicy.Resolve(HttpContext?.RequestServices?.GetService<IConfiguration>());
+        if (!emailEntryAvailability.Enabled)
+        {
+            return Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                detail: emailEntryAvailability.PreviewNote);
         }
 
         try

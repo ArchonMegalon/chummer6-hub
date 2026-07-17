@@ -171,6 +171,178 @@ def normalize(value: Any) -> str:
     return str(value or "").strip()
 
 
+def normalized_token(value: Any) -> str:
+    return normalize(value).lower()
+
+
+def int_value(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def route_truth_is_revoked(row: dict[str, Any]) -> bool:
+    return normalized_token(row.get("revokeState")) == "revoked" or normalized_token(row.get("promotionState")) == "revoked"
+
+
+def route_truth_is_recommended_primary(row: dict[str, Any]) -> bool:
+    return (
+        normalized_token(row.get("routeRole")) == "primary"
+        and normalized_token(row.get("promotionState")) == "promoted"
+        and not route_truth_is_revoked(row)
+    )
+
+
+def route_truth_is_fallback_recovery(row: dict[str, Any]) -> bool:
+    return (
+        normalized_token(row.get("routeRole")) == "fallback"
+        and normalized_token(row.get("promotionState")) == "promoted"
+        and not route_truth_is_revoked(row)
+    )
+
+
+def route_truth_is_blocked(row: dict[str, Any]) -> bool:
+    return (
+        normalized_token(row.get("promotionState")) == "proof_required"
+        and not route_truth_is_revoked(row)
+        and not (
+            normalized_token(row.get("routeRole")) == "fallback"
+            and normalized_token(row.get("parityPosture")) == "explicit_fallback"
+        )
+    )
+
+
+def summary_requires(summary: str, marker: str, errors: list[str], label: str) -> None:
+    if marker not in normalize(summary):
+        errors.append(f"{label} summary is missing {marker!r}")
+
+
+def verify_public_trust_metrics(
+    payload: dict[str, Any],
+    route_truth: list[dict[str, Any]],
+    artifact_by_id: dict[str, dict[str, Any]],
+    errors: list[str],
+) -> None:
+    metrics = payload.get("publicTrustMetrics")
+    if not isinstance(metrics, dict):
+        errors.append("release channel is missing publicTrustMetrics")
+        return
+
+    release_channel = metrics.get("releaseChannel")
+    adoption_health = metrics.get("adoptionHealth")
+    revocation_facts = metrics.get("revocationFacts")
+    if not isinstance(release_channel, dict):
+        errors.append("publicTrustMetrics is missing releaseChannel")
+        return
+    if not isinstance(adoption_health, dict):
+        errors.append("publicTrustMetrics is missing adoptionHealth")
+        return
+    if not isinstance(revocation_facts, dict):
+        errors.append("publicTrustMetrics is missing revocationFacts")
+        return
+
+    recommended_routes = [row for row in route_truth if route_truth_is_recommended_primary(row)]
+    fallback_routes = [row for row in route_truth if route_truth_is_fallback_recovery(row)]
+    blocked_routes = [row for row in route_truth if route_truth_is_blocked(row)]
+    revoked_routes = [row for row in route_truth if route_truth_is_revoked(row)]
+
+    expected_primary = len(recommended_routes)
+    expected_fallback = len(fallback_routes)
+    expected_blocked = len(blocked_routes)
+    expected_revoked = len(revoked_routes)
+
+    public_install_count = 0
+    account_linked_install_count = 0
+    for row in recommended_routes:
+        artifact_id = normalize(row.get("artifactId"))
+        artifact = artifact_by_id.get(artifact_id)
+        install_access_class = normalized_token((artifact or {}).get("installAccessClass"))
+        if install_access_class == "account_required":
+            account_linked_install_count += 1
+        else:
+            public_install_count += 1
+
+    if int_value(release_channel.get("recommendedRouteCount")) != expected_primary:
+        errors.append("publicTrustMetrics.releaseChannel.recommendedRouteCount drifted from desktopRouteTruth")
+    fallback_route_count = release_channel.get("fallbackRecoveryRouteCount")
+    if fallback_route_count is not None and int_value(fallback_route_count) != expected_fallback:
+        errors.append("publicTrustMetrics.releaseChannel.fallbackRecoveryRouteCount drifted from desktopRouteTruth")
+    if int_value(release_channel.get("blockedRouteCount")) != expected_blocked:
+        errors.append("publicTrustMetrics.releaseChannel.blockedRouteCount drifted from desktopRouteTruth")
+    if int_value(release_channel.get("revokedRouteCount")) != expected_revoked:
+        errors.append("publicTrustMetrics.releaseChannel.revokedRouteCount drifted from desktopRouteTruth")
+
+    if int_value(adoption_health.get("primaryPromotedCount")) != expected_primary:
+        errors.append("publicTrustMetrics.adoptionHealth.primaryPromotedCount drifted from desktopRouteTruth")
+    if int_value(adoption_health.get("fallbackRecoveryCount")) != expected_fallback:
+        errors.append("publicTrustMetrics.adoptionHealth.fallbackRecoveryCount drifted from desktopRouteTruth")
+    if int_value(adoption_health.get("blockedRouteCount")) != expected_blocked:
+        errors.append("publicTrustMetrics.adoptionHealth.blockedRouteCount drifted from desktopRouteTruth")
+    if int_value(adoption_health.get("revokedRouteCount")) != expected_revoked:
+        errors.append("publicTrustMetrics.adoptionHealth.revokedRouteCount drifted from desktopRouteTruth")
+    if int_value(adoption_health.get("publicInstallCount")) != public_install_count:
+        errors.append("publicTrustMetrics.adoptionHealth.publicInstallCount drifted from recommended route install access")
+    if int_value(adoption_health.get("accountLinkedInstallCount")) != account_linked_install_count:
+        errors.append("publicTrustMetrics.adoptionHealth.accountLinkedInstallCount drifted from recommended route install access")
+
+    if int_value(revocation_facts.get("activeRevocationCount")) != expected_revoked:
+        errors.append("publicTrustMetrics.revocationFacts.activeRevocationCount drifted from desktopRouteTruth")
+    active_revocations = revocation_facts.get("activeRevocations")
+    if isinstance(active_revocations, list) and len(active_revocations) != expected_revoked:
+        errors.append("publicTrustMetrics.revocationFacts.activeRevocations length drifted from desktopRouteTruth")
+
+    summary_requires(
+        release_channel.get("summary") or "",
+        f"{expected_fallback} promoted fallback recovery routes",
+        errors,
+        "publicTrustMetrics.releaseChannel",
+    )
+    summary_requires(
+        release_channel.get("summary") or "",
+        f"{expected_primary} recommended primary routes",
+        errors,
+        "publicTrustMetrics.releaseChannel",
+    )
+    summary_requires(
+        release_channel.get("summary") or "",
+        f"{expected_blocked} blocked routes",
+        errors,
+        "publicTrustMetrics.releaseChannel",
+    )
+    summary_requires(
+        release_channel.get("summary") or "",
+        f"{expected_revoked} active revocations",
+        errors,
+        "publicTrustMetrics.releaseChannel",
+    )
+
+    summary_requires(
+        adoption_health.get("summary") or "",
+        f"{expected_fallback} fallback recovery routes are promoted",
+        errors,
+        "publicTrustMetrics.adoptionHealth",
+    )
+    summary_requires(
+        adoption_health.get("summary") or "",
+        f"{public_install_count} are guest-readable",
+        errors,
+        "publicTrustMetrics.adoptionHealth",
+    )
+    summary_requires(
+        adoption_health.get("summary") or "",
+        f"{account_linked_install_count} require account-linked install handoff",
+        errors,
+        "publicTrustMetrics.adoptionHealth",
+    )
+    summary_requires(
+        adoption_health.get("summary") or "",
+        f"{expected_blocked} routes are still blocked on proof",
+        errors,
+        "publicTrustMetrics.adoptionHealth",
+    )
+
+
 def find_queue_item(payload: dict[str, Any], *, path: Path) -> dict[str, Any]:
     items = payload.get("items")
     if not isinstance(items, list):
@@ -368,6 +540,13 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
         for route_entry in route_truth
         if isinstance(route_entry, dict) and normalize(route_entry.get("tupleId"))
     }
+
+    verify_public_trust_metrics(
+        payload,
+        [row for row in route_truth if isinstance(row, dict)],
+        artifact_by_id,
+        errors,
+    )
 
     for entry in identity_registry:
         if not isinstance(entry, dict):

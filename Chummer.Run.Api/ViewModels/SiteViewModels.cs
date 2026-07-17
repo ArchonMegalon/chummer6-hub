@@ -115,7 +115,9 @@ public sealed record BillingMembershipPageViewModel(
     bool Unavailable,
     string Heading,
     string Summary,
-    string ManageMembershipHref);
+    string ManageMembershipHref,
+    bool EmailEntryEnabled,
+    bool GoogleAvailable);
 
 public sealed record HorizonArtifactAllowanceViewModel(
     string HorizonId,
@@ -973,9 +975,8 @@ public sealed record ReleaseUploadPageViewModel(
     string Heading,
     string Summary,
     string Command,
-    string HandoffCode,
+    string TicketUrl,
     string BootstrapUrl,
-    DateTimeOffset TicketExpiresAtUtc,
     string UploadUrl,
     string ReadmeUrl,
     string VerifyUrl,
@@ -1336,7 +1337,10 @@ public sealed record PrivacyBoundaryDomainViewModel(
     string RetentionSummary,
     string RedactionSummary,
     string PublicProjection,
-    string SignedInProjection);
+    string SignedInProjection,
+    string Status = "documented",
+    bool ReviewRequired = false,
+    string? LaunchBlockingReason = null);
 
 public sealed record PrivacyBoundarySurfaceRuleViewModel(
     string Label,
@@ -1351,7 +1355,10 @@ public sealed record PrivacyBoundaryPanelViewModel(
     IReadOnlyList<PrivacyBoundaryDomainViewModel> Domains,
     IReadOnlyList<PrivacyBoundarySurfaceRuleViewModel> SurfaceRules,
     TrustPageActionViewModel PrimaryAction,
-    TrustPageActionViewModel? SecondaryAction = null);
+    TrustPageActionViewModel? SecondaryAction = null,
+    string Status = "documented",
+    bool ReviewRequired = false,
+    string? LaunchBlockingReason = null);
 
 public sealed record SupportIntakeOptionViewModel(
     string Value,
@@ -1965,12 +1972,30 @@ public sealed record MobileCapabilityCardViewModel(
     string Label,
     string Summary);
 
+public sealed record MobileInstallRoleProfileViewModel(
+    string RoleKey,
+    string PurposeHeading,
+    string PurposeSummary,
+    string PrivacyHeading,
+    string PrivacySummary,
+    string AuthorityHeading,
+    string AuthoritySummary,
+    string InstallTargetPath,
+    string QrAriaLabel,
+    string OpenTargetLabel,
+    IReadOnlyList<MobileCapabilityCardViewModel> Capabilities);
+
 public sealed record MobileProjectionPageViewModel(
     SiteChromeViewModel Chrome,
     string Eyebrow,
     string Heading,
     string Intro,
+    string InstallRoleKey,
+    string DocumentTitle,
+    string ManifestHref,
+    string AppleAppTitle,
     string CurrentRoleLabel,
+    MobileInstallRoleProfileViewModel RoleProfile,
     string InstallabilitySummary,
     IReadOnlyList<MobileRoleCardViewModel> Roles,
     IReadOnlyList<MobileCapabilityCardViewModel> Capabilities,
@@ -2276,7 +2301,45 @@ public sealed record OriginDossierPublicationViewModel(
     string? AudiobookshelfDossierShareUrl = null,
     string? AudiobookshelfAudiobookShareUrl = null,
     SharedArtifactSurfaceRoutesViewModel? SharedArtifacts = null,
-    PublicHorizonCapabilityViewModel? ArtifactCapability = null);
+    PublicHorizonCapabilityViewModel? ArtifactCapability = null,
+    IReadOnlyList<OriginDossierPortraitChoiceViewModel>? PortraitChoices = null,
+    IReadOnlyList<OriginDossierAudiobookVoiceOptionViewModel>? AudiobookVoiceOptions = null,
+    IReadOnlyList<OriginDossierSceneHighlightViewModel>? SceneHighlights = null,
+    bool FullStoryVerified = false,
+    bool EbookHandoffReady = false,
+    string? RunnerLinkCode = null,
+    string? RunnerLinkShareUrl = null,
+    IReadOnlyList<OriginDossierStoryLinkViewModel>? StoryLinks = null);
+
+public sealed record OriginDossierPortraitChoiceViewModel(
+    string PortraitId,
+    string Title,
+    string Summary,
+    string? PreviewUrl = null,
+    bool Selected = false);
+
+public sealed record OriginDossierAudiobookVoiceOptionViewModel(
+    string VoiceId,
+    string Label,
+    string Summary,
+    bool Recommended = false,
+    bool Selected = false);
+
+public sealed record OriginDossierSceneHighlightViewModel(
+    string SceneId,
+    string ChapterLabel,
+    string Title,
+    string Summary,
+    bool Selected = false);
+
+public sealed record OriginDossierStoryLinkViewModel(
+    string LinkId,
+    string LinkedRunnerAlias,
+    string Summary,
+    string Status,
+    string? LinkedProjectId = null,
+    string? LinkedRunnerLinkCode = null,
+    bool IntegrateIntoStory = true);
 
 public sealed record OriginDossierPublicationDetailPageViewModel(
     SiteChromeViewModel Chrome,
@@ -2377,6 +2440,7 @@ public sealed record AuthPageViewModel(
     string ReturnLine,
     string NextPath,
     bool CreateAccount,
+    bool EmailEntryEnabled,
     bool GoogleAvailable,
     string? GoogleUnavailableReason,
     string GoogleStartHref,

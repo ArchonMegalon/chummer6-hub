@@ -75,6 +75,7 @@ public sealed class GoldReadinessArtifactServiceTests
 
             Assert.NotNull(snapshot);
             Assert.Equal("NOT_GOLD", snapshot!.Verdict);
+            Assert.False(snapshot.IsGoldReady);
             Assert.Single(snapshot.RuleAuthorityBlockers);
             GoldReadinessRuleAuthorityBlocker blocker = Assert.Single(snapshot.RuleAuthorityBlockers);
             Assert.Equal("sr4", blocker.RulesetId);
@@ -96,5 +97,27 @@ public sealed class GoldReadinessArtifactServiceTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public void PublicGapSummaryHumanizesReleaseBlockingFailures()
+    {
+        var snapshot = new GoldReadinessSnapshot(
+            Path: "/tmp/final-gold.json",
+            Status: "fail",
+            Verdict: "NOT_GOLD",
+            GeneratedAtUtc: DateTimeOffset.Parse("2026-06-30T09:24:00Z"),
+            RuleAuthorityBlockers: Array.Empty<GoldReadinessRuleAuthorityBlocker>(),
+            Failures:
+            [
+                "windows_installer_visual_audit failed",
+                "release_ready failed",
+                "operator_release_dashboard missing required checks"
+            ]);
+
+        Assert.False(snapshot.IsGoldReady);
+        Assert.Equal(
+            "final release checks are still blocked by native Windows installer proof, release readiness checks, and operator dashboard missing required checks",
+            snapshot.PublicGapSummary);
     }
 }

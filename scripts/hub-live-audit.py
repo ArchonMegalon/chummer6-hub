@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import re
@@ -21,6 +22,10 @@ BANNED_COPY = re.compile(r"\b(Read the linked detail|Read more|Learn more)\b", r
 SUPPORT_AUDIT_TITLE = "Live audit support verification case"
 SUPPORT_AUDIT_SUMMARY = "Signed-in live audit is verifying the assistant-led fix verification lane."
 SUPPORT_AUDIT_DETAIL_PREFIX = "Signed-in live audit is verifying the assistant-led fix verification lane on the rebuilt local edge."
+RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+EMAIL_SIGNIN_PROBE_ENV = "CHUMMER_ENABLE_EMAIL_SIGNIN_PROBE"
+AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG = RUN_SERVICES_ROOT / ".state" / "auth_signin_automation_paused.flag"
+TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 DEFAULT_REQUEST_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) "
@@ -74,6 +79,34 @@ class NoRedirectHandler(HTTPRedirectHandler):
 
     def http_error_308(self, req, fp, code, msg, headers):  # pragma: no cover - exercised via operational probes
         return fp
+
+
+def email_signin_probe_enabled() -> bool:
+    return str(os.environ.get(EMAIL_SIGNIN_PROBE_ENV) or "").strip().lower() in TRUTHY_ENV_VALUES
+
+
+def auth_signin_automation_pause_note() -> str:
+    if not AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG.is_file():
+        return ""
+    try:
+        note = AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG.read_text(encoding="utf-8", errors="replace").strip()
+    except Exception:
+        note = ""
+    if not note:
+        note = "paused by user request"
+    return note.splitlines()[0].strip()
+
+
+def base_url_allows_email_signin_probe(base_url: str) -> bool:
+    hostname = (urlparse(base_url).hostname or "").strip().lower()
+    if not hostname:
+        return False
+    if hostname == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
 
 
 def fetch(
@@ -526,6 +559,23 @@ def verify_signed_in_work_audit(
     public_host: str | None = None,
     forwarded_proto: str | None = None,
 ) -> None:
+    pause_note = auth_signin_automation_pause_note()
+    if pause_note:
+        raise AssertionError(
+            "signed-in work audit auth automation is paused by user request; "
+            f"remove or rename {AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG} only when you intentionally want to resume it "
+            f"({pause_note})"
+        )
+
+    if not email_signin_probe_enabled():
+        raise AssertionError(
+            f"signed-in work audit would exercise /auth/email/start; set {EMAIL_SIGNIN_PROBE_ENV}=1 only when you explicitly want to run the email sign-in probe and risk sending sign-in emails on this host"
+        )
+    if not base_url_allows_email_signin_probe(base_url):
+        raise AssertionError(
+            f"signed-in work audit remains blocked for non-loopback hosts even when {EMAIL_SIGNIN_PROBE_ENV}=1 to avoid sending sign-in emails from shared/public infrastructure"
+        )
+
     status, body, headers, _ = fetch(
         base_url,
         "/login?next=%2Faccount%2Fwork",
@@ -635,15 +685,24 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"/account/access returned {status}, expected 200")
-    require_snippet(body, "Installs", "/account/access")
-    require_snippet(body, "Cross-device recovery", "/account/access")
-    require_snippet(body, "Advanced device recovery", "/account/access")
-    require_snippet(body, "Offline-ready return", "/account/access")
-    require_snippet(body, "What stays on this device", "/account/access")
-    require_snippet(body, "Open downloads", "/account/access")
-    require_snippet(body, "How install linking works", "/account/access")
+    require_snippet(body, "Install Chummer", "/account/access")
+    require_snippet(body, "Linked copies", "/account/access")
+    require_snippet(body, "Copy details", "/account/access")
+    require_snippet(body, "Need help with an install?", "/account/access")
+    require_snippet(body, "Download Chummer", "/account/access")
+    require_snippet(body, "Open install help", "/account/access")
     require_snippet(body, "live-audit-host", "/account/access")
     require_snippet(body, "0.0-live-audit on preview", "/account/access")
+    for noisy_label in (
+        "Recent install handoffs",
+        "Cross-device recovery",
+        "Advanced device recovery",
+        "Offline-ready return",
+        "What stays on this device",
+        "How install linking works",
+    ):
+        if noisy_label in body:
+            raise AssertionError(f"/account/access restored noisy leading copy: {noisy_label}")
     if current_grant_access_token in body:
         raise AssertionError("/account/access leaked the raw installation access token")
 
@@ -656,31 +715,35 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"/account/settings returned {status}, expected 200")
-    require_snippet(body, "More settings", "/account/settings")
-    require_snippet(body, "Choose what stays visible while deeper identifiers remain tucked away.", "/account/settings")
-    require_snippet(body, "Visibility", "/account/settings")
-    require_snippet(body, "Recovery posture", "/account/settings")
-    require_snippet(body, "Provider-backed help", "/account/settings")
-    require_snippet(body, "Follow upcoming updates", "/account/settings")
-    require_snippet(body, "Invite me when the right beta opens", "/account/settings")
-    require_snippet(body, "When you need support, privacy, or preview-use guidance, use the first-party pages instead of guessing.", "/account/settings")
+    require_snippet(body, "Settings", "/account/settings")
+    require_snippet(body, "Keep updates, sign-in, and privacy tidy.", "/account/settings")
+    require_snippet(body, "Updates", "/account/settings")
+    require_snippet(body, "Choose what Chummer should send or keep quiet about.", "/account/settings")
+    require_snippet(body, "Followed items", "/account/settings")
+    require_snippet(body, "Public profile", "/account/settings")
+    require_snippet(body, "Result updates", "/account/settings")
+    require_snippet(body, "Black Ledger mobile stream", "/account/settings")
+    require_snippet(body, "Sign-in and privacy", "/account/settings")
+    require_snippet(body, "Primary sign-in", "/account/settings")
+    require_snippet(body, "Recovery", "/account/settings")
+    require_snippet(body, "Linked sign-ins", "/account/settings")
+    require_snippet(body, "Linked channels", "/account/settings")
+    require_snippet(body, "Public recognition", "/account/settings")
 
-    status, body, _, _ = fetch(
+    status, _, headers, _ = fetch(
         base_url,
         "/account/advanced",
         public_host=public_host,
         forwarded_proto=forwarded_proto,
+        follow_redirects=False,
         request_headers={"Cookie": cookie_header},
     )
-    if status != 200:
-        raise AssertionError(f"/account/advanced returned {status}, expected 200")
-    require_snippet(body, "Advanced account details", "/account/advanced")
-    require_snippet(body, "Hub account id", "/account/advanced")
-    require_snippet(body, "Primary auth", "/account/advanced")
-    require_snippet(body, "Linked identities", "/account/advanced")
-    require_snippet(body, "Linked channels", "/account/advanced")
-    require_snippet(body, "Recovery posture", "/account/advanced")
-    require_snippet(body, "Follow horizons", "/account/advanced")
+    if status not in {301, 302, 303, 307, 308}:
+        raise AssertionError(f"/account/advanced returned {status}, expected redirect to /account/settings")
+    if "/account/settings" not in headers.get("location", ""):
+        raise AssertionError(
+            f"/account/advanced redirected to {headers.get('location', '')!r}, expected /account/settings"
+        )
 
     status, body, _, _ = fetch(
         base_url,
@@ -11959,7 +12022,7 @@ def main() -> int:
                 "Download Chummer",
                 "Current public installer",
                 "Help",
-                "Watch 90 sec"),
+                "/media/promo/every-wonder-horizon-promo.mp4"),
             forbidden_texts=(
                 "The city is moving.",
                 "Six houses. One moving city.",
@@ -12007,7 +12070,7 @@ def main() -> int:
             "/status",
             "Status",
             required_texts=(
-                "Updated",
+                "Now",
                 "Downloads",
                 "Help"),
             forbidden_texts=("run-20260518-220935", "not gold-ready", "stale proof"),
@@ -12163,8 +12226,10 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Status", "Updated", "Downloads", "Help"):
+    for snippet in ("Status", "Now", "Downloads", "Help"):
         require_snippet(body, snippet, "/status")
+    if not any(snippet in body for snippet in ("Preview downloads", "Stable downloads", "Downloads paused")):
+        raise AssertionError("/status is missing the explicit release-posture heading")
     print(f"ok /status -> {final_url}")
 
     status, body, _, final_url = fetch(

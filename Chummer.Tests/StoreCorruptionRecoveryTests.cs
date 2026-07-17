@@ -2,6 +2,7 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -27,19 +28,22 @@ public sealed class StoreCorruptionRecoveryTests
     }
 
     [Fact]
-    public void InstallLinkingStoreQuarantinesCorruptSnapshotAndStartsEmpty()
+    public void InstallLinkingStoreQuarantinesCorruptSnapshotAndFailsClosed()
     {
         using TempStoreFile temp = new("install-linking-store.json");
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = temp.Path })
             .Build();
 
-        InstallLinkingStore store = new(configuration, NullLogger<InstallLinkingStore>.Instance);
+        InvalidOperationException failure = Assert.Throws<InvalidOperationException>(() =>
+            new InstallLinkingStore(
+                configuration,
+                DataProtectionProvider.Create(Path.Combine(temp.Root, "install-linking-keys")),
+                NullLogger<InstallLinkingStore>.Instance));
 
-        Assert.Empty(store.ReceiptsById);
-        Assert.Empty(store.InstallationsById);
-        Assert.Single(Directory.GetFiles(temp.Root, "install-linking-store.json.corrupt-*"));
-        Assert.False(File.Exists(temp.Path));
+        Assert.Equal("Install-linking durable state validation failed; startup is fail-closed.", failure.Message);
+        Assert.Single(Directory.GetFiles(temp.Root, ".install-linking-store.json.quarantine-*"));
+        Assert.True(File.Exists(temp.Path));
     }
 
     [Fact]

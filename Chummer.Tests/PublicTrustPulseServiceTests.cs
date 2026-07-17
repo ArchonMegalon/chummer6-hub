@@ -27,7 +27,10 @@ public sealed class PublicTrustPulseServiceTests
         Assert.Equal(5, snapshot.ProgressTrendSamples.Count);
         Assert.Equal("2026-03-23", snapshot.ProgressTrendSamples[0].AsOf);
         Assert.Equal(73, snapshot.ProgressTrendSamples[0].OverallProgressPercent);
-        Assert.Equal("Hold launch expansion while route canaries are still being checked.", snapshot.LaunchReadiness);
+        Assert.Equal("review_required", snapshot.LocalReleaseProofStatus);
+        Assert.True(snapshot.ParityClaimsReviewRequired);
+        Assert.Contains("current release status package is unavailable", snapshot.LaunchReadiness, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Import-route parity claims stay review-required", snapshot.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("Pilot defaults are settled", snapshot.ProviderRouteDefault);
         Assert.Equal("Canary green across all active routes", snapshot.ProviderRouteCanary);
         Assert.Equal("2026-06-01", snapshot.ProviderRouteReviewDue);
@@ -94,7 +97,7 @@ public sealed class PublicTrustPulseServiceTests
     }
 
     [Fact]
-    public void LoadSnapshotPrefersSynthesizedPulseSignalsWhenFallbackArtifactsAreMissing()
+    public void LoadSnapshotUsesSynthesizedProgressSignalsButFailsClosedWhenLocalProofIsMissing()
     {
         using var fixture = new PublicTrustPulseFixture();
         fixture.WritePulseWithSynthesizedSignals("chummer.weekly_product_pulse");
@@ -112,9 +115,28 @@ public sealed class PublicTrustPulseServiceTests
         Assert.Equal(3, snapshot.ProgressTrendSamples.Count);
         Assert.Equal("2026-03-24", snapshot.ProgressTrendSamples[0].AsOf);
         Assert.Equal(72, snapshot.ProgressTrendSamples[0].OverallProgressPercent);
-        Assert.Equal("passed", snapshot.LocalReleaseProofStatus);
+        Assert.Equal("review_required", snapshot.LocalReleaseProofStatus);
+        Assert.True(snapshot.ParityClaimsReviewRequired);
+        Assert.Contains("current release status package is unavailable", snapshot.LaunchReadiness, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Import-route parity claims stay review-required", snapshot.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(4, snapshot.ProvenJourneyCount);
         Assert.Equal(6, snapshot.ProvenRouteCount);
+    }
+
+    [Fact]
+    public void LoadSnapshotKeepsPassedStatusWhenCurrentDirectImportProofIsPresent()
+    {
+        using var fixture = new PublicTrustPulseFixture();
+        fixture.WritePulseWithSynthesizedSignals("chummer.weekly_product_pulse");
+        fixture.WriteLocalReleaseProof("passed");
+
+        var snapshot = fixture.CreateService().LoadSnapshot();
+
+        Assert.NotNull(snapshot);
+        Assert.Equal("passed", snapshot!.LocalReleaseProofStatus);
+        Assert.False(snapshot.ParityClaimsReviewRequired);
+        Assert.Equal("Route canaries are green; widen launch only while support fallout remains stable.", snapshot.LaunchReadiness);
+        Assert.DoesNotContain("Import-route parity claims stay review-required", snapshot.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -132,6 +154,7 @@ public sealed class PublicTrustPulseServiceTests
         Assert.Equal("review_required", snapshot.LocalReleaseProofStatus);
         Assert.Contains("desktop_client", snapshot.FlagshipReadinessReason, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("public routes and support surfaces", snapshot.LaunchReadiness, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("public routes, support surfaces, and publication lanes", snapshot.LaunchReadiness, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("review-required", snapshot.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -495,10 +518,19 @@ projects:
                 JsonSerializer.Serialize(new Dictionary<string, object?>
                 {
                     ["contract_name"] = "chummer6-hub.local_release_proof",
-                    ["generated_at"] = "2026-03-29T09:04:00Z",
+                    ["generated_at"] = DateTimeOffset.UtcNow.ToString("O"),
                     ["status"] = status,
                     ["journeys_passed"] = new[] { "install_claim_restore_continue", "build_explain_publish" },
-                    ["proof_routes"] = new[] { "/", "/downloads", "/help" }
+                    ["proof_routes"] = new[] { "/", "/downloads", "/help" },
+                    ["proof_receipts"] = ImportRouteParityProofGuardService.RequiredDirectProofReceiptIds
+                        .Select(receiptId => new Dictionary<string, object?>
+                        {
+                            ["receipt_id"] = receiptId,
+                            ["package_id"] = "test.direct-import-proof",
+                            ["summary"] = "Current direct import-route proof.",
+                            ["routes"] = Array.Empty<string>()
+                        })
+                        .ToArray()
                 }));
         }
 

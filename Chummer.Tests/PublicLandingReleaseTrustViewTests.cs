@@ -17,6 +17,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Current installers remain available, but wider readiness is under review.", view, StringComparison.Ordinal);
         Assert.Contains("Use Help if setup blocks your table.", view, StringComparison.Ordinal);
         Assert.Contains("attach this installed copy to your account", view, StringComparison.Ordinal);
+        Assert.Contains("data-downloads-release-version", view, StringComparison.Ordinal);
+        Assert.Contains("downloads-version", view, StringComparison.Ordinal);
+        Assert.Contains("ManifestVersionText(Model.Manifest)", view, StringComparison.Ordinal);
+        Assert.Contains("var version = !string.IsNullOrWhiteSpace(manifest.Version)", view, StringComparison.Ordinal);
+        Assert.Contains("? manifest.Version", view, StringComparison.Ordinal);
+        Assert.Contains(": manifest.DisplayVersion", view, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", view, StringComparison.Ordinal);
         Assert.Contains("<span>Nightly</span>", view, StringComparison.Ordinal);
         Assert.Contains("<summary>Other downloads</summary>", view, StringComparison.Ordinal);
@@ -35,30 +41,52 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void DownloadsVersionLabelUsesReleasePostureInsteadOfHardcodedPreviewSuffix()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("string previewSuffix = IsPublicStableRelease(manifest) ? string.Empty : \" (Preview)\";", view, StringComparison.Ordinal);
+        Assert.Contains("return $\"Version {stamp.Substring(0, 4)}.{stamp.Substring(4, 2)}.{stamp.Substring(6, 2)}{previewSuffix}\";", view, StringComparison.Ordinal);
+        Assert.Contains("return IsPublicStableRelease(manifest) ? \"Version\" : \"Version Preview\";", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("return $\"Version {stamp.Substring(0, 4)}.{stamp.Substring(4, 2)}.{stamp.Substring(6, 2)} (Preview)\";", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LandingViewKeepsBuilderFirstHeroAndKeepsBlackLedgerOffTheFrontDoor()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml");
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("minimal-hero", view, StringComparison.Ordinal);
-        Assert.Contains("minimal-hero__visual--screenshot", view, StringComparison.Ordinal);
-        Assert.Contains("/media/product/chummer-desktop-runner.png", view, StringComparison.Ordinal);
-        Assert.Contains("/media/promo/every-wonder-horizon-promo.mp4", view, StringComparison.Ordinal);
+        Assert.Contains("minimal-hero__visual--preview", view, StringComparison.Ordinal);
+        Assert.Contains("Desktop build. Mobile play packet.", view, StringComparison.Ordinal);
+        Assert.Contains("Track health, ammo, inventory, and modifiers.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep quick rolls and odds within reach.", view, StringComparison.Ordinal);
         Assert.Contains("A Shadowrun character manager for clean sheets and faster tables.", view, StringComparison.Ordinal);
         Assert.Contains("@publicPlatformSummary", view, StringComparison.Ordinal);
         Assert.Contains("var entryHref = Model.Chrome.Authenticated ? \"/account\" : \"/login?next=%2Faccount%2Faccess\";", view, StringComparison.Ordinal);
-        Assert.Contains("var entryLabel = Model.Chrome.Authenticated ? \"Account\" : \"Sign in\";", view, StringComparison.Ordinal);
+        Assert.Contains("var entryLabel = Model.Chrome.Authenticated ? \"Account\" : \"Sign in first\";", view, StringComparison.Ordinal);
+        Assert.Contains("minimal-open-chummer", view, StringComparison.Ordinal);
+        Assert.Contains("Model.Chrome.Authenticated", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"/build\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"/mobile/player\"", view, StringComparison.Ordinal);
+        Assert.Contains("data-disabled-target=\"/mobile/player\"", view, StringComparison.Ordinal);
+        Assert.Contains("data-sign-in-href=\"/login?next=%2Fmobile%2Fplayer\"", view, StringComparison.Ordinal);
+        Assert.Contains("site-open-chummer-menu__button--disabled", view, StringComparison.Ordinal);
+        Assert.Contains("type=\"button\" disabled aria-disabled=\"true\"", view, StringComparison.Ordinal);
+        Assert.Contains("Sign in first", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Windows and Linux.", view, StringComparison.Ordinal);
         Assert.Contains("href=\"/participate\"", view, StringComparison.Ordinal);
         Assert.Contains("minimal-inline-links", view, StringComparison.Ordinal);
-        Assert.Contains("minimal-runner-rail", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("minimal-runner-rail", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"runner-roster\"", view, StringComparison.Ordinal);
-        Assert.Contains("Kestrel", view, StringComparison.Ordinal);
-        Assert.Contains("Brick", view, StringComparison.Ordinal);
-        Assert.Contains("Whisper", view, StringComparison.Ordinal);
-        Assert.Contains("/account/open/example/decker", view, StringComparison.Ordinal);
-        Assert.Contains("/account/open/example/street-samurai", view, StringComparison.Ordinal);
-        Assert.Contains("/account/open/example/face", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Kestrel", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Brick", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Whisper", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("/account/open/example/decker", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("/account/open/example/street-samurai", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("/account/open/example/face", view, StringComparison.Ordinal);
         Assert.DoesNotContain("href=\"/login?next=%2Fhome%2Faccess\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"workflow\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"downloads\"", view, StringComparison.Ordinal);
@@ -77,9 +105,68 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("artifact", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("generated by AI", view, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("proof", view, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Watch 90 sec", view, StringComparison.Ordinal);
+        Assert.Contains("/media/promo/every-wonder-horizon-promo.mp4", view, StringComparison.Ordinal);
+        Assert.Contains("Product reel", view, StringComparison.Ordinal);
         Assert.DoesNotContain("data-black-ledger-geoscape-root", view, StringComparison.Ordinal);
         Assert.DoesNotContain("guestReadableHeroPrimaryHref", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Model.FlagshipCoverage", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LandingViewRequiresPublishedGoldReleaseBeforeStableHomepageLaneCopy()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("static bool IsPublishedStableRelease(PublicReleaseManifestDto manifest)", view, StringComparison.Ordinal);
+        Assert.Contains("string.Equals((manifest.SupportabilityState ?? string.Empty).Trim(), \"gold_supported\", StringComparison.OrdinalIgnoreCase)", view, StringComparison.Ordinal);
+        Assert.Contains("string.Equals((manifest.Status ?? string.Empty).Trim(), \"published\", StringComparison.OrdinalIgnoreCase)", view, StringComparison.Ordinal);
+        Assert.Contains("var isStableRelease = IsPublishedStableRelease(Model.Manifest);", view, StringComparison.Ordinal);
+        Assert.Contains("Current public lane: Stable.", view, StringComparison.Ordinal);
+        Assert.Contains("Current public lane: Preview. Review required.", view, StringComparison.Ordinal);
+        Assert.Contains("Current public lane: Downloads paused.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MobileRoleRoutesBackTheOpenChummerPlayLinks()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string frameGate = File.ReadAllText(RepoPaths.FromRoot("tests", "public", "ui-frame-integrity.spec.ts"));
+        string viewportSmoke = File.ReadAllText(RepoPaths.FromRoot("tests", "public", "mobile-pwa-viewport-smoke.spec.ts"));
+
+        Assert.Contains("[HttpGet(\"/mobile/{role}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("public async Task<IActionResult> MobileRoleProjectionPage", controller, StringComparison.Ordinal);
+        Assert.Contains("currentPath: $\"/mobile/{Uri.EscapeDataString(currentRoleKey)}\"", controller, StringComparison.Ordinal);
+        Assert.Contains("return Redirect($\"/mobile/{Uri.EscapeDataString(currentRoleKey)}\");", controller, StringComparison.Ordinal);
+        foreach (string route in new[] { "/mobile/player", "/mobile/gm", "/mobile/observer" })
+        {
+            Assert.Contains(route, frameGate, StringComparison.Ordinal);
+            Assert.Contains(route, viewportSmoke, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void LegacyRoleAliasesStayBoundToMobileProjectionRoutes()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string program = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs"));
+
+        Assert.Contains("public IActionResult PlayerProjectionAlias()", controller, StringComparison.Ordinal);
+        Assert.Contains("=> Redirect(\"/mobile/player\");", controller, StringComparison.Ordinal);
+        Assert.Contains("public IActionResult GmProjectionAlias()", controller, StringComparison.Ordinal);
+        Assert.Contains("=> Redirect(\"/mobile/gm\");", controller, StringComparison.Ordinal);
+        Assert.Contains("public IActionResult ObserverProjectionAlias()", controller, StringComparison.Ordinal);
+        Assert.Contains("=> Redirect(\"/mobile/observer\");", controller, StringComparison.Ordinal);
+
+        Assert.Contains("TryResolveRoleAliasRedirectPath(context.Request.Path, out string? redirectPath)", program, StringComparison.Ordinal);
+        Assert.Contains("redirectPath = \"/mobile/player\";", program, StringComparison.Ordinal);
+        Assert.Contains("redirectPath = \"/mobile/gm\";", program, StringComparison.Ordinal);
+        Assert.Contains("redirectPath = \"/mobile/observer\";", program, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("=> Redirect(\"/play?role=player\");", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("=> Redirect(\"/play?role=gm\");", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("=> Redirect(\"/play?role=observer\");", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -247,16 +334,16 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StatusRouteRedirectsToDownloadsInsteadOfRenderingASeparatePage()
+    public void StatusRouteRendersMinimalStatusPageInsteadOfRedirectingToDownloads()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("public IActionResult StatusPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
+        Assert.Contains("public async Task<IActionResult> StatusPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("ApplyNoStoreHeaders(Response.Headers);", controller, StringComparison.Ordinal);
-        Assert.Contains("return Redirect(\"/downloads\");", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("return View(\"~/Views/PublicLanding/Status.cshtml\"", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("BuildPublicOrAuthenticatedChromeAsync(\"Updated\"", controller, StringComparison.Ordinal);
+        Assert.Contains("return View(\"~/Views/PublicLanding/Status.cshtml\", model);", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildPublicOrAuthenticatedChromeAsync(\"Status\"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("return Redirect(\"/downloads\");", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -294,7 +381,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/status\")", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/downloads\")", controller, StringComparison.Ordinal);
         Assert.Contains("ApplyNoStoreHeaders(Response.Headers);", controller, StringComparison.Ordinal);
-        Assert.Contains("return Redirect(\"/downloads\");", controller, StringComparison.Ordinal);
+        Assert.Contains("return View(\"~/Views/PublicLanding/Status.cshtml\", model);", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("return Redirect(\"/downloads\");", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -365,14 +453,15 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StatusRedirectKeepsLaunchHealthRowsOffThePublicRoute()
+    public void StatusRouteKeepsDirectPublicStatusViewInsteadOfRedirectingToDownloads()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
 
         Assert.Contains("BuildPublicStatusReleaseSummary", controller, StringComparison.Ordinal);
         Assert.Contains("BuildPublicStatusCautionSummary", controller, StringComparison.Ordinal);
-        Assert.Contains("return Redirect(\"/downloads\");", controller, StringComparison.Ordinal);
+        Assert.Contains("return View(\"~/Views/PublicLanding/Status.cshtml\", model);", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("return Redirect(\"/downloads\");", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("LaunchHealthRows", controller, StringComparison.Ordinal);
     }
 
@@ -393,7 +482,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Download script", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Open Participate", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Soma-Career.chum5", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Newer than Stable.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Preview build. Review required.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("workflow-card__note", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("workflow-card__proof", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", downloadsView, StringComparison.Ordinal);
@@ -407,6 +496,21 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("start from Home after the first launch", nowView, StringComparison.Ordinal);
         Assert.Contains("current downloads page", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("included sample runner", nowView, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NowViewUsesHandoffHeadingOnlyForPublishedGoldRelease()
+    {
+        string nowViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml");
+        string nowView = File.ReadAllText(nowViewPath);
+
+        Assert.Contains("static bool IsPublishedStableRelease(PublicReleaseManifestDto releaseManifest)", nowView, StringComparison.Ordinal);
+        Assert.Contains("string.Equals((releaseManifest.SupportabilityState ?? string.Empty).Trim(), \"gold_supported\", StringComparison.OrdinalIgnoreCase)", nowView, StringComparison.Ordinal);
+        Assert.Contains("string.Equals((releaseManifest.Status ?? string.Empty).Trim(), \"published\", StringComparison.OrdinalIgnoreCase)", nowView, StringComparison.Ordinal);
+        Assert.Contains("var isStableRelease = IsPublishedStableRelease(manifest);", nowView, StringComparison.Ordinal);
+        Assert.Contains("var currentReleaseHeading = isStableRelease", nowView, StringComparison.Ordinal);
+        Assert.Contains("? \"Current handoff\"", nowView, StringComparison.Ordinal);
+        Assert.Contains(": \"Current release\";", nowView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -462,7 +566,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.DoesNotContain("Current public release:", controller, StringComparison.Ordinal);
         Assert.Contains("releaseExperience.Display.ChannelLabel", controller, StringComparison.Ordinal);
-        Assert.Contains("Open help before wider rollouts.", controller, StringComparison.Ordinal);
+        Assert.Contains("Preview builds can change before Stable returns.", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -471,11 +575,19 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Maintenance", view, StringComparison.Ordinal);
+        Assert.Contains("Horizons", view, StringComparison.Ordinal);
         Assert.Contains("Not the front door", view, StringComparison.Ordinal);
         Assert.Contains("Use the app first", view, StringComparison.Ordinal);
         Assert.Contains("The current job is simple: install Chummer, build a character, and report friction when the workflow gets in your way.", view, StringComparison.Ordinal);
+        Assert.Contains("Working lanes", view, StringComparison.Ordinal);
+        Assert.Contains("Stabilize now", view, StringComparison.Ordinal);
+        Assert.Contains("Install parity, build flow, and support friction stay first until Chummer feels boring in the good way.", view, StringComparison.Ordinal);
+        Assert.Contains("Play at the table next", view, StringComparison.Ordinal);
+        Assert.Contains("Inventory, health, ammo, modifiers, quick rolls, and reconnect belong in the mobile shell without replacing the builder.", view, StringComparison.Ordinal);
+        Assert.Contains("Living-world later", view, StringComparison.Ordinal);
+        Assert.Contains("Opt-in world follow, heat, aftermath, and shared continuity expand only after the core build and play loop stays quiet.", view, StringComparison.Ordinal);
         Assert.Contains("Open Downloads", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Black Ledger", view, StringComparison.Ordinal);
         Assert.DoesNotContain("trust-page-hero", view, StringComparison.Ordinal);
     }
 
@@ -766,9 +878,18 @@ public sealed class PublicLandingReleaseTrustViewTests
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string navigationPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_NAVIGATION.yaml");
+        string manifestPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "manifest.json");
+        string siteManifestPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "site.webmanifest");
+        string webManifestPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "manifest.webmanifest");
+        string serviceWorkerPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "service-worker.js");
 
         string controller = File.ReadAllText(controllerPath);
         string navigation = File.ReadAllText(navigationPath);
+        string manifest = File.ReadAllText(manifestPath);
+        string siteManifest = File.ReadAllText(siteManifestPath);
+        string webManifest = File.ReadAllText(webManifestPath);
+        string serviceWorker = File.ReadAllText(serviceWorkerPath);
+        const string expectedPwaDescription = "Installable bounded turn companion for live Chummer play sessions on player and GM devices.";
 
         Assert.Contains("public IActionResult BuildPage()", controller, StringComparison.Ordinal);
         Assert.Contains("public async Task<IActionResult> MobileProjectionPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
@@ -788,6 +909,15 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("href: /build", navigation, StringComparison.Ordinal);
         Assert.DoesNotContain("label: PWA", navigation, StringComparison.Ordinal);
         Assert.DoesNotContain("href: /mobile", navigation, StringComparison.Ordinal);
+        Assert.Contains(expectedPwaDescription, manifest, StringComparison.Ordinal);
+        Assert.Contains(expectedPwaDescription, siteManifest, StringComparison.Ordinal);
+        Assert.Contains(expectedPwaDescription, webManifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("desktop character work", manifest, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("desktop character work", siteManifest, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("desktop character work", webManifest, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"/manifest.json\"", serviceWorker, StringComparison.Ordinal);
+        Assert.Contains("\"/manifest.webmanifest\"", serviceWorker, StringComparison.Ordinal);
+        Assert.Contains("\"/site.webmanifest\"", serviceWorker, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -928,7 +1058,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("RUNBOOK PRESS keeps printable primers first-party", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/origin-dossier\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/origin-dossier/receipts/story-network.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("Origin Dossier keeps the approved story packet first", controller, StringComparison.Ordinal);
+        Assert.Contains("Origin Dossier is being hardened toward a full private story ebook with fitted cover first", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1015,7 +1145,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/account/passport\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/passport/open\")]", accountsController, StringComparison.Ordinal);
         Assert.Contains("/account/ledger/notifications", controller, StringComparison.Ordinal);
-        Assert.Contains("/account/roster#aftermath-packages", controller, StringComparison.Ordinal);
+        Assert.Contains("/account/work#aftermath-packages", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1136,6 +1266,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("<h1 id=\"auth-title\">@Model.Heading</h1>", view, StringComparison.Ordinal);
         Assert.Contains("<p class=\"auth-panel__hint\">@Model.SupportLine</p>", view, StringComparison.Ordinal);
         Assert.Contains("<p class=\"auth-panel__meta\">@Model.ReturnLine</p>", view, StringComparison.Ordinal);
+        Assert.Contains("@if (Model.EmailEntryEnabled)", view, StringComparison.Ordinal);
+        Assert.Contains("EmailEntryEnabled: emailEntryEnabled", controller, StringComparison.Ordinal);
         Assert.Contains("<label for=\"email\" class=\"field-label\">Email</label>", view, StringComparison.Ordinal);
         Assert.Contains("placeholder=\"runner@example.com\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("auth-value-strip", view, StringComparison.Ordinal);
@@ -1201,6 +1333,21 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void AuthControllerShowsUnavailableMessageWhenEmailDeliveryCannotStart()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AuthController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.Contains("Email unavailable", controller, StringComparison.Ordinal);
+        Assert.Contains("Requested return: {nextTarget}", controller, StringComparison.Ordinal);
+        Assert.Contains("Chummer is not sending sign-in emails on this host right now.", controller, StringComparison.Ordinal);
+        Assert.Contains("Chummer could not send the sign-in email on this host right now.", controller, StringComparison.Ordinal);
+        Assert.Contains("Google remains available as the non-email sign-in path on this host.", controller, StringComparison.Ordinal);
+        Assert.Contains("Email sign-in is unavailable on this host right now. Continue with Google instead.", controller, StringComparison.Ordinal);
+        Assert.Contains("Chummer is not offering email or Google sign-in on this host right now. Try again later.", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LayoutLoadsClickRankOnlyWhenExplicitlyConfiguredWithoutCacheBusting()
     {
         string layoutPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml");
@@ -1212,6 +1359,16 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("new Date().getTime()", layout, StringComparison.Ordinal);
         Assert.Contains("CLICKRANK_AI_CHUMMER_RUN_SITE_ID", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("data-clickrank-ai='seo'", layout, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LayoutPublishesStandardAndApplePwaInstallCapabilityMeta()
+    {
+        string layoutPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml");
+        string layout = File.ReadAllText(layoutPath);
+
+        Assert.Contains("<meta name=\"mobile-web-app-capable\" content=\"yes\" />", layout, StringComparison.Ordinal);
+        Assert.Contains("<meta name=\"apple-mobile-web-app-capable\" content=\"yes\" />", layout, StringComparison.Ordinal);
     }
 
     [Fact]

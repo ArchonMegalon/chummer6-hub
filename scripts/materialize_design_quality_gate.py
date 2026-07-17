@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -23,6 +24,35 @@ PREMIUM_UI_DESIGN_EXIT_GATE_PATH = PUBLISHED_ROOT / "PREMIUM_UI_DESIGN_EXIT_GATE
 REQUIRED_VIEWPORTS = {"390x844", "412x915", "768x1024", "1366x768", "1440x900", "1920x1080"}
 SUPPORTING_SURFACE_VIEWPORTS = {"390x844", "1366x768"}
 REQUIRED_SUPPORTING_SURFACES = {"downloads", "status", "ledger-map"}
+REQUIRED_FRAME_FULL_VIEWPORT_NAMES = {"phone-390", "phone-412", "tablet", "desktop-1366", "desktop-1440", "wide"}
+REQUIRED_FRAME_COMPACT_VIEWPORT_NAMES = {"phone-390", "tablet", "desktop-1366"}
+REQUIRED_FRAME_FULL_ROUTES = {
+    "/",
+    "/downloads",
+    "/ledger",
+    "/ledger/map",
+    "/login?next=%2Faccount%2Faccess",
+}
+REQUIRED_FRAME_COMPACT_ROUTES = {
+    "/status",
+    "/faq",
+    "/packages",
+    "/mobile",
+    "/mobile/player",
+    "/mobile/gm",
+    "/mobile/observer",
+    "/play",
+    "/play/continuity",
+    "/feedback",
+    "/docs/embed/origin-dossier-the-name-she-chose",
+}
+REQUIRED_FRAME_INSTALL_LINK_ROUTE_PREFIX = "/account/access/install-link?"
+RELEASE_CHANNEL_BLOCKING_ROLLOUT_STATES = {
+    "coverage_incomplete",
+    "release_review_required",
+    "desktop_polish_needed",
+    "revoked",
+}
 MINIMAL_EXPERIENCE_GATE_PATH = COMPLETION_ROOT / "MINIMAL_EXPERIENCE_GATE.generated.json"
 DESIGN_REVIEW_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/FINAL_PRODUCT_DESIGN_REVIEW.md")
 DESIGN_REVIEW_REQUIRED_SECTIONS = [
@@ -98,6 +128,46 @@ def status_pass(payload: dict[str, Any]) -> bool:
     return str(payload.get("status") or "").strip().lower() in {"pass", "passed", "ready"}
 
 
+def live_surface_parity_semantic_failures(payload: dict[str, Any]) -> list[str]:
+    failures: list[str] = []
+    release_posture = payload.get("release_posture") if isinstance(payload.get("release_posture"), dict) else {}
+    if not release_posture:
+        return ["live surface parity release_posture is missing"]
+
+    expected_failures = release_posture.get("expected_failures")
+    if not isinstance(expected_failures, list):
+        failures.append("live surface parity release_posture expected_failures is missing")
+    elif expected_failures:
+        failures.extend(str(item) for item in expected_failures if str(item).strip())
+
+    required_true_fields = {
+        "status_matches_expected": "live surface parity release status does not match expected release channel",
+        "version_matches_expected": "live surface parity release version does not match expected release channel",
+        "channel_matches_expected": "live surface parity release channel does not match expected release channel",
+        "supportability_matches_expected": "live surface parity release supportability does not match expected release channel",
+        "rollout_matches_expected": "live surface parity release rollout does not match expected release channel",
+    }
+    for field, message in required_true_fields.items():
+        if release_posture.get(field) is not True:
+            failures.append(message)
+
+    for field in (
+        "expected_status",
+        "expected_version",
+        "expected_channel",
+        "expected_supportability_state",
+        "expected_rollout_state",
+    ):
+        if not str(release_posture.get(field) or "").strip():
+            failures.append(f"live surface parity release_posture {field} is missing")
+
+    expected_status = str(release_posture.get("expected_status") or "").strip().lower()
+    if expected_status and expected_status != "published":
+        failures.append("live surface parity expected release status is not published")
+
+    return failures
+
+
 def normalize_base_url(value: object) -> str:
     return str(value or "").strip().rstrip("/")
 
@@ -115,6 +185,66 @@ def visual_proof_base_url_passes(base_url: str, *, live_public_ready: bool) -> b
     if is_public_base_url(base_url):
         return True
     return live_public_ready and is_loopback_base_url(base_url)
+
+
+def int_value(value: object, default: int = 0) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+
+
+def successful_frame_pages(payload: dict[str, Any]) -> dict[str, set[str]]:
+    pages = payload.get("pages") if isinstance(payload.get("pages"), list) else []
+    route_viewports: dict[str, set[str]] = {}
+    for page in pages:
+        if not isinstance(page, dict):
+            continue
+        route = str(page.get("route") or "").strip()
+        viewport = str(page.get("viewport") or "").strip()
+        if not route or not viewport:
+            continue
+        status = page.get("status")
+        status_code = int_value(status, -1)
+        if status_code >= 500 or status_code < 100:
+            continue
+        if int_value(page.get("failure_count"), -1) != 0:
+            continue
+        route_viewports.setdefault(route, set()).add(viewport)
+    return route_viewports
+
+
+def frame_required_checked_page_count() -> int:
+    return (
+        (len(REQUIRED_FRAME_FULL_ROUTES) * len(REQUIRED_FRAME_FULL_VIEWPORT_NAMES))
+        + (len(REQUIRED_FRAME_COMPACT_ROUTES) * len(REQUIRED_FRAME_COMPACT_VIEWPORT_NAMES))
+        + len(REQUIRED_FRAME_COMPACT_VIEWPORT_NAMES)
+    )
+
+
+def missing_frame_route_viewports(payload: dict[str, Any]) -> dict[str, list[str]]:
+    route_viewports = successful_frame_pages(payload)
+    missing: dict[str, list[str]] = {}
+
+    for route in sorted(REQUIRED_FRAME_FULL_ROUTES):
+        missing_viewports = sorted(REQUIRED_FRAME_FULL_VIEWPORT_NAMES - route_viewports.get(route, set()))
+        if missing_viewports:
+            missing[route] = missing_viewports
+
+    for route in sorted(REQUIRED_FRAME_COMPACT_ROUTES):
+        missing_viewports = sorted(REQUIRED_FRAME_COMPACT_VIEWPORT_NAMES - route_viewports.get(route, set()))
+        if missing_viewports:
+            missing[route] = missing_viewports
+
+    install_link_viewports: set[str] = set()
+    for route, viewports in route_viewports.items():
+        if route.startswith(REQUIRED_FRAME_INSTALL_LINK_ROUTE_PREFIX):
+            install_link_viewports.update(viewports)
+    missing_install_link_viewports = sorted(REQUIRED_FRAME_COMPACT_VIEWPORT_NAMES - install_link_viewports)
+    if missing_install_link_viewports:
+        missing[f"{REQUIRED_FRAME_INSTALL_LINK_ROUTE_PREFIX}*"] = missing_install_link_viewports
+
+    return missing
 
 
 def build_payload() -> dict[str, Any]:
@@ -150,13 +280,20 @@ def build_payload() -> dict[str, Any]:
     }
 
     live_surface_parity = load_json(LIVE_SURFACE_PARITY_PATH)
-    live_surface_parity_pass = status_pass(live_surface_parity) and not live_surface_parity.get("failures")
+    live_surface_parity_semantic_gaps = live_surface_parity_semantic_failures(live_surface_parity)
+    live_surface_parity_pass = (
+        status_pass(live_surface_parity)
+        and not live_surface_parity.get("failures")
+        and not live_surface_parity_semantic_gaps
+    )
     if not live_surface_parity_pass:
         failures.append("live surface parity is missing or failing")
     checks["live_surface_parity"] = {
         "path": str(LIVE_SURFACE_PARITY_PATH),
         "status": live_surface_parity.get("status", "missing"),
         "failure_count": len(live_surface_parity.get("failures") or []),
+        "semantic_failures": live_surface_parity_semantic_gaps,
+        "release_posture": live_surface_parity.get("release_posture"),
         "pass": live_surface_parity_pass,
     }
 
@@ -209,12 +346,15 @@ def build_payload() -> dict[str, Any]:
     ui_frame = load_json(ui_frame_path)
     frame_summary = ui_frame.get("summary") if isinstance(ui_frame.get("summary"), dict) else {}
     frame_failure_count = frame_summary.get("failure_count")
+    missing_frame_routes = missing_frame_route_viewports(ui_frame)
+    frame_required_checked_pages = frame_required_checked_page_count()
     live_public_ready = live_recrawl_pass and public_route_pass and live_surface_parity_pass
     frame_base_url = normalize_base_url(ui_frame.get("base_url"))
     frame_pass = (
         status_pass(ui_frame)
-        and int(frame_summary.get("checked_pages") or 0) >= 60
+        and int(frame_summary.get("checked_pages") or 0) >= frame_required_checked_pages
         and int(frame_failure_count if frame_failure_count is not None else -1) == 0
+        and not missing_frame_routes
         and visual_proof_base_url_passes(frame_base_url, live_public_ready=live_public_ready)
     )
     if not frame_pass:
@@ -224,7 +364,9 @@ def build_payload() -> dict[str, Any]:
         "status": ui_frame.get("status", "missing"),
         "base_url": ui_frame.get("base_url"),
         "checked_pages": frame_summary.get("checked_pages"),
+        "required_checked_pages": frame_required_checked_pages,
         "failure_count": frame_summary.get("failure_count"),
+        "missing_route_viewports": missing_frame_routes,
         "pass": frame_pass,
     }
 
@@ -394,10 +536,26 @@ def build_payload() -> dict[str, Any]:
     }
 
 
-def main() -> int:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Materialize the Chummer public design quality gate receipt.")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=OUTPUT,
+        help="Path to write the generated design-quality receipt.",
+    )
+    return parser.parse_args(argv)
+
+
+def write_payload(payload: dict[str, Any], output: Path) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     payload = build_payload()
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_payload(payload, args.output)
     print(f"design_quality_gate:{payload['status']}")
     return 0 if payload["status"] == "pass" else 1
 

@@ -4,8 +4,11 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import stat
 import sys
+import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -14,16 +17,116 @@ M102_ACTIVE_FLAGSHIP_FRONTIER_ID = 2594403904
 M102_FRONTIER_IDS = [M102_SUCCESSOR_FRONTIER_ID, M102_ACTIVE_FLAGSHIP_FRONTIER_ID]
 DEFAULT_FLAGSHIP_READINESS_PATH = REPO_ROOT / ".codex-studio" / "published" / "FLAGSHIP_PRODUCT_READINESS.generated.json"
 DEFAULT_HUB_LOCAL_RELEASE_PROOF_PATH = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+DEFAULT_SERVED_HUB_LOCAL_RELEASE_PROOF_PATH = REPO_ROOT / "Chummer.Run.Api" / "wwwroot" / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+DEFAULT_RELEASE_CHANNEL_PATH = REPO_ROOT / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json"
 FALLBACK_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
 CANONICAL_COMPOSE_FILE = "docker-compose.yml"
 CANONICAL_PLAYWRIGHT_TIMEOUT_SECONDS = 120
 M141_UI_PACKAGE_ID = "next90-m141-ui-capture-direct-screenshot-and-runtime-proof-for-translator-xml-amendment"
 M141_UI_FRONTIER_ID = 2354698282
 M141_UI_FLAGSHIP_FRONTIER_ID = 1922169755
+PUBLIC_JSON_ARTIFACT_MODE = 0o644
+STABLE_READ_CHUNK_BYTES = 1024 * 1024
 
 
 def iso_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _stable_regular_file_matches(path: Path, expected_bytes: bytes) -> bool:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError:
+        return False
+
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_nlink != 1
+            or stat.S_IMODE(before.st_mode) != PUBLIC_JSON_ARTIFACT_MODE
+            or before.st_size != len(expected_bytes)
+        ):
+            return False
+
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, STABLE_READ_CHUNK_BYTES)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+
+    stable_identity_before = (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+        before.st_mode,
+        before.st_nlink,
+    )
+    stable_identity_after = (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+        after.st_mode,
+        after.st_nlink,
+    )
+    return stable_identity_before == stable_identity_after and b"".join(chunks) == expected_bytes
+
+
+def _write_public_json_artifact(path: Path, text: str) -> bool:
+    """Atomically materialize one public JSON artifact as an exact regular 0644 file."""
+
+    payload = text.encode("utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if _stable_regular_file_matches(path, payload):
+        return False
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+    )
+    temporary_path = Path(temporary_name)
+    stream = None
+    try:
+        stream = os.fdopen(descriptor, "wb")
+        descriptor = -1
+        stream.write(payload)
+        stream.flush()
+        os.fsync(stream.fileno())
+        os.fchmod(stream.fileno(), PUBLIC_JSON_ARTIFACT_MODE)
+        os.fsync(stream.fileno())
+        stream.close()
+        stream = None
+
+        os.replace(temporary_path, path)
+        parent_flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_DIRECTORY", 0)
+        parent_descriptor = os.open(path.parent, parent_flags)
+        try:
+            os.fsync(parent_descriptor)
+        finally:
+            os.close(parent_descriptor)
+
+        if not _stable_regular_file_matches(path, payload):
+            raise RuntimeError(f"public JSON artifact did not settle as regular 0644: {path}")
+        return True
+    finally:
+        if stream is not None:
+            stream.close()
+        elif descriptor >= 0:
+            os.close(descriptor)
+        try:
+            temporary_path.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def _stable_payload(payload: dict) -> dict:
@@ -43,6 +146,22 @@ def _sorted_unique_strings(values: list[str]) -> list[str]:
         seen.add(candidate)
         ordered.append(candidate)
     return ordered
+
+
+def _append_reason_details(base_reason: str, details: list[str]) -> str:
+    normalized_base = str(base_reason or "").strip()
+    normalized_details = [
+        str(detail).strip().rstrip(".")
+        for detail in details
+        if str(detail).strip()
+    ]
+    if not normalized_base:
+        return " ".join(f"{detail}." for detail in normalized_details).strip()
+    if normalized_base[-1:] not in {".", "!", "?"}:
+        normalized_base += "."
+    if not normalized_details:
+        return normalized_base
+    return normalized_base + " " + " ".join(f"{detail}." for detail in normalized_details)
 
 
 def _load_existing_payload(path: Path) -> dict | None:
@@ -65,9 +184,27 @@ def _load_flagship_readiness_payload(path: Path) -> dict | None:
     return loaded if isinstance(loaded, dict) else None
 
 
+def _payload_generated_at(payload: dict | None) -> dt.datetime | None:
+    if not isinstance(payload, dict):
+        return None
+    raw_generated_at = str(payload.get("generatedAt") or payload.get("generated_at") or "").strip() or None
+    return _parse_iso_timestamp(raw_generated_at)
+
+
 def _configured_path(name: str, default: Path) -> Path:
     raw = str(os.environ.get(name) or "").strip()
     return Path(raw) if raw else default
+
+
+def _canonical_flagship_readiness_source_path() -> Path:
+    raw = str(os.environ.get("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH") or "").strip()
+    if raw:
+        return Path(raw)
+    if FALLBACK_FLAGSHIP_READINESS_PATH.is_file():
+        return FALLBACK_FLAGSHIP_READINESS_PATH
+    if DEFAULT_FLAGSHIP_READINESS_PATH.is_file():
+        return DEFAULT_FLAGSHIP_READINESS_PATH
+    return FALLBACK_FLAGSHIP_READINESS_PATH
 
 
 def _flagship_readiness_path() -> Path:
@@ -88,6 +225,14 @@ def _flagship_readiness_path() -> Path:
     return FALLBACK_FLAGSHIP_READINESS_PATH
 
 
+def _release_channel_path() -> Path:
+    for env_name in ("CHUMMER_HUB_RELEASE_CHANNEL_PATH", "CHUMMER_RELEASE_CHANNEL_PATH"):
+        raw = str(os.environ.get(env_name) or "").strip()
+        if raw:
+            return Path(raw)
+    return DEFAULT_RELEASE_CHANNEL_PATH
+
+
 def _parse_int_env(*names: str, default: int) -> int:
     for name in names:
         raw = str(os.environ.get(name) or "").strip()
@@ -100,6 +245,16 @@ def _parse_int_env(*names: str, default: int) -> int:
         if value >= 0:
             return value
     return default
+
+
+def _public_safe_base_url(base_url: str) -> str:
+    candidate = base_url.strip()
+    parsed = urlparse(candidate)
+    hostname = (parsed.hostname or "").casefold()
+    if hostname in {"127.0.0.1", "localhost", "::1"}:
+        public_base_url = str(os.environ.get("CHUMMER_PUBLIC_BASE_URL") or "").strip()
+        return public_base_url or "https://chummer.run"
+    return candidate
 
 
 def _parse_iso_timestamp(raw_value: str | None) -> dt.datetime | None:
@@ -139,6 +294,103 @@ def _release_readiness_reason(value: str) -> str:
         ),
     }
     return replacements.get(text, text)
+
+
+def _load_release_channel_snapshot() -> dict:
+    release_channel_path = _release_channel_path()
+    snapshot = {
+        "path": str(release_channel_path),
+        "channelId": "",
+        "channel": "",
+        "version": "",
+        "releaseVersion": "",
+        "rolloutState": "",
+        "supportabilityState": "",
+        "publishedAt": "",
+    }
+    if not release_channel_path.is_file():
+        return snapshot
+
+    loaded = _load_existing_payload(release_channel_path)
+    if loaded is None:
+        return snapshot
+
+    channel = str(loaded.get("channelId") or loaded.get("channel") or "").strip()
+    version = str(loaded.get("releaseVersion") or loaded.get("version") or "").strip()
+    snapshot.update(
+        {
+            "channelId": channel,
+            "channel": channel,
+            "version": version,
+            "releaseVersion": version,
+            "rolloutState": str(loaded.get("rolloutState") or loaded.get("rollout_state") or "").strip(),
+            "supportabilityState": str(loaded.get("supportabilityState") or loaded.get("supportability_state") or "").strip(),
+            "publishedAt": str(loaded.get("publishedAt") or loaded.get("generatedAt") or loaded.get("generated_at") or "").strip(),
+        }
+    )
+    return snapshot
+
+
+def _published_installer_proof_routes() -> list[str]:
+    loaded = _load_existing_payload(_release_channel_path())
+    if not isinstance(loaded, dict):
+        return [
+            "/downloads/install/avalonia-linux-x64-installer",
+            "/downloads/install/avalonia-osx-arm64-installer",
+            "/downloads/install/avalonia-win-x64-installer",
+        ]
+
+    routes: list[str] = []
+    for collection_name in ("artifacts", "downloads"):
+        collection = loaded.get(collection_name)
+        if not isinstance(collection, list):
+            continue
+        for item in collection:
+            if not isinstance(item, dict):
+                continue
+            artifact_id = str(item.get("artifactId") or item.get("id") or "").strip()
+            kind = str(item.get("kind") or "").strip().lower()
+            if not artifact_id or kind != "installer":
+                continue
+            routes.append(f"/downloads/install/{artifact_id}")
+
+    return sorted(_sorted_unique_strings(routes))
+
+
+def _effective_readiness_override_reason(readiness_payload: dict, coverage_gap_keys: list[str]) -> str:
+    if str(readiness_payload.get("status") or "").strip().lower() in {"pass", "passed", "ready"}:
+        return ""
+    gate_status_override = readiness_payload.get("gate_status_override")
+    if not isinstance(gate_status_override, dict):
+        return ""
+
+    effective_reason = _release_readiness_reason(str(gate_status_override.get("effective_reason") or "").strip())
+    if effective_reason:
+        return effective_reason
+    base_reason = _release_readiness_reason(str(gate_status_override.get("reason") or "").strip())
+    blockers = _sorted_unique_strings(
+        [
+            str(item).strip()
+            for item in gate_status_override.get("launch_critical_nested_blockers") or []
+            if str(item).strip()
+        ]
+    )
+    normalized_coverage_gap_keys = _sorted_unique_strings(coverage_gap_keys)
+    scoped_coverage_gap_keys = _sorted_unique_strings(
+        [
+            str(item).strip()
+            for item in gate_status_override.get("scoped_coverage_gap_keys") or []
+            if str(item).strip()
+        ]
+    )
+    details: list[str] = []
+    if blockers:
+        details.append("Launch blockers: " + ", ".join(blockers))
+    if normalized_coverage_gap_keys:
+        details.append("Coverage gaps: " + ", ".join(normalized_coverage_gap_keys))
+    if scoped_coverage_gap_keys and scoped_coverage_gap_keys != normalized_coverage_gap_keys:
+        details.append("Scoped coverage gaps: " + ", ".join(scoped_coverage_gap_keys))
+    return _append_reason_details(base_reason, details)
 
 
 def _load_flagship_readiness_snapshot() -> dict:
@@ -191,16 +443,19 @@ def _load_flagship_readiness_snapshot() -> dict:
         if str(item).strip()
     ]
     completion_audit = readiness_payload.get("completion_audit")
-    reason = _release_readiness_reason(
+    raw_reason = _release_readiness_reason(
         str(readiness_audit.get("reason") or "").strip()
         if isinstance(readiness_audit, dict)
         else ""
-    ) or default_reason
-    completion_audit_reason = _release_readiness_reason(
+    )
+    raw_completion_audit_reason = _release_readiness_reason(
         str(completion_audit.get("reason") or "").strip()
         if isinstance(completion_audit, dict)
         else ""
     )
+    effective_override_reason = _effective_readiness_override_reason(readiness_payload, normalized_coverage_gap_keys)
+    reason = effective_override_reason or raw_reason or default_reason
+    completion_audit_reason = effective_override_reason or raw_completion_audit_reason
 
     return {
         "status": str(readiness_payload.get("status") or "").strip() or "unknown",
@@ -247,12 +502,40 @@ def _sync_local_flagship_readiness_artifact_if_needed(*, out_path: Path, source_
         return
 
     existing_payload = _load_existing_payload(sync_path)
+    source_generated_at = _payload_generated_at(source_payload)
+    existing_generated_at = _payload_generated_at(existing_payload)
+    if (
+        source_generated_at is not None
+        and existing_generated_at is not None
+        and source_generated_at < existing_generated_at
+    ):
+        print(
+            "skipped local flagship readiness sync because source is older: "
+            f"{sync_path} keeps {existing_generated_at.isoformat()} over {source_generated_at.isoformat()}"
+        )
+        return
     if existing_payload is not None and existing_payload == source_payload:
         return
 
     sync_path.parent.mkdir(parents=True, exist_ok=True)
     sync_path.write_text(json.dumps(source_payload, indent=2) + "\n", encoding="utf-8")
     print(f"synced local flagship readiness: {sync_path} <- {source}")
+
+
+def _resolve_served_release_proof_sync_path(*, out_path: Path) -> Path | None:
+    if out_path.expanduser().resolve() == DEFAULT_HUB_LOCAL_RELEASE_PROOF_PATH.expanduser().resolve():
+        return DEFAULT_SERVED_HUB_LOCAL_RELEASE_PROOF_PATH
+    return None
+
+
+def _sync_served_release_proof_if_needed(*, out_path: Path) -> None:
+    sync_path = _resolve_served_release_proof_sync_path(out_path=out_path)
+    if sync_path is None or not out_path.is_file():
+        return
+
+    source_text = out_path.read_text(encoding="utf-8")
+    if _write_public_json_artifact(sync_path, source_text):
+        print(f"synced served hub local proof: {sync_path} <- {out_path}")
 
 
 def _m141_direct_import_route_receipts() -> list[dict]:
@@ -367,7 +650,18 @@ def main() -> int:
         "CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
         default=300,
     )
+    _sync_local_flagship_readiness_artifact_if_needed(
+        out_path=out_path,
+        source_path=str(_canonical_flagship_readiness_source_path()),
+    )
     desktop_client_readiness = _load_flagship_readiness_snapshot()
+    release_channel = _load_release_channel_snapshot()
+    published_installer_proof_routes = _published_installer_proof_routes()
+    additional_installer_proof_routes = [
+        route
+        for route in published_installer_proof_routes
+        if route != "/downloads/install/avalonia-linux-x64-installer"
+    ]
 
     successor_queue_packages = [
         {
@@ -781,6 +1075,7 @@ def main() -> int:
         "package_repo": "chummer6-hub",
         "status": "passed",
         "desktop_client_readiness": desktop_client_readiness,
+        "release_channel": release_channel,
         "publicTrustSurface": {
             "summary": "This governor-visible trust surface bundle keeps status, current release, downloads, proof shelf, and public pulse routes aligned on the same outward-facing release truth.",
             "statusRoute": "/status",
@@ -827,7 +1122,7 @@ def main() -> int:
             package["package_id"]: dict(package)
             for package in successor_queue_packages
         },
-        "base_url": base_url,
+        "base_url": _public_safe_base_url(base_url),
         "compose_file": CANONICAL_COMPOSE_FILE,
         "playwright_timeout_seconds": CANONICAL_PLAYWRIGHT_TIMEOUT_SECONDS,
         "edge_rebuild_skipped": skip_rebuild.lower() in {"1", "true"},
@@ -848,8 +1143,7 @@ def main() -> int:
             "/account/support",
             "/contact",
             "/downloads",
-            "/downloads/install/avalonia-osx-arm64-installer",
-            "/downloads/install/avalonia-win-x64-installer",
+            *additional_installer_proof_routes,
         ]),
         "proof_receipts": [
             {
@@ -1509,6 +1803,11 @@ def main() -> int:
             max_future_skew_seconds=proof_max_future_skew_seconds,
         )
     ):
+        _write_public_json_artifact(
+            out_path,
+            json.dumps(existing_payload, indent=2) + "\n",
+        )
+        _sync_served_release_proof_if_needed(out_path=out_path)
         print(f"hub local proof unchanged and still fresh: {out_path}")
         return 0
 
@@ -1516,8 +1815,8 @@ def main() -> int:
     payload["generated_at"] = generated_at
     payload["generatedAt"] = generated_at
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    _write_public_json_artifact(out_path, json.dumps(payload, indent=2) + "\n")
+    _sync_served_release_proof_if_needed(out_path=out_path)
     print(f"wrote hub local proof: {out_path}")
     return 0
 

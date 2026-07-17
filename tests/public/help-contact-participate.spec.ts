@@ -52,11 +52,15 @@ test('help, contact, and participate keep public and private paths clear', async
   expect(participateText).toContain('Participate');
   expect(participateText).not.toContain('Public requests, clear bugs, useful ideas.');
   expect(participateText.includes('data-chummer-participate-frame') || participateText.includes('Board offline right now')).toBeTruthy();
+  expect(participateText).not.toContain('Public requests, clear bugs, useful ideas.');
+  expect(participateText).not.toContain('<p class="eyebrow">Board</p>');
   expect(participateText).not.toContain('ProductLift');
   expect(new URL(participateBoardResponse.url()).pathname).toBe('/participate');
   expect(participateBoardText).toContain('Participate');
   expect(participateBoardText).not.toContain('Public requests, clear bugs, useful ideas.');
   expect(participateBoardText.includes('data-chummer-participate-frame') || participateBoardText.includes('Board offline right now')).toBeTruthy();
+  expect(participateBoardText).not.toContain('Public requests, clear bugs, useful ideas.');
+  expect(participateBoardText).not.toContain('<p class="eyebrow">Board</p>');
   expect(participateBoardText).not.toContain('ProductLift');
   expect(new URL(participateFrameResponse.url()).pathname).toBe('/participate/board');
   expect(new URL(participateFrameResponse.url()).search).toContain('embed=1');

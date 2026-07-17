@@ -10,10 +10,14 @@ public sealed class HubIdentityHintCookieService
 {
     private readonly IDataProtector _protector;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly PublicCanonicalOriginPolicy? _publicOrigin;
 
-    public HubIdentityHintCookieService(IDataProtectionProvider dataProtectionProvider)
+    public HubIdentityHintCookieService(
+        IDataProtectionProvider dataProtectionProvider,
+        PublicCanonicalOriginPolicy? publicOrigin = null)
     {
         _protector = dataProtectionProvider.CreateProtector("Chummer.Run.Api.HubIdentityHintCookie.v1");
+        _publicOrigin = publicOrigin;
     }
 
     public void WriteCookie(HttpRequest request, HttpResponse response, IdentitySessionIssueResponse session)
@@ -42,7 +46,7 @@ public sealed class HubIdentityHintCookieService
             new CookieOptions
             {
                 HttpOnly = true,
-                Secure = HubBrowserAuthService.ShouldUseSecureCookies(request),
+                Secure = HubBrowserAuthService.ShouldUseSecureCookies(request, _publicOrigin),
                 SameSite = SameSiteMode.Lax,
                 Expires = session.ExpiresAtUtc.UtcDateTime,
                 IsEssential = true,
@@ -69,7 +73,7 @@ public sealed class HubIdentityHintCookieService
                 Path = "/",
                 SameSite = SameSiteMode.Lax,
                 HttpOnly = true,
-                Secure = HubBrowserAuthService.ShouldUseSecureCookies(request),
+                Secure = HubBrowserAuthService.ShouldUseSecureCookies(request, _publicOrigin),
                 IsEssential = true
             });
     }

@@ -15,6 +15,7 @@ using Chummer.Run.AI.Services.Ops;
 using Chummer.Control.Contracts.Support;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -63,7 +64,12 @@ internal static class SupportCrashVerification
                 Path.Combine(configuration["CHUMMER_DOWNLOADS_SOURCE_ROOT"]!, "releases.json"),
                 JsonSerializer.Serialize(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
 
-            InstallLinkingStore installStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
+            IDataProtectionProvider installStoreDataProtection = DataProtectionProvider.Create(
+                Path.Combine(tempRoot, "install-linking-keys"));
+            InstallLinkingStore installStore = new(
+                configuration,
+                installStoreDataProtection,
+                NullLogger<InstallLinkingStore>.Instance);
             InstallLinkingService installLinking = new(installStore, configuration);
             CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
             RewardService rewards = new(communityStore);
@@ -348,7 +354,10 @@ internal static class SupportCrashVerification
                 configuration,
                 NullLogger<SupportProgressEmailWorkflowService>.Instance);
             SupportCaseService reloadedSupportCases = new(reloadedStore, reloadedAttachments, reloadedRewards, reloadedProgressEmails, NullLogger<SupportCaseService>.Instance);
-            InstallLinkingStore reloadedInstallStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
+            InstallLinkingStore reloadedInstallStore = new(
+                configuration,
+                installStoreDataProtection,
+                NullLogger<InstallLinkingStore>.Instance);
             InstallLinkingService reloadedInstallLinking = new(reloadedInstallStore, configuration);
             CrashSupportService reloadedService = new(reloadedStore, reloadedSupportCases, reloadedInstallLinking, NullLogger<CrashSupportService>.Instance);
             CrashIncidentProjection? reloadedIncident = reloadedService.GetIncident(first.Incident.IncidentId);

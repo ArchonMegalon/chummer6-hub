@@ -5,6 +5,7 @@ using Chummer.Contracts.Presentation;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -17,12 +18,29 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 });
 builder.AddHubApiRuntimeGuardrails();
 builder.AddHubRequestObservability();
+var publicOriginPolicy = PublicCanonicalOriginPolicy.Create(builder.Configuration, builder.Environment);
+var releaseUploadQuotaOptions = ReleaseUploadQuotaOptions.FromConfiguration(builder.Configuration);
+var windowsProofUploadOptions = WindowsProofUploadOptions.FromConfiguration(builder.Configuration);
+// Keep ASP.NET Core's host filter and the application policy on the same normalized,
+// explicit allowlist. Program startup has already rejected wildcard/invalid values.
+builder.Configuration["AllowedHosts"] = publicOriginPolicy.AllowedHostsConfiguration;
 var enableHttpsRedirection = builder.Configuration.GetValue("CHUMMER_ENABLE_HTTPS_REDIRECTION", true);
 var hasHttpsListenerConfiguration = HasHttpsListenerConfiguration(builder.Configuration);
+PlayAuthorizationApiPolicy.ValidateStartup(builder.Configuration, builder.Environment);
 
 // Add services to the container.
 
 builder.Services.AddProblemDetails();
+builder.Services.AddSingleton(publicOriginPolicy);
+builder.Services.AddSingleton(releaseUploadQuotaOptions);
+builder.Services.AddSingleton(windowsProofUploadOptions);
+builder.Services.AddSingleton<WindowsProofUploadTicketService>();
+builder.Services.AddSingleton<WindowsProofUploadAuthorizationEvaluator>();
+builder.Services.AddSingleton<WindowsProofUploadSessionService>();
+builder.Services.AddSingleton<IReleaseUploadStorageProbe, ReleaseUploadStorageProbe>();
+builder.Services.AddSingleton<ReleaseUploadAuthorizationEvaluator>();
+builder.Services.AddSingleton<ReleaseUploadAdmissionService>();
+builder.Services.AddHostedService<ReleaseShelfPublicationReadinessRefreshService>();
 builder.Services
     .AddControllersWithViews()
     .ConfigureApiBehaviorOptions(options =>
@@ -41,20 +59,36 @@ builder.Services
     });
 var dataProtectionPath = HubRuntimePathDefaults.ResolveDataProtectionKeysPath(builder.Configuration, builder.Environment);
 
-builder.Services.AddDataProtection()
-    .SetApplicationName("Chummer.Run.Api")
-    .PersistKeysToFileSystem(new DirectoryInfo(Path.GetFullPath(dataProtectionPath)));
+DataProtectionKeyProtectionStatus dataProtectionKeyProtection =
+    DataProtectionKeyProtectionConfigurator.Configure(
+        builder.Services,
+        builder.Configuration,
+        builder.Environment,
+        dataProtectionPath);
+builder.Services.AddSingleton(dataProtectionKeyProtection);
+builder.Services.AddPlayAuthorizationProcessLease();
 builder.Services
     .AddHubPublicGuideContext()
     .AddHubAccountsAndCommunityContext()
     .AddHubCampaignSpineContext()
     .AddHubControlAndSupportContext()
-    .AddHubInstallAndOrchestrationAdapters();
+    .AddHubInstallAndOrchestrationAdapters(builder.Configuration, builder.Environment);
+builder.Services.AddSingleton<HubDeepReadinessService>();
+builder.Services.AddSingleton<PortalDeploymentIdentityReadinessService>();
 builder.Services.AddSingleton<DesktopAnalyticsBridgeService>();
 builder.Services.AddHttpClient("RybbitProxy", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);
 });
+builder.Services
+    .AddHttpClient(PublicProxyRedirectPolicy.HttpClientName)
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false,
+        UseCookies = false
+    });
+builder.Services.AddSingleton<PublicPlayProxyGateway>();
+builder.Services.AddSingleton<IPublicPlayPrivateRouteDelegator, DenyAllPublicPlayPrivateRouteDelegator>();
 var trustedProxies = GetCsvValues(builder.Configuration["CHUMMER_FORWARDED_HEADER_TRUSTED_PROXIES"]);
 var trustedIpNetworks = GetCsvValues(builder.Configuration["CHUMMER_FORWARDED_HEADER_TRUSTED_IP_NETWORKS"]);
 
@@ -91,6 +125,15 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 var app = builder.Build();
+PublicPlayProxyGateway playProjectionGateway = app.Services.GetRequiredService<PublicPlayProxyGateway>();
+PublicPlayProjectionReadiness playProjectionReadiness = playProjectionGateway.GetReadiness();
+if (!playProjectionReadiness.Ready)
+{
+    app.Logger.LogError(
+        "Public Play projection readiness is {Status}: {Detail}",
+        playProjectionReadiness.Status,
+        playProjectionReadiness.Detail);
+}
 if (!HubRuntimePathDefaults.IsExplicitlyConfigured(builder.Configuration))
 {
     if (HubRuntimePathDefaults.UsesTempFallback(dataProtectionPath))
@@ -138,6 +181,61 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 app.UseForwardedHeaders();
+app.Use(async (context, next) =>
+{
+    if (!publicOriginPolicy.TryValidateRequest(context.Request, out string failure))
+    {
+        PrivateResponseCacheHeaders.Apply(context.Response.Headers);
+        if (RequiresNoReferrerHeaders(context.Request.Path))
+        {
+            context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        }
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        context.Response.ContentType = "application/problem+json; charset=utf-8";
+        var problem = new ProblemDetails
+        {
+            Title = "Invalid public host.",
+            Type = "https://chummer.run/problems/invalid-public-host",
+            Status = StatusCodes.Status400BadRequest,
+            Detail = failure,
+            Instance = $"{context.Request.Path}#{context.TraceIdentifier}"
+        };
+        await JsonSerializer.SerializeAsync(context.Response.Body, problem, cancellationToken: context.RequestAborted);
+        return;
+    }
+
+    await next();
+});
+// Register private-response and indexing headers before HTTPS redirection so a
+// redirect cannot bypass the account/admin cache boundary.
+app.Use(async (context, next) =>
+{
+    bool requiresNoStore = RequiresNoStoreHeaders(context.Request.Path);
+    string robotsPolicy = ResolveRobotsPolicy(context.Request.Path);
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers["X-Robots-Tag"] = robotsPolicy;
+        if (requiresNoStore)
+        {
+            PrivateResponseCacheHeaders.Apply(context.Response.Headers);
+        }
+        if (RequiresNoReferrerHeaders(context.Request.Path))
+        {
+            context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        }
+        if (IsPrivatePlayDocumentPath(context.Request.Path))
+        {
+            context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; base-uri 'none'; connect-src 'none'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; manifest-src 'self'; script-src 'self'; style-src 'self'; worker-src 'self'";
+            context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+            context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+            context.Response.Headers["X-Frame-Options"] = "DENY";
+        }
+
+        return Task.CompletedTask;
+    });
+
+    await next();
+});
 if (enableHttpsRedirection && hasHttpsListenerConfiguration)
 {
     app.UseHttpsRedirection();
@@ -148,23 +246,6 @@ else if (enableHttpsRedirection)
 }
 app.Use(async (context, next) =>
 {
-    bool requiresNoStore = RequiresNoStoreHeaders(context.Request.Path);
-    string robotsPolicy = ResolveRobotsPolicy(context.Request.Path);
-    context.Response.OnStarting(() =>
-    {
-        context.Response.Headers["X-Robots-Tag"] = robotsPolicy;
-        if (requiresNoStore)
-        {
-            ApplyNoStoreHeaders(context.Response.Headers);
-        }
-
-        return Task.CompletedTask;
-    });
-
-    await next();
-});
-app.Use(async (context, next) =>
-{
     if (IsLegacyMacReleaseBootstrapArtifactPath(context.Request.Path))
     {
         context.Response.Redirect("/downloads/release-upload/bootstrap.sh", permanent: false);
@@ -173,16 +254,37 @@ app.Use(async (context, next) =>
 
     await next();
 });
-Uri? playPwaProxyBaseUri = ResolvePlayPwaProxyBaseUri(app.Configuration);
-string playPwaProxyApiKey = (app.Configuration["CHUMMER_PUBLIC_PLAY_PROXY_API_KEY"]
-    ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_PLAY_PROXY_API_KEY")
-    ?? string.Empty).Trim();
 app.Use(async (context, next) =>
 {
-    if (ShouldProxyPlayPwaRequest(context.Request.Path)
-        && playPwaProxyBaseUri is not null
-        && await TryProxyPlayPwaRequestAsync(context, playPwaProxyBaseUri, playPwaProxyApiKey))
+    if ((HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method))
+        && TryResolveRoleAliasRedirectPath(context.Request.Path, out string? redirectPath))
     {
+        PrivateResponseCacheHeaders.Apply(context.Response.Headers);
+        context.Response.Headers.CacheControl = "private, no-store, no-cache, max-age=0";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        // Role aliases are public install-entry names, never session handoff URLs.
+        // Drop every query value and emit an explicit empty fragment so browsers do
+        // not inherit a private fragment from the alias URL during redirection.
+        context.Response.Redirect($"{redirectPath}#", permanent: false);
+        return;
+    }
+
+    await next();
+});
+app.UseRouting();
+app.UseMiddleware<WindowsProofUploadRequestGateMiddleware>();
+app.UseMiddleware<ReleaseUploadRequestGateMiddleware>();
+app.UsePlayAuthorizationApiGate();
+app.UseHubRequestObservability();
+app.UseHubApiRuntimeGuardrails();
+app.UseMiddleware<InstallLinkingRequestAdmissionMiddleware>();
+app.Use(async (context, next) =>
+{
+    if (PublicPlaySessionAccessPolicy.RequiresSessionGrant(context.Request))
+    {
+        IPublicPlayPrivateRouteDelegator privateRoutes = context.RequestServices
+            .GetRequiredService<IPublicPlayPrivateRouteDelegator>();
+        await privateRoutes.DenyAsync(context, context.RequestAborted);
         return;
     }
 
@@ -190,6 +292,7 @@ app.Use(async (context, next) =>
 });
 FileExtensionContentTypeProvider contentTypeProvider = new();
 contentTypeProvider.Mappings[".vtt"] = "text/vtt";
+contentTypeProvider.Mappings[".webmanifest"] = "application/manifest+json";
 HorizonArtifactAccessTokenService horizonArtifactAccessTokens = app.Services.GetRequiredService<HorizonArtifactAccessTokenService>();
 
 app.Use(async (context, next) =>
@@ -204,23 +307,41 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseStaticFiles(new StaticFileOptions
-{
-    ContentTypeProvider = contentTypeProvider,
-    OnPrepareResponse = fileContext =>
+app.UseWhen(
+    static context => !IsGovernedReleaseStaticPath(context.Request.Path),
+    staticFiles => staticFiles.UseStaticFiles(new StaticFileOptions
     {
-        PathString requestPath = fileContext.Context.Request.Path;
-        fileContext.Context.Response.Headers["X-Robots-Tag"] = ResolveRobotsPolicy(requestPath);
-        if (RequiresNoStoreHeaders(requestPath))
+        ContentTypeProvider = contentTypeProvider,
+        OnPrepareResponse = fileContext =>
         {
-            ApplyNoStoreHeaders(fileContext.Context.Response.Headers);
+            PathString requestPath = fileContext.Context.Request.Path;
+            fileContext.Context.Response.Headers["X-Robots-Tag"] = ResolveRobotsPolicy(requestPath);
+            if (RequiresNoStoreHeaders(requestPath))
+            {
+                PrivateResponseCacheHeaders.Apply(fileContext.Context.Response.Headers);
+            }
+            if (IsLocalPlayInstallAssetPath(requestPath))
+            {
+                fileContext.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                if (requestPath.Equals("/service-worker.js", StringComparison.OrdinalIgnoreCase)
+                    || requestPath.Equals("/mobile/service-worker.js", StringComparison.OrdinalIgnoreCase))
+                {
+                    fileContext.Context.Response.ContentType = "application/javascript; charset=utf-8";
+                    fileContext.Context.Response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
+                }
+                else
+                {
+                    if (requestPath.Value?.EndsWith(".js", StringComparison.OrdinalIgnoreCase) is true)
+                    {
+                        fileContext.Context.Response.ContentType = "application/javascript; charset=utf-8";
+                    }
+                    fileContext.Context.Response.Headers.CacheControl = "public, max-age=300, must-revalidate";
+                }
+            }
         }
-    }
-});
+    }));
 
 app.UseWebSockets();
-app.UseHubRequestObservability();
-app.UseHubApiRuntimeGuardrails();
 app.UseAuthorization();
 
 app.MapMethods("/api/health", new[] { HttpMethods.Get, HttpMethods.Head }, () => Results.Json(new
@@ -230,12 +351,145 @@ app.MapMethods("/api/health", new[] { HttpMethods.Get, HttpMethods.Head }, () =>
     status = "pass",
     generatedAt = DateTimeOffset.UtcNow
 }));
-app.MapGet("/downloads/release-evidence/{**path}", (string? path, PublicReleaseManifestService releases) =>
+app.MapMethods("/api/ready", new[] { HttpMethods.Get, HttpMethods.Head }, (
+    HubDeepReadinessService readiness,
+    PublicPlayProxyGateway playGateway,
+    PortalDeploymentIdentityReadinessService deploymentIdentityReadiness,
+    HttpContext context) =>
 {
-    string? filePath = releases.ResolveReleaseEvidenceFilePath(path);
+    PrivateResponseCacheHeaders.Apply(context.Response.Headers);
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    HubDeepReadinessReport report = readiness.Evaluate();
+    PublicPlayProjectionReadiness projection = playGateway.GetReadiness();
+    PortalDeploymentIdentityReadiness deploymentIdentity = deploymentIdentityReadiness.Evaluate();
+    context.Response.Headers["X-Chummer-Play-Projection-Status"] = projection.Status;
+    HubReadyResponse combinedReport = HubReadyResponse.Create(
+        report,
+        projection,
+        deploymentIdentity);
+    return Results.Json(
+        combinedReport,
+        statusCode: combinedReport.Ready
+            ? StatusCodes.Status200OK
+            : StatusCodes.Status503ServiceUnavailable);
+});
+app.MapMethods("/api/ready/play-projection", new[] { HttpMethods.Get, HttpMethods.Head }, (
+    PublicPlayProxyGateway playGateway) =>
+{
+    PublicPlayProjectionReadiness projection = playGateway.GetReadiness();
+    return Results.Json(
+        projection,
+        statusCode: projection.Ready
+            ? StatusCodes.Status200OK
+            : StatusCodes.Status503ServiceUnavailable);
+});
+app.MapMethods("/api/ready/publication", new[] { HttpMethods.Get, HttpMethods.Head }, async (
+    HubDeepReadinessService readiness,
+    CancellationToken cancellationToken) =>
+{
+    ReleaseShelfPublicationReadinessState publication =
+        await readiness.EvaluatePublicationReadinessAsync(cancellationToken);
+    return Results.Json(
+        publication,
+        statusCode: publication.Ready
+            ? StatusCodes.Status200OK
+            : StatusCodes.Status503ServiceUnavailable);
+});
+app.MapGet("/downloads/release-evidence/{**path}", (
+    string? path,
+    PublicReleaseManifestService releases,
+    HttpContext context) =>
+{
+    ReleaseShelfSnapshot snapshot = releases.CaptureShelfSnapshot();
+    if (!string.IsNullOrWhiteSpace(snapshot.GenerationId))
+    {
+        context.Response.Headers["X-Chummer-Release-Generation"] = snapshot.GenerationId;
+    }
+
+    if (!snapshot.IsLegacy)
+    {
+        ReleaseShelfVerifiedFile? verified = snapshot.OpenVerifiedFile($"release-evidence/{path}");
+        return verified is null
+            ? Results.NotFound()
+            : Results.Stream(verified.Stream, "application/json; charset=utf-8");
+    }
+
+    string? filePath = releases.ResolveReleaseEvidenceFilePath(snapshot, path);
     return filePath is null
         ? Results.NotFound()
         : Results.File(filePath, "application/json; charset=utf-8");
+});
+app.MapGet("/downloads/g/{generationId}/release-evidence/{**path}", (
+    string generationId,
+    string? path,
+    PublicReleaseManifestService releases,
+    HttpContext context) =>
+{
+    try
+    {
+        ReleaseShelfSnapshot snapshot = releases.CaptureShelfGeneration(generationId);
+        context.Response.Headers["X-Chummer-Release-Generation"] = snapshot.GenerationId;
+        ReleaseShelfVerifiedFile? verified = snapshot.OpenVerifiedFile($"release-evidence/{path}");
+        return verified is null
+            ? Results.NotFound()
+            : Results.Stream(verified.Stream, "application/json; charset=utf-8");
+    }
+    catch (InvalidDataException)
+    {
+        return Results.NotFound();
+    }
+    catch (InvalidOperationException)
+    {
+        return Results.NotFound();
+    }
+});
+app.MapGet("/downloads/g/{generationId}/proof/{**path}", (
+    string generationId,
+    string? path,
+    PublicReleaseManifestService releases,
+    HttpContext context) =>
+{
+    try
+    {
+        ReleaseShelfSnapshot snapshot = releases.CaptureShelfGeneration(generationId);
+        context.Response.Headers["X-Chummer-Release-Generation"] = snapshot.GenerationId;
+        ReleaseShelfVerifiedFile? verified = snapshot.OpenVerifiedFile($"proof/{path}");
+        return verified is null
+            ? Results.NotFound()
+            : Results.Stream(verified.Stream, "application/json; charset=utf-8");
+    }
+    catch (InvalidDataException)
+    {
+        return Results.NotFound();
+    }
+    catch (InvalidOperationException)
+    {
+        return Results.NotFound();
+    }
+});
+app.MapGet("/downloads/g/{generationId}/startup-smoke/{**path}", (
+    string generationId,
+    string? path,
+    PublicReleaseManifestService releases,
+    HttpContext context) =>
+{
+    try
+    {
+        ReleaseShelfSnapshot snapshot = releases.CaptureShelfGeneration(generationId);
+        context.Response.Headers["X-Chummer-Release-Generation"] = snapshot.GenerationId;
+        ReleaseShelfVerifiedFile? verified = snapshot.OpenVerifiedFile($"startup-smoke/{path}");
+        return verified is null
+            ? Results.NotFound()
+            : Results.Stream(verified.Stream, "application/json; charset=utf-8");
+    }
+    catch (InvalidDataException)
+    {
+        return Results.NotFound();
+    }
+    catch (InvalidOperationException)
+    {
+        return Results.NotFound();
+    }
 });
 app.MapMethods("/api/rybbit/{**proxyPath}", new[] { "GET", "POST", "OPTIONS" }, ProxyRybbitAsync);
 app.MapPost("/api/desktop-analytics/track", async (
@@ -292,14 +546,29 @@ app.Run();
 
 static bool RequiresNoStoreHeaders(PathString path)
 {
-    return path.StartsWithSegments("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
+    string rawPath = path.Value ?? string.Empty;
+    return rawPath.Equals("/login", StringComparison.OrdinalIgnoreCase)
+        || rawPath.Equals("/signup", StringComparison.OrdinalIgnoreCase)
+        || rawPath.Equals("/auth", StringComparison.OrdinalIgnoreCase)
+        || rawPath.StartsWith("/auth/", StringComparison.OrdinalIgnoreCase)
+        || PrivateResponseCacheHeaders.IsPrivateAccountSurface(path)
+        || PrivateResponseCacheHeaders.IsPrivateAdminSurface(path)
+        || path.StartsWithSegments("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments(PlayAuthorizationApiPolicy.AccountPathPrefix, StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments(PlayAuthorizationApiPolicy.InternalPathPrefix, StringComparison.OrdinalIgnoreCase)
+        || IsInstallLinkingSensitivePath(path)
         || IsLegacyMacReleaseBootstrapArtifactPath(path)
         || IsPublicVideoMediaPath(path)
         || path.Equals("/service-worker.js", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/mobile/service-worker.js", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/manifest.json", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/supplemental/windows", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/proof/windows", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/downloads/releases.json", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/downloads/RELEASE_CHANNEL.generated.json", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/release-evidence", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/aur-packages.json", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/g", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/ledger/newsroom", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/file", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/files", StringComparison.OrdinalIgnoreCase)
@@ -309,17 +578,47 @@ static bool RequiresNoStoreHeaders(PathString path)
         || path.Equals("/sitemap.xml", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/llms.txt", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/ai.txt", StringComparison.OrdinalIgnoreCase)
+        || IsPrivatePlayDocumentPath(path)
         || path.Value?.StartsWith("/install-", StringComparison.OrdinalIgnoreCase) == true;
 }
 
-static void ApplyNoStoreHeaders(IHeaderDictionary headers)
+static bool RequiresNoReferrerHeaders(PathString path)
+    => IsPrivatePlayDocumentPath(path)
+        || IsInstallLinkingSensitivePath(path)
+        || PrivateResponseCacheHeaders.IsPrivateAccountSurface(path)
+        || PrivateResponseCacheHeaders.IsPrivateAdminSurface(path)
+        || path.StartsWithSegments("/downloads/g", StringComparison.OrdinalIgnoreCase);
+
+static bool IsGovernedReleaseStaticPath(PathString path)
 {
-    headers["Cache-Control"] = "private, no-store, max-age=0";
-    headers["CDN-Cache-Control"] = "no-store, max-age=0";
-    headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
-    headers["Surrogate-Control"] = "no-store";
-    headers["Pragma"] = "no-cache";
-    headers["Expires"] = "0";
+    return path.Equals("/downloads/current.json", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/downloads/releases.json", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/downloads/RELEASE_CHANNEL.generated.json", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/downloads/aur-packages.json", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/g", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/files", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/file", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/get", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/proof", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/startup-smoke", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/release-evidence", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/aur", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool IsPrivatePlayDocumentPath(PathString path)
+{
+    string value = (path.Value ?? string.Empty).TrimEnd('/');
+    return value.Equals("/mobile", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile/player", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile/gm", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile/observer", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool IsInstallLinkingSensitivePath(PathString path)
+{
+    return path.StartsWithSegments("/api/v1/install-linking", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/account/access/install-link", StringComparison.OrdinalIgnoreCase);
 }
 
 static bool IsPublicVideoMediaPath(PathString path)
@@ -389,200 +688,48 @@ static bool IsLegacyMacReleaseBootstrapArtifactPath(PathString path)
     return path.Equals("/artifacts/mac-codex-release-pipeline/bootstrap.sh", StringComparison.OrdinalIgnoreCase);
 }
 
-static bool ShouldProxyPlayPwaRequest(PathString path)
+static bool TryResolveRoleAliasRedirectPath(PathString path, out string redirectPath)
 {
-    string value = path.Value ?? string.Empty;
-    return value.Equals("/mobile", StringComparison.OrdinalIgnoreCase)
-        || value.Equals("/mobile/player", StringComparison.OrdinalIgnoreCase)
-        || value.Equals("/mobile/gm", StringComparison.OrdinalIgnoreCase)
-        || value.Equals("/mobile/observer", StringComparison.OrdinalIgnoreCase)
-        || value.Equals("/manifest.player.webmanifest", StringComparison.OrdinalIgnoreCase)
-        || value.Equals("/manifest.gm.webmanifest", StringComparison.OrdinalIgnoreCase)
-        || value.Equals("/mobile.css", StringComparison.OrdinalIgnoreCase)
-        || value.Equals("/mobile-turn-companion.js", StringComparison.OrdinalIgnoreCase)
-        || value.StartsWith("/icons/", StringComparison.OrdinalIgnoreCase)
-        || value.StartsWith("/_framework/", StringComparison.OrdinalIgnoreCase)
-        || value.StartsWith("/api/play/", StringComparison.OrdinalIgnoreCase)
-        || value.Equals("/api/play", StringComparison.OrdinalIgnoreCase);
-}
-
-static Uri? ResolvePlayPwaProxyBaseUri(IConfiguration configuration)
-{
-    string enabled = (configuration["CHUMMER_PUBLIC_PLAY_PROXY_ENABLED"]
-        ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_PLAY_PROXY_ENABLED")
-        ?? "false").Trim();
-    if (!string.Equals(enabled, "true", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(enabled, "1", StringComparison.OrdinalIgnoreCase)
-        && !string.Equals(enabled, "yes", StringComparison.OrdinalIgnoreCase))
+    if (path.Equals("/player", StringComparison.OrdinalIgnoreCase)
+        || path.Equals("/jammer", StringComparison.OrdinalIgnoreCase))
     {
-        return null;
-    }
-
-    string configured = (configuration["CHUMMER_PUBLIC_PLAY_PROXY_URL"]
-        ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_PLAY_PROXY_URL")
-        ?? string.Empty).Trim();
-    if (!Uri.TryCreate(configured, UriKind.Absolute, out Uri? uri))
-    {
-        return null;
-    }
-
-    string normalized = uri.AbsoluteUri.EndsWith("/", StringComparison.Ordinal)
-        ? uri.AbsoluteUri
-        : $"{uri.AbsoluteUri}/";
-    return new Uri(normalized);
-}
-
-static async Task<bool> TryProxyPlayPwaRequestAsync(HttpContext context, Uri upstream, string playApiKey)
-{
-    Uri target = BuildPlayPwaProxyTarget(upstream, context.Request.Path, context.Request.QueryString);
-    using HttpClient client = context.RequestServices.GetRequiredService<IHttpClientFactory>().CreateClient();
-    bool proxyHeadAsGet = HttpMethods.IsHead(context.Request.Method);
-    using var outbound = new HttpRequestMessage(proxyHeadAsGet ? HttpMethod.Get : new HttpMethod(context.Request.Method), target);
-    bool requestHasBody = context.Request.ContentLength.GetValueOrDefault() > 0
-        || context.Request.Headers.ContainsKey("Transfer-Encoding");
-    if (requestHasBody)
-    {
-        outbound.Content = new StreamContent(context.Request.Body);
-    }
-
-    CopyPlayPwaProxyRequestHeaders(context, outbound);
-    if (!string.IsNullOrWhiteSpace(playApiKey)
-        && (context.Request.Path.StartsWithSegments("/api/play", StringComparison.OrdinalIgnoreCase)
-            || context.Request.Path.StartsWithSegments("/mobile", StringComparison.OrdinalIgnoreCase)))
-    {
-        outbound.Headers.Remove("X-Chummer-Play-Api-Key");
-        outbound.Headers.TryAddWithoutValidation("X-Chummer-Play-Api-Key", playApiKey);
-    }
-
-    HttpResponseMessage response;
-    try
-    {
-        response = await client.SendAsync(
-            outbound,
-            HttpCompletionOption.ResponseHeadersRead,
-            context.RequestAborted);
-    }
-    catch (HttpRequestException)
-    {
-        return false;
-    }
-    catch (TaskCanceledException) when (!context.RequestAborted.IsCancellationRequested)
-    {
-        return false;
-    }
-
-    using (response)
-    {
-        if ((int)response.StatusCode >= 500)
-        {
-            return false;
-        }
-
-        if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
-        {
-            context.Response.Redirect(RewritePlayPwaProxyLocation(response.Headers.Location, upstream), permanent: false);
-            return true;
-        }
-
-        context.Response.StatusCode = (int)response.StatusCode;
-        CopyPlayPwaProxyResponseHeaders(context, response);
-        if (proxyHeadAsGet)
-        {
-            return true;
-        }
-
-        await using Stream stream = await response.Content.ReadAsStreamAsync(context.RequestAborted);
-        await stream.CopyToAsync(context.Response.Body, context.RequestAborted);
+        redirectPath = "/mobile/player";
         return true;
     }
+
+    if (path.Equals("/gm", StringComparison.OrdinalIgnoreCase))
+    {
+        redirectPath = "/mobile/gm";
+        return true;
+    }
+
+    if (path.Equals("/observer", StringComparison.OrdinalIgnoreCase))
+    {
+        redirectPath = "/mobile/observer";
+        return true;
+    }
+
+    redirectPath = string.Empty;
+    return false;
 }
 
-static Uri BuildPlayPwaProxyTarget(Uri upstream, PathString path, QueryString queryString)
+static bool IsLocalPlayInstallAssetPath(PathString path)
 {
-    string relativePath = (path.Value ?? string.Empty).TrimStart('/');
-    var builder = new UriBuilder(string.IsNullOrWhiteSpace(relativePath) ? upstream : new Uri(upstream, relativePath));
-    if (queryString.HasValue)
-    {
-        builder.Query = queryString.Value!.TrimStart('?');
-    }
-
-    return builder.Uri;
-}
-
-static void CopyPlayPwaProxyRequestHeaders(HttpContext context, HttpRequestMessage outbound)
-{
-    foreach (var header in context.Request.Headers)
-    {
-        if (IsHopByHopHeader(header.Key))
-        {
-            continue;
-        }
-
-        if (!outbound.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray()))
-        {
-            outbound.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-        }
-    }
-
-    outbound.Headers.TryAddWithoutValidation("X-Forwarded-Host", context.Request.Host.Value);
-    outbound.Headers.TryAddWithoutValidation("X-Forwarded-Proto", context.Request.Scheme);
-}
-
-static void CopyPlayPwaProxyResponseHeaders(HttpContext context, HttpResponseMessage response)
-{
-    foreach (var header in response.Headers)
-    {
-        if (IsHopByHopHeader(header.Key) || string.Equals(header.Key, "Location", StringComparison.OrdinalIgnoreCase))
-        {
-            continue;
-        }
-
-        context.Response.Headers[header.Key] = header.Value.ToArray();
-    }
-
-    foreach (var header in response.Content.Headers)
-    {
-        if (IsHopByHopHeader(header.Key))
-        {
-            continue;
-        }
-
-        context.Response.Headers[header.Key] = header.Value.ToArray();
-    }
-
-    context.Response.Headers.Remove("transfer-encoding");
-}
-
-static bool IsHopByHopHeader(string headerName)
-    => string.Equals(headerName, "Connection", StringComparison.OrdinalIgnoreCase)
-       || string.Equals(headerName, "Host", StringComparison.OrdinalIgnoreCase)
-       || string.Equals(headerName, "Keep-Alive", StringComparison.OrdinalIgnoreCase)
-       || string.Equals(headerName, "Proxy-Authenticate", StringComparison.OrdinalIgnoreCase)
-       || string.Equals(headerName, "Proxy-Authorization", StringComparison.OrdinalIgnoreCase)
-       || string.Equals(headerName, "TE", StringComparison.OrdinalIgnoreCase)
-       || string.Equals(headerName, "Trailer", StringComparison.OrdinalIgnoreCase)
-       || string.Equals(headerName, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase)
-       || string.Equals(headerName, "Upgrade", StringComparison.OrdinalIgnoreCase);
-
-static string RewritePlayPwaProxyLocation(Uri location, Uri upstream)
-{
-    if (location.IsAbsoluteUri)
-    {
-        if (!Uri.Compare(location, upstream, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase).Equals(0))
-        {
-            return location.ToString();
-        }
-
-        return string.IsNullOrWhiteSpace(location.PathAndQuery) ? "/mobile" : location.PathAndQuery;
-    }
-
-    string candidate = location.OriginalString;
-    if (string.IsNullOrWhiteSpace(candidate) || candidate == "/")
-    {
-        return "/mobile";
-    }
-
-    return candidate.StartsWith("/", StringComparison.Ordinal) ? candidate : $"/{candidate}";
+    string value = path.Value ?? string.Empty;
+    return value.Equals("/js/mobile-app-handoff.js", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile-install-shell.js", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile.css", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/service-worker.js", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/mobile/service-worker.js", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/manifest.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/manifest.play.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/manifest.player.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/manifest.gm.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/manifest.observer.webmanifest", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/icons/icon-192.svg", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/icons/icon-512.svg", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/icons/icon-192.png", StringComparison.OrdinalIgnoreCase)
+        || value.Equals("/icons/icon-512.png", StringComparison.OrdinalIgnoreCase);
 }
 
 static string ResolveHubContentRoot()

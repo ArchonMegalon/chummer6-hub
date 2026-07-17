@@ -15,6 +15,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from functools import lru_cache
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -23,6 +24,14 @@ from typing import Any, Callable
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_ROOT = Path(__file__).resolve().parent
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+
+from magicai_pool_registry import env_assignments as shared_env_assignments
+from magicai_pool_registry import magicai_platform_audit as shared_magicai_platform_audit
+from magicai_pool_registry import magicai_pool_counts as shared_magicai_pool_counts
+
 PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 SYNC_LOCK_FILENAME = "teable-important-work-sync.lock"
 SYNC_LOCK_DIRECTORY_NAME = f"chummer-teable-important-work-sync-{os.geteuid()}"
@@ -30,6 +39,8 @@ DEFAULT_SYNC_LOCK_PATH = Path("/tmp") / SYNC_LOCK_DIRECTORY_NAME / SYNC_LOCK_FIL
 SYNC_LOCK_SIGNATURE = b"chummer.teable-important-work-sync.lock.v1\n"
 DEFAULT_OUTPUT = PUBLISHED_ROOT / "TEABLE_IMPORTANT_WORK.generated.json"
 DEFAULT_CSV_OUTPUT = PUBLISHED_ROOT / "TEABLE_IMPORTANT_WORK.csv"
+DEFAULT_MAGICAI_PLATFORM_AUDIT = PUBLISHED_ROOT / "MAGICAI_PLATFORM_ACCESS.generated.json"
+DEFAULT_ORIGIN_GOLD_PROOF_CHAIN = Path("/docker/chummercomplete/.tmp/origin-dossier-fresh-gold/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json")
 DEFAULT_TEABLE_ORIGIN = "https://app.teable.ai"
 DEFAULT_API_BASE_URL = "https://app.teable.ai/api"
 DEFAULT_HUB_BASE_URL = "https://chummer.run"
@@ -184,8 +195,8 @@ def important_work_items() -> list[ImportantWorkItem]:
             cadence="daily until released",
             source="Product direction",
             why_it_matters="The feature should feel like creating a book, not filling an internal options form.",
-            next_action="Verify the next installed desktop build starts from race/metatype and archetype, shows the story first, labels the primary handoff as a book before audio/video, and preserves authenticated read/listen/watch/canon-audit owner routes.",
-            acceptance_gate="A user can start a dossier, read the story first, open the FlipLink-style book, then request audio/video and access private read/listen/watch/canon-audit routes only as the signed-in owner.",
+            next_action="Verify the next installed desktop build starts from race/metatype and archetype, hands over a real full story ebook with fitting cover art first, then exactly three story-fit portraits, then voice-choice audiobook request, then chapter-scene summaries for one chosen character-visible cinematic render, while preserving authenticated read/listen/watch/canon-audit owner routes.",
+            acceptance_gate="A user can start a dossier, receive the real full story ebook with fitting cover art first, choose one of three story-fit portraits, request a voice-choice audiobook, choose one scene from the chapter shortlist for a character-visible render, and access private read/listen/watch/canon-audit routes only as the signed-in owner.",
         ),
         ImportantWorkItem(
             item_id="origin-dossier-alice-seed",
@@ -209,7 +220,7 @@ def important_work_items() -> list[ImportantWorkItem]:
             source="Product direction",
             why_it_matters="A dossier should read like a deliberate character book, not generated filler or a form summary.",
             next_action="Run the generated story through the Undetectable Humanizer LTD lane before FlipLink/book, audiobook, video, and Alice ingestion; keep advanced steering collapsed by default.",
-            acceptance_gate="Origin Dossier E2E proves race/archetype first, story-first review, humanized prose, book-first output, voice choice, video option, and Alice using the final story.",
+            acceptance_gate="Origin Dossier E2E proves race/archetype first, story-first review, humanized prose, Subscribr-authored full story, fitting cover art, three story-fit portraits, voice choice, chapter-scene shortlist, one chosen character-visible render, and Alice using the final story.",
         ),
         ImportantWorkItem(
             item_id="alice-build-from-scratch",
@@ -540,12 +551,12 @@ def important_work_items() -> list[ImportantWorkItem]:
             title="Magicfit origin visuals and MagicAI runsite pool",
             area="Provider governance",
             priority="P1",
-            status="active",
+            status=origin_visuals_runtime["status"],
             cadence="daily until stable",
             source="Provider account update",
             why_it_matters="Origin Dossier visual proofs should stay on the preferred Magicfit lane, book/PDF/ebook packaging should have its own governed provider account role, and Runsite scene renders plus Propertyquarry apartment videos should use the multi-account MagicAI/omagic pool through internal EA skills.",
-            next_action="Keep Magicfit as the approved Origin Dossier visual receipt lane, require packaging account aliases on book artifact receipts when configured, keep provider credit reservation audit-only checks read-only across free/supporter tiers, mint missing omagic API keys, keep empty key slots explicit in env until minted, and route runsite/propertyquarry render requests through internal-only EA capability surfaces.",
-            acceptance_gate="Origin Dossier accepts Magicfit-backed visual receipts, validates configured packaging provider receipts, proves no-credit-burn provider readiness audits and free/supporter credit gates, Runsite and Propertyquarry expose internal render capability receipts, and Teable reflects the split without exposing raw provider credentials.",
+            next_action=origin_visuals_runtime["next_action"],
+            acceptance_gate="Deployed Origin Dossier owner proof stays pass on chummer.run, packaging and visual receipt policy remain truthful, no-credit-burn provider readiness audits and free/supporter credit gates stay enforced, Runsite and Propertyquarry share one internal render capability receipt contract, and Teable/env reflect provider account state without exposing raw credentials.",
         ),
         ImportantWorkItem(
             item_id="code-quality-specialization-pass",
@@ -2231,7 +2242,21 @@ def open_hub_url(request: urllib.request.Request, *, timeout: float):
     )
 
 
-def send_hub_json(method: str, url: str, token: str, payload: dict[str, Any] | None = None, timeout: int = 60) -> Any:
+def send_hub_json(
+    method: str,
+    url: str,
+    token: str,
+    payload: dict[str, Any] | None = None,
+    timeout: float | None = None,
+    *,
+    deadline_monotonic: float | None = None,
+) -> Any:
+    requested_timeout_seconds = resolve_http_timeout_seconds() if timeout is None else float(timeout)
+    effective_timeout_seconds = bounded_timeout_seconds(
+        requested_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+        label="hub_request",
+    )
     data: bytes | None = None
     headers = {
         "Authorization": f"Bearer {token}",
@@ -2293,7 +2318,12 @@ def important_work_item_to_hub_request(item: ImportantWorkItem) -> dict[str, Any
     }
 
 
-def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any]:
+def seed_hub_store(
+    *,
+    hub_base_url: str,
+    hub_token: str | None,
+    request_timeout_seconds: float,
+) -> dict[str, Any]:
     started_at = now_iso()
     rows = important_work_items()
     if not hub_token:
@@ -2301,6 +2331,7 @@ def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any
             "state": "blocked",
             "attempted": True,
             "started_at_utc": started_at,
+            "request_timeout_seconds": request_timeout_seconds,
             "recorded_count": 0,
             "failed_count": len(rows),
             "errors": ["hub_internal_token_missing"],
@@ -2310,7 +2341,13 @@ def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any
     endpoint = f"{hub_base_url.rstrip('/')}/api/internal/community/important-work"
     for item in rows:
         try:
-            send_hub_json("POST", endpoint, hub_token, important_work_item_to_hub_request(item))
+            send_hub_json(
+                "POST",
+                endpoint,
+                hub_token,
+                important_work_item_to_hub_request(item),
+                timeout=request_timeout_seconds,
+            )
             recorded += 1
         except Exception as exc:  # pragma: no cover - live edge behavior is integration-level.
             errors.append(f"{item.item_id}:{safe_hub_error_code(exc)}")
@@ -2320,6 +2357,7 @@ def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any
         "started_at_utc": started_at,
         "finished_at_utc": now_iso(),
         "hub_base_url": hub_base_url.rstrip("/"),
+        "request_timeout_seconds": request_timeout_seconds,
         "recorded_count": recorded,
         "failed_count": len(errors),
         "errors": errors,
@@ -2404,6 +2442,7 @@ def main(argv: list[str] | None = None) -> int:
         projection["hub_seed"] = seed_hub_store(
             hub_base_url=str(args.hub_base_url),
             hub_token=args.hub_token,
+            request_timeout_seconds=float(args.request_timeout_seconds),
         )
         if projection["hub_seed"]["state"] != "passed":
             projection["status"] = "blocked" if projection["hub_seed"]["state"] == "blocked" else "failed"

@@ -63,6 +63,9 @@ public sealed class HubIdentitySubjectCache
         _entries[BuildCacheKey(cacheScope, accessToken)] = new CachedAuthenticatedHubSubject(subject, DateTimeOffset.UtcNow.Add(ttl));
     }
 
+    public void Remove(string cacheScope, string accessToken)
+        => _entries.TryRemove(BuildCacheKey(cacheScope, accessToken), out _);
+
     private static string BuildCacheKey(string cacheScope, string accessToken)
         => string.Concat(cacheScope, "|", accessToken);
 }
@@ -107,7 +110,20 @@ public sealed class HubIdentityClient
         }
     }
 
-    public async Task<AuthenticatedHubSubject> RequireSubjectAsync(HttpRequest request, CancellationToken cancellationToken)
+    public Task<AuthenticatedHubSubject> RequireSubjectAsync(
+        HttpRequest request,
+        CancellationToken cancellationToken)
+        => ResolveSubjectAsync(request, allowCachedSubject: true, cancellationToken);
+
+    public Task<AuthenticatedHubSubject> RequireFreshSubjectAsync(
+        HttpRequest request,
+        CancellationToken cancellationToken)
+        => ResolveSubjectAsync(request, allowCachedSubject: false, cancellationToken);
+
+    private async Task<AuthenticatedHubSubject> ResolveSubjectAsync(
+        HttpRequest request,
+        bool allowCachedSubject,
+        CancellationToken cancellationToken)
     {
         var accessToken = ExtractBearerToken(request);
         if (TryResolveLocalSeededSubject(request, accessToken, out AuthenticatedHubSubject? localSubject))
@@ -115,14 +131,31 @@ public sealed class HubIdentityClient
             return localSubject!;
         }
 
-        if (_subjectCache.TryGet(BaseUrl, accessToken, out AuthenticatedHubSubject? cachedSubject))
+        if (allowCachedSubject
+            && _subjectCache.TryGet(BaseUrl, accessToken, out AuthenticatedHubSubject? cachedSubject))
         {
             return cachedSubject!;
         }
 
-        var introspection = await IntrospectAsync(accessToken, cancellationToken);
+        IdentityIntrospectionResponse introspection;
+        try
+        {
+            introspection = await IntrospectAsync(accessToken, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (!allowCachedSubject
+            && ex.StatusCode == StatusCodes.Status401Unauthorized)
+        {
+            _subjectCache.Remove(BaseUrl, accessToken);
+            throw;
+        }
+
         if (!introspection.Active || string.IsNullOrWhiteSpace(introspection.SubjectId))
         {
+            if (!allowCachedSubject)
+            {
+                _subjectCache.Remove(BaseUrl, accessToken);
+            }
+
             throw new HubRequestAuthException(StatusCodes.Status401Unauthorized, "active identity session required.");
         }
 

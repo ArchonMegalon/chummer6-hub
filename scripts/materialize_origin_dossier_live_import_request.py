@@ -49,6 +49,8 @@ RAW_EVIDENCE_LEAK_MARKERS = (
 VERIFIED_STATUSES = ("verified", "delivered", "ok", "success")
 LIVE_TOKEN = "operator_verified_live_run"
 PROVIDER_REFERENCE_TOKEN = "provider_receipt_reference"
+MINIMUM_FULL_STORY_WORD_COUNT = 10_000
+MINIMUM_FULL_STORY_CHAPTER_COUNT = 8
 
 
 class ValidationError(RuntimeError):
@@ -110,6 +112,24 @@ def _require_file_relative_to(value: object, field: str, base_dir: Path) -> Path
     return _require_file(value, field)
 
 
+def _default_namespace_artifact_path(base_dir: Path, namespace: str, filenames: tuple[str, ...]) -> Path | None:
+    branch = base_dir / namespace
+    for filename in filenames:
+        candidate = branch / filename
+        if candidate.is_file() and candidate.stat().st_size > 0:
+            return candidate
+    return None
+
+
+def _normalize_book_artifact_path(book_artifact: Path) -> Path:
+    if book_artifact.suffix.lower() != ".epub":
+        return book_artifact
+    sibling_pdf = book_artifact.with_name("book.pdf")
+    if sibling_pdf.is_file() and sibling_pdf.stat().st_size > 0:
+        return sibling_pdf
+    return book_artifact
+
+
 def _json_text(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
@@ -161,6 +181,46 @@ def _string(value: object) -> str:
     return str(value or "").strip()
 
 
+def _count_story_words(value: str) -> int:
+    words = 0
+    in_word = False
+    for character in value:
+        if character.isalnum():
+            in_word = True
+        elif in_word:
+            words += 1
+            in_word = False
+    return words + 1 if in_word else words
+
+
+def _count_chapter_markers(value: str) -> int:
+    return sum(
+        1
+        for line in value.splitlines()
+        if line.strip().lower().startswith(("# chapter ", "## chapter ", "chapter "))
+    )
+
+
+def _validate_full_story_manuscript_artifact(path: Path) -> None:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValidationError(f"providerManuscriptPath: cannot read manuscript: {exc}") from exc
+    _reject_fake_markers(text, "providerManuscriptPath")
+    word_count = _count_story_words(text)
+    if word_count < MINIMUM_FULL_STORY_WORD_COUNT:
+        raise ValidationError(
+            "providerManuscriptPath: full story manuscript is below "
+            f"{MINIMUM_FULL_STORY_WORD_COUNT} words"
+        )
+    chapter_count = _count_chapter_markers(text)
+    if chapter_count < MINIMUM_FULL_STORY_CHAPTER_COUNT:
+        raise ValidationError(
+            "providerManuscriptPath: full story manuscript has fewer than "
+            f"{MINIMUM_FULL_STORY_CHAPTER_COUNT} chapter markers"
+        )
+
+
 def _bool(value: object) -> bool:
     return value is True or str(value or "").strip().lower() in {"1", "true", "yes", "pass", "ready", "verified"}
 
@@ -199,10 +259,6 @@ def _owner_path(project_id: str, artifact_kind: str | None = None) -> str:
     return f"{base}/{artifact_kind}" if artifact_kind else base
 
 
-def _provider_allowed(provider: str, allowed: tuple[str, ...]) -> bool:
-    return OriginProviderCapabilityRegistry(manuscript_provider_tokens=allowed).manuscript_provider_allowed(provider)
-
-
 def _validate_receipt(
     *,
     path: Path,
@@ -238,16 +294,14 @@ def _validate_receipt(
 
 
 def _validate_provider_manuscript_receipt(path: Path, manuscript_hash: str) -> None:
-    raw = _read_json(path)
-    provider = _json_text(raw)
-    internal_chummer_origin = _provider_allowed(provider, ("chummer originbookengine",))
     receipt = _validate_receipt(
         path=path,
         label="providerManuscriptReceiptPath",
         operation="provider_manuscript_import",
         provider_token=None,
         artifact_hashes=(manuscript_hash,),
-        external=not internal_chummer_origin,
+        required_tokens=("full_story_manuscript", "chaptered_story"),
+        external=True,
     )
     if not PROVIDER_REGISTRY.manuscript_provider_allowed(receipt.get("provider")):
         raise ValidationError("providerManuscriptReceiptPath: provider is not in the configured Origin manuscript provider registry")
@@ -484,22 +538,53 @@ def _validate_live_delivery_receipt(
 
 def _materialize_normalized_receipts(
     *,
-    output_dir: Path,
+    dossier_output_dir: Path,
+    audiobook_output_dir: Path,
     project_id: str,
     audiobook_share_url: str,
     dossier_share_url: str,
     origin_namespace: str,
+    ebook_hash: str,
     audiobook_hash: str,
     audiobook_provider: str,
+    ebook_dossier_receipt_path: Path,
     ea_job_receipt_path: Path,
     ea_live_receipt_path: Path,
-) -> tuple[Path, Path]:
+) -> tuple[Path, Path, Path]:
     generated_at = _now_iso()
+    dossier_receipt_hash = _sha256_file(ebook_dossier_receipt_path)
     job_receipt_hash = _sha256_file(ea_job_receipt_path)
     live_receipt_hash = _sha256_file(ea_live_receipt_path)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    audiobook_receipt_path = output_dir / f"{project_id}.audiobookshelf-import.receipt.json"
-    telegram_receipt_path = output_dir / f"{project_id}.telegram-share.receipt.json"
+    dossier_output_dir.mkdir(parents=True, exist_ok=True)
+    audiobook_output_dir.mkdir(parents=True, exist_ok=True)
+    dossier_taxonomy = f"{origin_namespace}/dossier"
+    audiobook_taxonomy = f"{origin_namespace}/audiobook"
+    dossier_receipt_path = dossier_output_dir / f"{project_id}.audiobookshelf-dossier-import.receipt.json"
+    audiobook_receipt_path = audiobook_output_dir / f"{project_id}.audiobookshelf-import.receipt.json"
+    telegram_receipt_path = audiobook_output_dir / f"{project_id}.telegram-share.receipt.json"
+    dossier_receipt = {
+        "operation": "audiobookshelf_dossier_import",
+        "provider": "Audiobookshelf",
+        "status": "verified",
+        "completedAtUtc": generated_at,
+        "artifactSha256": [ebook_hash],
+        "audiobookshelfDossierShareUrl": dossier_share_url,
+        "originEditionNamespace": origin_namespace,
+        "originTaxonomy": dossier_taxonomy,
+        "libraryPath": dossier_taxonomy,
+        "deliveredLinks": [
+            LIVE_TOKEN,
+            f"{PROVIDER_REFERENCE_TOKEN}:audiobookshelf_dossier_receipt:{dossier_receipt_hash}",
+            origin_namespace,
+            dossier_taxonomy,
+            dossier_share_url,
+            f"audiobookshelf_dossier_share_sha256:{_sha256_text(dossier_share_url)}",
+        ],
+        "evidence": {
+            "providerReceiptSha256": dossier_receipt_hash,
+            "providerReceiptOperation": "audiobookshelf_dossier_import",
+        },
+    }
     audiobook_receipt = {
         "operation": "audiobookshelf_import",
         "provider": "Audiobookshelf",
@@ -508,10 +593,15 @@ def _materialize_normalized_receipts(
         "artifactSha256": [audiobook_hash],
         "audiobookProvider": audiobook_provider,
         "audiobookshelfShareUrl": audiobook_share_url,
+        "originEditionNamespace": origin_namespace,
+        "originTaxonomy": audiobook_taxonomy,
+        "libraryPath": audiobook_taxonomy,
         "deliveredLinks": [
             LIVE_TOKEN,
             f"{PROVIDER_REFERENCE_TOKEN}:ea_job_receipt:{job_receipt_hash}",
             f"{PROVIDER_REFERENCE_TOKEN}:ea_live_delivery_receipt:{live_receipt_hash}",
+            origin_namespace,
+            audiobook_taxonomy,
             f"narrationProvider: {audiobook_provider}",
             "machine_playback_e2e_verified",
             audiobook_share_url,
@@ -524,34 +614,52 @@ def _materialize_normalized_receipts(
         },
     }
     telegram_receipt = {
+        "contractName": EA_LIVE_DELIVERY_CONTRACT_NAME,
         "operation": "telegram_share_delivery",
         "provider": "EA Telegram",
+        "adapter": "ExecutiveAssistantChannelMessagingService",
         "status": "delivered",
         "deliveredAtUtc": generated_at,
+        "telegramMessageIdHashedByEa": True,
+        "rawTelegramChatIdIncluded": False,
+        "origin_edition_link_bundle": {
+            "project_id": project_id,
+            "origin_namespace_sha256": _sha256_text(origin_namespace),
+            "open_in_chummer_url_sha256": _sha256_text(_owner_path(project_id)),
+            "read_url_sha256": _sha256_text(_owner_path(project_id, "read")),
+            "listen_url_sha256": _sha256_text(_owner_path(project_id, "listen")),
+            "watch_url_sha256": _sha256_text(_owner_path(project_id, "watch")),
+            "all_required_links_present": True,
+            "raw_urls_exposed": False,
+            "telegram_delivery_status": "sent",
+            "telegram_message_id_present": True,
+        },
         "linkBundleSha256": {
-            "open_in_chummer": hashlib.sha256(_owner_path(project_id).encode("utf-8")).hexdigest(),
-            "read": hashlib.sha256(_owner_path(project_id, "read").encode("utf-8")).hexdigest(),
-            "listen": hashlib.sha256(_owner_path(project_id, "listen").encode("utf-8")).hexdigest(),
-            "watch": hashlib.sha256(_owner_path(project_id, "video").encode("utf-8")).hexdigest(),
-            "origin_namespace": hashlib.sha256(origin_namespace.encode("utf-8")).hexdigest(),
+            "open_in_chummer": _sha256_text(_owner_path(project_id)),
+            "read": _sha256_text(_owner_path(project_id, "read")),
+            "listen": _sha256_text(_owner_path(project_id, "listen")),
+            "watch": _sha256_text(_owner_path(project_id, "video")),
+            "origin_namespace": _sha256_text(origin_namespace),
         },
         "deliveredLinks": [
             _owner_path(project_id),
             _owner_path(project_id, "read"),
             _owner_path(project_id, "listen"),
             _owner_path(project_id, "video"),
-            hashlib.sha256(_owner_path(project_id).encode("utf-8")).hexdigest(),
-            hashlib.sha256(_owner_path(project_id, "read").encode("utf-8")).hexdigest(),
-            hashlib.sha256(_owner_path(project_id, "listen").encode("utf-8")).hexdigest(),
-            hashlib.sha256(_owner_path(project_id, "video").encode("utf-8")).hexdigest(),
+            _sha256_text(_owner_path(project_id)),
+            _sha256_text(_owner_path(project_id, "read")),
+            _sha256_text(_owner_path(project_id, "listen")),
+            _sha256_text(_owner_path(project_id, "video")),
             origin_namespace,
-            hashlib.sha256(origin_namespace.encode("utf-8")).hexdigest(),
+            _sha256_text(origin_namespace),
             dossier_share_url,
             audiobook_share_url,
             LIVE_TOKEN,
             f"{PROVIDER_REFERENCE_TOKEN}:ea_live_delivery_receipt:{live_receipt_hash}",
-            f"audiobookshelf_dossier_share_sha256:{hashlib.sha256(dossier_share_url.encode('utf-8')).hexdigest()}",
-            f"audiobookshelf_audiobook_share_sha256:{hashlib.sha256(audiobook_share_url.encode('utf-8')).hexdigest()}",
+            _owner_path(project_id, "watch"),
+            _sha256_text(_owner_path(project_id, "watch")),
+            f"audiobookshelf_dossier_share_sha256:{_sha256_text(dossier_share_url)}",
+            f"audiobookshelf_audiobook_share_sha256:{_sha256_text(audiobook_share_url)}",
         ],
         "evidence": {
             "eaLiveDeliveryReceiptSha256": live_receipt_hash,
@@ -559,9 +667,10 @@ def _materialize_normalized_receipts(
             "telegramMessageIdHashedByEa": True,
         },
     }
+    _write_json(dossier_receipt_path, dossier_receipt)
     _write_json(audiobook_receipt_path, audiobook_receipt)
     _write_json(telegram_receipt_path, telegram_receipt)
-    return audiobook_receipt_path, telegram_receipt_path
+    return dossier_receipt_path, audiobook_receipt_path, telegram_receipt_path
 
 
 def materialize(manifest_path: Path, output_path: Path | None = None, *, base_url_override: str | None = None) -> dict[str, Any]:
@@ -612,7 +721,8 @@ def materialize(manifest_path: Path, output_path: Path | None = None, *, base_ur
         manifest_dir,
     )
     canon_receipt = _require_file_relative_to(manifest.get("canonAuditReceiptPath"), "canonAuditReceiptPath", manifest_dir)
-    book_artifact = _require_file_relative_to(manifest.get("bookArtifactPath"), "bookArtifactPath", manifest_dir)
+    raw_book_artifact = _require_file_relative_to(manifest.get("bookArtifactPath"), "bookArtifactPath", manifest_dir)
+    book_artifact = _normalize_book_artifact_path(raw_book_artifact)
     book_receipt = _require_file_relative_to(manifest.get("bookArtifactReceiptPath"), "bookArtifactReceiptPath", manifest_dir)
     ebook_artifact = _require_file_relative_to(manifest.get("ebookArtifactPath") or manifest.get("bookArtifactPath"), "ebookArtifactPath", manifest_dir)
     ebook_dossier_receipt = _require_file_relative_to(
@@ -623,6 +733,16 @@ def materialize(manifest_path: Path, output_path: Path | None = None, *, base_ur
     )
     cover_artifact = _require_file_relative_to(manifest.get("storySceneCoverPath"), "storySceneCoverPath", manifest_dir)
     cover_receipt = _require_file_relative_to(manifest.get("storySceneCoverReceiptPath"), "storySceneCoverReceiptPath", manifest_dir)
+    cover_consistency_receipt = _require_file_relative_to(
+        manifest.get("coverConsistencyReceiptPath")
+        or _default_namespace_artifact_path(
+            manifest_dir,
+            origin_namespace,
+            ("cover-consistency-strict.receipt.json", "cover-consistency.receipt.json"),
+        ),
+        "coverConsistencyReceiptPath",
+        manifest_dir,
+    )
     audiobook_artifact = _require_file_relative_to(manifest.get("audiobookPath"), "audiobookPath", manifest_dir)
     video_artifact = _require_file_relative_to(manifest.get("dossierVideoPath"), "dossierVideoPath", manifest_dir)
     movie_poster_artifact = _require_file_relative_to(
@@ -663,6 +783,7 @@ def materialize(manifest_path: Path, output_path: Path | None = None, *, base_ur
     video_hash = _sha256_file(video_artifact)
     movie_poster_hash = _sha256_file(movie_poster_artifact)
 
+    _validate_full_story_manuscript_artifact(provider_manuscript)
     _validate_receipt(
         path=source_receipt,
         label="sourcePacketReceiptPath",
@@ -695,6 +816,7 @@ def materialize(manifest_path: Path, output_path: Path | None = None, *, base_ur
         operation="book_artifact_import",
         provider_token=None,
         artifact_hashes=(book_hash,),
+        required_tokens=("story_edition_ebook", "fitted_cover_art"),
         external=True,
     )
     _validate_dossier_audiobookshelf_import_receipt(
@@ -711,6 +833,7 @@ def materialize(manifest_path: Path, output_path: Path | None = None, *, base_ur
         operation="dossier_video_import",
         provider_token=None,
         artifact_hashes=(video_hash,),
+        required_tokens=("selected_character_face", "selected_cinematic_scene", "character_visible_cinematic"),
         external=True,
     )
     audiobook_provider = _validate_audio_job_receipt(ea_job_receipt, audiobook_hash, audiobook_share_url)
@@ -730,15 +853,19 @@ def materialize(manifest_path: Path, output_path: Path | None = None, *, base_ur
     )
 
     resolved_output = output_path or manifest_path.with_name(DEFAULT_OUTPUT_NAME)
-    normalized_dir = resolved_output.parent / origin_namespace / "audiobook"
-    audiobook_receipt, telegram_receipt = _materialize_normalized_receipts(
-        output_dir=normalized_dir,
+    normalized_dossier_dir = resolved_output.parent / origin_namespace / "dossier"
+    normalized_audiobook_dir = resolved_output.parent / origin_namespace / "audiobook"
+    dossier_receipt, audiobook_receipt, telegram_receipt = _materialize_normalized_receipts(
+        dossier_output_dir=normalized_dossier_dir,
+        audiobook_output_dir=normalized_audiobook_dir,
         project_id=project_id,
         audiobook_share_url=audiobook_share_url,
         dossier_share_url=dossier_share_url,
         origin_namespace=origin_namespace,
+        ebook_hash=ebook_hash,
         audiobook_hash=audiobook_hash,
         audiobook_provider=audiobook_provider,
+        ebook_dossier_receipt_path=ebook_dossier_receipt,
         ea_job_receipt_path=ea_job_receipt,
         ea_live_receipt_path=ea_live_delivery_receipt,
     )
@@ -776,9 +903,10 @@ def materialize(manifest_path: Path, output_path: Path | None = None, *, base_ur
         "bookArtifactPath": str(book_artifact),
         "bookArtifactReceiptPath": str(book_receipt),
         "ebookArtifactPath": str(ebook_artifact),
-        "ebookAudiobookshelfImportReceiptPath": str(ebook_dossier_receipt),
+        "ebookAudiobookshelfImportReceiptPath": str(dossier_receipt),
         "storySceneCoverPath": str(cover_artifact),
         "storySceneCoverReceiptPath": str(cover_receipt),
+        "coverConsistencyReceiptPath": str(cover_consistency_receipt),
         "audiobookPath": str(audiobook_artifact),
         "m4bProviderImportReceiptPath": str(ea_m4b_provider_receipt),
         "audiobookshelfImportReceiptPath": str(audiobook_receipt),
@@ -786,6 +914,7 @@ def materialize(manifest_path: Path, output_path: Path | None = None, *, base_ur
         "moviePosterPath": str(movie_poster_artifact),
         "dossierVideoPosterPath": str(movie_poster_artifact),
         "dossierVideoReceiptPath": str(video_receipt),
+        "eaTelegramLiveDeliveryReceiptPath": str(ea_live_delivery_receipt),
         "telegramShareDeliveryReceiptPath": str(telegram_receipt),
         "finalNoFallbackNoSentinelAuditReceiptPath": str(final_no_fallback_receipt),
         "missingGoldRequirements": [],
@@ -809,14 +938,18 @@ def materialize(manifest_path: Path, output_path: Path | None = None, *, base_ur
             "humanizerQualityReceiptSha256": _sha256_file(humanizer_quality_receipt),
             "bookArtifactSha256": book_hash,
             "ebookArtifactSha256": ebook_hash,
-            "ebookAudiobookshelfImportReceiptSha256": _sha256_file(ebook_dossier_receipt),
+            "ebookAudiobookshelfImportReceiptSha256": _sha256_file(dossier_receipt),
             "storySceneCoverSha256": cover_hash,
+            "coverConsistencyReceiptSha256": _sha256_file(cover_consistency_receipt),
             "audiobookSha256": audiobook_hash,
             "dossierVideoSha256": video_hash,
             "moviePosterSha256": movie_poster_hash,
             "eaAudiobookJobReceiptSha256": _sha256_file(ea_job_receipt),
             "eaM4bProviderImportReceiptSha256": _sha256_file(ea_m4b_provider_receipt),
             "eaTelegramLiveDeliveryReceiptSha256": _sha256_file(ea_live_delivery_receipt),
+            "eaTelegramLiveDeliveryReceiptPath": str(ea_live_delivery_receipt),
+            "sourceEbookAudiobookshelfImportReceiptSha256": _sha256_file(ebook_dossier_receipt),
+            "normalizedEbookAudiobookshelfImportReceiptPath": str(dossier_receipt),
             "normalizedAudiobookshelfImportReceiptPath": str(audiobook_receipt),
             "normalizedTelegramShareDeliveryReceiptPath": str(telegram_receipt),
         },

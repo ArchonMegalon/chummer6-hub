@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj" />
   <Project Path="Chummer.Control.Contracts/Chummer.Control.Contracts.csproj" />
+  <Project Path="Chummer.InstallLinking.Postgres.Tool/Chummer.InstallLinking.Postgres.Tool.csproj" />
   <Project Path="Chummer.Run.AI/Chummer.Run.AI.csproj" />
   <Project Path="Chummer.Run.Api/Chummer.Run.Api.csproj" />
   <Project Path="Chummer.Run.Contracts/Chummer.Run.Contracts.csproj" />

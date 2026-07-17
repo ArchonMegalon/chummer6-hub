@@ -161,6 +161,9 @@ class ArtifactFactoryPublishFlowTests(unittest.TestCase):
         self.assertIn("materialize_artifact_factory_source_pack_batch.py", script_text)
         self.assertIn("launch_artifact_factory_source_pack_batch.py", script_text)
         self.assertIn("Artifact-factory batch launched via", script_text)
+        self.assertIn('ARTIFACT_FACTORY_REQUIRED="${CHUMMER_ARTIFACT_FACTORY_AUTOLAUNCH_REQUIRED:-0}"', script_text)
+        self.assertIn("Artifact-factory autolaunch warning:", script_text)
+        self.assertIn("set CHUMMER_ARTIFACT_FACTORY_AUTOLAUNCH_REQUIRED=1 to make this fatal.", script_text)
 
     def test_publish_http_script_auto_resolves_release_proof_candidates(self) -> None:
         script_text = PUBLISH_HTTP.read_text(encoding="utf-8")

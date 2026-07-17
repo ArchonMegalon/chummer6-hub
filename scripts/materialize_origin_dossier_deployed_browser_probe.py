@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import sys
 from typing import Any
 from urllib.parse import quote
@@ -202,11 +203,25 @@ def response_sha256(response: requests.Response | None) -> str:
     return hashlib.sha256(response.content or b"").hexdigest()
 
 
+def attribute_int(detail_text: str, attribute_name: str) -> int:
+    match = re.search(rf'{re.escape(attribute_name)}="(\d+)"', detail_text)
+    return int(match.group(1)) if match else 0
+
+
 def share_reachable(response: requests.Response | None) -> bool:
     if status(response) != 200:
         return False
     content_type = header(response, "content-type").lower()
     return body_size(response) > 0 and any(token in content_type for token in ("text/html", "application/xhtml", "application/json"))
+
+
+def expected_book_content_type_tokens(book_artifact_path: str) -> tuple[str, ...]:
+    path = str(book_artifact_path or "").strip().lower()
+    if path.endswith(".pdf"):
+        return ("application/pdf",)
+    if path.endswith(".epub"):
+        return ("application/epub+zip", "epub")
+    return ("application/pdf", "application/epub+zip", "epub")
 
 
 def materialize(
@@ -226,7 +241,8 @@ def materialize(
     live_evidence = imported.get("evidence") if isinstance(imported.get("evidence"), dict) else {}
     deployed_state_import = read_deployed_state_import(evidence_root, context)
     expected_cover_sha = str(live_evidence.get("storySceneCoverSha256") or "").strip()
-    expected_book_sha = str(live_evidence.get("ebookArtifactSha256") or live_evidence.get("bookArtifactSha256") or "").strip()
+    expected_book_sha = str(live_evidence.get("bookArtifactSha256") or live_evidence.get("ebookArtifactSha256") or "").strip()
+    expected_book_content_types = expected_book_content_type_tokens(str(request.get("bookArtifactPath") or ""))
     expected_video_sha = str(live_evidence.get("dossierVideoSha256") or "").strip()
     share_url = str(request.get("audiobookshelfAudiobookShareUrl") or request.get("audiobookshelfShareUrl") or "").strip()
     dossier_share_url = str(request.get("audiobookshelfDossierShareUrl") or "").strip()
@@ -295,7 +311,7 @@ def materialize(
     detail_text = detail.text if detail is not None and status(detail) == 200 else ""
     logged_in = status(detail) == 200 and "data-origin-dossier-detail" in detail_text
     cover_route = f'{cover_url}"'
-    cover_alt = f'Rendered Origin Dossier story scene cover for {context.runner_name}'
+    cover_alt = f'Fitted Origin Dossier cover art for {context.runner_name}'
     selected_cover_marker = 'data-story-scene-cover-uses-selected-character-face="true"' in detail_text
     selected_cover_alt = cover_alt in detail_text
     selected_cover_route = cover_route in detail_text
@@ -309,6 +325,12 @@ def materialize(
     read_tab = read_link and read_section
     listen_tab = listen_link and listen_section
     watch_tab = watch_link and watch_section
+    portrait_choice_count = attribute_int(detail_text, "data-origin-portrait-choice-count")
+    audiobook_voice_count = attribute_int(detail_text, "data-origin-audiobook-voice-count")
+    scene_highlight_count = attribute_int(detail_text, "data-origin-scene-highlight-count")
+    portrait_choice_count_verified = portrait_choice_count == 3
+    audiobook_voice_count_verified = audiobook_voice_count > 0
+    scene_highlight_count_verified = scene_highlight_count > 0
     canon_tab = 'href="#origin-edition-canon-audit"' in detail_text
     canon_section = 'id="origin-edition-canon-audit"' in detail_text and 'data-origin-edition-tab="canon-audit"' in detail_text
     chummer_canon_owner = 'data-chummer-owns-canon="true"' in detail_text
@@ -331,7 +353,7 @@ def materialize(
     dossier_share_reachable = share_reachable(dossier_share)
     watch_gate = status(video) == 200 and "video/mp4" in header(video, "content-type")
     cover_gate = status(cover) == 200 and "image/" in header(cover, "content-type")
-    book_gate = status(book) == 200 and "epub" in header(book, "content-type").lower()
+    book_gate = status(book) == 200 and any(token in header(book, "content-type").lower() for token in expected_book_content_types)
     canon_audit_route = status(canon_audit) == 200 and "application/json" in header(canon_audit, "content-type")
     watch_artifact_nonempty = watch_gate and body_size(video) > 0
     cover_artifact_nonempty = cover_gate and body_size(cover) > 0
@@ -346,6 +368,9 @@ def materialize(
             read_tab,
             listen_tab,
             watch_tab,
+            portrait_choice_count_verified,
+            audiobook_voice_count_verified,
+            scene_highlight_count_verified,
             canon_tab,
             canon_audit_content_verified,
             canon_audit_route,
@@ -389,6 +414,9 @@ def materialize(
         "listen_section_visible": listen_section,
         "watch_tab_visible": watch_tab,
         "watch_section_visible": watch_section,
+        "portrait_choice_count_verified": portrait_choice_count_verified,
+        "audiobook_voice_count_verified": audiobook_voice_count_verified,
+        "scene_highlight_count_verified": scene_highlight_count_verified,
         "canon_audit_tab_visible": canon_tab,
         "canon_audit_section_visible": canon_section,
         "chummer_canon_owner_visible": chummer_canon_owner,
@@ -499,6 +527,11 @@ def materialize(
             "canon_audit": body_size(canon_audit),
             "audiobook_share": body_size(audiobook_share),
             "dossier_share": body_size(dossier_share),
+        },
+        "ownerPageCounts": {
+            "portraitChoices": portrait_choice_count,
+            "audiobookVoiceOptions": audiobook_voice_count,
+            "sceneHighlights": scene_highlight_count,
         },
         "response_sha256": {
             "cover": response_sha256(cover),

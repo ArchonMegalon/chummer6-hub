@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from materialize_google_oauth_linking_proof import verify_receipt as verify_google_oauth_linking_receipt
+
 
 RUN_SERVICES_ROOT = Path("/docker/chummercomplete/chummer.run-services")
 PRESENTATION_ROOT = Path("/docker/chummercomplete/chummer-presentation")
@@ -27,11 +29,19 @@ def load_json(path: Path) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def normalized_strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
 def status_is_pass(payload: dict[str, Any] | None) -> bool:
     if not payload:
         return False
     status = str(payload.get("status") or "").strip().lower()
-    return status in PASS_STATUSES
+    failures = normalized_strings(payload.get("failures"))
+    failed_gates = normalized_strings(payload.get("failed_gates"))
+    return status in PASS_STATUSES and not failures and not failed_gates
 
 
 def resolve_path(root: Path, candidate: Any) -> Path | None:
@@ -126,7 +136,7 @@ def validate_canonical_domain(payload: dict[str, Any]) -> tuple[bool, str]:
     status = str(payload.get("status") or "").strip().lower()
     domain_status = payload.get("domain_status") or {}
     retired_alias = domain_status.get("chummer6.run")
-    ok = status in PASS_STATUSES and canonical == "chummer.run" and retired_alias == "not_used"
+    ok = status_is_pass(payload) and canonical == "chummer.run" and retired_alias == "not_used"
     return ok, (
         f"status={status or 'missing'} canonical_public_domain={canonical!r} "
         f"chummer6.run={retired_alias!r}"
@@ -168,22 +178,11 @@ def validate_live_support_proof(payload: dict[str, Any]) -> tuple[bool, str]:
 
 
 def validate_live_oauth_linking_proof(payload: dict[str, Any]) -> tuple[bool, str]:
-    script = payload.get("script")
-    script_path = resolve_path(RUN_SERVICES_ROOT, script)
-    test_cases = payload.get("test_cases")
-    ok = (
-        status_is_pass(payload)
-        and payload.get("base_url") == "https://chummer.run"
-        and isinstance(script, str)
-        and script_path is not None
-        and script_path.is_file()
-        and isinstance(test_cases, list)
-        and len(test_cases) >= 4
-    )
+    ok, issues = verify_google_oauth_linking_receipt(payload, require_pass=True)
     return ok, (
         f"status={payload.get('status')!r} base_url={payload.get('base_url')!r} "
-        f"script={script!r} script_exists={bool(script_path and script_path.is_file())} "
-        f"test_cases={len(test_cases) if isinstance(test_cases, list) else 'missing'}"
+        f"proof_contract_version={payload.get('proof_contract_version')!r} "
+        f"issues={issues}"
     )
 
 

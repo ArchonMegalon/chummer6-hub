@@ -73,35 +73,35 @@ public sealed class PublicTrustPulseService
                 static payload => string.Equals(payload.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal),
                 "hub local release status");
             FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
-            ImportRouteParityProofGuardSnapshot importRouteGuard = localReleaseProof is null
-                ? new ImportRouteParityProofGuardSnapshot(true, null)
-                : _importRouteParityProofGuard.Evaluate();
-            bool readinessReviewRequired = readiness?.RequiresReview == true;
-            string? readinessReason = readinessReviewRequired
-                ? readiness!.ReviewRequiredSummary
+            ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
+            string? readinessReason = readiness?.MissingDesktopClientCoverage == true
+                ? readiness.DesktopClientGapSummary
                 : readiness?.Reason;
             string summary = payload.Summary ?? string.Empty;
-            if (readinessReviewRequired && !string.IsNullOrWhiteSpace(readinessReason))
+            if (readiness?.MissingDesktopClientCoverage == true && !string.IsNullOrWhiteSpace(readinessReason))
             {
                 summary = AppendDistinctSentence(
                     summary,
-                    $"Flagship claims stay review-required because {readinessReason!.Trim().TrimEnd('.')}.");
+                    $"Flagship desktop parity claims stay review-required because {readinessReason!.Trim().TrimEnd('.')}.");
             }
             string? launchReadiness = payload.SupportingSignals?.LaunchReadiness;
-            if (readinessReviewRequired && !string.IsNullOrWhiteSpace(readinessReason))
+            if (readiness?.MissingDesktopClientCoverage == true && !string.IsNullOrWhiteSpace(readinessReason))
             {
-                launchReadiness = $"Hold broad ready claims on public routes and support surfaces because {readinessReason!.Trim().TrimEnd('.')}.";
+                launchReadiness = $"Hold parity claims on public routes and support surfaces because {readinessReason!.Trim().TrimEnd('.')}.";
             }
             if (!importRouteGuard.IsCurrent && !string.IsNullOrWhiteSpace(importRouteGuard.ReviewRequiredReason))
             {
                 summary = AppendDistinctSentence(
                     summary,
                     $"Import-route parity claims stay review-required because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
-                launchReadiness = $"Hold parity claims on public routes, support surfaces, and publication lanes because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.";
+                string importRouteReadiness = $"Hold parity claims on public routes, support surfaces, and publication lanes because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.";
+                launchReadiness = readiness?.MissingDesktopClientCoverage == true
+                    ? AppendDistinctSentence(launchReadiness, importRouteReadiness)
+                    : importRouteReadiness;
             }
 
             string? localReleaseProofStatus = adoptionHealth?.LocalReleaseProofStatus ?? localReleaseProof?.Status;
-            bool parityClaimsReviewRequired = readinessReviewRequired || !importRouteGuard.IsCurrent;
+            bool parityClaimsReviewRequired = readiness?.MissingDesktopClientCoverage == true || !importRouteGuard.IsCurrent;
             if (parityClaimsReviewRequired)
             {
                 localReleaseProofStatus = "review_required";
@@ -152,7 +152,6 @@ public sealed class PublicTrustPulseService
                 FlagshipReadinessStatus: readiness?.Status,
                 FlagshipReadinessReason: readinessReason,
                 MissingDesktopClientCoverage: readiness?.MissingDesktopClientCoverage == true,
-                BlockedFlagshipJourneyEvidenceCount: readiness?.BlockedJourneyEvidenceCount ?? 0,
                 ParityClaimsReviewRequired: parityClaimsReviewRequired);
         }
         catch (FileNotFoundException ex)
@@ -179,15 +178,8 @@ public sealed class PublicTrustPulseService
             return existing;
         }
 
-        string trimmed = existing.Trim();
-        string separator = EndsWithSentencePunctuation(trimmed) ? " " : ". ";
-        return $"{trimmed}{separator}{sentence}";
+        return $"{existing.Trim().TrimEnd('.')} {sentence}";
     }
-
-    private static bool EndsWithSentencePunctuation(string value)
-        => value.EndsWith(".", StringComparison.Ordinal)
-           || value.EndsWith("!", StringComparison.Ordinal)
-           || value.EndsWith("?", StringComparison.Ordinal);
 
     private TPayload? LoadOptionalArtifact<TPayload>(
         string? path,
@@ -468,7 +460,6 @@ public sealed record PublicTrustPulseSnapshot(
     string? FlagshipReadinessStatus,
     string? FlagshipReadinessReason,
     bool MissingDesktopClientCoverage,
-    int BlockedFlagshipJourneyEvidenceCount,
     bool ParityClaimsReviewRequired);
 
 public sealed record ProgressHistoryTrendPoint(string AsOf, int OverallProgressPercent);

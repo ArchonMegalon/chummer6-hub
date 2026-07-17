@@ -26,6 +26,9 @@ RUN nice -n 10 dotnet publish -c Release -o /app/publish --nologo -m:${CHUMMER_B
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/publish .
 ENV ASPNETCORE_URLS=http://+:8080
 ENTRYPOINT ["dotnet", "Chummer.Run.Identity.dll"]

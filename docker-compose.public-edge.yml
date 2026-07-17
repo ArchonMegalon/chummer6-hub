@@ -13,6 +13,13 @@ services:
       SUPPORT_PROGRESS_EMAILIT_REPLY_TO: ${IDENTITY_EMAIL_REPLY_TO:-support@chummer.run}
     volumes:
       - /docker/chummercomplete/chummer.run-services/scripts:/workspace/scripts:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5).status == 200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    mem_limit: ${CHUMMER_SUPPORT_PROGRESS_MEMORY_LIMIT:-128m}
     networks:
       public-origin:
         aliases:
@@ -29,6 +36,13 @@ services:
     environment:
       CHUMMER_PORTAL_OWNER_SHARED_KEY: ${CHUMMER_PORTAL_OWNER_SHARED_KEY:-public-edge-blazor-owner-shared-key}
       CHUMMER_PORTAL_OWNER_MAX_AGE_SECONDS: ${CHUMMER_PORTAL_OWNER_MAX_AGE_SECONDS:-300}
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    mem_limit: ${CHUMMER_PRESENTATION_API_MEMORY_LIMIT:-1g}
     cpu_shares: 128
     cpus: ${CHUMMER_PRESENTATION_API_CPUS:-0.75}
     networks:
@@ -45,7 +59,8 @@ services:
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
     depends_on:
-      - chummer-presentation-api
+      chummer-presentation-api:
+        condition: service_healthy
     environment:
       CHUMMER_API_BASE_URL: http://chummer-presentation-api:8080
       CHUMMER_BLAZOR_PATH_BASE: /blazor
@@ -56,12 +71,58 @@ services:
       CHUMMER_BLAZOR_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
     volumes:
       - chummer-public-blazor-state:/app/state
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/blazor/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    mem_limit: ${CHUMMER_PUBLIC_BLAZOR_MEMORY_LIMIT:-1g}
     cpu_shares: 128
     cpus: ${CHUMMER_PUBLIC_BLAZOR_CPUS:-0.75}
     networks:
       public-origin:
         aliases:
           - chummer-public-blazor
+
+  chummer-play-web:
+    profiles: ["play-private"]
+    image: chummer-play-web:local
+    restart: unless-stopped
+    build:
+      context: /docker/chummercomplete
+      dockerfile: chummer-play/src/Chummer.Play.Web/Dockerfile
+      additional_contexts:
+        play-source: /docker/chummercomplete/chummer-play
+        core-engine-contracts: /docker/chummercomplete/chummer-core-engine/Chummer.Contracts
+        campaign-contracts: /docker/chummercomplete/chummer.run-services/Chummer.Campaign.Contracts
+        play-contracts: /docker/chummercomplete/chummer.run-services/Chummer.Play.Contracts
+        ui-kit-source: /docker/chummercomplete/chummer-ui-kit
+      args:
+        CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      CHUMMER_PLAY_BROWSER_STATE_DIR: /app/state/browser-state
+      CHUMMER_PLAY_API_KEY: ${CHUMMER_PLAY_API_KEY:-}
+      RYBBIT_CHUMMER_PLAY_SITE_ID: ${RYBBIT_CHUMMER_PLAY_SITE_ID:-${RYBBIT_CHUMMER_RUN_SITE_ID:-}}
+      RYBBIT_CHUMMER_PLAY_SCRIPT_URL: ${RYBBIT_CHUMMER_PLAY_SCRIPT_URL:-${RYBBIT_CHUMMER_RUN_SCRIPT_URL:-}}
+      RYBBIT_CHUMMER_PLAY_SCRIPT_ORIGIN: ${RYBBIT_CHUMMER_PLAY_SCRIPT_ORIGIN:-${RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN:-https://app.rybbit.io}}
+      RYBBIT_CHUMMER_PLAY_ALLOW_SAME_HOST_PROXY: ${RYBBIT_CHUMMER_PLAY_ALLOW_SAME_HOST_PROXY:-${RYBBIT_CHUMMER_RUN_ALLOW_SAME_HOST_PROXY:-false}}
+    volumes:
+      - chummer-play-web-state:/app/state
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    mem_limit: ${CHUMMER_PLAY_WEB_MEMORY_LIMIT:-768m}
+    cpu_shares: 128
+    cpus: ${CHUMMER_PLAY_WEB_CPUS:-0.50}
+    networks:
+      public-origin:
+        aliases:
+          - chummer-play-web
 
   chummer-run-identity:
     image: chummer-run-identity:local
@@ -81,7 +142,12 @@ services:
       CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH: /app/state/identity-email-delivery.json
       IDENTITY_PUBLIC_BASE_URL: ${IDENTITY_PUBLIC_BASE_URL:-https://chummer.run}
       IDENTITY_ADMIN_KEY: ${IDENTITY_ADMIN_KEY:-}
-      IDENTITY_EMAIL_PROVIDER_ORDER: ${IDENTITY_EMAIL_PROVIDER_ORDER:-}
+      IDENTITY_EMAIL_PROVIDER_ORDER: ${IDENTITY_EMAIL_PROVIDER_ORDER:-none}
+      IDENTITY_EMAIL_START_ENABLED: ${IDENTITY_EMAIL_START_ENABLED:-false}
+      IDENTITY_EMAIL_START_WINDOW_SECONDS: ${IDENTITY_EMAIL_START_WINDOW_SECONDS:-900}
+      IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_WINDOW: ${IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_WINDOW:-60}
+      IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_RECIPIENT_PER_WINDOW: ${IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_RECIPIENT_PER_WINDOW:-3}
+      IDENTITY_EMAIL_START_MIN_SECONDS_BETWEEN_RECIPIENT_ATTEMPTS: ${IDENTITY_EMAIL_START_MIN_SECONDS_BETWEEN_RECIPIENT_ATTEMPTS:-120}
       IDENTITY_EMAIL_REPLY_TO: ${IDENTITY_EMAIL_REPLY_TO:-support@chummer.run}
       IDENTITY_EMAILIT_API_KEY: ${IDENTITY_EMAILIT_API_KEY:-}
       IDENTITY_EMAILIT_BASE_URL: ${IDENTITY_EMAILIT_BASE_URL:-https://api.emailit.com/v2}
@@ -97,6 +163,13 @@ services:
       IDENTITY_SMTP_USE_SSL: ${IDENTITY_SMTP_USE_SSL:-true}
     volumes:
       - chummer-run-identity-state:/app/state
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    mem_limit: ${CHUMMER_IDENTITY_MEMORY_LIMIT:-512m}
     cpu_shares: 128
     cpus: ${CHUMMER_IDENTITY_CPUS:-0.50}
     networks:
@@ -117,21 +190,43 @@ services:
         design-product: /docker/chummercomplete/chummer-design
       args:
         CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
+        CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
+        CHUMMER_RUNTIME_GID: ${CHUMMER_PORTAL_GID:-1654}
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
     env_file:
       - /docker/fleet/secrets/codexliz-cf-access.env
     depends_on:
-      - chummer-run-identity
-      - support-progress-mock
+      chummer-public-blazor:
+        condition: service_healthy
+      chummer-run-identity:
+        condition: service_healthy
+      support-progress-mock:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
       CHUMMER_ENABLE_HTTPS_REDIRECTION: ${CHUMMER_ENABLE_HTTPS_REDIRECTION:-false}
+      AllowedHosts: ${CHUMMER_PUBLIC_ALLOWED_HOSTS:-chummer.run}
+      CHUMMER_PUBLIC_ALLOWED_HOSTS: ${CHUMMER_PUBLIC_ALLOWED_HOSTS:-chummer.run}
+      CHUMMER_PUBLIC_CANONICAL_ORIGIN: ${CHUMMER_PUBLIC_CANONICAL_ORIGIN:-https://chummer.run}
       CHUMMER_PUBLIC_CANON_ROOT: /app
       CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT: /fleet-artifacts
       CHUMMER_COMMUNITY_STORE_PATH: /app/state/community-store.json
       CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
+      CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH: /run/chummer-secrets/data-protection-key-encryption.pfx
+      CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE: /run/chummer-secrets/data-protection-key-encryption.password
+      # PostgreSQL is the cross-host rollback authority, but the process-local mutation model still
+      # treats a compare-and-swap conflict as terminal. Keep one portal writer until reload/retry exists.
+      CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
+      CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
       CHUMMER_PUBLIC_CONCIERGE_ENABLED: ${CHUMMER_PUBLIC_CONCIERGE_ENABLED:-true}
       CHUMMER_PUBLIC_CONCIERGE_STORE_PATH: /app/state/public-concierge-store.json
       CHUMMER_PUBLIC_CONCIERGE_DOWNLOADS_ENABLED: ${CHUMMER_PUBLIC_CONCIERGE_DOWNLOADS_ENABLED:-true}
@@ -166,7 +261,23 @@ services:
       CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER: ${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-true}
       IDENTITY_SERVICE_BASE_URL: http://chummer-run-identity:8080
       IDENTITY_ADMIN_KEY: ${IDENTITY_ADMIN_KEY:-}
+      IDENTITY_EMAIL_START_ENABLED: ${IDENTITY_EMAIL_START_ENABLED:-false}
       CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX: ${CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX:-/app/state/origin-dossier-publications.json}
+      CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS: ${CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS:-audio.chummer.run,audiobookshelf.chummer.run,audiobookshelf.girschele.com}
+      CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY_PATH:-}
+      CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_REGISTRY:-}
+      CHUMMER_ORIGIN_PROVIDER_ACCOUNT_ALIASES: ${CHUMMER_ORIGIN_PROVIDER_ACCOUNT_ALIASES:-}
+      CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES: ${CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES:-}
+      CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES: ${CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES:-}
+      CHUMMER_ORIGIN_VISUAL_ACCOUNT_ALIASES: ${CHUMMER_ORIGIN_VISUAL_ACCOUNT_ALIASES:-}
+      CHUMMER_ORIGIN_PACKAGING_ACCOUNT_ALIASES: ${CHUMMER_ORIGIN_PACKAGING_ACCOUNT_ALIASES:-}
+      CHUMMER_ORIGIN_TELEGRAM_ACCOUNT_ALIASES: ${CHUMMER_ORIGIN_TELEGRAM_ACCOUNT_ALIASES:-}
+      CHUMMER_ORIGIN_MANUSCRIPT_PROVIDER_TOKENS: ${CHUMMER_ORIGIN_MANUSCRIPT_PROVIDER_TOKENS:-}
+      CHUMMER_ORIGIN_AUDIO_PROVIDER_TOKENS: ${CHUMMER_ORIGIN_AUDIO_PROVIDER_TOKENS:-}
+      CHUMMER_ORIGIN_VISUAL_PREFERRED_PROVIDER_TOKENS: ${CHUMMER_ORIGIN_VISUAL_PREFERRED_PROVIDER_TOKENS:-}
+      CHUMMER_ORIGIN_VISUAL_PROVIDER_TOKENS: ${CHUMMER_ORIGIN_VISUAL_PROVIDER_TOKENS:-}
+      CHUMMER_ORIGIN_PACKAGING_PROVIDER_TOKENS: ${CHUMMER_ORIGIN_PACKAGING_PROVIDER_TOKENS:-}
+      CHUMMER_RENDER_POOL_PROVIDER_TOKENS: ${CHUMMER_RENDER_POOL_PROVIDER_TOKENS:-}
       GOOGLE_OIDC_CLIENT_ID: ${GOOGLE_OIDC_CLIENT_ID:-}
       GOOGLE_OIDC_CLIENT_SECRET: ${GOOGLE_OIDC_CLIENT_SECRET:-}
       GOOGLE_OIDC_REDIRECT_URI: ${GOOGLE_OIDC_REDIRECT_URI:-https://chummer.run/auth/google/callback}
@@ -184,6 +295,33 @@ services:
       CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_TRANSPORT: ${CHUMMER_EA_CHANNEL_MESSAGING_EA_WHATSAPP_TRANSPORT:-}
       CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID: ${CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID:-hub}
       CHUMMER_DOWNLOADS_SOURCE_ROOT: /downloads-source
+      # These two flags are deliberately required from the operator environment. For the
+      # controlled first activation only, use layout=false and initial-migration=true.
+      # After current.json, the layout marker, and its committed activation receipt are
+      # verified, permanently use layout=true and initial-migration=false.
+      CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED: "${CHUMMER_RELEASE_SHELF_LAYOUT_V1_REQUIRED:?Set the release shelf layout migration posture explicitly}"
+      CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED: "${CHUMMER_RELEASE_SHELF_INITIAL_MIGRATION_ALLOWED:?Set the one-time release shelf migration posture explicitly}"
+      # Upload-session single-use coordination is filesystem-backed. Keep this on one durable
+      # shared volume; multi-host replicas require a store with verified cross-host locking.
+      CHUMMER_RELEASE_UPLOAD_SESSION_ROOT: /release-upload-sessions
+      # Direct promotion cannot produce the durable staged-session completion receipt.
+      # This is intentionally not operator-overridable on the public edge.
+      CHUMMER_RELEASE_DIRECT_BUNDLE_UPLOAD_ENABLED: "false"
+      CHUMMER_RELEASE_UPLOAD_MAX_CHUNK_BYTES: ${CHUMMER_RELEASE_UPLOAD_MAX_CHUNK_BYTES:-67108864}
+      CHUMMER_RELEASE_UPLOAD_MAX_REQUEST_BYTES: ${CHUMMER_RELEASE_UPLOAD_MAX_REQUEST_BYTES:-68157440}
+      CHUMMER_RELEASE_UPLOAD_MAX_PATH_BYTES: ${CHUMMER_RELEASE_UPLOAD_MAX_PATH_BYTES:-1024}
+      CHUMMER_RELEASE_UPLOAD_MAX_FILE_BYTES: ${CHUMMER_RELEASE_UPLOAD_MAX_FILE_BYTES:-4294967296}
+      CHUMMER_RELEASE_UPLOAD_MAX_CHUNKS_PER_FILE: ${CHUMMER_RELEASE_UPLOAD_MAX_CHUNKS_PER_FILE:-128}
+      CHUMMER_RELEASE_UPLOAD_MAX_FILES_PER_SESSION: ${CHUMMER_RELEASE_UPLOAD_MAX_FILES_PER_SESSION:-512}
+      CHUMMER_RELEASE_UPLOAD_MAX_SESSION_BYTES: ${CHUMMER_RELEASE_UPLOAD_MAX_SESSION_BYTES:-17179869184}
+      CHUMMER_RELEASE_UPLOAD_MAX_ACTIVE_SESSIONS: ${CHUMMER_RELEASE_UPLOAD_MAX_ACTIVE_SESSIONS:-8}
+      CHUMMER_RELEASE_UPLOAD_MAX_ACTIVE_SESSIONS_PER_AUTHORIZATION: ${CHUMMER_RELEASE_UPLOAD_MAX_ACTIVE_SESSIONS_PER_AUTHORIZATION:-2}
+      CHUMMER_RELEASE_UPLOAD_MAX_SHARED_BYTES: ${CHUMMER_RELEASE_UPLOAD_MAX_SHARED_BYTES:-34359738368}
+      CHUMMER_RELEASE_UPLOAD_MIN_FREE_BYTES: ${CHUMMER_RELEASE_UPLOAD_MIN_FREE_BYTES:-10737418240}
+      CHUMMER_RELEASE_UPLOAD_MIN_FREE_FRACTION: ${CHUMMER_RELEASE_UPLOAD_MIN_FREE_FRACTION:-0.10}
+      CHUMMER_RELEASE_UPLOAD_JANITOR_INTERVAL_SECONDS: ${CHUMMER_RELEASE_UPLOAD_JANITOR_INTERVAL_SECONDS:-300}
+      CHUMMER_RELEASE_UPLOAD_COMPLETED_RECEIPT_RETENTION_SECONDS: ${CHUMMER_RELEASE_UPLOAD_COMPLETED_RECEIPT_RETENTION_SECONDS:-604800}
+      CHUMMER_RELEASE_UPLOAD_TICKET_REVOCATION_EPOCH: ${CHUMMER_RELEASE_UPLOAD_TICKET_REVOCATION_EPOCH:-1}
       CHUMMER_PUBLIC_BLAZOR_PROXY_URL: ${CHUMMER_PUBLIC_BLAZOR_PROXY_URL:-http://chummer-public-blazor:8080/blazor/}
       CHUMMER_PUBLIC_AVALONIA_PROXY_URL: ${CHUMMER_PUBLIC_AVALONIA_PROXY_URL:-}
       CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: ${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-true}
@@ -407,14 +545,28 @@ services:
       ANSWERLY_OPENAI_COMPAT_EA_HTTP_REFERER: ${ANSWERLY_OPENAI_COMPAT_EA_HTTP_REFERER:-https://chummer.run}
       ANSWERLY_OPENAI_COMPAT_EA_X_TITLE: ${ANSWERLY_OPENAI_COMPAT_EA_X_TITLE:-Chummer Rule Ghost}
     volumes:
+      - ${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app}:/app:ro
       - chummer-run-api-state:/app/state
+      # Both host files must be owned by CHUMMER_PORTAL_UID and have mode 0400 or 0600.
+      - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE:?Set the container-user-owned PKCS#12 key-encryption certificate file}:/run/chummer-secrets/data-protection-key-encryption.pfx:ro
+      - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the container-user-owned certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro
+      # This runtime-only credential must be owned by CHUMMER_PORTAL_UID and have mode 0400 or 0600.
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE:?Set the container-user-owned InstallLinking PostgreSQL runtime connection file}:/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro
       - /docker/fleet/.codex-studio/published:/fleet-artifacts:ro
       - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
+      - chummer-release-upload-sessions:/release-upload-sessions
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json:/proofs/FINAL_GOLD_JANITOR.generated.json:ro
     ports:
       - "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "5", "--header", "Host: chummer.run", "http://127.0.0.1:8080/api/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    mem_limit: ${CHUMMER_PORTAL_MEMORY_LIMIT:-1536m}
     cpu_shares: 256
     cpus: ${CHUMMER_PORTAL_CPUS:-1.00}
     networks:
@@ -424,20 +576,121 @@ services:
       fleet-origin: {}
       ea-origin: {}
 
+  # Operator-only jobs for a managed/external PostgreSQL authority. These services use a
+  # dedicated tool-only image target and deliberately omit the portal's /app overlay.
+  chummer-install-linking-postgres-admin:
+    image: chummer-install-linking-postgres-tool:local
+    profiles: ["install-linking-postgres-admin"]
+    restart: "no"
+    build:
+      context: /docker/chummercomplete
+      dockerfile: chummer.run-services/Chummer.Run.Api/Dockerfile
+      target: install-linking-postgres-tool-final
+      additional_contexts:
+        run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
+        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
+        design-product: /docker/chummercomplete/chummer-design
+      args:
+        CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
+        CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
+        CHUMMER_RUNTIME_GID: ${CHUMMER_PORTAL_GID:-1654}
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1700
+    environment:
+      CHUMMER_INSTALL_LINKING_MIGRATOR_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-migrator.connection-string
+      CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE: "${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE:?Set the pre-existing InstallLinking PostgreSQL runtime role}"
+    volumes:
+      # The migrator credential is never mounted into the long-running portal or the import job.
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_MIGRATOR_CONNECTION_FILE:?Set the container-user-owned InstallLinking PostgreSQL migrator connection file}:/run/chummer-secrets/install-linking-postgres-migrator.connection-string:ro
+    # Safe default: validate only. Operators must explicitly override this with `prepare <runtime-role>`.
+    command: ["validate"]
+    networks:
+      public-origin: {}
+
+  chummer-install-linking-postgres-import:
+    image: chummer-install-linking-postgres-tool:local
+    profiles: ["install-linking-postgres-admin"]
+    restart: "no"
+    build:
+      context: /docker/chummercomplete
+      dockerfile: chummer.run-services/Chummer.Run.Api/Dockerfile
+      target: install-linking-postgres-tool-final
+      additional_contexts:
+        run-services-source: ${CHUMMER_RUN_SERVICES_SOURCE:-/docker/chummercomplete/chummer.run-services}
+        fleet-media-factory-contracts: /docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts
+        design-product: /docker/chummercomplete/chummer-design
+      args:
+        CHUMMER_BUILD_CONCURRENCY: ${CHUMMER_BUILD_CONCURRENCY:-1}
+        CHUMMER_RUNTIME_UID: ${CHUMMER_PORTAL_UID:-1654}
+        CHUMMER_RUNTIME_GID: ${CHUMMER_PORTAL_GID:-1654}
+    user: "${CHUMMER_PORTAL_UID:-1654}:${CHUMMER_PORTAL_GID:-1654}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      core: 0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1700
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
+      CHUMMER_DATA_PROTECTION_CERTIFICATE_PATH: /run/chummer-secrets/data-protection-key-encryption.pfx
+      CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE: /run/chummer-secrets/data-protection-key-encryption.password
+      CHUMMER_INSTALL_LINKING_STORE_PATH: /app/state/install-linking/install-linking-store.json
+      CHUMMER_INSTALL_LINKING_POSTGRES_CONNECTION_STRING_FILE: /run/chummer-secrets/install-linking-postgres-runtime.connection-string
+    volumes:
+      # The import job shares only the state and cryptographic material needed to decrypt the local snapshot.
+      - chummer-run-api-state:/app/state
+      - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_FILE:?Set the container-user-owned PKCS#12 key-encryption certificate file}:/run/chummer-secrets/data-protection-key-encryption.pfx:ro
+      - ${CHUMMER_DATA_PROTECTION_CERTIFICATE_PASSWORD_FILE:?Set the container-user-owned certificate password file}:/run/chummer-secrets/data-protection-key-encryption.password:ro
+      - ${CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_CONNECTION_FILE:?Set the container-user-owned InstallLinking PostgreSQL runtime connection file}:/run/chummer-secrets/install-linking-postgres-runtime.connection-string:ro
+    # Deliberately invalid/non-mutating: import requires an explicit command and confirmation flag.
+    command: ["refuse-import-without-explicit-command"]
+    networks:
+      public-origin: {}
+
   chummer-run-cloudflared:
-    image: "cloudflare/cloudflared:${CHUMMER_CLOUDFLARED_IMAGE_TAG:-2024.6.1}"
+    image: "cloudflare/cloudflared:${CHUMMER_CLOUDFLARED_IMAGE_TAG:-2026.7.0}"
     container_name: chummer-run-cloudflared
     restart: unless-stopped
+    depends_on:
+      chummer-portal:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command:
       - tunnel
       - --no-autoupdate
+      - --metrics
+      - 0.0.0.0:2000
       - run
       - --token
       - "${CHUMMER_RUN_CF_TUNNEL_TOKEN:?set CHUMMER_RUN_CF_TUNNEL_TOKEN in an ignored .env file}"
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      public-origin: {}
+    mem_limit: ${CHUMMER_CLOUDFLARED_MEMORY_LIMIT:-256m}
 
 volumes:
   chummer-public-blazor-state:
+  chummer-play-web-state:
   chummer-run-api-state:
+  chummer-release-upload-sessions:
   chummer-run-identity-state:
 
 networks:

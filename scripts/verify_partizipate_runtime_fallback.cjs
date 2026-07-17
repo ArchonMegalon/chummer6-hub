@@ -105,6 +105,7 @@ async function assertBoardShell(page, path) {
 
 async function main() {
   const browser = await chromium.launch({
+    channel: process.env.CHUMMER_PLAYWRIGHT_CHANNEL?.trim() || 'chromium',
     headless: true,
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
@@ -154,14 +155,14 @@ async function main() {
     await framePage.waitForFunction(
       () => {
         const text = (document.body && document.body.innerText) || '';
-        return /What do you want to see next\?|Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(text);
+        return /What do you want to see next\?|Board offline right now/i.test(text);
       },
       { timeout: 15000 },
     );
     assert.equal(/\/participate\/board\/?\?embed=1$/.test(framePage.url()), true, '/participate/frame should resolve to the embedded first-party board document.');
     assert.equal(await framePage.locator('iframe[data-chummer-participate-frame]').count(), 0, '/participate/frame should resolve directly to the embedded board document instead of nesting another frame.');
     const frameText = await framePage.locator('body').innerText();
-    assert.equal(/What do you want to see next\?|Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(frameText), true, '/participate/frame should keep the request entry point visible.');
+    assert.equal(/What do you want to see next\?|Board offline right now/i.test(frameText), true, '/participate/frame should keep the request entry point visible.');
     await framePage.close();
 
     console.log(JSON.stringify({

@@ -6,9 +6,14 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Contracts.Billing;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Ledger;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -63,9 +68,12 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Contains("<p class=\"eyebrow\">Supporter</p>", view, StringComparison.Ordinal);
         Assert.Contains("1 book/month on Free. 2/month on Supporter.", view, StringComparison.Ordinal);
         Assert.Contains("Continue with email", view, StringComparison.Ordinal);
+        Assert.Contains("Continue with Google", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Only the book limit changes</h2>", view, StringComparison.Ordinal);
         Assert.Contains("@Model.Summary", view, StringComparison.Ordinal);
         Assert.Contains("Email first. Supporter attaches after that step.", view, StringComparison.Ordinal);
+        Assert.Contains("Google first. Supporter attaches after that step.", view, StringComparison.Ordinal);
+        Assert.Contains("Sign-in is unavailable on this host right now.", view, StringComparison.Ordinal);
         Assert.Contains("Checkout stays attached to this account.", view, StringComparison.Ordinal);
         Assert.Contains("Supporter is already attached to this account.", view, StringComparison.Ordinal);
         Assert.Contains("Become supporter", view, StringComparison.Ordinal);
@@ -186,8 +194,38 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.Equal("Next", genericCopy.Eyebrow);
         Assert.Equal("Open Chummer", genericCopy.Heading);
         Assert.Equal("Email first. Google if you prefer.", genericCopy.SupportLine);
+        Assert.Equal(
+            "Google first. Billing stays attached after that step.",
+            AuthController.ResolveEntryPresentation("/account/billing", createAccount: false, emailEntryEnabled: false, googleAvailable: true).SupportLine);
+        Assert.Equal(
+            "Email sign-in is unavailable on this host right now. Continue with Google instead.",
+            AuthController.ResolveEntryPresentation("/downloads", createAccount: false, emailEntryEnabled: false, googleAvailable: true).SupportLine);
+        Assert.Equal(
+            "Use Google to claim this copy when you want installs, support, and recovery together.",
+            AuthController.ResolveEntryPresentation("/downloads", createAccount: true, emailEntryEnabled: false, googleAvailable: true).SupportLine);
+        Assert.Equal(
+            "Sign-in is unavailable on this host right now.",
+            AuthController.ResolveEntryPresentation("/downloads", createAccount: false, emailEntryEnabled: false, googleAvailable: false).SupportLine);
         Assert.Equal("billing", AuthController.DescribeNextTarget("/account/billing"));
         Assert.Equal("downloads", AuthController.DescribeNextTarget("/downloads"));
+    }
+
+    [Fact]
+    public async Task BillingLoginPageKeepsSupporterEntryWhenInteractiveAuthIsUnavailable()
+    {
+        AuthController controller = CreateAuthControllerWithNoInteractiveAuth();
+
+        IActionResult result = await controller.LoginPage("/account/billing", CancellationToken.None);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        Assert.Equal("~/Views/Auth/Entry.cshtml", view.ViewName);
+        AuthPageViewModel model = Assert.IsType<AuthPageViewModel>(view.Model);
+        Assert.Equal("Supporter", model.Eyebrow);
+        Assert.Equal("Supporter", model.Heading);
+        Assert.Equal("Sign-in is unavailable on this host right now.", model.SupportLine);
+        Assert.Equal("After this step, Chummer returns to billing.", model.ReturnLine);
+        Assert.False(model.EmailEntryEnabled);
+        Assert.False(model.GoogleAvailable);
     }
 
     [Fact]
@@ -327,7 +365,7 @@ public sealed class BrilliantDirectoriesBillingTests
                 SupporterActive: true,
                 ObservedAtUtc: new DateTimeOffset(2026, 6, 24, 10, 0, 0, TimeSpan.Zero)),
             "sync-secret");
-        service.ConsumeMyFirstBookQuota(user.UserId, new DateTimeOffset(2026, 6, 24, 12, 0, 0, TimeSpan.Zero));
+        service.ConsumeMyFirstBookQuota(user.UserId, DateTimeOffset.UtcNow);
 
         IActionResult result = await controller.BillingPage("ignored-user", "ignored@example.com", preview: true);
 
@@ -362,7 +400,7 @@ public sealed class BrilliantDirectoriesBillingTests
             }
         };
 
-        service.ConsumeMyFirstBookQuota("user-a", new DateTimeOffset(2026, 6, 24, 12, 0, 0, TimeSpan.Zero));
+        service.ConsumeMyFirstBookQuota("user-a", DateTimeOffset.UtcNow);
 
         ActionResult<MyFirstBookQuotaSnapshotDto> unauthorizedLookup = controller.MyFirstBookQuota("user-a");
         ActionResult<MyFirstBookQuotaConsumeResultDto> unauthorizedConsume = controller.ConsumeMyFirstBookQuota("user-a");
@@ -756,6 +794,43 @@ public sealed class BrilliantDirectoriesBillingTests
         Assert.False(model.UsingSignedInAccount);
         Assert.False(model.Unavailable);
         Assert.Equal("Membership", model.Heading);
+    }
+
+    [Fact]
+    public async Task BillingPagePreviewWithoutAttachedUserUsesGoogleWhenEmailStartIsDisabled()
+    {
+        BrilliantDirectoriesBillingService service = CreateService();
+        BrilliantDirectoriesBillingController controller = new(service)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
+        string? originalEmailStart = Environment.GetEnvironmentVariable("IDENTITY_EMAIL_START_ENABLED");
+        string? originalGoogleClientId = Environment.GetEnvironmentVariable("GOOGLE_OIDC_CLIENT_ID");
+        string? originalGoogleClientSecret = Environment.GetEnvironmentVariable("GOOGLE_OIDC_CLIENT_SECRET");
+        try
+        {
+            Environment.SetEnvironmentVariable("IDENTITY_EMAIL_START_ENABLED", "false");
+            Environment.SetEnvironmentVariable("GOOGLE_OIDC_CLIENT_ID", "google-client-id");
+            Environment.SetEnvironmentVariable("GOOGLE_OIDC_CLIENT_SECRET", "google-client-secret");
+
+            IActionResult result = await controller.BillingPage(preview: true);
+
+            ViewResult view = Assert.IsType<ViewResult>(result);
+            BillingMembershipPageViewModel model = Assert.IsType<BillingMembershipPageViewModel>(view.Model);
+            Assert.False(model.EmailEntryEnabled);
+            Assert.True(model.GoogleAvailable);
+            Assert.False(model.Chrome.Authenticated);
+            Assert.False(model.UsingSignedInAccount);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("IDENTITY_EMAIL_START_ENABLED", originalEmailStart);
+            Environment.SetEnvironmentVariable("GOOGLE_OIDC_CLIENT_ID", originalGoogleClientId);
+            Environment.SetEnvironmentVariable("GOOGLE_OIDC_CLIENT_SECRET", originalGoogleClientSecret);
+        }
     }
 
     [Fact]
@@ -1282,5 +1357,109 @@ public sealed class BrilliantDirectoriesBillingTests
         };
 
         return (controller, ensured, receipts);
+    }
+
+    private static AuthController CreateAuthControllerWithNoInteractiveAuth()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "chummer-auth-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = "/docker/chummercomplete/chummer.run-services",
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json"),
+                ["IDENTITY_SERVICE_BASE_URL"] = "https://identity.example.test",
+                ["IDENTITY_EMAIL_START_ENABLED"] = "false"
+            })
+            .Build();
+
+        PublicCanonFileLoader canon = new(configuration);
+        PublicActionResolver actions = new();
+        PublicLandingService landing = new(canon, actions);
+        PublicRouteCatalogService routes = new(canon);
+        PublicNavigationService navigation = new(canon, routes);
+        PublicReleaseManifestService releases = new(configuration);
+        ReleaseSelectionService releaseSelection = new(canon);
+        DefaultHttpContext httpContext = new();
+        ServiceProvider requestServices = new ServiceCollection()
+            .AddSingleton(configuration)
+            .AddSingleton<ITempDataDictionaryFactory, TestTempDataDictionaryFactory>()
+            .BuildServiceProvider();
+        httpContext.RequestServices = requestServices;
+        HttpContextAccessor httpContextAccessor = new()
+        {
+            HttpContext = httpContext
+        };
+        HubPageChromeService chrome = new(landing, navigation, releases, releaseSelection, httpContextAccessor);
+        CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
+        AccountService accounts = new(communityStore);
+        IdentityLinkService links = new(communityStore, accounts, configuration);
+        HubBrowserAuthService browserAuth = new(new HttpClient(), configuration, NullLogger<HubBrowserAuthService>.Instance);
+        HubIdentityClient identity = new(new HttpClient(), configuration, NullLogger<HubIdentityClient>.Instance);
+        IDataProtectionProvider dataProtection = DataProtectionProvider.Create(Path.Combine(root, "keys"));
+        HubGoogleAuthService google = new(
+            new HttpClient(),
+            configuration,
+            browserAuth,
+            links,
+            accounts,
+            dataProtection,
+            NullLogger<HubGoogleAuthService>.Instance,
+            new TestHostEnvironment());
+        ParticipationOperatorNotificationService notifications = new(
+            new HttpClient(),
+            communityStore,
+            configuration,
+            NullLogger<ParticipationOperatorNotificationService>.Instance);
+        HubEmailLinkVerificationService emailLinks = new(dataProtection);
+
+        AuthController controller = new AuthController(
+            browserAuth,
+            identity,
+            landing,
+            releases,
+            releaseSelection,
+            chrome,
+            google,
+            accounts,
+            notifications,
+            links,
+            emailLinks,
+            NullLogger<AuthController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = httpContext
+            }
+        };
+
+        controller.TempData = new TempDataDictionary(httpContext, new TestTempDataProvider());
+        return controller;
+    }
+
+    private sealed class TestHostEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Development;
+        public string ApplicationName { get; set; } = "Chummer.Tests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private sealed class TestTempDataDictionaryFactory : ITempDataDictionaryFactory
+    {
+        private static readonly ITempDataProvider Provider = new TestTempDataProvider();
+
+        public ITempDataDictionary GetTempData(HttpContext context)
+            => new TempDataDictionary(context, Provider);
+    }
+
+    private sealed class TestTempDataProvider : ITempDataProvider
+    {
+        public IDictionary<string, object> LoadTempData(HttpContext context)
+            => new Dictionary<string, object>(StringComparer.Ordinal);
+
+        public void SaveTempData(HttpContext context, IDictionary<string, object> values)
+        {
+        }
     }
 }

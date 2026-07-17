@@ -2,6 +2,7 @@ using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
@@ -81,7 +82,11 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.DoesNotContain(artifacts.EnumerateArray(), artifact =>
             string.Equals(artifact.GetProperty("artifactId").GetString(), "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
         JsonElement coverage = document.RootElement.GetProperty("desktopTupleCoverage");
-        Assert.Empty(coverage.GetProperty("missingRequiredPlatforms").EnumerateArray().ToArray());
+        string[] missingPlatforms = coverage.GetProperty("missingRequiredPlatforms")
+            .EnumerateArray()
+            .Select(static item => item.GetString() ?? string.Empty)
+            .ToArray();
+        Assert.Equal(["linux", "windows"], missingPlatforms);
     }
 
     [Fact]
@@ -142,8 +147,10 @@ public sealed class DownloadsCompatibilityControllerTests
 
         IActionResult result = await fixture.Controller.DownloadResolvedArtifactFile("avalonia-osx-x64-installer", CancellationToken.None);
 
-        var file = Assert.IsType<PhysicalFileResult>(result);
+        var file = Assert.IsType<FileStreamResult>(result);
         Assert.Equal("chummer-avalonia-osx-x64-installer.dmg", file.FileDownloadName);
+        Assert.Equal(11, file.FileStream.Length);
+        await file.FileStream.DisposeAsync();
         Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
     }
 
@@ -166,8 +173,10 @@ public sealed class DownloadsCompatibilityControllerTests
 
         IActionResult result = await fixture.Controller.DownloadResolvedArtifactFile("avalonia-osx-x64-installer", CancellationToken.None);
 
-        var file = Assert.IsType<PhysicalFileResult>(result);
+        var file = Assert.IsType<FileStreamResult>(result);
         Assert.Equal("chummer-avalonia-osx-x64-installer.dmg", file.FileDownloadName);
+        Assert.Equal(11, file.FileStream.Length);
+        await file.FileStream.DisposeAsync();
         Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
     }
 
@@ -188,7 +197,7 @@ public sealed class DownloadsCompatibilityControllerTests
     }
 
     [Fact]
-    public async Task WindowsInstallerFilePathRouteDownloadsDirectlyEvenWhenRegistryMetadataIsStale()
+    public async Task WindowsInstallerFilePathRouteDownloadsDirectlyWhenCanonicalMetadataMatchesBytes()
     {
         using Fixture fixture = new();
         fixture.Controller.ControllerContext = new ControllerContext
@@ -198,8 +207,31 @@ public sealed class DownloadsCompatibilityControllerTests
 
         IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-win-x64-installer.exe", CancellationToken.None);
 
-        var file = Assert.IsType<PhysicalFileResult>(result);
+        var file = Assert.IsType<FileStreamResult>(result);
         Assert.True(file.EnableRangeProcessing);
+        Assert.Equal(11, file.FileStream.Length);
+        await file.FileStream.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task WindowsInstallerFilePathRouteFailsClosedWhenCanonicalDigestDoesNotMatchBytes()
+    {
+        using Fixture fixture = new();
+        string downloadsRoot = fixture.Configuration["CHUMMER_DOWNLOADS_SOURCE_ROOT"]!;
+        File.WriteAllBytes(
+            Path.Combine(downloadsRoot, "files", "chummer-avalonia-win-x64-installer.exe"),
+            "tampered-win-preview"u8.ToArray());
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.DownloadFile(
+            "chummer-avalonia-win-x64-installer.exe",
+            CancellationToken.None);
+
+        ObjectResult blocked = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, blocked.StatusCode);
     }
 
     [Fact]
@@ -213,10 +245,11 @@ public sealed class DownloadsCompatibilityControllerTests
 
         IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-win-x64-payload.zip", CancellationToken.None);
 
-        var file = Assert.IsType<PhysicalFileResult>(result);
+        var file = Assert.IsType<FileStreamResult>(result);
         Assert.True(file.EnableRangeProcessing);
         Assert.Equal("application/octet-stream", file.ContentType);
-        Assert.EndsWith("downloads/files/chummer-avalonia-win-x64-payload.zip", file.FileName, StringComparison.Ordinal);
+        Assert.Equal(11, file.FileStream.Length);
+        await file.FileStream.DisposeAsync();
     }
 
     [Fact]
@@ -230,10 +263,14 @@ public sealed class DownloadsCompatibilityControllerTests
 
         IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-win-x64-payload.zip.json", CancellationToken.None);
 
-        var file = Assert.IsType<PhysicalFileResult>(result);
+        var file = Assert.IsType<FileStreamResult>(result);
         Assert.True(file.EnableRangeProcessing);
         Assert.Equal("application/json; charset=utf-8", file.ContentType);
-        Assert.EndsWith("downloads/files/chummer-avalonia-win-x64-payload.zip.json", file.FileName, StringComparison.Ordinal);
+        using JsonDocument sidecar = await JsonDocument.ParseAsync(file.FileStream);
+        Assert.Equal(
+            "chummer6-ui.windows_bootstrap_payload",
+            sidecar.RootElement.GetProperty("contractName").GetString());
+        await file.FileStream.DisposeAsync();
     }
 
     [Fact]
@@ -341,13 +378,13 @@ public sealed class DownloadsCompatibilityControllerTests
 
         IActionResult result = fixture.Controller.DownloadWindowsProofInstaller("chummer-avalonia-win-x64-installer.exe");
 
-        var file = Assert.IsType<PhysicalFileResult>(result);
-        Assert.EndsWith("proof/windows/chummer-avalonia-win-x64-installer.exe", file.FileName, StringComparison.Ordinal);
+        var file = Assert.IsType<FileStreamResult>(result);
         Assert.Equal("chummer-avalonia-win-x64-installer.exe", file.FileDownloadName);
         Assert.Equal("private, no-store, max-age=0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
         Assert.Equal("no-cache", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Pragma.ToString());
         Assert.Equal("0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Expires.ToString());
         Assert.Equal("supplemental", fixture.Controller.ControllerContext.HttpContext.Response.Headers["X-Chummer-Install-Tier"].ToString());
+        file.FileStream.Dispose();
     }
 
     [Fact]
@@ -361,13 +398,13 @@ public sealed class DownloadsCompatibilityControllerTests
 
         IActionResult result = fixture.Controller.DownloadWindowsProofInstallerByArtifactId("avalonia-win-x64-installer");
 
-        var file = Assert.IsType<PhysicalFileResult>(result);
-        Assert.EndsWith("proof/windows/chummer-avalonia-win-x64-installer.exe", file.FileName, StringComparison.Ordinal);
+        var file = Assert.IsType<FileStreamResult>(result);
         Assert.Equal("chummer-avalonia-win-x64-installer.exe", file.FileDownloadName);
         Assert.Equal("private, no-store, max-age=0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
         Assert.Equal("no-cache", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Pragma.ToString());
         Assert.Equal("0", fixture.Controller.ControllerContext.HttpContext.Response.Headers.Expires.ToString());
         Assert.Equal("supplemental", fixture.Controller.ControllerContext.HttpContext.Response.Headers["X-Chummer-Install-Tier"].ToString());
+        file.FileStream.Dispose();
     }
 
     [Fact]
@@ -421,6 +458,10 @@ public sealed class DownloadsCompatibilityControllerTests
 
         File.Delete(proofPath);
         WriteEmbeddedPayloadInstaller(publishedInstallerPath, "avalonia");
+        fixture.WriteSigningReceiptForPath(
+            publishedInstallerPath,
+            "chummer-avalonia-win-x64-installer.exe",
+            "avalonia");
 
         IActionResult result = fixture.Controller.WindowsProofInstallers();
 
@@ -428,6 +469,65 @@ public sealed class DownloadsCompatibilityControllerTests
         string payload = JsonSerializer.Serialize(ok.Value);
         Assert.Contains("\"status\":\"support_only\"", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("run-stale", "preview", "pass", "pass", false)]
+    [InlineData("run-test", "stable", "pass", "pass", false)]
+    [InlineData("run-test", "preview", "unsigned_public_release", "pass", false)]
+    [InlineData("run-test", "preview", "skipped_preview", "pass", false)]
+    [InlineData("run-test", "preview", "pass", "unsigned_public_release", false)]
+    [InlineData("run-test", "preview", "pass", "pass", true)]
+    public void WindowsProofInstallerRoutesFailClosedWhenSigningProofDoesNotBindCurrentBytes(
+        string releaseVersion,
+        string releaseChannel,
+        string signingStatus,
+        string artifactSigningStatus,
+        bool driftDigest)
+    {
+        using Fixture fixture = new();
+        string installerPath = Path.Combine(
+            fixture.ProofRoot,
+            "chummer-avalonia-win-x64-installer.exe");
+        fixture.WriteSigningReceiptForPath(
+            installerPath,
+            "chummer-avalonia-win-x64-installer.exe",
+            "avalonia",
+            releaseVersion,
+            releaseChannel,
+            signingStatus,
+            artifactSigningStatus,
+            driftDigest);
+
+        IActionResult byFile = fixture.Controller.DownloadWindowsProofInstaller(
+            "chummer-avalonia-win-x64-installer.exe");
+        IActionResult byArtifact = fixture.Controller.DownloadWindowsProofInstallerByArtifactId(
+            "avalonia-win-x64-installer");
+        IActionResult catalog = fixture.Controller.WindowsProofInstallers();
+
+        Assert.IsType<NotFoundResult>(byFile);
+        Assert.IsType<NotFoundResult>(byArtifact);
+        var ok = Assert.IsType<OkObjectResult>(catalog);
+        string payload = JsonSerializer.Serialize(ok.Value);
+        Assert.DoesNotContain("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
+        Assert.Contains("chummer-blazor-desktop-win-x64-installer.exe", payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowsProofInstallerRoutesFailClosedWhenSigningReceiptIsMissing()
+    {
+        using Fixture fixture = new();
+        File.Delete(Path.Combine(
+            fixture.SigningRoot,
+            "signing-avalonia-win-x64.receipt.json"));
+
+        IActionResult byFile = fixture.Controller.DownloadWindowsProofInstaller(
+            "chummer-avalonia-win-x64-installer.exe");
+        IActionResult byArtifact = fixture.Controller.DownloadWindowsProofInstallerByArtifactId(
+            "avalonia-win-x64-installer");
+
+        Assert.IsType<NotFoundResult>(byFile);
+        Assert.IsType<NotFoundResult>(byArtifact);
     }
 
     [Fact]
@@ -477,8 +577,10 @@ public sealed class DownloadsCompatibilityControllerTests
             string downloadsRoot = Path.Combine(_root, "downloads");
             string filesRoot = Path.Combine(downloadsRoot, "files");
             string proofRoot = Path.Combine(downloadsRoot, "proof", "windows");
+            string signingRoot = Path.Combine(downloadsRoot, "signing");
             Directory.CreateDirectory(filesRoot);
             Directory.CreateDirectory(proofRoot);
+            Directory.CreateDirectory(signingRoot);
             File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-osx-x64-installer.dmg"), "mac-preview"u8.ToArray());
             File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-win-x64-installer.exe"), "win-preview"u8.ToArray());
             File.WriteAllBytes(Path.Combine(filesRoot, "chummer-avalonia-win-x64-payload.zip"), "win-payload"u8.ToArray());
@@ -487,11 +589,26 @@ public sealed class DownloadsCompatibilityControllerTests
                 """
                 {
                   "contractName": "chummer6-ui.windows_bootstrap_payload",
-                  "fileName": "chummer-avalonia-win-x64-payload.zip"
+                  "fileName": "chummer-avalonia-win-x64-payload.zip",
+                  "downloadUrl": "/downloads/files/chummer-avalonia-win-x64-payload.zip",
+                  "sha256": "090b3af3cab189292414c7a66e48cd2384cd1154c93d3c41ec8ccd25fb91d7fb",
+                  "sizeBytes": 11,
+                  "installerFileName": "chummer-avalonia-win-x64-installer.exe",
+                  "releaseVersion": "run-test"
                 }
                 """);
             WriteProofInstaller(Path.Combine(proofRoot, "chummer-avalonia-win-x64-installer.exe"), "avalonia");
             WriteProofInstaller(Path.Combine(proofRoot, "chummer-blazor-desktop-win-x64-installer.exe"), "blazor-desktop");
+            WriteSigningReceipt(
+                Path.Combine(proofRoot, "chummer-avalonia-win-x64-installer.exe"),
+                Path.Combine(signingRoot, "signing-avalonia-win-x64.receipt.json"),
+                "chummer-avalonia-win-x64-installer.exe",
+                "avalonia");
+            WriteSigningReceipt(
+                Path.Combine(proofRoot, "chummer-blazor-desktop-win-x64-installer.exe"),
+                Path.Combine(signingRoot, "signing-blazor-desktop-win-x64.receipt.json"),
+                "chummer-blazor-desktop-win-x64-installer.exe",
+                "blazor-desktop");
             File.WriteAllText(
                 Path.Combine(downloadsRoot, "releases.json"),
                 """
@@ -511,8 +628,8 @@ public sealed class DownloadsCompatibilityControllerTests
                       "id": "avalonia-osx-x64-installer",
                       "platform": "Avalonia Desktop macOS X64 Installer",
                       "url": "/downloads/files/chummer-avalonia-osx-x64-installer.dmg",
-                      "sha256": "71cea7987b5323078baed5c104ca82ef80060b249f3fa8401ddf42d0e6ed8c39",
-                      "sizeBytes": 51887995,
+                      "sha256": "910842cfc7e41715bfc30a5d13c05eb68259f77e6271016470b5aa95054a086e",
+                      "sizeBytes": 11,
                       "head": "avalonia",
                       "platformId": "macOS",
                       "arch": "x64",
@@ -524,14 +641,18 @@ public sealed class DownloadsCompatibilityControllerTests
                       "id": "avalonia-win-x64-installer",
                       "platform": "Avalonia Desktop Windows X64 Installer",
                       "url": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
-                      "sha256": "34f6cb5006019d6c8e19d55c32302efea6aaed7cd63f3770aee7f087f0ee4bf9",
-                      "sizeBytes": 51887995,
+                      "payloadFileName": "chummer-avalonia-win-x64-payload.zip",
+                      "payloadDownloadUrl": "/downloads/files/chummer-avalonia-win-x64-payload.zip",
+                      "payloadSha256": "090b3af3cab189292414c7a66e48cd2384cd1154c93d3c41ec8ccd25fb91d7fb",
+                      "payloadSizeBytes": 11,
+                      "sha256": "d9918b165efb94cec18c30e5a4c4217a93b397ea28171bf3fe5dfe4ef688089e",
+                      "sizeBytes": 11,
                       "head": "avalonia",
                       "platformId": "win-x64",
                       "arch": "x64",
                       "kind": "installer",
                       "fileName": "chummer-avalonia-win-x64-installer.exe",
-                      "installAccessClass": "account_required"
+                      "installAccessClass": "open_public"
                     }
                   ]
                 }
@@ -588,8 +709,8 @@ public sealed class DownloadsCompatibilityControllerTests
                       "platformLabel": "Avalonia Desktop macOS X64 Installer",
                       "fileName": "chummer-avalonia-osx-x64-installer.dmg",
                       "downloadUrl": "/downloads/files/chummer-avalonia-osx-x64-installer.dmg",
-                      "sha256": "71cea7987b5323078baed5c104ca82ef80060b249f3fa8401ddf42d0e6ed8c39",
-                      "sizeBytes": 51887995,
+                      "sha256": "910842cfc7e41715bfc30a5d13c05eb68259f77e6271016470b5aa95054a086e",
+                      "sizeBytes": 11,
                       "installAccessClass": "account_required"
                     },
                     {
@@ -604,9 +725,11 @@ public sealed class DownloadsCompatibilityControllerTests
                       "downloadUrl": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
                       "payloadFileName": "chummer-avalonia-win-x64-payload.zip",
                       "payloadDownloadUrl": "/downloads/files/chummer-avalonia-win-x64-payload.zip",
-                      "sha256": "34f6cb5006019d6c8e19d55c32302efea6aaed7cd63f3770aee7f087f0ee4bf9",
-                      "sizeBytes": 51887995,
-                      "installAccessClass": "account_required"
+                      "payloadSha256": "090b3af3cab189292414c7a66e48cd2384cd1154c93d3c41ec8ccd25fb91d7fb",
+                      "payloadSizeBytes": 11,
+                      "sha256": "d9918b165efb94cec18c30e5a4c4217a93b397ea28171bf3fe5dfe4ef688089e",
+                      "sizeBytes": 11,
+                      "installAccessClass": "open_public"
                     }
                   ]
                 }
@@ -616,6 +739,7 @@ public sealed class DownloadsCompatibilityControllerTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
+                    ["CHUMMER_WINDOWS_PROOF_LEGACY_SHELF_FALLBACK"] = "true",
                     ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking.json"),
                     ["IDENTITY_SERVICE_BASE_URL"] = "http://127.0.0.1:9"
@@ -625,10 +749,12 @@ public sealed class DownloadsCompatibilityControllerTests
 
             ManifestService = new PublicReleaseManifestService(Configuration);
             ReleaseSelection = new ReleaseSelectionService(new PublicCanonFileLoader(Configuration));
-            InstallBootstrapTickets = new InstallBootstrapTicketService(
-                Microsoft.AspNetCore.DataProtection.DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys"))),
+            IDataProtectionProvider dataProtection = DataProtectionProvider.Create(
+                new DirectoryInfo(Path.Combine(_root, "keys")));
+            InstallBootstrapTickets = new InstallBootstrapTicketService(dataProtection, Configuration);
+            InstallLinking = new InstallLinkingService(
+                new InstallLinkingStore(Configuration, dataProtection, NullLogger<InstallLinkingStore>.Instance),
                 Configuration);
-            InstallLinking = new InstallLinkingService(new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance), Configuration);
             var windowsProofInstallers = new WindowsProofInstallerService(Configuration);
             var identityClient = new HubIdentityClient(new HttpClient(), Configuration, NullLogger<HubIdentityClient>.Instance);
             Controller = new DownloadsCompatibilityController(
@@ -646,6 +772,28 @@ public sealed class DownloadsCompatibilityControllerTests
         public IConfiguration Configuration { get; }
 
         public string ProofRoot => Path.Combine(_root, "downloads", "proof", "windows");
+
+        public string SigningRoot => Path.Combine(_root, "downloads", "signing");
+
+        public void WriteSigningReceiptForPath(
+            string installerPath,
+            string fileName,
+            string head,
+            string releaseVersion = "run-test",
+            string releaseChannel = "preview",
+            string signingStatus = "pass",
+            string artifactSigningStatus = "pass",
+            bool driftDigest = false)
+            => WriteSigningReceipt(
+                installerPath,
+                Path.Combine(SigningRoot, $"signing-{head}-win-x64.receipt.json"),
+                fileName,
+                head,
+                releaseVersion,
+                releaseChannel,
+                signingStatus,
+                artifactSigningStatus,
+                driftDigest);
 
         public PublicReleaseManifestService ManifestService { get; }
 
@@ -671,6 +819,51 @@ public sealed class DownloadsCompatibilityControllerTests
                 path,
                 System.Text.Encoding.UTF8.GetBytes(
                     $"stub-{head}-binary\0ChummerInstaller.Payload.zip\0Samples/Legacy/Soma-Career.chum5\0tail"));
+        }
+
+        private static void WriteSigningReceipt(
+            string installerPath,
+            string receiptPath,
+            string fileName,
+            string head,
+            string releaseVersion = "run-test",
+            string releaseChannel = "preview",
+            string signingStatus = "pass",
+            string artifactSigningStatus = "pass",
+            bool driftDigest = false)
+        {
+            string sha256 = Convert.ToHexStringLower(
+                System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(installerPath)));
+            if (driftDigest)
+            {
+                sha256 = new string('a', 64);
+            }
+
+            File.WriteAllText(
+                receiptPath,
+                JsonSerializer.Serialize(new
+                {
+                    contractName = "chummer6-ui.desktop_artifact_signing",
+                    generatedAt = "2026-04-02T16:14:45Z",
+                    platform = "windows",
+                    app = head,
+                    rid = "win-x64",
+                    releaseChannel,
+                    releaseVersion,
+                    signingStatus,
+                    notarizationStatus = (string?)null,
+                    artifacts = new[]
+                    {
+                        new
+                        {
+                            fileName,
+                            sha256,
+                            kind = "installer",
+                            signingStatus = artifactSigningStatus,
+                            notarizationStatus = (string?)null
+                        }
+                    }
+                }));
         }
     }
 }

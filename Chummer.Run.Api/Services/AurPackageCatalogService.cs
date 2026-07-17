@@ -1,13 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text;
 
 namespace Chummer.Run.Api.Services;
 
 public sealed class AurPackageCatalogService
 {
-    private const string DownloadsRootKey = "CHUMMER_DOWNLOADS_SOURCE_ROOT";
-    private const string PublicCanonRootKey = "CHUMMER_PUBLIC_CANON_ROOT";
-    private const string DefaultRoot = "/downloads-source";
     private static readonly HashSet<string> DownloadableFileNames = new(StringComparer.OrdinalIgnoreCase)
     {
         "chummer6-bin-aur-source.tar.gz",
@@ -15,17 +13,34 @@ public sealed class AurPackageCatalogService
         "chummer6-bin.SRCINFO"
     };
 
-    private readonly IConfiguration _configuration;
+    private readonly ReleaseShelfGenerationStore _shelfStore;
 
     public AurPackageCatalogService(IConfiguration configuration)
+        : this(configuration, new ReleaseShelfGenerationStore(configuration))
     {
-        _configuration = configuration;
+    }
+
+    public AurPackageCatalogService(
+        IConfiguration configuration,
+        ReleaseShelfGenerationStore shelfStore)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        _shelfStore = shelfStore ?? throw new ArgumentNullException(nameof(shelfStore));
     }
 
     public AurPackageCatalog LoadCatalog()
+        => LoadCatalog(_shelfStore.CaptureForCurrentRequest());
+
+    public AurPackageCatalog LoadCatalog(ReleaseShelfSnapshot snapshot)
     {
-        string catalogPath = Path.Combine(ResolveDownloadsRoot(), "aur-packages.json");
-        if (!File.Exists(catalogPath))
+        ArgumentNullException.ThrowIfNull(snapshot);
+        const string catalogRelativePath = "aur-packages.json";
+        byte[]? catalogBytes = snapshot.IsLegacy
+            ? ReadBoundedLegacyCatalog(snapshot.ResolveLegacyFilePath(catalogRelativePath))
+            : snapshot.ReadVerifiedFileBytes(
+                catalogRelativePath,
+                ReleaseShelfGenerationStore.MaximumAurCatalogBytes);
+        if (catalogBytes is null)
         {
             return new AurPackageCatalog([]);
         }
@@ -33,9 +48,22 @@ public sealed class AurPackageCatalogService
         try
         {
             var payload = JsonSerializer.Deserialize<AurPackageCatalogDocument>(
-                File.ReadAllText(catalogPath),
+                catalogBytes,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            return new AurPackageCatalog((payload?.Packages ?? []).Where(IsComplete).ToArray());
+            IReadOnlyList<AurPackageEntry> packages = (payload?.Packages ?? [])
+                .Where(IsComplete)
+                .ToArray();
+            if (snapshot.IsLegacy)
+            {
+                return new AurPackageCatalog(packages);
+            }
+
+            return new AurPackageCatalog(
+                packages
+                    .Select(package => ValidateAndBindGenerationPackage(snapshot, package))
+                    .Where(static package => package is not null)
+                    .Select(static package => package!)
+                    .ToArray());
         }
         catch (JsonException)
         {
@@ -45,34 +73,48 @@ public sealed class AurPackageCatalogService
         {
             return new AurPackageCatalog([]);
         }
+        catch (DecoderFallbackException)
+        {
+            return new AurPackageCatalog([]);
+        }
     }
 
     public AurPackageEntry? FindByFileName(string? fileName)
+        => FindByFileName(_shelfStore.CaptureForCurrentRequest(), fileName);
+
+    public AurPackageEntry? FindByFileName(
+        ReleaseShelfSnapshot snapshot,
+        string? fileName)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
         string? normalized = NormalizeSidecarFileName(fileName);
         if (normalized is null)
         {
             return null;
         }
 
-        return LoadCatalog().Packages.FirstOrDefault(package =>
+        return LoadCatalog(snapshot).Packages.FirstOrDefault(package =>
             string.Equals(package.SourceArchiveFileName, normalized, StringComparison.OrdinalIgnoreCase)
             || string.Equals(package.PkgbuildFileName, normalized, StringComparison.OrdinalIgnoreCase)
             || string.Equals(package.SrcinfoFileName, normalized, StringComparison.OrdinalIgnoreCase));
     }
 
     public string? ResolvePackageFilePath(string? fileName)
+        => ResolvePackageFilePath(_shelfStore.CaptureForCurrentRequest(), fileName);
+
+    public string? ResolvePackageFilePath(
+        ReleaseShelfSnapshot snapshot,
+        string? fileName)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
         string? normalized = NormalizeSidecarFileName(fileName);
         if (normalized is null)
         {
             return null;
         }
 
-        string root = Path.GetFullPath(ResolveDownloadsRoot());
-        string candidate = Path.GetFullPath(Path.Combine(root, "files", normalized));
-        return candidate.StartsWith(root, StringComparison.Ordinal) && File.Exists(candidate)
-            ? candidate
+        return snapshot.IsLegacy
+            ? snapshot.ResolveLegacyFilePath($"files/{normalized}")
             : null;
     }
 
@@ -98,49 +140,161 @@ public sealed class AurPackageCatalogService
            && !string.IsNullOrWhiteSpace(package.SourceArchiveSha256)
            && !string.IsNullOrWhiteSpace(package.UpstreamArtifactSha256);
 
-    private string ResolveDownloadsRoot()
+    private static AurPackageEntry? ValidateAndBindGenerationPackage(
+        ReleaseShelfSnapshot snapshot,
+        AurPackageEntry package)
     {
-        if (_configuration[DownloadsRootKey]?.Trim() is { Length: > 0 } configured)
+        if (snapshot.GenerationId is not { Length: > 0 } generationId
+            || !TryValidateGenerationFile(
+                snapshot,
+                package.SourceArchiveFileName,
+                package.SourceArchiveUrl,
+                package.SourceArchiveSha256,
+                package.SourceArchiveSizeBytes,
+                out ReleaseShelfInventoryEntry? sourceArchive)
+            || !TryValidateGenerationFile(
+                snapshot,
+                package.PkgbuildFileName,
+                package.PkgbuildUrl,
+                package.PkgbuildSha256,
+                expectedSize: null,
+                out _)
+            || !TryValidateGenerationFile(
+                snapshot,
+                package.SrcinfoFileName,
+                package.SrcinfoUrl,
+                package.SrcinfoSha256,
+                expectedSize: null,
+                out _)
+            || !TryValidateGenerationFile(
+                snapshot,
+                package.UpstreamArtifactFileName,
+                package.UpstreamArtifactUrl,
+                package.UpstreamArtifactSha256,
+                package.UpstreamArtifactSizeBytes,
+                out ReleaseShelfInventoryEntry? upstream))
         {
-            return configured;
+            return null;
         }
 
-        foreach (string candidate in ResolveDefaultDownloadsRootCandidates())
+        string prefix = $"/downloads/g/{generationId}/files/";
+        return package with
         {
-            if (Directory.Exists(candidate))
+            SourceArchiveUrl = prefix + Uri.EscapeDataString(package.SourceArchiveFileName),
+            SourceArchiveSizeBytes = sourceArchive!.SizeBytes,
+            PkgbuildUrl = prefix + Uri.EscapeDataString(package.PkgbuildFileName),
+            SrcinfoUrl = prefix + Uri.EscapeDataString(package.SrcinfoFileName),
+            UpstreamArtifactUrl = prefix + Uri.EscapeDataString(package.UpstreamArtifactFileName),
+            UpstreamArtifactSizeBytes = upstream!.SizeBytes
+        };
+    }
+
+    private static bool TryValidateGenerationFile(
+        ReleaseShelfSnapshot snapshot,
+        string fileName,
+        string sourceUrl,
+        string expectedSha256,
+        long? expectedSize,
+        out ReleaseShelfInventoryEntry? inventoryEntry)
+    {
+        inventoryEntry = null;
+        string normalizedFileName = (fileName ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalizedFileName)
+            || normalizedFileName.Contains("..", StringComparison.Ordinal)
+            || normalizedFileName.Contains('/', StringComparison.Ordinal)
+            || normalizedFileName.Contains('\\', StringComparison.Ordinal)
+            || !UrlRefersToFile(sourceUrl, normalizedFileName)
+            || !snapshot.Inventory.TryGetValue($"files/{normalizedFileName}", out ReleaseShelfInventoryEntry? expected)
+            || !string.Equals(expected.Sha256, expectedSha256?.Trim(), StringComparison.OrdinalIgnoreCase)
+            || (expectedSize is long size && size != expected.SizeBytes))
+        {
+            return false;
+        }
+
+        inventoryEntry = expected;
+        return true;
+    }
+
+    private static bool UrlRefersToFile(string sourceUrl, string fileName)
+    {
+        string raw = (sourceUrl ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(raw)
+            || !Uri.TryCreate(raw, UriKind.RelativeOrAbsolute, out Uri? uri))
+        {
+            return false;
+        }
+
+        string path;
+        if (uri.IsAbsoluteUri)
+        {
+            if (!string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
             {
-                return candidate;
+                return false;
             }
+
+            path = uri.AbsolutePath;
+        }
+        else
+        {
+            if (raw.Contains('?') || raw.Contains('#'))
+            {
+                return false;
+            }
+
+            path = raw;
         }
 
-        return DefaultRoot;
+        return string.Equals(
+            Path.GetFileName(Uri.UnescapeDataString(path)),
+            fileName,
+            StringComparison.Ordinal);
     }
 
-    private IEnumerable<string> ResolveDefaultDownloadsRootCandidates()
+    private static byte[]? ReadBoundedLegacyCatalog(string? path)
     {
-        if (_configuration[PublicCanonRootKey]?.Trim() is { Length: > 0 } canonRoot)
+        if (path is null)
         {
-            yield return Path.Combine(canonRoot, "Chummer.Portal", "downloads");
+            return null;
         }
 
-        foreach (string candidate in ResolveAncestorPortalDownloadsRoots(Directory.GetCurrentDirectory()))
+        try
         {
-            yield return candidate;
-        }
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 64 * 1024,
+                FileOptions.SequentialScan);
+            long descriptorLength = stream.Length;
+            if (descriptorLength <= 0
+                || descriptorLength > ReleaseShelfGenerationStore.MaximumAurCatalogBytes)
+            {
+                return null;
+            }
 
-        foreach (string candidate in ResolveAncestorPortalDownloadsRoots(AppContext.BaseDirectory))
-        {
-            yield return candidate;
-        }
-    }
+            byte[] bytes = new byte[checked((int)descriptorLength)];
+            stream.ReadExactly(bytes);
+            if (stream.ReadByte() != -1 || stream.Length != descriptorLength)
+            {
+                return null;
+            }
 
-    private static IEnumerable<string> ResolveAncestorPortalDownloadsRoots(string start)
-    {
-        var cursor = new DirectoryInfo(Path.GetFullPath(start));
-        while (cursor is not null)
+            _ = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
+                .GetString(bytes);
+            return bytes;
+        }
+        catch (IOException)
         {
-            yield return Path.Combine(cursor.FullName, "Chummer.Portal", "downloads");
-            cursor = cursor.Parent;
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+        catch (DecoderFallbackException)
+        {
+            return null;
         }
     }
 

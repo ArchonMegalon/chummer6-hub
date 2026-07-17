@@ -5,18 +5,18 @@ from dataclasses import dataclass
 
 
 DEFAULT_MANUSCRIPT_PROVIDER_TOKENS = (
-    "inkfluence",
-    "youbooks",
-    "first book",
-    "firstbook",
-    "chummer originbookengine",
+    "subscribr",
 )
 DEFAULT_AUDIO_PROVIDER_TOKENS = (
     "inkfluence",
     "unmixr",
 )
-DEFAULT_VISUAL_PROVIDER_TOKENS = (
+DEFAULT_PREFERRED_VISUAL_PROVIDER_TOKENS = (
     "magicfit",
+)
+DEFAULT_RENDER_POOL_PROVIDER_TOKENS = (
+    "magicai",
+    "omagic",
 )
 
 
@@ -30,10 +30,16 @@ def _configured_tokens(env_name: str, defaults: tuple[str, ...]) -> tuple[str, .
 class OriginProviderCapabilityRegistry:
     manuscript_provider_tokens: tuple[str, ...] = DEFAULT_MANUSCRIPT_PROVIDER_TOKENS
     audio_provider_tokens: tuple[str, ...] = DEFAULT_AUDIO_PROVIDER_TOKENS
-    visual_provider_tokens: tuple[str, ...] = DEFAULT_VISUAL_PROVIDER_TOKENS
+    visual_provider_tokens: tuple[str, ...] = DEFAULT_PREFERRED_VISUAL_PROVIDER_TOKENS
+    visual_preferred_provider_tokens: tuple[str, ...] = DEFAULT_PREFERRED_VISUAL_PROVIDER_TOKENS
+    render_pool_provider_tokens: tuple[str, ...] = DEFAULT_RENDER_POOL_PROVIDER_TOKENS
 
     @classmethod
     def from_env(cls) -> "OriginProviderCapabilityRegistry":
+        preferred_visual_provider_tokens = _configured_tokens(
+            "CHUMMER_ORIGIN_VISUAL_PREFERRED_PROVIDER_TOKENS",
+            DEFAULT_PREFERRED_VISUAL_PROVIDER_TOKENS,
+        )
         return cls(
             manuscript_provider_tokens=_configured_tokens(
                 "CHUMMER_ORIGIN_MANUSCRIPT_PROVIDER_TOKENS",
@@ -45,7 +51,12 @@ class OriginProviderCapabilityRegistry:
             ),
             visual_provider_tokens=_configured_tokens(
                 "CHUMMER_ORIGIN_VISUAL_PROVIDER_TOKENS",
-                DEFAULT_VISUAL_PROVIDER_TOKENS,
+                preferred_visual_provider_tokens,
+            ),
+            visual_preferred_provider_tokens=preferred_visual_provider_tokens,
+            render_pool_provider_tokens=_configured_tokens(
+                "CHUMMER_RENDER_POOL_PROVIDER_TOKENS",
+                DEFAULT_RENDER_POOL_PROVIDER_TOKENS,
             ),
         )
 
@@ -58,11 +69,23 @@ class OriginProviderCapabilityRegistry:
     def visual_provider_allowed(self, value: object) -> bool:
         return _contains_any(value, self.visual_provider_tokens)
 
+    def preferred_visual_provider_allowed(self, value: object) -> bool:
+        return _contains_any(value, self.visual_preferred_provider_tokens)
+
+    def render_pool_provider_allowed(self, value: object) -> bool:
+        return _contains_any(value, self.render_pool_provider_tokens)
+
     def matched_audio_provider_label(self, *values: object) -> str:
         return _matched_label(self.audio_provider_tokens, *values)
 
     def matched_visual_provider_label(self, *values: object) -> str:
         return _matched_label(self.visual_provider_tokens, *values)
+
+    def matched_preferred_visual_provider_label(self, *values: object) -> str:
+        return _matched_label(self.visual_preferred_provider_tokens, *values)
+
+    def matched_render_pool_provider_label(self, *values: object) -> str:
+        return _matched_label(self.render_pool_provider_tokens, *values)
 
 
 def _contains_any(value: object, tokens: tuple[str, ...]) -> bool:

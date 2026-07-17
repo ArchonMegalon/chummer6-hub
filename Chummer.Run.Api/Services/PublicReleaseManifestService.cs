@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -9,7 +10,6 @@ namespace Chummer.Run.Api.Services;
 
 public sealed class PublicReleaseManifestService
 {
-    private const string DefaultRoot = "/downloads-source";
     private const string DefaultManifestContractName = "Chummer.Hub.Registry.Contracts";
     private const string DefaultLocalProofRelativePath = ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json";
     private const string RegistryCurrentUrlKey = "CHUMMER_RELEASE_REGISTRY_CURRENT_URL";
@@ -41,104 +41,400 @@ public sealed class PublicReleaseManifestService
     };
     private readonly IConfiguration _configuration;
     private readonly HttpClient? _httpClient;
+    private readonly ReleaseShelfGenerationStore _shelfStore;
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
+    private readonly GoldReadinessArtifactService _goldReadiness;
     private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
+    private readonly TimeProvider _timeProvider;
+    private readonly PrivacyLaunchGateSnapshot _privacyLaunchGate;
     private readonly object _manifestCacheLock = new();
-    private CachedManifestState _manifestCache = CachedManifestState.Empty;
+    private readonly Dictionary<string, CachedManifestState> _manifestCache = new(StringComparer.Ordinal);
 
     public PublicReleaseManifestService(IConfiguration configuration)
-        : this(configuration, httpClient: null)
+        : this(
+            configuration,
+            httpClient: null,
+            TimeProvider.System,
+            PrivacyLaunchGate.Current,
+            new ReleaseShelfGenerationStore(configuration))
     {
     }
 
     public PublicReleaseManifestService(IConfiguration configuration, HttpClient? httpClient)
+        : this(
+            configuration,
+            httpClient,
+            TimeProvider.System,
+            PrivacyLaunchGate.Current,
+            new ReleaseShelfGenerationStore(configuration))
+    {
+    }
+
+    internal PublicReleaseManifestService(
+        IConfiguration configuration,
+        ReleaseShelfGenerationStore shelfStore)
+        : this(
+            configuration,
+            httpClient: null,
+            TimeProvider.System,
+            PrivacyLaunchGate.Current,
+            shelfStore)
+    {
+    }
+
+    internal PublicReleaseManifestService(
+        IConfiguration configuration,
+        HttpClient? httpClient,
+        TimeProvider timeProvider)
+        : this(
+            configuration,
+            httpClient,
+            timeProvider,
+            PrivacyLaunchGate.Current,
+            new ReleaseShelfGenerationStore(configuration))
+    {
+    }
+
+    internal PublicReleaseManifestService(
+        IConfiguration configuration,
+        HttpClient? httpClient,
+        TimeProvider timeProvider,
+        PrivacyLaunchGateSnapshot privacyLaunchGate)
+        : this(
+            configuration,
+            httpClient,
+            timeProvider,
+            privacyLaunchGate,
+            new ReleaseShelfGenerationStore(configuration))
+    {
+    }
+
+    internal PublicReleaseManifestService(
+        IConfiguration configuration,
+        HttpClient? httpClient,
+        TimeProvider timeProvider,
+        PrivacyLaunchGateSnapshot privacyLaunchGate,
+        ReleaseShelfGenerationStore shelfStore)
     {
         _configuration = configuration;
         _httpClient = httpClient;
+        _shelfStore = shelfStore ?? throw new ArgumentNullException(nameof(shelfStore));
         _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
+        _goldReadiness = new GoldReadinessArtifactService(configuration);
         _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        _privacyLaunchGate = privacyLaunchGate ?? throw new ArgumentNullException(nameof(privacyLaunchGate));
     }
 
     public PublicReleaseManifestDto LoadManifest()
+        => LoadManifest(CaptureShelfSnapshot());
+
+    public ReleaseShelfSnapshot CaptureShelfSnapshot()
+        => _shelfStore.CaptureForCurrentRequest();
+
+    /// <summary>
+    /// Captures the currently active shelf without consulting the request generation
+    /// pin. This is reserved for channel-wide safety truth, such as revocations, that
+    /// must govern both current and retained-generation delivery routes.
+    /// </summary>
+    internal ReleaseShelfSnapshot CaptureUnpinnedActiveShelfSnapshot()
+        => _shelfStore.Capture();
+
+    public ReleaseShelfSnapshot CaptureShelfGeneration(string generationId)
+        => _shelfStore.CaptureGenerationForCurrentRequest(generationId);
+
+    public PublicReleaseManifestDto LoadManifest(ReleaseShelfSnapshot snapshot)
     {
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        PublicReleaseManifestDto? cachedManifest = TryGetCachedManifest(now, allowStale: false);
-        if (cachedManifest is not null)
+        ArgumentNullException.ThrowIfNull(snapshot);
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        byte[]? generationCanonicalBytes = snapshot.IsLegacy
+            ? null
+            : snapshot.ReadVerifiedFileBytes(
+                ReleaseShelfGenerationStore.CanonicalManifestFileName,
+                ReleaseShelfGenerationStore.MaximumManifestBytes)
+              ?? throw new InvalidDataException("Captured release shelf canonical manifest no longer matches its inventory binding.");
+
+        PublicReleaseManifestDto? cachedManifest = TryGetCachedManifest(snapshot.CacheKey, now, allowStale: false);
+        if (cachedManifest is not null
+            && !CachedManifestProofFreshnessDrifts(cachedManifest, now)
+            && !CachedManifestPrivacyReadinessDrifts(cachedManifest, _privacyLaunchGate))
         {
             return cachedManifest;
         }
 
-        var root = ResolveDownloadsRoot();
-        var registryManifestPath = ResolveRegistryManifestPath(root);
-        bool registryManifestExists = File.Exists(registryManifestPath);
+        if (!snapshot.IsLegacy)
+        {
+            PublicReleaseManifestDto immutableManifest = BindGeneration(
+                LoadRegistryReleaseManifestPayload(
+                    FilterManifestPayload(
+                        DecodeUtf8Manifest(
+                            generationCanonicalBytes!,
+                            ReleaseShelfGenerationStore.CanonicalManifestFileName)),
+                    "registry"),
+                snapshot);
+            WriteManifestCache(snapshot.CacheKey, immutableManifest, now);
+            return immutableManifest;
+        }
+
+        string root = snapshot.PhysicalRoot;
+        string registryManifestPath = ResolveRegistryManifestPath(snapshot);
+        bool registryManifestExists = snapshot.IsLegacy
+            ? File.Exists(registryManifestPath)
+            : generationCanonicalBytes is not null;
         bool preferLocalRegistryManifest = registryManifestExists && ShouldPreferLocalRegistryManifestInDevelopment();
         var registryManifestUrl = preferLocalRegistryManifest ? null : ResolveRegistryManifestUrl();
         PublicReleaseManifestDto? runtimeManifest = null;
         if (!string.IsNullOrWhiteSpace(registryManifestUrl))
         {
-            runtimeManifest = TryLoadRegistryReleaseManifestFromUrl(registryManifestUrl);
+            runtimeManifest = TryLoadRegistryReleaseManifestFromUrl(registryManifestUrl, snapshot);
         }
 
         PublicReleaseManifestDto manifest;
         if (registryManifestExists)
         {
-            var canonicalManifest = LoadRegistryReleaseManifestPayload(FilterManifestPayload(File.ReadAllText(registryManifestPath)), "registry");
-            manifest = ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(ChoosePreferredRegistryManifest(runtimeManifest, canonicalManifest)))));
-            WriteManifestCache(manifest, now);
+            string canonicalJson = snapshot.IsLegacy
+                ? ReadLegacyManifestText(registryManifestPath)
+                : DecodeUtf8Manifest(
+                    generationCanonicalBytes!,
+                    ReleaseShelfGenerationStore.CanonicalManifestFileName);
+            var canonicalManifest = LoadRegistryReleaseManifestPayload(FilterManifestPayload(canonicalJson), "registry");
+            manifest = ApplyImportRouteParityGuard(ApplyGoldReadinessGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(ChoosePreferredRegistryManifest(runtimeManifest, canonicalManifest), snapshot)))));
+            manifest = BindGeneration(manifest, snapshot);
+            WriteManifestCache(snapshot.CacheKey, manifest, now);
             return manifest;
         }
 
         if (runtimeManifest is not null)
         {
-            manifest = ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(runtimeManifest))));
-            WriteManifestCache(manifest, now);
+            manifest = ApplyImportRouteParityGuard(ApplyGoldReadinessGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(runtimeManifest, snapshot)))));
+            manifest = BindGeneration(manifest, snapshot);
+            WriteManifestCache(snapshot.CacheKey, manifest, now);
             return manifest;
         }
 
-        var manifestPath = Path.Combine(root, "releases.json");
-        if (!File.Exists(manifestPath))
+        var manifestPath = Path.Combine(root, ReleaseShelfGenerationStore.CompatibilityManifestFileName);
+        if (snapshot.IsLegacy && !File.Exists(manifestPath))
         {
-            manifest = ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(new PublicReleaseManifestDto(
+            manifest = ApplyImportRouteParityGuard(ApplyGoldReadinessGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(new PublicReleaseManifestDto(
                 Version: "unpublished",
                 Channel: "preview",
-                PublishedAt: DateTimeOffset.UtcNow,
+                PublishedAt: now,
                 Downloads: [],
                 Source: "fallback",
                 Status: "unpublished",
                 Message: "No published desktop builds are available yet.",
                 HasFallbackSource: false,
-                GeneratedAt: DateTimeOffset.UtcNow)))));
-            WriteManifestCache(manifest, now);
+                GeneratedAt: now), snapshot)))));
+            manifest = BindGeneration(manifest, snapshot);
+            WriteManifestCache(snapshot.CacheKey, manifest, now);
             return manifest;
         }
 
-        manifest = ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(LoadReleaseManifestPayload(FilterManifestPayload(File.ReadAllText(manifestPath)))))));
-        WriteManifestCache(manifest, now);
+        string compatibilityJson = ReadLegacyManifestText(manifestPath);
+        manifest = ApplyImportRouteParityGuard(ApplyGoldReadinessGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(LoadReleaseManifestPayload(FilterManifestPayload(compatibilityJson)), snapshot)))));
+        manifest = BindGeneration(manifest, snapshot);
+        WriteManifestCache(snapshot.CacheKey, manifest, now);
         return manifest;
     }
 
-    public bool RequiresCanonicalManifestRewrite()
+    /// <summary>
+    /// Loads the immutable Registry artifact bindings without applying Hub display
+    /// suppression. Delivery authorization must resolve the original binding first
+    /// so a globally disabled or revoked artifact returns an explicit gone decision
+    /// instead of being indistinguishable from an unknown route.
+    /// </summary>
+    internal PublicReleaseManifestDto LoadDeliveryManifest(ReleaseShelfSnapshot snapshot)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.IsLegacy)
+        {
+            return LoadManifest(snapshot);
+        }
+
+        byte[] canonicalBytes = snapshot.ReadVerifiedFileBytes(
+                ReleaseShelfGenerationStore.CanonicalManifestFileName,
+                ReleaseShelfGenerationStore.MaximumManifestBytes)
+            ?? throw new InvalidDataException(
+                "Captured release shelf canonical manifest no longer matches its inventory binding.");
+        return BindGeneration(
+            LoadRegistryReleaseManifestPayload(
+                DecodeUtf8Manifest(
+                    canonicalBytes,
+                    ReleaseShelfGenerationStore.CanonicalManifestFileName),
+                "registry"),
+            snapshot);
+    }
+
+    private static PublicReleaseManifestDto BindGeneration(
+        PublicReleaseManifestDto manifest,
+        ReleaseShelfSnapshot snapshot)
+        => snapshot.GenerationId is null
+            ? manifest
+            : manifest with
+            {
+                GenerationId = snapshot.GenerationId,
+                Version = snapshot.ReleaseVersion ?? manifest.Version,
+                Channel = snapshot.Channel ?? manifest.Channel,
+                PublishedAt = snapshot.PublishedAt ?? manifest.PublishedAt
+            };
+
+    private static byte[] ReadBoundedLegacyBytes(string path, int maximumBytes, string label)
+    {
+        try
+        {
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 64 * 1024,
+                FileOptions.SequentialScan);
+            long descriptorLength = stream.Length;
+            if (descriptorLength <= 0 || descriptorLength > maximumBytes)
+            {
+                throw new InvalidDataException($"{label} exceeds the permitted manifest byte length.");
+            }
+
+            byte[] bytes = new byte[checked((int)descriptorLength)];
+            stream.ReadExactly(bytes);
+            if (stream.ReadByte() != -1 || stream.Length != descriptorLength)
+            {
+                throw new InvalidDataException($"{label} changed while it was being read.");
+            }
+
+            return bytes;
+        }
+        catch (EndOfStreamException exception)
+        {
+            throw new InvalidDataException($"{label} changed while it was being read.", exception);
+        }
+        catch (IOException exception)
+        {
+            throw new InvalidDataException($"{label} could not be read atomically.", exception);
+        }
+    }
+
+    private static string DecodeUtf8Manifest(byte[] bytes, string label)
+    {
+        try
+        {
+            return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
+                .GetString(bytes);
+        }
+        catch (DecoderFallbackException exception)
+        {
+            throw new InvalidDataException($"{label} is not valid UTF-8.", exception);
+        }
+    }
+
+    private static string ReadLegacyManifestText(string path)
+        => DecodeUtf8Manifest(
+            ReadBoundedLegacyBytes(
+                path,
+                ReleaseShelfGenerationStore.MaximumManifestBytes,
+                Path.GetFileName(path)),
+            Path.GetFileName(path));
+
+    public bool RequiresCanonicalManifestRewrite()
+        => RequiresCanonicalManifestRewrite(CaptureShelfSnapshot());
+
+    public bool RequiresCanonicalManifestRewrite(ReleaseShelfSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.IsExplicitGeneration)
+        {
+            return false;
+        }
         if (ResolveDisabledArtifactIds().Count > 0 || ForceAccountRequiredDownloads())
         {
             return true;
         }
 
-        string? manifestPath = ResolveCanonicalManifestFilePath();
+        string? manifestPath = ResolveCanonicalManifestFilePath(snapshot);
         if (string.IsNullOrWhiteSpace(manifestPath) || !File.Exists(manifestPath))
         {
             return false;
         }
 
-        return CanonicalManifestNeedsInstallAwareRewrite(File.ReadAllText(manifestPath));
+        byte[]? manifestBytes = snapshot.ReadVerifiedFileBytes(
+            ReleaseShelfGenerationStore.CanonicalManifestFileName,
+            ReleaseShelfGenerationStore.MaximumManifestBytes);
+        if (!snapshot.IsLegacy && manifestBytes is null)
+        {
+            throw new InvalidDataException("Captured release shelf canonical manifest no longer matches its inventory binding.");
+        }
+
+        string json = manifestBytes is null
+            ? ReadLegacyManifestText(manifestPath)
+            : DecodeUtf8Manifest(manifestBytes, ReleaseShelfGenerationStore.CanonicalManifestFileName);
+        if (CanonicalManifestNeedsInstallAwareRewrite(json))
+        {
+            return true;
+        }
+
+        JsonObject? source = JsonNode.Parse(json)?.AsObject();
+        if (source is null)
+        {
+            return false;
+        }
+
+        JsonObject projected = source.DeepClone().AsObject();
+        ApplyProofFreshnessSupportabilityFloor(
+            projected,
+            _timeProvider.GetUtcNow(),
+            _privacyLaunchGate);
+        return !JsonNode.DeepEquals(source, projected);
     }
 
     public string? LoadCanonicalManifestJson()
+        => LoadCanonicalManifestJson(CaptureShelfSnapshot());
+
+    public string? LoadCanonicalManifestJson(ReleaseShelfSnapshot snapshot)
     {
-        var manifestPath = ResolveCanonicalManifestFilePath();
-        return manifestPath is null
-            ? null
-            : FilterManifestPayload(File.ReadAllText(manifestPath));
+        ArgumentNullException.ThrowIfNull(snapshot);
+        byte[]? bytes;
+        if (snapshot.IsLegacy)
+        {
+            string? path = ResolveCanonicalManifestFilePath(snapshot);
+            bytes = path is null
+                ? null
+                : ReadBoundedLegacyBytes(
+                    path,
+                    ReleaseShelfGenerationStore.MaximumManifestBytes,
+                    ReleaseShelfGenerationStore.CanonicalManifestFileName);
+        }
+        else
+        {
+            bytes = LoadGenerationCanonicalManifestBytes(snapshot);
+        }
+        if (bytes is null)
+        {
+            return null;
+        }
+
+        string json = DecodeUtf8Manifest(bytes, ReleaseShelfGenerationStore.CanonicalManifestFileName);
+        // Layout-v1 bytes are immutable inputs, not permission to bypass the
+        // runtime proof/privacy supportability floor. Project a response copy for
+        // both legacy and generation shelves; generation-bound raw-byte routes
+        // continue to use LoadGenerationCanonicalManifestBytes directly.
+        return FilterManifestPayload(json);
+    }
+
+    public byte[]? LoadGenerationCanonicalManifestBytes(ReleaseShelfSnapshot snapshot)
+        => LoadBoundManifestBytes(snapshot, ReleaseShelfGenerationStore.CanonicalManifestFileName);
+
+    public byte[]? LoadGenerationCompatibilityManifestBytes(ReleaseShelfSnapshot snapshot)
+        => LoadBoundManifestBytes(snapshot, ReleaseShelfGenerationStore.CompatibilityManifestFileName);
+
+    private static byte[]? LoadBoundManifestBytes(ReleaseShelfSnapshot snapshot, string fileName)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (snapshot.IsLegacy)
+        {
+            throw new InvalidOperationException("Generation-bound manifest bytes require an active layout-v1 snapshot.");
+        }
+
+        return snapshot.ReadVerifiedFileBytes(fileName, ReleaseShelfGenerationStore.MaximumManifestBytes);
     }
 
     private static PublicReleaseManifestDto ChoosePreferredRegistryManifest(
@@ -292,7 +588,17 @@ public sealed class PublicReleaseManifestService
     private static bool RuntimeManifestDriftsCanonicalRegistryTruth(
         PublicReleaseManifestDto runtimeManifest,
         PublicReleaseManifestDto canonicalManifest)
-        => JsonElementDrifts(runtimeManifest.DesktopTupleCoverage, canonicalManifest.DesktopTupleCoverage)
+        => ScalarDrifts(runtimeManifest.Version, canonicalManifest.Version)
+           || ScalarDrifts(runtimeManifest.PublicVersion, canonicalManifest.PublicVersion)
+           || ScalarDrifts(runtimeManifest.Channel, canonicalManifest.Channel)
+           || ScalarDrifts(runtimeManifest.Status, canonicalManifest.Status)
+           || ScalarDrifts(runtimeManifest.RolloutState, canonicalManifest.RolloutState)
+           || ScalarDrifts(runtimeManifest.RolloutReason, canonicalManifest.RolloutReason)
+           || ScalarDrifts(runtimeManifest.SupportabilityState, canonicalManifest.SupportabilityState)
+           || ScalarDrifts(runtimeManifest.SupportabilitySummary, canonicalManifest.SupportabilitySummary)
+           || ScalarDrifts(runtimeManifest.ProofStatus, canonicalManifest.ProofStatus)
+           || ReleaseProofDrifts(runtimeManifest.ReleaseProof, canonicalManifest.ReleaseProof)
+           || JsonElementDrifts(runtimeManifest.DesktopTupleCoverage, canonicalManifest.DesktopTupleCoverage)
            || JsonElementDrifts(runtimeManifest.RegistryBoundaryCoverage, canonicalManifest.RegistryBoundaryCoverage)
            || JsonElementDrifts(runtimeManifest.PublicTrustMetrics, canonicalManifest.PublicTrustMetrics)
            || JsonElementDrifts(runtimeManifest.InstallAwareArtifactRegistry, canonicalManifest.InstallAwareArtifactRegistry)
@@ -300,6 +606,19 @@ public sealed class PublicReleaseManifestService
            || JsonElementDrifts(runtimeManifest.ArtifactIdentityRegistry, canonicalManifest.ArtifactIdentityRegistry)
            || JsonElementDrifts(runtimeManifest.ArtifactPublicationBindings, canonicalManifest.ArtifactPublicationBindings)
            || JsonElementDrifts(runtimeManifest.ExchangeLineageRegistry, canonicalManifest.ExchangeLineageRegistry);
+
+    private static bool ReleaseProofDrifts(
+        PublicReleaseProofDto? runtimeProof,
+        PublicReleaseProofDto? canonicalProof)
+        => !JsonNode.DeepEquals(
+            JsonSerializer.SerializeToNode(runtimeProof),
+            JsonSerializer.SerializeToNode(canonicalProof));
+
+    private static bool ScalarDrifts(string? runtimeValue, string? canonicalValue)
+        => !string.Equals(
+            NormalizeOptional(runtimeValue),
+            NormalizeOptional(canonicalValue),
+            StringComparison.OrdinalIgnoreCase);
 
     private static bool JsonElementDrifts(JsonElement? runtimeElement, JsonElement? canonicalElement)
     {
@@ -316,6 +635,65 @@ public sealed class PublicReleaseManifestService
         return !JsonNode.DeepEquals(
             JsonNode.Parse(runtime.GetRawText()),
             JsonNode.Parse(canonical.GetRawText()));
+    }
+
+    private static bool CachedManifestProofFreshnessDrifts(
+        PublicReleaseManifestDto manifest,
+        DateTimeOffset evaluationInstant)
+    {
+        if (manifest.PublicTrustMetrics is not JsonElement publicTrustMetricsElement
+            || publicTrustMetricsElement.ValueKind != JsonValueKind.Object
+            || JsonNode.Parse(publicTrustMetricsElement.GetRawText()) is not JsonObject publicTrustMetrics
+            || publicTrustMetrics["proofFreshness"] is not JsonObject proofFreshness)
+        {
+            return false;
+        }
+
+        JsonObject? releaseProof = JsonSerializer.SerializeToNode(manifest.ReleaseProof)?.AsObject();
+        if (releaseProof is not null && manifest.ProofGeneratedAt is DateTimeOffset proofGeneratedAt)
+        {
+            releaseProof["generatedAt"] = proofGeneratedAt
+                .ToUniversalTime()
+                .ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+        }
+
+        ReleaseProofFreshnessEvaluation freshness = ReleaseProofFreshnessEvaluator.Evaluate(
+            proofFreshness,
+            releaseProof,
+            manifest.PublishedAt,
+            evaluationInstant);
+        string materializedStatus = NormalizeStateToken(GetJsonString(proofFreshness["status"]));
+        return !string.Equals(
+            materializedStatus,
+            NormalizeStateToken(freshness.MaterializedStatus),
+            StringComparison.Ordinal);
+    }
+
+    private static bool CachedManifestPrivacyReadinessDrifts(
+        PublicReleaseManifestDto manifest,
+        PrivacyLaunchGateSnapshot privacyLaunchGate)
+    {
+        if (!privacyLaunchGate.BlocksReleaseSupportability)
+        {
+            return false;
+        }
+
+        if (manifest.PublicTrustMetrics is not JsonElement publicTrustMetricsElement
+            || publicTrustMetricsElement.ValueKind != JsonValueKind.Object
+            || JsonNode.Parse(publicTrustMetricsElement.GetRawText()) is not JsonObject publicTrustMetrics
+            || !JsonNode.DeepEquals(
+                publicTrustMetrics["privacyReadiness"],
+                privacyLaunchGate.ToJsonObject()))
+        {
+            return true;
+        }
+
+        return string.Equals(
+                NormalizeStateToken(manifest.Status),
+                "published",
+                StringComparison.Ordinal)
+            && NormalizeStateToken(manifest.SupportabilityState) is
+                "gold_supported" or "preview_supported" or "supported";
     }
 
     private static HashSet<string> LoadArtifactIds(
@@ -348,6 +726,15 @@ public sealed class PublicReleaseManifestService
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private static DateTimeOffset? TryGetJsonDateTimeOffset(JsonNode? node)
+        => DateTimeOffset.TryParse(
+            GetJsonString(node),
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.RoundtripKind,
+            out DateTimeOffset parsed)
+            ? parsed
+            : null;
+
     private static string AppendDistinctSentence(string? existing, string sentence)
     {
         if (string.IsNullOrWhiteSpace(existing))
@@ -360,41 +747,53 @@ public sealed class PublicReleaseManifestService
             return existing;
         }
 
-        string trimmed = existing.Trim();
-        string separator = EndsWithSentencePunctuation(trimmed) ? " " : ". ";
-        return $"{trimmed}{separator}{sentence}";
+        return $"{existing.Trim().TrimEnd('.')} {sentence}";
     }
 
-    private static bool EndsWithSentencePunctuation(string value)
-        => value.EndsWith(".", StringComparison.Ordinal)
-           || value.EndsWith("!", StringComparison.Ordinal)
-           || value.EndsWith("?", StringComparison.Ordinal);
+    private static bool HasBlockingRolloutState(string? rolloutState)
+        => NormalizeOptional(rolloutState) is "coverage_incomplete"
+            or "release_review_required"
+            or "public_release_review_required"
+            or "desktop_polish_needed"
+            or "revoked";
+
+    private static bool HasOnlyProofFreshnessRolloutBlocker(PublicReleaseManifestDto manifest)
+        => string.Equals(
+                NormalizeOptional(manifest.RolloutState),
+                "public_release_review_required",
+                StringComparison.OrdinalIgnoreCase)
+            && manifest.RolloutReason?.Contains(
+                "stale or incomplete proof receipts",
+                StringComparison.OrdinalIgnoreCase) == true;
 
     public string? ResolveDownloadFilePath(string? path)
+        => ResolveDownloadFilePath(CaptureShelfSnapshot(), path);
+
+    public string? ResolveDownloadFilePath(ReleaseShelfSnapshot snapshot, string? path)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
         if (string.IsNullOrWhiteSpace(path))
         {
             return null;
         }
 
-        var root = Path.GetFullPath(ResolveDownloadsRoot());
         var relative = path.Trim().TrimStart('/').Replace('\\', '/');
         if (relative.Contains("..", StringComparison.Ordinal))
         {
             return null;
         }
 
-        var candidate = Path.GetFullPath(Path.Combine(root, "files", relative.Replace('/', Path.DirectorySeparatorChar)));
-        if (!candidate.StartsWith(root, StringComparison.Ordinal) || !File.Exists(candidate))
-        {
-            return null;
-        }
-
-        return candidate;
+        return snapshot.IsLegacy
+            ? snapshot.ResolveLegacyFilePath($"files/{relative}")
+            : null;
     }
 
     public string? ResolveReleaseEvidenceFilePath(string? path)
+        => ResolveReleaseEvidenceFilePath(CaptureShelfSnapshot(), path);
+
+    public string? ResolveReleaseEvidenceFilePath(ReleaseShelfSnapshot snapshot, string? path)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
         if (string.IsNullOrWhiteSpace(path))
         {
             return null;
@@ -407,17 +806,9 @@ public sealed class PublicReleaseManifestService
             return null;
         }
 
-        string root = Path.GetFullPath(Path.Combine(ResolveDownloadsRoot(), "release-evidence"));
-        string candidate = Path.GetFullPath(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
-        string scopedRoot = root.EndsWith(Path.DirectorySeparatorChar)
-            ? root
-            : root + Path.DirectorySeparatorChar;
-        if (!candidate.StartsWith(scopedRoot, StringComparison.Ordinal) || !File.Exists(candidate))
-        {
-            return null;
-        }
-
-        return candidate;
+        return snapshot.IsLegacy
+            ? snapshot.ResolveLegacyFilePath($"release-evidence/{relative}")
+            : null;
     }
 
     public PublicReleaseArtifactDto? FindDownload(string? artifactId)
@@ -460,7 +851,14 @@ public sealed class PublicReleaseManifestService
     }
 
     public string? ResolveDownloadFilePath(PublicReleaseArtifactDto artifact)
+        => ResolveDownloadFilePath(CaptureShelfSnapshot(), artifact);
+
+    public string? ResolveDownloadFilePath(
+        ReleaseShelfSnapshot snapshot,
+        PublicReleaseArtifactDto artifact)
     {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(artifact);
         var fileName = artifact.FileName;
         if (string.IsNullOrWhiteSpace(fileName))
         {
@@ -469,66 +867,83 @@ public sealed class PublicReleaseManifestService
             fileName = Path.GetFileName(withoutQuery);
         }
 
-        return ResolveDownloadFilePath(fileName);
+        return ResolveDownloadFilePath(snapshot, fileName);
     }
 
-    public string? ResolveCanonicalManifestFilePath()
+    public ReleaseShelfVerifiedFile? OpenVerifiedArtifactFile(
+        ReleaseShelfSnapshot snapshot,
+        PublicReleaseArtifactDto artifact,
+        string? requestedRelativePath = null)
     {
-        var root = ResolveDownloadsRoot();
-        var path = ResolveRegistryManifestPath(root);
-        return File.Exists(path) ? path : null;
-    }
-
-    private string ResolveDownloadsRoot()
-    {
-        if (_configuration["CHUMMER_DOWNLOADS_SOURCE_ROOT"]?.Trim() is { Length: > 0 } configured)
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(artifact);
+        if (snapshot.IsLegacy)
         {
-            return configured;
+            return null;
         }
 
-        foreach (string candidate in ResolveDefaultDownloadsRootCandidates())
+        string fileName = (artifact.FileName ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(fileName))
         {
-            if (Directory.Exists(candidate))
+            fileName = Path.GetFileName((artifact.Url ?? string.Empty).Split('?', '#')[0]);
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName)
+            || !string.Equals(Path.GetFileName(fileName), fileName, StringComparison.Ordinal)
+            || fileName.Contains('/', StringComparison.Ordinal)
+            || fileName.Contains('\\', StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (requestedRelativePath is not null)
+        {
+            string requested = requestedRelativePath.Trim().TrimStart('/');
+            if (!string.Equals(requested, fileName, StringComparison.Ordinal))
             {
-                return candidate;
+                return null;
             }
         }
 
-        return DefaultRoot;
+        ReleaseShelfVerifiedFile? verified = snapshot.OpenVerifiedFile($"files/{fileName}");
+        if (verified is null
+            || string.IsNullOrWhiteSpace(artifact.Sha256)
+            || !string.Equals(verified.ExpectedSha256, artifact.Sha256.Trim(), StringComparison.OrdinalIgnoreCase)
+            || (artifact.SizeBytes is long expectedSize && verified.SizeBytes != expectedSize))
+        {
+            verified?.Dispose();
+            return null;
+        }
+
+        return verified;
     }
 
-    private IEnumerable<string> ResolveDefaultDownloadsRootCandidates()
+    public string? ResolveCanonicalManifestFilePath()
+        => ResolveCanonicalManifestFilePath(CaptureShelfSnapshot());
+
+    public string? ResolveCanonicalManifestFilePath(ReleaseShelfSnapshot snapshot)
     {
-        if (_configuration[PublicCanonRootKey]?.Trim() is { Length: > 0 } canonRoot)
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (!snapshot.IsLegacy)
         {
-            yield return Path.Combine(canonRoot, "Chummer.Portal", "downloads");
+            return null;
         }
 
-        foreach (string candidate in ResolveAncestorPortalDownloadsRoots(Directory.GetCurrentDirectory()))
-        {
-            yield return candidate;
-        }
-
-        foreach (string candidate in ResolveAncestorPortalDownloadsRoots(AppContext.BaseDirectory))
-        {
-            yield return candidate;
-        }
-
-        yield return DefaultRoot;
+        string path = ResolveRegistryManifestPath(snapshot);
+        return File.Exists(path) ? path : null;
     }
 
-    private static IEnumerable<string> ResolveAncestorPortalDownloadsRoots(string start)
+    private PublicReleaseManifestDto ApplyLocalReleaseProofFallback(
+        PublicReleaseManifestDto manifest,
+        ReleaseShelfSnapshot snapshot)
     {
-        string? current = Path.GetFullPath(start);
-        for (int depth = 0; depth < 6 && !string.IsNullOrWhiteSpace(current); depth++)
+        if (!snapshot.IsLegacy)
         {
-            yield return Path.Combine(current, "Chummer.Portal", "downloads");
-            current = Directory.GetParent(current)?.FullName;
+            // A generation must be self-contained. Never splice mutable repo-local proof
+            // bytes into an activated immutable shelf generation.
+            return EnsureContractName(manifest);
         }
-    }
 
-    private PublicReleaseManifestDto ApplyLocalReleaseProofFallback(PublicReleaseManifestDto manifest)
-    {
         var proofPath = ResolveLocalReleaseProofPath();
         if (string.IsNullOrWhiteSpace(proofPath) || !File.Exists(proofPath))
         {
@@ -571,10 +986,11 @@ public sealed class PublicReleaseManifestService
             ? manifest with { ContractName = DefaultManifestContractName }
             : manifest;
 
-    private string ResolveRegistryManifestPath(string downloadsRoot)
-        => _configuration["CHUMMER_RELEASE_REGISTRY_MANIFEST_FILE"]?.Trim() is { Length: > 0 } configured
+    private string ResolveRegistryManifestPath(ReleaseShelfSnapshot snapshot)
+        => snapshot.IsLegacy
+           && _configuration["CHUMMER_RELEASE_REGISTRY_MANIFEST_FILE"]?.Trim() is { Length: > 0 } configured
             ? configured
-            : Path.Combine(downloadsRoot, "RELEASE_CHANNEL.generated.json");
+            : Path.Combine(snapshot.PhysicalRoot, ReleaseShelfGenerationStore.CanonicalManifestFileName);
 
     private string? ResolveLocalReleaseProofPath()
     {
@@ -612,41 +1028,44 @@ public sealed class PublicReleaseManifestService
         return $"{baseUrl.TrimEnd('/')}/api/v1/registry/release-channel/current";
     }
 
-    private static PublicReleaseManifestDto LoadReleaseManifest(string manifestPath)
+    private PublicReleaseManifestDto LoadReleaseManifest(string manifestPath)
         => LoadReleaseManifestPayload(File.ReadAllText(manifestPath));
 
-    private static PublicReleaseManifestDto LoadReleaseManifestPayload(string json)
+    private PublicReleaseManifestDto LoadReleaseManifestPayload(string json)
     {
+        DateTimeOffset fallbackInstant = _timeProvider.GetUtcNow();
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
         {
             PropertyNameCaseInsensitive = true
         };
 
-        var parsed = LoadStoredCompatibilityManifestPayload(json, options);
+        var parsed = LoadStoredCompatibilityManifestPayload(json, options, fallbackInstant);
         if (parsed is null)
         {
             return new PublicReleaseManifestDto(
                 Version: "unpublished",
                 Channel: "preview",
-                PublishedAt: DateTimeOffset.UtcNow,
+                PublishedAt: fallbackInstant,
                 Downloads: [],
                 Source: "manifest",
                 Status: "manifest-error",
                 Message: "Release manifest exists but could not be parsed.",
                 HasFallbackSource: false,
-                GeneratedAt: DateTimeOffset.UtcNow);
+                GeneratedAt: fallbackInstant);
         }
 
-        var status = parsed.Downloads.Count > 0
-            ? "published"
-            : string.Equals(parsed.Version, "unpublished", StringComparison.OrdinalIgnoreCase)
-                ? "unpublished"
-                : "manifest-empty";
-        var message = parsed.Downloads.Count > 0
-            ? null
-            : status == "unpublished"
-                ? "No published desktop builds are available yet."
-                : "Release manifest is present but contains no downloadable artifacts.";
+        var status = NormalizeOptional(parsed.Status)
+            ?? (parsed.Downloads.Count > 0
+                ? "published"
+                : string.Equals(parsed.Version, "unpublished", StringComparison.OrdinalIgnoreCase)
+                    ? "unpublished"
+                    : "manifest-empty");
+        var message = NormalizeOptional(parsed.Message)
+            ?? (parsed.Downloads.Count > 0
+                ? null
+                : status == "unpublished"
+                    ? "No published desktop builds are available yet."
+                    : "Release manifest is present but contains no downloadable artifacts.");
         return parsed with
         {
             Source = "manifest",
@@ -656,21 +1075,72 @@ public sealed class PublicReleaseManifestService
         };
     }
 
-    private static PublicReleaseManifestDto LoadRegistryReleaseManifest(string manifestPath)
+    private PublicReleaseManifestDto LoadRegistryReleaseManifest(string manifestPath)
         => LoadRegistryReleaseManifestPayload(File.ReadAllText(manifestPath), "registry");
 
-    private PublicReleaseManifestDto? TryLoadRegistryReleaseManifestFromUrl(string manifestUrl)
+    private PublicReleaseManifestDto? TryLoadRegistryReleaseManifestFromUrl(
+        string manifestUrl,
+        ReleaseShelfSnapshot snapshot)
     {
         try
         {
             using var client = _httpClient is null ? new HttpClient() : null;
             using var timeoutCts = new CancellationTokenSource(RegistryRuntimeManifestFetchTimeout);
             string json = (_httpClient ?? client!).GetStringAsync(manifestUrl, timeoutCts.Token).GetAwaiter().GetResult();
+            if (!RuntimeRegistryManifestMatchesSnapshot(json, snapshot))
+            {
+                return null;
+            }
+
             return LoadRegistryReleaseManifestPayload(FilterManifestPayload(json), "registry_runtime");
         }
         catch
         {
             return null;
+        }
+    }
+
+    private static bool RuntimeRegistryManifestMatchesSnapshot(
+        string json,
+        ReleaseShelfSnapshot snapshot)
+    {
+        if (snapshot.IsLegacy)
+        {
+            return true;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(json);
+            JsonElement root = document.RootElement;
+            string? generationId = root.TryGetProperty("generationId", out JsonElement generationIdElement)
+                ? generationIdElement.GetString()
+                : null;
+            string? version = root.TryGetProperty("version", out JsonElement versionElement)
+                ? versionElement.GetString()
+                : null;
+            string? channel = root.TryGetProperty("channelId", out JsonElement channelElement)
+                ? channelElement.GetString()
+                : root.TryGetProperty("channel", out JsonElement canonicalChannelElement)
+                    ? canonicalChannelElement.GetString()
+                    : null;
+            DateTimeOffset? publishedAt = root.TryGetProperty("publishedAt", out JsonElement publishedAtElement)
+                && publishedAtElement.ValueKind == JsonValueKind.String
+                && DateTimeOffset.TryParse(
+                    publishedAtElement.GetString(),
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind,
+                    out DateTimeOffset parsedPublishedAt)
+                    ? parsedPublishedAt
+                    : null;
+            return string.Equals(generationId, snapshot.GenerationId, StringComparison.Ordinal)
+                   && string.Equals(version, snapshot.ReleaseVersion, StringComparison.Ordinal)
+                   && string.Equals(channel, snapshot.Channel, StringComparison.Ordinal)
+                   && publishedAt?.ToUniversalTime() == snapshot.PublishedAt?.ToUniversalTime();
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 
@@ -681,34 +1151,52 @@ public sealed class PublicReleaseManifestService
                || string.Equals(environmentName, "Local", StringComparison.OrdinalIgnoreCase);
     }
 
-    private PublicReleaseManifestDto? TryGetCachedManifest(DateTimeOffset now, bool allowStale)
+    private PublicReleaseManifestDto? TryGetCachedManifest(
+        string cacheKey,
+        DateTimeOffset now,
+        bool allowStale)
     {
         lock (_manifestCacheLock)
         {
-            if (_manifestCache.Manifest is null)
+            if (!_manifestCache.TryGetValue(cacheKey, out CachedManifestState? state)
+                || state.Manifest is null)
             {
                 return null;
             }
 
-            if (now <= _manifestCache.FreshUntilUtc)
+            if (now <= state.FreshUntilUtc)
             {
-                return _manifestCache.Manifest;
+                return state.Manifest;
             }
 
-            return allowStale && now <= _manifestCache.StaleUntilUtc
-                ? _manifestCache.Manifest
+            return allowStale && now <= state.StaleUntilUtc
+                ? state.Manifest
                 : null;
         }
     }
 
-    private void WriteManifestCache(PublicReleaseManifestDto manifest, DateTimeOffset now)
+    private void WriteManifestCache(
+        string cacheKey,
+        PublicReleaseManifestDto manifest,
+        DateTimeOffset now)
     {
         lock (_manifestCacheLock)
         {
-            _manifestCache = new CachedManifestState(
+            _manifestCache[cacheKey] = new CachedManifestState(
                 manifest,
                 now.Add(ManifestCacheFreshTtl),
                 now.Add(ManifestCacheStaleTtl));
+
+            if (_manifestCache.Count > 8)
+            {
+                foreach (string expiredKey in _manifestCache
+                             .Where(entry => entry.Value.StaleUntilUtc < now)
+                             .Select(static entry => entry.Key)
+                             .ToArray())
+                {
+                    _manifestCache.Remove(expiredKey);
+                }
+            }
         }
     }
 
@@ -717,14 +1205,11 @@ public sealed class PublicReleaseManifestService
         DateTimeOffset FreshUntilUtc,
         DateTimeOffset StaleUntilUtc)
     {
-        public static CachedManifestState Empty { get; } = new(
-            Manifest: null,
-            FreshUntilUtc: DateTimeOffset.MinValue,
-            StaleUntilUtc: DateTimeOffset.MinValue);
     }
 
-    private static PublicReleaseManifestDto LoadRegistryReleaseManifestPayload(string json, string source)
+    private PublicReleaseManifestDto LoadRegistryReleaseManifestPayload(string json, string source)
     {
+        DateTimeOffset fallbackInstant = _timeProvider.GetUtcNow();
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
         {
             PropertyNameCaseInsensitive = true
@@ -736,15 +1221,16 @@ public sealed class PublicReleaseManifestService
             return new PublicReleaseManifestDto(
                 Version: "unpublished",
                 Channel: "preview",
-                PublishedAt: DateTimeOffset.UtcNow,
+                PublishedAt: fallbackInstant,
                 Downloads: [],
                 Source: source,
                 Status: "manifest-error",
                 Message: "Registry release manifest exists but could not be parsed.",
                 HasFallbackSource: false,
-                GeneratedAt: DateTimeOffset.UtcNow);
+                GeneratedAt: fallbackInstant);
         }
 
+        string projectedChannel = parsed.ChannelId ?? parsed.Channel ?? "preview";
         var downloads = (parsed.Artifacts ?? [])
             .Where(item => !string.IsNullOrWhiteSpace(item.DownloadUrl))
             .Select(item => new PublicReleaseArtifactDto(
@@ -763,8 +1249,8 @@ public sealed class PublicReleaseManifestService
                 PlatformLabel: item.PlatformLabel ?? item.Platform ?? "Preview build",
                 Format: InferArtifactFormat(item.FileName, item.DownloadUrl),
                 Flavor: InferArtifactFlavor(item.Kind, item.FileName, item.DownloadUrl),
-                ChannelId: parsed.ChannelId,
-                Channel: parsed.ChannelId,
+                ChannelId: projectedChannel,
+                Channel: projectedChannel,
                 Version: parsed.Version,
                 ReleaseVersion: parsed.Version,
                 CompatibilityState: item.CompatibilityState,
@@ -777,21 +1263,21 @@ public sealed class PublicReleaseManifestService
                 PayloadSizeBytes: item.PayloadSizeBytes))
             .ToList();
 
-        var status = downloads.Count > 0
-            ? "published"
-            : string.Equals(parsed.Status, "manifest-empty", StringComparison.OrdinalIgnoreCase)
-                ? "manifest-empty"
-                : "unpublished";
-        var message = downloads.Count > 0
-            ? parsed.Message
-            : status == "unpublished"
-                ? "No published desktop builds are available yet."
-                : "Registry release manifest is present but contains no downloadable artifacts.";
+        var status = NormalizeOptional(parsed.Status)
+            ?? (downloads.Count > 0
+                ? "published"
+                : "unpublished");
+        var message = NormalizeOptional(parsed.Message)
+            ?? (downloads.Count > 0
+                ? null
+                : status == "unpublished"
+                    ? "No published desktop builds are available yet."
+                    : "Registry release manifest is present but contains no downloadable artifacts.");
 
         return new PublicReleaseManifestDto(
             Version: parsed.Version ?? "unpublished",
-            Channel: parsed.ChannelId ?? "preview",
-            PublishedAt: parsed.PublishedAt ?? DateTimeOffset.UtcNow,
+            Channel: projectedChannel,
+            PublishedAt: parsed.PublishedAt ?? fallbackInstant,
             Downloads: downloads,
             Source: source,
             Status: status,
@@ -816,6 +1302,9 @@ public sealed class PublicReleaseManifestService
         {
             ProofUiLocalizationReleaseGate = parsed.ReleaseProof?.UiLocalizationReleaseGate is JsonElement uiLocalizationReleaseGate
                 ? uiLocalizationReleaseGate.Clone()
+                : null,
+            ProofFlagshipReadiness = parsed.ReleaseProof?.FlagshipReadiness is JsonElement flagshipReadiness
+                ? flagshipReadiness.Clone()
                 : null,
             DesktopTupleCoverage = parsed.DesktopTupleCoverage is JsonElement desktopTupleCoverage
                 ? desktopTupleCoverage.Clone()
@@ -845,7 +1334,10 @@ public sealed class PublicReleaseManifestService
         };
     }
 
-    private static PublicReleaseManifestDto? LoadStoredCompatibilityManifestPayload(string json, JsonSerializerOptions options)
+    private static PublicReleaseManifestDto? LoadStoredCompatibilityManifestPayload(
+        string json,
+        JsonSerializerOptions options,
+        DateTimeOffset fallbackInstant)
     {
         CompatibilityReleaseManifest? parsed = JsonSerializer.Deserialize<CompatibilityReleaseManifest>(json, options);
         if (parsed is null)
@@ -856,10 +1348,10 @@ public sealed class PublicReleaseManifestService
         return new PublicReleaseManifestDto(
             Version: parsed.Version ?? "unpublished",
             Channel: parsed.Channel ?? parsed.ChannelId ?? "preview",
-            PublishedAt: parsed.PublishedAt ?? DateTimeOffset.UtcNow,
+            PublishedAt: parsed.PublishedAt ?? fallbackInstant,
             Downloads: parsed.Downloads ?? [],
             Source: parsed.Source ?? "manifest",
-            Status: parsed.Status ?? "published",
+            Status: parsed.Status ?? string.Empty,
             Message: parsed.Message,
             HasFallbackSource: parsed.HasFallbackSource,
             RolloutState: parsed.RolloutState,
@@ -881,6 +1373,9 @@ public sealed class PublicReleaseManifestService
         {
             ProofUiLocalizationReleaseGate = parsed.ReleaseProof?.UiLocalizationReleaseGate is JsonElement uiLocalizationReleaseGate
                 ? uiLocalizationReleaseGate.Clone()
+                : null,
+            ProofFlagshipReadiness = parsed.ReleaseProof?.FlagshipReadiness is JsonElement flagshipReadiness
+                ? flagshipReadiness.Clone()
                 : null,
             DesktopTupleCoverage = parsed.DesktopTupleCoverage is JsonElement desktopTupleCoverage
                 ? desktopTupleCoverage.Clone()
@@ -927,26 +1422,33 @@ public sealed class PublicReleaseManifestService
 
     private string FilterManifestPayload(string json)
     {
+        DateTimeOffset evaluationInstant = _timeProvider.GetUtcNow();
         HashSet<string> disabledArtifactIds = ResolveDisabledArtifactIds();
         bool forceAccountRequiredDownloads = ForceAccountRequiredDownloads();
         bool rewriteCoverageDerivedRegistries = CanonicalManifestNeedsInstallAwareRewrite(json);
-        if (disabledArtifactIds.Count == 0 && !forceAccountRequiredDownloads && !rewriteCoverageDerivedRegistries)
-        {
-            JsonObject? passthroughManifest = JsonNode.Parse(json)?.AsObject();
-            if (passthroughManifest is null || passthroughManifest["desktopTupleCoverage"] is not JsonObject passthroughCoverage)
-            {
-                return json;
-            }
-
-            List<ManifestArtifactShape> remainingArtifacts = CollectManifestArtifactShapes(passthroughManifest);
-            RebuildCoverageDerivedRegistries(passthroughManifest, passthroughCoverage, remainingArtifacts);
-            return passthroughManifest.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        }
-
         JsonObject? manifest = JsonNode.Parse(json)?.AsObject();
         if (manifest is null)
         {
             return json;
+        }
+
+        if (disabledArtifactIds.Count == 0 && !forceAccountRequiredDownloads && !rewriteCoverageDerivedRegistries)
+        {
+            bool rewroteManifest = false;
+            if (manifest["desktopTupleCoverage"] is JsonObject passthroughCoverage)
+            {
+                List<ManifestArtifactShape> remainingArtifacts = CollectManifestArtifactShapes(manifest);
+                RebuildCoverageDerivedRegistries(manifest, passthroughCoverage, remainingArtifacts);
+                rewroteManifest = true;
+            }
+
+            rewroteManifest |= ApplyProofFreshnessSupportabilityFloor(
+                manifest,
+                evaluationInstant,
+                _privacyLaunchGate);
+            return rewroteManifest
+                ? manifest.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : json;
         }
 
         if (disabledArtifactIds.Count > 0)
@@ -965,8 +1467,265 @@ public sealed class PublicReleaseManifestService
             ApplyForcedAccountRequiredDownloadPolicy(manifest);
         }
 
+        ApplyProofFreshnessSupportabilityFloor(
+            manifest,
+            evaluationInstant,
+            _privacyLaunchGate);
         return manifest.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web));
     }
+
+    private static bool ApplyProofFreshnessSupportabilityFloor(
+        JsonObject manifest,
+        DateTimeOffset evaluationInstant,
+        PrivacyLaunchGateSnapshot privacyLaunchGate)
+    {
+        JsonObject original = manifest.DeepClone().AsObject();
+        JsonObject publicTrustMetrics = manifest["publicTrustMetrics"] as JsonObject ?? [];
+        JsonObject proofFreshness = publicTrustMetrics["proofFreshness"] as JsonObject ?? [];
+        DateTimeOffset? publishedAt = TryGetJsonDateTimeOffset(manifest["publishedAt"]);
+        ReleaseProofFreshnessEvaluation freshness = ReleaseProofFreshnessEvaluator.Evaluate(
+            proofFreshness,
+            manifest["releaseProof"] as JsonObject,
+            publishedAt,
+            evaluationInstant);
+
+        manifest["publicTrustMetrics"] = publicTrustMetrics;
+        publicTrustMetrics["proofFreshness"] = proofFreshness;
+        proofFreshness["status"] = freshness.MaterializedStatus;
+        publicTrustMetrics["privacyReadiness"] = privacyLaunchGate.ToJsonObject();
+        if (freshness.IsFresh && !privacyLaunchGate.BlocksReleaseSupportability)
+        {
+            return !JsonNode.DeepEquals(original, manifest);
+        }
+
+        const string reviewRolloutState = "public_release_review_required";
+        string readinessBlocker = ReleaseReadinessBlockerClause(
+            freshness.IsFresh,
+            privacyLaunchGate);
+        string reviewRolloutReason =
+            $"Current shelf is published, but release posture stays review-required because {readinessBlocker}.";
+        string reviewSupportabilitySummary =
+            $"Treat the current release as review-required because {readinessBlocker}.";
+        string reviewKnownIssueSummary = $"Known issue: {readinessBlocker}.";
+        string reviewFixAvailabilitySummary =
+            "Only send fixed notices after current launch-readiness blockers are cleared and the affected install "
+            + "can receive the published channel artifact now on the release page.";
+
+        string publicationStatus = NormalizeToken(GetJsonString(manifest["status"]));
+        string existingRolloutState = NormalizeStateToken(GetJsonString(manifest["rolloutState"]));
+        string effectiveRolloutState = ResolveNonFreshRolloutState(
+            publicationStatus,
+            existingRolloutState,
+            reviewRolloutState);
+        bool strongerRolloutState = IsStrongerThanProofReview(effectiveRolloutState);
+
+        manifest["rolloutState"] = effectiveRolloutState;
+        manifest["rolloutReason"] = PreserveOrReplaceNarrative(
+            GetJsonString(manifest["rolloutReason"]),
+            reviewRolloutReason,
+            strongerRolloutState);
+
+        string existingSupportabilityState = NormalizeStateToken(GetJsonString(manifest["supportabilityState"]));
+        manifest["supportabilityState"] = ResolveNonFreshSupportabilityState(
+            publicationStatus,
+            effectiveRolloutState,
+            existingSupportabilityState);
+        manifest["supportabilitySummary"] = PreserveOrReplaceNarrative(
+            GetJsonString(manifest["supportabilitySummary"]),
+            reviewSupportabilitySummary,
+            strongerRolloutState);
+        manifest["knownIssueSummary"] = PreserveOrReplaceNarrative(
+            GetJsonString(manifest["knownIssueSummary"]),
+            reviewKnownIssueSummary,
+            strongerRolloutState);
+        manifest["fixAvailabilitySummary"] = PreserveOrReplaceNarrative(
+            GetJsonString(manifest["fixAvailabilitySummary"]),
+            reviewFixAvailabilitySummary,
+            strongerRolloutState);
+
+        JsonObject publicReleaseChannel = publicTrustMetrics["releaseChannel"] as JsonObject ?? [];
+        publicTrustMetrics["releaseChannel"] = publicReleaseChannel;
+        ApplyProofFreshnessReleaseChannelFloor(
+            publicReleaseChannel,
+            publicationStatus,
+            effectiveRolloutState,
+            "posture",
+            $"Release channel remains review-required because {readinessBlocker}.");
+
+        JsonObject registryBoundaryCoverage = manifest["registryBoundaryCoverage"] as JsonObject ?? [];
+        manifest["registryBoundaryCoverage"] = registryBoundaryCoverage;
+        JsonObject registryReleaseChannel = registryBoundaryCoverage["releaseChannel"] as JsonObject ?? [];
+        registryBoundaryCoverage["releaseChannel"] = registryReleaseChannel;
+        ApplyProofFreshnessReleaseChannelFloor(
+            registryReleaseChannel,
+            publicationStatus,
+            effectiveRolloutState,
+            "publicTrustPosture",
+            $"Release-channel truth remains review-required because {readinessBlocker}.");
+
+        return !JsonNode.DeepEquals(original, manifest);
+    }
+
+    private static string ReleaseReadinessBlockerClause(
+        bool proofFresh,
+        PrivacyLaunchGateSnapshot privacyLaunchGate)
+        => (proofFresh, privacyLaunchGate.BlocksReleaseSupportability) switch
+        {
+            (false, true) => "stale or incomplete proof receipts and Hosted Build privacy, retention, recovery, and erasure review still block launch-readiness claims",
+            (false, false) => "stale or incomplete proof receipts still block launch-readiness claims",
+            (true, true) => "Hosted Build privacy, retention, recovery, and erasure review still blocks launch-readiness claims",
+            _ => "launch-readiness review remains incomplete",
+        };
+
+    private static void ApplyProofFreshnessReleaseChannelFloor(
+        JsonObject releaseChannel,
+        string publicationStatus,
+        string topLevelRolloutState,
+        string publicTrustPosturePropertyName,
+        string reviewSummary)
+    {
+        string existingRolloutState = NormalizeStateToken(GetJsonString(releaseChannel["rolloutState"]));
+        string effectiveRolloutState = ResolveNonFreshRolloutState(
+            publicationStatus,
+            existingRolloutState,
+            topLevelRolloutState);
+        bool strongerRolloutState = IsStrongerThanProofReview(effectiveRolloutState);
+        releaseChannel["rolloutState"] = effectiveRolloutState;
+        releaseChannel["supportabilityState"] = ResolveNonFreshSupportabilityState(
+            publicationStatus,
+            effectiveRolloutState,
+            NormalizeStateToken(GetJsonString(releaseChannel["supportabilityState"])));
+        releaseChannel[publicTrustPosturePropertyName] = ResolveNonFreshPublicTrustPosture(
+            publicationStatus,
+            effectiveRolloutState,
+            NormalizeStateToken(GetJsonString(releaseChannel[publicTrustPosturePropertyName])));
+        releaseChannel["summary"] = PreserveOrReplaceNarrative(
+            GetJsonString(releaseChannel["summary"]),
+            reviewSummary,
+            strongerRolloutState);
+    }
+
+    private static string ResolveNonFreshPublicTrustPosture(
+        string publicationStatus,
+        string effectiveRolloutState,
+        string currentPublicTrustPosture)
+        => string.Equals(publicationStatus, "revoked", StringComparison.Ordinal)
+            || string.Equals(effectiveRolloutState, "revoked", StringComparison.Ordinal)
+            || string.Equals(currentPublicTrustPosture, "revoked", StringComparison.Ordinal)
+            ? "revoked"
+            : "blocked";
+
+    private static string ResolveNonFreshRolloutState(
+        string publicationStatus,
+        string currentRolloutState,
+        string fallbackReviewState)
+    {
+        string terminalPublicationState = TerminalPublicationState(publicationStatus);
+        if (!string.IsNullOrWhiteSpace(terminalPublicationState))
+        {
+            return IsTerminalOrUnknownRolloutState(currentRolloutState)
+                ? currentRolloutState
+                : terminalPublicationState;
+        }
+
+        return IsNonOptimisticState(currentRolloutState)
+            ? currentRolloutState
+            : fallbackReviewState;
+    }
+
+    private static string ResolveNonFreshSupportabilityState(
+        string publicationStatus,
+        string effectiveRolloutState,
+        string currentSupportabilityState)
+    {
+        string terminalPublicationState = TerminalPublicationState(publicationStatus);
+        if (!string.IsNullOrWhiteSpace(terminalPublicationState))
+        {
+            return IsTerminalOrUnknownSupportabilityState(currentSupportabilityState)
+                ? currentSupportabilityState
+                : terminalPublicationState;
+        }
+
+        if (IsNonOptimisticSupportabilityState(currentSupportabilityState))
+        {
+            return currentSupportabilityState;
+        }
+
+        return IsTerminalOrUnknownRolloutState(effectiveRolloutState)
+            ? effectiveRolloutState
+            : "review_required";
+    }
+
+    private static string PreserveOrReplaceNarrative(
+        string? current,
+        string reviewNarrative,
+        bool preserveStrongerBlockerNarrative)
+        => preserveStrongerBlockerNarrative
+           && !string.IsNullOrWhiteSpace(current)
+           && !NarrativeMakesOptimisticSupportClaim(current)
+            ? current.Trim()
+            : reviewNarrative;
+
+    private static bool NarrativeMakesOptimisticSupportClaim(string value)
+    {
+        string normalized = value.Trim().ToLowerInvariant();
+        return normalized.Contains("supported", StringComparison.Ordinal)
+            || normalized.Contains("passed the local release", StringComparison.Ordinal)
+            || normalized.Contains("available now", StringComparison.Ordinal)
+            || normalized.Contains("release status is green", StringComparison.Ordinal)
+            || normalized.Contains("no blocking release caveat", StringComparison.Ordinal)
+            || normalized.Contains("ready for launch", StringComparison.Ordinal);
+    }
+
+    private static string TerminalPublicationState(string publicationStatus)
+        => NormalizeStateToken(publicationStatus) switch
+        {
+            "revoked" => "revoked",
+            "unpublished" or "draft" or "manifest_empty" or "manifest_error" => "unpublished",
+            "disabled" => "disabled",
+            "blocked" => "blocked",
+            "quarantined" => "quarantined",
+            "security_hold" => "security_hold",
+            _ => string.Empty
+        };
+
+    private static bool IsNonOptimisticState(string state)
+        => !string.IsNullOrWhiteSpace(state) && !IsOptimisticRolloutState(state);
+
+    private static bool IsNonOptimisticSupportabilityState(string state)
+        => !string.IsNullOrWhiteSpace(state)
+            && state is not "gold_supported"
+            && state is not "preview_supported"
+            && state is not "supported";
+
+    private static bool IsTerminalOrUnknownSupportabilityState(string state)
+        => IsNonOptimisticSupportabilityState(state)
+            && state is not "review_required"
+            and not "limited";
+
+    private static bool IsOptimisticRolloutState(string state)
+        => state is "public_stable"
+            or "stable"
+            or "docker"
+            or "promoted_preview"
+            or "preview"
+            or "published"
+            or "live";
+
+    private static bool IsStrongerThanProofReview(string rolloutState)
+        => !string.IsNullOrWhiteSpace(rolloutState)
+            && rolloutState is not "public_release_review_required"
+            and not "release_review_required"
+            and not "review_required"
+            && !IsOptimisticRolloutState(rolloutState);
+
+    private static bool IsTerminalOrUnknownRolloutState(string rolloutState)
+        => IsStrongerThanProofReview(rolloutState)
+            && rolloutState is not "coverage_incomplete"
+            and not "desktop_polish_needed";
+
+    private static string NormalizeStateToken(string? value)
+        => NormalizeToken(value).Replace('-', '_');
 
     private PublicReleaseManifestDto ApplyArtifactSuppressionPolicy(PublicReleaseManifestDto manifest)
     {
@@ -1032,37 +1791,104 @@ public sealed class PublicReleaseManifestService
 
     private PublicReleaseManifestDto ApplyFlagshipReadinessGuard(PublicReleaseManifestDto manifest)
     {
-        FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
-        if (readiness is null || !readiness.RequiresReview)
+        if (ShouldPreserveCurrentGoldSupportability(manifest))
         {
             return EnsureContractName(manifest);
         }
 
-        string gapSummary = readiness.ReviewRequiredSummary.Trim().TrimEnd('.');
+        FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
+        if (readiness is null || !readiness.MissingDesktopClientCoverage)
+        {
+            return EnsureContractName(manifest);
+        }
+
+        string gapSummary = readiness.DesktopClientGapSummary.Trim().TrimEnd('.');
+        bool published = string.Equals(NormalizeOptional(manifest.Status), "published", StringComparison.OrdinalIgnoreCase);
+        bool preserveBlockingRollout = HasBlockingRolloutState(manifest.RolloutState)
+            && !HasOnlyProofFreshnessRolloutBlocker(manifest);
+        string? rolloutState = published && !preserveBlockingRollout
+            ? "desktop_polish_needed"
+            : manifest.RolloutState;
+        bool preserveRolloutReason = preserveBlockingRollout;
+        bool preserveReviewContext = string.Equals(NormalizeOptional(manifest.SupportabilityState), "review_required", StringComparison.OrdinalIgnoreCase);
         return EnsureContractName(manifest with
         {
-            RolloutState = string.Equals(NormalizeOptional(manifest.Status), "published", StringComparison.OrdinalIgnoreCase)
-                ? readiness.MissingDesktopClientCoverage ? "desktop_polish_needed" : "readiness_review_required"
-                : manifest.RolloutState,
-            RolloutReason = AppendDistinctSentence(
-                manifest.RolloutReason,
-                $"The current release stays install-capable, but broad ready claims remain review-required because {gapSummary}."),
+            RolloutState = rolloutState,
+            RolloutReason = preserveRolloutReason
+                ? AppendDistinctSentence(
+                    manifest.RolloutReason,
+                    $"The current release stays install-capable, but parity claims remain blocked because {gapSummary}.")
+                : $"The current release stays install-capable, but parity claims remain blocked because {gapSummary}.",
             SupportabilityState = "review_required",
-            SupportabilitySummary = AppendDistinctSentence(
-                manifest.SupportabilitySummary,
-                $"Treat the current release as limited because {gapSummary}."),
-            KnownIssueSummary = AppendDistinctSentence(
-                manifest.KnownIssueSummary,
-                readiness.MissingDesktopClientCoverage
-                    ? "Desktop polish is not current yet, so parity-sensitive routes stay with support."
-                    : "Some flagship journeys are still blocked, so broad ready claims stay with support."),
-            FixAvailabilitySummary = AppendDistinctSentence(
-                manifest.FixAvailabilitySummary,
-                readiness.MissingDesktopClientCoverage
-                    ? "Use linked-install recovery and Chummer support until the desktop experience is ready again."
-                    : "Use linked-install recovery and Chummer support until the blocked flagship journeys are cleared.")
+            SupportabilitySummary = preserveReviewContext
+                ? AppendDistinctSentence(
+                    manifest.SupportabilitySummary,
+                    $"Treat the current release as limited because {gapSummary}.")
+                : $"Treat the current release as limited because {gapSummary}.",
+            KnownIssueSummary = preserveReviewContext
+                ? AppendDistinctSentence(
+                    manifest.KnownIssueSummary,
+                    "Desktop polish is not current yet, so parity-sensitive routes stay with support.")
+                : "Desktop polish is not current yet, so parity-sensitive routes stay with support.",
+            FixAvailabilitySummary = preserveReviewContext
+                ? AppendDistinctSentence(
+                    manifest.FixAvailabilitySummary,
+                    "Use linked-install recovery and Chummer support until the desktop experience is ready again.")
+                : "Use linked-install recovery and Chummer support until the desktop experience is ready again."
         });
     }
+
+    private PublicReleaseManifestDto ApplyGoldReadinessGuard(PublicReleaseManifestDto manifest)
+    {
+        if (ShouldPreserveCurrentGoldSupportability(manifest))
+        {
+            return EnsureContractName(manifest);
+        }
+
+        GoldReadinessSnapshot? readiness = _goldReadiness.LoadSnapshot();
+        if (readiness is null || readiness.IsGoldReady)
+        {
+            return EnsureContractName(manifest);
+        }
+
+        string gapSummary = BuildGoldReadinessGapSummary(readiness).Trim().TrimEnd('.');
+        bool published = string.Equals(NormalizeOptional(manifest.Status), "published", StringComparison.OrdinalIgnoreCase);
+        bool preserveBlockingRollout = HasBlockingRolloutState(manifest.RolloutState)
+            && !HasOnlyProofFreshnessRolloutBlocker(manifest);
+        string? rolloutState = published && !preserveBlockingRollout
+            ? "release_review_required"
+            : manifest.RolloutState;
+        bool preserveRolloutReason = preserveBlockingRollout;
+        bool preserveReviewContext = string.Equals(NormalizeOptional(manifest.SupportabilityState), "review_required", StringComparison.OrdinalIgnoreCase);
+        return EnsureContractName(manifest with
+        {
+            RolloutState = rolloutState,
+            RolloutReason = preserveRolloutReason
+                ? AppendDistinctSentence(
+                    manifest.RolloutReason,
+                    $"The current release remains available, but flagship readiness claims stay blocked because {gapSummary}.")
+                : $"The current release remains available, but flagship readiness claims stay blocked because {gapSummary}.",
+            SupportabilityState = "review_required",
+            SupportabilitySummary = preserveReviewContext
+                ? AppendDistinctSentence(
+                    manifest.SupportabilitySummary,
+                    $"Treat the current release as limited because {gapSummary}.")
+                : $"Treat the current release as limited because {gapSummary}.",
+            KnownIssueSummary = preserveReviewContext
+                ? AppendDistinctSentence(
+                    manifest.KnownIssueSummary,
+                    "Final release checks are not current yet, so launch-sensitive claims stay review-required.")
+                : "Final release checks are not current yet, so launch-sensitive claims stay review-required.",
+            FixAvailabilitySummary = preserveReviewContext
+                ? AppendDistinctSentence(
+                    manifest.FixAvailabilitySummary,
+                    "Use linked-install recovery and Chummer support until final release checks pass.")
+                : "Use linked-install recovery and Chummer support until final release checks pass."
+        });
+    }
+
+    private static string BuildGoldReadinessGapSummary(GoldReadinessSnapshot readiness)
+        => readiness.PublicGapSummary;
 
     private PublicReleaseManifestDto ApplyImportRouteParityGuard(PublicReleaseManifestDto manifest)
     {
@@ -1101,9 +1927,25 @@ public sealed class PublicReleaseManifestService
         }
 
         FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
+        GoldReadinessSnapshot? goldReadiness = _goldReadiness.LoadSnapshot();
+        if (goldReadiness is not null && !goldReadiness.IsGoldReady)
+        {
+            return readiness is not null
+                && readiness.IsFinalGoldClosureOnlyBlocked
+                && goldReadiness.IsClosureReceiptCycleOnlyBlocked;
+        }
+
         if (readiness is not null
             && string.Equals(NormalizeOptional(readiness.Status), "pass", StringComparison.OrdinalIgnoreCase)
-            && !readiness.RequiresReview)
+            && !readiness.MissingDesktopClientCoverage)
+        {
+            return true;
+        }
+
+        if (readiness is not null
+            && goldReadiness is not null
+            && readiness.IsFinalGoldClosureOnlyBlocked
+            && goldReadiness.IsClosureReceiptCycleOnlyBlocked)
         {
             return true;
         }
@@ -1528,32 +2370,8 @@ public sealed class PublicReleaseManifestService
 
     private static void RebuildDesktopTupleCoverage(JsonObject coverage, IReadOnlyList<ManifestArtifactShape> artifacts)
     {
-        List<string> derivedRequiredPlatforms = DeriveRequiredDesktopPlatforms(artifacts);
-        List<string> requiredPlatforms = ToJsonStringList(coverage["requiredDesktopPlatforms"]);
-        if (requiredPlatforms.Count == 0)
-        {
-            requiredPlatforms = ToJsonStringList(coverage["requiredPlatformIds"]);
-        }
-
-        if (requiredPlatforms.Count == 0)
-        {
-            requiredPlatforms = derivedRequiredPlatforms.Count > 0
-                ? derivedRequiredPlatforms
-                : [.. RequiredDesktopPlatforms];
-        }
-        else if (derivedRequiredPlatforms.Count > 0)
-        {
-            requiredPlatforms = requiredPlatforms
-                .Where(platform => derivedRequiredPlatforms.Contains(platform, StringComparer.OrdinalIgnoreCase))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-
-        List<string> requiredHeads = ToJsonStringList(coverage["requiredDesktopHeads"]);
-        if (requiredHeads.Count == 0)
-        {
-            requiredHeads = [.. RequiredDesktopHeads];
-        }
+        List<string> requiredPlatforms = [.. RequiredDesktopPlatforms];
+        List<string> requiredHeads = [.. RequiredDesktopHeads];
 
         List<Dictionary<string, string>> promotedInstallerTuples = [];
         HashSet<string> promotedPlatformTokens = new(StringComparer.OrdinalIgnoreCase);
@@ -1600,23 +2418,25 @@ public sealed class PublicReleaseManifestService
             promotedPlatformTokens.Add(artifact.Platform);
         }
 
-        List<string> requiredTupleIds = ToJsonStringList(coverage["requiredDesktopPlatformHeadRidTuples"]);
-        if (requiredTupleIds.Count > 0)
-        {
-            requiredTupleIds = requiredTupleIds
-                .Where(tupleId =>
-                {
-                    string[] parts = tupleId.Split(':', 3, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                    return parts.Length == 3
-                        && requiredPlatforms.Contains(parts[2], StringComparer.OrdinalIgnoreCase);
-                })
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-        if (requiredTupleIds.Count == 0)
-        {
-            requiredTupleIds = BuildRequiredDesktopTupleIds(requiredPlatforms, requiredHeads, promotedPlatformHeadRidTuples);
-        }
+        List<string> sourceRequiredTupleIds = ToJsonStringList(coverage["requiredDesktopPlatformHeadRidTuples"])
+            .Where(tupleId =>
+            {
+                string[] parts = tupleId.Split(':', 3, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                return parts.Length == 3
+                    && requiredHeads.Contains(parts[0], StringComparer.OrdinalIgnoreCase)
+                    && requiredPlatforms.Contains(parts[2], StringComparer.OrdinalIgnoreCase)
+                    && RidToPlatformArch.TryGetValue(parts[1], out (string Platform, string Arch) mapping)
+                    && string.Equals(mapping.Platform, parts[2], StringComparison.OrdinalIgnoreCase);
+            })
+            .ToList();
+        List<string> requiredTupleIds = BuildRequiredDesktopTupleIds(
+                requiredPlatforms,
+                requiredHeads,
+                promotedPlatformHeadRidTuples)
+            .Concat(sourceRequiredTupleIds)
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         List<string> missingRequiredPlatforms = requiredPlatforms
             .Where(platform => !promotedPlatformTokens.Contains(platform))
@@ -2148,20 +2968,6 @@ public sealed class PublicReleaseManifestService
             .ToList();
     }
 
-    private static List<string> DeriveRequiredDesktopPlatforms(IReadOnlyList<ManifestArtifactShape> artifacts)
-    {
-        HashSet<string> promotedPlatforms = artifacts
-            .Where(artifact =>
-                RequiredDesktopPlatforms.Contains(artifact.Platform, StringComparer.OrdinalIgnoreCase)
-                && IsDesktopInstallMedia(artifact.Platform, artifact.Kind))
-            .Select(artifact => artifact.Platform)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return RequiredDesktopPlatforms
-            .Where(platform => promotedPlatforms.Contains(platform))
-            .ToList();
-    }
-
     private static bool CoverageIsComplete(JsonObject coverage)
         => ToJsonStringList(coverage["missingRequiredPlatforms"]).Count == 0
             && ToJsonStringList(coverage["missingRequiredHeads"]).Count == 0
@@ -2446,6 +3252,7 @@ public sealed class PublicReleaseManifestService
         [property: JsonPropertyName("contract_name")] string? ContractNameAlias,
         string? Product,
         string? ChannelId,
+        string? Channel,
         string? Version,
         string? PublicVersion,
         DateTimeOffset? GeneratedAt,
@@ -2475,7 +3282,8 @@ public sealed class PublicReleaseManifestService
         string? BaseUrl,
         IReadOnlyList<string>? JourneysPassed,
         IReadOnlyList<string>? ProofRoutes,
-        JsonElement? UiLocalizationReleaseGate);
+        JsonElement? UiLocalizationReleaseGate,
+        JsonElement? FlagshipReadiness);
 
     private sealed record CompatibilityReleaseManifest(
         string? Version,
@@ -2514,7 +3322,8 @@ public sealed class PublicReleaseManifestService
         string? BaseUrl,
         IReadOnlyList<string>? JourneysPassed,
         IReadOnlyList<string>? ProofRoutes,
-        JsonElement? UiLocalizationReleaseGate);
+        JsonElement? UiLocalizationReleaseGate,
+        JsonElement? FlagshipReadiness);
 
     private sealed record RegistryReleaseArtifact(
         string? ArtifactId,

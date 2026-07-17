@@ -13,6 +13,7 @@ PORTAL_PUBLIC_HOST="${CHUMMER_PORTAL_PUBLIC_HOST:-chummer.run}"
 PORTAL_FORWARDED_PROTO="${CHUMMER_PORTAL_FORWARDED_PROTO:-https}"
 PORTAL_REQUIRE_BLAZOR="${CHUMMER_PORTAL_REQUIRE_BLAZOR:-0}"
 PORTAL_SKIP_EDGE_REBUILD="${CHUMMER_PORTAL_E2E_SKIP_EDGE_REBUILD:-0}"
+PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE:-1}"
 if [[ -n "${CHUMMER_PORTAL_PLAYWRIGHT:-}" ]]; then
   RUN_PORTAL_PLAYWRIGHT="$CHUMMER_PORTAL_PLAYWRIGHT"
 elif [[ "${CI:-}" == "true" || "${GITHUB_ACTIONS:-}" == "true" ]]; then
@@ -62,6 +63,10 @@ fi
 if [[ "$PORTAL_SKIP_EDGE_REBUILD" == "1" || "$PORTAL_SKIP_EDGE_REBUILD" == "true" || "$PORTAL_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
   echo "reusing current public-edge containers for portal playwright e2e"
 else
+  if [[ "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" != "0" && "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" != "false" && "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" != "FALSE" ]]; then
+    python3 scripts/check_public_edge_deploy_preflight.py
+  fi
+
   compose_up_log="$(mktemp)"
   set +e
   docker compose -p "$PORTAL_EDGE_PROJECT_NAME" -f "$PORTAL_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"

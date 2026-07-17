@@ -12,6 +12,8 @@ const NOTIFICATION_ROUTE_PATHS = new Set([
   "/mobile",
   "/play",
   "/play/continuity",
+  "/ledger/map",
+  "/passport",
   "/account",
   "/account/ledger",
   "/account/ledger/advisory",
@@ -20,9 +22,7 @@ const NOTIFICATION_ROUTE_PATHS = new Set([
   "/account/passport",
   "/account/passport/open",
   "/ledger",
-  "/ledger/map",
   "/ledger/newsroom",
-  "/passport",
   "/passport/identity-network"
 ]);
 const NOTIFICATION_ROUTE_PREFIXES = [
@@ -94,140 +94,60 @@ const PUBLIC_NAVIGATION_CACHE_PATHS = new Set([
   "/help",
   "/status"
 ]);
-const PUBLIC_RUNTIME_CACHE_PREFIXES = [
-  "/css/",
-  "/js/",
-  "/images/",
-  "/media/",
-  "/fonts/"
-];
-const PUBLIC_RUNTIME_CACHE_SUFFIXES = [
-  ".css",
-  ".js",
-  ".svg",
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".webp",
-  ".gif",
-  ".ico",
-  ".woff",
-  ".woff2",
-  ".ttf",
-  ".eot",
-  ".webmanifest",
-  ".json",
-  ".txt"
-];
-const NON_CACHEABLE_PATHS = new Set([
-  "/mobile/pwa/ledger.json"
-]);
-const NON_CACHEABLE_PATH_PREFIXES = [
-  "/account",
-  "/api",
-  "/admin",
-  "/support",
-  "/signin",
-  "/signout",
-  "/auth"
+const CRITICAL_SHELL_ASSETS = [
+  "/mobile-install-shell.js",
+  "/manifest.play.webmanifest",
+  "/manifest.player.webmanifest",
+  "/manifest.gm.webmanifest",
+  "/manifest.observer.webmanifest",
+  "/icons/icon-192.svg",
+  "/icons/icon-512.svg"
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(SHELL_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(precacheCriticalShell());
 });
+
+async function precacheCriticalShell() {
+  const verified = await Promise.all(CRITICAL_SHELL_ASSETS.map(async (asset) => {
+    const request = new Request(asset, { method: "GET", cache: "reload", credentials: "omit" });
+    const response = await fetch(request);
+    if (!isExpectedPublicAssetResponse(request, response)) {
+      throw new Error(`critical public shell asset failed validation: ${asset}`);
+    }
+    return { request, response };
+  }));
+  const cache = await caches.open(SHELL_CACHE);
+  await Promise.all(verified.map(({ request, response }) => cache.put(request, response)));
+}
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== SHELL_CACHE && key !== RUNTIME_CACHE).map((key) => caches.delete(key))))
-      .then(async () => {
-        if ("navigationPreload" in self.registration) {
-          await self.registration.navigationPreload.enable();
-        }
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => (isManagedWorkerCache(key) && ![SHELL_CACHE, MEDIA_CACHE, MEDIA_META_CACHE, RUNTIME_CACHE].includes(key))
+            || isLegacyPrivateCache(key))
+          .map((key) => caches.delete(key))
+        )
+    ).then(async () => {
+      await pruneMediaCache();
+      if ("navigationPreload" in self.registration) {
+        await self.registration.navigationPreload.enable();
+      }
 
-        return self.clients.claim();
-      })
+    })
   );
 });
 
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") {
-    return;
+self.addEventListener("message", (event) => {
+  const data = event.data || {};
+  if (data.type === "chummer-play-network-state" && event.source && typeof event.source.postMessage === "function") {
+    event.source.postMessage({
+      type: "chummer-play-network-state-ack",
+      online: data.online !== false
+    });
   }
-
-  const requestUrl = new URL(event.request.url);
-  if (requestUrl.origin !== self.location.origin) {
-    return;
-  }
-
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      (async () => {
-        try {
-          const preload = await event.preloadResponse;
-          if (preload) {
-            return preload;
-          }
-
-          const response = await fetch(event.request);
-          if (shouldCacheResponse(event.request, response)) {
-            const copy = response.clone();
-            event.waitUntil(
-              caches.open(RUNTIME_CACHE).then((cache) => cache.put(event.request, copy))
-            );
-          }
-          return response;
-        } catch {
-          if (isPublicRuntimeCacheableRequest(event.request)) {
-            const cachedRoute = await caches.match(event.request);
-            if (cachedRoute) {
-              return cachedRoute;
-            }
-          }
-
-          const mobileRail = await caches.match(NAVIGATION_FALLBACK);
-          if (mobileRail) {
-            return mobileRail;
-          }
-
-          const landingRail = await caches.match("/");
-          if (landingRail) {
-            return landingRail;
-          }
-
-          return Response.error();
-        }
-      })()
-    );
-    return;
-  }
-
-  event.respondWith(
-    (async () => {
-      const cacheable = isPublicRuntimeCacheableRequest(event.request);
-      const cached = cacheable ? await caches.match(event.request) : null;
-      const isStaticAsset = PUBLIC_RUNTIME_CACHE_PREFIXES.some((prefix) => requestUrl.pathname.startsWith(prefix))
-        || PUBLIC_RUNTIME_CACHE_SUFFIXES.some((suffix) => requestUrl.pathname.endsWith(suffix));
-      if (cached && isStaticAsset) {
-        event.waitUntil(refreshRuntime(event.request));
-        return cached;
-      }
-
-      if (cached) {
-        return cached;
-      }
-
-      try {
-        return await refreshRuntime(event.request);
-      } catch {
-        return cached || Response.error();
-      }
-    })()
-  );
 });
 
 self.addEventListener("push", (event) => {
@@ -242,15 +162,23 @@ self.addEventListener("notificationclose", (event) => {
   event.waitUntil(handleNotificationClose(event));
 });
 
-async function refreshRuntime(request) {
-  const response = await fetch(request);
-  if (!shouldCacheResponse(request, response)) {
-    return response;
+function isManagedWorkerCache(cacheName) {
+  return MANAGED_CACHE_PREFIXES.some((prefix) => cacheName.startsWith(prefix));
+}
+
+function isLegacyPrivateCache(cacheName) {
+  return LEGACY_PRIVATE_CACHE_PREFIXES.some((prefix) => cacheName.startsWith(prefix));
+}
+
+function isNonCacheableRequest(url) {
+  const pathname = String(url.pathname || "");
+  if (NON_CACHEABLE_PATHS.has(pathname)) {
+    return true;
   }
 
-  const copy = response.clone();
-  await caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
-  return response;
+  return NON_CACHEABLE_PATH_PREFIXES.some((prefix) =>
+    pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
 }
 
 function isPublicRuntimeCacheableRequest(request) {
@@ -264,31 +192,29 @@ function isPublicRuntimeCacheableRequest(request) {
       return false;
     }
 
-    if (NON_CACHEABLE_PATHS.has(url.pathname)) {
+    if (url.search) {
       return false;
     }
 
-    if (NON_CACHEABLE_PATH_PREFIXES.some((prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) {
-      return false;
-    }
-
-    if (request.mode === "navigate") {
-      return PUBLIC_NAVIGATION_CACHE_PATHS.has(url.pathname);
-    }
-
-    if (PRECACHE_URLS.includes(url.pathname)) {
-      return true;
-    }
-
-    return PUBLIC_RUNTIME_CACHE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))
-      || PUBLIC_RUNTIME_CACHE_SUFFIXES.some((suffix) => url.pathname.endsWith(suffix));
+    if (request.mode === "navigate") return false;
+    return PUBLIC_CACHEABLE_ASSETS.has(url.pathname);
   } catch {
     return false;
   }
 }
 
+function isExpectedPublicAssetResponse(request, response) {
+  if (!response || !response.ok || response.status !== 200 || !isPublicRuntimeCacheableRequest(request)) {
+    return false;
+  }
+  const url = new URL(request.url, self.location.origin);
+  const expected = PUBLIC_CACHEABLE_ASSETS.get(url.pathname);
+  const actual = String(response.headers.get("Content-Type") || "").split(";", 1)[0].trim().toLowerCase();
+  return Boolean(expected && expected.has(actual));
+}
+
 function shouldCacheResponse(request, response) {
-  if (!response || !response.ok || response.status !== 200) {
+  if (!isExpectedPublicAssetResponse(request, response)) {
     return false;
   }
 
@@ -297,8 +223,180 @@ function shouldCacheResponse(request, response) {
     return false;
   }
 
-  return isPublicRuntimeCacheableRequest(request);
+  return true;
 }
+
+async function refreshRuntime(request) {
+  const response = await fetch(request);
+  if (!shouldCacheResponse(request, response)) {
+    return response;
+  }
+
+  const copy = response.clone();
+  await cacheWithQuotaHandling(RUNTIME_CACHE, request, copy);
+  return response;
+}
+
+function isBuildOwnedRequest(url) {
+  if (!url || url.origin !== self.location.origin) {
+    return false;
+  }
+
+  return url.pathname === "/blazor" || url.pathname.startsWith("/blazor/");
+}
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  const url = new URL(request.url);
+
+  if (request.method !== "GET") {
+    return;
+  }
+
+  if (isBuildOwnedRequest(url)) {
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/play/")) {
+    // Private play state is network-only; do not replay another account's cached API response.
+    event.respondWith(
+      fetch(request)
+        .catch(() => new Response(
+          JSON.stringify({
+            error: "play_api_network_unavailable",
+            detail: "Reconnect before loading private play data."
+          }),
+          {
+            status: 503,
+            headers: {
+              "content-type": "application/problem+json",
+              "cache-control": "no-store"
+            }
+          }
+        ))
+    );
+    return;
+  }
+
+  if (isNonCacheableRequest(url)) {
+    event.respondWith(
+      fetch(request)
+        .catch(() => request.mode === "navigate"
+          ? offlineNavigationResponse(url.pathname)
+          : new Response(
+            JSON.stringify({
+              error: "play_public_route_network_unavailable",
+              detail: "Reconnect before loading account, ledger, support, or API data."
+            }),
+            {
+              status: 503,
+              headers: {
+                "content-type": "application/problem+json",
+                "cache-control": "no-store"
+              }
+            }
+          ))
+    );
+    return;
+  }
+
+  if (request.mode === "navigate") {
+    event.respondWith(handleNavigationRequest(request, url));
+    return;
+  }
+
+  if (isMediaRequest(request, url)) {
+    event.respondWith(handleMediaRequest(request));
+    return;
+  }
+
+  event.respondWith(
+    caches.open(SHELL_CACHE).then((cache) => cache.match(request)).then((cached) => {
+      if (cached) {
+        return cached;
+      }
+
+      return fetch(request).then((response) => {
+        if (!shouldCacheResponse(request, response)) {
+          return response;
+        }
+
+        event.waitUntil(cacheWithQuotaHandling(SHELL_CACHE, request, response.clone()));
+        return response;
+      });
+    })
+  );
+});
+
+async function handleNavigationRequest(request, url) {
+  try {
+    return await fetch(request);
+  } catch {
+    return offlineNavigationResponse(url.pathname);
+  }
+}
+
+function offlineNavigationResponse(pathname) {
+  const normalized = String(pathname || "").toLowerCase();
+  let title = "Chummer needs a connection";
+  let heading = "You're offline";
+  let summary = "Reconnect, then reload this page to continue.";
+  let detail = "No account or release data was loaded from an old page.";
+
+  if (normalized === "/downloads" || normalized.startsWith("/downloads/")) {
+    title = "Downloads need a connection";
+    heading = "Downloads aren't available offline";
+    summary = "Reconnect before checking the current release or starting an installer download.";
+    detail = "Chummer does not show an older cached release as if it were current.";
+  } else if (normalized === "/account/billing" || normalized.startsWith("/account/billing/")) {
+    title = "Billing needs a connection";
+    heading = "Billing isn't available offline";
+    summary = "Reconnect before reviewing or changing membership.";
+    detail = "Billing and account details are never replayed from an offline cache.";
+  } else if (normalized === "/account" || normalized.startsWith("/account/")) {
+    title = "Account needs a connection";
+    heading = "Your account isn't available offline";
+    summary = "Reconnect before opening account, install, support, or campaign information.";
+    detail = "Private account details are never replayed from an offline cache.";
+  }
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title}</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101318; color: #f4f7fb; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; }
+    main { box-sizing: border-box; width: min(42rem, 100%); padding: 2rem; }
+    h1 { line-height: 1.1; }
+    p { color: #c9d2de; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <main id="main">
+    <div role="status" aria-live="polite" aria-atomic="true">
+      <h1>${heading}</h1>
+      <p>${summary}</p>
+      <p>${detail}</p>
+    </div>
+  </main>
+</body>
+</html>`;
+
+  return new Response(html, {
+    status: 503,
+    statusText: "Service Unavailable",
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "x-content-type-options": "nosniff"
+    }
+  });
+}
+
 async function handlePush(event) {
   const payload = normalizePushPayload(event);
   const href = normalizeNotificationHref(payload.href || payload.route || payload.url || DEFAULT_NOTIFICATION_HREF);
@@ -534,4 +632,149 @@ async function broadcastClientMessage(type, payload) {
       }
     })
   );
+}
+
+async function handleMediaRequest(request) {
+  const cache = await caches.open(MEDIA_CACHE);
+  const cached = await cache.match(request);
+
+  if (cached) {
+    recordMediaTouch(request.url);
+    return cached;
+  }
+
+  try {
+    const response = await fetch(request);
+    if (!shouldCacheResponse(request, response)) {
+      return response;
+    }
+
+    await cacheWithQuotaHandling(MEDIA_CACHE, request, response.clone());
+    await recordMediaTouch(request.url);
+    await pruneMediaCache();
+    return response;
+  } catch {
+    const fallback = await cache.match(request);
+    if (fallback) {
+      return fallback;
+    }
+    throw new Error("media unavailable offline");
+  }
+}
+
+function isMediaRequest(request, url) {
+  if (url.search) {
+    return false;
+  }
+
+  if (request.destination === "image" || request.destination === "video" || request.destination === "audio") {
+    return true;
+  }
+
+  if (url.pathname.startsWith("/media/")) {
+    return true;
+  }
+
+  return /\.(png|jpg|jpeg|gif|webp|svg|avif|mp3|wav|ogg|mp4|webm)$/i.test(url.pathname);
+}
+
+async function cacheWithQuotaHandling(cacheName, request, response) {
+  try {
+    const cache = await caches.open(cacheName);
+    await cache.put(request, response);
+  } catch (error) {
+    if (isQuotaExceededError(error)) {
+      await pruneMediaCache(true);
+      const cache = await caches.open(cacheName);
+      await cache.put(request, response);
+      return;
+    }
+
+    throw error;
+  }
+}
+
+function isQuotaExceededError(error) {
+  return typeof error === "object" &&
+    error !== null &&
+    (error.name === "QuotaExceededError" || error.name === "NS_ERROR_DOM_QUOTA_REACHED");
+}
+
+async function recordMediaTouch(url) {
+  const metaCache = await caches.open(MEDIA_META_CACHE);
+  const metaRequest = new Request(url, { method: "GET" });
+  await metaCache.put(metaRequest, new Response(String(Date.now()), { headers: { "content-type": "text/plain" } }));
+}
+
+async function pruneMediaCache(forceBackpressure = false) {
+  const mediaCache = await caches.open(MEDIA_CACHE);
+  const metaCache = await caches.open(MEDIA_META_CACHE);
+  const mediaRequests = await mediaCache.keys();
+
+  if (mediaRequests.length === 0) {
+    return;
+  }
+
+  const now = Date.now();
+  const candidates = [];
+
+  for (const request of mediaRequests) {
+    const touchedAt = await readMediaTouch(metaCache, request.url);
+    const effectiveTouchedAt = Number.isFinite(touchedAt) ? touchedAt : 0;
+    const ageMs = now - effectiveTouchedAt;
+    const stale = ageMs > MEDIA_MAX_AGE_MS;
+    candidates.push({ request, touchedAt: effectiveTouchedAt, stale });
+  }
+
+  for (const candidate of candidates) {
+    if (candidate.stale) {
+      await mediaCache.delete(candidate.request);
+      await metaCache.delete(new Request(candidate.request.url, { method: "GET" }));
+    }
+  }
+
+  const remainingRequests = await mediaCache.keys();
+  if (!forceBackpressure && remainingRequests.length <= MEDIA_MAX_ENTRIES) {
+    return;
+  }
+
+  const remainingCandidates = [];
+  for (const request of remainingRequests) {
+    const touchedAt = await readMediaTouch(metaCache, request.url);
+    remainingCandidates.push({ request, touchedAt: Number.isFinite(touchedAt) ? touchedAt : 0 });
+  }
+
+  remainingCandidates.sort((left, right) => left.touchedAt - right.touchedAt);
+  const maxEntries = forceBackpressure ? Math.floor(MEDIA_MAX_ENTRIES * 0.75) : MEDIA_MAX_ENTRIES;
+  const deleteCount = Math.max(0, remainingCandidates.length - maxEntries);
+  for (let index = 0; index < deleteCount; index += 1) {
+    const target = remainingCandidates[index];
+    await mediaCache.delete(target.request);
+    await metaCache.delete(new Request(target.request.url, { method: "GET" }));
+  }
+}
+
+async function readMediaTouch(metaCache, url) {
+  const response = await metaCache.match(new Request(url, { method: "GET" }));
+  if (!response) {
+    return Number.NaN;
+  }
+
+  const value = await response.text();
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function resolveMobileFallback(pathname) {
+  const normalized = String(pathname || "").toLowerCase();
+  if (normalized.indexOf("/mobile/gm") === 0) {
+    return MOBILE_GM_NAV_FALLBACK;
+  }
+  if (normalized.indexOf("/mobile/observer") === 0) {
+    return MOBILE_OBSERVER_NAV_FALLBACK;
+  }
+  if (normalized.indexOf("/mobile/player") === 0) {
+    return MOBILE_PLAYER_NAV_FALLBACK;
+  }
+  return MOBILE_NAV_FALLBACK;
 }

@@ -202,6 +202,8 @@ public sealed class FlipLinkDocumentPortalServiceTests
         Assert.Equal("origin-book-studio.md", source!.FileName);
         Assert.Equal("text/markdown; charset=utf-8", source.ContentType);
         Assert.Equal(document.SourceHash, source.Sha256);
-        Assert.Contains("OriginBookEngine", System.Text.Encoding.UTF8.GetString(source.Bytes), StringComparison.Ordinal);
+        string sourceText = System.Text.Encoding.UTF8.GetString(source.Bytes);
+        Assert.Contains("SubscribrManuscriptLane", sourceText, StringComparison.Ordinal);
+        Assert.Contains("Narrative Origin", sourceText, StringComparison.Ordinal);
     }
 }

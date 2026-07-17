@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -186,6 +186,7 @@ def _load_module():
     if spec is None or spec.loader is None:
         raise RuntimeError("unable to load verifier module")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -197,31 +198,23 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
             self.skipTest("chummer-design checkout is not available")
         text = design_spec_path.read_text(encoding="utf-8")
 
-        for required in (
-            "during-play companion surface",
-            "`/mobile` is the canonical PWA start URL",
-            "`/pwa` redirects to",
-            "`/play` is the shared play shell",
-            "`/player`, `/gm`, `/observer`, and",
-            "`/mobile/pwa/ledger.json`",
-            "`mode: mobile_pwa_living_world`",
-            "`updates_route: /mobile/pwa/ledger.json`",
-            "`opt_in_required`, `no_world_data`,",
-            "`live`, and `world_not_followed`",
-            "no-store caching and vary by",
-            "`Cookie` and `Authorization`",
-            "must never be pre-cached",
-            "`/play/continuity/history` or `/play/continuity/receipts`",
-            "scripts/verify_mobile_pwa_public_projection.py --base-url https://chummer.run",
-            "tests/public/mobile-pwa-public.spec.ts",
-            "tests/public/pwa-installability.spec.ts",
-            "tests/public/pwa-offline-cache.spec.ts",
-            "not be described as a complete mobile character builder",
-        ):
-            self.assertIn(required, text)
+    payload = module.source_topology(ROOT)
 
-        self.assertNotIn("preview shell", text)
-        self.assertNotIn("Gate `gate-mobile-pwa` includes", text)
+    assert payload["status"] == "pass", payload["failures"]
+    assert payload["topology"] == {
+        "privatePlayProfileOnly": True,
+        "publicProjectionDefaultOff": True,
+        "edgeServiceKeyAbsent": True,
+        "edgeUpstreamAbsent": True,
+        "portalHasNoPlayDependency": True,
+    }
+    assert payload["gateway"]["zeroPublicPaths"] is True
+    assert payload["gateway"]["noHttpClient"] is True
+    assert payload["gateway"]["notInRequestPipeline"] is True
+    assert payload["readiness"]["combinedBodyReturned"] is True
+    assert payload["roleShell"]["playAppliesPrivateHeaders"] is True
+    assert payload["roleShell"]["roleFieldsInModel"] is True
+    assert all(payload["retiredEnvAbsent"].values())
 
     def test_public_role_aliases_converge_on_play_shell_not_mobile_subroutes(self) -> None:
         controller = (REPO_ROOT / "Chummer.Run.Api/Controllers/PublicLandingController.cs").read_text(encoding="utf-8")
@@ -266,12 +259,8 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
         self.assertTrue(captured_payloads[0]["public_entry"]["build_route_holds"])
         self.assertTrue(captured_payloads[0]["public_entry"]["play_shell_holds"])
 
-    def test_verifier_fails_when_role_route_redirect_drifts(self) -> None:
-        class DriftedSession(_FakeSession):
-            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
-                if url.endswith("/gm"):
-                    return _FakeResponse("http://example.test/play")
-                return super().get(url, timeout=timeout, allow_redirects=allow_redirects)
+    assert not any(result.values())
+    assert len(failures) == len(result)
 
         module = _load_module()
         stdout = io.StringIO()
@@ -402,163 +391,221 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
             self.assertIn('"status": "pass"', output.read_text(encoding="utf-8"))
             self.assertIn("- Status: `pass`", report.read_text(encoding="utf-8"))
 
-    def test_verifier_fails_when_mobile_page_drops_service_worker_registration(self) -> None:
-        class DriftedSession(_FakeSession):
-            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
-                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
-                if url.endswith("/mobile"):
-                    return _FakeResponse(
-                        response.url,
-                        text=response.text.replace('serviceWorker.register("/service-worker.js?v=test")', "console.log('no sw')", 1),
-                    )
+
+class FakeSession:
+    def __init__(self, *, readiness_status: int = 200, readiness_ready: bool = True):
+        self.readiness_status = readiness_status
+        self.readiness_ready = readiness_ready
+
+    def get(self, url: str, timeout: int = 30, allow_redirects: bool = True):
+        if url.endswith("/api/ready"):
+            return FakeResponse(
+                self.readiness_status,
+                payload={
+                    "ready": self.readiness_ready,
+                    "status": "ready" if self.readiness_ready else "not_ready",
+                    "hub": {"ready": True, "status": "pass"},
+                    "playProjection": {"status": "disabled", "ready": True, "enabled": False},
+                    "deploymentIdentity": {
+                        "ready": True,
+                        "code": "overlay_identity_bound",
+                        "sourceFingerprintSha256": "ab" * 32,
+                    },
+                },
+            )
+        values = parse_qs(urlsplit(url).query, keep_blank_values=True).get("role", [])
+        normalized = values[0].strip().lower() if len(values) == 1 else ""
+        role = (
+            "gm"
+            if normalized in {"gm", "game-master", "gamemaster"}
+            else "observer"
+            if normalized in {"observer", "spectator", "viewer"}
+            else "player"
+        )
+        manifest = f"/manifest.{role}.webmanifest"
+        title = "Chummer Observer" if role == "observer" else "Chummer GM" if role == "gm" else "Chummer Player"
+        purpose = {
+            "player": "Keep your runner ready at the table.",
+            "gm": "Stage the table without exposing Game Master controls.",
+            "observer": "Follow the table without gaining control.",
+        }[role]
+        capability = {
+            "player": "Runner readiness",
+            "gm": "Scene pacing",
+            "observer": "Read-mostly return",
+        }[role]
+        target = f"/mobile/{role}"
+        return FakeResponse(
+            200,
+            text=(
+                f'<title>Install {title} Companion</title>'
+                f'<link rel="manifest" href="{manifest}">'
+                f'<main data-install-role="{role}" data-play-surface="install-only" '
+                f'data-mobile-app-path="{target}">'
+                f'<h1>{purpose}</h1><h2>{capability}</h2>'
+                f'<a href="{target}">Open</a><svg data-mobile-app-inline-qr></svg>'
+                f'<section data-role-privacy-warning="{role}"></section>'
+                f'<section data-role-authority-warning="{role}"></section>'
+                f'{title}</main>'
+                '<script src="/mobile-install-shell.js"></script>'
+            ),
+            headers={
+                "Cache-Control": "private, no-store",
+                "Content-Security-Policy": "default-src 'none'; connect-src 'none'",
+            },
+            url=f"https://example.test{target}",
+            history=[FakeResponse(302, headers={"Location": target}, url=url)],
+        )
+
+
+class PassingStaticVerifier:
+    @staticmethod
+    def verify_live(base_url: str, timeout: float):
+        return {"status": "pass", "failures": [], "baseUrl": base_url, "timeout": timeout}
+
+
+def test_live_contract_accepts_truthful_readiness_and_role_specific_install_shells(monkeypatch) -> None:
+    module = load_module()
+    monkeypatch.setattr(module, "load_static_verifier", lambda: PassingStaticVerifier)
+
+    payload = module.live_projection("https://example.test", session=FakeSession())
+
+    assert payload["status"] == "pass", payload["failures"]
+    assert payload["readiness"]["payload"]["ready"] is True
+    assert set(payload["roleShells"]) == {"player", "gm", "observer"}
+    assert all(all(checks.values()) for checks in payload["roleShells"].values())
+    assert set(payload["roleProbes"]) == {probe[0] for probe in module.ROLE_PROBES}
+    assert all(
+        all(result["checks"].values())
+        for result in payload["roleProbes"].values()
+    )
+    assert payload["roleProbes"]["repeated_roles"]["expectedRole"] == "player"
+    assert payload["roleProbes"]["unknown_role"]["expectedRole"] == "player"
+    assert payload["roleProbes"]["mixed_case_alias"]["expectedRole"] == "gm"
+    assert all(
+        "?" not in location and "must-not-survive" not in location
+        for result in payload["roleProbes"].values()
+        for location in result["redirectLocations"]
+    )
+
+
+def test_live_contract_rejects_readiness_body_status_contradiction(monkeypatch) -> None:
+    module = load_module()
+    monkeypatch.setattr(module, "load_static_verifier", lambda: PassingStaticVerifier)
+
+    payload = module.live_projection(
+        "https://example.test",
+        session=FakeSession(readiness_status=503, readiness_ready=True),
+    )
+
+    assert payload["status"] == "fail"
+    assert "/api/ready: http200 failed" in payload["failures"]
+
+
+def test_live_contract_rejects_missing_failed_or_incomplete_hub_truth(monkeypatch) -> None:
+    module = load_module()
+    monkeypatch.setattr(module, "load_static_verifier", lambda: PassingStaticVerifier)
+
+    class InvalidHubSession(FakeSession):
+        def __init__(self, hub_payload, *, top_status="ready"):
+            super().__init__()
+            self.hub_payload = hub_payload
+            self.top_status = top_status
+
+        def get(self, url: str, timeout: int = 30, allow_redirects: bool = True):
+            response = super().get(url, timeout, allow_redirects)
+            if url.endswith("/api/ready"):
+                response._payload["status"] = self.top_status
+                if self.hub_payload is None:
+                    response._payload.pop("hub", None)
+                else:
+                    response._payload["hub"] = self.hub_payload
+            return response
+
+    cases = (
+        (None, "ready", "hubObject"),
+        ({"ready": False, "status": "fail"}, "ready", "hubReady"),
+        ({"ready": True}, "ready", "hubStatus"),
+        ({"ready": True, "status": "pass"}, "not_ready", "bodyStatus"),
+    )
+    for hub_payload, top_status, failed_check in cases:
+        payload = module.live_projection(
+            "https://example.test",
+            session=InvalidHubSession(hub_payload, top_status=top_status),
+        )
+        assert payload["status"] == "fail"
+        assert payload["readiness"]["checks"][failed_check] is False
+        assert payload["readiness"]["checks"]["combinedConsistent"] is False
+
+
+def test_live_contract_rejects_unbound_deployment_identity(monkeypatch) -> None:
+    module = load_module()
+    monkeypatch.setattr(module, "load_static_verifier", lambda: PassingStaticVerifier)
+
+    class UnboundIdentitySession(FakeSession):
+        def get(self, url: str, timeout: int = 30, allow_redirects: bool = True):
+            response = super().get(url, timeout, allow_redirects)
+            if url.endswith("/api/ready"):
+                response._payload["deploymentIdentity"] = {
+                    "ready": False,
+                    "code": "overlay_identity_invalid",
+                    "sourceFingerprintSha256": None,
+                }
+            return response
+
+    payload = module.live_projection(
+        "https://example.test",
+        session=UnboundIdentitySession(),
+    )
+
+    assert payload["status"] == "fail"
+    assert payload["readiness"]["checks"]["deploymentIdentityReady"] is False
+    assert payload["readiness"]["checks"]["deploymentIdentityCode"] is False
+    assert payload["readiness"]["checks"]["deploymentIdentityFingerprint"] is False
+
+
+def test_live_contract_rejects_generic_or_noncanonical_role_shell(monkeypatch) -> None:
+    module = load_module()
+    monkeypatch.setattr(module, "load_static_verifier", lambda: PassingStaticVerifier)
+
+    class GenericShellSession(FakeSession):
+        def get(self, url: str, timeout: int = 30, allow_redirects: bool = True):
+            response = super().get(url, timeout, allow_redirects)
+            if url.endswith("/api/ready"):
                 return response
+            response.text = response.text.replace("Scene pacing", "Generic companion")
+            response.url = f"{url}&secret=must-not-survive"
+            response.history = []
+            return response
 
-        module = _load_module()
-        stdout = io.StringIO()
+    payload = module.live_projection("https://example.test", session=GenericShellSession())
 
-        with (
-            patch.object(module.requests, "Session", return_value=DriftedSession()),
-            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
-            patch.object(module, "write_json"),
-            patch.object(module, "write_text"),
-            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
-            redirect_stdout(stdout),
-        ):
-            result = module.run("http://example.test")
+    assert payload["status"] == "fail"
+    assert "gm (/play?role=gm): capability failed" in payload["failures"]
+    assert "gm (/play?role=gm): exactlyOneRedirect failed" in payload["failures"]
+    assert "gm (/play?role=gm): cleanFinalUrl failed" in payload["failures"]
 
-        self.assertEqual(result, 1)
-        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
 
-    def test_verifier_fails_when_manifest_id_drifts(self) -> None:
-        class DriftedSession(_FakeSession):
-            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
-                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
-                if url.endswith("/manifest.json"):
-                    manifest = dict(response.json())
-                    manifest["id"] = "/play"
-                    return _FakeResponse(response.url, json_data=manifest)
+def test_live_contract_rejects_multi_hop_or_secret_bearing_redirect_history(monkeypatch) -> None:
+    module = load_module()
+    monkeypatch.setattr(module, "load_static_verifier", lambda: PassingStaticVerifier)
+
+    class LeakyHistorySession(FakeSession):
+        def get(self, url: str, timeout: int = 30, allow_redirects: bool = True):
+            response = super().get(url, timeout, allow_redirects)
+            if url.endswith("/api/ready"):
                 return response
+            response.history = [
+                FakeResponse(302, headers={"Location": "/play?token=must-not-survive"}, url=url),
+                FakeResponse(302, headers={"Location": f"/mobile/{response.url.rsplit('/', 1)[-1]}"}, url=url),
+            ]
+            return response
 
-        module = _load_module()
-        stdout = io.StringIO()
+    payload = module.live_projection("https://example.test", session=LeakyHistorySession())
 
-        with (
-            patch.object(module.requests, "Session", return_value=DriftedSession()),
-            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
-            patch.object(module, "write_json"),
-            patch.object(module, "write_text"),
-            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
-            redirect_stdout(stdout),
-        ):
-            result = module.run("http://example.test")
-
-        self.assertEqual(result, 1)
-        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
-
-    def test_verifier_fails_when_service_worker_drops_required_shell_cache_path(self) -> None:
-        class DriftedSession(_FakeSession):
-            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
-                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
-                if "/service-worker.js" in url:
-                    return _FakeResponse(
-                        response.url,
-                        text=response.text.replace('"/play/continuity", ', "", 1),
-                    )
-                return response
-
-        module = _load_module()
-        stdout = io.StringIO()
-
-        with (
-            patch.object(module.requests, "Session", return_value=DriftedSession()),
-            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
-            patch.object(module, "write_json"),
-            patch.object(module, "write_text"),
-            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
-            redirect_stdout(stdout),
-        ):
-            result = module.run("http://example.test")
-
-        self.assertEqual(result, 1)
-        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
-
-    def test_verifier_fails_when_service_worker_allows_personalized_ledger_stream_cache(self) -> None:
-        class DriftedSession(_FakeSession):
-            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
-                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
-                if "/service-worker.js" in url:
-                    return _FakeResponse(
-                        response.url,
-                        text=response.text.replace('"/mobile/pwa/ledger.json"', "", 1),
-                    )
-                return response
-
-        module = _load_module()
-        stdout = io.StringIO()
-
-        with (
-            patch.object(module.requests, "Session", return_value=DriftedSession()),
-            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
-            patch.object(module, "write_json"),
-            patch.object(module, "write_text"),
-            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
-            redirect_stdout(stdout),
-        ):
-            result = module.run("http://example.test")
-
-        self.assertEqual(result, 1)
-        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
-
-    def test_verifier_fails_when_service_worker_drops_notification_route_bounds(self) -> None:
-        class DriftedSession(_FakeSession):
-            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
-                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
-                if "/service-worker.js" in url:
-                    return _FakeResponse(
-                        response.url,
-                        text=response.text.replace("const NOTIFICATION_ROUTE_PATHS", "const DROPPED_NOTIFICATION_ROUTE_PATHS", 1),
-                    )
-                return response
-
-        module = _load_module()
-        stdout = io.StringIO()
-
-        with (
-            patch.object(module.requests, "Session", return_value=DriftedSession()),
-            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
-            patch.object(module, "write_json"),
-            patch.object(module, "write_text"),
-            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
-            redirect_stdout(stdout),
-        ):
-            result = module.run("http://example.test")
-
-        self.assertEqual(result, 1)
-        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
-
-    def test_verifier_fails_when_personalized_ledger_stream_drops_no_store_headers(self) -> None:
-        class DriftedSession(_FakeSession):
-            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
-                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
-                if url.endswith("/mobile/pwa/ledger.json"):
-                    return _FakeResponse(response.url, json_data=response.json(), headers={"Cache-Control": "public, max-age=60"})
-                return response
-
-        module = _load_module()
-        stdout = io.StringIO()
-
-        with (
-            patch.object(module.requests, "Session", return_value=DriftedSession()),
-            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
-            patch.object(module, "write_json"),
-            patch.object(module, "write_text"),
-            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
-            redirect_stdout(stdout),
-        ):
-            result = module.run("http://example.test")
-
-        self.assertEqual(result, 1)
-        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+    assert payload["status"] == "fail"
+    assert "gm_secret_extra (/play?role=gm&secret=must-not-survive&extra=1): exactlyOneRedirect failed" in payload["failures"]
+    assert "gm_secret_extra (/play?role=gm&secret=must-not-survive&extra=1): cleanRedirectLocations failed" in payload["failures"]
 
     def test_verifier_fails_when_opt_in_required_ledger_stream_leaks_world_payload(self) -> None:
         class DriftedSession(_FakeSession):
@@ -596,5 +643,34 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
         self.assertIn("world", captured_payloads[0]["ledger_stream"]["opt_in_required_leaked_keys"])
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_run_writes_v2_audit_without_gating_on_legacy_interactive_proof(monkeypatch) -> None:
+    module = load_module()
+    written: list[dict] = []
+    monkeypatch.setattr(module, "source_topology", lambda source_root: {
+        "contractName": module.CONTRACT_NAME,
+        "mode": "source",
+        "status": "pass",
+        "failures": [],
+    })
+    monkeypatch.setattr(module, "write_audit_artifacts", lambda payload, markdown: written.append(payload))
+    stdout = io.StringIO()
+
+    with redirect_stdout(stdout):
+        result = module.run(mobile_release_proof_path=Path("/stale/interactive-proof.json"))
+
+    assert result == 0
+    assert stdout.getvalue().strip() == "mobile_pwa_public_projection:ok"
+    assert written[0]["legacyMobileReleaseProof"]["gating"] is False
+
+
+def test_release_rehearsal_uses_only_the_canonical_mobile_pwa_browser_proof() -> None:
+    rehearsal = (ROOT / "scripts" / "release_dress_rehearsal.sh").read_text(encoding="utf-8")
+    matching_lines = [
+        line.strip().removesuffix("\\").strip()
+        for line in rehearsal.splitlines()
+        if "mobile-pwa-public.spec.ts" in line
+    ]
+
+    assert matching_lines == ["tests/public/mobile-pwa-public.spec.ts"]
+    assert (ROOT / "tests" / "public" / "mobile-pwa-public.spec.ts").is_file()
+    assert not (ROOT / "mobile-pwa-public.spec.ts").exists()

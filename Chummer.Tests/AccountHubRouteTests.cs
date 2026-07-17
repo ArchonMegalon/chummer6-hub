@@ -122,7 +122,7 @@ public sealed class AccountHubRouteTests
     }
 
     [Fact]
-    public async Task AccountAccessRouteShowsMinimalSectionPage()
+    public async Task AccountAccessRouteShowsFocusedInstallPage()
     {
         using var fixture = AccountHubRouteFixture.Create();
         AccountsController controller = fixture.CreateController();
@@ -133,11 +133,34 @@ public sealed class AccountHubRouteTests
         Assert.Equal("~/Views/Accounts/Section.cshtml", view.ViewName);
         AccountSectionPageViewModel model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
         Assert.Equal("Installs", model.Eyebrow);
-        Assert.Equal("Installs", model.Heading);
-        Assert.Equal(3, model.Cards.Count);
-        Assert.Equal("Downloads", model.Cards[0].Title);
-        Assert.Equal("Linked copies", model.Cards[1].Title);
-        Assert.Equal("Recovery", model.Cards[2].Title);
+        Assert.Equal("Install Chummer", model.Heading);
+        Assert.Equal("Download Chummer and manage copies linked to this account.", model.Summary);
+        Assert.Empty(model.Highlights);
+        AccountHubCardViewModel primaryAction = Assert.Single(model.Cards);
+        Assert.Equal("Download Chummer", primaryAction.Title);
+        Assert.Equal("Download Chummer", primaryAction.PrimaryLabel);
+        Assert.Equal("/downloads", primaryAction.PrimaryHref);
+        Assert.NotNull(model.AccessInstallations);
+    }
+
+    [Theory]
+    [InlineData("unlinked", "Copy unlinked.")]
+    [InlineData("unlink_refresh", "Open that copy once, then try unlinking it here again.")]
+    [InlineData("unlink_failed", "Chummer could not unlink that copy right now.")]
+    public async Task AccountAccessRouteShowsOnlyTheActionableAccessNotice(string accessNotice, string expectedNotice)
+    {
+        using var fixture = AccountHubRouteFixture.Create();
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.AccountPage(
+            "access",
+            null,
+            CancellationToken.None,
+            accessNotice: accessNotice);
+
+        ViewResult view = Assert.IsType<ViewResult>(result);
+        AccountSectionPageViewModel model = Assert.IsType<AccountSectionPageViewModel>(view.Model);
+        Assert.Equal(expectedNotice, Assert.Single(model.Highlights));
     }
 
     [Fact]
@@ -182,7 +205,17 @@ public sealed class AccountHubRouteTests
 
         Assert.Contains("action=\"/account/access/unlink\"", view, StringComparison.Ordinal);
         Assert.Contains(">Unlink</button>", view, StringComparison.Ordinal);
-        Assert.Contains("Manage attached installs", view, StringComparison.Ordinal);
+        Assert.Contains("data-account-access-primary", view, StringComparison.Ordinal);
+        Assert.Equal(
+            view.IndexOf("data-account-access-primary", StringComparison.Ordinal),
+            view.LastIndexOf("data-account-access-primary", StringComparison.Ordinal));
+        Assert.Contains("<summary>Copy details</summary>", view, StringComparison.Ordinal);
+        Assert.Contains("aria-label=\"Unlink @installation.Title\"", view, StringComparison.Ordinal);
+        Assert.Contains("No linked copies yet.", view, StringComparison.Ordinal);
+        Assert.Contains("<summary>Need help with an install?</summary>", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"/account/support\">Open install help</a>", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Manage attached installs", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<span class=\"tag\">Copy</span>", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -462,6 +495,15 @@ public sealed class AccountHubRouteTests
         Assert.Contains("Open Table Pulse", view, StringComparison.Ordinal);
         Assert.Contains("Signal Deck", view, StringComparison.Ordinal);
         Assert.Contains("Latest visible scenes.", view, StringComparison.Ordinal);
+        Assert.Contains("\"/account/work#aftermath-packages\"", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AccountViewKeepsCanonicalAftermathFallbackRoutes()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml"));
+
+        Assert.Contains("\"/account/work#aftermath-packages\"", view, StringComparison.Ordinal);
     }
 
     [Fact]

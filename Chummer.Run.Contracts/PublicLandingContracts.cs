@@ -107,6 +107,10 @@ public sealed record PublicReleaseManifestDto(
     string? ContractName = "Chummer.Hub.Registry.Contracts",
     string? PublicVersion = null)
 {
+    [JsonPropertyName("generationId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? GenerationId { get; init; }
+
     [JsonPropertyName("generated_at")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DateTimeOffset? GeneratedAtAlias => GeneratedAt;
@@ -119,13 +123,13 @@ public sealed record PublicReleaseManifestDto(
     public string VersionRole => "artifact_identity";
 
     [JsonPropertyName("displayVersion")]
-    public string DisplayVersion => ResolveDisplayVersion(PublicVersion, Version, Channel, RolloutState);
+    public string DisplayVersion => ResolveDisplayVersion(PublicVersion, Version, Channel, RolloutState, Status, SupportabilityState);
 
     [JsonPropertyName("displayBuildLabel")]
-    public string DisplayBuildLabel => ResolveDisplayBuildLabel(Version, Channel, RolloutState);
+    public string DisplayBuildLabel => ResolveDisplayBuildLabel(Version, Channel, RolloutState, Status, SupportabilityState);
 
     [JsonPropertyName("displayChannelLabel")]
-    public string DisplayChannelLabel => ResolveDisplayChannelLabel(Channel, RolloutState);
+    public string DisplayChannelLabel => ResolveDisplayChannelLabel(Channel, RolloutState, Status, SupportabilityState);
 
     [JsonPropertyName("releaseProof")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -136,6 +140,7 @@ public sealed record PublicReleaseManifestDto(
         && (ProofJourneys is null || ProofJourneys.Count == 0)
         && (ProofRoutes is null || ProofRoutes.Count == 0)
         && ProofUiLocalizationReleaseGate is null
+        && ProofFlagshipReadiness is null
             ? null
             : new(
                 Status: ProofStatus,
@@ -143,7 +148,8 @@ public sealed record PublicReleaseManifestDto(
                 BaseUrl: ProofBaseUrl,
                 JourneysPassed: ProofJourneys,
                 ProofRoutes: ProofRoutes,
-                UiLocalizationReleaseGate: ProofUiLocalizationReleaseGate);
+                UiLocalizationReleaseGate: ProofUiLocalizationReleaseGate,
+                FlagshipReadiness: ProofFlagshipReadiness);
 
     [JsonPropertyName("desktopTupleCoverage")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -180,49 +186,68 @@ public sealed record PublicReleaseManifestDto(
     [JsonIgnore]
     public JsonElement? ProofUiLocalizationReleaseGate { get; init; }
 
-    private static string ResolveDisplayVersion(string? publicVersion, string? version, string? channel, string? rolloutState)
+    [JsonIgnore]
+    public JsonElement? ProofFlagshipReadiness { get; init; }
+
+    private static string ResolveDisplayVersion(string? publicVersion, string? version, string? channel, string? rolloutState, string? status, string? supportabilityState)
     {
-        if (!string.IsNullOrWhiteSpace(publicVersion))
+        if (!string.IsNullOrWhiteSpace(publicVersion)
+            && IsPublicStable(channel, rolloutState, status, supportabilityState))
         {
             return publicVersion.Trim();
         }
 
-        return ResolveDisplayVersion(version, channel, rolloutState);
+        return ResolveDisplayVersion(version, channel, rolloutState, status, supportabilityState);
     }
 
-    private static string ResolveDisplayVersion(string? version, string? channel, string? rolloutState)
-        => IsPublicStable(channel, rolloutState)
+    private static string ResolveDisplayVersion(string? version, string? channel, string? rolloutState, string? status, string? supportabilityState)
+        => IsPublicStable(channel, rolloutState, status, supportabilityState)
             ? "current-public-build"
             : string.IsNullOrWhiteSpace(version)
                 ? "unpublished"
                 : version.Trim();
 
-    private static string ResolveDisplayBuildLabel(string? version, string? channel, string? rolloutState)
-        => IsPublicStable(channel, rolloutState)
+    private static string ResolveDisplayBuildLabel(string? version, string? channel, string? rolloutState, string? status, string? supportabilityState)
+        => IsPublicStable(channel, rolloutState, status, supportabilityState)
             ? "Current public build"
             : string.IsNullOrWhiteSpace(version)
                 ? "Unpublished build"
                 : $"Build {version.Trim()}";
 
-    private static string ResolveDisplayChannelLabel(string? channel, string? rolloutState)
-        => IsPublicStable(channel, rolloutState)
+    private static string ResolveDisplayChannelLabel(string? channel, string? rolloutState, string? status, string? supportabilityState)
+        => IsPublicStable(channel, rolloutState, status, supportabilityState)
             ? "Public release"
-            : string.Equals((channel ?? string.Empty).Trim(), "preview", StringComparison.OrdinalIgnoreCase)
+            : IsPreviewLikeChannel(channel, rolloutState)
                 ? "Current release build"
                 : string.IsNullOrWhiteSpace(channel)
                     ? "Release channel"
                     : channel.Trim();
 
-    private static bool IsPublicStable(string? channel, string? rolloutState)
+    private static bool IsPreviewLikeChannel(string? channel, string? rolloutState)
     {
         var normalizedChannel = (channel ?? string.Empty).Trim();
         var normalizedRolloutState = (rolloutState ?? string.Empty).Trim();
-        return string.Equals(normalizedRolloutState, "public_stable", StringComparison.OrdinalIgnoreCase)
-            && (
+        return string.Equals(normalizedChannel, "preview", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedRolloutState, "promoted_preview", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedChannel, "public_stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedChannel, "stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedChannel, "docker", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedRolloutState, "public_stable", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPublicStable(string? channel, string? rolloutState, string? status, string? supportabilityState)
+    {
+        var normalizedChannel = (channel ?? string.Empty).Trim();
+        var normalizedRolloutState = (rolloutState ?? string.Empty).Trim();
+        var stableLanePublished = string.Equals(normalizedRolloutState, "public_stable", StringComparison.OrdinalIgnoreCase)
+            || (
                 string.Equals(normalizedChannel, "docker", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(normalizedChannel, "public_stable", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(normalizedChannel, "stable", StringComparison.OrdinalIgnoreCase)
             );
+        return stableLanePublished
+            && string.Equals((supportabilityState ?? string.Empty).Trim(), "gold_supported", StringComparison.OrdinalIgnoreCase)
+            && string.Equals((status ?? string.Empty).Trim(), "published", StringComparison.OrdinalIgnoreCase);
     }
 }
 
@@ -233,7 +258,9 @@ public sealed record PublicReleaseProofDto(
     IReadOnlyList<string>? JourneysPassed,
     IReadOnlyList<string>? ProofRoutes,
     [property: JsonPropertyName("uiLocalizationReleaseGate")]
-    JsonElement? UiLocalizationReleaseGate = null);
+    JsonElement? UiLocalizationReleaseGate = null,
+    [property: JsonPropertyName("flagshipReadiness")]
+    JsonElement? FlagshipReadiness = null);
 
 public sealed record PublicFeatureCardDto(
     string Id,

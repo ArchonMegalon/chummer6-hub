@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -16,6 +17,18 @@ DEFAULT_BATCH_PATH = "/api/internal/artifact-factory/source-pack-batches"
 DEFAULT_RECIPES_PATH = "/api/internal/artifact-factory/recipes"
 EXPECTED_CONTRACT_NAME = "chummer.run.artifact_factory.recipe_job.v1"
 EXPECTED_RECIPE_VERSION = "2026-04-15"
+DEFAULT_HTTP_HEADERS = {
+    "Accept": "application/json",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/135.0.0.0 Safari/537.36 "
+        "ChummerArtifactFactoryLauncher/1.0"
+    ),
+}
 PROVIDER_SPECIFIC_REF_PREFIXES = {
     "provider",
     "vendor",
@@ -49,19 +62,40 @@ class LaunchValidationError(SystemExit):
     pass
 
 
+class SafeArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        self.print_usage(sys.stderr)
+        self.exit(2, f"{self.prog}: invalid arguments; credential-bearing CLI arguments are not supported.\n")
+
+
+SAFE_ERROR_METADATA = re.compile(r"^[A-Za-z0-9._:+-]{1,128}$")
+
+
+def sanitized_http_error_metadata(raw_body: bytes) -> str:
+    """Return only non-secret correlation metadata from an untrusted error body."""
+    try:
+        payload = json.loads(raw_body.decode("utf-8", errors="strict"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+
+    safe_parts: list[str] = []
+    for field_name in ("traceId", "requestId"):
+        value = payload.get(field_name)
+        if isinstance(value, str) and SAFE_ERROR_METADATA.fullmatch(value):
+            safe_parts.append(f"{field_name}={value}")
+    return " ".join(safe_parts)
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
+    parser = SafeArgumentParser(
         description="Launch artifact-factory source-pack batches against the internal Hub orchestration API."
     )
     parser.add_argument(
         "--base-url",
         default=os.environ.get("CHUMMER_ARTIFACT_FACTORY_BASE_URL", DEFAULT_BASE_URL),
         help="Hub base URL. Defaults to CHUMMER_ARTIFACT_FACTORY_BASE_URL or https://chummer.run.",
-    )
-    parser.add_argument(
-        "--token",
-        default=os.environ.get("FLEET_INTERNAL_API_TOKEN", ""),
-        help="Internal bearer token. Defaults to FLEET_INTERNAL_API_TOKEN.",
     )
     parser.add_argument(
         "--request-file",
@@ -110,10 +144,8 @@ def build_headers(token: str, public_host: str, forwarded_proto: str, include_js
     if not token.strip():
         raise SystemExit("artifact-factory internal bearer token is required.")
 
-    headers = {
-        "Accept": "application/json",
-        "Authorization": f"Bearer {token.strip()}",
-    }
+    headers = dict(DEFAULT_HTTP_HEADERS)
+    headers["Authorization"] = f"Bearer {token.strip()}"
     if include_json_body:
         headers["Content-Type"] = "application/json"
     if public_host.strip():
@@ -130,9 +162,11 @@ def request_json(url: str, method: str, headers: dict[str, str], payload: dict[s
         with urllib.request.urlopen(request, timeout=30) as response:
             response_body = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
-        error_body = exc.read().decode("utf-8", errors="replace").strip()
-        detail = error_body or exc.reason
-        raise SystemExit(f"artifact-factory request failed ({exc.code}): {detail}") from exc
+        metadata = sanitized_http_error_metadata(exc.read())
+        suffix = f" ({metadata})" if metadata else ""
+        raise SystemExit(
+            f"artifact-factory request failed ({exc.code}); response detail suppressed{suffix}."
+        ) from exc
     except urllib.error.URLError as exc:
         raise SystemExit(f"artifact-factory request failed: {exc.reason}") from exc
 
@@ -1164,20 +1198,21 @@ def receipt_ref_matches_prefix(evidence_refs: set[str], prefix: str) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    token = os.environ.get("FLEET_INTERNAL_API_TOKEN", "")
     base_url = args.base_url.rstrip("/")
     if not base_url:
         raise SystemExit("artifact-factory base URL is required.")
 
     if args.recipes:
-        response = load_recipe_catalog(base_url, args.token, args.public_host, args.forwarded_proto)
+        response = load_recipe_catalog(base_url, token, args.public_host, args.forwarded_proto)
     else:
-        recipe_catalog = load_recipe_catalog(base_url, args.token, args.public_host, args.forwarded_proto)
+        recipe_catalog = load_recipe_catalog(base_url, token, args.public_host, args.forwarded_proto)
         payload = normalize_launch_payload(read_request_payload(args.request_file), recipe_catalog)
         url = f"{base_url}{DEFAULT_BATCH_PATH}"
         response = request_json(
             url,
             "POST",
-            build_headers(args.token, args.public_host, args.forwarded_proto, include_json_body=True),
+            build_headers(token, args.public_host, args.forwarded_proto, include_json_body=True),
             payload=payload,
         )
         validate_batch_launch_response(response, recipe_catalog, payload)

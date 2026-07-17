@@ -227,7 +227,6 @@ public sealed class AccountsController : Controller
                         selectedSection,
                         user,
                         installLinking,
-                        supportCases,
                         campaignSpine,
                         _originAuthoringAllowance.TryGetAllowance(user.UserId, user.Email),
                         _packageCatalog.ListReceiptsForSubject(subject.SubjectId, 8),
@@ -505,7 +504,6 @@ public sealed class AccountsController : Controller
         string section,
         HubUserDto user,
         InstallLinkingSummaryDto installLinking,
-        IReadOnlyList<SupportCaseProjection> supportCases,
         AccountCampaignSummary campaignSpine,
         HorizonArtifactAllowanceViewModel? allowance,
         IReadOnlyList<PublicPackageReceipt> participationPackageReceipts,
@@ -513,7 +511,7 @@ public sealed class AccountsController : Controller
         string? accessNotice)
         => section switch
         {
-            "access" => BuildAccountAccessSectionModel(user, installLinking, supportCases, accessNotice),
+            "access" => BuildAccountAccessSectionModel(user, installLinking, accessNotice),
             "work" => BuildAccountWorkSectionModel(user, installLinking, campaignSpine),
             "participation" => BuildAccountParticipationSectionModel(user, allowance, participationPackageReceipts, participationActivityReceipts),
             _ => throw new InvalidOperationException($"Unsupported account section '{section}'.")
@@ -522,26 +520,17 @@ public sealed class AccountsController : Controller
     private AccountSectionPageViewModel BuildAccountAccessSectionModel(
         HubUserDto user,
         InstallLinkingSummaryDto installLinking,
-        IReadOnlyList<SupportCaseProjection> supportCases,
         string? accessNotice)
     {
         List<string> highlights = [];
-        int pendingClaimCount = installLinking.PendingClaimTickets.Count;
-        int installSupportCount = supportCases.Count(item =>
-            string.Equals(item.Kind, "install_help", StringComparison.OrdinalIgnoreCase)
-            || !string.IsNullOrWhiteSpace(item.InstallationId)
-            || !string.IsNullOrWhiteSpace(item.ReleaseChannel)
-            || !string.IsNullOrWhiteSpace(item.Platform));
         var activeInstallations = (installLinking.ClaimedInstallations ?? Array.Empty<ClaimedInstallationDto>())
             .Where(item => string.Equals(item.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(static item => item.UpdatedAtUtc)
             .ToArray();
-        int linkedInstallCount = activeInstallations.Length;
         HashSet<string> activeGrantInstallationIds = (installLinking.ActiveGrants ?? Array.Empty<InstallationGrantDto>())
             .Where(item => string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
             .Select(static item => item.InstallationId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        ClaimedInstallationDto? leadInstall = activeInstallations.FirstOrDefault();
 
         switch ((accessNotice ?? string.Empty).Trim().ToLowerInvariant())
         {
@@ -556,52 +545,24 @@ public sealed class AccountsController : Controller
                 break;
         }
 
-        string linkedInstallSummary = leadInstall is null
-            ? "No copy is linked yet. Downloads claimed while signed in come back here."
-            : $"{CountLabel(linkedInstallCount, "linked copy", "linked copies")}. Latest: {DescribeInstallation(leadInstall)}.";
-        string claimSummary = pendingClaimCount > 0
-            ? $"{CountLabel(pendingClaimCount, "setup code", "setup codes")} waiting."
-            : "If a copy stops opening, recovery and relink start here.";
-        string supportSummary = installSupportCount > 0
-            ? $"{CountLabel(installSupportCount, "install case", "install cases")} already tracked on this account."
-            : "No install-specific support case is open right now.";
-
         return new AccountSectionPageViewModel(
             Chrome: _chrome.BuildAuthenticatedChrome(
                 "Account · Installs",
-                "Downloads, linked copies, and recovery.",
+                "Download Chummer and manage linked copies.",
                 "/account/access",
                 user.DisplayName,
                 user.Email),
             Eyebrow: "Installs",
-            Heading: "Installs",
-            Summary: "Downloads, linked copies, and recovery.",
-            Highlights: BuildAccessHighlights(),
+            Heading: "Install Chummer",
+            Summary: "Download Chummer and manage copies linked to this account.",
+            Highlights: highlights,
             Cards:
             [
                 new AccountHubCardViewModel(
-                    "Downloads",
-                    "Downloads",
-                    "Stable and nightly stay on the release page. Signed-in downloads claim themselves back to this account.",
-                    "Open downloads",
-                    "/downloads",
-                    "Install help",
-                    "/account/support"),
-                new AccountHubCardViewModel(
-                    "Linked copies",
-                    "Linked copies",
-                    linkedInstallSummary,
-                    linkedInstallCount > 0 ? "Open support" : "Open downloads",
-                    linkedInstallCount > 0 ? "/account/support" : "/downloads",
-                    "Account home",
-                    "/account"),
-                new AccountHubCardViewModel(
-                    "Recovery",
-                    "Recovery",
-                    $"{claimSummary} {supportSummary}",
-                    "Open support",
-                    "/account/support",
-                    "Downloads",
+                    "Install",
+                    "Download Chummer",
+                    "Choose stable or nightly on the downloads page.",
+                    "Download Chummer",
                     "/downloads")
             ],
             BackLabel: "Back to account",
@@ -613,16 +574,6 @@ public sealed class AccountsController : Controller
                     BuildAccessInstallationSummary(item),
                     activeGrantInstallationIds.Contains(item.InstallationId)))
                 .ToArray());
-
-        IReadOnlyList<string> BuildAccessHighlights()
-        {
-            highlights.Add(user.DisplayName);
-            highlights.Add($"{CountLabel(linkedInstallCount, "linked copy", "linked copies")}.");
-            highlights.Add(pendingClaimCount > 0
-                ? $"{CountLabel(pendingClaimCount, "setup code", "setup codes")} waiting."
-                : "No pending setup code.");
-            return highlights;
-        }
     }
 
     private AccountSectionPageViewModel BuildAccountWorkSectionModel(
@@ -985,7 +936,7 @@ public sealed class AccountsController : Controller
             var model = new OriginDossierPublicationDetailPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(
                     publication.Title,
-                    "Private Origin Dossier edition, cover, and audiobook gate.",
+                    "Private Origin Dossier full story, portrait shortlist, audiobook request, and cinematic scene gate.",
                     currentPath,
                     user.DisplayName,
                     user.Email),
@@ -1011,6 +962,282 @@ public sealed class AccountsController : Controller
                 SecondaryLabel: "Return home",
                 SecondaryHref: "/home"));
         }
+    }
+
+    [HttpPost("/account/work/origin-dossiers/{originDossierProjectId}/portrait")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SelectOriginDossierPortrait(
+        [FromRoute] string originDossierProjectId,
+        [FromForm] string? portraitId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/work/origin-dossiers/{Uri.EscapeDataString(originDossierProjectId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            OriginDossierPublicationViewModel? publication = _originDossierPublications.SelectPortraitForAccount(
+                user.UserId,
+                subject.SubjectId,
+                originDossierProjectId,
+                portraitId ?? string.Empty);
+            if (publication is null)
+            {
+                return NotFound();
+            }
+
+            RecordOriginDossierMediaSelectionRequest(
+                user.UserId,
+                subject.Email,
+                publication,
+                "portrait",
+                portraitId ?? string.Empty);
+            return Redirect($"{currentPath}#origin-edition-portraits");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Origin Dossier portrait choice could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpPost("/account/work/origin-dossiers/{originDossierProjectId}/audiobook")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SelectOriginDossierAudiobookVoice(
+        [FromRoute] string originDossierProjectId,
+        [FromForm] string? voiceId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/work/origin-dossiers/{Uri.EscapeDataString(originDossierProjectId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            OriginDossierPublicationViewModel? publication = _originDossierPublications.SelectAudiobookVoiceForAccount(
+                user.UserId,
+                subject.SubjectId,
+                originDossierProjectId,
+                voiceId ?? string.Empty);
+            if (publication is null)
+            {
+                return NotFound();
+            }
+
+            RecordOriginDossierMediaSelectionRequest(
+                user.UserId,
+                subject.Email,
+                publication,
+                "audiobook",
+                voiceId ?? string.Empty);
+            return Redirect($"{currentPath}#origin-edition-listen");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Origin Dossier audiobook voice request could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpPost("/account/work/origin-dossiers/{originDossierProjectId}/cinematic-scene")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SelectOriginDossierCinematicScene(
+        [FromRoute] string originDossierProjectId,
+        [FromForm] string? sceneId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/work/origin-dossiers/{Uri.EscapeDataString(originDossierProjectId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            OriginDossierPublicationViewModel? publication = _originDossierPublications.SelectCinematicSceneForAccount(
+                user.UserId,
+                subject.SubjectId,
+                originDossierProjectId,
+                sceneId ?? string.Empty);
+            if (publication is null)
+            {
+                return NotFound();
+            }
+
+            RecordOriginDossierMediaSelectionRequest(
+                user.UserId,
+                subject.Email,
+                publication,
+                "cinematic",
+                sceneId ?? string.Empty);
+            return Redirect($"{currentPath}#origin-edition-watch");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Origin Dossier cinematic scene request could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpPost("/account/work/origin-dossiers/{originDossierProjectId}/story-link")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LinkOriginDossierRunner(
+        [FromRoute] string originDossierProjectId,
+        [FromForm] string? runnerLinkCode,
+        [FromForm] string? relationshipSummary,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/work/origin-dossiers/{Uri.EscapeDataString(originDossierProjectId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            OriginDossierPublicationViewModel? publication = _originDossierPublications.LinkRunnerForAccount(
+                user.UserId,
+                subject.SubjectId,
+                originDossierProjectId,
+                runnerLinkCode ?? string.Empty,
+                relationshipSummary);
+            if (publication is null)
+            {
+                return NotFound();
+            }
+
+            return Redirect($"{currentPath}#origin-edition-links");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Origin Dossier runner story link could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    private void RecordOriginDossierMediaSelectionRequest(
+        string userId,
+        string? email,
+        OriginDossierPublicationViewModel publication,
+        string selectionKind,
+        string selectedId)
+    {
+        if (_artifactRequests is null)
+        {
+            return;
+        }
+
+        MediaArtifactSurfaceDefinition surface = _mediaHorizons?.GetSurface("origin-dossier")
+            ?? new("origin-dossier", "origin-dossier-media");
+        string normalizedKind = NormalizeOriginDossierSelectionToken(selectionKind, "media");
+        string normalizedSelectedId = NormalizeOriginDossierSelectionToken(selectedId, "selected");
+        string sourceRef = _mediaHorizons?.BuildSourceRef(surface, $"{publication.ProjectId}:{normalizedKind}:{normalizedSelectedId}")
+            ?? $"{surface.HorizonId}:{publication.ProjectId}:{normalizedKind}:{normalizedSelectedId}";
+        HorizonArtifactRequestReceipt receipt = _artifactRequests.BuildRequest(
+            new HorizonArtifactRequestCreateRequest(
+                HorizonId: surface.HorizonId,
+                ArtifactKindOrCapabilityId: surface.CapabilityId,
+                UserId: userId,
+                SourceRef: sourceRef,
+                Visibility: "private",
+                ExternalProcessingConsent: true,
+                Email: email,
+                GovernedRenderRequest: new HorizonGovernedRenderRequestCreateRequest(
+                    WorkItemId: $"origin.{NormalizeOriginDossierSelectionToken(publication.ProjectId, "dossier")}.{normalizedKind}.{normalizedSelectedId}",
+                    RequestedBy: "chummer.account",
+                    Subject: $"{publication.RunnerAlias} Origin Dossier {normalizedKind} request",
+                    Audience: "owner_private",
+                    Locale: "en-US",
+                    PreferredProvider: string.Equals(normalizedKind, "audiobook", StringComparison.OrdinalIgnoreCase)
+                        ? null
+                        : "Magicfit",
+                    TruthRefs:
+                    [
+                        $"origin-dossier:{NormalizeOriginDossierSelectionToken(publication.ProjectId, "dossier")}:approved-book",
+                        $"origin-dossier:{NormalizeOriginDossierSelectionToken(publication.ProjectId, "dossier")}:{normalizedKind}:{normalizedSelectedId}"
+                    ],
+                    EvidenceRefs:
+                    [
+                        $"origin-dossier:{NormalizeOriginDossierSelectionToken(publication.ProjectId, "dossier")}:owner-selection:{normalizedKind}:{normalizedSelectedId}"
+                    ],
+                    Artifacts:
+                    [
+                        new HorizonGovernedRenderArtifactSpec(
+                            ArtifactId: $"{normalizedKind}-{normalizedSelectedId}",
+                            Role: ResolveOriginDossierSelectionRole(normalizedKind),
+                            Category: $"origin-dossier/{normalizedKind}",
+                            Payload: $"project={NormalizeOriginDossierSelectionToken(publication.ProjectId, "dossier")};selection={normalizedKind};selected={normalizedSelectedId}",
+                            OutputFormat: ResolveOriginDossierSelectionOutputFormat(normalizedKind),
+                            DeduplicationKey: $"origin.{NormalizeOriginDossierSelectionToken(publication.ProjectId, "dossier")}.{normalizedKind}.{normalizedSelectedId}",
+                            AspectRatio: string.Equals(normalizedKind, "portrait", StringComparison.OrdinalIgnoreCase)
+                                ? "4:5"
+                                : string.Equals(normalizedKind, "cinematic", StringComparison.OrdinalIgnoreCase)
+                                    ? "16:9"
+                                    : null,
+                            DurationProfile: string.Equals(normalizedKind, "audiobook", StringComparison.OrdinalIgnoreCase)
+                                ? "full_audiobook"
+                                : string.Equals(normalizedKind, "cinematic", StringComparison.OrdinalIgnoreCase)
+                                    ? "short_cinematic_scene"
+                                    : null,
+                            RequiresApproval: true,
+                            PersistOnApproval: false)
+                    ])),
+            consumeQuota: false,
+            requireEnabledCapability: false);
+        if (!string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "Origin Dossier media selection request was not accepted for {UserId} on {ProjectId}/{SelectionKind}/{SelectedId}; blocked reasons: {BlockedReasons}.",
+                userId,
+                publication.ProjectId,
+                normalizedKind,
+                normalizedSelectedId,
+                string.Join(", ", receipt.BlockedReasons));
+        }
+    }
+
+    private static string ResolveOriginDossierSelectionRole(string selectionKind)
+        => string.Equals(selectionKind, "portrait", StringComparison.OrdinalIgnoreCase)
+            ? "portrait_choice"
+            : string.Equals(selectionKind, "audiobook", StringComparison.OrdinalIgnoreCase)
+                ? "audiobook_voice_request"
+                : "cinematic_scene_request";
+
+    private static string ResolveOriginDossierSelectionOutputFormat(string selectionKind)
+        => string.Equals(selectionKind, "portrait", StringComparison.OrdinalIgnoreCase)
+            ? "png"
+            : string.Equals(selectionKind, "audiobook", StringComparison.OrdinalIgnoreCase)
+                ? "m4b"
+                : "mp4";
+
+    private static string NormalizeOriginDossierSelectionToken(string? value, string fallback)
+    {
+        string source = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        Span<char> buffer = stackalloc char[source.Length];
+        int written = 0;
+        foreach (char c in source)
+        {
+            if (char.IsLetterOrDigit(c) || c is '.' or '_' or ':' or '-')
+            {
+                buffer[written++] = c;
+            }
+            else if (written > 0 && buffer[written - 1] != '-')
+            {
+                buffer[written++] = '-';
+            }
+        }
+
+        string normalized = new string(buffer[..written]).Trim('-', '.', '_', ':');
+        return string.IsNullOrWhiteSpace(normalized) ? fallback : normalized;
     }
 
     [HttpGet("/account/work/origin-dossiers/{originDossierProjectId}/{artifactKind}")]
@@ -1957,7 +2184,7 @@ public sealed class AccountsController : Controller
 
             if (accountSummary.Workspaces.Count > 0)
             {
-                return Redirect("/account/roster#aftermath-packages");
+                return Redirect("/account/work#aftermath-packages");
             }
 
             return Redirect("/account/access");

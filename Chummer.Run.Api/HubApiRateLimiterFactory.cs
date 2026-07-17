@@ -42,16 +42,9 @@ public static class HubApiRateLimiterFactory
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        string? forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwarded))
-        {
-            string[] parts = forwarded.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (parts.Length > 0 && !string.IsNullOrWhiteSpace(parts[0]))
-            {
-                return parts[0];
-            }
-        }
-
-        return context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+        // ForwardedHeadersMiddleware is the only component allowed to translate a
+        // trusted proxy header into RemoteIpAddress. Reading X-Forwarded-For here
+        // would let an untrusted caller choose its own rate-limit partition.
+        return context.Connection.RemoteIpAddress?.ToString() ?? "remote-ip-unavailable";
     }
 }

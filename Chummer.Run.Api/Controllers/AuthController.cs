@@ -2,12 +2,17 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
 [AutoValidateAntiforgeryToken]
+[ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
 public sealed class AuthController : Controller
 {
     private const int MaxRequestBodyBytes = 16 * 1024;
@@ -53,6 +58,16 @@ public sealed class AuthController : Controller
         _logger = logger;
     }
 
+    public override void OnActionExecuting(ActionExecutingContext context)
+    {
+        Response.OnStarting(static state =>
+        {
+            ApplyNoStoreHeaders(((HttpResponse)state).Headers);
+            return Task.CompletedTask;
+        }, Response);
+        base.OnActionExecuting(context);
+    }
+
     [HttpGet("/login")]
     [Produces("text/html")]
     public async Task<IActionResult> LoginPage([FromQuery] string? next, CancellationToken cancellationToken)
@@ -61,7 +76,7 @@ public sealed class AuthController : Controller
         var sessionState = await ResolveAuthEntrySessionStateAsync(cancellationToken);
         if (sessionState == AuthEntrySessionState.Authenticated)
         {
-            return Redirect(nextPath);
+            return LocalRedirect(nextPath);
         }
         if (sessionState == AuthEntrySessionState.Unavailable)
         {
@@ -78,6 +93,11 @@ public sealed class AuthController : Controller
                 secondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}");
         }
 
+        if (!HasInteractiveAuthEntry() && !ShouldRenderScopedAuthEntryWithoutInteractiveMethods(nextPath))
+        {
+            return BuildNoAuthEntryMethodsMessage(currentPath: "/login", nextPath: nextPath, createAccount: false);
+        }
+
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             nextPath,
             createAccount: false));
@@ -91,7 +111,7 @@ public sealed class AuthController : Controller
         var sessionState = await ResolveAuthEntrySessionStateAsync(cancellationToken);
         if (sessionState == AuthEntrySessionState.Authenticated)
         {
-            return Redirect(nextPath);
+            return LocalRedirect(nextPath);
         }
         if (sessionState == AuthEntrySessionState.Unavailable)
         {
@@ -106,6 +126,11 @@ public sealed class AuthController : Controller
                 primaryHref: "/",
                 secondaryLabel: "Try account creation again",
                 secondaryHref: $"/signup?next={Uri.EscapeDataString(nextPath)}");
+        }
+
+        if (!HasInteractiveAuthEntry() && !ShouldRenderScopedAuthEntryWithoutInteractiveMethods(nextPath))
+        {
+            return BuildNoAuthEntryMethodsMessage(currentPath: "/signup", nextPath: nextPath, createAccount: true);
         }
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
@@ -127,6 +152,35 @@ public sealed class AuthController : Controller
 
         var nextPath = HubBrowserAuthService.SanitizeNextPath(next);
         var nextTarget = DescribeNextTarget(nextPath);
+        var emailEntryAvailability = ResolveEmailEntryAvailability();
+        if (!emailEntryAvailability.Enabled)
+        {
+            return BuildAuthMessage(
+                chromeTitle: "Email sign-in unavailable",
+                chromeDescription: "Email sign-in is not sending messages from this host right now.",
+                currentPath: "/login",
+                heading: "Email sign-in is unavailable",
+                supportLine: BuildEmailSignInUnavailableSupportLine(emailEntryAvailability.DeliveryMode, emailEntryAvailability.PreviewNote),
+                notice: $"Requested return: {nextTarget}",
+                primaryLabel: _google.IsConfigured() ? "Continue with Google" : "Return to sign in",
+                primaryHref: _google.IsConfigured()
+                    ? $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}"
+                    : $"/login?next={Uri.EscapeDataString(nextPath)}",
+                secondaryLabel: "Use a different email",
+                secondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}",
+                stateLabel: "Email unavailable",
+                highlights:
+                [
+                    IsEmailStartStopped(emailEntryAvailability.DeliveryMode)
+                        ? "Chummer is not sending sign-in emails on this host right now."
+                        : "Chummer could not send the sign-in email on this host right now.",
+                    $"After sign-in is restored, Chummer still returns to {nextTarget}.",
+                    _google.IsConfigured()
+                        ? "Google remains available as the non-email sign-in path on this host."
+                        : "Try the email path again later if you still need it on this host."
+                ]);
+        }
+
         var started = default(Chummer.Run.Contracts.Identity.EmailAuthStartResponse)!;
         try
         {
@@ -148,6 +202,34 @@ public sealed class AuthController : Controller
                     : $"/login?next={Uri.EscapeDataString(nextPath)}",
                 secondaryLabel: "Use a different email",
                 secondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}");
+        }
+
+        if (IsEmailDeliveryUnavailable(started.DeliveryMode))
+        {
+            return BuildAuthMessage(
+                chromeTitle: "Email sign-in unavailable",
+                chromeDescription: "Email sign-in is not sending messages from this host right now.",
+                currentPath: "/login",
+                heading: "Email sign-in is unavailable",
+                supportLine: BuildEmailSignInUnavailableSupportLine(started.DeliveryMode, started.PreviewNote),
+                notice: $"Requested return: {nextTarget}",
+                primaryLabel: _google.IsConfigured() ? "Continue with Google" : "Return to sign in",
+                primaryHref: _google.IsConfigured()
+                    ? $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}"
+                    : $"/login?next={Uri.EscapeDataString(nextPath)}",
+                secondaryLabel: "Use a different email",
+                secondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}",
+                stateLabel: "Email unavailable",
+                highlights:
+                [
+                    IsEmailStartStopped(started.DeliveryMode)
+                        ? "Chummer is not sending sign-in emails on this host right now."
+                        : "Chummer could not send the sign-in email on this host right now.",
+                    $"After sign-in is restored, Chummer still returns to {nextTarget}.",
+                    _google.IsConfigured()
+                        ? "Google remains available as the non-email sign-in path on this host."
+                        : "Try the email path again later if you still need it on this host."
+                ]);
         }
 
         bool inlinePreviewAllowed = string.Equals(started.DeliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase)
@@ -225,7 +307,7 @@ public sealed class AuthController : Controller
         }
         catch (HubBrowserAuthUnavailableException ex)
         {
-            _logger.LogWarning(ex, "Email sign-in callback could not be completed for next path {NextPath}.", nextPath);
+            _logger.LogWarning(ex, "Email sign-in callback could not be completed.");
             return BuildAuthMessage(
                 chromeTitle: "Email sign-in unavailable",
                 chromeDescription: "The email sign-in callback could not be completed right now.",
@@ -262,7 +344,7 @@ public sealed class AuthController : Controller
                 cancellationToken);
         }
 
-        return Redirect(nextPath);
+        return LocalRedirect(nextPath);
     }
 
     [HttpGet("/auth/email/link/callback")]
@@ -383,7 +465,7 @@ public sealed class AuthController : Controller
                 secondaryHref: "/home");
         }
 
-        return Redirect(payload.NextPath);
+        return LocalRedirect(HubBrowserAuthService.SanitizeNextPath(payload.NextPath));
     }
 
     [HttpGet("/auth/google/start")]
@@ -392,18 +474,20 @@ public sealed class AuthController : Controller
         var nextPath = HubBrowserAuthService.SanitizeNextPath(next);
         if (!_google.IsConfigured())
         {
+            var fallbackAction = ResolveNonGoogleAuthAction(nextPath);
             var model = new AuthMessagePageViewModel(
                 Chrome: _chrome.BuildPublicChrome("Google unavailable", _google.DisabledReason() ?? "Google sign-in is unavailable on this host.", "/login"),
                 Heading: "Google sign-in is unavailable",
                 SupportLine: _google.DisabledReason() ?? "Google sign-in is unavailable on this host.",
                 Notice: null,
-                PrimaryLabel: "Continue with email",
-                PrimaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}",
+                PrimaryLabel: fallbackAction.PrimaryLabel,
+                PrimaryHref: fallbackAction.PrimaryHref,
                 SecondaryLabel: "Create account",
                 SecondaryHref: $"/signup?next={Uri.EscapeDataString(nextPath)}");
             return View("~/Views/Auth/Message.cshtml", model);
         }
 
+        _google.ClearStateCookie(Request, Response);
         var challenge = _google.CreateChallenge(Request, nextPath);
         Response.Cookies.Append(
             HubGoogleAuthConstants.StateCookieName,
@@ -450,6 +534,7 @@ public sealed class AuthController : Controller
 
         if (!_google.IsConfigured())
         {
+            var fallbackAction = ResolveNonGoogleAuthAction(nextPath);
             return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
                 Chrome: _chrome.BuildPublicChrome("Google unavailable", _google.DisabledReason() ?? "Google sign-in is unavailable on this host.", "/account"),
                 Heading: "Google sign-in is unavailable",
@@ -457,10 +542,11 @@ public sealed class AuthController : Controller
                 Notice: null,
                 PrimaryLabel: "Open account",
                 PrimaryHref: nextPath,
-                SecondaryLabel: "Continue with email",
-                SecondaryHref: "/account"));
+                SecondaryLabel: fallbackAction.PrimaryLabel,
+                SecondaryHref: fallbackAction.PrimaryHref));
         }
 
+        _google.ClearStateCookie(Request, Response);
         var challenge = _google.CreateLinkChallenge(Request, subject.SubjectId, nextPath);
         Response.Cookies.Append(
             HubGoogleAuthConstants.StateCookieName,
@@ -482,15 +568,17 @@ public sealed class AuthController : Controller
             _logger.LogWarning(ex, "Google sign-in callback failed.");
             result = new GoogleAuthCompletionResult(
                 Session: null,
-                NextPath: "/login?next=/home",
+                NextPath: "/home",
                 ErrorTitle: "Google sign-in failed",
-                ErrorDetail: "Chummer could not complete the Google sign-in handshake right now. Start the flow again in a moment.");
+                ErrorDetail: "Chummer could not complete your Google sign-in right now. Start the flow again in a moment.");
         }
 
-        Response.Cookies.Delete(HubGoogleAuthConstants.StateCookieName, _google.BuildStateCookie(Request, DateTimeOffset.UtcNow));
+        _google.ClearStateCookie(Request, Response);
 
         if (result.MergeCandidate is not null)
         {
+            _logger.LogInformation(
+                "Google sign-in callback produced a merge confirmation instead of a direct session.");
             var mergeModel = new GoogleMergePageViewModel(
                 Chrome: _chrome.BuildPublicChrome("Confirm account link", "Google found a confirmed email that already belongs to a Chummer account.", "/login"),
                 ExistingDisplayName: result.MergeCandidate.ExistingDisplayName,
@@ -512,18 +600,24 @@ public sealed class AuthController : Controller
                 authProviderFamily: "google",
                 accountCreated: result.AccountCreated,
                 cancellationToken);
-            return Redirect(result.NextPath);
+            return LocalRedirect(HubBrowserAuthService.SanitizeNextPath(result.NextPath));
         }
 
+        _logger.LogInformation(
+            "Google sign-in callback completed without a Hub session. ErrorTitle {ErrorTitle}.",
+            result.ErrorTitle ?? "<none>");
+
+        string continuationNextPath = HubBrowserAuthService.SanitizeNextPath(result.NextPath);
+        var callbackAction = ResolveGoogleCallbackFailureAction(continuationNextPath);
         return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
             Chrome: _chrome.BuildPublicChrome(result.ErrorTitle ?? "Google sign-in", result.ErrorDetail ?? "Google sign-in did not complete.", "/login"),
             Heading: result.ErrorTitle ?? "Google sign-in failed",
             SupportLine: result.ErrorDetail ?? "Google sign-in did not complete.",
             Notice: null,
-            PrimaryLabel: "Continue with email",
-            PrimaryHref: $"/login?next={Uri.EscapeDataString(result.NextPath)}",
+            PrimaryLabel: callbackAction.PrimaryLabel,
+            PrimaryHref: callbackAction.PrimaryHref,
             SecondaryLabel: "Return to account creation",
-            SecondaryHref: $"/signup?next={Uri.EscapeDataString(result.NextPath)}"));
+            SecondaryHref: $"/signup?next={Uri.EscapeDataString(continuationNextPath)}"));
     }
 
     [HttpPost("/auth/google/merge")]
@@ -563,7 +657,7 @@ public sealed class AuthController : Controller
                 authProviderFamily: "google",
                 accountCreated: result.AccountCreated,
                 cancellationToken);
-            return Redirect(result.NextPath);
+            return LocalRedirect(HubBrowserAuthService.SanitizeNextPath(result.NextPath));
         }
 
         return View("~/Views/Auth/Message.cshtml", new AuthMessagePageViewModel(
@@ -669,7 +763,9 @@ public sealed class AuthController : Controller
         _landing.LoadSurface();
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, Request.Headers.UserAgent.ToString(), authenticated: false);
-        var presentation = ResolveEntryPresentation(nextPath, createAccount);
+        bool emailEntryEnabled = ResolveEmailEntryAvailability().Enabled;
+        bool googleAvailable = _google.IsConfigured();
+        var presentation = ResolveEntryPresentation(nextPath, createAccount, emailEntryEnabled, googleAvailable);
         var nextTarget = DescribeNextTarget(nextPath);
         var returnLine = $"After this step, Chummer returns to {nextTarget}.";
         return new AuthPageViewModel(
@@ -680,22 +776,100 @@ public sealed class AuthController : Controller
             ReturnLine: returnLine,
             NextPath: nextPath,
             CreateAccount: createAccount,
-            GoogleAvailable: _google.IsConfigured(),
+            EmailEntryEnabled: emailEntryEnabled,
+            GoogleAvailable: googleAvailable,
             GoogleUnavailableReason: _google.DisabledReason(),
             GoogleStartHref: $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}",
             AccessPosture: accessPosture);
     }
 
+    private IActionResult BuildNoAuthEntryMethodsMessage(string currentPath, string nextPath, bool createAccount)
+    {
+        if (ShouldRenderScopedAuthEntryWithoutInteractiveMethods(nextPath))
+        {
+            return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(nextPath, createAccount));
+        }
+
+        string nextTarget = DescribeNextTarget(nextPath);
+        return BuildAuthMessage(
+            chromeTitle: createAccount ? "Account creation unavailable" : "Sign-in unavailable",
+            chromeDescription: "No sign-in method is available on this host right now.",
+            currentPath: currentPath,
+            heading: createAccount ? "Account creation is unavailable right now" : "Sign-in is unavailable right now",
+            supportLine: "Chummer is not offering email or Google sign-in on this host right now. Try again later.",
+            notice: $"Requested return: {nextTarget}",
+            primaryLabel: "Return home",
+            primaryHref: "/",
+            secondaryLabel: createAccount ? "Return to sign in" : "Try sign-in again",
+            secondaryHref: $"/login?next={Uri.EscapeDataString(nextPath)}");
+    }
+
+    private static bool IsEmailDeliveryUnavailable(string? deliveryMode)
+        => string.Equals(deliveryMode, "email_start_disabled", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(deliveryMode, "email_start_paused", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(deliveryMode, "email_delivery_unavailable", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsEmailStartStopped(string? deliveryMode)
+        => string.Equals(deliveryMode, "email_start_disabled", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(deliveryMode, "email_start_paused", StringComparison.OrdinalIgnoreCase);
+
+    private static string BuildEmailSignInUnavailableSupportLine(string? deliveryMode, string? previewNote = null)
+        => string.Equals(deliveryMode, "email_start_paused", StringComparison.OrdinalIgnoreCase)
+            ? $"{previewNote ?? "Email sign-in is paused on this host."} Use Google if it is available on this host."
+            : string.Equals(deliveryMode, "email_start_disabled", StringComparison.OrdinalIgnoreCase)
+            ? "Chummer is not sending sign-in emails on this host right now. Use Google if it is available on this host."
+            : "Chummer could not send the sign-in email on this host right now. Use Google if it is available on this host or try again later.";
+
     internal static (string Eyebrow, string Heading, string SupportLine) ResolveEntryPresentation(string nextPath, bool createAccount)
+        => ResolveEntryPresentation(nextPath, createAccount, emailEntryEnabled: true, googleAvailable: true);
+
+    internal static (string Eyebrow, string Heading, string SupportLine) ResolveEntryPresentation(
+        string nextPath,
+        bool createAccount,
+        bool emailEntryEnabled,
+        bool googleAvailable)
     {
         if (nextPath.StartsWith("/account/billing", StringComparison.OrdinalIgnoreCase))
         {
+            if (!emailEntryEnabled && googleAvailable)
+            {
+                return ("Supporter", "Supporter", "Google first. Billing stays attached after that step.");
+            }
+
+            if (!emailEntryEnabled)
+            {
+                return ("Supporter", "Supporter", "Sign-in is unavailable on this host right now.");
+            }
+
             return ("Supporter", "Supporter", "Email first. Billing stays attached after this step.");
         }
 
-        return createAccount
-            ? ("Next", "Claim your copy", "Claim this copy when you want installs, support, and recovery together.")
-            : ("Next", "Open Chummer", "Email first. Google if you prefer.");
+        if (createAccount)
+        {
+            if (!emailEntryEnabled && googleAvailable)
+            {
+                return ("Next", "Claim your copy", "Use Google to claim this copy when you want installs, support, and recovery together.");
+            }
+
+            if (!emailEntryEnabled)
+            {
+                return ("Next", "Claim your copy", "Account creation is unavailable on this host right now.");
+            }
+
+            return ("Next", "Claim your copy", "Claim this copy when you want installs, support, and recovery together.");
+        }
+
+        if (!emailEntryEnabled && googleAvailable)
+        {
+            return ("Next", "Open Chummer", "Email sign-in is unavailable on this host right now. Continue with Google instead.");
+        }
+
+        if (!emailEntryEnabled)
+        {
+            return ("Next", "Open Chummer", "Sign-in is unavailable on this host right now.");
+        }
+
+        return ("Next", "Open Chummer", "Email first. Google if you prefer.");
     }
 
     internal static string DescribeNextTarget(string nextPath)
@@ -714,5 +888,40 @@ public sealed class AuthController : Controller
         Guest,
         Authenticated,
         Unavailable
+    }
+
+    private static bool ShouldRenderScopedAuthEntryWithoutInteractiveMethods(string nextPath)
+        => nextPath.StartsWith("/account/billing", StringComparison.OrdinalIgnoreCase);
+
+    private static void ApplyNoStoreHeaders(IHeaderDictionary headers)
+    {
+        headers["Cache-Control"] = "private, no-store, max-age=0";
+        headers["CDN-Cache-Control"] = "no-store, max-age=0";
+        headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
+        headers["Surrogate-Control"] = "no-store";
+        headers["Pragma"] = "no-cache";
+        headers["Expires"] = "0";
+    }
+
+    private bool HasInteractiveAuthEntry()
+        => ResolveEmailEntryAvailability().Enabled || _google.IsConfigured();
+
+    private HubEmailSignInAvailability ResolveEmailEntryAvailability()
+        => HubEmailSignInPolicy.Resolve(HttpContext?.RequestServices.GetService<IConfiguration>());
+
+    private (string PrimaryLabel, string PrimaryHref) ResolveNonGoogleAuthAction(string nextPath)
+    {
+        string escapedNext = Uri.EscapeDataString(nextPath);
+        return ResolveEmailEntryAvailability().Enabled
+            ? ("Continue with email", $"/login?next={escapedNext}")
+            : ("Return to sign in", $"/login?next={escapedNext}");
+    }
+
+    private (string PrimaryLabel, string PrimaryHref) ResolveGoogleCallbackFailureAction(string nextPath)
+    {
+        string escapedNext = Uri.EscapeDataString(nextPath);
+        return _google.IsConfigured()
+            ? ("Try Google again", $"/auth/google/start?next={escapedNext}")
+            : ("Return to sign in", $"/login?next={escapedNext}");
     }
 }

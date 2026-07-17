@@ -34,6 +34,8 @@ TIMEOUT_SECONDS="${CHUMMER_FLAGSHIP_PUBLIC_EDGE_TIMEOUT_SECONDS:-240}"
 SKIP_PREFLIGHT_OVERRIDE="${CHUMMER_FLAGSHIP_PUBLIC_EDGE_SKIP_PREFLIGHT:-auto}"
 INCLUDE_HORIZONS="${CHUMMER_FLAGSHIP_PUBLIC_EDGE_INCLUDE_HORIZONS:-1}"
 RELEASE_CHANNEL_RECEIPT="${CHUMMER_FLAGSHIP_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT:-$ROOT_DIR/../chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json}"
+EXPECTED_BUILD_INFO="${CHUMMER_FLAGSHIP_PUBLIC_EDGE_EXPECTED_BUILD_INFO:-${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-$ROOT_DIR/.state/public-edge-portal-overlay/app}/.codex-studio/runtime/PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json}"
+EXPECTED_PWA_ASSET_INVENTORY_SHA256="${CHUMMER_FLAGSHIP_PUBLIC_EDGE_EXPECTED_PWA_ASSET_INVENTORY_SHA256:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,6 +49,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --timeout-seconds)
       TIMEOUT_SECONDS="${2:?--timeout-seconds requires a value}"
+      shift 2
+      ;;
+    --expected-build-info)
+      EXPECTED_BUILD_INFO="${2:?--expected-build-info requires a value}"
+      shift 2
+      ;;
+    --expected-pwa-asset-inventory-sha256)
+      EXPECTED_PWA_ASSET_INVENTORY_SHA256="${2:?--expected-pwa-asset-inventory-sha256 requires a value}"
       shift 2
       ;;
     --skip-preflight)
@@ -68,6 +78,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# The build-info lives at <overlay>/.codex-studio/runtime/<file>. Derive the same
+# overlay root that the trusted digest loader validates and pass it to postdeploy;
+# otherwise a custom --expected-build-info could be cross-checked against the
+# unrelated environment/default overlay.
+EXPECTED_OVERLAY_ROOT="$(dirname -- "$(dirname -- "$(dirname -- "$EXPECTED_BUILD_INFO")")")"
+
 to_bool() {
   local value=""
   value="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
@@ -75,14 +91,7 @@ to_bool() {
 }
 
 default_skip_preflight() {
-  case "$1" in
-    https://*)
-      printf 'true\n'
-      ;;
-    *)
-      printf 'false\n'
-      ;;
-  esac
+  printf 'false\n'
 }
 
 if [[ -z "$OUTPUT_DIR" ]]; then
@@ -120,10 +129,29 @@ if to_bool "$INCLUDE_HORIZONS"; then
   done
 fi
 
-python3 scripts/verify_public_pwa_static_assets.py \
-  --base-url "$BASE_URL" \
-  --timeout-seconds "$TIMEOUT_SECONDS" \
-  --output "$OUTPUT_DIR/PUBLIC_PWA_STATIC_ASSETS.generated.json"
+EXPECTED_FULL_DEPLOYMENT_DIGEST_SHA256="$(
+  python3 - "$EXPECTED_BUILD_INFO" "$ROOT_DIR" <<'PY'
+import os
+from pathlib import Path
+import sys
+
+from scripts.verify_public_edge_postdeploy_gate import (
+    load_expected_full_deployment_digest,
+)
+
+build_info_path = Path(os.path.abspath(os.fspath(Path(sys.argv[1]).expanduser())))
+source_root = Path(
+    os.environ.get("CHUMMER_RUN_SERVICES_SOURCE") or sys.argv[2]
+)
+sys.stdout.write(
+    load_expected_full_deployment_digest(
+        build_info_path,
+        source_root=source_root,
+        overlay_root=build_info_path.parents[2],
+    )
+)
+PY
+)"
 
 python3 scripts/verify_mobile_pwa_ledger_boundary.py \
   --base-url "$BASE_URL" \
@@ -149,6 +177,9 @@ postdeploy_args=(
   --base-url "$BASE_URL"
   --timeout-seconds "$TIMEOUT_SECONDS"
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"
+  --overlay-root "$EXPECTED_OVERLAY_ROOT"
+  --expected-build-info "$EXPECTED_BUILD_INFO"
+  --expected-full-deployment-digest-sha256 "$EXPECTED_FULL_DEPLOYMENT_DIGEST_SHA256"
   --require-downloads-status-playwright
   --playwright-artifact-dir "$DOWNLOADS_BROWSER_DIR"
   --require-mobile-pwa-viewport-playwright
@@ -160,10 +191,30 @@ postdeploy_args=(
   --output "$OUTPUT_DIR/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
 )
 if to_bool "$SKIP_PREFLIGHT"; then
+  if [[ ! "$EXPECTED_PWA_ASSET_INVENTORY_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "Skipping preflight requires a sealed expected PWA asset inventory SHA-256." >&2
+    exit 2
+  fi
   postdeploy_args+=(--skip-preflight)
+  postdeploy_args+=(--expected-pwa-asset-inventory-sha256 "$EXPECTED_PWA_ASSET_INVENTORY_SHA256")
 fi
 
 python3 scripts/verify_public_edge_postdeploy_gate.py "${postdeploy_args[@]}"
+
+python3 - "$OUTPUT_DIR/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json" "$OUTPUT_DIR/PUBLIC_PWA_STATIC_ASSETS.generated.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+postdeploy_path = Path(sys.argv[1])
+output_path = Path(sys.argv[2])
+postdeploy = json.loads(postdeploy_path.read_text(encoding="utf-8"))
+children = postdeploy.get("childReceipts")
+pwa = children.get("pwaStatic") if isinstance(children, dict) else None
+if not isinstance(pwa, dict):
+    raise SystemExit("postdeploy receipt does not contain the PWA static child receipt")
+output_path.write_text(json.dumps(pwa, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
 
 python3 - "$OUTPUT_DIR" <<'PY'
 from __future__ import annotations

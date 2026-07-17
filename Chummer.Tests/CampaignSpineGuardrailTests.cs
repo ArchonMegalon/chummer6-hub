@@ -151,6 +151,34 @@ public sealed class CampaignSpineGuardrailTests
         Assert.Equal(nameof(CampaignConsequenceUpdateRequest.ReturnLoopAction), error.ParamName);
     }
 
+    [Theory]
+    [InlineData("heat")]
+    [InlineData("faction")]
+    [InlineData("contact")]
+    [InlineData("reputation")]
+    public void UpsertCampaignConsequenceDefaultsSharedWorkspaceReturnLoopRouteForGovernedReviewKinds(string kind)
+    {
+        using var fixture = new Fixture();
+
+        CampaignConsequenceProjection consequence = fixture.Service.UpsertCampaignConsequence(
+            fixture.User,
+            fixture.Workspace,
+            new CampaignConsequenceUpdateRequest(
+                Kind: kind,
+                State: "under_review",
+                Summary: $"{kind} remains attached to the governed return rail.",
+                ReturnLoopAction: null,
+                ReturnLoopRoute: null,
+                Note: null));
+
+        CampaignConsequenceReceipt routeReceipt = Assert.Single(
+            consequence.Receipts,
+            receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal));
+
+        Assert.Equal("/account/work", routeReceipt.ReceiptId);
+        Assert.Equal("Return-loop route: /account/work.", routeReceipt.Summary);
+    }
+
     [Fact]
     public void UpsertRunboardContinuityRejectsOversizedTurnLedgerSummary()
     {

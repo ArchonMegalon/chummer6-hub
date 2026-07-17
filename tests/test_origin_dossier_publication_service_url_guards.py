@@ -40,10 +40,21 @@ def test_origin_publication_service_provider_tokens_are_configurable() -> None:
     assert "OriginDossier:AudioProviderTokens" in source
     assert "CHUMMER_ORIGIN_VISUAL_PROVIDER_TOKENS" in source
     assert "OriginDossier:VisualProviderTokens" in source
+    assert "CHUMMER_ORIGIN_VISUAL_PREFERRED_PROVIDER_TOKENS" in source
+    assert "OriginDossier:VisualPreferredProviderTokens" in source
+    assert "CHUMMER_ORIGIN_PACKAGING_PROVIDER_TOKENS" in source
+    assert "OriginDossier:PackagingProviderTokens" in source
     assert "ResolveApprovedProviderTokens" in source
+    assert "ResolvePreferredProviderTokens" in source
     assert "ContainsTokenWithBoundary" in source
     assert "ReceiptProviderMatchesAnyToken" in source
     assert "provider.Contains(token, StringComparison.OrdinalIgnoreCase)" not in source
+
+
+def test_origin_publication_service_allows_chummer_publication_assembler_by_default() -> None:
+    source = SERVICE.read_text(encoding="utf-8")
+
+    assert "Chummer PublicationAssembler" in source
 
 
 def test_origin_publication_service_requires_canonical_watch_telegram_link() -> None:

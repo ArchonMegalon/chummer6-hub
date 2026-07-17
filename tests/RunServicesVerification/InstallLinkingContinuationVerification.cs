@@ -32,6 +32,7 @@ internal static class InstallLinkingContinuationVerification
         {
             string downloadsRoot = Path.Combine(tempRoot, "downloads");
             Directory.CreateDirectory(downloadsRoot);
+            string localReleaseProofPath = Path.Combine(tempRoot, "HUB_LOCAL_RELEASE_PROOF.generated.json");
             PublicReleaseArtifactDto currentArtifact = new(
                 Id: "avalonia-linux-x64-installer",
                 Platform: "linux",
@@ -52,7 +53,30 @@ internal static class InstallLinkingContinuationVerification
             File.WriteAllText(
                 Path.Combine(downloadsRoot, "releases.json"),
                 JsonSerializer.Serialize(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            File.WriteAllText(
+                localReleaseProofPath,
+                $$"""
+                {
+                  "contract_name": "chummer6-hub.local_release_proof",
+                  "status": "passed",
+                  "generated_at": "{{DateTimeOffset.UtcNow.ToString("O")}}",
+                  "proof_receipts": [
+                    {
+                      "receipt_id": "native-continuation-fixture",
+                      "package_id": "next90-m102-hub-desktop-native-trust",
+                      "summary": "Fixture proof that direct native continuation routes are present while final-gold truth still blocks parity claims.",
+                      "routes": [
+                        "/api/v1/install-linking/continuation",
+                        "/api/v1/install-linking/continuation/support",
+                        "/api/v1/install-linking/continuation/update",
+                        "/api/v1/install-linking/continuation/rollback"
+                      ]
+                    }
+                  ]
+                }
+                """);
             string readinessPath = Path.Combine(tempRoot, "FLAGSHIP_PRODUCT_READINESS.generated.json");
+            string finalGoldPath = Path.Combine(tempRoot, "FINAL_GOLD_JANITOR.generated.json");
             File.WriteAllText(
                 readinessPath,
                 """
@@ -68,6 +92,20 @@ internal static class InstallLinkingContinuationVerification
                   }
                 }
                 """);
+            File.WriteAllText(
+                finalGoldPath,
+                """
+                {
+                  "contract_name": "chummer.final_gold_janitor",
+                  "status": "fail",
+                  "verdict": "NOT_GOLD",
+                  "generated_at_utc": "2026-06-30T09:24:00Z",
+                  "failures": [
+                    "windows_installer_visual_audit failed",
+                    "release_ready failed"
+                  ]
+                }
+                """);
 
             IConfiguration configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
@@ -76,11 +114,16 @@ internal static class InstallLinkingContinuationVerification
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
                     ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
                     ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "false",
+                    ["CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE"] = localReleaseProofPath,
                     ["CHUMMER_PUBLIC_FLAGSHIP_READINESS_FILE"] = readinessPath,
+                    ["CHUMMER_PUBLIC_FINAL_GOLD_JANITOR_FILE"] = finalGoldPath,
                 })
                 .Build();
 
-            InstallLinkingStore installStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
+            InstallLinkingStore installStore = new(
+                configuration,
+                DataProtectionProvider.Create(Path.Combine(tempRoot, "install-linking-keys")),
+                NullLogger<InstallLinkingStore>.Instance);
             SeedClaimedInstall(installStore);
             InstallLinkingService installLinking = new(installStore, configuration);
             CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
@@ -340,7 +383,7 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.Equal("bounded_failure", response.RouteState, "Claimed desktop continuation should stay bounded when desktop readiness proof is not current even if a native route receipt exists.");
             VerificationAssert.True(response.RouteReceipt is not null, "Claimed desktop continuation should expose the governing native continuation route receipt.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", response.RouteReceipt!.MatchedRoute, "Claimed desktop continuation should cite the native continuation route receipt.");
-            VerificationAssert.True(response.BoundedFailureReason?.Contains("Current direct route receipt is attached, but parity claims stay review-required because desktop client coverage is still missing from the current flagship readiness proof", StringComparison.Ordinal) == true, "Claimed desktop continuation should explain why the route stays bounded after the current receipt is found.");
+            VerificationAssert.True(response.BoundedFailureReason?.Contains("Current direct route receipt is attached, but parity claims stay review-required because final release checks are still blocked by native Windows installer proof and release readiness checks", StringComparison.Ordinal) == true, "Claimed desktop continuation should explain why the route stays bounded after the current receipt is found.");
             VerificationAssert.True(response.FallbackPosture.Contains("Claim codes are a recovery fallback", StringComparison.Ordinal), "Continuation should expose fallback posture so desktop, support, and download surfaces agree.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation/update", response.NativePrimaryActionHref, "Claimed desktop continuation should send update-ready follow-through directly to the grant-bound native update planner.");
             VerificationAssert.True(!response.NativePrimaryActionHref.StartsWith("/account/", StringComparison.Ordinal), "Claimed desktop continuation primary action should not send the app through the account browser rail.");
@@ -453,7 +496,7 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.Equal("bounded_failure", nativeSupport.RouteState, "Native support continuation should stay bounded when desktop readiness proof is not current even if a native route receipt exists.");
             VerificationAssert.True(nativeSupport.RouteReceipt is not null, "Native support continuation should expose the governing native support route receipt.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation/support", nativeSupport.RouteReceipt!.MatchedRoute, "Native support continuation should cite the native support route receipt.");
-            VerificationAssert.True(nativeSupport.BoundedFailureReason?.Contains("desktop client coverage is still missing from the current flagship readiness proof", StringComparison.Ordinal) == true, "Native support continuation should explain why the route stays bounded after the current receipt is found.");
+            VerificationAssert.True(nativeSupport.BoundedFailureReason?.Contains("final release checks are still blocked by native Windows installer proof and release readiness checks", StringComparison.Ordinal) == true, "Native support continuation should explain why the route stays bounded after the current receipt is found.");
             VerificationAssert.True(nativeSupport.FallbackPosture.Contains("Claim codes are a recovery fallback", StringComparison.Ordinal), "Native support continuation should keep fallback posture available after filing support.");
             VerificationAssert.True(nativeSupport.UpdateAvailable, "Native support continuation should tell the app whether the claimed install still needs an update.");
             VerificationAssert.True(nativeSupport.UpdateAction.Contains("Update this linked install from preview 0.7.0-preview to preview 0.7.1-preview", StringComparison.Ordinal), "Native support continuation should keep update instructions on the claimed install rail after filing support.");
@@ -513,7 +556,7 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.Equal("bounded_failure", update.RouteState, "Native update should stay bounded when desktop readiness proof is not current even if a native route receipt exists.");
             VerificationAssert.True(update.RouteReceipt is not null, "Native update should expose the governing native update route receipt.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation/update", update.RouteReceipt!.MatchedRoute, "Native update should cite the native update route receipt.");
-            VerificationAssert.True(update.BoundedFailureReason?.Contains("desktop client coverage is still missing from the current flagship readiness proof", StringComparison.Ordinal) == true, "Native update should explain why the route stays bounded after the current receipt is found.");
+            VerificationAssert.True(update.BoundedFailureReason?.Contains("final release checks are still blocked by native Windows installer proof and release readiness checks", StringComparison.Ordinal) == true, "Native update should explain why the route stays bounded after the current receipt is found.");
             VerificationAssert.True(update.UpdateAvailable, "Native update should tell the app whether the claimed install is behind current release truth.");
             VerificationAssert.True(update.UpdatePlan.Contains("installed build receipt receipt-old", StringComparison.Ordinal), "Native update should tell the app which installed-build receipt anchors the update.");
             VerificationAssert.True(update.UpdatePlan.Contains("to preview 0.7.1-preview", StringComparison.Ordinal), "Native update should tell the app the target release without opening downloads.");
@@ -551,7 +594,7 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.Equal("bounded_failure", rollback.RouteState, "Native rollback should stay bounded when desktop readiness proof is not current even if a native route receipt exists.");
             VerificationAssert.True(rollback.RouteReceipt is not null, "Native rollback should expose the governing native rollback route receipt.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation/rollback", rollback.RouteReceipt!.MatchedRoute, "Native rollback should cite the native rollback route receipt.");
-            VerificationAssert.True(rollback.BoundedFailureReason?.Contains("desktop client coverage is still missing from the current flagship readiness proof", StringComparison.Ordinal) == true, "Native rollback should explain why the route stays bounded after the current receipt is found.");
+            VerificationAssert.True(rollback.BoundedFailureReason?.Contains("final release checks are still blocked by native Windows installer proof and release readiness checks", StringComparison.Ordinal) == true, "Native rollback should explain why the route stays bounded after the current receipt is found.");
             VerificationAssert.True(rollback.UpdateAvailable, "Native rollback should tell the app whether the claimed install is behind current release truth.");
             VerificationAssert.True(rollback.RollbackPlan.Contains("installed build receipt receipt-old", StringComparison.Ordinal), "Native rollback should tell the app which installed-build receipt anchors the rollback.");
             VerificationAssert.True(rollback.RollbackAction.Contains("previous installed copy", StringComparison.OrdinalIgnoreCase), "Native rollback should keep rollback on the previous installed copy.");

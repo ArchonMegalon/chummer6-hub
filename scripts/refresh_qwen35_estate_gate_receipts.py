@@ -107,7 +107,9 @@ GATE_SPECS: tuple[GateSpec, ...] = (
         repo_path=str(RUN_SERVICES_ROOT),
         next_action="Keep auth/account/install proofs current for public and signed-in route behavior.",
         commands=(
-            CommandSpec("python3 scripts/check-google-oauth-linking.py", str(RUN_SERVICES_ROOT)),
+            CommandSpec("python3 scripts/materialize_google_oauth_linking_operator_evidence_request.py --base-url https://chummer.run", str(RUN_SERVICES_ROOT)),
+            CommandSpec("python3 scripts/verify_google_oauth_linking_operator_evidence_request.py", str(RUN_SERVICES_ROOT)),
+            CommandSpec("python3 scripts/materialize_google_oauth_linking_proof.py --base-url https://chummer.run", str(RUN_SERVICES_ROOT)),
             CommandSpec("python3 scripts/check-support-case-flow.py", str(RUN_SERVICES_ROOT)),
             CommandSpec("python3 scripts/verify_install_aware_support_concierge.py", str(RUN_SERVICES_ROOT)),
         ),

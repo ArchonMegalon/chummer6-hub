@@ -825,7 +825,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             Summary: packages.Length == 0
                 ? $"{workspace.CampaignName} has no governed downtime or aftermath packages yet."
                 : $"{packages.Length} governed downtime and aftermath package(s) stay attached to the shared return path.",
-            ReturnLoopRoute: "/account/roster#aftermath-packages",
+            ReturnLoopRoute: "/account/work#aftermath-packages",
             ReturnLoopActions: returnLoopActions,
             Packages: packages,
             Consequences: consequences,
@@ -970,6 +970,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         string leadRecoveryHint = leadConflict?.RecoveryHint
             ?? leadRecoverableProvenance?.RecoveryHint
             ?? ResolveRestoreReceiptStatusFallbackRecoveryHint(scope);
+        bool entitlementSyncAccountAccessConflictReview = scope == RestoreReceiptStatusScope.EntitlementSync
+            && blockingConflictCount > 0
+            && string.Equals(leadConflict?.RecoveryRoute, "/account/access", StringComparison.Ordinal);
 
         string stalenessPosture = refreshBeforeContinueCount > 0
             ? "stale_or_drift_receipts_present"
@@ -981,7 +984,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             : conflictReceipts.Count > 0
                 ? "reviewable_conflicts_present"
                 : "no_active_conflicts";
-        string continuePosture = blockingConflictCount > 0
+        string continuePosture = entitlementSyncAccountAccessConflictReview
+            ? "review_before_continue"
+            : blockingConflictCount > 0
             ? "blocked_until_receipt_resolved"
             : refreshBeforeContinueCount > 0
                 ? "refresh_before_continue"
@@ -1465,7 +1470,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         string kind = NormalizeOptional(receipt.Kind) ?? string.Empty;
         return kind.Contains("claimed_installation", StringComparison.OrdinalIgnoreCase)
             ? "/account/access"
-            : "/account/roster";
+            : "/account/work";
     }
 
     private static string ResolveRestoreProvenanceRecoverySummary(WorkspaceRestoreProvenanceReceipt receipt)

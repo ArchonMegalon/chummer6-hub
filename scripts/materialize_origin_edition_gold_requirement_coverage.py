@@ -21,7 +21,7 @@ REQUIREMENTS: tuple[tuple[str, str, tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         "provider_story_and_humanizer_pipeline",
-        "Story/manuscript generation and Undetectable Humanizer post-step are proved",
+        "Full story generation is proved from the configured story-authoring lane (Subscribr preferred) and Undetectable Humanizer post-step is proved",
         ("story_generation_receipt", "provider_manuscript_file", "undetectable_humanizer_receipt", "humanizer_quality_receipt"),
         (),
     ),
@@ -33,7 +33,7 @@ REQUIREMENTS: tuple[tuple[str, str, tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         "cover_consistency_all_surfaces",
-        "Same rendered story-scene cover is used across Chummer, ebook, PDF, M4B, Audiobookshelf, and movie",
+        "Same fitted cover art is used across Chummer, ebook, PDF, M4B, Audiobookshelf, and movie",
         ("cover_generation_receipt", "cover_consistency_receipt", "cover_consistency_required_surfaces"),
         ("same_cover_sha_bound",),
     ),
@@ -57,7 +57,7 @@ REQUIREMENTS: tuple[tuple[str, str, tuple[str, ...], tuple[str, ...]], ...] = (
     ),
     (
         "movie_story_scene_playback",
-        "Chummer media hosts a real story-scene movie with selected-face cover and approved premium narration audio",
+        "Chummer media hosts one chosen chapter-scene movie with the runner visible, selected-face cover, and approved premium narration audio",
         ("movie_generation_receipt", "movie_artifact_file", "movie_artifact_namespace", "chummer_movie_story_scene_playback_verified"),
         ("chummer_movie_story_scene_playback_verified",),
     ),
@@ -72,6 +72,12 @@ REQUIREMENTS: tuple[tuple[str, str, tuple[str, ...], tuple[str, ...]], ...] = (
         "RunSite handoff constraints, newest LTD/env inspection, Rybbit env-only wiring, and no-deploy posture are proved",
         ("runsite_integration_proof", "runsite_handoff_constraints_verified"),
         ("runsite_handoff_constraints_verified",),
+    ),
+    (
+        "controlled_live_provider_pilot",
+        "A no-credit-burn MagicAI API handshake proves the shared EA render lane against a real live provider",
+        ("magicai_no_credit_burn_api_handshake",),
+        ("controlled_live_provider_pilot_verified",),
     ),
     (
         "telegram_origin_links",

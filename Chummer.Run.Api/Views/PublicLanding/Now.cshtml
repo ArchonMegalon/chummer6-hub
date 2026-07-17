@@ -1,6 +1,23 @@
 @model NowPageViewModel
 @{
-    ViewData["Title"] = "Current release";
+    var manifest = Model.Manifest;
+
+    static bool IsPublishedStableRelease(PublicReleaseManifestDto releaseManifest)
+    {
+        var stableLanePublished = string.Equals((releaseManifest.Channel ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((releaseManifest.Channel ?? string.Empty).Trim(), "stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((releaseManifest.Channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((releaseManifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase);
+        return stableLanePublished
+            && string.Equals((releaseManifest.SupportabilityState ?? string.Empty).Trim(), "gold_supported", StringComparison.OrdinalIgnoreCase)
+            && string.Equals((releaseManifest.Status ?? string.Empty).Trim(), "published", StringComparison.OrdinalIgnoreCase);
+    }
+
+    var isStableRelease = IsPublishedStableRelease(manifest);
+    var currentReleaseHeading = isStableRelease
+        ? "Current handoff"
+        : "Current release";
+    ViewData["Title"] = currentReleaseHeading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-now surface-minimal";
     var sourceAlias = Context?.Request?.Query["source"].ToString() ?? string.Empty;
@@ -53,8 +70,8 @@
 
 <section class="minimal-page-hero route-anchor-target" id="public-shipped-closeout">
     <div>
-        <p class="eyebrow">Current release</p>
-        <h1>Current release</h1>
+        <p class="eyebrow">@currentReleaseHeading</p>
+        <h1>@currentReleaseHeading</h1>
         <p>Use this page when you want the short answer before you install.</p>
         @if (fromChangelogAlias)
         {

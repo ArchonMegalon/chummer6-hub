@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -59,12 +60,8 @@ def parse_screenshot_report(path: Path) -> tuple[bool, list[str]]:
 
 
 def copy_route_proof(root: Path) -> Path | None:
-    source = ROUTE_PROOF_PATH
-    if LIVE_ROUTE_PROOF_PATH.is_file():
-        live_payload = read_json(LIVE_ROUTE_PROOF_PATH)
-        if route_proof_passes(live_payload) and str(live_payload.get("base_url") or "").strip().lower() == "https://chummer.run":
-            source = LIVE_ROUTE_PROOF_PATH
-    if not source.is_file():
+    source = select_route_proof_source()
+    if source is None or not source.is_file():
         return None
     target = root / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
     target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
@@ -90,6 +87,56 @@ def route_proof_passes(payload: dict) -> bool:
         if failed_count == 0 and isinstance(positive_proof_count, int) and positive_proof_count > 0:
             return True
     return False
+
+
+def route_proof_generated_at(payload: dict) -> datetime | None:
+    for key in ("generated_at_utc", "generatedAt", "generated_at"):
+        raw = str(payload.get(key) or "").strip()
+        if not raw:
+            continue
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(raw)
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+    return None
+
+
+def route_proof_is_canonical_public(payload: dict) -> bool:
+    return route_proof_passes(payload) and str(payload.get("base_url") or "").strip().lower() == "https://chummer.run"
+
+
+def select_route_proof_source() -> Path | None:
+    live_payload = local_payload = None
+
+    if LIVE_ROUTE_PROOF_PATH.is_file():
+        live_payload = read_json(LIVE_ROUTE_PROOF_PATH)
+    if ROUTE_PROOF_PATH.is_file():
+        local_payload = read_json(ROUTE_PROOF_PATH)
+
+    live_usable = bool(live_payload) and route_proof_is_canonical_public(live_payload)
+    local_usable = bool(local_payload) and route_proof_passes(local_payload)
+
+    if live_usable and local_usable:
+        local_canonical = route_proof_is_canonical_public(local_payload)
+        if local_canonical:
+            live_generated_at = route_proof_generated_at(live_payload)
+            local_generated_at = route_proof_generated_at(local_payload)
+            if live_generated_at and local_generated_at:
+                return ROUTE_PROOF_PATH if local_generated_at >= live_generated_at else LIVE_ROUTE_PROOF_PATH
+            if local_generated_at and not live_generated_at:
+                return ROUTE_PROOF_PATH
+        return LIVE_ROUTE_PROOF_PATH
+
+    if live_usable:
+        return LIVE_ROUTE_PROOF_PATH
+    if local_usable:
+        return ROUTE_PROOF_PATH
+    return None
 
 
 def main() -> int:

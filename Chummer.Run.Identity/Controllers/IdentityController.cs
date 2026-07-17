@@ -180,7 +180,7 @@ public sealed class IdentityController : ControllerBase
             return false;
         }
 
-        return string.Equals(supplied.ToString(), configuredKey, StringComparison.Ordinal);
+        return FixedTimeEquals(supplied.ToString(), configuredKey);
     }
 
     private ObjectResult? ValidateEmailitWebhookAuthorization()

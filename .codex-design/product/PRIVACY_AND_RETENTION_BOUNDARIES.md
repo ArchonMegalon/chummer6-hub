@@ -80,6 +80,29 @@ Redaction baseline:
 * no character names, campaign names, notes, free text, or full custom-data blobs in the default hosted telemetry plane
 * install-linked telemetry is opt-out by default, pseudonymous by default, and must not be repurposed as a marketing profile
 
+### Hosted Build workspaces
+
+Owner: `chummer-presentation`
+
+Current runtime behavior:
+
+* hosted workspace content is stored and served inside an owner-scoped boundary
+* deleting a hosted workspace removes its active row from the serving store, so that workspace no longer appears in the owner's hosted workspace list
+* deleting the active row is not a permanent-deletion guarantee and does not describe copies that may exist outside the serving store
+
+Retention posture:
+
+* the backup and point-in-time-recovery retention policy is unresolved and has no approved numeric public window
+* tombstone or lineage retention, restore-time deletion replay, and whole-account export and erasure policy are unresolved
+* restore-time deletion replay is not implemented, so the product must not claim that a deleted workspace cannot reappear after recovery from older data
+* launch and release posture remains `review_required` until these policies are approved, implemented, and proven by restore and erasure evidence
+
+Redaction baseline:
+
+* workspace content must remain owner-scoped and must not be copied into support, telemetry, or operator logs by default
+* deletion copy must distinguish removal from the active hosted serving store from backup retention and from files the user already downloaded
+* public and in-product copy must not promise permanent deletion or invent a retention window while the policy is unresolved
+
 ### Survey and follow-up results
 
 Owner: `chummer6-hub`
@@ -166,10 +189,12 @@ Redaction baseline:
 * `fleet` owns limited maintainer incident and publish-history evidence, not the whole-user record
 * `executive-assistant` owns route-steering logs and answer summaries, not public or support system-of-record semantics
 * `chummer6-media-factory` owns render records, preview supersession, and revoked file handling
+* `chummer-presentation` owns Hosted Build workspace serving-store behavior and must keep its retention, recovery, tombstone, deletion-replay, and account-erasure posture explicit
 
 ## Release and audit gates
 
 * a surface that persists passwords, raw outside-service logs, or undefined retention windows fails release signoff
 * a new help or outside-service integration must declare redaction and retention posture before it can be promoted
 * product review may freeze a wave when retention or privacy posture drifts behind shipped user trust claims
+* Hosted Build remains `review_required` for launch and release while backup/PITR retention, tombstone or lineage retention, deletion replay, and whole-account erasure remain unresolved or unproven
 * any new contribution, Teable, Emailit, Signitic, ProductLift, Icanpreneur, Hedy, Nonverbia, Unmixr, or Deftform workflow must declare contribution class, visibility class, redaction posture, and delete-or-summarize rule before promotion

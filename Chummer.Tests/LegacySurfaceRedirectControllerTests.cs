@@ -55,19 +55,39 @@ public sealed class LegacySurfaceRedirectControllerTests
     }
 
     [Fact]
-    public async Task AppRouteProxiesToBlazorCharacterRoster()
+    public async Task AppRouteRedirectsBrowserGetsToHostedBlazorCharacterRoster()
     {
-        var handler = new RecordingHandler(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-        {
-            Content = new StringContent("<html><body>roster</body></html>")
-        });
-        var controller = CreateBrowserController(new StaticHttpClientFactory(new HttpClient(handler)));
+        var controller = CreateBrowserController(new StaticHttpClientFactory(new HttpClient(new RecordingHandler(
+            new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent("<html><body>roster</body></html>")
+            }))));
         controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?command=character_roster");
 
         IActionResult result = await controller.App(path: null, CancellationToken.None);
 
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/blazor/app?command=character_roster", redirect.Url);
+    }
+
+    [Fact]
+    public async Task AppRouteStillProxiesNonGetRequestsToHostedBlazorApp()
+    {
+        var handler = new RecordingHandler(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"connectionId\":\"abc\"}")
+        });
+        var controller = CreateBrowserController(new StaticHttpClientFactory(new HttpClient(handler)));
+        controller.ControllerContext.HttpContext.Request.Method = HttpMethods.Post;
+        controller.ControllerContext.HttpContext.Request.ContentType = "text/plain;charset=UTF-8";
+        controller.ControllerContext.HttpContext.Request.Body = new MemoryStream(Array.Empty<byte>());
+        controller.ControllerContext.HttpContext.Request.QueryString = new QueryString("?negotiateVersion=1");
+
+        IActionResult result = await controller.App(path: "_blazor/negotiate", CancellationToken.None);
+
         Assert.IsType<EmptyResult>(result);
-        Assert.Equal("https://browser.example/blazor/app/?command=character_roster", handler.RequestUri?.ToString());
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("https://browser.example/blazor/app/_blazor/negotiate?negotiateVersion=1", handler.RequestUri?.ToString());
     }
 
     [Fact]

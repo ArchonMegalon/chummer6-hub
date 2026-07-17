@@ -360,10 +360,13 @@ public sealed class InstallLinkedWorkspaceSnapshotTests
                 })
                 .Build();
 
-            InstallStore = new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance);
+            IDataProtectionProvider dataProtection = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
+            InstallStore = new InstallLinkingStore(
+                Configuration,
+                dataProtection,
+                NullLogger<InstallLinkingStore>.Instance);
             InstallLinking = new InstallLinkingService(InstallStore, Configuration);
             Workspaces = new InstallLinkedWorkspaceSnapshotService(new InstallLinkedWorkspaceSnapshotStore(Configuration));
-            IDataProtectionProvider dataProtection = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
             Controller = new InstallLinkingController(
                 identity: new HubIdentityClient(new HttpClient(), Configuration),
                 accounts: new AccountService(new CommunityStore(Configuration, NullLogger<CommunityStore>.Instance)),

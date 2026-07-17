@@ -52,6 +52,10 @@ public sealed class IdentityAccessService : IIdentityAccessService
         public required DateTimeOffset ExpiresAtUtc { get; init; }
     }
 
+    private sealed record EmailStartAttemptState(
+        string Email,
+        DateTimeOffset OccurredAtUtc);
+
     private sealed record IdentitySnapshot(
         IReadOnlyList<IdentitySubjectSnapshot> Subjects,
         IReadOnlyList<IdentitySessionSnapshot> Sessions,
@@ -87,8 +91,11 @@ public sealed class IdentityAccessService : IIdentityAccessService
     private readonly Dictionary<string, SubjectState> _subjects = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SessionState> _sessionsByAccessTokenHash = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EmailTicketState> _emailTicketsByHash = new(StringComparer.Ordinal);
+    private readonly List<EmailStartAttemptState> _recentEmailStartAttempts = new();
     private readonly object _mutate = new();
+    private readonly IConfiguration _configuration;
     private readonly string _storagePath;
+    private readonly string _emailStartPauseFlagPath;
     private readonly ILogger<IdentityAccessService> _logger;
     private readonly IIdentityEmailDeliveryService _emailDelivery;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
@@ -112,9 +119,11 @@ public sealed class IdentityAccessService : IIdentityAccessService
 
     public IdentityAccessService(IConfiguration configuration, ILogger<IdentityAccessService> logger, IIdentityEmailDeliveryService emailDelivery)
     {
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _logger = logger ?? NullLogger<IdentityAccessService>.Instance;
         _emailDelivery = emailDelivery;
         _storagePath = ResolveStoragePath(configuration);
+        _emailStartPauseFlagPath = ResolveEmailStartPauseFlagPath(configuration, _storagePath);
         LoadSnapshot();
     }
 
@@ -148,6 +157,45 @@ public sealed class IdentityAccessService : IIdentityAccessService
         lock (_mutate)
         {
             PurgeExpiredTicketsLocked();
+            PurgeExpiredEmailStartAttemptsLocked(now);
+            if (TryGetEmailStartPauseReason(out var pausePreviewNote))
+            {
+                _logger.LogWarning(
+                    "Identity email start blocked for {Email}: paused by {PauseFlagPath}.",
+                    email,
+                    _emailStartPauseFlagPath);
+                _emailDelivery.RecordStartGuardrailBlock(email, "email_start_paused", pausePreviewNote);
+                return BuildRejectedEmailStartResponse(
+                    subjectId,
+                    email,
+                    displayName,
+                    nextPath,
+                    now,
+                    deliveryMode: "email_start_paused",
+                    previewNote: pausePreviewNote);
+            }
+
+            if (!IsEmailStartEnabled())
+            {
+                const string disabledPreviewNote = "Email sign-in is disabled on this host.";
+                _logger.LogWarning("Identity email start blocked for {Email}: disabled by IDENTITY_EMAIL_START_ENABLED.", email);
+                _emailDelivery.RecordStartGuardrailBlock(email, "email_start_disabled", disabledPreviewNote);
+                return BuildRejectedEmailStartResponse(
+                    subjectId,
+                    email,
+                    displayName,
+                    nextPath,
+                    now,
+                    deliveryMode: "email_start_disabled",
+                    previewNote: disabledPreviewNote);
+            }
+
+            if (TryBuildEmailStartThrottleResponseLocked(email, displayName, subjectId, nextPath, now, out var blockedResponse))
+            {
+                return blockedResponse;
+            }
+
+            _recentEmailStartAttempts.Add(new EmailStartAttemptState(email, now));
             EnsureSubjectLocked(subjectId, displayName, email, new[] { "player" }, now);
             var ticketId = $"eml_{Guid.NewGuid():N}";
             var ticket = new EmailTicketState
@@ -568,6 +616,23 @@ public sealed class IdentityAccessService : IIdentityAccessService
         return Path.Combine(ResolveDefaultStateRoot(configuration), "identity", "identity-store.json");
     }
 
+    private static string ResolveEmailStartPauseFlagPath(IConfiguration configuration, string storagePath)
+    {
+        var configured = configuration["CHUMMER_AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG"]?.Trim();
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return Path.GetFullPath(configured);
+        }
+
+        var storageDirectory = Path.GetDirectoryName(storagePath);
+        if (!string.IsNullOrWhiteSpace(storageDirectory))
+        {
+            return Path.Combine(storageDirectory, "auth_signin_automation_paused.flag");
+        }
+
+        return Path.Combine(ResolveDefaultStateRoot(configuration), "identity", "auth_signin_automation_paused.flag");
+    }
+
     private static string ResolveDefaultStateRoot(IConfiguration configuration)
     {
         var configuredStateRoot = configuration["CHUMMER_IDENTITY_STATE_ROOT"]?.Trim()
@@ -634,6 +699,152 @@ public sealed class IdentityAccessService : IIdentityAccessService
         return $"sha256:{Convert.ToHexString(bytes).ToLowerInvariant()}";
     }
 
+    private bool TryGetEmailStartPauseReason(out string previewNote)
+    {
+        previewNote = string.Empty;
+
+        try
+        {
+            if (!File.Exists(_emailStartPauseFlagPath))
+            {
+                return false;
+            }
+
+            previewNote = NormalizeOptional(File.ReadAllText(_emailStartPauseFlagPath))
+                          ?? "Email sign-in is paused on this host.";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Identity email start pause flag at {PauseFlagPath} could not be read; failing closed.",
+                _emailStartPauseFlagPath);
+            previewNote = "Email sign-in is paused on this host.";
+            return true;
+        }
+    }
+
+    private bool IsEmailStartEnabled()
+        => ResolveBool(_configuration["IDENTITY_EMAIL_START_ENABLED"], defaultValue: false);
+
+    private void PurgeExpiredEmailStartAttemptsLocked(DateTimeOffset now)
+    {
+        var retentionSeconds = Math.Max(
+            ResolvePositiveInt(_configuration["IDENTITY_EMAIL_START_WINDOW_SECONDS"], defaultValue: 900),
+            ResolveNonNegativeInt(_configuration["IDENTITY_EMAIL_START_MIN_SECONDS_BETWEEN_RECIPIENT_ATTEMPTS"], defaultValue: 120));
+        var cutoff = now.AddSeconds(-Math.Max(retentionSeconds, 60));
+        _recentEmailStartAttempts.RemoveAll(attempt => attempt.OccurredAtUtc < cutoff);
+    }
+
+    private bool TryBuildEmailStartThrottleResponseLocked(
+        string email,
+        string displayName,
+        string subjectId,
+        string? nextPath,
+        DateTimeOffset now,
+        out EmailAuthStartResponse response)
+    {
+        var windowSeconds = ResolvePositiveInt(_configuration["IDENTITY_EMAIL_START_WINDOW_SECONDS"], defaultValue: 900);
+        var globalLimit = ResolveNonNegativeInt(_configuration["IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_WINDOW"], defaultValue: 60);
+        var recipientLimit = ResolvePositiveInt(_configuration["IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_RECIPIENT_PER_WINDOW"], defaultValue: 3);
+        var recipientCooldownSeconds = ResolveNonNegativeInt(_configuration["IDENTITY_EMAIL_START_MIN_SECONDS_BETWEEN_RECIPIENT_ATTEMPTS"], defaultValue: 120);
+        var windowStart = now.AddSeconds(-windowSeconds);
+
+        var globalAttempts = _recentEmailStartAttempts.Count(attempt => attempt.OccurredAtUtc >= windowStart);
+        if (globalLimit > 0 && globalAttempts >= globalLimit)
+        {
+            const string previewNote = "Email sign-in is temporarily rate-limited on this host. Try again later.";
+            _logger.LogWarning(
+                "Identity email start blocked for {Email}: global limit {AttemptCount}/{Limit} in {WindowSeconds}s.",
+                email,
+                globalAttempts,
+                globalLimit,
+                windowSeconds);
+            _emailDelivery.RecordStartGuardrailBlock(email, "email_start_rate_limited", previewNote);
+            response = BuildRejectedEmailStartResponse(
+                subjectId,
+                email,
+                displayName,
+                nextPath,
+                now,
+                deliveryMode: "email_start_rate_limited",
+                previewNote: previewNote);
+            return true;
+        }
+
+        var recipientAttempts = _recentEmailStartAttempts
+            .Where(attempt => string.Equals(attempt.Email, email, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(attempt => attempt.OccurredAtUtc)
+            .ToArray();
+        if (recipientCooldownSeconds > 0 && recipientAttempts.Length > 0)
+        {
+            var earliestNextAttemptAt = recipientAttempts[0].OccurredAtUtc.AddSeconds(recipientCooldownSeconds);
+            if (earliestNextAttemptAt > now)
+            {
+                const string previewNote = "Email sign-in is cooling down for this address. Wait before requesting another link.";
+                _logger.LogWarning(
+                    "Identity email start blocked for {Email}: recipient cooldown active until {NextAttemptAtUtc:O}.",
+                    email,
+                    earliestNextAttemptAt);
+                _emailDelivery.RecordStartGuardrailBlock(email, "email_start_rate_limited", previewNote);
+                response = BuildRejectedEmailStartResponse(
+                    subjectId,
+                    email,
+                    displayName,
+                    nextPath,
+                    now,
+                    deliveryMode: "email_start_rate_limited",
+                    previewNote: previewNote);
+                return true;
+            }
+        }
+
+        var recentRecipientAttempts = recipientAttempts.Count(attempt => attempt.OccurredAtUtc >= windowStart);
+        if (recipientLimit > 0 && recentRecipientAttempts >= recipientLimit)
+        {
+            const string previewNote = "Email sign-in has reached the retry limit for this address. Try again later.";
+            _logger.LogWarning(
+                "Identity email start blocked for {Email}: recipient limit {AttemptCount}/{Limit} in {WindowSeconds}s.",
+                email,
+                recentRecipientAttempts,
+                recipientLimit,
+                windowSeconds);
+            _emailDelivery.RecordStartGuardrailBlock(email, "email_start_rate_limited", previewNote);
+            response = BuildRejectedEmailStartResponse(
+                subjectId,
+                email,
+                displayName,
+                nextPath,
+                now,
+                deliveryMode: "email_start_rate_limited",
+                previewNote: previewNote);
+            return true;
+        }
+
+        response = default!;
+        return false;
+    }
+
+    private static EmailAuthStartResponse BuildRejectedEmailStartResponse(
+        string subjectId,
+        string email,
+        string displayName,
+        string? nextPath,
+        DateTimeOffset now,
+        string deliveryMode,
+        string previewNote)
+        => new(
+            TicketId: string.Empty,
+            SubjectId: subjectId,
+            Email: email,
+            DisplayName: displayName,
+            NextPath: nextPath,
+            CreatedAtUtc: now,
+            ExpiresAtUtc: now,
+            DeliveryMode: deliveryMode,
+            PreviewNote: previewNote);
+
     private static bool IsInlinePreviewDelivery(string deliveryMode)
         => string.Equals(deliveryMode, "preview_inline_link", StringComparison.OrdinalIgnoreCase);
 
@@ -672,6 +883,15 @@ public sealed class IdentityAccessService : IIdentityAccessService
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static bool ResolveBool(string? value, bool defaultValue)
+        => bool.TryParse(value, out var parsed) ? parsed : defaultValue;
+
+    private static int ResolvePositiveInt(string? value, int defaultValue)
+        => int.TryParse(value, out var parsed) && parsed > 0 ? parsed : defaultValue;
+
+    private static int ResolveNonNegativeInt(string? value, int defaultValue)
+        => int.TryParse(value, out var parsed) && parsed >= 0 ? parsed : defaultValue;
 
     private static string BuildToken(string subjectId, string tokenType)
     {

@@ -32,6 +32,14 @@ verify_public_edge_deploy_source() {
   python3 scripts/verify_public_edge_deploy_source.py "${gate_args[@]}"
 }
 
+verify_public_edge_deploy_preflight() {
+  if [[ "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" == "0" || "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" == "false" || "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" == "FALSE" ]]; then
+    return 0
+  fi
+
+  python3 scripts/check_public_edge_deploy_preflight.py
+}
+
 for ((iter = 1; iter <= MAX_ITERS; iter++)); do
   echo "===== migration slice iteration ${iter}/${MAX_ITERS} ====="
 

@@ -15,8 +15,35 @@ if ! mkdir -p "$TMP_ROOT" 2>/dev/null || [[ ! -w "$TMP_ROOT" ]]; then
 fi
 TMP_DIR="$(mktemp -d "${TMP_ROOT}/run-services-restore-drill.XXXXXX")"
 trap 'rm -rf "$TMP_DIR"' EXIT
+TEST_BIN="Chummer.Tests/bin/Debug/net10.0"
 
-"$script_dir/build_r1_cleanroom.sh" >/dev/null
+resolve_artifact() {
+  local label="$1"
+  shift
+  local candidate
+  for candidate in "$@"; do
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  echo "missing artifact for ${label}" >&2
+  return 1
+}
+
+copy_artifact() {
+  local label="$1"
+  local output_name="$2"
+  shift 2
+  local source_path
+  source_path="$(resolve_artifact "$label" "$@")" || return 1
+  cp "$source_path" "${TMP_DIR}/${output_name}"
+}
+
+if [[ "${CHUMMER_SKIP_CLEANROOM_BUILD:-0}" != "1" ]]; then
+  "$script_dir/build_r1_cleanroom.sh" >/dev/null
+fi
 
 for required_artifact in \
   "Chummer.Play.Contracts/bin/Debug/net10.0/Chummer.Play.Contracts.dll" \
@@ -26,13 +53,19 @@ for required_artifact in \
   "Chummer.Run.Contracts/bin/Debug/net10.0/Chummer.Run.Contracts.dll"
 do
   if [[ ! -f "$required_artifact" ]]; then
-    echo "skip restore drill: repository slice does not include required local run-services artifacts"
-    exit 0
+    echo "restore drill blocked: required artifact is missing: ${required_artifact}" >&2
+    exit 1
   fi
 done
 
 SDK_VERSION="$(dotnet --version)"
 DOTNET_ROOT="$(dirname "$(readlink -f "$(command -v dotnet)")")"
+if [[ ! -d "${DOTNET_ROOT}/packs" || ! -d "${DOTNET_ROOT}/sdk/${SDK_VERSION}" ]]; then
+  DOTNET_BASE_PATH="$(dotnet --info | awk -F': *' '/Base Path:/{print $2; exit}')"
+  if [[ -n "$DOTNET_BASE_PATH" ]]; then
+    DOTNET_ROOT="$(dirname "$(dirname "${DOTNET_BASE_PATH%/}")")"
+  fi
+fi
 CSC_DLL="${DOTNET_ROOT}/sdk/${SDK_VERSION}/Roslyn/bincore/csc.dll"
 NETCORE_REF_DIR="$(find "${DOTNET_ROOT}/packs/Microsoft.NETCore.App.Ref" -path '*/ref/net10.0' -type d | sort | tail -n 1)"
 ASPNET_REF_DIR="$(find "${DOTNET_ROOT}/packs/Microsoft.AspNetCore.App.Ref" -path '*/ref/net10.0' -type d | sort | tail -n 1)"
@@ -47,16 +80,36 @@ if [[ ! -f "$CSC_DLL" || -z "$NETCORE_REF_DIR" || -z "$ASPNET_REF_DIR" || -z "$N
   exit 1
 fi
 
-cp Chummer.Play.Contracts/bin/Debug/net10.0/Chummer.Play.Contracts.dll "$TMP_DIR/"
-cp Chummer.Campaign.Contracts/bin/Debug/net10.0/Chummer.Campaign.Contracts.dll "$TMP_DIR/"
-cp Chummer.Control.Contracts/bin/Debug/net10.0/Chummer.Control.Contracts.dll "$TMP_DIR/"
-cp ../chummer-core-engine/Chummer.Contracts/bin/Debug/net10.0/Chummer.Engine.Contracts.dll "$TMP_DIR/"
-cp ../chummer-hub-registry/Chummer.Hub.Registry.Contracts/bin/Debug/net10.0/Chummer.Hub.Registry.Contracts.dll "$TMP_DIR/"
-cp ../chummer-hub-registry/Chummer.Run.Registry/bin/Debug/net10.0/Chummer.Run.Registry.dll "$TMP_DIR/"
-cp ../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/bin/Debug/net10.0/Chummer.Media.Contracts.dll "$TMP_DIR/"
-cp ../../fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime/bin/Debug/net10.0/Chummer.Media.Factory.Runtime.dll "$TMP_DIR/"
-cp Chummer.Run.AI/bin/Debug/net10.0/Chummer.Run.AI.dll "$TMP_DIR/"
-cp Chummer.Run.Contracts/bin/Debug/net10.0/Chummer.Run.Contracts.dll "$TMP_DIR/"
+copy_artifact "Chummer.Play.Contracts" "Chummer.Play.Contracts.dll" \
+  "Chummer.Play.Contracts/bin/Debug/net10.0/Chummer.Play.Contracts.dll" \
+  "${TEST_BIN}/Chummer.Play.Contracts.dll"
+copy_artifact "Chummer.Campaign.Contracts" "Chummer.Campaign.Contracts.dll" \
+  "Chummer.Campaign.Contracts/bin/Debug/net10.0/Chummer.Campaign.Contracts.dll" \
+  "${TEST_BIN}/Chummer.Campaign.Contracts.dll"
+copy_artifact "Chummer.Control.Contracts" "Chummer.Control.Contracts.dll" \
+  "Chummer.Control.Contracts/bin/Debug/net10.0/Chummer.Control.Contracts.dll" \
+  "${TEST_BIN}/Chummer.Control.Contracts.dll"
+copy_artifact "Chummer.Engine.Contracts" "Chummer.Engine.Contracts.dll" \
+  "../chummer-core-engine/Chummer.Contracts/bin/Debug/net10.0/Chummer.Engine.Contracts.dll" \
+  "${TEST_BIN}/Chummer.Engine.Contracts.dll"
+copy_artifact "Chummer.Hub.Registry.Contracts" "Chummer.Hub.Registry.Contracts.dll" \
+  "../chummer-hub-registry/Chummer.Hub.Registry.Contracts/bin/Debug/net10.0/Chummer.Hub.Registry.Contracts.dll" \
+  "${TEST_BIN}/Chummer.Hub.Registry.Contracts.dll"
+copy_artifact "Chummer.Run.Registry" "Chummer.Run.Registry.dll" \
+  "../chummer-hub-registry/Chummer.Run.Registry/bin/Debug/net10.0/Chummer.Run.Registry.dll" \
+  "${TEST_BIN}/Chummer.Run.Registry.dll"
+copy_artifact "Chummer.Media.Contracts" "Chummer.Media.Contracts.dll" \
+  "../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/bin/Debug/net10.0/Chummer.Media.Contracts.dll" \
+  "${TEST_BIN}/Chummer.Media.Contracts.dll"
+copy_artifact "Chummer.Media.Factory.Runtime" "Chummer.Media.Factory.Runtime.dll" \
+  "../../fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime/bin/Debug/net10.0/Chummer.Media.Factory.Runtime.dll" \
+  "${TEST_BIN}/Chummer.Media.Factory.Runtime.dll"
+copy_artifact "Chummer.Run.AI" "Chummer.Run.AI.dll" \
+  "Chummer.Run.AI/bin/Debug/net10.0/Chummer.Run.AI.dll" \
+  "${TEST_BIN}/Chummer.Run.AI.dll"
+copy_artifact "Chummer.Run.Contracts" "Chummer.Run.Contracts.dll" \
+  "Chummer.Run.Contracts/bin/Debug/net10.0/Chummer.Run.Contracts.dll" \
+  "${TEST_BIN}/Chummer.Run.Contracts.dll"
 
 cat > "$PROGRAM_FILE" <<'EOF'
 using RunServicesVerification;

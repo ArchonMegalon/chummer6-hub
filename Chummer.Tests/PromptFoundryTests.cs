@@ -44,6 +44,18 @@ public sealed class PromptFoundryTests
         Assert.Equal("pass", draft.PrivacyScanStatus);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ProviderVerificationReportsOnlyVerifiedMcpConnections(bool mcpVerified)
+    {
+        TestPromptFoundryContext ctx = CreateContext(mcpVerified);
+
+        PromptArchitectsProviderVerificationProjection provider = ctx.Service.BuildProviderVerification();
+
+        Assert.Equal(mcpVerified, provider.McpConnectionClaimed);
+    }
+
     [Fact]
     public void TemplateSeedEnhancementProducesDiffAndPromptUnitsWithoutRenderUnits()
     {
@@ -173,7 +185,7 @@ public sealed class PromptFoundryTests
         Assert.Equal(nameof(PromptFoundryEditDraftRequest.EnhancedPrompt), error.ParamName);
     }
 
-    private static TestPromptFoundryContext CreateContext()
+    private static TestPromptFoundryContext CreateContext(bool mcpVerified = false)
     {
         string root = Path.Combine(Path.GetTempPath(), "chummer-prompt-foundry-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -185,7 +197,7 @@ public sealed class PromptFoundryTests
                 ["PROMPT_ARCHITECTS_TIER4_VERIFIED"] = "true",
                 ["PROMPT_ARCHITECTS_EXPORT_AVAILABLE"] = "true",
                 ["PROMPT_ARCHITECTS_API_AVAILABLE"] = "false",
-                ["PROMPT_ARCHITECTS_MCP_VERIFIED"] = "false",
+                ["PROMPT_ARCHITECTS_MCP_VERIFIED"] = mcpVerified.ToString(),
                 ["PROMPT_ARCHITECTS_DATA_RETENTION_REVIEWED"] = "false"
             })
             .Build();

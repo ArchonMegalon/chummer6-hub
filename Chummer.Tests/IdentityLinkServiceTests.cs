@@ -2,6 +2,7 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Threading;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -348,6 +349,46 @@ public sealed class IdentityLinkServiceTests
             accounts.EnsureUserWithStatus("subject.empty.runner", "Runner Prime", "runner@example.com");
 
             Assert.Throws<ArgumentException>(() => links.GetChannelDeepLink("subject.empty.runner", "whatsapp_official_business", null));
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
+    public void LinkExternalIdentity_DoesNotRewriteStoreWhenExistingGoogleLinkIsUnchanged()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            string storePath = Path.Combine(tempRoot, "community-store.json");
+            CommunityStore store = new(BuildConfiguration(tempRoot), NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            IdentityLinkService links = new(store, accounts);
+            accounts.EnsureUserWithStatus("subject.google.runner", "Runner Prime", "runner@example.com");
+
+            LinkedIdentityDto first = links.LinkExternalIdentity(new LinkExternalIdentityRequest(
+                "subject.google.runner",
+                "google",
+                "google-subject-1",
+                "runner@example.com",
+                true));
+            DateTime firstWrite = File.GetLastWriteTimeUtc(storePath);
+
+            Thread.Sleep(1100);
+
+            LinkedIdentityDto second = links.LinkExternalIdentity(new LinkExternalIdentityRequest(
+                "subject.google.runner",
+                "google",
+                "google-subject-1",
+                "runner@example.com",
+                true));
+            DateTime secondWrite = File.GetLastWriteTimeUtc(storePath);
+
+            Assert.Equal(first.IdentityLinkId, second.IdentityLinkId);
+            Assert.Equal(first.UpdatedAtUtc, second.UpdatedAtUtc);
+            Assert.Equal(firstWrite, secondWrite);
         }
         finally
         {

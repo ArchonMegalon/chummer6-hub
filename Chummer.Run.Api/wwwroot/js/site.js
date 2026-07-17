@@ -1,5 +1,6 @@
 (() => {
   const ChummerUi = window.ChummerUi || (window.ChummerUi = {});
+  const modalInertState = new WeakMap();
 
   ChummerUi.getAntiForgeryToken = function getAntiForgeryToken(root = document) {
     return root.querySelector("input[name='__RequestVerificationToken']")?.value || "";
@@ -16,11 +17,19 @@
     }
 
     button.disabled = busy;
+    if (busy) {
+      button.setAttribute("aria-busy", "true");
+    } else {
+      button.removeAttribute("aria-busy");
+    }
     button.textContent = busy ? busyLabel : button.dataset.defaultLabel;
   };
 
   ChummerUi.setNotice = function setNotice(node, message, isError = false) {
     if (!node) return;
+    node.setAttribute("role", isError ? "alert" : "status");
+    node.setAttribute("aria-live", isError ? "assertive" : "polite");
+    node.setAttribute("aria-atomic", "true");
     node.hidden = false;
     node.textContent = message;
     node.classList.toggle("status-copy--error", isError);
@@ -146,6 +155,183 @@
     }
   };
 
+  ChummerUi.bindModalDialog = function bindModalDialog(dialog, options = {}) {
+    if (!(dialog instanceof HTMLElement)) return null;
+
+    const openButtons = Array.from(options.openButtons || []).filter((node) => node instanceof HTMLElement);
+    const closeButtons = Array.from(options.closeButtons || []).filter((node) => node instanceof HTMLElement);
+    const focusableSelector = [
+      "a[href]",
+      "button:not([disabled])",
+      "input:not([disabled]):not([type='hidden'])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[contenteditable]:not([contenteditable='false'])",
+      "[tabindex]:not([tabindex='-1'])"
+    ].join(",");
+    let returnFocus = null;
+    let focusFrame = 0;
+    const inertedBackground = new Set();
+
+    const makeBackgroundInert = () => {
+      let branch = dialog;
+      while (branch instanceof HTMLElement && branch !== document.body) {
+        const parent = branch.parentElement;
+        if (!(parent instanceof HTMLElement)) break;
+
+        for (const sibling of parent.children) {
+          if (!(sibling instanceof HTMLElement) || sibling === branch || inertedBackground.has(sibling)) continue;
+          let state = modalInertState.get(sibling);
+          if (!state) {
+            state = { count: 0, wasInert: sibling.inert };
+            modalInertState.set(sibling, state);
+          }
+          state.count += 1;
+          sibling.inert = true;
+          inertedBackground.add(sibling);
+        }
+
+        branch = parent;
+      }
+    };
+
+    const restoreBackground = () => {
+      for (const node of inertedBackground) {
+        const state = modalInertState.get(node);
+        if (!state) continue;
+        state.count -= 1;
+        if (state.count <= 0) {
+          node.inert = state.wasInert;
+          modalInertState.delete(node);
+        }
+      }
+      inertedBackground.clear();
+    };
+
+    const isFocusable = (node) =>
+      node instanceof HTMLElement
+      && node.tabIndex >= 0
+      && !node.hidden
+      && node.getAttribute("aria-hidden") !== "true"
+      && node.getClientRects().length > 0;
+
+    const focusableNodes = () =>
+      Array.from(dialog.querySelectorAll(focusableSelector)).filter(isFocusable);
+
+    const preferredFocus = () => {
+      if (options.initialFocus instanceof HTMLElement && dialog.contains(options.initialFocus)) {
+        return options.initialFocus;
+      }
+      if (typeof options.initialFocus === "string") {
+        const configured = dialog.querySelector(options.initialFocus);
+        if (isFocusable(configured)) return configured;
+      }
+      return focusableNodes()[0] || null;
+    };
+
+    const scheduleFocus = (resolveTarget) => {
+      if (focusFrame) window.cancelAnimationFrame(focusFrame);
+      focusFrame = window.requestAnimationFrame(() => {
+        focusFrame = 0;
+        const target = resolveTarget();
+        if (target instanceof HTMLElement && target.isConnected) {
+          target.focus();
+        }
+      });
+    };
+
+    const syncBodyLock = () => {
+      const hasOpenModal = document.querySelector('[role="dialog"][aria-modal="true"]:not([hidden])');
+      document.body.classList.toggle("dialog-open", Boolean(hasOpenModal));
+    };
+
+    const open = (trigger) => {
+      const active = trigger instanceof HTMLElement ? trigger : document.activeElement;
+      returnFocus = active instanceof HTMLElement ? active : null;
+      dialog.hidden = false;
+      makeBackgroundInert();
+      syncBodyLock();
+      scheduleFocus(() => preferredFocus() || dialog);
+    };
+
+    const close = () => {
+      if (dialog.hidden) return;
+      const focusTarget = returnFocus;
+      returnFocus = null;
+      dialog.hidden = true;
+      restoreBackground();
+      syncBodyLock();
+      scheduleFocus(() => focusTarget);
+    };
+
+    const handleKeydown = (event) => {
+      if (dialog.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const nodes = focusableNodes();
+      if (nodes.length === 0) {
+        event.preventDefault();
+        if (!dialog.hasAttribute("tabindex")) dialog.setAttribute("tabindex", "-1");
+        dialog.focus();
+        return;
+      }
+
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !dialog.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    const handleBackdropClick = (event) => {
+      if (options.closeOnBackdrop !== false && event.target === dialog) close();
+    };
+
+    const openerBindings = openButtons.map((button) => {
+      const handler = () => open(button);
+      button.addEventListener("click", handler);
+      return [button, handler];
+    });
+    const closerBindings = closeButtons.map((button) => {
+      const handler = () => close();
+      button.addEventListener("click", handler);
+      return [button, handler];
+    });
+    dialog.addEventListener("keydown", handleKeydown);
+    dialog.addEventListener("click", handleBackdropClick);
+
+    if (!dialog.hidden) {
+      makeBackgroundInert();
+      syncBodyLock();
+      scheduleFocus(() => preferredFocus() || dialog);
+    }
+
+    return {
+      open,
+      close,
+      destroy() {
+        openerBindings.forEach(([button, handler]) => button.removeEventListener("click", handler));
+        closerBindings.forEach(([button, handler]) => button.removeEventListener("click", handler));
+        dialog.removeEventListener("keydown", handleKeydown);
+        dialog.removeEventListener("click", handleBackdropClick);
+        if (focusFrame) window.cancelAnimationFrame(focusFrame);
+        restoreBackground();
+        syncBodyLock();
+      }
+    };
+  };
+
   ChummerUi.copyToClipboard = async function copyToClipboard(text, button, copiedLabel = "Copied", resetDelayMs = 1200) {
     await navigator.clipboard.writeText(text);
     await ChummerUi.withBusyState(button, copiedLabel, async () => {
@@ -213,6 +399,20 @@
   };
 
   document.addEventListener("click", (event) => {
+    const googleStartLink = event.target instanceof Element
+      ? event.target.closest("a[href^='/auth/google/start']")
+      : null;
+    if (googleStartLink instanceof HTMLAnchorElement
+      && event.button === 0
+      && !event.metaKey
+      && !event.ctrlKey
+      && !event.shiftKey
+      && !event.altKey) {
+      const url = new URL(googleStartLink.href, window.location.origin);
+      url.searchParams.set("flow", `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+      googleStartLink.href = `${url.pathname}${url.search}${url.hash}`;
+    }
+
     const node = event.target instanceof Element
       ? event.target.closest("[data-analytics-event]")
       : null;

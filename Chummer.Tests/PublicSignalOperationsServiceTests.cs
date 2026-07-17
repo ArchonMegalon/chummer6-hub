@@ -18,6 +18,25 @@ namespace Chummer.Tests;
 
 public sealed class PublicSignalOperationsServiceTests
 {
+    [Theory]
+    [InlineData("")]
+    [InlineData("   \n")]
+    [InlineData("{not-json")]
+    [InlineData("null")]
+    public void ConstructorStartsWithEmptyReceiptsWhenStoredSnapshotIsUnreadable(string storedSnapshot)
+    {
+        using var fixture = new PublicSignalOperationsFixture(initialStoreJson: storedSnapshot);
+        fixture.WriteSupportFiles();
+
+        PublicSignalOperationsPacketViewModel packet = fixture.CreateService().BuildPacket();
+
+        Assert.Equal(0, packet.ReceiptCount);
+        Assert.Equal(0, packet.RoutingReceiptCount);
+        Assert.Equal(0, packet.CloseoutDeliveryReceiptCount);
+        Assert.Equal(0, packet.CloseoutDispatchReceiptCount);
+        Assert.Equal(0, packet.JourneyReceiptCount);
+    }
+
     [Fact]
     public void BuildPacketDefaultsToFirstPartyWhenHostedPromotionIsMissing()
     {
@@ -2050,7 +2069,10 @@ public sealed class PublicSignalOperationsServiceTests
         private readonly PublicSignalOperationsService _service;
         private readonly CapturingHttpClientFactory? _httpClientFactory;
 
-        public PublicSignalOperationsFixture(IReadOnlyDictionary<string, string?>? settings = null, bool enableHttpCapture = false)
+        public PublicSignalOperationsFixture(
+            IReadOnlyDictionary<string, string?>? settings = null,
+            bool enableHttpCapture = false,
+            string? initialStoreJson = null)
         {
             _root = Path.Combine(Path.GetTempPath(), "public-signal-operations-tests", Guid.NewGuid().ToString("N"));
             _canonRoot = Path.Combine(_root, "repo");
@@ -2064,6 +2086,11 @@ public sealed class PublicSignalOperationsServiceTests
                 ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_root, "community-store.json"),
                 ["CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE"] = Path.Combine(_root, "HUB_LOCAL_RELEASE_PROOF.generated.json")
             };
+
+            if (initialStoreJson is not null)
+            {
+                File.WriteAllText(configValues["CHUMMER_PRODUCTLIFT_OPERATIONS_STORE_PATH"]!, initialStoreJson);
+            }
 
             _configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(configValues)

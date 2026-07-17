@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 
 from absolute_completion_common import LocalHubApp, completion_path, now_iso, read_json, write_json, write_text
@@ -48,15 +49,57 @@ def route_proof_passes(payload: dict) -> bool:
     return False
 
 
+def route_proof_generated_at(payload: dict) -> datetime | None:
+    for key in ("generated_at_utc", "generatedAt", "generated_at"):
+        raw = str(payload.get(key) or "").strip()
+        if not raw:
+            continue
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(raw)
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+    return None
+
+
+def route_proof_is_canonical_public(payload: dict) -> bool:
+    return route_proof_passes(payload) and str(payload.get("base_url") or "").strip().lower() == "https://chummer.run"
+
+
 def load_live_or_local_route_proof() -> tuple[dict, str]:
+    live_payload = local_payload = None
+
     if LIVE_ROUTE_PROOF_PATH.is_file():
-        payload = read_json(LIVE_ROUTE_PROOF_PATH)
-        if route_proof_passes(payload) and str(payload.get("base_url") or "").strip().lower() == "https://chummer.run":
-            return payload, "live"
+        live_payload = read_json(LIVE_ROUTE_PROOF_PATH)
     if LOCAL_ROUTE_PROOF_PATH.is_file():
-        payload = read_json(LOCAL_ROUTE_PROOF_PATH)
-        if route_proof_passes(payload):
-            return payload, "local-published"
+        local_payload = read_json(LOCAL_ROUTE_PROOF_PATH)
+
+    live_usable = bool(live_payload) and route_proof_is_canonical_public(live_payload)
+    local_usable = bool(local_payload) and route_proof_passes(local_payload)
+
+    if live_usable and local_usable:
+        local_canonical = route_proof_is_canonical_public(local_payload)
+        if local_canonical:
+            live_generated_at = route_proof_generated_at(live_payload)
+            local_generated_at = route_proof_generated_at(local_payload)
+            if live_generated_at and local_generated_at:
+                return (
+                    (local_payload, "local-published")
+                    if local_generated_at >= live_generated_at
+                    else (live_payload, "live")
+                )
+            if local_generated_at and not live_generated_at:
+                return local_payload, "local-published"
+        return live_payload, "live"
+
+    if live_usable:
+        return live_payload, "live"
+    if local_usable:
+        return local_payload, "local-published"
     return {}, "missing"
 
 

@@ -7495,7 +7495,7 @@ public sealed class CampaignSpineService
         if (string.Equals(normalizedKind, "downtime", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "aftermath", StringComparison.OrdinalIgnoreCase))
         {
-            evidenceLines.Add("Return-loop route: /account/roster#aftermath-packages.");
+            evidenceLines.Add("Return-loop route: /account/work#aftermath-packages.");
         }
 
         evidenceLines.Add("Return-loop action: Review downtime obligations.");
@@ -7518,9 +7518,9 @@ public sealed class CampaignSpineService
                     SourceKind: ReturnLoopActionSourceKind,
                     Summary: "Review downtime obligations"),
                 CampaignConsequence(
-                    ReceiptId: "/account/roster#aftermath-packages",
+                    ReceiptId: "/account/work#aftermath-packages",
                     SourceKind: ReturnLoopRouteSourceKind,
-                    Summary: "Return-loop route: /account/roster#aftermath-packages.")
+                    Summary: "Return-loop route: /account/work#aftermath-packages.")
             ],
             UpdatedAtUtc: package.GeneratedAtUtc);
     }
@@ -7692,8 +7692,8 @@ public sealed class CampaignSpineService
     {
         string canonicalRoute = consequenceKind switch
         {
-            "downtime" or "aftermath" => "/account/roster#aftermath-packages",
-            _ => "/account/roster"
+            "downtime" or "aftermath" => "/account/work#aftermath-packages",
+            _ => "/account/work"
         };
 
         string? normalizedRoute = AccountService.NormalizeOptional(returnLoopRoute);

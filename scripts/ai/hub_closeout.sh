@@ -39,6 +39,12 @@ if [[ -n "$HUB_ENV_FILE" ]]; then
   done < <(grep -E '^(IDENTITY_ADMIN_KEY|GOOGLE_OIDC_CLIENT_ID|GOOGLE_OIDC_CLIENT_SECRET|GOOGLE_OIDC_REDIRECT_URI)=' "$HUB_ENV_FILE" || true)
 fi
 
+if [[ "$HUB_EDGE_COMPOSE_FILE" == /* ]]; then
+  HUB_EDGE_COMPOSE_PATH="$HUB_EDGE_COMPOSE_FILE"
+else
+  HUB_EDGE_COMPOSE_PATH="$ROOT_DIR/$HUB_EDGE_COMPOSE_FILE"
+fi
+
 compose_args=(-p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE")
 if [[ -n "$HUB_ENV_FILE" ]]; then
   compose_args=(--env-file "$HUB_ENV_FILE" "${compose_args[@]}")
@@ -84,7 +90,10 @@ if [[ "$HUB_CLOSEOUT_BUILD" == "1" || "$HUB_CLOSEOUT_BUILD" == "true" || "$HUB_C
   if [[ "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "1" || "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "true" || "$HUB_CLOSEOUT_INCLUDE_BLAZOR" == "TRUE" ]]; then
     public_edge_services+=(chummer-public-blazor)
   fi
-  docker compose "${compose_args[@]}" up -d --build --remove-orphans "${public_edge_services[@]}"
+  "$BUILD_PROVENANCE_DOCKER_BINARY" compose "${compose_args[@]}" up -d --build --remove-orphans "${public_edge_services[@]}"
+  finalize_oci_build_provenance "$identity_provenance_invocation_id" "$identity_provenance_state" "$identity_provenance_receipt"
+  finalize_oci_build_provenance "$api_provenance_invocation_id" "$api_provenance_state" "$api_provenance_receipt"
+  echo "OCI build provenance receipts: $identity_provenance_receipt $api_provenance_receipt"
 fi
 
 echo
@@ -100,12 +109,18 @@ fi
 
 echo
 echo "== local route audit =="
-python3 scripts/hub-live-audit.py \
-  --base-url "$HUB_LOCAL_BASE_URL" \
-  --public-host "$HUB_PUBLIC_HOST" \
-  --forwarded-proto https \
-  --verify-http-redirects \
-  --verify-signed-in-work
+hub_live_audit_args=(
+  --base-url "$HUB_LOCAL_BASE_URL"
+  --public-host "$HUB_PUBLIC_HOST"
+  --forwarded-proto https
+  --verify-http-redirects
+)
+if [[ -f "$AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG" ]]; then
+  echo "skipping signed-in hub audit: auth/sign-in automation is paused at $AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG"
+else
+  hub_live_audit_args+=(--verify-signed-in-work)
+fi
+python3 scripts/hub-live-audit.py "${hub_live_audit_args[@]}"
 
 if [[ "$HUB_CLOSEOUT_LIVE_AUDIT" == "1" || "$HUB_CLOSEOUT_LIVE_AUDIT" == "true" || "$HUB_CLOSEOUT_LIVE_AUDIT" == "TRUE" ]]; then
   echo

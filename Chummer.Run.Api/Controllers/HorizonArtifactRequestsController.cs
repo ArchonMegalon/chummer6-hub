@@ -88,7 +88,8 @@ public sealed class HorizonArtifactRequestsController : ControllerBase
                     SourceRef: request.SourceRef,
                     Visibility: request.Visibility,
                     ExternalProcessingConsent: request.ExternalProcessingConsent,
-                    Email: actor.Email),
+                    Email: actor.Email,
+                    GovernedRenderRequest: request.GovernedRenderRequest),
                 consumeQuota: true);
             ApplyReceiptHeaders(receipt);
 
@@ -219,7 +220,8 @@ public sealed record SignedInHorizonArtifactRequestCreateRequest(
     string ArtifactKindOrCapabilityId,
     string SourceRef,
     string Visibility,
-    bool ExternalProcessingConsent);
+    bool ExternalProcessingConsent,
+    HorizonGovernedRenderRequestCreateRequest? GovernedRenderRequest = null);
 
 public sealed record PublicHorizonArtifactRequestReceipt(
     string RequestId,

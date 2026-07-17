@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -39,9 +40,15 @@ def resolve_workspace_root() -> Path:
 
 WORKSPACE_ROOT = resolve_workspace_root()
 CHUMMER6_ROOT = WORKSPACE_ROOT / "Chummer6"
+CHUMMER_PLAY_ROOT = WORKSPACE_ROOT / "chummer-play"
 DEFAULT_COMPLETION_ROOT = WORKSPACE_ROOT / "_completion" / "chummer6_absolute_completion"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_COMPLETION_BASE_URL", "http://127.0.0.1:5099").rstrip("/")
 REQUEST_TIMEOUT_SECONDS = 30
+LOCAL_HUB_READY_TIMEOUT_SECONDS = 90
+_LOCAL_HUB_BUILD_LOCK = threading.Lock()
+_LOCAL_HUB_BUILD_READY = False
+_LOCAL_PLAY_BUILD_LOCK = threading.Lock()
+_LOCAL_PLAY_BUILD_READY = False
 
 
 def now_iso() -> str:
@@ -139,6 +146,77 @@ def extract_first_select_option(html: str, select_name: str) -> str:
 def slugify_route(route: str) -> str:
     cleaned = route.strip("/") or "index"
     return re.sub(r"[^a-z0-9]+", "-", cleaned.lower()).strip("-") or "index"
+
+
+def tail_text_file(path: Path, *, max_lines: int = 120) -> str:
+    if not path.exists():
+        return ""
+
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+
+    if len(lines) > max_lines:
+        lines = lines[-max_lines:]
+
+    return "\n".join(lines).strip()
+
+
+def ensure_local_hub_build() -> None:
+    global _LOCAL_HUB_BUILD_READY
+
+    if _LOCAL_HUB_BUILD_READY:
+        return
+
+    with _LOCAL_HUB_BUILD_LOCK:
+        if _LOCAL_HUB_BUILD_READY:
+            return
+
+        result = subprocess.run(
+            ["dotnet", "build", "Chummer.Run.Api/Chummer.Run.Api.csproj", "-nologo"],
+            cwd=RUN_SERVICES_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        if result.returncode != 0:
+            build_output = (result.stdout or "").strip()
+            excerpt = "\n".join(build_output.splitlines()[-120:])
+            message = "local hub prebuild failed"
+            if excerpt:
+                message = f"{message}\n{excerpt}"
+            raise RuntimeError(message)
+
+        _LOCAL_HUB_BUILD_READY = True
+
+
+def ensure_local_play_build() -> None:
+    global _LOCAL_PLAY_BUILD_READY
+
+    if _LOCAL_PLAY_BUILD_READY:
+        return
+
+    with _LOCAL_PLAY_BUILD_LOCK:
+        if _LOCAL_PLAY_BUILD_READY:
+            return
+
+        result = subprocess.run(
+            ["bash", "scripts/ai/with-package-plane.sh", "build", "src/Chummer.Play.Web/Chummer.Play.Web.csproj", "-nologo"],
+            cwd=CHUMMER_PLAY_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        if result.returncode != 0:
+            build_output = (result.stdout or "").strip()
+            excerpt = "\n".join(build_output.splitlines()[-120:])
+            message = "local play prebuild failed"
+            if excerpt:
+                message = f"{message}\n{excerpt}"
+            raise RuntimeError(message)
+
+        _LOCAL_PLAY_BUILD_READY = True
 
 
 class TokenIdentityStub(AbstractContextManager["TokenIdentityStub"]):
@@ -294,7 +372,7 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
         self.port = pick_free_port()
         self.base_url = f"http://127.0.0.1:{self.port}"
         self._process: subprocess.Popen[str] | None = None
-        self._temp_root: tempfile.TemporaryDirectory[str] | None = None
+        self._temp_root: Path | None = None
         self._log_path: Path | None = None
         self._log_handle: Any | None = None
 
@@ -320,8 +398,10 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
         return self._debug_binary_available()
 
     def __enter__(self) -> "LocalHubApp":
-        self._temp_root = tempfile.TemporaryDirectory(prefix="chummer-local-hub-")
-        temp_root = Path(self._temp_root.name)
+        ensure_local_hub_build()
+
+        temp_root = Path(tempfile.mkdtemp(prefix="chummer-local-hub-"))
+        self._temp_root = temp_root
         self._log_path = temp_root / "hub.log"
 
         env = os.environ.copy()
@@ -340,6 +420,8 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
             "Chummer.Run.Api/Chummer.Run.Api.csproj",
             "-nologo",
             "--no-launch-profile",
+            "--no-build",
+            "--no-restore",
         ]
         if self._should_skip_build():
             command.append("--no-build")
@@ -359,7 +441,7 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
             raise RuntimeError(f"{exc}\nLocalHubApp log tail:\n{self._read_log_tail()}") from exc
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def _stop_process(self) -> None:
         if self._process is not None:
             self._process.terminate()
             try:

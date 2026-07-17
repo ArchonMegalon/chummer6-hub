@@ -1,0 +1,16 @@
+[Unit]
+Description=Recover stalled qBittorrent staging and queue state periodically
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/qbittorrent-staging-hygiene-watchdog
+ExecStart=/usr/local/sbin/qbittorrent-staging-hygiene-watchdog.sh
+User=root
+Group=root
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ReadWritePaths=/run /docker/chummercomplete/chummer.run-services /docker/arr-v2

@@ -9,9 +9,503 @@ public sealed class VerificationEntryPointTests
     public void AuditComplianceUsesSupportedVerificationScript()
     {
         string scriptPath = RepoPaths.FromRoot("scripts", "audit-compliance.sh");
+        string verifyScriptPath = RepoPaths.FromRoot("scripts", "ai", "verify.sh");
         string script = File.ReadAllText(scriptPath);
+        string verifyScript = File.ReadAllText(verifyScriptPath);
 
         Assert.Contains("bash scripts/ai/verify.sh", script, StringComparison.Ordinal);
+        Assert.Contains(
+            "python3 \"$ROOT_DIR/scripts/materialize_release_ready_receipt.py\" --force-global-verifier >/dev/null",
+            verifyScript,
+            StringComparison.Ordinal
+        );
+        Assert.Contains(
+            "node \"$ROOT_DIR/scripts/verify_partizipate_runtime_fallback.cjs\" --base-url \"${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}\" >/dev/null",
+            verifyScript,
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            verifyScript.IndexOf(
+                "node \"$ROOT_DIR/scripts/verify_partizipate_runtime_fallback.cjs\" --base-url \"${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}\" >/dev/null",
+                StringComparison.Ordinal
+            )
+            <
+            verifyScript.IndexOf(
+                "python3 \"$ROOT_DIR/scripts/materialize_release_ready_receipt.py\" --force-global-verifier >/dev/null",
+                StringComparison.Ordinal
+            )
+        );
+    }
+
+    [Fact]
+    public void PublicPwaStaticAssetVerifierGuardsInstallablePlayerSurface()
+    {
+        string scriptPath = RepoPaths.FromRoot("scripts", "verify_public_pwa_static_assets.py");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("EXPECTED_DESCRIPTION", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.public_pwa_static_assets.v1", script, StringComparison.Ordinal);
+        Assert.Contains("/manifest.json", script, StringComparison.Ordinal);
+        Assert.Contains("/manifest.webmanifest", script, StringComparison.Ordinal);
+        Assert.Contains("/site.webmanifest", script, StringComparison.Ordinal);
+        Assert.Contains("/mobile", script, StringComparison.Ordinal);
+        Assert.Contains("/play/continuity", script, StringComparison.Ordinal);
+        Assert.Contains("/ready/handoff/mobile.json", script, StringComparison.Ordinal);
+        Assert.Contains("/pwa-icon.svg", script, StringComparison.Ordinal);
+        Assert.Contains("/pwa-screenshot-mobile.svg", script, StringComparison.Ordinal);
+        Assert.Contains("/service-worker.js", script, StringComparison.Ordinal);
+        Assert.Contains("/mobile/pwa/ledger.json", script, StringComparison.Ordinal);
+        Assert.Contains("ledger_stream_non_cacheable", script, StringComparison.Ordinal);
+        Assert.Contains("verify_source", script, StringComparison.Ordinal);
+        Assert.Contains("mode", script, StringComparison.Ordinal);
+        Assert.Contains("route_attribute", script, StringComparison.Ordinal);
+        Assert.Contains("PublicLandingController.cs", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DownloadsVersionMarkerVerifierGuardsReleaseShelfVersionProof()
+    {
+        string scriptPath = RepoPaths.FromRoot("scripts", "verify_downloads_version_marker.py");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("verify_source", script, StringComparison.Ordinal);
+        Assert.Contains("verify_live", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.downloads_version_marker.v1", script, StringComparison.Ordinal);
+        Assert.Contains("data-downloads-release-version", script, StringComparison.Ordinal);
+        Assert.Contains("ManifestVersionText", script, StringComparison.Ordinal);
+        Assert.Contains("manifest.Version", script, StringComparison.Ordinal);
+        Assert.Contains("manifest_version_marker_prefers_release_version", script, StringComparison.Ordinal);
+        Assert.Contains("downloads-version", script, StringComparison.Ordinal);
+        Assert.Contains("downloads_version_text", script, StringComparison.Ordinal);
+        Assert.Contains("status_redirect_version_text", script, StringComparison.Ordinal);
+        Assert.Contains("downloads_marker", script, StringComparison.Ordinal);
+        Assert.Contains("status_redirect_marker", script, StringComparison.Ordinal);
+        Assert.Contains("DEFAULT_RELEASE_CHANNEL_RECEIPT", script, StringComparison.Ordinal);
+        Assert.Contains("expected_release_version", script, StringComparison.Ordinal);
+        Assert.Contains("visible_version_matches_release_channel", script, StringComparison.Ordinal);
+        Assert.Contains("status_redirect_version_matches_release_channel", script, StringComparison.Ordinal);
+        Assert.Contains("/downloads visible Version text does not match release channel", script, StringComparison.Ordinal);
+        Assert.Contains("/status visible Version text does not match release channel", script, StringComparison.Ordinal);
+        Assert.Contains("release channel version is missing", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicEdgeDeployPreflightFailsClosedOnActiveBuildLanes()
+    {
+        string scriptPath = RepoPaths.FromRoot("scripts", "check_public_edge_deploy_preflight.py");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("chummer.public_edge_deploy_preflight.v1", script, StringComparison.Ordinal);
+        Assert.Contains("build-chummer6-linux", script, StringComparison.Ordinal);
+        Assert.Contains("Chummer.Presentation", script, StringComparison.Ordinal);
+        Assert.Contains("Chummer.Play", script, StringComparison.Ordinal);
+        Assert.Contains("/Roslyn/bincore/csc", script, StringComparison.Ordinal);
+        Assert.Contains("active_build_lane", script, StringComparison.Ordinal);
+        Assert.Contains("activeLockCount", script, StringComparison.Ordinal);
+        Assert.Contains("foreignLockCount", script, StringComparison.Ordinal);
+        Assert.Contains("allowForeignBuildLocks", script, StringComparison.Ordinal);
+        Assert.Contains("--allow-foreign-build-locks", script, StringComparison.Ordinal);
+        Assert.Contains("frontdoor_launch_route = \"/mobile/player\"", script, StringComparison.Ordinal);
+        Assert.Contains("role_routes = new[]", script, StringComparison.Ordinal);
+        Assert.Contains("manifest_path = \"/manifest.player.webmanifest\"", script, StringComparison.Ordinal);
+        Assert.Contains("manifest_path = \"/manifest.gm.webmanifest\"", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicEdgePostdeployGateCombinesPreflightDownloadsAndPwaProofs()
+    {
+        string scriptPath = RepoPaths.FromRoot("scripts", "verify_public_edge_postdeploy_gate.py");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("chummer.public_edge_postdeploy_gate.v1", script, StringComparison.Ordinal);
+        Assert.Contains("check_public_edge_deploy_preflight.py", script, StringComparison.Ordinal);
+        Assert.Contains("--allow-foreign-build-locks", script, StringComparison.Ordinal);
+        Assert.Contains("verify_downloads_version_marker.py", script, StringComparison.Ordinal);
+        Assert.Contains("verify_public_pwa_static_assets.py", script, StringComparison.Ordinal);
+        Assert.Contains("CORE_CHILD_CONTRACTS", script, StringComparison.Ordinal);
+        Assert.Contains("OPTIONAL_PLAYWRIGHT_CONTRACTS", script, StringComparison.Ordinal);
+        Assert.Contains("REQUIRED_READY_MOBILE_TOOLS", script, StringComparison.Ordinal);
+        Assert.Contains("REQUIRED_LEDGER_CACHE_CONTROL_TOKENS", script, StringComparison.Ordinal);
+        Assert.Contains("MINIMUM_PARTICIPATE_IFRAME_ROUTES", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.public_edge_deploy_preflight.v1", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.downloads_version_marker.v1", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.public_pwa_static_assets.v1", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.mobile_pwa_ledger_boundary.v1", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.ready_mobile_handoff_contract.v1", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.participate_iframe_shell.v1", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.downloads_status_e2e.v1", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.mobile_pwa_viewport_smoke.v1", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.frontdoor_mobile_launch.v1", script, StringComparison.Ordinal);
+        Assert.Contains("chummer.black_ledger_globe_frontdoor.v1", script, StringComparison.Ordinal);
+        Assert.Contains("coreChildContracts", script, StringComparison.Ordinal);
+        Assert.Contains("ArtifactContract", script, StringComparison.Ordinal);
+        Assert.Contains("child receipt contract is not", script, StringComparison.Ordinal);
+        Assert.Contains("Playwright artifact contract is not", script, StringComparison.Ordinal);
+        Assert.Contains("downloads receipt does not prove /downloads version marker", script, StringComparison.Ordinal);
+        Assert.Contains("downloads receipt does not prove /status version marker", script, StringComparison.Ordinal);
+        Assert.Contains("downloads receipt missing visible Version text", script, StringComparison.Ordinal);
+        Assert.Contains("DEFAULT_RELEASE_CHANNEL_RECEIPT", script, StringComparison.Ordinal);
+        Assert.Contains("expectedReleaseVersion", script, StringComparison.Ordinal);
+        Assert.Contains("visibleVersionMatchesReleaseChannel", script, StringComparison.Ordinal);
+        Assert.Contains("statusRedirectVersion", script, StringComparison.Ordinal);
+        Assert.Contains("statusRedirectVersionMatchesReleaseChannel", script, StringComparison.Ordinal);
+        Assert.Contains("downloads visible Version text does not match release channel", script, StringComparison.Ordinal);
+        Assert.Contains("status redirect visible Version text does not match release channel", script, StringComparison.Ordinal);
+        Assert.Contains("release channel version is missing", script, StringComparison.Ordinal);
+        Assert.Contains("run_playwright_command", script, StringComparison.Ordinal);
+        Assert.Contains("subprocess.TimeoutExpired", script, StringComparison.Ordinal);
+        Assert.Contains("\"timedOut\"", script, StringComparison.Ordinal);
+        Assert.Contains("public PWA static proof does not keep ledger stream non-cacheable", script, StringComparison.Ordinal);
+        Assert.Contains("public PWA static proof precaches personalized ledger stream", script, StringComparison.Ordinal);
+        Assert.Contains("mobile ledger receipt payload is not opt_in_required", script, StringComparison.Ordinal);
+        Assert.Contains("mobile ledger cache-control is missing private/no-store/no-cache/max-age=0", script, StringComparison.Ordinal);
+        Assert.Contains("mobile ledger vary is missing Cookie and Authorization", script, StringComparison.Ordinal);
+        Assert.Contains("Ready mobile handoff is missing required tools", script, StringComparison.Ordinal);
+        Assert.Contains("Ready mobile handoff is missing required packet roles", script, StringComparison.Ordinal);
+        Assert.Contains("Participate iframe shell does not prove both iframe routes", script, StringComparison.Ordinal);
+        Assert.Contains("Participate iframe shell is using offline fallback routes", script, StringComparison.Ordinal);
+        Assert.Contains("verify_mobile_pwa_ledger_boundary.py", script, StringComparison.Ordinal);
+        Assert.Contains("verify_ready_mobile_handoff_contract.py", script, StringComparison.Ordinal);
+        Assert.Contains("verify_participate_iframe_shell.py", script, StringComparison.Ordinal);
+        Assert.Contains("downloadsHasMarker", script, StringComparison.Ordinal);
+        Assert.Contains("downloadsStatusBrowserStatus", script, StringComparison.Ordinal);
+        Assert.Contains("require-downloads-status-playwright", script, StringComparison.Ordinal);
+        Assert.Contains("require-mobile-pwa-viewport-playwright", script, StringComparison.Ordinal);
+        Assert.Contains("require-frontdoor-navigation-playwright", script, StringComparison.Ordinal);
+        Assert.Contains("ledgerStreamNonCacheable", script, StringComparison.Ordinal);
+        Assert.Contains("mobileLedgerStatus", script, StringComparison.Ordinal);
+        Assert.Contains("mobileLedgerPayloadStatus", script, StringComparison.Ordinal);
+        Assert.Contains("readyMobileHandoffStatus", script, StringComparison.Ordinal);
+        Assert.Contains("participateIframeShellStatus", script, StringComparison.Ordinal);
+        Assert.Contains("mobilePwaViewportStatus", script, StringComparison.Ordinal);
+        Assert.Contains("MOBILE_PWA_VIEWPORT_SMOKE.generated.json", script, StringComparison.Ordinal);
+        Assert.Contains("frontdoorNavigationStatus", script, StringComparison.Ordinal);
+        Assert.Contains("FRONTDOOR_MOBILE_LAUNCH.generated.json", script, StringComparison.Ordinal);
+        Assert.Contains("BLACK_LEDGER_GLOBE_FRONTDOOR.generated.json", script, StringComparison.Ordinal);
+        Assert.Contains("preflightStaleLookingLockCount", script, StringComparison.Ordinal);
+        Assert.Contains("staleLookingLockCount", script, StringComparison.Ordinal);
+        Assert.Contains("public-edge deploy preflight is not pass", script, StringComparison.Ordinal);
+        Assert.Contains("mobile PWA ledger boundary proof is not pass", script, StringComparison.Ordinal);
+        Assert.Contains("Ready mobile handoff proof is not pass", script, StringComparison.Ordinal);
+        Assert.Contains("Participate iframe shell proof is not pass", script, StringComparison.Ordinal);
+        Assert.Contains("mobile PWA viewport Playwright proof is not pass", script, StringComparison.Ordinal);
+        Assert.Contains("front-door navigation Playwright proof is not pass", script, StringComparison.Ordinal);
+        Assert.Contains("downloads-status Playwright proof is not pass", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReleaseConsumersRejectStalePublicEdgePostdeployReceipts()
+    {
+        string finalGoldPath = RepoPaths.FromRoot("scripts", "final_gold_janitor.py");
+        string dashboardPath = RepoPaths.FromRoot("scripts", "materialize_operator_release_dashboard.py");
+
+        string finalGold = File.ReadAllText(finalGoldPath);
+        string dashboard = File.ReadAllText(dashboardPath);
+
+        foreach (string script in new[] { finalGold, dashboard })
+        {
+            Assert.Contains("PUBLIC_EDGE_POSTDEPLOY_CONTRACT_NAME", script, StringComparison.Ordinal);
+            Assert.Contains("chummer.public_edge_postdeploy_gate.v1", script, StringComparison.Ordinal);
+            Assert.Contains("PUBLIC_EDGE_POSTDEPLOY_REQUIRED_FIELDS", script, StringComparison.Ordinal);
+            Assert.Contains("PUBLIC_EDGE_REQUIRED_RELEASE_STATUS_FIELDS", script, StringComparison.Ordinal);
+            Assert.Contains("PUBLIC_EDGE_REQUIRED_CORE_CHILD_CONTRACTS", script, StringComparison.Ordinal);
+            Assert.Contains("PUBLIC_EDGE_REQUIRED_ARTIFACT_CONTRACT_FIELDS", script, StringComparison.Ordinal);
+            Assert.Contains("public_edge_postdeploy_semantic_failures", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy downloads marker is not proven", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy PWA manifest count is below required count", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy mobile ledger payload is not opt_in_required", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy Ready mobile handoff tools are incomplete", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy Participate iframe shell is using offline fallback routes", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy front-door navigation does not gate Build and Play", script, StringComparison.Ordinal);
+            Assert.Contains("contract", script, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("preflightStatus", script, StringComparison.Ordinal);
+            Assert.Contains("preflightBlockingLockCount", script, StringComparison.Ordinal);
+            Assert.Contains("preflightStaleForeignLockCount", script, StringComparison.Ordinal);
+            Assert.Contains("preflightStaleForeignLocksIgnored", script, StringComparison.Ordinal);
+            Assert.Contains("downloadsStatus", script, StringComparison.Ordinal);
+            Assert.Contains("downloadsHasMarker", script, StringComparison.Ordinal);
+            Assert.Contains("statusRedirectHasMarker", script, StringComparison.Ordinal);
+            Assert.Contains("expectedReleaseVersion", script, StringComparison.Ordinal);
+            Assert.Contains("visibleVersionMatchesReleaseChannel", script, StringComparison.Ordinal);
+            Assert.Contains("statusRedirectVersion", script, StringComparison.Ordinal);
+            Assert.Contains("statusRedirectVersionMatchesReleaseChannel", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy expected release version is missing", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy visible Version text does not match release channel", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy visible Version text does not equal expected release version", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy status redirect Version text does not match release channel", script, StringComparison.Ordinal);
+            Assert.Contains("public-edge postdeploy status redirect Version text does not equal expected release version", script, StringComparison.Ordinal);
+            Assert.Contains("pwaManifestCount", script, StringComparison.Ordinal);
+            Assert.Contains("ledgerStreamNonCacheable", script, StringComparison.Ordinal);
+            Assert.Contains("mobileLedgerPayloadStatus", script, StringComparison.Ordinal);
+            Assert.Contains("readyMobileHandoffToolIds", script, StringComparison.Ordinal);
+            Assert.Contains("downloadsStatusBrowserArtifactContract", script, StringComparison.Ordinal);
+            Assert.Contains("frontdoorNavigationLedgerArtifactContract", script, StringComparison.Ordinal);
+            Assert.Contains("pwaStaticStatus", script, StringComparison.Ordinal);
+            Assert.Contains("mobileLedgerStatus", script, StringComparison.Ordinal);
+            Assert.Contains("readyMobileHandoffStatus", script, StringComparison.Ordinal);
+            Assert.Contains("downloadsStatusBrowserStatus", script, StringComparison.Ordinal);
+            Assert.Contains("mobilePwaViewportStatus", script, StringComparison.Ordinal);
+            Assert.Contains("mobilePwaViewportRouteCount", script, StringComparison.Ordinal);
+            Assert.Contains("mobilePwaViewportViewportCount", script, StringComparison.Ordinal);
+            Assert.Contains("participateIframeShellStatus", script, StringComparison.Ordinal);
+            Assert.Contains("participateIframeRouteCount", script, StringComparison.Ordinal);
+            Assert.Contains("frontdoorNavigationStatus", script, StringComparison.Ordinal);
+            Assert.Contains("frontdoorNavigationGatedTargets", script, StringComparison.Ordinal);
+            Assert.Contains("frontdoorNavigationLedgerPrimary", script, StringComparison.Ordinal);
+            Assert.Contains("missing postdeploy fields", script, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("PUBLIC_EDGE_POSTDEPLOY_PREFLIGHT_ARGS", finalGold, StringComparison.Ordinal);
+        Assert.Contains("--skip-preflight", finalGold, StringComparison.Ordinal);
+        Assert.Contains("--require-mobile-pwa-viewport-playwright", finalGold, StringComparison.Ordinal);
+        Assert.Contains("--require-frontdoor-navigation-playwright", finalGold, StringComparison.Ordinal);
+        Assert.Contains("https://chummer.run", finalGold, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReleaseConsumersRequireTeableImportantWorkSync()
+    {
+        string finalGoldPath = RepoPaths.FromRoot("scripts", "final_gold_janitor.py");
+        string dashboardPath = RepoPaths.FromRoot("scripts", "materialize_operator_release_dashboard.py");
+        string teablePath = RepoPaths.FromRoot("scripts", "sync_important_work_to_teable.py");
+        string releaseReadyPath = RepoPaths.FromRoot("..", "scripts", "release", "verify_chummer6_release_ready.sh");
+
+        string finalGold = File.ReadAllText(finalGoldPath);
+        string dashboard = File.ReadAllText(dashboardPath);
+        string teable = File.ReadAllText(teablePath);
+        string releaseReady = File.ReadAllText(releaseReadyPath);
+
+        Assert.Contains("teable_important_work", finalGold, StringComparison.Ordinal);
+        Assert.Contains("TEABLE_IMPORTANT_WORK.generated.json", finalGold, StringComparison.Ordinal);
+        Assert.Contains("sync_important_work_to_teable.py", finalGold, StringComparison.Ordinal);
+        Assert.Contains("--sync", finalGold, StringComparison.Ordinal);
+        Assert.Contains("teable_important_work_sync_summary", finalGold, StringComparison.Ordinal);
+        Assert.Contains("sync not passed", finalGold, StringComparison.Ordinal);
+        Assert.Contains("teable_important_work", dashboard, StringComparison.Ordinal);
+        Assert.Contains("Teable important work sync is not pass", dashboard, StringComparison.Ordinal);
+        Assert.Contains("chummer.teable_important_work.v1", teable, StringComparison.Ordinal);
+        Assert.Contains("sync_to_teable", teable, StringComparison.Ordinal);
+        Assert.Contains("verify_teable_important_work_sync", releaseReady, StringComparison.Ordinal);
+        Assert.Contains("python3 scripts/sync_important_work_to_teable.py --sync", releaseReady, StringComparison.Ordinal);
+        Assert.Contains("verify_operator_release_dashboard", releaseReady, StringComparison.Ordinal);
+        Assert.Contains("--release-ready-self-check", releaseReady, StringComparison.Ordinal);
+        Assert.True(
+            releaseReady.IndexOf("verify_teable_important_work_sync", StringComparison.Ordinal)
+            < releaseReady.IndexOf("verify_operator_release_dashboard", StringComparison.Ordinal),
+            "Release-ready must refresh Teable important-work sync before the operator dashboard reads it.");
+    }
+
+    [Fact]
+    public void ReleaseConsumersRequireFlagshipProductReadiness()
+    {
+        string finalGoldPath = RepoPaths.FromRoot("scripts", "final_gold_janitor.py");
+        string dashboardPath = RepoPaths.FromRoot("scripts", "materialize_operator_release_dashboard.py");
+        string readinessGatePath = RepoPaths.FromRoot("scripts", "verify_flagship_product_readiness_gate.py");
+        string releaseReadyPath = RepoPaths.FromRoot("..", "scripts", "release", "verify_chummer6_release_ready.sh");
+
+        string finalGold = File.ReadAllText(finalGoldPath);
+        string dashboard = File.ReadAllText(dashboardPath);
+        string readinessGate = File.ReadAllText(readinessGatePath);
+        string releaseReady = File.ReadAllText(releaseReadyPath);
+
+        Assert.Contains("flagship_product_readiness", finalGold, StringComparison.Ordinal);
+        Assert.Contains("FLAGSHIP_PRODUCT_READINESS.generated.json", finalGold, StringComparison.Ordinal);
+        Assert.Contains("verify_flagship_product_readiness_gate.py", finalGold, StringComparison.Ordinal);
+        Assert.Contains("flagship_product_readiness_summary", finalGold, StringComparison.Ordinal);
+        Assert.Contains("OPERATOR_DASHBOARD_REQUIRED_CHECKS", finalGold, StringComparison.Ordinal);
+        Assert.Contains("OPERATOR_DASHBOARD_FRESHNESS_REQUIRED_CHECKS", finalGold, StringComparison.Ordinal);
+        Assert.Contains("OPERATOR_DASHBOARD_REQUIRED_CHECK_FIELDS", finalGold, StringComparison.Ordinal);
+        Assert.Contains("ui_frame_integrity", finalGold, StringComparison.Ordinal);
+        Assert.Contains("teable_important_work", finalGold, StringComparison.Ordinal);
+        Assert.Contains("account_handoff_runtime_config", finalGold, StringComparison.Ordinal);
+        Assert.Contains("google_oauth_linking_proof", finalGold, StringComparison.Ordinal);
+        Assert.Contains("\"release_ready\",", finalGold, StringComparison.Ordinal);
+        Assert.Contains("OPERATOR_DASHBOARD_CONTRACT_NAME", finalGold, StringComparison.Ordinal);
+        Assert.Contains("chummer.operator_release_dashboard", finalGold, StringComparison.Ordinal);
+        Assert.Contains("dashboard_required_check_contradictions", finalGold, StringComparison.Ordinal);
+        Assert.Contains("semanticFailures", finalGold, StringComparison.Ordinal);
+        Assert.Contains("contradictory_required_checks", finalGold, StringComparison.Ordinal);
+        Assert.Contains("missing required check freshness fields", finalGold, StringComparison.Ordinal);
+        Assert.Contains("has stale required checks", finalGold, StringComparison.Ordinal);
+        Assert.Contains("has failing required checks", finalGold, StringComparison.Ordinal);
+        Assert.Contains("marks required checks nonblocking", finalGold, StringComparison.Ordinal);
+        Assert.Contains("has unexpected contract", finalGold, StringComparison.Ordinal);
+        Assert.Contains("has unexpected verdict", finalGold, StringComparison.Ordinal);
+        Assert.Contains("missing dashboard check fields", finalGold, StringComparison.Ordinal);
+        Assert.Contains("stale dashboard checks", finalGold, StringComparison.Ordinal);
+        Assert.Contains("failing dashboard checks", finalGold, StringComparison.Ordinal);
+        Assert.Contains("contradictory dashboard checks", finalGold, StringComparison.Ordinal);
+        Assert.Contains("nonblocking dashboard checks", finalGold, StringComparison.Ordinal);
+        Assert.Contains("flagship_product_readiness", dashboard, StringComparison.Ordinal);
+        Assert.Contains("google_oauth_linking_proof", dashboard, StringComparison.Ordinal);
+        Assert.Contains("Flagship product readiness is not pass", dashboard, StringComparison.Ordinal);
+        Assert.Contains("FRESHNESS_REQUIRED_CHECKS", dashboard, StringComparison.Ordinal);
+        Assert.Contains("RELEASE_BLOCKING_MAX_AGE_HOURS", dashboard, StringComparison.Ordinal);
+        Assert.Contains("generated_at_is_fresh", dashboard, StringComparison.Ordinal);
+        Assert.Contains("generated_at is missing or stale for operator dashboard", dashboard, StringComparison.Ordinal);
+        Assert.Contains("fleet.flagship_product_readiness", readinessGate, StringComparison.Ordinal);
+        Assert.Contains("materialize_flagship_product_readiness.py", readinessGate, StringComparison.Ordinal);
+        Assert.Contains("verify_flagship_product_readiness", releaseReady, StringComparison.Ordinal);
+        Assert.Contains("python3 scripts/verify_flagship_product_readiness_gate.py", releaseReady, StringComparison.Ordinal);
+        Assert.Contains("auto_import_windows_installer_gold_proof.py", releaseReady, StringComparison.Ordinal);
+        Assert.Contains("WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json", releaseReady, StringComparison.Ordinal);
+        Assert.Contains("auto_import_google_oauth_linking_operator_evidence.py", releaseReady, StringComparison.Ordinal);
+        Assert.Contains("GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_AUTO_IMPORT.generated.json", releaseReady, StringComparison.Ordinal);
+        Assert.True(
+            releaseReady.IndexOf("verify_windows_installer_visual_audit_intake_request", StringComparison.Ordinal)
+            < releaseReady.IndexOf("verify_flagship_product_readiness", StringComparison.Ordinal),
+            "Release-ready must resolve Windows intake and auto-import before flagship readiness runs.");
+        Assert.True(
+            releaseReady.IndexOf("verify_google_oauth_linking_operator_evidence_request", StringComparison.Ordinal)
+            < releaseReady.IndexOf("verify_google_oauth_linking_proof", StringComparison.Ordinal),
+            "Release-ready must resolve Google evidence intake and auto-import before the Google proof gate runs.");
+        Assert.True(
+            releaseReady.IndexOf("auto_import_windows_installer_gold_proof.py", StringComparison.Ordinal)
+            < releaseReady.IndexOf("verify_flagship_product_readiness", StringComparison.Ordinal),
+            "Release-ready must attempt Windows proof auto-import before flagship readiness runs.");
+        Assert.True(
+            releaseReady.IndexOf("auto_import_google_oauth_linking_operator_evidence.py", StringComparison.Ordinal)
+            < releaseReady.IndexOf("verify_google_oauth_linking_proof", StringComparison.Ordinal),
+            "Release-ready must attempt Google evidence auto-import before the Google proof gate runs.");
+    }
+
+    [Fact]
+    public void ReleaseReadyReceiptMaterializerFailsClosedOnParsedFailureLines()
+    {
+        string materializerPath = RepoPaths.FromRoot("scripts", "materialize_release_ready_receipt.py");
+        string materializer = File.ReadAllText(materializerPath);
+
+        Assert.Contains("extract_failed_gates", materializer, StringComparison.Ordinal);
+        Assert.Contains("verdict_markers", materializer, StringComparison.Ordinal);
+        Assert.Contains("READY_MARKER", materializer, StringComparison.Ordinal);
+        Assert.Contains("NOT_READY_MARKER", materializer, StringComparison.Ordinal);
+        Assert.Contains("failed_gates", materializer, StringComparison.Ordinal);
+        Assert.Contains("saw_release_ready_marker", materializer, StringComparison.Ordinal);
+        Assert.Contains("not_release_ready_markers", materializer, StringComparison.Ordinal);
+        Assert.Contains("verify_release_ready printed NOT_RELEASE_READY marker", materializer, StringComparison.Ordinal);
+        Assert.Contains("verify_release_ready did not print RELEASE_READY marker", materializer, StringComparison.Ordinal);
+        Assert.Contains("release_ready = returncode == 0 and saw_ready_marker and not not_ready_lines and not failure_lines and not failed_gates", materializer, StringComparison.Ordinal);
+        Assert.Contains("\"status\": \"pass\" if release_ready else \"fail\"", materializer, StringComparison.Ordinal);
+        Assert.Contains("\"verdict\": \"RELEASE_READY\" if release_ready else \"NOT_RELEASE_READY\"", materializer, StringComparison.Ordinal);
+        Assert.Contains("line.strip().startswith(\"FAIL \")", materializer, StringComparison.Ordinal);
+        Assert.Contains("line.strip().startswith(\"verify_\")", materializer, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FinalGoldRequiresReleaseReadyReceiptContractAndVerdict()
+    {
+        string finalGoldPath = RepoPaths.FromRoot("scripts", "final_gold_janitor.py");
+        string dashboardPath = RepoPaths.FromRoot("scripts", "materialize_operator_release_dashboard.py");
+        string finalGold = File.ReadAllText(finalGoldPath);
+        string dashboard = File.ReadAllText(dashboardPath);
+
+        foreach (string script in new[] { finalGold, dashboard })
+        {
+            Assert.Contains("RELEASE_READY_CONTRACT_NAME", script, StringComparison.Ordinal);
+            Assert.Contains("chummer.release_ready", script, StringComparison.Ordinal);
+            Assert.Contains("RELEASE_READY_VERDICT", script, StringComparison.Ordinal);
+            Assert.Contains("RELEASE_READY", script, StringComparison.Ordinal);
+            Assert.Contains("release_ready_receipt_semantic_failures", script, StringComparison.Ordinal);
+            Assert.Contains("release_ready verifier returncode is not zero", script, StringComparison.Ordinal);
+            Assert.Contains("release_ready verifier timed_out is not false", script, StringComparison.Ordinal);
+            Assert.Contains("release_ready receipt did not record RELEASE_READY marker", script, StringComparison.Ordinal);
+            Assert.Contains("release_ready receipt contains NOT_RELEASE_READY markers", script, StringComparison.Ordinal);
+            Assert.Contains("release_ready receipt contains failed gates", script, StringComparison.Ordinal);
+            Assert.Contains("release_ready semantic proof failed", script, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("release_ready_contract_name", finalGold, StringComparison.Ordinal);
+        Assert.Contains("release_ready_verdict", finalGold, StringComparison.Ordinal);
+        Assert.Contains("has unexpected contract", finalGold, StringComparison.Ordinal);
+        Assert.Contains("has unexpected verdict", finalGold, StringComparison.Ordinal);
+        Assert.Contains("release_ready_self_check", dashboard, StringComparison.Ordinal);
+        Assert.Contains("self_check_skipped", dashboard, StringComparison.Ordinal);
+        Assert.DoesNotContain("checks[\"release_ready\"][\"release_blocking\"] = False", dashboard, StringComparison.Ordinal);
+        Assert.Contains("checks[\"final_gold_janitor\"][\"release_blocking\"] = False", dashboard, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReleaseConsumersRequireWindowsInstallerVisualAuditSemantics()
+    {
+        string finalGoldPath = RepoPaths.FromRoot("scripts", "final_gold_janitor.py");
+        string dashboardPath = RepoPaths.FromRoot("scripts", "materialize_operator_release_dashboard.py");
+
+        string finalGold = File.ReadAllText(finalGoldPath);
+        string dashboard = File.ReadAllText(dashboardPath);
+
+        foreach (string script in new[] { finalGold, dashboard })
+        {
+            Assert.Contains("WINDOWS_INSTALLER_VISUAL_AUDIT_CONTRACT_NAME", script, StringComparison.Ordinal);
+            Assert.Contains("chummer.windows_installer_visual_audit", script, StringComparison.Ordinal);
+            Assert.Contains("windows_installer_visual_audit_semantic_failures", script, StringComparison.Ordinal);
+            Assert.Contains("windows_installer_visual_audit artifact sha256 does not match actual artifact bytes", script, StringComparison.Ordinal);
+            Assert.Contains("windows_installer_visual_audit startup receipt is incompatible-host", script, StringComparison.Ordinal);
+            Assert.Contains("windows_installer_visual_audit visual source platform is not windows", script, StringComparison.Ordinal);
+            Assert.Contains("windows_installer_visual_audit required surfaces are incomplete", script, StringComparison.Ordinal);
+            Assert.Contains("windows_installer_visual_audit scaled-DPI screenshot count is below required count", script, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("windows_installer_visual_audit semantic proof failed", finalGold, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParticipateIframeShellVerifierGuardsTheExistingIframeOnlySurface()
+    {
+        string scriptPath = RepoPaths.FromRoot("scripts", "verify_participate_iframe_shell.py");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("chummer.participate_iframe_shell.v1", script, StringComparison.Ordinal);
+        Assert.Contains("/participate", script, StringComparison.Ordinal);
+        Assert.Contains("/partizipate", script, StringComparison.Ordinal);
+        Assert.Contains("data-chummer-participate-frame", script, StringComparison.Ordinal);
+        Assert.Contains("participate-board-fallback", script, StringComparison.Ordinal);
+        Assert.Contains("Public requests, clear bugs, useful ideas.", script, StringComparison.Ordinal);
+        Assert.Contains("<p class=\"eyebrow\">Board</p>", script, StringComparison.Ordinal);
+        Assert.Contains("participate-hosted__header", script, StringComparison.Ordinal);
+        Assert.Contains("source", script, StringComparison.Ordinal);
+        Assert.Contains("live", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReadyMobileHandoffVerifierGuardsPlaytimeContract()
+    {
+        string scriptPath = RepoPaths.FromRoot("scripts", "verify_ready_mobile_handoff_contract.py");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("chummer.ready_mobile_handoff_contract.v1", script, StringComparison.Ordinal);
+        Assert.Contains("/ready/handoff/mobile.json", script, StringComparison.Ordinal);
+        Assert.Contains("inventory", script, StringComparison.Ordinal);
+        Assert.Contains("health", script, StringComparison.Ordinal);
+        Assert.Contains("ammo", script, StringComparison.Ordinal);
+        Assert.Contains("modifiers", script, StringComparison.Ordinal);
+        Assert.Contains("quick_rolls", script, StringComparison.Ordinal);
+        Assert.Contains("living_world", script, StringComparison.Ordinal);
+        Assert.Contains("frontdoor_launch_route", script, StringComparison.Ordinal);
+        Assert.Contains("role_routes", script, StringComparison.Ordinal);
+        Assert.Contains("/mobile/player", script, StringComparison.Ordinal);
+        Assert.Contains("/mobile/gm", script, StringComparison.Ordinal);
+        Assert.Contains("/manifest.player.webmanifest", script, StringComparison.Ordinal);
+        Assert.Contains("/manifest.gm.webmanifest", script, StringComparison.Ordinal);
+        Assert.Contains("account opt-in", script, StringComparison.Ordinal);
+        Assert.Contains("followed-world selection", script, StringComparison.Ordinal);
+        Assert.Contains("gm remains final authority", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MobilePwaLedgerBoundaryVerifierGuardsOptInAndCachePrivacy()
+    {
+        string scriptPath = RepoPaths.FromRoot("scripts", "verify_mobile_pwa_ledger_boundary.py");
+        string script = File.ReadAllText(scriptPath);
+
+        Assert.Contains("chummer.mobile_pwa_ledger_boundary.v1", script, StringComparison.Ordinal);
+        Assert.Contains("/mobile/pwa/ledger.json", script, StringComparison.Ordinal);
+        Assert.Contains("mobile_pwa_living_world", script, StringComparison.Ordinal);
+        Assert.Contains("opt_in_required", script, StringComparison.Ordinal);
+        Assert.Contains("world_not_followed", script, StringComparison.Ordinal);
+        Assert.Contains("private, no-store", script, StringComparison.Ordinal);
+        Assert.Contains("Cookie", script, StringComparison.Ordinal);
+        Assert.Contains("Authorization", script, StringComparison.Ordinal);
+        Assert.Contains("world_not_followed payload leaks world_turn", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -452,27 +946,29 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("/downloads/release-upload/bootstrap.sh", controller, StringComparison.Ordinal);
         Assert.Contains("/downloads/release-upload/bootstrap.command", controller, StringComparison.Ordinal);
         Assert.Contains("set -euo pipefail", controller, StringComparison.Ordinal);
-        Assert.Contains("curl -fsSL", controller, StringComparison.Ordinal);
+        Assert.Contains("curl -q -fsSL", controller, StringComparison.Ordinal);
         Assert.Contains("TMP_BOOTSTRAP_SCRIPT", controller, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_BOOTSTRAP_EXPECTED_SHA256", controller, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS", controller, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadTicketService", controller, StringComparison.Ordinal);
         Assert.Contains("digest-pinned bootstrap command", controller, StringComparison.Ordinal);
-        Assert.Contains("ResolveReleaseUploadCommandAuth", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildReleaseUploadBootstrapCommand", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("ResolveReleaseUploadCommandAuth", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadTicketEnvironmentVariable", controller, StringComparison.Ordinal);
-        Assert.Contains("\"export \" + releaseUploadAuthEnvironmentVariable + \"=\"", controller, StringComparison.Ordinal);
-        Assert.Contains("Release upload authorization was attached", controller, StringComparison.Ordinal);
+        Assert.Contains("ReleaseUploadTicketEnvironmentVariable + \"=\\\"$RELEASE_UPLOAD_AUTH\\\" \"", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"export \" + releaseUploadAuthEnvironmentVariable + \"=\"", controller, StringComparison.Ordinal);
+        Assert.Contains("set +x; set -euo pipefail", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadPageViewModel", viewModel, StringComparison.Ordinal);
         Assert.Contains("Build macOS", view, StringComparison.Ordinal);
         Assert.Contains("keeps the Mac build handoff in Chummer", view, StringComparison.Ordinal);
         Assert.Contains("recovery-aware status path", view, StringComparison.Ordinal);
         Assert.Contains("recovery-only code", view, StringComparison.Ordinal);
-        Assert.Contains("carries the current short-lived access code", view, StringComparison.Ordinal);
-        Assert.Contains("This release command contains a short-lived access code", view, StringComparison.Ordinal);
+        Assert.Contains("asks for the short-lived access code without echoing it", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("carries the current short-lived access code", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("This release command contains a short-lived access code", view, StringComparison.Ordinal);
         Assert.Contains("delete the local release work root and temporary packaging files again", view, StringComparison.Ordinal);
         Assert.Contains("Short-lived access code", view, StringComparison.Ordinal);
-        Assert.Contains("Backup access code", view, StringComparison.Ordinal);
         Assert.Contains("one authenticated access code, one setup command", view, StringComparison.Ordinal);
         Assert.Contains("current public release file", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Signed-in release upload", view, StringComparison.Ordinal);
@@ -489,14 +985,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("bootstrap integrity verified", bootstrap, StringComparison.Ordinal);
         Assert.DoesNotContain("staged upload token:", bootstrap, StringComparison.Ordinal);
         Assert.Contains("verify_checkout_expected_commit", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_UI_REF='main'", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_HUB_REF='main'", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_UI_KIT_REF='main'", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_REF=\"${CHUMMER_UI_REF:-main}\"", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_HUB_REF=\"${CHUMMER_HUB_REF:-main}\"", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_KIT_REF=\"${CHUMMER_UI_KIT_REF:-main}\"", bootstrap, StringComparison.Ordinal);
         Assert.DoesNotContain("export CHUMMER_UI_EXPECTED_COMMIT=", bootstrap, StringComparison.Ordinal);
         Assert.DoesNotContain("export CHUMMER_UI_KIT_EXPECTED_COMMIT=", bootstrap, StringComparison.Ordinal);
         Assert.DoesNotContain("export CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT=", bootstrap, StringComparison.Ordinal);
         Assert.Contains("umask 077", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("\"--config\"", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("curl -q --config -", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_URL", bootstrap, StringComparison.Ordinal);
         Assert.Contains("resolve_live_release_verify_urls", bootstrap, StringComparison.Ordinal);
@@ -512,9 +1008,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("no release-upload auth was supplied", wrapper, StringComparison.Ordinal);
         Assert.Contains("cannot mint a signed-in release ticket by itself", wrapper, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload", wrapper, StringComparison.Ordinal);
-        Assert.Contains("downloads/release-upload/bootstrap.sh", wrapper, StringComparison.Ordinal);
         Assert.Contains("copy the generated Command block", wrapper, StringComparison.Ordinal);
-        Assert.Contains("has no upload credential", wrapper, StringComparison.Ordinal);
         Assert.DoesNotContain("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/artifacts/mac-codex-release-pipeline/bootstrap.sh", wrapper, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload/bootstrap.sh", maintenanceReadme, StringComparison.Ordinal);
@@ -532,14 +1026,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("CHUMMER_DESKTOP_INSTALLER_TMPDIR", selfHostedRunbook, StringComparison.Ordinal);
         Assert.Contains("prompts for it with hidden input", selfHostedRunbook, StringComparison.Ordinal);
         Assert.Contains("copy the generated `Command` block", selfHostedRunbook, StringComparison.Ordinal);
-        Assert.Contains("do not run the raw `bootstrap.sh` URL for promotion", selfHostedRunbook, StringComparison.Ordinal);
+        Assert.Contains("Do not run the raw `bootstrap.sh` URL for promotion", selfHostedRunbook, StringComparison.Ordinal);
         Assert.Contains("hdiutil: create failed - No space left on device", selfHostedRunbook, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload", publicReadme, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload/bootstrap.sh", publicReadme, StringComparison.Ordinal);
         Assert.Contains("run-mac-release-bootstrap.sh", publicReadme, StringComparison.Ordinal);
         Assert.Contains("Copy the generated `Command` block", publicReadme, StringComparison.Ordinal);
         Assert.Contains("a raw public script has no upload credential", publicReadme, StringComparison.Ordinal);
-        Assert.Contains("pins the repo refs to expected commits", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("exact full 40-hex commit pin for every source repository", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_MIN_FREE_GIB", publicReadme, StringComparison.Ordinal);
         Assert.Contains("preflight-capacity-abort.json", publicReadme, StringComparison.Ordinal);
@@ -665,7 +1159,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("chummer6-media-factory.git", bootstrap, StringComparison.Ordinal);
         Assert.Contains("validate_publish_mode", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_TOKEN", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("[[ \"${#app_heads[@]}\" -eq 0 ]]", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("array_count()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("(( $(array_count app_heads) > 0 )) || die \"no app heads requested\"", bootstrap, StringComparison.Ordinal);
+        Assert.DoesNotContain("[[ \"${#app_heads[@]}\" -eq 0 ]]", bootstrap, StringComparison.Ordinal);
         Assert.Contains("upload_release_bundle_http()", bootstrap, StringComparison.Ordinal);
         Assert.Contains("write_public_promotion_evidence()", bootstrap, StringComparison.Ordinal);
         Assert.Contains("require_min_free_space_gib", bootstrap, StringComparison.Ordinal);
@@ -3408,28 +3904,48 @@ public sealed class VerificationEntryPointTests
     public void PublicEdgeProgramForcesNoStoreHeadersForBootstrapProofAndInstallRoutes()
     {
         string programPath = RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs");
+        string authControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AuthController.cs");
+        string privateCacheHeadersPath = RepoPaths.FromRoot("Chummer.Run.Api", "PrivateResponseCacheHeaders.cs");
         string program = File.ReadAllText(programPath);
+        string authController = File.ReadAllText(authControllerPath);
+        string privateCacheHeaders = File.ReadAllText(privateCacheHeadersPath);
 
         Assert.Contains("RequiresNoStoreHeaders", program, StringComparison.Ordinal);
         Assert.Contains("IsLegacyMacReleaseBootstrapArtifactPath", program, StringComparison.Ordinal);
+        Assert.Contains("string rawPath = path.Value ?? string.Empty;", program, StringComparison.Ordinal);
+        Assert.Contains("rawPath.Equals(\"/login\"", program, StringComparison.Ordinal);
+        Assert.Contains("rawPath.Equals(\"/signup\"", program, StringComparison.Ordinal);
+        Assert.Contains("rawPath.Equals(\"/auth\"", program, StringComparison.Ordinal);
+        Assert.Contains("rawPath.StartsWith(\"/auth/\"", program, StringComparison.Ordinal);
+        Assert.Contains("PrivateResponseCacheHeaders.IsPrivateAccountSurface(path)", program, StringComparison.Ordinal);
+        Assert.Contains("path.StartsWithSegments(\"/account\"", privateCacheHeaders, StringComparison.Ordinal);
+        Assert.Contains("path.StartsWithSegments(\"/api/v1/accounts\"", privateCacheHeaders, StringComparison.Ordinal);
+        Assert.Contains("PrivateResponseCacheHeaders.Apply(context.Response.Headers)", program, StringComparison.Ordinal);
+        Assert.Contains("[ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]", authController, StringComparison.Ordinal);
+        Assert.Contains("public override void OnActionExecuting", authController, StringComparison.Ordinal);
+        Assert.Contains("Response.OnStarting", authController, StringComparison.Ordinal);
+        Assert.Contains("ApplyNoStoreHeaders(((HttpResponse)state).Headers);", authController, StringComparison.Ordinal);
+        Assert.Contains("headers[\"Cache-Control\"] = \"private, no-store, max-age=0\";", authController, StringComparison.Ordinal);
+        Assert.Contains("headers[\"Cloudflare-CDN-Cache-Control\"] = \"no-store, max-age=0\";", authController, StringComparison.Ordinal);
         Assert.Contains("/downloads/release-upload", program, StringComparison.Ordinal);
         Assert.Contains("/downloads/release-upload/bootstrap.sh", program, StringComparison.Ordinal);
         Assert.DoesNotContain("context.Response.SendFileAsync(bootstrapPath)", program, StringComparison.Ordinal);
         Assert.Contains("/artifacts/mac-codex-release-pipeline/bootstrap.sh", program, StringComparison.Ordinal);
         Assert.Contains("/downloads/proof/windows", program, StringComparison.Ordinal);
+        Assert.Contains("/downloads/RELEASE_CHANNEL.generated.json", program, StringComparison.Ordinal);
         Assert.Contains("/downloads/install", program, StringComparison.Ordinal);
         Assert.Contains("/install-", program, StringComparison.Ordinal);
         Assert.Contains("/service-worker.js", program, StringComparison.Ordinal);
         Assert.Contains("/manifest.json", program, StringComparison.Ordinal);
         Assert.Contains("OnPrepareResponse", program, StringComparison.Ordinal);
-        Assert.Contains("ApplyNoStoreHeaders(fileContext.Context.Response.Headers)", program, StringComparison.Ordinal);
+        Assert.Contains("PrivateResponseCacheHeaders.Apply(fileContext.Context.Response.Headers)", program, StringComparison.Ordinal);
         Assert.Contains("context.Response.Redirect(\"/downloads/release-upload/bootstrap.sh\", permanent: false)", program, StringComparison.Ordinal);
-        Assert.Contains("Cache-Control", program, StringComparison.Ordinal);
-        Assert.Contains("CDN-Cache-Control", program, StringComparison.Ordinal);
-        Assert.Contains("Cloudflare-CDN-Cache-Control", program, StringComparison.Ordinal);
-        Assert.Contains("Surrogate-Control", program, StringComparison.Ordinal);
-        Assert.Contains("no-store, max-age=0", program, StringComparison.Ordinal);
-        Assert.Contains("no-cache", program, StringComparison.Ordinal);
+        Assert.Contains("Cache-Control", privateCacheHeaders, StringComparison.Ordinal);
+        Assert.Contains("CDN-Cache-Control", privateCacheHeaders, StringComparison.Ordinal);
+        Assert.Contains("Cloudflare-CDN-Cache-Control", privateCacheHeaders, StringComparison.Ordinal);
+        Assert.Contains("Surrogate-Control", privateCacheHeaders, StringComparison.Ordinal);
+        Assert.Contains("no-store, max-age=0", privateCacheHeaders, StringComparison.Ordinal);
+        Assert.Contains("no-cache", privateCacheHeaders, StringComparison.Ordinal);
         Assert.Contains("app.UseExceptionHandler(errorApp =>", program, StringComparison.Ordinal);
         Assert.Contains("Unexpected server error.", program, StringComparison.Ordinal);
         Assert.Contains("The request could not be completed. Retry, and contact support if the problem continues.", program, StringComparison.Ordinal);
@@ -3483,6 +3999,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("PublicTrustPulseTrendPointViewModel", viewModel, StringComparison.Ordinal);
         Assert.Contains("Weekly update", partial, StringComparison.Ordinal);
         Assert.Contains("trust-pulse-trend", body, StringComparison.Ordinal);
+        Assert.Contains("@PublicTrustPulseText(row.Value)", body, StringComparison.Ordinal);
         Assert.Contains("Current caution", controller, StringComparison.Ordinal);
         Assert.Contains("Closure health", controller, StringComparison.Ordinal);
         Assert.Contains("Progress trend", controller, StringComparison.Ordinal);
@@ -3545,7 +4062,7 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
-    public void LandingPageKeepsGuestDownloadsSeparateFromTheAccountAwareInstallRail()
+    public void LandingPageKeepsGuestDownloadsSeparateFromPublicInstallHandoffsAndTheAccountRail()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string servicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "ReleaseSelectionService.cs");
@@ -3565,8 +4082,22 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Download Chummer", landingView, StringComparison.Ordinal);
         Assert.Contains("href=\"/downloads\"", landingView, StringComparison.Ordinal);
         Assert.Contains("Open Chummer", landingView, StringComparison.Ordinal);
+        Assert.Contains("Sign in first", landingView, StringComparison.Ordinal);
+        Assert.Contains("var entryHref = Model.Chrome.Authenticated ? \"/account\" : \"/login?next=%2Faccount%2Faccess\";", landingView, StringComparison.Ordinal);
+        Assert.Contains("var entryLabel = Model.Chrome.Authenticated ? \"Account\" : \"Sign in first\";", landingView, StringComparison.Ordinal);
+        Assert.Contains("@if (Model.Chrome.Authenticated)", landingView, StringComparison.Ordinal);
         Assert.Contains("href=\"/build\"", landingView, StringComparison.Ordinal);
-        Assert.Contains("href=\"/play\"", landingView, StringComparison.Ordinal);
+        Assert.Contains("href=\"/mobile/player\"", landingView, StringComparison.Ordinal);
+        Assert.Contains("data-public-install-handoff=\"true\"", landingView, StringComparison.Ordinal);
+        Assert.Contains("data-mobile-app-device-picker", landingView, StringComparison.Ordinal);
+        Assert.Contains("Target: MobileAppHandoffTarget.Build", landingView, StringComparison.Ordinal);
+        Assert.Contains("Target: MobileAppHandoffTarget.Play", landingView, StringComparison.Ordinal);
+        Assert.Contains("Chummer Play · Jammer Companion", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-disabled-target", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-sign-in-href", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("site-open-chummer-menu__button--disabled", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("disabled aria-disabled=\"true\"", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("href=\"/play\"", landingView, StringComparison.Ordinal);
         Assert.Contains("minimal-inline-links", landingView, StringComparison.Ordinal);
         Assert.DoesNotContain("data-homepage-section=\"help\"", landingView, StringComparison.Ordinal);
         Assert.Contains("href=\"/participate\"", landingView, StringComparison.Ordinal);
@@ -3693,6 +4224,22 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
+    public void HubLiveAuditRequiresExplicitOptInBeforeEmailSignInProbe()
+    {
+        string auditPath = RepoPaths.FromRoot("scripts", "hub-live-audit.py");
+        string audit = File.ReadAllText(auditPath);
+
+        Assert.Contains("CHUMMER_ENABLE_EMAIL_SIGNIN_PROBE", audit, StringComparison.Ordinal);
+        Assert.Contains("auth_signin_automation_paused.flag", audit, StringComparison.Ordinal);
+        Assert.Contains("auth automation is paused by user request", audit, StringComparison.Ordinal);
+        Assert.Contains("def base_url_allows_email_signin_probe", audit, StringComparison.Ordinal);
+        Assert.Contains("signed-in work audit would exercise /auth/email/start", audit, StringComparison.Ordinal);
+        Assert.Contains("risk sending sign-in emails on this host", audit, StringComparison.Ordinal);
+        Assert.Contains("signed-in work audit remains blocked for non-loopback hosts", audit, StringComparison.Ordinal);
+        Assert.Contains("shared/public infrastructure", audit, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PublicDownloadCanonUsesCurrentInstallWording()
     {
         string designRoot = "/docker/chummercomplete/chummer-design/products/chummer";
@@ -3783,8 +4330,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release-api-portable", docs, StringComparison.Ordinal);
         Assert.Contains("checked-in public download mirror", docs, StringComparison.Ordinal);
         Assert.Contains("desktop-download-bundle", docs, StringComparison.Ordinal);
-        Assert.Contains("RUNBOOK_MODE=publish-latest-nightly", runbook, StringComparison.Ordinal);
-        Assert.Contains("08:00 Europe/Vienna", runbook, StringComparison.Ordinal);
+        Assert.Contains("bash scripts/materialize-public-downloads-bundle.sh", runbook, StringComparison.Ordinal);
+        Assert.Contains("RUNBOOK_MODE=downloads-upload-http", runbook, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 RUNBOOK_MODE=downloads-verify", runbook, StringComparison.Ordinal);
+        Assert.Contains("Keep the default strict verifier for gold promotion", runbook, StringComparison.Ordinal);
         Assert.DoesNotContain("run " + "workflow", runbook, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -3803,6 +4352,7 @@ public sealed class VerificationEntryPointTests
 
         Assert.DoesNotContain("Chummer.Portal/appsettings.json", runbook, StringComparison.Ordinal);
         Assert.Contains("Chummer.Run.Api/Chummer.Run.Api.csproj", runbook, StringComparison.Ordinal);
+        Assert.Contains("TEST_FRAMEWORK=net10.0", runbook, StringComparison.Ordinal);
         Assert.Contains("Chummer.Run.Api/Dockerfile", compose, StringComparison.Ordinal);
         Assert.Contains("chummer.run:host-gateway", compose, StringComparison.Ordinal);
         Assert.Contains("/docker/chummercomplete/chummer-hub-registry/.codex-studio/published:/downloads-source:ro", compose, StringComparison.Ordinal);

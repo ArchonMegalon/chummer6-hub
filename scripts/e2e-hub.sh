@@ -15,6 +15,7 @@ PUBLIC_EDGE_EXPECTED_HEAD="${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}"
 PUBLIC_EDGE_DEPLOY_REPO_ROOT="${CHUMMER_PUBLIC_EDGE_DEPLOY_REPO_ROOT:-${CHUMMER_RUN_SERVICES_SOURCE:-$ROOT_DIR}}"
 HUB_LOCAL_PROOF_PATH="${CHUMMER_HUB_LOCAL_PROOF_PATH:-.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
 HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT="${CHUMMER_HUB_SYNTHETIC_SUPPORT_CLEANUP_SCRIPT:-scripts/cleanup_synthetic_support_cases.py}"
+AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG="${CHUMMER_AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG:-$ROOT_DIR/.state/auth_signin_automation_paused.flag}"
 
 cd "$ROOT_DIR"
 
@@ -111,6 +112,15 @@ resolve_hub_proof_base_url() {
   printf '%s\n' "$HUB_BASE_URL"
 }
 
+hub_signed_in_work_args() {
+  if [[ -f "$AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG" ]]; then
+    echo "skipping signed-in hub audit: auth/sign-in automation is paused at $AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG" >&2
+    return 0
+  fi
+
+  printf '%s\n' --verify-signed-in-work
+}
+
 if [[ "$HUB_SKIP_EDGE_REBUILD" == "1" || "$HUB_SKIP_EDGE_REBUILD" == "true" || "$HUB_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
   echo "reusing current hub edge containers for playwright e2e"
 else
@@ -139,7 +149,11 @@ wait_for_hub_edge
 
 hub_live_audit_args=(--base-url "$HUB_BASE_URL")
 if [[ "$HUB_BASE_URL" == http://* ]]; then
-  hub_live_audit_args+=(--public-host "$HUB_PUBLIC_HOST" --forwarded-proto https --verify-http-redirects --verify-signed-in-work)
+  hub_live_audit_args+=(--public-host "$HUB_PUBLIC_HOST" --forwarded-proto https --verify-http-redirects)
+  while IFS= read -r extra_arg; do
+    [[ -n "$extra_arg" ]] || continue
+    hub_live_audit_args+=("$extra_arg")
+  done < <(hub_signed_in_work_args)
 fi
 
 python3 scripts/hub-live-audit.py "${hub_live_audit_args[@]}"

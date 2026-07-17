@@ -50,11 +50,18 @@ public sealed class NexusPanContinuityService
                 reviewState: "live"))
     ];
 
-    private readonly InstallLinkingStore _installLinkingStore;
+    private readonly InstallLinkingStore? _installLinkingStore;
+    private readonly InstallLinkingStoreAccess? _installLinkingStoreAccess;
 
     public NexusPanContinuityService(InstallLinkingStore installLinkingStore)
     {
         _installLinkingStore = installLinkingStore;
+    }
+
+    public NexusPanContinuityService(InstallLinkingStoreAccess installLinkingStoreAccess)
+    {
+        _installLinkingStoreAccess = installLinkingStoreAccess
+            ?? throw new ArgumentNullException(nameof(installLinkingStoreAccess));
     }
 
     public IReadOnlyList<NexusPanReceipt> ListReceipts() => Receipts;
@@ -65,24 +72,29 @@ public sealed class NexusPanContinuityService
 
     public NexusPanPublicSummary BuildPublicSummary()
     {
-        lock (_installLinkingStore.Gate)
+        if (!TryGetInstallLinkingStore(out InstallLinkingStore installLinkingStore))
+        {
+            return new NexusPanPublicSummary(0, 0, 0, 0, [], DateTimeOffset.UtcNow);
+        }
+
+        lock (installLinkingStore.Gate)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            ClaimedInstallationDto[] activeInstallations = _installLinkingStore.InstallationsById.Values
+            ClaimedInstallationDto[] activeInstallations = installLinkingStore.InstallationsById.Values
                 .Where(item => string.Equals(item.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(static item => item.UpdatedAtUtc)
                 .ToArray();
-            InstallationGrantDto[] activeGrants = _installLinkingStore.GrantsById.Values
+            InstallationGrantDto[] activeGrants = installLinkingStore.GrantsById.Values
                 .Where(item => string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
                 .Where(item => item.ExpiresAtUtc > now)
                 .OrderByDescending(static item => item.IssuedAtUtc)
                 .ToArray();
-            InstallClaimTicketDto[] pendingTickets = _installLinkingStore.ClaimTicketsById.Values
+            InstallClaimTicketDto[] pendingTickets = installLinkingStore.ClaimTicketsById.Values
                 .Where(item => string.Equals(item.Status, InstallClaimTicketStates.Pending, StringComparison.OrdinalIgnoreCase))
                 .Where(item => item.ExpiresAtUtc > now)
                 .OrderByDescending(static item => item.CreatedAtUtc)
                 .ToArray();
-            InstallBrowserCallbackDto[] pendingCallbacks = _installLinkingStore.BrowserCallbacksById.Values
+            InstallBrowserCallbackDto[] pendingCallbacks = installLinkingStore.BrowserCallbacksById.Values
                 .Where(item => string.Equals(item.Status, InstallBrowserCallbackStates.Pending, StringComparison.OrdinalIgnoreCase))
                 .Where(item => item.ExpiresAtUtc > now)
                 .OrderByDescending(static item => item.CreatedAtUtc)
@@ -107,6 +119,17 @@ public sealed class NexusPanContinuityService
                     ?? pendingCallbacks.FirstOrDefault()?.CreatedAtUtc
                     ?? now);
         }
+    }
+
+    private bool TryGetInstallLinkingStore(out InstallLinkingStore store)
+    {
+        if (_installLinkingStore is not null)
+        {
+            store = _installLinkingStore;
+            return true;
+        }
+
+        return _installLinkingStoreAccess!.TryGet(out store);
     }
 
     public string BuildIndexJson()

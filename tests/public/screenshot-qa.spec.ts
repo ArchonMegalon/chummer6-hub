@@ -20,7 +20,7 @@ const supportingSurfaces = [
     id: 'downloads',
     route: '/downloads',
     screenshotPrefix: 'downloads',
-    requiredText: ['Downloads', 'Stable', 'Nightly', 'Stable release', 'Build from source'],
+    requiredText: ['Downloads', 'Version', 'Stable', 'Nightly', 'Stable release.', 'Build from source'],
   },
   {
     id: 'status',

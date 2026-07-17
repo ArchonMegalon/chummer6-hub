@@ -206,6 +206,7 @@ class _RecordingHandler(BaseHTTPRequestHandler):
             "mediaFactoryRequests": [release_media_request()],
         },
     }
+    response_status_by_path: dict[str, int] = {}
     requests: list[dict[str, object]] = []
 
     def do_GET(self) -> None:
@@ -227,6 +228,8 @@ class _RecordingHandler(BaseHTTPRequestHandler):
             "authorization": self.headers.get("Authorization"),
             "host": self.headers.get("Host"),
             "forwarded_proto": self.headers.get("X-Forwarded-Proto"),
+            "user_agent": self.headers.get("User-Agent"),
+            "accept_language": self.headers.get("Accept-Language"),
             "content_type": self.headers.get("Content-Type"),
             "body": parsed_body,
         }
@@ -239,7 +242,7 @@ class _RecordingHandler(BaseHTTPRequestHandler):
             return
 
         body = json.dumps(type(self).response_payloads_by_path[self.path]).encode("utf-8")
-        self.send_response(200)
+        self.send_response(type(self).response_status_by_path.get(self.path, 200))
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -248,6 +251,8 @@ class _RecordingHandler(BaseHTTPRequestHandler):
 
 class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
     def setUp(self) -> None:
+        self.previous_fleet_internal_api_token = os.environ.get("FLEET_INTERNAL_API_TOKEN")
+        os.environ["FLEET_INTERNAL_API_TOKEN"] = "expected-token"
         _RecordingHandler.expected_methods_by_path = {
             "/api/internal/artifact-factory/recipes": "GET",
             "/api/internal/artifact-factory/source-pack-batches": "POST",
@@ -317,6 +322,7 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 "mediaFactoryRequests": [release_media_request()],
             },
         }
+        _RecordingHandler.response_status_by_path = {}
         _RecordingHandler.requests = []
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _RecordingHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -327,6 +333,10 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=5)
+        if self.previous_fleet_internal_api_token is None:
+            os.environ.pop("FLEET_INTERNAL_API_TOKEN", None)
+        else:
+            os.environ["FLEET_INTERNAL_API_TOKEN"] = self.previous_fleet_internal_api_token
 
     def test_launches_source_pack_batch_from_file(self) -> None:
         payload = {
@@ -361,8 +371,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                     str(SCRIPT),
                     "--base-url",
                     self.base_url,
-                    "--token",
-                    "expected-token",
                     "--public-host",
                     "chummer.run",
                     "--forwarded-proto",
@@ -405,6 +413,8 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 "authorization": "Bearer expected-token",
                 "host": "chummer.run",
                 "forwarded_proto": "https",
+                "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 ChummerArtifactFactoryLauncher/1.0",
+                "accept_language": "en-US,en;q=0.9",
                 "content_type": None,
                 "body": None,
             },
@@ -417,6 +427,8 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 "authorization": "Bearer expected-token",
                 "host": "chummer.run",
                 "forwarded_proto": "https",
+                "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 ChummerArtifactFactoryLauncher/1.0",
+                "accept_language": "en-US,en;q=0.9",
                 "content_type": "application/json",
                 "body": payload,
             },
@@ -430,8 +442,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--recipes",
             ],
             cwd=REPO_ROOT,
@@ -462,8 +472,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--recipes",
             ],
             cwd=REPO_ROOT,
@@ -523,8 +531,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                     str(SCRIPT),
                     "--base-url",
                     self.base_url,
-                    "--token",
-                    "expected-token",
                     "--public-host",
                     "chummer.run",
                     "--forwarded-proto",
@@ -580,8 +586,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -628,8 +632,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -676,8 +678,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -736,8 +736,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -784,8 +782,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -844,8 +840,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -900,8 +894,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -947,8 +939,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -994,8 +984,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1049,8 +1037,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1096,8 +1082,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1144,8 +1128,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1250,8 +1232,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1286,8 +1266,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1330,8 +1308,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1367,8 +1343,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1411,8 +1385,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1456,8 +1428,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1607,8 +1577,6 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 str(SCRIPT),
                 "--base-url",
                 self.base_url,
-                "--token",
-                "expected-token",
                 "--request-file",
                 "-",
             ],
@@ -1687,7 +1655,7 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         }
 
         result = subprocess.run(
-            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--request-file", "-"],
             cwd=REPO_ROOT,
             input=json.dumps(payload),
             stdout=subprocess.PIPE,
@@ -1723,7 +1691,7 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         }
 
         result = subprocess.run(
-            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--request-file", "-"],
             cwd=REPO_ROOT,
             input=json.dumps(payload),
             stdout=subprocess.PIPE,
@@ -1758,7 +1726,7 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         }
 
         result = subprocess.run(
-            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--request-file", "-"],
             cwd=REPO_ROOT,
             input=json.dumps(payload),
             stdout=subprocess.PIPE,
@@ -1793,7 +1761,7 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         }
 
         result = subprocess.run(
-            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--request-file", "-"],
             cwd=REPO_ROOT,
             input=json.dumps(payload),
             stdout=subprocess.PIPE,
@@ -1828,7 +1796,7 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         }
 
         result = subprocess.run(
-            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--request-file", "-"],
             cwd=REPO_ROOT,
             input=json.dumps(payload),
             stdout=subprocess.PIPE,
@@ -1863,7 +1831,7 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         }
 
         result = subprocess.run(
-            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--request-file", "-"],
             cwd=REPO_ROOT,
             input=json.dumps(payload),
             stdout=subprocess.PIPE,
@@ -1900,6 +1868,64 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("internal bearer token is required", result.stderr)
+
+    def test_rejects_credential_cli_without_echoing_value(self) -> None:
+        sentinel = "cli-token-must-not-be-echoed"
+        result = subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--base-url",
+                self.base_url,
+                "--token",
+                sentinel,
+                "--recipes",
+            ],
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("credential-bearing CLI arguments are not supported", result.stderr)
+        self.assertNotIn(sentinel, result.stdout)
+        self.assertNotIn(sentinel, result.stderr)
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertNotIn('parser.add_argument(\n        "--token"', source)
+
+    def test_http_error_body_is_suppressed_before_logging(self) -> None:
+        hostile_secret = "must-not-leak-artifact-factory-bearer"
+        _RecordingHandler.response_status_by_path = {
+            "/api/internal/artifact-factory/recipes": 403,
+        }
+        _RecordingHandler.response_payloads_by_path[
+            "/api/internal/artifact-factory/recipes"
+        ] = {
+            "message": f"Authorization: Bearer {hostile_secret}",
+            "credential": hostile_secret,
+            "traceId": "trace-safe-123",
+        }
+
+        env = os.environ.copy()
+        env["FLEET_INTERNAL_API_TOKEN"] = "launcher-only-token"
+        result = subprocess.run(
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--recipes"],
+            cwd=REPO_ROOT,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("response detail suppressed", result.stderr)
+        self.assertIn("traceId=trace-safe-123", result.stderr)
+        self.assertNotIn(hostile_secret, result.stdout)
+        self.assertNotIn(hostile_secret, result.stderr)
+        self.assertNotIn("Authorization", result.stderr)
 
 
 if __name__ == "__main__":

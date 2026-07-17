@@ -1,5 +1,6 @@
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Community;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -223,16 +224,74 @@ public sealed class RunsiteOrientationRequestComposerServiceTests
             payload.PreviewSafeTruth.PreviewTruthPosture);
     }
 
+    [Fact]
+    public void BridgeServiceComposesSharedRunsiteSceneRenderArtifactRequest()
+    {
+        RunsiteOrientationArtifactRequestBridgeService service = new(new RunsiteOrientationRequestComposerService());
+
+        RunsiteOrientationArtifactRequestBridgePayload result = service.Compose(
+            new RunsiteOrientationArtifactRequestBridgeRequest(
+                UserId: "subject.runsite",
+                OrientationRequest: BuildRequest(),
+                ConsumeQuota: false));
+
+        Assert.Equal("runsite", result.ArtifactRequest.HorizonId);
+        Assert.Equal("runsite-scene-render", result.ArtifactRequest.ArtifactKindOrCapabilityId);
+        Assert.Equal("private", result.ArtifactRequest.Visibility);
+        Assert.StartsWith("runsite:orientation:runsite-pack-redmond:redmond-docks-route:runsite-redmond-bundle", result.ArtifactRequest.SourceRef, StringComparison.Ordinal);
+        HorizonGovernedRenderRequestCreateRequest governed = Assert.IsType<HorizonGovernedRenderRequestCreateRequest>(result.ArtifactRequest.GovernedRenderRequest);
+        IReadOnlyList<string> evidenceRefs = Assert.IsAssignableFrom<IReadOnlyList<string>>(governed.EvidenceRefs);
+        IReadOnlyList<string> truthRefs = Assert.IsAssignableFrom<IReadOnlyList<string>>(governed.TruthRefs);
+        IReadOnlyList<HorizonGovernedRenderArtifactSpec> artifacts = Assert.IsAssignableFrom<IReadOnlyList<HorizonGovernedRenderArtifactSpec>>(governed.Artifacts);
+        Assert.Equal("magicai", governed.PreferredProvider);
+        Assert.Equal("runsite-redmond-bundle", governed.WorkItemId);
+        Assert.Contains("route-summary:redmond-docks-route", evidenceRefs);
+        Assert.Contains("/artifacts/routes/redmond-docks-route/segment-a", truthRefs);
+        Assert.Equal(result.OrientationRequest.BundleRequest.Artifacts.Count, artifacts.Count);
+    }
+
+    [Fact]
+    public void InternalControllerReturnsSharedArtifactRequestWhenAuthorized()
+    {
+        InternalRunsiteOrientationController controller = BuildController(expectedToken: "approved-token");
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer approved-token";
+
+        ActionResult<RunsiteOrientationArtifactRequestBridgeResult> response = controller.ComposeArtifactRequest(
+            new RunsiteOrientationArtifactRequestBridgeRequest(
+                UserId: "subject.runsite",
+                OrientationRequest: BuildRequest(),
+                ConsumeQuota: false));
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(response.Result);
+        RunsiteOrientationArtifactRequestBridgeResult payload = Assert.IsType<RunsiteOrientationArtifactRequestBridgeResult>(ok.Value);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+        Assert.Equal("accepted", payload.ArtifactRequestReceipt.Status);
+        Assert.Equal("runsite-scene-render", payload.ArtifactRequestReceipt.CapabilityId);
+        Assert.NotNull(payload.ArtifactRequestReceipt.GovernedRenderRequest);
+        Assert.Equal("runsite-redmond-bundle", payload.OrientationRequest.BundleRequest.BundleId);
+        Assert.Equal(["segment-a", "segment-b"], payload.OrientationRequest.RouteSummaryArtifactLaunches.Select(static launch => launch.RouteSegmentId).ToArray());
+    }
+
     private static InternalRunsiteOrientationController BuildController(string expectedToken)
     {
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["FLEET_INTERNAL_API_TOKEN"] = expectedToken
+                ["FLEET_INTERNAL_API_TOKEN"] = expectedToken,
+                ["CHUMMER_HORIZON_RUNSITE_CAPABILITY_RUNSITE_SCENE_RENDER_ENABLED"] = "true"
             })
             .Build();
+        HorizonCapabilityService capabilities = new(configuration);
+        HorizonArtifactRequestService artifactRequests = new(capabilities);
+        RunsiteOrientationArtifactRequestBridgeService bridge = new(new RunsiteOrientationRequestComposerService());
         return new InternalRunsiteOrientationController(
             new RunsiteOrientationRequestComposerService(),
+            bridge,
+            artifactRequests,
             configuration);
     }
 

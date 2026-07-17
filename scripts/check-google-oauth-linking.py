@@ -1,71 +1,46 @@
 #!/usr/bin/env python3
-"""Check Google OAuth/account-linking flow on live chummer.run."""
+"""Quick structural Google OAuth handoff probe for live chummer.run."""
+
+from __future__ import annotations
 
 import sys
 
-import requests
-
-BASE_URL = "https://chummer.run"
-SESSION = requests.Session()
-ROUTES = [
-    ("/login", {200}),
-    ("/auth/google/start", {302, 303, 307, 308}),
-    ("/account/access", {200, 302, 303, 307, 308}),
-]
-TEST_CASES = [
-    "anonymous user starts on /login",
-    "Google handoff path exposes /auth/google/start",
-    "existing account can link Google",
-    "linked account can sign back in with Google",
-    "linked-provider state is visible on /account/access",
-    "logout/login preserves the expected linked state",
-]
-
-
-def probe_route(route: str, expected_statuses: set[int]) -> bool:
-    try:
-        response = SESSION.get(f"{BASE_URL}{route}", timeout=10, allow_redirects=False)
-    except Exception as exc:
-        print(f"{route} request failed: {exc}")
-        return False
-
-    status = response.status_code
-    location = response.headers.get("Location")
-    print(f"{route} status={status} Location={location!r}")
-    if status not in expected_statuses:
-        return False
-
-    if route == "/auth/google/start":
-        if location is None:
-            print(f"{route} response missing Location header for OAuth handoff path")
-            return False
-        if (
-            "accounts.google.com" not in str(location)
-            and "googleapis.com" not in str(location)
-            and "/auth/google/callback" not in str(location)
-            and "start" not in str(location)
-        ):
-            print(f"{route} redirect target does not include expected OAuth handoff")
-            return False
-    return True
+from materialize_google_oauth_linking_proof import DEFAULT_BASE_URL, probe_public_google_handoff
 
 
 def main() -> int:
-    all_ok = True
-    for route, expected_statuses in ROUTES:
-        if not probe_route(route, expected_statuses):
-            print(f"{route} failed")
-            all_ok = False
+    probe = probe_public_google_handoff(DEFAULT_BASE_URL)
+    print(f"base_url={DEFAULT_BASE_URL}")
+    print(f"login_url={probe.get('login_url')}")
+    print(f"google_start_url={probe.get('google_start_url')}")
+    print(f"login_status={probe.get('login_status')}")
+    print(f"google_start_status={probe.get('google_start_status')}")
+    print(f"google_start_href_present={probe.get('google_start_href_present')}")
+    print(f"state_cookie_present={probe.get('state_cookie_present')}")
 
-    for test_case in TEST_CASES:
-        print(f"Test case: {test_case}")
+    redirect = probe.get("redirect") or {}
+    for key in (
+        "is_google_host",
+        "is_supported_google_path",
+        "redirect_uri_matches",
+        "response_type_code",
+        "scope_includes_openid_profile_email",
+        "state_present",
+        "nonce_present",
+        "code_challenge_present",
+        "code_challenge_method_s256",
+        "prompt_select_account",
+    ):
+        print(f"{key}={redirect.get(key)}")
 
-    if all_ok:
-        print("Google OAuth/account-linking flow ok")
-        return 0
+    if probe.get("failures"):
+        for failure in probe["failures"]:
+            print(f"failure={failure}")
+        print("google_oauth_structural_handoff:fail")
+        return 1
 
-    print("Some OAuth checks failed")
-    return 1
+    print("google_oauth_structural_handoff:pass")
+    return 0
 
 
 if __name__ == "__main__":

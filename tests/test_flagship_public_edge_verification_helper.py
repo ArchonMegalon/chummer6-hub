@@ -10,7 +10,8 @@ def test_flagship_public_edge_helper_runs_the_live_proof_pack() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
 
     assert "scripts/verify_all_horizons_preview_routes.py" in text
-    assert "scripts/verify_public_pwa_static_assets.py" in text
+    assert 'children.get("pwaStatic")' in text
+    assert "PUBLIC_PWA_STATIC_ASSETS.generated.json" in text
     assert "scripts/verify_mobile_pwa_ledger_boundary.py" in text
     assert "scripts/verify_ready_mobile_handoff_contract.py" in text
     assert "scripts/verify_participate_iframe_shell.py" in text
