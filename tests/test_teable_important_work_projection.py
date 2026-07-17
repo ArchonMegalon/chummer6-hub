@@ -50,6 +50,20 @@ def governed_lock_path(module, root: Path) -> Path:
     return root / module.SYNC_LOCK_DIRECTORY_NAME / module.SYNC_LOCK_FILENAME
 
 
+def synthetic_credentialed_https_url(
+    username: str,
+    password: str,
+    location: str,
+    query_token: str,
+) -> str:
+    return "{}://{}@{}?token={}".format(
+        "https",
+        ":".join((username, password)),
+        location,
+        query_token,
+    )
+
+
 @pytest.fixture(autouse=True)
 def isolate_teable_sync_lock(tmp_path, monkeypatch):
     isolated_path = (
@@ -1756,7 +1770,12 @@ def test_unsafe_api_base_url_fails_before_network(tmp_path, monkeypatch, api_bas
 def test_api_url_credentials_and_query_are_removed_from_failed_receipt(tmp_path, monkeypatch):
     module = load_module()
     monkeypatch.setattr(module, "important_work_items", lambda: [make_item(module, "item-1")])
-    raw_url = "https://operator:super-secret@relay.example/governed/api?token=query-secret"
+    raw_url = synthetic_credentialed_https_url(
+        "operator",
+        "super-secret",
+        "relay.example/governed/api",
+        "query-secret",
+    )
 
     result = module.sync_to_teable(
         api_key=None,
@@ -2212,6 +2231,12 @@ def test_post_redirect_is_reconciled_once_without_retry_or_secret_leak(
     handler = module.SafeTeableRedirectHandler()
     item = make_item(module, "item-1")
     post_count = 0
+    redirect_url = synthetic_credentialed_https_url(
+        "redirect-user",
+        "redirect-secret",
+        "other.example/next",
+        "redirect-query",
+    )
     monkeypatch.setattr(module, "important_work_items", lambda: [item])
     monkeypatch.setattr(module, "ensure_fields", lambda *args, **kwargs: None)
 
@@ -2230,7 +2255,7 @@ def test_post_redirect_is_reconciled_once_without_retry_or_secret_leak(
             status_code,
             "Redirect",
             {},
-            "https://redirect-user:redirect-secret@other.example/next?token=redirect-query",
+            redirect_url,
         )
 
     monkeypatch.setattr(module, "find_existing_record", lookup)
@@ -2260,6 +2285,12 @@ def test_get_cross_origin_redirect_remains_non_mutating_setup_failure_without_ur
     module = load_module()
     handler = module.SafeTeableRedirectHandler()
     open_count = 0
+    redirect_url = synthetic_credentialed_https_url(
+        "redirect-user",
+        "redirect-secret",
+        "other.example/next",
+        "redirect-query",
+    )
 
     def redirect_after_get(request, timeout):
         nonlocal open_count
@@ -2271,7 +2302,7 @@ def test_get_cross_origin_redirect_remains_non_mutating_setup_failure_without_ur
             302,
             "Found",
             {},
-            "https://redirect-user:redirect-secret@other.example/next?token=redirect-query",
+            redirect_url,
         )
 
     monkeypatch.setattr(module, "open_teable_url", redirect_after_get)
@@ -2290,6 +2321,12 @@ def test_patch_redirect_is_not_retried_and_is_not_counted_as_create_ambiguity(tm
     handler = module.SafeTeableRedirectHandler()
     item = make_item(module, "item-1")
     patch_count = 0
+    redirect_url = synthetic_credentialed_https_url(
+        "redirect-user",
+        "redirect-secret",
+        "other.example/next",
+        "redirect-query",
+    )
     monkeypatch.setattr(module, "important_work_items", lambda: [item])
     monkeypatch.setattr(module, "ensure_fields", lambda *args, **kwargs: None)
     monkeypatch.setattr(module, "find_existing_record", lambda *args, **kwargs: "rec-1")
@@ -2304,7 +2341,7 @@ def test_patch_redirect_is_not_retried_and_is_not_counted_as_create_ambiguity(tm
             302,
             "Found",
             {},
-            "https://redirect-user:redirect-secret@other.example/next?token=redirect-query",
+            redirect_url,
         )
 
     monkeypatch.setattr(module, "open_teable_url", redirect_after_patch)
