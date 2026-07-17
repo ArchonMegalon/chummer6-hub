@@ -434,26 +434,52 @@ def test_public_edge_rebuild_source_gate_still_covers_source_checked_scripts() -
 def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> None:
     script = (ROOT / "scripts" / "deploy_public_edge_portal.sh").read_text(encoding="utf-8")
 
+    assert script.startswith("#!/usr/bin/bash\n")
+    assert "/usr/bin/env -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C" in script
+    assert "/usr/bin/bash --noprofile --norc scripts/deploy_public_edge_portal.sh" in script
+    assert "CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH" in script
     assert "scripts/verify_public_edge_deploy_source.py" in script
+    assert "scripts/verify_public_edge_deploy_authority.py" in script
     assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD" in script
+    assert "CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF" in script
+    assert "CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256" in script
+    assert 'readonly TRUSTED_SHA256SUM="/usr/bin/sha256sum"' in script
+    assert '"$TRUSTED_SHA256SUM" -- "$TRUSTED_AUTHORITY_VERIFIER"' in script
     assert "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM" in script
     assert "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" in script
     assert "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS" in script
     assert "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_RETRY_DELAY_SECONDS" in script
     assert "CHUMMER_RUN_SERVICES_CONTEXT_DIR" in script
     assert "CHUMMER_RUN_SERVICES_SOURCE" in script
-    assert "docker buildx build" in script
+    assert "docker_cli buildx build" in script
+    assert '--builder "$CANONICAL_BUILDX_BUILDER"' in script
+    assert '--context "$CANONICAL_DOCKER_CONTEXT"' in script
+    assert 'CANONICAL_DOCKER_HOST="unix:///var/run/docker.sock"' in script
+    assert 'CANONICAL_BUILDX_BUILDER="default"' in script
     assert "--build-context \"run-services-source=$SOURCE_ROOT\"" in script
     assert "--build-context \"fleet-media-factory-contracts=$FLEET_MEDIA_CONTRACTS\"" in script
     assert "--build-context \"design-product=$DESIGN_PRODUCT_ROOT\"" in script
-    assert "docker image inspect \"$IMAGE_TAG\" --format '{{.Id}}'" in script
+    assert "docker_cli image inspect \"$IMAGE_TAG\" --format '{{.Id}}'" in script
     assert 'stop chummer-portal' in script
     assert "run --rm --no-deps chummer-portal-volume-init" in script
     assert "up -d --no-build --no-deps --force-recreate" in script
     assert '--wait --wait-timeout "$PORTAL_READY_TIMEOUT_SECONDS" chummer-portal' in script
     assert "public-edge-mutation.lock" in script
     assert "public edge deploy refuses a Compose file outside the audited source root" in script
+    assert "BASH_ENV|ENV|CDPATH|GLOBIGNORE|LD_PRELOAD|LD_LIBRARY_PATH" in script
+    assert "DOCKER_*|BUILDKIT_HOST|BUILDX_*|COMPOSE_*" in script
+    assert "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM:-auto" not in script
     assert "--self-contained-direct" not in script
+    authority_index = script.index(
+        '"$TRUSTED_PYTHON" -I "$TRUSTED_AUTHORITY_VERIFIER"'
+    )
+    selected_source_index = script.index(
+        'trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.py"'
+    )
+    compose_render_index = script.index(
+        "compose_cli --profile install-linking-postgres-admin config --format json"
+    )
+    assert authority_index < selected_source_index < compose_render_index
     stop_index = script.index("stop chummer-portal")
     init_index = script.index("run --rm --no-deps chummer-portal-volume-init")
     recreate_index = script.index(
@@ -462,8 +488,8 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     )
     assert stop_index < init_index < recreate_index
     assert "restore_prior_portal()" in script
-    assert 'docker start "$prior_portal_container_id"' in script
-    assert 'docker tag "$prior_portal_image_id" "$IMAGE_TAG"' in script
+    assert 'docker_cli start "$prior_portal_container_id"' in script
+    assert 'docker_cli tag "$prior_portal_image_id" "$IMAGE_TAG"' in script
     assert "scripts/verify_public_edge_postdeploy_gate.py" in script
     assert "--strict-preflight" in script
     assert "--release-channel-receipt \"$RELEASE_CHANNEL_RECEIPT\"" in script
@@ -477,7 +503,7 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "--mobile-pwa-viewport-artifact-dir \"$PLAYWRIGHT_ARTIFACT_DIR/mobile-pwa-viewport\"" in script
     assert "--frontdoor-navigation-artifact-dir \"$PLAYWRIGHT_ARTIFACT_DIR/frontdoor-navigation\"" in script
     assert "for ((attempt = 1; attempt <= POSTDEPLOY_ATTEMPTS; attempt++))" in script
-    assert "sleep \"$POSTDEPLOY_RETRY_DELAY_SECONDS\"" in script
+    assert '"$TRUSTED_SLEEP" "$POSTDEPLOY_RETRY_DELAY_SECONDS"' in script
 
 
 def test_release_ready_script_calls_public_edge_deploy_source_gate() -> None:
@@ -505,6 +531,12 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
 
     assert "Public-edge source and browser proof gate" in runbook
     assert "scripts/deploy_public_edge_portal.sh" in runbook
+    assert "CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH=1" in runbook
+    assert "CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF='refs/remotes/origin/main'" in runbook
+    assert "CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256='5f9b25d9d2ce75e35542834cca9041eb373f2ff7aded5c21801d97b835bb5290'" in runbook
+    assert "/usr/bin/bash --noprofile --norc" in runbook
+    assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD=\"$(git rev-parse HEAD)\"" not in runbook
+    assert "bash scripts/deploy_public_edge_portal.sh" not in runbook
     assert "Do not use raw `docker compose ... up -d --build chummer-portal` for release publication." in runbook
     assert "scripts/verify_public_edge_deploy_source.py" in runbook
     assert "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" in runbook
@@ -524,6 +556,9 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "--portal-container chummer6-hub-chummer-portal-1" in runbook
     assert "--portal-image-tag chummer-run-api:local" in runbook
     assert "scripts/restore_public_edge_portal_image.py" in runbook
+    assert "/usr/bin/python3 -I" in runbook
+    assert "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml" in runbook
+    assert "/docker/chummercomplete/chummer.run-services/.env" in runbook
     assert "Public-edge mutable storage preflight" in runbook
     assert "docker compose run --rm --no-deps chummer-portal-volume-init" in runbook
     assert "never changes host ownership or modes" in runbook

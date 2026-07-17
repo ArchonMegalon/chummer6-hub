@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
+import sys
+import time
 
 import pytest
 
@@ -18,6 +22,104 @@ RUNBOOK = ROOT / "docs" / "SELF_HOSTED_DOWNLOADS_RUNBOOK.md"
 
 @pytest.fixture(autouse=True)
 def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    for forbidden_name in (
+        "BASH_ENV",
+        "ENV",
+        "CDPATH",
+        "GLOBIGNORE",
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "PYTHONHOME",
+        "PYTHONPATH",
+        "PYTHONSTARTUP",
+        "PYTHONINSPECT",
+        "PYTHONBREAKPOINT",
+        "PYTHONWARNINGS",
+        "PYTHONSAFEPATH",
+        "DOCKER_HOST",
+        "DOCKER_CONTEXT",
+        "DOCKER_CONFIG",
+        "BUILDKIT_HOST",
+        "BUILDX_BUILDER",
+        "COMPOSE_FILE",
+    ):
+        monkeypatch.delenv(forbidden_name, raising=False)
+    trusted_tools = tmp_path / "trusted-tools"
+    trusted_tools.mkdir()
+    trusted_python = trusted_tools / "python3"
+    trusted_python.write_text(
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "if [ -n \"${FAKE_TRUSTED_PYTHON_LOG:-}\" ]; then printf '%s\\n' \"$*\" >> \"$FAKE_TRUSTED_PYTHON_LOG\"; fi\n"
+        "case \"$*\" in\n"
+        "  *verify_public_edge_deploy_authority.py*) exit \"${FAKE_AUTHORITY_EXIT:-0}\";;\n"
+        "  *verify_public_edge_deploy_source.py*) exit \"${FAKE_SOURCE_GATE_EXIT:-0}\";;\n"
+        "  *verify_public_edge_postdeploy_gate.py*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *validate_public_edge_compose_runtime.py*) /usr/bin/cat >/dev/null; exit 0;;\n"
+        "  *secrets.token_hex*|*hmac.compare_digest*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *matches\\ =\\ \\[\\]*) exec /usr/bin/python3 \"$@\";;\n"
+        "esac\n"
+        "if [ \"${1:-}\" = -I ] && [ \"${2:-}\" = -c ]; then\n"
+        "  /usr/bin/cat >/dev/null\n"
+        "  printf '%s\\n' 'default|docker|default|running'\n"
+        "  exit 0\n"
+        "fi\n"
+        "exec /usr/bin/env python3 \"$@\"\n",
+        encoding="utf-8",
+    )
+    trusted_python.chmod(0o755)
+    trusted_docker = trusted_tools / "docker"
+    trusted_docker.write_text(
+        "#!/bin/sh\n"
+        "set -eu\n"
+        "if [ \"${1:-}\" = --context ] && [ \"${2:-}\" = default ]; then shift 2; fi\n"
+        "case \"$*\" in\n"
+        "  \"context inspect default --format {{.Name}}|{{.Endpoints.docker.Host}}|{{.Endpoints.docker.SkipTLSVerify}}\")\n"
+        "    if [ -n \"${FAKE_DOCKER_CONTEXT_PAUSE_READY:-}\" ]; then /usr/bin/touch \"$FAKE_DOCKER_CONTEXT_PAUSE_READY\"; /usr/bin/sleep 30; fi\n"
+        "    printf '%s\\n' \"${FAKE_DOCKER_CONTEXT_IDENTITY:-default|unix:///var/run/docker.sock|false}\"; exit 0;;\n"
+        "  \"buildx ls --format json\")\n"
+        "    if [ -n \"${FAKE_BUILDER_JSON:-}\" ]; then printf '%s\\n' \"$FAKE_BUILDER_JSON\"; else printf '%s\\n' '{\"Current\":true,\"Driver\":\"docker\",\"Name\":\"default\",\"Nodes\":[{\"Endpoint\":\"default\",\"Name\":\"default\",\"Status\":\"running\"}]}'; fi; exit 0;;\n"
+        "esac\n"
+        "exec /usr/bin/env docker \"$@\"\n",
+        encoding="utf-8",
+    )
+    trusted_docker.chmod(0o755)
+    deploy_under_test = tmp_path / "deploy_public_edge_portal.sh"
+    deploy_script = DEPLOY.read_text(encoding="utf-8")
+    deploy_script = deploy_script.replace(
+        'readonly TRUSTED_PYTHON="/usr/bin/python3"',
+        f'readonly TRUSTED_PYTHON="{trusted_python}"',
+    ).replace(
+        'readonly TRUSTED_DOCKER="/usr/bin/docker"',
+        f'readonly TRUSTED_DOCKER="{trusted_docker}"',
+    ).replace(
+        'ROOT_DIR="$("$TRUSTED_REALPATH" -e -- "$SCRIPT_DIR/..")"',
+        f'ROOT_DIR="{ROOT}"',
+    ).replace(
+        'CANONICAL_DOCKER_CONFIG_ROOT="/docker/chummercomplete/.state/public-edge-docker-cli"',
+        f'CANONICAL_DOCKER_CONFIG_ROOT="{tmp_path / "docker-config"}"',
+    ).replace(
+        'DEPLOY_LOCK_ROOT="/docker/chummercomplete/.state"',
+        f'DEPLOY_LOCK_ROOT="{tmp_path / "lock-state"}"',
+    ).replace("PATH=/usr/bin:/bin", 'PATH="$PATH"').replace(
+        '"$TRUSTED_ENV" -i', '"$TRUSTED_ENV"'
+    )
+    deploy_under_test.write_text(deploy_script, encoding="utf-8")
+    deploy_under_test.chmod(0o755)
+    monkeypatch.setattr(sys.modules[__name__], "DEPLOY", deploy_under_test)
+    monkeypatch.setenv("CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD", "0" * 40)
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF", "refs/remotes/origin/main"
+    )
+    monkeypatch.setenv("CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM", "1")
+    monkeypatch.setenv("CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH", "1")
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256",
+        hashlib.sha256(
+            (ROOT / "scripts" / "verify_public_edge_deploy_authority.py").read_bytes()
+        ).hexdigest(),
+    )
+
     build = {
         "context": "/docker/chummercomplete",
         "dockerfile": str(ROOT / "Chummer.Run.Api" / "Dockerfile"),
@@ -90,6 +192,377 @@ def make_fake_authority_source(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return source
+
+
+@pytest.mark.parametrize(
+    ("missing_name", "message"),
+    (
+        (
+            "CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH",
+            "requires /usr/bin/env -i",
+        ),
+        (
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD",
+            "externally supplied as a full 40-hex commit",
+        ),
+        (
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF",
+            "full refs/remotes/... authority",
+        ),
+        (
+            "CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256",
+            "independently supplied full SHA-256",
+        ),
+    ),
+)
+def test_guarded_deploy_requires_external_clean_launch_and_source_authorities(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    missing_name: str,
+    message: str,
+) -> None:
+    docker_log = tmp_path / "docker.log"
+    monkeypatch.delenv(missing_name, raising=False)
+    monkeypatch.setenv("FAKE_DOCKER_LOG", str(docker_log))
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 2
+    assert message in result.stderr
+    assert not docker_log.exists()
+
+
+@pytest.mark.parametrize(
+    ("name", "value", "message"),
+    (
+        (
+            "CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256",
+            "0" * 64,
+            "does not match its independent SHA-256 pin",
+        ),
+        (
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM",
+            "0",
+            "upstream authority is mandatory",
+        ),
+    ),
+)
+def test_guarded_deploy_rejects_authority_pin_mismatch_or_upstream_bypass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    value: str,
+    message: str,
+) -> None:
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    monkeypatch.setenv(name, value)
+    monkeypatch.setenv("FAKE_DOCKER_LOG", str(docker_log))
+    monkeypatch.setenv("FAKE_TRUSTED_PYTHON_LOG", str(python_log))
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 2
+    assert message in result.stderr
+    assert not docker_log.exists()
+    assert not python_log.exists()
+
+
+@pytest.mark.parametrize(
+    "name",
+    (
+        "BASH_ENV",
+        "ENV",
+        "PYTHONPATH",
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "DOCKER_HOST",
+        "DOCKER_CONTEXT",
+        "DOCKER_CONFIG",
+        "BUILDKIT_HOST",
+        "BUILDX_BUILDER",
+        "COMPOSE_FILE",
+    ),
+)
+def test_guarded_deploy_rejects_ambient_execution_routing_before_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+) -> None:
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    monkeypatch.setenv(name, "/dev/null")
+    monkeypatch.setenv("FAKE_DOCKER_LOG", str(docker_log))
+    monkeypatch.setenv("FAKE_TRUSTED_PYTHON_LOG", str(python_log))
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 2
+    assert "rejects ambient execution routing" in result.stderr
+    assert not docker_log.exists()
+    assert not python_log.exists()
+
+
+def test_guarded_deploy_authority_gate_precedes_selected_source_and_docker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    docker_log = tmp_path / "docker.log"
+    python_log = tmp_path / "python.log"
+    monkeypatch.setenv("FAKE_DOCKER_LOG", str(docker_log))
+    monkeypatch.setenv("FAKE_TRUSTED_PYTHON_LOG", str(python_log))
+    monkeypatch.setenv("FAKE_AUTHORITY_EXIT", "19")
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 19
+    python_calls = python_log.read_text(encoding="utf-8").splitlines()
+    assert len(python_calls) == 1
+    assert "verify_public_edge_deploy_authority.py" in python_calls[0]
+    assert "check_public_edge_deploy_preflight.py" not in python_calls[0]
+    assert not docker_log.exists()
+
+
+@pytest.mark.parametrize(
+    ("name", "value", "message"),
+    (
+        (
+            "FAKE_DOCKER_CONTEXT_IDENTITY",
+            "remote|tcp://attacker.invalid:2375|false",
+            "non-canonical Docker daemon context",
+        ),
+        (
+            "FAKE_BUILDER_JSON",
+            '{"Current":true,"Driver":"docker-container","Name":"default","Nodes":[]}',
+            "non-canonical Buildx builder",
+        ),
+    ),
+)
+def test_guarded_deploy_attests_local_daemon_and_builder_before_compose(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    value: str,
+    message: str,
+) -> None:
+    docker_log = tmp_path / "docker.log"
+    monkeypatch.setenv(name, value)
+    monkeypatch.setenv("FAKE_DOCKER_LOG", str(docker_log))
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 2
+    assert message in result.stderr
+    assert not docker_log.exists()
+    assert not (tmp_path / "lock-state" / "public-edge-mutation.lock").exists()
+    assert not list(
+        (
+            tmp_path
+            / "lock-state"
+            / "public-edge-lock-recovery-receipts"
+        ).glob("deploy-*.owner-token")
+    )
+
+
+def test_guarded_deploy_accepts_semantically_identical_duplicate_default_builders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    builder = {
+        "Current": True,
+        "Driver": "docker",
+        "Name": "default",
+        "Nodes": [
+            {
+                "Endpoint": "default",
+                "Name": "default",
+                "Status": "running",
+            }
+        ],
+    }
+    monkeypatch.setenv(
+        "FAKE_BUILDER_JSON",
+        "\n".join((json.dumps(builder), json.dumps(builder, sort_keys=True))),
+    )
+    monkeypatch.setenv("FAKE_SOURCE_GATE_EXIT", "23")
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 23
+    assert "non-canonical Buildx builder" not in result.stderr
+
+
+def test_guarded_deploy_rejects_conflicting_duplicate_default_builders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    canonical = {
+        "Current": True,
+        "Driver": "docker",
+        "Name": "default",
+        "Nodes": [
+            {
+                "Endpoint": "default",
+                "Name": "default",
+                "Status": "running",
+            }
+        ],
+    }
+    conflicting = {
+        **canonical,
+        "Nodes": [{**canonical["Nodes"][0], "Status": "stopped"}],
+    }
+    monkeypatch.setenv(
+        "FAKE_BUILDER_JSON",
+        "\n".join((json.dumps(canonical), json.dumps(conflicting))),
+    )
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 2
+    assert "non-canonical Buildx builder" in result.stderr
+    assert not (tmp_path / "lock-state" / "public-edge-mutation.lock").exists()
+
+
+def test_guarded_deploy_sigkill_leaves_external_authenticated_recovery_token(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ready = tmp_path / "docker-context-paused"
+    monkeypatch.setenv("FAKE_DOCKER_CONTEXT_PAUSE_READY", str(ready))
+    process = subprocess.Popen(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    deadline = time.monotonic() + 5
+    while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert ready.exists(), "deploy did not reach the paused canonical Docker attestation"
+
+    lock_token = tmp_path / "lock-state" / "public-edge-mutation.lock" / "owner-token"
+    external_tokens = list(
+        (
+            tmp_path
+            / "lock-state"
+            / "public-edge-lock-recovery-receipts"
+        ).glob("deploy-*.owner-token")
+    )
+    assert len(external_tokens) == 1
+    external_token = external_tokens[0]
+    assert lock_token.stat().st_mode & 0o777 == 0o600
+    assert external_token.stat().st_mode & 0o777 == 0o600
+    assert lock_token.read_text(encoding="ascii") == external_token.read_text(
+        encoding="ascii"
+    )
+
+    os.killpg(process.pid, signal.SIGKILL)
+    process.wait(timeout=5)
+
+    assert (tmp_path / "lock-state" / "public-edge-mutation.lock").is_dir()
+    assert external_token.is_file()
+
+
+def test_guarded_deploy_unique_auth_orphan_does_not_block_new_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lock_root = tmp_path / "lock-state"
+    auth_root = lock_root / "public-edge-lock-recovery-receipts"
+    auth_root.mkdir(parents=True, mode=0o700)
+    auth_root.chmod(0o700)
+    orphan_token = "a" * 64
+    orphan_digest = hashlib.sha256(orphan_token.encode("ascii")).hexdigest()
+    orphan = auth_root / f"deploy-{orphan_digest}.owner-token"
+    orphan.write_text(orphan_token + "\n", encoding="ascii")
+    orphan.chmod(0o600)
+    monkeypatch.setenv(
+        "FAKE_DOCKER_CONTEXT_IDENTITY",
+        "remote|tcp://attacker.invalid:2375|false",
+    )
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 2
+    assert "non-canonical Docker daemon context" in result.stderr
+    assert orphan.read_text(encoding="ascii") == orphan_token + "\n"
+    assert not (lock_root / "public-edge-mutation.lock").exists()
+    assert list(auth_root.glob("deploy-*.owner-token")) == [orphan]
+
+
+def test_guarded_deploy_never_removes_tokenless_existing_fixed_lock(
+    tmp_path: Path,
+) -> None:
+    lock_root = tmp_path / "lock-state"
+    lock_root.mkdir(mode=0o700)
+    fixed_lock = lock_root / "public-edge-mutation.lock"
+    fixed_lock.mkdir(mode=0o700)
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=os.environ.copy(),
+        text=True,
+        capture_output=True,
+    )
+
+    assert result.returncode == 75
+    assert "another public-edge mutation owns" in result.stderr
+    assert fixed_lock.is_dir()
+    assert list(fixed_lock.iterdir()) == []
+    assert not list(lock_root.glob(".public-edge-mutation.lock.staging.*"))
+    assert not list(
+        (lock_root / "public-edge-lock-recovery-receipts").glob(
+            "deploy-*.owner-token"
+        )
+    )
 
 
 @pytest.mark.parametrize(
@@ -170,7 +643,7 @@ case "$*" in
       if [ "$count" -eq 1 ]; then exit 41; fi
     fi
     ;;
-  *" exec -T chummer-portal curl "*)
+  *" exec -T chummer-portal /usr/bin/curl "*)
     if [ "$FAKE_DOCKER_FAILURE_PHASE" = publication_readiness ]; then exit 45; fi
     ;;
 esac
@@ -191,7 +664,7 @@ exit 0
             "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(ROOT / "docker-compose.public-edge.yml"),
             "CHUMMER_PUBLIC_EDGE_ENV_FILE": "/docker/chummercomplete/chummer.run-services/.env",
             "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
-            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "0",
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
             "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
         }
     )
@@ -242,7 +715,7 @@ exit 0
         publication_index = next(
             index
             for index, command in enumerate(commands)
-            if " exec -T chummer-portal curl " in command
+            if " exec -T chummer-portal /usr/bin/curl " in command
         )
         rollback_stop_index = next(
             index
@@ -311,7 +784,7 @@ exit 0
                 source / "docker-compose.public-edge.yml"
             ),
             "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
-            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "0",
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
             "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
         }
     )
@@ -394,7 +867,7 @@ exit 0
                 source / "docker-compose.public-edge.yml"
             ),
             "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
-            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "0",
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
             "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
         }
     )
@@ -444,7 +917,7 @@ def test_guarded_deploy_preflight_failure_prevents_every_docker_command(
             "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(ROOT / "docker-compose.public-edge.yml"),
             "CHUMMER_PUBLIC_EDGE_ENV_FILE": "/docker/chummercomplete/chummer.run-services/.env",
             "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
-            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "0",
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
         }
     )
 
@@ -492,7 +965,7 @@ def test_guarded_deploy_compose_config_failure_prevents_image_build(
             "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(ROOT / "docker-compose.public-edge.yml"),
             "CHUMMER_PUBLIC_EDGE_ENV_FILE": "/docker/chummercomplete/chummer.run-services/.env",
             "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
-            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "0",
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
         }
     )
 
@@ -554,7 +1027,7 @@ exit 0
             "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(ROOT / "docker-compose.public-edge.yml"),
             "CHUMMER_PUBLIC_EDGE_ENV_FILE": "/docker/chummercomplete/chummer.run-services/.env",
             "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
-            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "0",
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
         }
     )
 
@@ -829,7 +1302,7 @@ exit 0
             "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(ROOT / "docker-compose.public-edge.yml"),
             "CHUMMER_PUBLIC_EDGE_ENV_FILE": "/docker/chummercomplete/chummer.run-services/.env",
             "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
-            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "0",
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
         }
     )
 
@@ -847,11 +1320,16 @@ def test_all_public_edge_mutators_share_one_nonoverrideable_host_lock() -> None:
     lock_path = "/docker/chummercomplete/.state/public-edge-mutation.lock"
     deploy_text = DEPLOY.read_text(encoding="utf-8")
     restore_text = RESTORE.read_text(encoding="utf-8")
+    shared_lock_text = (ROOT / "scripts" / "public_edge_mutation_lock.py").read_text(
+        encoding="utf-8"
+    )
     publisher_text = PUBLISHER.read_text(encoding="utf-8")
     runbook_text = RUNBOOK.read_text(encoding="utf-8")
 
     assert f'DEPLOY_LOCK_DIR="$DEPLOY_LOCK_ROOT/public-edge-mutation.lock"' in deploy_text
-    assert f'Path("{lock_path}")' in restore_text
+    assert "LOCK_PATH as PUBLIC_EDGE_MUTATION_LOCK" in restore_text
+    assert 'LOCK_ROOT = Path("/docker/chummercomplete/.state")' in shared_lock_text
+    assert 'LOCK_PATH = LOCK_ROOT / "public-edge-mutation.lock"' in shared_lock_text
     assert f'Path("{lock_path}")' in publisher_text
     assert f"cutover_lock_dir={lock_path}" in runbook_text
     assert "CHUMMER_PUBLIC_EDGE_DEPLOY_LOCK_ROOT" not in deploy_text
@@ -899,7 +1377,7 @@ case "$*" in
   "container inspect --format {{.Image}} prior-stopped"|"container inspect --format {{.Image}} restored-stopped") printf '%s\n' sha256:prior-image ;;
   "container inspect --format {{.State.Running}} prior-stopped"|"container inspect --format {{.State.Running}} restored-stopped") printf '%s\n' false ;;
   "container inspect prior-stopped") exit 1 ;;
-  *" exec -T chummer-portal curl "*) exit 45 ;;
+  *" exec -T chummer-portal /usr/bin/curl "*) exit 45 ;;
 esac
 exit 0
 """,
@@ -916,7 +1394,7 @@ exit 0
             "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(ROOT / "docker-compose.public-edge.yml"),
             "CHUMMER_PUBLIC_EDGE_ENV_FILE": "/docker/chummercomplete/chummer.run-services/.env",
             "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
-            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "0",
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
             "CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS": "1",
         }
     )

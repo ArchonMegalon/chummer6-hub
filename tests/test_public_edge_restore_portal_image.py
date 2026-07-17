@@ -4,6 +4,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -30,11 +31,246 @@ def test_restore_uses_exclusive_shared_public_edge_mutation_lock(
     monkeypatch.setattr(module, "PUBLIC_EDGE_MUTATION_LOCK", lock_path)
 
     acquired = module.acquire_public_edge_mutation_lock(dry_run=False)
-    assert acquired == lock_path
+    assert acquired is not None
+    assert acquired.lock_path == lock_path
+    owner_token = lock_path / "owner-token"
+    assert owner_token.stat().st_mode & 0o777 == 0o600
+    assert len(owner_token.read_text(encoding="ascii").strip()) == 64
+    assert acquired.authorization_path.is_file()
+    assert acquired.authorization_path.stat().st_mode & 0o777 == 0o600
     with pytest.raises(RuntimeError, match="another public-edge mutation"):
         module.acquire_public_edge_mutation_lock(dry_run=False)
     module.release_public_edge_mutation_lock(acquired)
     assert not lock_path.exists()
+    assert not acquired.authorization_path.exists()
+
+
+def test_restore_materializes_atomic_success_receipt_before_releasing_shared_lock(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock_path = tmp_path / ".state" / "public-edge-mutation.lock"
+    compose_file = tmp_path / "docker-compose.public-edge.yml"
+    compose_file.write_text("services: {}\n", encoding="utf-8")
+    env_file = tmp_path / ".env"
+    env_file.write_text("SAFE=1\n", encoding="utf-8")
+    output = tmp_path / "receipts" / "restore.json"
+    expected = "sha256:" + "a" * 64
+    events: list[str] = []
+
+    monkeypatch.setattr(module, "PUBLIC_EDGE_MUTATION_LOCK", lock_path)
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "CANONICAL_ENV_FILE", env_file)
+    monkeypatch.setattr(
+        module,
+        "attest_canonical_docker_authority",
+        lambda: {"context": "default|unix:///var/run/docker.sock|false", "builder": "default|docker|default|running"},
+    )
+    monkeypatch.setenv("CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH", "1")
+    for name in list(module.os.environ):
+        if (
+            name in module.FORBIDDEN_ROUTING_VARIABLES
+            or name.startswith("BUILDX_")
+            or name.startswith("COMPOSE_")
+            or name.startswith("DOCKER_")
+        ):
+            monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(module, "inspect_container_image_id", lambda *_args, **_kwargs: (expected, ""))
+    monkeypatch.setattr(module, "resolve_image_tags", lambda *_args, **_kwargs: ["chummer-run-api:local"])
+    monkeypatch.setattr(module, "restore_portal_image", lambda *_args, **_kwargs: {"status": "pass"})
+    monkeypatch.setattr(module, "watch_runtime_stability", lambda *_args, **_kwargs: {"status": "pass"})
+    monkeypatch.setattr(module, "discover_runtime_alias_tags", lambda *_args, **_kwargs: [])
+
+    original_atomic_write = module.atomic_write_success_receipt
+    original_release = module.release_public_edge_mutation_lock
+
+    def tracked_atomic_write(path: Path, rendered: str) -> None:
+        assert lock_path.is_dir()
+        events.append("receipt")
+        original_atomic_write(path, rendered)
+
+    def tracked_release(path: Path | None) -> None:
+        assert output.is_file()
+        assert json.loads(output.read_text(encoding="utf-8"))["status"] == "pass"
+        events.append("release")
+        original_release(path)
+
+    monkeypatch.setattr(module, "atomic_write_success_receipt", tracked_atomic_write)
+    monkeypatch.setattr(module, "release_public_edge_mutation_lock", tracked_release)
+
+    result = module.main(
+        [
+            "--expected-portal-image-id",
+            expected,
+            "--compose-file",
+            str(compose_file),
+            "--env-file",
+            str(env_file),
+            "--skip-postdeploy",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert result == 0
+    assert events == ["receipt", "release"]
+    assert output.stat().st_mode & 0o777 == 0o600
+    assert not lock_path.exists()
+
+
+def test_restore_atomic_success_receipt_rejects_symlink_output(tmp_path: Path) -> None:
+    module = load_module()
+    target = tmp_path / "target.json"
+    target.write_text("unchanged\n", encoding="utf-8")
+    output = tmp_path / "restore.json"
+    output.symlink_to(target)
+
+    with pytest.raises(RuntimeError, match="must not be a symlink"):
+        module.atomic_write_success_receipt(output, '{"status":"pass"}\n')
+
+    assert target.read_text(encoding="utf-8") == "unchanged\n"
+
+
+def test_restore_reports_runtime_error_from_shared_lease_release(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = load_module()
+    compose_file = tmp_path / "docker-compose.public-edge.yml"
+    compose_file.write_text("services: {}\n", encoding="utf-8")
+    env_file = tmp_path / ".env"
+    env_file.write_text("SAFE=1\n", encoding="utf-8")
+    output = tmp_path / "restore.json"
+    expected = "sha256:" + "c" * 64
+    lease = object()
+
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "CANONICAL_ENV_FILE", env_file)
+    monkeypatch.setattr(
+        module,
+        "attest_canonical_docker_authority",
+        lambda: {
+            "context": "default|unix:///var/run/docker.sock|false",
+            "builder": "default|docker|default|running",
+        },
+    )
+    monkeypatch.setenv("CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH", "1")
+    for name in list(module.os.environ):
+        if (
+            name in module.FORBIDDEN_ROUTING_VARIABLES
+            or name.startswith("BUILDX_")
+            or name.startswith("COMPOSE_")
+            or name.startswith("DOCKER_")
+        ):
+            monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(
+        module, "acquire_public_edge_mutation_lock", lambda **_kwargs: lease
+    )
+
+    def fail_release(_lease: object) -> None:
+        raise RuntimeError("durable lease retirement failed")
+
+    monkeypatch.setattr(module, "release_public_edge_mutation_lock", fail_release)
+    monkeypatch.setattr(
+        module,
+        "inspect_container_image_id",
+        lambda *_args, **_kwargs: (expected, ""),
+    )
+    monkeypatch.setattr(
+        module,
+        "resolve_image_tags",
+        lambda *_args, **_kwargs: ["chummer-run-api:local"],
+    )
+    monkeypatch.setattr(
+        module,
+        "restore_portal_image",
+        lambda *_args, **_kwargs: {"status": "pass"},
+    )
+    monkeypatch.setattr(
+        module,
+        "watch_runtime_stability",
+        lambda *_args, **_kwargs: {"status": "pass"},
+    )
+    monkeypatch.setattr(module, "discover_runtime_alias_tags", lambda *_args, **_kwargs: [])
+
+    result = module.main(
+        [
+            "--expected-portal-image-id",
+            expected,
+            "--compose-file",
+            str(compose_file),
+            "--env-file",
+            str(env_file),
+            "--skip-postdeploy",
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert result == 1
+    assert "failed to release public-edge mutation lock" in capsys.readouterr().err
+    assert output.is_file()
+
+
+def test_restore_subprocess_uses_absolute_canonical_docker_and_clean_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    module = load_module()
+    monkeypatch.setattr(module, "CANONICAL_DOCKER_CONFIG_ROOT", tmp_path / "docker-cli")
+    captured: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["env"] = kwargs["env"]
+        return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    result = module.run_command(["docker", "ps"])
+
+    assert captured["command"] == ["/usr/bin/docker", "--context", "default", "ps"]
+    assert captured["env"] == {
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(tmp_path / "docker-cli" / "home"),
+        "DOCKER_CONFIG": str(tmp_path / "docker-cli" / "config"),
+        "LANG": "C",
+        "LC_ALL": "C",
+    }
+    assert result.command == captured["command"]
+
+
+def test_restore_builder_identity_deduplicates_identical_records_and_rejects_conflict() -> None:
+    module = load_module()
+    canonical = {
+        "Name": "default",
+        "Current": True,
+        "Driver": "docker",
+        "Nodes": [{"Name": "default", "Endpoint": "default", "Status": "running"}],
+    }
+    duplicate = json.dumps(canonical) + "\n" + json.dumps(canonical) + "\n"
+    assert module._canonical_builder_identity(duplicate) == "default|docker|default|running"
+
+    conflicting = dict(canonical)
+    conflicting["Driver"] = "docker-container"
+    with pytest.raises(RuntimeError, match="conflicting duplicates"):
+        module._canonical_builder_identity(
+            json.dumps(canonical) + "\n" + json.dumps(conflicting) + "\n"
+        )
+
+
+def test_restore_requires_clean_launcher_and_rejects_ambient_routing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_module()
+    monkeypatch.delenv("CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH", raising=False)
+    with pytest.raises(RuntimeError, match="env -i"):
+        module.validate_clean_launch_environment()
+
+    monkeypatch.setenv("CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH", "1")
+    monkeypatch.setenv("DOCKER_HOST", "tcp://attacker.invalid:2375")
+    with pytest.raises(RuntimeError, match="DOCKER_HOST"):
+        module.validate_clean_launch_environment()
 
 
 def test_restore_retages_and_recreates_when_container_or_tag_drift(monkeypatch, tmp_path) -> None:

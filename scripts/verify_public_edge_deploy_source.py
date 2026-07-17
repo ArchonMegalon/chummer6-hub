@@ -15,6 +15,7 @@ import yaml
 
 ENV_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 GENERATED_PROOF_PREFIXES = (".codex-studio/published/",)
+TRUSTED_GIT = "/usr/bin/git"
 
 
 def expand_compose_value(value: str) -> str:
@@ -39,11 +40,39 @@ def resolve_path_value(value: str, base_dir: Path) -> Path:
 
 def run_git(repo_root: Path, *args: str) -> str:
     result = subprocess.run(
-        ["git", "-C", str(repo_root), *args],
+        [
+            TRUSTED_GIT,
+            "-c",
+            "core.hooksPath=/dev/null",
+            "-c",
+            "credential.helper=",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.untrackedCache=false",
+            "-c",
+            "submodule.recurse=false",
+            "-C",
+            str(repo_root),
+            *args,
+        ],
         check=False,
+        env={
+            "PATH": "/usr/bin:/bin",
+            "HOME": "/nonexistent",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_NO_REPLACE_OBJECTS": "1",
+            "GIT_OPTIONAL_LOCKS": "0",
+            "GIT_TERMINAL_PROMPT": "0",
+        },
+        stdin=subprocess.DEVNULL,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        timeout=30,
     )
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip()
