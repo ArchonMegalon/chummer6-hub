@@ -7,6 +7,7 @@ import json
 import os
 import posixpath
 import re
+import stat
 import tempfile
 import subprocess
 import sys
@@ -16,7 +17,27 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
+
+try:
+    from scripts.publish_public_edge_portal_overlay import (
+        full_deployment_digest,
+        source_fingerprint,
+        staged_payload_fingerprint,
+        validate_payload_modes_against_receipt,
+    )
+except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
+    from publish_public_edge_portal_overlay import (
+        full_deployment_digest,
+        source_fingerprint,
+        staged_payload_fingerprint,
+        validate_payload_modes_against_receipt,
+    )
+
+try:
+    from scripts.strict_json_contract import StrictJsonContractError, strict_json_object
+except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
+    from strict_json_contract import StrictJsonContractError, strict_json_object
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1299,7 +1320,7 @@ def verify(
     }
 
 
-def main(argv: list[str] | None = None) -> int:
+def self_contained_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify public-edge deployment after Chummer portal publish.")
     parser.add_argument("--base-url", default="https://chummer.run")
     parser.add_argument("--timeout-seconds", type=float, default=25.0)
@@ -1347,6 +1368,4213 @@ def main(argv: list[str] | None = None) -> int:
     else:
         sys.stdout.write(rendered)
     return 0 if result["status"] == "pass" else 1
+
+
+# Orchestrated flagship verification retained from the integration branch.
+RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+WORKSPACE_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_RELEASE_CHANNEL_RECEIPT = WORKSPACE_ROOT / "chummer-hub-registry" / ".codex-studio" / "published" / "RELEASE_CHANNEL.generated.json"
+DEFAULT_PUBLIC_EDGE_OVERLAY_ROOT = RUN_SERVICES_ROOT / ".state" / "public-edge-portal-overlay" / "app"
+OVERLAY_BUILD_INFO_RELATIVE_PATH = (
+    Path(".codex-studio")
+    / "runtime"
+    / "PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
+)
+MAX_OVERLAY_BUILD_INFO_BYTES = 1024 * 1024
+CORE_CHILD_CONTRACTS = {
+    "preflight": "chummer.public_edge_deploy_preflight.v1",
+    "downloads": "chummer.downloads_version_marker.v1",
+    "pwaStatic": "chummer.public_pwa_static_assets.v1",
+    "mobileLedger": "chummer.mobile_pwa_ledger_boundary.v1",
+    "readyMobileHandoff": "chummer.ready_mobile_handoff_contract.v1",
+    "participateIframeShell": "chummer.participate_iframe_shell.v1",
+}
+ONLINE_LAUNCH_CONTRACT = "chummer.online_character_roster_launch.v1"
+ONLINE_LAUNCH_PATH = "/app"
+ONLINE_LAUNCH_COMMAND = "character_roster"
+ONLINE_LAUNCH_ALLOWED_FINAL_PATHS = {"/app", "/blazor/app"}
+OPTIONAL_PLAYWRIGHT_CONTRACTS = {
+    "downloadsStatusBrowser": "chummer.downloads_status_e2e.v1",
+    "mobilePwaViewport": "chummer.mobile_pwa_viewport_smoke.v1",
+    "pwaOfflineCache": "chummer.pwa_offline_cache.v2",
+    "blazorNewRunnerMenu": "chummer.blazor_new_runner_menu.v1",
+    "frontdoorNavigationMobile": "chummer.frontdoor_mobile_launch.v2",
+    "frontdoorNavigationLedger": "chummer.black_ledger_globe_frontdoor.v1",
+    "frontdoorNavigationAnchor": "chummer.frontdoor_mobile_anchor_redirect.v2",
+}
+DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS = float(
+    os.environ.get("CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS", "24")
+)
+REQUIRED_READY_MOBILE_TOOLS = {"inventory", "health", "ammo", "modifiers", "quick_rolls", "living_world"}
+REQUIRED_READY_MOBILE_PACKET_ROLES = {"player", "gm", "organizer"}
+REQUIRED_READY_MOBILE_FRONTDOOR_LAUNCH_ROUTE = "/mobile/player"
+REQUIRED_READY_MOBILE_ROLE_ROUTES = {
+    "Player": {
+        "mode": "player",
+        "route": "/mobile/player",
+        "manifest_path": "/manifest.player.webmanifest",
+        "manifest_id": "/mobile/player",
+        "manifest_start_url": "/mobile/player?role=Player",
+        "session_handoff_route_template": "/mobile/player?sessionId={sessionId}&role=Player",
+        "frontdoor_default": True,
+    },
+    "GameMaster": {
+        "mode": "gm",
+        "route": "/mobile/gm",
+        "manifest_path": "/manifest.gm.webmanifest",
+        "manifest_id": "/mobile/gm",
+        "manifest_start_url": "/mobile/gm?role=GameMaster",
+        "session_handoff_route_template": "/mobile/gm?sessionId={sessionId}&role=GameMaster",
+        "frontdoor_default": False,
+    },
+}
+REQUIRED_LEDGER_CACHE_CONTROL_TOKENS = {"private", "no-store", "no-cache", "max-age=0"}
+REQUIRED_LEDGER_VARY_TOKENS = {"cookie", "authorization"}
+REQUIRED_MOBILE_PWA_VIEWPORT_ROUTES = {
+    "/build",
+    "/mobile",
+    "/mobile/player",
+    "/mobile/gm",
+    "/mobile/observer",
+    "/play",
+    "/play/continuity",
+}
+REQUIRED_MOBILE_PWA_VIEWPORTS = {
+    "phone-390": {"width": 390, "height": 844, "buildLayout": "compact"},
+    "tablet": {"width": 768, "height": 1024, "buildLayout": "compact"},
+    "desktop-1366": {"width": 1366, "height": 768, "buildLayout": "workspace"},
+}
+REQUIRED_MOBILE_PWA_RESULT_FIELDS = {
+    "route",
+    "viewport",
+    "width",
+    "height",
+    "status",
+    "overflow_x",
+    "navigation_error",
+}
+REQUIRED_BUILD_PWA_RESULT_FIELDS = {
+    "final_url",
+    "build_layout_source",
+    "build_layout_preference",
+    "build_layout_effective",
+    "build_layout_override_checked",
+}
+REQUIRED_BUILD_PWA_FINAL_ROUTE = "/blazor/app?command=character_roster"
+REQUIRED_PWA_MANIFEST_COUNT = 3
+MINIMUM_PWA_ASSET_COUNT = 1
+MINIMUM_PARTICIPATE_IFRAME_ROUTES = 2
+MINIMUM_MOBILE_PWA_VIEWPORTS = len(REQUIRED_MOBILE_PWA_VIEWPORTS)
+REQUIRED_PWA_OFFLINE_STATIC_PATHS = {
+    "/manifest.player.webmanifest",
+    "/manifest.gm.webmanifest",
+    "/mobile.css",
+    "/mobile-turn-companion.js",
+}
+REQUIRED_PWA_OFFLINE_LEGACY_PRIVATE_CACHE_PREFIXES = {
+    "chummer-shell-play-shell-",
+    "chummer-media-play-shell-",
+    "chummer-media-meta-play-shell-",
+}
+REQUIRED_PWA_OFFLINE_ROLE_FALLBACKS = {
+    "Player": "/mobile/player",
+    "GameMaster": "/mobile/gm",
+}
+REQUIRED_ROLE_PWA_MANIFESTS = {
+    "Player": ("/manifest.player.webmanifest", "/mobile/player", "/mobile/player"),
+    "GameMaster": ("/manifest.gm.webmanifest", "/mobile/gm", "/mobile/gm"),
+}
+ROLE_ALIAS_EXPECTED_FINAL_ROUTES = {
+    "/player": "/mobile/player",
+    "/jammer": "/mobile/player",
+    "/gm": "/mobile/gm",
+    "/observer": "/mobile/observer",
+}
+ROLE_ALIAS_SYNTHETIC_PRIVATE_VALUE = "synthetic-role-alias-proof"
+ROLE_ALIAS_REQUIRED_CACHE_CONTROL_TOKENS = {
+    "private",
+    "no-store",
+    "no-cache",
+    "max-age=0",
+}
+ROLE_ALIAS_CANONICAL_MAX_BODY_BYTES = 256 * 1024
+ROLE_ALIAS_INSTALL_ONLY_SHELL_PATTERN = re.compile(
+    rb"<main\b[^>]*\bdata-play-surface\s*=\s*['\"]install-only['\"][^>]*>",
+    re.IGNORECASE,
+)
+RELEASE_CHANNEL_GOLD_SUPPORTABILITY_STATE = "gold_supported"
+RELEASE_CHANNEL_PREVIEW_SUPPORTABILITY_STATE = "preview_supported"
+RELEASE_CHANNEL_STABLE_CHANNELS = {"public_stable", "stable", "docker"}
+RELEASE_CHANNEL_BLOCKING_ROLLOUT_STATES = {
+    "coverage_incomplete",
+    "release_review_required",
+    "public_release_review_required",
+    "desktop_polish_needed",
+    "revoked",
+}
+FRONTDOOR_ANCHOR_CANONICAL_SUFFIX = "/#turn-runsite-card"
+FRONTDOOR_ANCHOR_LEGACY_SUFFIX = "/#turn-runsite-card?"
+FRONTDOOR_REDACTED_PRIVATE_VALUE = "[redacted]"
+FRONTDOOR_PRIVATE_QUERY_KEYS = {"sessionid", "deviceid"}
+FRONTDOOR_PRIVATE_QUERY_ASSIGNMENT = re.compile(
+    r"(?i)((?:[?&]|\b)(?:sessionId|deviceId)[\"']?\s*[:=]\s*[\"']?)([^&#,}\s\"']*)"
+)
+
+
+def require_full_deployment_digest(value: object, *, label: str) -> str:
+    normalized = str(value or "").strip()
+    if re.fullmatch(r"[0-9a-f]{64}", normalized) is None:
+        raise RuntimeError(f"{label} is not a lowercase SHA-256 digest")
+    return normalized
+
+
+def load_expected_full_deployment_digest(
+    build_info_path: Path,
+    *,
+    source_root: Path = RUN_SERVICES_ROOT,
+    overlay_root: Path | None = None,
+) -> str:
+    normalized = Path(os.path.abspath(os.fspath(build_info_path.expanduser())))
+    current = Path(normalized.anchor)
+    for component in normalized.parts[1:]:
+        current /= component
+        try:
+            metadata = current.lstat()
+        except OSError as exc:
+            raise RuntimeError("trusted overlay build-info is unavailable") from exc
+        if stat.S_ISLNK(metadata.st_mode):
+            raise RuntimeError("trusted overlay build-info contains a symlink component")
+    path_stat = normalized.lstat()
+    if (
+        not stat.S_ISREG(path_stat.st_mode)
+        or path_stat.st_size <= 0
+        or path_stat.st_size > MAX_OVERLAY_BUILD_INFO_BYTES
+    ):
+        raise RuntimeError("trusted overlay build-info is not a bounded regular file")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(normalized, flags)
+    try:
+        before = os.fstat(descriptor)
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(descriptor, 64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_OVERLAY_BUILD_INFO_BYTES:
+                raise RuntimeError("trusted overlay build-info exceeds its size limit")
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    if (
+        (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        or total != before.st_size
+    ):
+        raise RuntimeError("trusted overlay build-info changed while being read")
+    try:
+        path_after = normalized.lstat()
+    except OSError as exc:
+        raise RuntimeError("trusted overlay build-info pathname changed after read") from exc
+    if (
+        not stat.S_ISREG(path_after.st_mode)
+        or (
+            path_after.st_dev,
+            path_after.st_ino,
+            path_after.st_size,
+            path_after.st_mtime_ns,
+            path_after.st_ctime_ns,
+        )
+        != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+    ):
+        raise RuntimeError("trusted overlay build-info pathname changed after read")
+
+    try:
+        payload = strict_json_object(
+            b"".join(chunks),
+            label="trusted overlay build-info",
+        )
+    except StrictJsonContractError as exc:
+        raise RuntimeError("trusted overlay build-info is not strict UTF-8 JSON") from exc
+    recorded_source_fingerprint = payload.get("sourceFingerprint")
+    recorded_staged_payload_fingerprint = payload.get("stagedPayloadFingerprint")
+    recorded_payload_mode_receipt = payload.get("payloadModeReceipt")
+    recorded_digest = payload.get("fullDeploymentDigest")
+    if (
+        not isinstance(recorded_source_fingerprint, dict)
+        or not isinstance(recorded_staged_payload_fingerprint, dict)
+        or not isinstance(recorded_payload_mode_receipt, dict)
+        or not isinstance(recorded_digest, dict)
+    ):
+        raise RuntimeError("trusted overlay build-info deployment identity is incomplete")
+    current_source_fingerprint = source_fingerprint(source_root.resolve())
+    current_staged_payload_fingerprint = staged_payload_fingerprint(
+        (overlay_root or normalized.parents[2]).resolve()
+    )
+    payload_mode_binding = validate_payload_modes_against_receipt(
+        (overlay_root or normalized.parents[2]).resolve(),
+        recorded_payload_mode_receipt,
+    )
+    recomputed_digest = full_deployment_digest(
+        current_source_fingerprint,
+        current_staged_payload_fingerprint,
+    )
+    if (
+        recorded_source_fingerprint != current_source_fingerprint
+        or recorded_staged_payload_fingerprint != current_staged_payload_fingerprint
+        or payload_mode_binding.get("status") != "pass"
+        or recorded_digest != recomputed_digest
+    ):
+        raise RuntimeError("trusted overlay build-info full deployment digest is invalid")
+    return require_full_deployment_digest(
+        recomputed_digest.get("sha256"),
+        label="trusted overlay build-info full deployment digest",
+    )
+
+
+def frontdoor_anchor_entry_url_matches_contract(entry_url: str) -> bool:
+    normalized = str(entry_url or "").strip()
+    return normalized.endswith(FRONTDOOR_ANCHOR_CANONICAL_SUFFIX) or normalized.endswith(FRONTDOOR_ANCHOR_LEGACY_SUFFIX)
+
+
+def supportability_state_supported_for_channel(channel: str, supportability_state: str) -> bool:
+    normalized_channel = (channel or "").lower()
+    normalized_state = (supportability_state or "").lower()
+    if normalized_channel in RELEASE_CHANNEL_STABLE_CHANNELS:
+        return normalized_state == RELEASE_CHANNEL_GOLD_SUPPORTABILITY_STATE
+    if normalized_channel == "preview":
+        return normalized_state in {
+            RELEASE_CHANNEL_GOLD_SUPPORTABILITY_STATE,
+            RELEASE_CHANNEL_PREVIEW_SUPPORTABILITY_STATE,
+        }
+    return bool(normalized_state)
+
+
+def is_published_stable_release(
+    expected_release_status: str,
+    expected_release_channel: str,
+    expected_supportability_state: str,
+    expected_rollout_state: str,
+) -> bool:
+    normalized_status = str(expected_release_status or "").strip().lower()
+    normalized_channel = str(expected_release_channel or "").strip().lower()
+    normalized_supportability_state = str(expected_supportability_state or "").strip().lower()
+    normalized_rollout_state = str(expected_rollout_state or "").strip().lower()
+    stable_lane_published = (
+        normalized_channel in RELEASE_CHANNEL_STABLE_CHANNELS
+        or normalized_rollout_state == "public_stable"
+    )
+    status_allows_stable_release = not normalized_status or normalized_status == "published"
+    return (
+        stable_lane_published
+        and normalized_supportability_state == RELEASE_CHANNEL_GOLD_SUPPORTABILITY_STATE
+        and status_allows_stable_release
+    )
+
+
+def expected_visible_version_candidates(
+    expected_release_version: str,
+    expected_release_status: str = "",
+    expected_release_channel: str = "",
+    expected_supportability_state: str = "",
+    expected_rollout_state: str = "",
+) -> list[str]:
+    normalized = str(expected_release_version or "").strip()
+    if not normalized:
+        return []
+
+    posture_known = any(
+        (
+            str(expected_release_status or "").strip(),
+            str(expected_release_channel or "").strip(),
+            str(expected_supportability_state or "").strip(),
+            str(expected_rollout_state or "").strip(),
+        )
+    )
+    stable_release = is_published_stable_release(
+        expected_release_status,
+        expected_release_channel,
+        expected_supportability_state,
+        expected_rollout_state,
+    )
+    candidates: list[str] = [f"Version {normalized}"]
+    if normalized.lower().startswith("run-") and len(normalized) >= 12:
+        stamp = normalized[4:12]
+        if stamp.isdigit():
+            stable_label = f"Version {stamp[0:4]}.{stamp[4:6]}.{stamp[6:8]}"
+            preview_label = f"{stable_label} (Preview)"
+            candidates.insert(0, stable_label if stable_release else preview_label)
+            if not posture_known:
+                candidates.insert(1, preview_label)
+                candidates.insert(2, stable_label)
+        else:
+            candidates.insert(0, "Version" if stable_release else "Version Preview")
+            if not posture_known:
+                candidates.insert(1, "Version")
+                candidates.insert(2, "Version Preview")
+
+    return list(dict.fromkeys(candidate for candidate in candidates if candidate))
+
+
+def expected_homepage_lane_text(
+    expected_release_status: str,
+    expected_release_version: str,
+    expected_release_channel: str,
+    expected_supportability_state: str,
+    expected_rollout_state: str,
+) -> str | None:
+    normalized_status = (expected_release_status or "").strip().lower()
+    normalized_version = (expected_release_version or "").strip()
+    normalized_channel = (expected_release_channel or "").strip().lower()
+    normalized_supportability_state = (expected_supportability_state or "").strip().lower()
+    normalized_rollout_state = (expected_rollout_state or "").strip().lower()
+
+    if not any(
+        (
+            normalized_status,
+            normalized_version,
+            normalized_channel,
+            normalized_supportability_state,
+            normalized_rollout_state,
+        )
+    ):
+        return None
+
+    if normalized_status and normalized_status != "published":
+        return "Current public lane: Downloads paused."
+
+    if is_published_stable_release(
+        normalized_status,
+        normalized_channel,
+        normalized_supportability_state,
+        normalized_rollout_state,
+    ):
+        return "Current public lane: Stable."
+
+    if (
+        normalized_channel == "preview"
+        or normalized_rollout_state == "promoted_preview"
+        or normalized_supportability_state == RELEASE_CHANNEL_PREVIEW_SUPPORTABILITY_STATE
+        or normalized_channel in RELEASE_CHANNEL_STABLE_CHANNELS
+        or normalized_rollout_state == "public_stable"
+        or normalized_supportability_state == RELEASE_CHANNEL_GOLD_SUPPORTABILITY_STATE
+        or normalized_version
+    ):
+        return "Current public lane: Preview. Review required."
+
+    return None
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_json_with_status(path: Path) -> tuple[dict[str, Any], str]:
+    if not path.is_file():
+        return {}, "missing"
+    try:
+        payload = load_json(path)
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        return {}, "invalid"
+    if not isinstance(payload, dict):
+        return {}, "invalid"
+    return payload, "loaded"
+
+
+def load_optional_json(path: Path) -> dict[str, Any]:
+    payload, load_status = load_json_with_status(path)
+    return payload if load_status == "loaded" else {}
+
+
+def resolve_public_edge_overlay_root(configured_root: str = "") -> Path:
+    configured = (configured_root or os.environ.get("CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR") or "").strip()
+    return Path(configured).resolve() if configured else DEFAULT_PUBLIC_EDGE_OVERLAY_ROOT.resolve()
+
+
+def receipt_contract(payload: dict[str, Any]) -> str:
+    return str(payload.get("contractName") or payload.get("contract_name") or "").strip()
+
+
+def list_count(value: Any) -> int:
+    return len(value) if isinstance(value, list) else 0
+
+
+def int_value(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def string_set(value: Any) -> set[str]:
+    if not isinstance(value, list):
+        return set()
+    return {str(item).strip() for item in value if str(item).strip()}
+
+
+def string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def contains_tokens(value: Any, required_tokens: set[str]) -> bool:
+    normalized = str(value or "").lower()
+    return all(token in normalized for token in required_tokens)
+
+
+def mobile_pwa_viewport_route_set(artifact: dict[str, Any]) -> set[str]:
+    routes = string_set(artifact.get("routes"))
+    results = artifact.get("results") if isinstance(artifact.get("results"), list) else []
+    for result in results:
+        if not isinstance(result, dict):
+            continue
+        route = str(result.get("route") or "").strip()
+        if route:
+            routes.add(route)
+    return routes
+
+
+def route_from_url(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    parsed = urlparse(text)
+    if not parsed.scheme and not parsed.netloc:
+        return text
+    route = parsed.path or "/"
+    return route + (f"?{parsed.query}" if parsed.query else "")
+
+
+def artifact_object(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def blazor_new_runner_workbench_route(artifact: dict[str, Any]) -> dict[str, Any]:
+    return artifact_object(artifact.get("workbench_fallback_route"))
+
+
+def blazor_new_runner_app_roster_transition(artifact: dict[str, Any]) -> dict[str, Any]:
+    return artifact_object(artifact.get("app_roster_transition"))
+
+
+def artifact_value_with_fallback(
+    artifact: dict[str, Any],
+    key: str,
+    nested: dict[str, Any] | None = None,
+) -> Any:
+    value = artifact.get(key)
+    if value not in (None, ""):
+        return value
+    nested_payload = nested if nested is not None else artifact
+    value = nested_payload.get(key)
+    if value not in (None, ""):
+        return value
+    return None
+
+
+def role_alias_route_results(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, dict):
+        return []
+    results = value.get("results")
+    if not isinstance(results, list):
+        return []
+    return [item for item in results if isinstance(item, dict)]
+
+
+class _RoleAliasNoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        return None
+
+
+def open_role_alias_without_redirects(request: Request, timeout: float):
+    opener = build_opener(_RoleAliasNoRedirectHandler())
+    try:
+        return opener.open(request, timeout=timeout)
+    except HTTPError as exc:
+        # urllib represents a deliberately un-followed 3xx response as HTTPError.
+        return exc
+
+
+def open_role_alias_first_hop(request: Request, timeout: float):
+    return open_role_alias_without_redirects(request, timeout)
+
+
+def open_role_alias_canonical_target(request: Request, timeout: float):
+    return open_role_alias_without_redirects(request, timeout)
+
+
+def role_alias_response_status(response: Any) -> int:
+    return int(getattr(response, "status", 0) or getattr(response, "code", 0) or 0)
+
+
+def role_alias_header(headers: Any, name: str) -> str:
+    if headers is None:
+        return ""
+    value = headers.get(name) if hasattr(headers, "get") else None
+    if value in (None, "") and isinstance(headers, dict):
+        lowered = name.lower()
+        value = next(
+            (item for key, item in headers.items() if str(key).lower() == lowered),
+            "",
+        )
+    return str(value or "").strip()
+
+
+def role_alias_origin(value: str) -> tuple[str, str, int] | None:
+    try:
+        parsed = urlparse(value)
+        port = parsed.port
+    except ValueError:
+        return None
+    scheme = parsed.scheme.lower()
+    host = (parsed.hostname or "").lower()
+    if scheme not in {"http", "https"} or not host:
+        return None
+    return scheme, host, port or (443 if scheme == "https" else 80)
+
+
+def role_alias_safe_base_url(value: str) -> str:
+    origin = role_alias_origin(value)
+    if origin is None:
+        return ""
+    scheme, host, port = origin
+    display_host = f"[{host}]" if ":" in host else host
+    default_port = 443 if scheme == "https" else 80
+    port_suffix = "" if port == default_port else f":{port}"
+    return f"{scheme}://{display_host}{port_suffix}"
+
+
+def role_alias_final_url_matches(
+    base_url: str,
+    final_url: str,
+    expected_path: str,
+) -> bool:
+    try:
+        parsed = urlparse(final_url)
+    except ValueError:
+        return False
+    return (
+        parsed.username is None
+        and parsed.password is None
+        and role_alias_origin(final_url) == role_alias_origin(base_url)
+        and parsed.path == expected_path
+        and not parsed.query
+        and not parsed.fragment
+        and "?" not in final_url.split("#", 1)[0]
+    )
+
+
+def role_alias_canonical_target_result_matches(
+    result: Any,
+    expected_final_route: str,
+) -> bool:
+    if not isinstance(result, dict):
+        return False
+    cache_tokens = {
+        token.strip().lower()
+        for token in str(result.get("cacheControl") or "").split(",")
+        if token.strip()
+    }
+    body_bytes_read = result.get("bodyBytesRead")
+    return (
+        str(result.get("route") or "") == expected_final_route
+        and int_value(result.get("status")) == 200
+        and str(result.get("contentType") or "").split(";", 1)[0].strip().lower()
+        == "text/html"
+        and ROLE_ALIAS_REQUIRED_CACHE_CONTROL_TOKENS <= cache_tokens
+        and str(result.get("pragma") or "").strip().lower() == "no-cache"
+        and str(result.get("expires") or "").strip() == "0"
+        and str(result.get("referrerPolicy") or "").strip().lower() == "no-referrer"
+        and str(result.get("contentTypeOptions") or "").strip().lower() == "nosniff"
+        and type(body_bytes_read) is int
+        and 0 < body_bytes_read <= ROLE_ALIAS_CANONICAL_MAX_BODY_BYTES
+        and result.get("responseUrlExact") is True
+        and result.get("noRedirectLocation") is True
+        and result.get("bodyWithinLimit") is True
+        and result.get("installOnlyShell") is True
+        and result.get("pass") is True
+        and not str(result.get("error") or "").strip()
+    )
+
+
+def role_alias_requested_url_matches(
+    base_url: str,
+    requested_url: str,
+    expected_alias_path: str,
+) -> bool:
+    try:
+        parsed = urlparse(requested_url)
+    except ValueError:
+        return False
+    return (
+        parsed.username is None
+        and parsed.password is None
+        and role_alias_origin(requested_url) == role_alias_origin(base_url)
+        and parsed.path == expected_alias_path
+        and parsed.query == "sessionId=[redacted]&deviceId=[redacted]"
+        and not parsed.fragment
+        and "#" not in requested_url
+    )
+
+
+def role_alias_first_hop_result_matches(
+    result: Any,
+    expected_method: str,
+    expected_location: str,
+) -> bool:
+    if not isinstance(result, dict):
+        return False
+    cache_tokens = {
+        token.strip().lower()
+        for token in str(result.get("cacheControl") or "").split(",")
+        if token.strip()
+    }
+    return (
+        str(result.get("method") or "").upper() == expected_method
+        and int_value(result.get("status")) == 302
+        and str(result.get("location") or "") == expected_location
+        and ROLE_ALIAS_REQUIRED_CACHE_CONTROL_TOKENS <= cache_tokens
+        and str(result.get("pragma") or "").strip().lower() == "no-cache"
+        and str(result.get("expires") or "").strip() == "0"
+        and str(result.get("referrerPolicy") or "").strip().lower() == "no-referrer"
+        and result.get("pass") is True
+        and not str(result.get("error") or "").strip()
+    )
+
+
+def role_alias_result_matches_contract(
+    result: Any,
+    base_url: str,
+    expected_alias_path: str,
+    expected_final_route: str,
+) -> bool:
+    if not isinstance(result, dict):
+        return False
+    expected_location = f"{expected_final_route}#"
+    first_hops = result.get("firstHopResults")
+    if not isinstance(first_hops, list) or len(first_hops) != 2:
+        return False
+    by_method = {
+        str(item.get("method") or "").upper(): item
+        for item in first_hops
+        if isinstance(item, dict)
+    }
+    return (
+        set(by_method) == {"GET", "HEAD"}
+        and all(
+            role_alias_first_hop_result_matches(
+                by_method[method],
+                method,
+                expected_location,
+            )
+            for method in ("GET", "HEAD")
+        )
+        and str(result.get("expectedFirstHopLocation") or "") == expected_location
+        and str(result.get("aliasPath") or "") == expected_alias_path
+        and str(result.get("expectedFinalRoute") or "") == expected_final_route
+        and role_alias_requested_url_matches(
+            base_url,
+            str(result.get("requestedUrl") or ""),
+            expected_alias_path,
+        )
+        and result.get("firstHopsPass") is True
+        and result.get("finalUrlPass") is True
+        and int_value(result.get("httpStatus")) == 200
+        and role_alias_canonical_target_result_matches(
+            result.get("canonicalTarget"),
+            expected_final_route,
+        )
+        and role_alias_final_url_matches(
+            base_url,
+            str(result.get("finalUrl") or ""),
+            expected_final_route,
+        )
+        and str(result.get("finalRoute") or "") == expected_final_route
+        and result.get("pass") is True
+        and not str(result.get("error") or "").strip()
+        and not artifact_contains_raw_private_identity(result)
+    )
+
+
+def inspect_role_alias_first_hop(
+    requested_url: str,
+    expected_location: str,
+    method: str,
+    timeout: float,
+) -> dict[str, Any]:
+    response = None
+    error = ""
+    status = 0
+    location = ""
+    cache_control = ""
+    pragma = ""
+    expires = ""
+    referrer_policy = ""
+    try:
+        request = Request(
+            requested_url,
+            headers={"User-Agent": "chummer-public-edge-postdeploy-gate/1.0"},
+            method=method,
+        )
+        response = open_role_alias_first_hop(request, timeout)
+        status = role_alias_response_status(response)
+        headers = getattr(response, "headers", None)
+        location = role_alias_header(headers, "Location")
+        cache_control = role_alias_header(headers, "Cache-Control")
+        pragma = role_alias_header(headers, "Pragma")
+        expires = role_alias_header(headers, "Expires")
+        referrer_policy = role_alias_header(headers, "Referrer-Policy")
+    except (TimeoutError, URLError, OSError, ValueError) as exc:
+        # Do not persist exception text: urllib errors can contain the raw request URL.
+        error = f"{type(exc).__name__}: first-hop request failed"
+    finally:
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
+
+    cache_tokens = {
+        token.strip().lower()
+        for token in cache_control.split(",")
+        if token.strip()
+    }
+    checks = {
+        "exact302": status == 302,
+        "exactLocation": location == expected_location,
+        "privateNoCache": ROLE_ALIAS_REQUIRED_CACHE_CONTROL_TOKENS <= cache_tokens,
+        "pragmaNoCache": pragma.lower() == "no-cache",
+        "expiresZero": expires == "0",
+        "noReferrer": referrer_policy.lower() == "no-referrer",
+        "requestSucceeded": not error,
+    }
+    recorded_location = (
+        location
+        if checks["exactLocation"]
+        else "[invalid]" if location else ""
+    )
+    return {
+        "method": method,
+        "status": status,
+        "location": recorded_location,
+        "cacheControl": cache_control,
+        "pragma": pragma,
+        "expires": expires,
+        "referrerPolicy": referrer_policy,
+        "checks": checks,
+        "pass": all(checks.values()),
+        "error": error,
+    }
+
+
+def inspect_role_alias_canonical_target(
+    base_url: str,
+    expected_final_route: str,
+    timeout: float,
+) -> dict[str, Any]:
+    normalized_base_url = base_url.rstrip("/") + "/"
+    target_url = urljoin(normalized_base_url, expected_final_route.lstrip("/"))
+    status = 0
+    response_url_exact = False
+    content_type = ""
+    cache_control = ""
+    pragma = ""
+    expires = ""
+    referrer_policy = ""
+    content_type_options = ""
+    location = ""
+    body_bytes_read = 0
+    body_within_limit = False
+    install_only_shell = False
+    error = ""
+    response = None
+
+    if not role_alias_final_url_matches(base_url, target_url, expected_final_route):
+        error = "canonical target construction failed"
+    else:
+        try:
+            request = Request(
+                target_url,
+                headers={"User-Agent": "chummer-public-edge-postdeploy-gate/1.0"},
+                method="GET",
+            )
+            response = open_role_alias_canonical_target(request, timeout)
+            status = role_alias_response_status(response)
+            response_url = str(response.geturl() or "")
+            response_url_exact = role_alias_final_url_matches(
+                base_url,
+                response_url,
+                expected_final_route,
+            )
+            headers = getattr(response, "headers", None)
+            content_type = role_alias_header(headers, "Content-Type")
+            cache_control = role_alias_header(headers, "Cache-Control")
+            pragma = role_alias_header(headers, "Pragma")
+            expires = role_alias_header(headers, "Expires")
+            referrer_policy = role_alias_header(headers, "Referrer-Policy")
+            content_type_options = role_alias_header(headers, "X-Content-Type-Options")
+            location = role_alias_header(headers, "Location")
+
+            if status == 200:
+                declared_length_text = role_alias_header(headers, "Content-Length")
+                declared_length = (
+                    int(declared_length_text)
+                    if declared_length_text.isdigit()
+                    else None
+                )
+                if (
+                    declared_length is not None
+                    and declared_length > ROLE_ALIAS_CANONICAL_MAX_BODY_BYTES
+                ):
+                    body_bytes_read = 0
+                else:
+                    body = response.read(ROLE_ALIAS_CANONICAL_MAX_BODY_BYTES + 1)
+                    if not isinstance(body, bytes):
+                        body = bytes(body or b"")
+                    body_bytes_read = len(body)
+                    body_within_limit = (
+                        body_bytes_read <= ROLE_ALIAS_CANONICAL_MAX_BODY_BYTES
+                    )
+                    if body_within_limit:
+                        install_only_shell = bool(
+                            ROLE_ALIAS_INSTALL_ONLY_SHELL_PATTERN.search(body)
+                        )
+        except (TimeoutError, URLError, OSError, ValueError, TypeError) as exc:
+            # Do not persist exception text: urllib errors can contain a raw URL.
+            error = f"{type(exc).__name__}: canonical target request failed"
+        finally:
+            close = getattr(response, "close", None)
+            if callable(close):
+                close()
+
+    cache_tokens = {
+        token.strip().lower()
+        for token in cache_control.split(",")
+        if token.strip()
+    }
+    checks = {
+        "exact200": status == 200,
+        "responseUrlExact": response_url_exact,
+        "noRedirectLocation": not location,
+        "htmlContentType": content_type.split(";", 1)[0].strip().lower() == "text/html",
+        "privateNoCache": ROLE_ALIAS_REQUIRED_CACHE_CONTROL_TOKENS <= cache_tokens,
+        "pragmaNoCache": pragma.lower() == "no-cache",
+        "expiresZero": expires == "0",
+        "noReferrer": referrer_policy.lower() == "no-referrer",
+        "noSniff": content_type_options.lower() == "nosniff",
+        "bodyWithinLimit": body_within_limit,
+        "installOnlyShell": install_only_shell,
+        "requestSucceeded": not error,
+    }
+    return {
+        "route": expected_final_route,
+        "status": status,
+        "contentType": content_type,
+        "cacheControl": cache_control,
+        "pragma": pragma,
+        "expires": expires,
+        "referrerPolicy": referrer_policy,
+        "contentTypeOptions": content_type_options,
+        "bodyBytesRead": body_bytes_read,
+        "responseUrlExact": response_url_exact,
+        "noRedirectLocation": not location,
+        "bodyWithinLimit": body_within_limit,
+        "installOnlyShell": install_only_shell,
+        "checks": checks,
+        "pass": all(checks.values()),
+        "error": error,
+    }
+
+
+def probe_role_alias_routes(base_url: str, timeout_seconds: float) -> dict[str, Any]:
+    results: list[dict[str, Any]] = []
+    normalized_base_url = base_url.rstrip("/") + "/"
+    timeout = max(1.0, timeout_seconds)
+    for alias_path, expected_final_route in ROLE_ALIAS_EXPECTED_FINAL_ROUTES.items():
+        requested_url = (
+            urljoin(normalized_base_url, alias_path.lstrip("/"))
+            + f"?sessionId={ROLE_ALIAS_SYNTHETIC_PRIVATE_VALUE}"
+            + f"&deviceId={ROLE_ALIAS_SYNTHETIC_PRIVATE_VALUE}"
+        )
+        expected_location = f"{expected_final_route}#"
+        first_hops = [
+            inspect_role_alias_first_hop(
+                requested_url,
+                expected_location,
+                method,
+                timeout,
+            )
+            for method in ("GET", "HEAD")
+        ]
+        first_hops_pass = len(first_hops) == 2 and all(
+            hop.get("pass") is True for hop in first_hops
+        )
+        canonical_target: dict[str, Any] = {
+            "route": expected_final_route,
+            "status": 0,
+            "pass": False,
+            "error": "first-hop contract failed; canonical target probe skipped",
+        }
+        if first_hops_pass:
+            canonical_target = inspect_role_alias_canonical_target(
+                base_url,
+                expected_final_route,
+                timeout,
+            )
+        http_status = int_value(canonical_target.get("status"))
+        final_url_pass = role_alias_canonical_target_result_matches(
+            canonical_target,
+            expected_final_route,
+        )
+        final_url = (
+            urljoin(normalized_base_url, expected_final_route.lstrip("/"))
+            if canonical_target.get("responseUrlExact") is True
+            else ""
+        )
+        final_route = expected_final_route if final_url_pass else ""
+        error = str(canonical_target.get("error") or "")
+        raw_result = {
+            "aliasPath": alias_path,
+            "requestedUrl": requested_url,
+            "expectedFirstHopLocation": expected_location,
+            "firstHopResults": first_hops,
+            "httpStatus": http_status,
+            "finalUrl": final_url,
+            "finalRoute": final_route,
+            "canonicalTarget": canonical_target,
+            "expectedFinalRoute": expected_final_route,
+            "firstHopsPass": first_hops_pass,
+            "finalUrlPass": final_url_pass,
+            "pass": first_hops_pass and final_url_pass,
+            "error": error,
+        }
+        results.append(redact_private_identity(raw_result))
+    drift = [result for result in results if result.get("pass") is not True]
+    return {
+        "contractName": "chummer.public_role_alias_routes.v1",
+        "status": "pass" if not drift and len(results) == len(ROLE_ALIAS_EXPECTED_FINAL_ROUTES) else "fail",
+        "baseUrl": role_alias_safe_base_url(base_url),
+        "results": results,
+        "drift": drift,
+    }
+
+
+def coerce_output(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def run_playwright_command(command: list[str], env: dict[str, str], timeout_seconds: int) -> tuple[int, str, str, bool]:
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            cwd=RUN_SERVICES_ROOT,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return 124, coerce_output(exc.output), coerce_output(exc.stderr), True
+    return completed.returncode, coerce_output(completed.stdout), coerce_output(completed.stderr), False
+
+
+CHILD_RAW_DIAGNOSTIC_FIELDS = {
+    "argv",
+    "childargv",
+    "childcommand",
+    "childstderr",
+    "childstderrtail",
+    "childstdout",
+    "childstdouttail",
+    "command",
+    "stderr",
+    "stderrtail",
+    "stdout",
+    "stdouttail",
+}
+CHILD_TEXT_DIAGNOSTIC_FIELDS = {
+    "detail",
+    "error",
+    "errors",
+    "failure",
+    "failures",
+    "message",
+    "messages",
+    "reason",
+    "reasons",
+}
+CHILD_UNSAFE_DIAGNOSTIC_TEXT = re.compile(
+    r"(?:\?|[&][^\s&#=]{1,128}=|\b(?:argv|command|stderr|stdout)\b)",
+    re.IGNORECASE,
+)
+CHILD_IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\.py")
+
+
+def child_verifier_identifier(command: list[str]) -> str:
+    """Return a bounded, query-free identifier without serializing child argv."""
+    for argument in command:
+        candidate = Path(str(argument)).name
+        if CHILD_IDENTIFIER.fullmatch(candidate):
+            return candidate.removesuffix(".py")
+    return "child-verifier"
+
+
+def sanitize_child_diagnostic_text(value: str) -> str:
+    """Keep query-free messages while failing closed on command/output-like text."""
+    if CHILD_UNSAFE_DIAGNOSTIC_TEXT.search(value):
+        return "[child diagnostic redacted]"
+    return value
+
+
+def sanitize_child_receipt(value: Any, *, diagnostic_context: bool = False) -> Any:
+    """Remove raw execution diagnostics before a child receipt can be persisted."""
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            normalized_key = re.sub(r"[^a-z0-9]", "", str(key).lower())
+            if (
+                normalized_key in CHILD_RAW_DIAGNOSTIC_FIELDS
+                or any(
+                    raw_name in normalized_key
+                    for raw_name in ("argv", "command", "stderr", "stdout")
+                )
+            ):
+                continue
+            sanitized[key] = sanitize_child_receipt(
+                item,
+                diagnostic_context=(
+                    diagnostic_context
+                    or normalized_key in CHILD_TEXT_DIAGNOSTIC_FIELDS
+                ),
+            )
+        return sanitized
+    if isinstance(value, list):
+        return [
+            sanitize_child_receipt(item, diagnostic_context=diagnostic_context)
+            for item in value
+        ]
+    if isinstance(value, tuple):
+        return tuple(
+            sanitize_child_receipt(item, diagnostic_context=diagnostic_context)
+            for item in value
+        )
+    if diagnostic_context and isinstance(value, str):
+        return sanitize_child_diagnostic_text(value)
+    return value
+
+
+def normalize_base_url(value: Any) -> str:
+    return str(value or "").strip().rstrip("/")
+
+
+def artifact_base_url_matches(artifact: dict[str, Any], base_url: str) -> bool:
+    artifact_base_url = normalize_base_url(artifact.get("base_url") or artifact.get("baseUrl"))
+    requested_base_url = normalize_base_url(base_url)
+    return not artifact_base_url or artifact_base_url == requested_base_url
+
+
+def artifact_generated_at_text(artifact: dict[str, Any]) -> str:
+    return str(
+        artifact.get("generated_at_utc")
+        or artifact.get("generatedAtUtc")
+        or artifact.get("generated_at")
+        or artifact.get("generatedAt")
+        or ""
+    ).strip()
+
+
+def artifact_age_hours(artifact: dict[str, Any]) -> float | None:
+    generated_at = artifact_generated_at_text(artifact)
+    if not generated_at:
+        return None
+
+    try:
+        parsed = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    else:
+        parsed = parsed.astimezone(UTC)
+
+    age_hours = (datetime.now(UTC) - parsed).total_seconds() / 3600.0
+    return max(age_hours, 0.0)
+
+
+def mobile_pwa_viewport_artifact_contract_failures(
+    artifact: dict[str, Any],
+    *,
+    expected_base_url: str = "",
+) -> list[str]:
+    failures: list[str] = []
+    expected_contract = OPTIONAL_PLAYWRIGHT_CONTRACTS["mobilePwaViewport"]
+    if receipt_contract(artifact) != expected_contract:
+        failures.append(
+            "mobile PWA viewport Playwright artifact contract is not "
+            + expected_contract
+        )
+    if str(artifact.get("status") or "").strip().lower() != "pass":
+        failures.append("mobile PWA viewport Playwright artifact status is not pass")
+
+    artifact_base_url = normalize_base_url(
+        artifact.get("base_url") or artifact.get("baseUrl")
+    )
+    normalized_expected_base_url = normalize_base_url(expected_base_url)
+    if not artifact_base_url:
+        failures.append("mobile PWA viewport Playwright artifact base URL is missing")
+    elif (
+        normalized_expected_base_url
+        and artifact_base_url != normalized_expected_base_url
+    ):
+        failures.append(
+            "mobile PWA viewport Playwright artifact base URL does not match the requested base URL"
+        )
+
+    routes_value = artifact.get("routes")
+    routes = string_set(routes_value)
+    if (
+        not isinstance(routes_value, list)
+        or len(routes) != len(routes_value)
+        or any(not isinstance(route, str) or not route.strip() for route in routes_value)
+    ):
+        failures.append(
+            "mobile PWA viewport Playwright routes must be unique non-empty strings"
+        )
+    route_count = artifact.get("route_count")
+    if type(route_count) is not int or route_count != len(routes):
+        failures.append(
+            "mobile PWA viewport Playwright route count does not match its unique routes"
+        )
+    if type(route_count) is not int or route_count < len(
+        REQUIRED_MOBILE_PWA_VIEWPORT_ROUTES
+    ):
+        failures.append(
+            "mobile PWA viewport Playwright route count is below required mobile routes"
+        )
+    missing_routes = sorted(REQUIRED_MOBILE_PWA_VIEWPORT_ROUTES - routes)
+    if missing_routes:
+        failures.append(
+            "mobile PWA viewport Playwright proof is missing required routes: "
+            + ", ".join(missing_routes)
+        )
+
+    viewport_count = artifact.get("viewport_count")
+    if type(viewport_count) is not int or viewport_count < MINIMUM_MOBILE_PWA_VIEWPORTS:
+        failures.append(
+            "mobile PWA viewport Playwright viewport count is below required viewports"
+        )
+
+    results_value = artifact.get("results")
+    results = results_value if isinstance(results_value, list) else []
+    if not isinstance(results_value, list):
+        failures.append("mobile PWA viewport Playwright results must be an array")
+    required_results: dict[tuple[str, str], dict[str, Any]] = {}
+    for index, result in enumerate(results):
+        if not isinstance(result, dict):
+            failures.append(
+                f"mobile PWA viewport Playwright result {index} is not an object"
+            )
+            continue
+        route = str(result.get("route") or "").strip()
+        viewport = str(result.get("viewport") or "").strip()
+        key = (route, viewport)
+        if (
+            route not in REQUIRED_MOBILE_PWA_VIEWPORT_ROUTES
+            or viewport not in REQUIRED_MOBILE_PWA_VIEWPORTS
+        ):
+            continue
+        if key in required_results:
+            failures.append(
+                "mobile PWA viewport Playwright proof duplicates required result "
+                f"{route}@{viewport}"
+            )
+            continue
+        required_results[key] = result
+
+        required_fields = set(REQUIRED_MOBILE_PWA_RESULT_FIELDS)
+        if route == "/build":
+            required_fields.update(REQUIRED_BUILD_PWA_RESULT_FIELDS)
+        missing_fields = sorted(required_fields - set(result))
+        if missing_fields:
+            failures.append(
+                "mobile PWA viewport Playwright result "
+                f"{route}@{viewport} is missing required fields: "
+                + ", ".join(missing_fields)
+            )
+
+        expected_viewport = REQUIRED_MOBILE_PWA_VIEWPORTS[viewport]
+        if (
+            type(result.get("width")) is not int
+            or result.get("width") != expected_viewport["width"]
+            or type(result.get("height")) is not int
+            or result.get("height") != expected_viewport["height"]
+        ):
+            failures.append(
+                "mobile PWA viewport Playwright result "
+                f"{route}@{viewport} has wrong viewport dimensions"
+            )
+        status = result.get("status")
+        if type(status) is not int or not 200 <= status < 400:
+            failures.append(
+                "mobile PWA viewport Playwright result "
+                f"{route}@{viewport} did not prove a successful HTTP response"
+            )
+        overflow = result.get("overflow_x")
+        if (
+            isinstance(overflow, bool)
+            or not isinstance(overflow, (int, float))
+            or not 0 <= overflow <= 1
+        ):
+            failures.append(
+                "mobile PWA viewport Playwright result "
+                f"{route}@{viewport} did not prove bounded horizontal overflow"
+            )
+        if result.get("navigation_error") != "":
+            failures.append(
+                "mobile PWA viewport Playwright result "
+                f"{route}@{viewport} contains a navigation error"
+            )
+
+        if route != "/build":
+            continue
+        final_url = str(result.get("final_url") or "").strip()
+        try:
+            parsed_final_url = urlparse(final_url)
+        except ValueError:
+            parsed_final_url = None
+        final_route = route_from_url(final_url) if parsed_final_url else ""
+        final_origin = (
+            normalize_base_url(
+                f"{parsed_final_url.scheme}://{parsed_final_url.netloc}"
+            )
+            if parsed_final_url
+            and parsed_final_url.scheme in {"http", "https"}
+            and parsed_final_url.netloc
+            else ""
+        )
+        if (
+            final_route != REQUIRED_BUILD_PWA_FINAL_ROUTE
+            or not final_origin
+            or final_origin != artifact_base_url
+            or (parsed_final_url is not None and bool(parsed_final_url.fragment))
+        ):
+            failures.append(
+                "mobile PWA viewport Playwright result "
+                f"/build@{viewport} did not prove the canonical roster-first Build PWA URL"
+            )
+        expected_layout = str(expected_viewport["buildLayout"])
+        expected_override = (
+            "workspace" if expected_layout == "compact" else "compact"
+        )
+        expected_build_fields = {
+            "build_layout_source": "browser-media-query",
+            "build_layout_preference": "auto",
+            "build_layout_effective": expected_layout,
+            "build_layout_override_checked": expected_override,
+        }
+        for field, expected_value in expected_build_fields.items():
+            if result.get(field) != expected_value:
+                failures.append(
+                    "mobile PWA viewport Playwright result "
+                    f"/build@{viewport} has invalid {field}"
+                )
+
+    missing_result_keys = sorted(
+        (route, viewport)
+        for route in REQUIRED_MOBILE_PWA_VIEWPORT_ROUTES
+        for viewport in REQUIRED_MOBILE_PWA_VIEWPORTS
+        if (route, viewport) not in required_results
+    )
+    if missing_result_keys:
+        failures.append(
+            "mobile PWA viewport Playwright proof is missing required results: "
+            + ", ".join(
+                f"{route}@{viewport}" for route, viewport in missing_result_keys
+            )
+        )
+    if artifact.get("failures") != []:
+        failures.append(
+            "mobile PWA viewport Playwright artifact failures must be an empty array"
+        )
+    return failures
+
+
+def mobile_pwa_viewport_artifact_matches_current_contract(
+    artifact: dict[str, Any],
+    *,
+    expected_base_url: str = "",
+) -> bool:
+    return not mobile_pwa_viewport_artifact_contract_failures(
+        artifact,
+        expected_base_url=expected_base_url,
+    )
+
+
+def private_identity_value_is_redacted(value: Any) -> bool:
+    normalized = str(value or "").strip().lower()
+    return normalized in {
+        FRONTDOOR_REDACTED_PRIVATE_VALUE,
+        "%5bredacted%5d",
+        "%3credacted%3e",
+        "<redacted>",
+        "redacted",
+    }
+
+
+def text_contains_raw_private_query_value(value: Any) -> bool:
+    text = str(value or "")
+    for match in FRONTDOOR_PRIVATE_QUERY_ASSIGNMENT.finditer(text):
+        raw_value = match.group(2)
+        if raw_value and not private_identity_value_is_redacted(raw_value):
+            return True
+    return False
+
+
+def artifact_contains_raw_private_identity(value: Any) -> bool:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized_key = re.sub(r"[^a-z0-9]", "", str(key).lower())
+            if (
+                normalized_key in FRONTDOOR_PRIVATE_QUERY_KEYS
+                and item not in (None, "")
+                and not private_identity_value_is_redacted(item)
+            ):
+                return True
+            if artifact_contains_raw_private_identity(item):
+                return True
+        return False
+    if isinstance(value, (list, tuple)):
+        return any(artifact_contains_raw_private_identity(item) for item in value)
+    return isinstance(value, str) and text_contains_raw_private_query_value(value)
+
+
+def redact_private_identity(value: Any) -> Any:
+    if isinstance(value, dict):
+        redacted: dict[str, Any] = {}
+        for key, item in value.items():
+            normalized_key = re.sub(r"[^a-z0-9]", "", str(key).lower())
+            if normalized_key in FRONTDOOR_PRIVATE_QUERY_KEYS and item not in (None, ""):
+                redacted[key] = FRONTDOOR_REDACTED_PRIVATE_VALUE
+            else:
+                redacted[key] = redact_private_identity(item)
+        return redacted
+    if isinstance(value, list):
+        return [redact_private_identity(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_private_identity(item) for item in value)
+    if isinstance(value, str):
+        redacted = FRONTDOOR_PRIVATE_QUERY_ASSIGNMENT.sub(
+            lambda match: match.group(1) + FRONTDOOR_REDACTED_PRIVATE_VALUE,
+            value,
+        )
+        return redacted.replace(
+            ROLE_ALIAS_SYNTHETIC_PRIVATE_VALUE,
+            FRONTDOOR_REDACTED_PRIVATE_VALUE,
+        )
+    return value
+
+
+def visible_role_url_is_path_only(value: Any, expected_path: str, expected_hash: str = "") -> bool:
+    text = str(value or "").strip()
+    if not text:
+        return False
+    try:
+        parsed = urlparse(text)
+    except ValueError:
+        return False
+    return (
+        parsed.path == expected_path
+        and not parsed.query
+        and not parsed.params
+        and parsed.fragment == expected_hash.lstrip("#")
+    )
+
+
+def redacted_handoff_url_matches_contract(value: Any, expected_path: str, expected_role: str) -> bool:
+    text = str(value or "").strip()
+    if not text or artifact_contains_raw_private_identity(text):
+        return False
+    try:
+        parsed = urlparse(text)
+    except ValueError:
+        return False
+    query_items = {}
+    for item in parsed.query.split("&") if parsed.query else []:
+        key, separator, raw_value = item.partition("=")
+        if not separator or key in query_items:
+            return False
+        query_items[key] = raw_value
+    return (
+        parsed.path == expected_path
+        and not parsed.fragment
+        and set(query_items) == {"sessionId", "role"}
+        and private_identity_value_is_redacted(query_items.get("sessionId"))
+        and query_items.get("role") == expected_role
+    )
+
+
+def frontdoor_mobile_artifact_matches_privacy_contract(mobile_artifact: dict[str, Any]) -> bool:
+    return (
+        receipt_contract(mobile_artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationMobile"]
+        and not artifact_contains_raw_private_identity(mobile_artifact)
+        and mobile_artifact.get("private_identity_redacted") is True
+        and mobile_artifact.get("visible_player_url_private_identity_absent") is True
+        and visible_role_url_is_path_only(mobile_artifact.get("final_url"), "/mobile/player")
+        and mobile_artifact.get("player_session_context_present") is True
+        and mobile_artifact.get("player_device_context_present") is True
+        and mobile_artifact.get("visible_gm_url_private_identity_absent") is True
+        and visible_role_url_is_path_only(mobile_artifact.get("gm_final_url"), "/mobile/gm")
+        and mobile_artifact.get("gm_session_context_present") is True
+        and mobile_artifact.get("gm_device_context_present") is True
+        and str(mobile_artifact.get("gm_route") or "").strip() == "/mobile/gm"
+        and mobile_artifact.get("gm_route_session_id_present") is True
+        and mobile_artifact.get("gm_route_private_identity_redacted") is True
+        and mobile_artifact.get("player_session_handoff_private_identity_redacted") is True
+        and redacted_handoff_url_matches_contract(
+            mobile_artifact.get("player_session_handoff_url"),
+            "/mobile/player",
+            "Player",
+        )
+        and mobile_artifact.get("gm_session_handoff_private_identity_redacted") is True
+        and redacted_handoff_url_matches_contract(
+            mobile_artifact.get("gm_session_handoff_url"),
+            "/mobile/gm",
+            "GameMaster",
+        )
+    )
+
+
+def pwa_offline_artifact_matches_privacy_contract(artifact: dict[str, Any]) -> bool:
+    static_paths = string_set(artifact.get("static_paths"))
+    purged_prefixes = string_set(artifact.get("legacy_private_cache_prefixes_purged"))
+    role_results = artifact.get("offline_role_fallbacks") if isinstance(artifact.get("offline_role_fallbacks"), list) else []
+    role_results_by_role = {
+        str(item.get("role") or "").strip(): item
+        for item in role_results
+        if isinstance(item, dict)
+    }
+    role_fallbacks_safe = all(
+        (result := role_results_by_role.get(role)) is not None
+        and result.get("path") == path
+        and int_value(result.get("status")) == 503
+        and "no-store" in str(result.get("cache_control") or "").lower()
+        and result.get("private_projection_restored") is False
+        for role, path in REQUIRED_PWA_OFFLINE_ROLE_FALLBACKS.items()
+    )
+    return (
+        receipt_contract(artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["pwaOfflineCache"]
+        and str(artifact.get("status") or "").strip().lower() == "pass"
+        and artifact.get("cache_version") == "v17"
+        and artifact.get("navigation_policy") == "network_only"
+        and artifact.get("private_state_scope") == "open_tab_only"
+        and artifact.get("query_bearing_requests_cached") is False
+        and artifact.get("private_navigation_cached") is False
+        and artifact.get("private_api_cached") is False
+        and artifact.get("personalized_ledger_cached") is False
+        and artifact.get("unrelated_cache_preserved") is True
+        and REQUIRED_PWA_OFFLINE_STATIC_PATHS <= static_paths
+        and REQUIRED_PWA_OFFLINE_LEGACY_PRIVATE_CACHE_PREFIXES <= purged_prefixes
+        and role_fallbacks_safe
+    )
+
+
+def frontdoor_anchor_artifact_matches_current_contract(anchor_artifact: dict[str, Any]) -> bool:
+    entry_url = str(anchor_artifact.get("entry_url") or "").strip()
+    final_path = str(anchor_artifact.get("final_pathname") or "").strip()
+    final_hash = str(anchor_artifact.get("final_hash") or "").strip()
+    manifest_path = str(anchor_artifact.get("pwa_manifest_path") or "").strip()
+    role = str(anchor_artifact.get("pwa_role") or "").strip()
+    blazor_shell = str(anchor_artifact.get("blazor_shell") or "").strip()
+    return (
+        receipt_contract(anchor_artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"]
+        and not artifact_contains_raw_private_identity(anchor_artifact)
+        and frontdoor_anchor_entry_url_matches_contract(entry_url)
+        and visible_role_url_is_path_only(
+            anchor_artifact.get("final_url"),
+            "/mobile/player",
+            "#turn-runsite-card",
+        )
+        and final_path == "/mobile/player"
+        and final_hash == "#turn-runsite-card"
+        and manifest_path == "/manifest.player.webmanifest"
+        and role == "Player"
+        and blazor_shell == "interactive-server"
+        and anchor_artifact.get("private_identity_redacted") is True
+        and anchor_artifact.get("visible_url_private_identity_absent") is True
+        and anchor_artifact.get("session_context_present") is True
+        and anchor_artifact.get("device_context_present") is True
+    )
+
+
+def maybe_reuse_playwright_artifact(
+    *,
+    artifact_path: Path,
+    expected_contract: str,
+    base_url: str,
+    timeout_seconds: int,
+    reuse_artifact_max_age_hours: float | None,
+) -> dict[str, Any] | None:
+    if not artifact_path.is_file():
+        return None
+
+    artifact, artifact_load_status = load_json_with_status(artifact_path)
+    if artifact_load_status != "loaded":
+        return None
+    artifact_contract = receipt_contract(artifact)
+    artifact_status = str(artifact.get("status") or "").strip().lower()
+    base_url_matches = artifact_base_url_matches(artifact, base_url)
+    generated_at = artifact_generated_at_text(artifact)
+    age_hours = artifact_age_hours(artifact)
+    artifact_fresh = (
+        True
+        if reuse_artifact_max_age_hours is None
+        else age_hours is not None and age_hours <= reuse_artifact_max_age_hours
+    )
+    artifact_pass = (
+        artifact_status == "pass"
+        and artifact_contract == expected_contract
+        and base_url_matches
+        and artifact_fresh
+    )
+    if not artifact_pass:
+        return None
+
+    return {
+        "status": "pass",
+        "exitCode": 0,
+        "timedOut": False,
+        "timeoutSeconds": timeout_seconds,
+        "artifactPath": str(artifact_path),
+        "artifactContract": artifact_contract,
+        "expectedArtifactContract": expected_contract,
+        "artifactBaseUrlMatchesRequested": base_url_matches,
+        "artifactGeneratedAtUtc": generated_at or None,
+        "artifactAgeHours": age_hours,
+        "artifactFresh": artifact_fresh,
+        "artifactMaxAgeHours": reuse_artifact_max_age_hours,
+        "artifact": artifact,
+        "artifactReused": True,
+        "playwrightExecuted": False,
+        "stdoutTail": "",
+        "stderrTail": "",
+    }
+
+
+def run_child(command: list[str], output_path: Path, allow_failure: bool = False) -> dict[str, Any]:
+    resolved_command = list(command)
+    child_id = child_verifier_identifier(resolved_command)
+    if len(resolved_command) >= 2 and resolved_command[1].startswith("scripts/"):
+        resolved_command[1] = str(RUN_SERVICES_ROOT / resolved_command[1])
+    try:
+        completed = subprocess.run(
+            resolved_command + ["--output", str(output_path)],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=RUN_SERVICES_ROOT,
+        )
+    except (OSError, subprocess.SubprocessError):
+        synthetic = {
+            "status": "fail",
+            "failures": [f"child verifier {child_id} could not execute"],
+            "childId": child_id,
+            "childExitCode": None,
+        }
+        if not allow_failure:
+            raise RuntimeError(
+                f"child verifier {child_id} could not execute"
+            ) from None
+        return synthetic
+    if completed.returncode != 0 and not allow_failure:
+        raise RuntimeError(
+            f"child verifier {child_id} failed with exit code {completed.returncode}"
+        )
+    if not output_path.is_file():
+        synthetic = {
+            "status": "fail",
+            "failures": [f"child verifier {child_id} did not write its receipt"],
+            "childId": child_id,
+            "childExitCode": completed.returncode,
+        }
+        if not allow_failure:
+            raise RuntimeError(
+                f"child verifier {child_id} did not write its receipt"
+            )
+        return synthetic
+    payload, load_status = load_json_with_status(output_path)
+    if load_status == "loaded":
+        return sanitize_child_receipt(payload)
+    synthetic = {
+        "status": "fail",
+        "failures": [f"child verifier {child_id} wrote an invalid receipt"],
+        "childId": child_id,
+        "childExitCode": completed.returncode,
+    }
+    if not allow_failure:
+        raise RuntimeError(
+            f"child verifier {child_id} wrote an invalid receipt"
+        )
+    return synthetic
+
+
+def compose_status(
+    preflight: dict[str, Any],
+    downloads: dict[str, Any],
+    pwa_static: dict[str, Any],
+    mobile_ledger: dict[str, Any],
+    ready_mobile_handoff: dict[str, Any],
+    participate_iframe_shell: dict[str, Any],
+    downloads_status_browser: dict[str, Any] | None = None,
+    mobile_pwa_viewport: dict[str, Any] | None = None,
+    frontdoor_navigation: dict[str, Any] | None = None,
+    pwa_offline_cache: dict[str, Any] | None = None,
+    blazor_new_runner_menu: dict[str, Any] | None = None,
+    expected_release_version: str | None = None,
+    require_launch_supported_release_channel: bool = True,
+    role_alias_routes: dict[str, Any] | None = None,
+    online_launch: dict[str, Any] | None = None,
+    expected_full_deployment_digest_sha256: str = "",
+) -> dict[str, Any]:
+    failures: list[str] = []
+    core_child_receipts = {
+        "preflight": preflight,
+        "downloads": downloads,
+        "pwaStatic": pwa_static,
+        "mobileLedger": mobile_ledger,
+        "readyMobileHandoff": ready_mobile_handoff,
+        "participateIframeShell": participate_iframe_shell,
+    }
+    for name, expected_contract in CORE_CHILD_CONTRACTS.items():
+        child = core_child_receipts[name]
+        actual_contract = str(child.get("contractName") or child.get("contract_name") or "").strip()
+        if actual_contract != expected_contract:
+            failures.append(f"{name} child receipt contract is not {expected_contract}")
+    if preflight.get("status") != "pass":
+        failures.append("public-edge deploy preflight is not pass")
+    if downloads.get("status") != "pass":
+        failures.append("downloads version marker proof is not pass")
+    if pwa_static.get("status") != "pass":
+        failures.append("public PWA static asset proof is not pass")
+    if mobile_ledger.get("status") != "pass":
+        failures.append("mobile PWA ledger boundary proof is not pass")
+    if ready_mobile_handoff.get("status") != "pass":
+        failures.append("Ready mobile handoff proof is not pass")
+    if participate_iframe_shell.get("status") != "pass":
+        failures.append("Participate iframe shell proof is not pass")
+    if online_launch is not None:
+        online_launch_contract = receipt_contract(online_launch)
+        if online_launch_contract != ONLINE_LAUNCH_CONTRACT:
+            failures.append(f"onlineLaunch child receipt contract is not {ONLINE_LAUNCH_CONTRACT}")
+        if online_launch.get("status") != "pass":
+            failures.append("Chummer Online launch proof is not pass")
+        launch_url = str(online_launch.get("launch_url") or "").strip()
+        final_url = str(online_launch.get("final_url") or "").strip()
+        launch_url_parsed = urlparse(launch_url) if launch_url else None
+        final_url_parsed = urlparse(final_url) if final_url else None
+        if not launch_url_parsed or launch_url_parsed.path != ONLINE_LAUNCH_PATH:
+            failures.append("Chummer Online launch proof did not request /app")
+        elif launch_url_parsed.query != f"command={ONLINE_LAUNCH_COMMAND}":
+            failures.append("Chummer Online launch proof did not request character_roster")
+        if online_launch.get("http_status") != 200:
+            failures.append("Chummer Online launch proof did not return HTTP 200")
+        if not final_url_parsed or final_url_parsed.path not in ONLINE_LAUNCH_ALLOWED_FINAL_PATHS:
+            failures.append("Chummer Online launch proof did not land on /app or /blazor/app")
+        elif final_url_parsed.query != f"command={ONLINE_LAUNCH_COMMAND}":
+            failures.append("Chummer Online launch proof did not preserve character_roster")
+        if online_launch.get("has_blazor_marker") is not True:
+            failures.append("Chummer Online launch proof did not prove the Blazor shell")
+
+    service_worker = pwa_static.get("service_worker") if isinstance(pwa_static.get("service_worker"), dict) else {}
+    pwa_deployment_identity = (
+        pwa_static.get("deploymentIdentity")
+        if isinstance(pwa_static.get("deploymentIdentity"), dict)
+        else {}
+    )
+    pwa_full_deployment_digest_sha256 = str(
+        pwa_deployment_identity.get("fullDeploymentDigestSha256") or ""
+    ).strip()
+    normalized_expected_full_deployment_digest = str(
+        expected_full_deployment_digest_sha256 or ""
+    ).strip()
+    pwa_full_deployment_digest_matches_expected = bool(
+        pwa_deployment_identity.get("matchesExpectedFullDeploymentDigest") is True
+        and re.fullmatch(r"[0-9a-f]{64}", pwa_full_deployment_digest_sha256)
+        is not None
+        and (
+            not normalized_expected_full_deployment_digest
+            or pwa_full_deployment_digest_sha256
+            == normalized_expected_full_deployment_digest
+        )
+    )
+    if not pwa_full_deployment_digest_matches_expected:
+        failures.append("public PWA static proof is not bound to the expected full deployment digest")
+    if downloads.get("downloads_has_marker") is not True:
+        failures.append("downloads receipt does not prove /downloads version marker")
+    if downloads.get("status_redirect_has_marker") is not True:
+        failures.append("downloads receipt does not prove /status version marker")
+    visible_version = str(downloads.get("visible_version") or "").strip()
+    status_redirect_version = str(downloads.get("status_redirect_version") or "").strip()
+    downloads_version_marker_value = str(downloads.get("downloads_version_marker_value") or "").strip()
+    status_redirect_version_marker_value = str(downloads.get("status_redirect_version_marker_value") or "").strip()
+    downloads_version_marker_matches_release_channel = downloads.get("downloads_version_marker_matches_release_channel")
+    status_redirect_version_marker_matches_release_channel = downloads.get("status_redirect_version_marker_matches_release_channel")
+    status_redirect_heading = str(downloads.get("status_redirect_heading") or "").strip()
+    status_redirect_heading_recognized = downloads.get("status_redirect_heading_recognized")
+    status_redirect_heading_expected = str(downloads.get("status_redirect_heading_expected") or "").strip()
+    status_redirect_heading_matches_release_channel = downloads.get("status_redirect_heading_matches_release_channel")
+    status_redirect_heading_uses_generic_updated_copy = downloads.get("status_redirect_heading_uses_generic_updated_copy")
+    if not visible_version.startswith("Version "):
+        failures.append("downloads receipt missing visible Version text")
+    if not status_redirect_version.startswith("Version "):
+        failures.append("downloads receipt missing /status visible Version text")
+    if not downloads_version_marker_value.startswith("Version "):
+        failures.append("downloads receipt missing /downloads version marker value")
+    if not status_redirect_version_marker_value.startswith("Version "):
+        failures.append("downloads receipt missing /status version marker value")
+    if not status_redirect_heading:
+        failures.append("downloads receipt missing /status decision heading")
+    if status_redirect_heading_recognized is not True:
+        failures.append("downloads receipt does not prove a recognized /status decision heading")
+    if status_redirect_heading_uses_generic_updated_copy is True:
+        failures.append("downloads receipt still proves the stale generic Updated /status heading")
+    if status_redirect_heading_expected and status_redirect_heading_matches_release_channel is not True:
+        failures.append("downloads receipt does not prove the /status heading matches release posture")
+    expected_release_status = str(downloads.get("expected_release_status") or "").strip()
+    expected_release_channel = str(downloads.get("expected_release_channel") or "").strip()
+    expected_release_supportability_state = str(downloads.get("expected_release_supportability_state") or "").strip()
+    expected_release_rollout_state = str(downloads.get("expected_release_rollout_state") or "").strip()
+    expected_release_version = str(expected_release_version or "").strip()
+    require_release_channel_parity = bool(expected_release_version)
+    expected_visible_versions = expected_visible_version_candidates(
+        expected_release_version,
+        expected_release_status,
+        expected_release_channel,
+        expected_release_supportability_state,
+        expected_release_rollout_state,
+    )
+    visible_version_matches_release_channel = (
+        downloads.get("visible_version_matches_release_channel")
+        if isinstance(downloads.get("visible_version_matches_release_channel"), bool)
+        else visible_version in expected_visible_versions
+        if expected_release_version
+        else None
+    )
+    status_redirect_version_matches_release_channel = (
+        downloads.get("status_redirect_version_matches_release_channel")
+        if isinstance(downloads.get("status_redirect_version_matches_release_channel"), bool)
+        else status_redirect_version in expected_visible_versions
+        if expected_release_version
+        else None
+    )
+    if expected_release_version and downloads_version_marker_matches_release_channel is not True:
+        failures.append("downloads version marker data does not match release channel")
+    if expected_release_version and status_redirect_version_marker_matches_release_channel is not True:
+        failures.append("status redirect version marker data does not match release channel")
+    if expected_release_version and not visible_version_matches_release_channel:
+        failures.append("downloads visible Version text does not match release channel")
+    if expected_release_version and not status_redirect_version_matches_release_channel:
+        failures.append("status redirect visible Version text does not match release channel")
+    release_manifest_http_status = downloads.get("release_manifest_http_status")
+    release_manifest_status_matches_release_channel = downloads.get("release_manifest_status_matches_release_channel")
+    release_manifest_channel_matches_release_channel = downloads.get("release_manifest_channel_matches_release_channel")
+    release_manifest_version_matches_release_channel = downloads.get("release_manifest_version_matches_release_channel")
+    release_manifest_supportability_matches_release_channel = downloads.get("release_manifest_supportability_matches_release_channel")
+    release_manifest_rollout_matches_release_channel = downloads.get("release_manifest_rollout_matches_release_channel")
+    public_release_copy_safe = downloads.get("public_release_copy_safe")
+    release_manifest_copy_safe = downloads.get("release_manifest_copy_safe")
+    if require_release_channel_parity:
+        if not expected_release_status:
+            failures.append("downloads receipt missing expected release status")
+        elif expected_release_status.lower() != "published":
+            failures.append("downloads receipt expected release status is not published")
+        if not expected_release_channel:
+            failures.append("downloads receipt missing expected release channel")
+        if not expected_release_supportability_state:
+            failures.append("downloads receipt missing expected release supportability state")
+        elif (
+            require_launch_supported_release_channel
+            and not supportability_state_supported_for_channel(
+                expected_release_channel,
+                expected_release_supportability_state,
+            )
+        ):
+            failures.append("downloads receipt expected release supportability is not launch-supported")
+        if not expected_release_rollout_state:
+            failures.append("downloads receipt missing expected release rollout state")
+        elif (
+            require_launch_supported_release_channel
+            and expected_release_rollout_state.lower() in RELEASE_CHANNEL_BLOCKING_ROLLOUT_STATES
+        ):
+            failures.append(f"downloads receipt expected release rollout is blocking: {expected_release_rollout_state.lower()}")
+        if release_manifest_http_status != 200:
+            failures.append("downloads receipt does not prove live release manifest HTTP 200")
+        if release_manifest_status_matches_release_channel is not True:
+            failures.append("downloads receipt live release manifest status does not match release channel")
+        if release_manifest_channel_matches_release_channel is not True:
+            failures.append("downloads receipt live release manifest channel does not match release channel")
+        if release_manifest_version_matches_release_channel is not True:
+            failures.append("downloads receipt live release manifest version does not match release channel")
+        if release_manifest_supportability_matches_release_channel is not True:
+            failures.append("downloads receipt live release manifest supportability does not match release channel")
+        if release_manifest_rollout_matches_release_channel is not True:
+            failures.append("downloads receipt live release manifest rollout does not match release channel")
+        if public_release_copy_safe is not True:
+            failures.append("downloads receipt static public release manifest copy is not safe")
+        if release_manifest_copy_safe is not True:
+            failures.append("downloads receipt live release manifest copy is not safe")
+
+    pwa_manifest_count = list_count(pwa_static.get("manifests"))
+    role_manifests = pwa_static.get("role_manifests") if isinstance(pwa_static.get("role_manifests"), list) else []
+    role_manifest_count = len(role_manifests)
+    role_manifests_by_role = {
+        str(entry.get("role") or "").strip(): entry
+        for entry in role_manifests
+        if isinstance(entry, dict)
+    }
+    pwa_asset_count = list_count(pwa_static.get("assets"))
+    if pwa_manifest_count < REQUIRED_PWA_MANIFEST_COUNT:
+        failures.append("public PWA static proof does not include all manifests")
+    for role, (path, expected_id, expected_start_url) in REQUIRED_ROLE_PWA_MANIFESTS.items():
+        manifest = role_manifests_by_role.get(role)
+        if not manifest:
+            failures.append(f"public PWA static proof does not include the {role} role manifest")
+            continue
+        if str(manifest.get("path") or "").strip() != path:
+            failures.append(f"public PWA static proof {role} manifest path is not {path}")
+        if str(manifest.get("id") or "").strip() != expected_id:
+            failures.append(f"public PWA static proof {role} manifest id is not {expected_id}")
+        if str(manifest.get("start_url") or "").strip() != expected_start_url:
+            failures.append(
+                f"public PWA static proof {role} manifest start_url is not {expected_start_url}"
+            )
+        if str(manifest.get("display") or "").strip() != "standalone":
+            failures.append(f"public PWA static proof {role} manifest display is not standalone")
+    if pwa_asset_count < MINIMUM_PWA_ASSET_COUNT:
+        failures.append("public PWA static proof does not include required assets")
+    if service_worker.get("ledger_stream_non_cacheable") is not True:
+        failures.append("public PWA static proof does not keep ledger stream non-cacheable")
+    if service_worker.get("ledger_stream_precached") is not False:
+        failures.append("public PWA static proof precaches personalized ledger stream")
+    if service_worker.get("worker_kind") != "play":
+        failures.append("public PWA static proof does not use the Play root service worker")
+
+    if mobile_ledger.get("payload_status") != "opt_in_required":
+        failures.append("mobile ledger receipt payload is not opt_in_required")
+    if not contains_tokens(mobile_ledger.get("cache_control"), REQUIRED_LEDGER_CACHE_CONTROL_TOKENS):
+        failures.append("mobile ledger cache-control is missing private/no-store/no-cache/max-age=0")
+    if not contains_tokens(mobile_ledger.get("vary"), REQUIRED_LEDGER_VARY_TOKENS):
+        failures.append("mobile ledger vary is missing Cookie and Authorization")
+
+    tool_ids = string_set(ready_mobile_handoff.get("tool_ids"))
+    missing_tools = sorted(REQUIRED_READY_MOBILE_TOOLS - tool_ids)
+    if missing_tools:
+        failures.append("Ready mobile handoff is missing required tools: " + ", ".join(missing_tools))
+    packet_roles = string_set(ready_mobile_handoff.get("packet_roles"))
+    missing_roles = sorted(REQUIRED_READY_MOBILE_PACKET_ROLES - packet_roles)
+    if missing_roles:
+        failures.append("Ready mobile handoff is missing required packet roles: " + ", ".join(missing_roles))
+    frontdoor_launch_route = str(ready_mobile_handoff.get("frontdoor_launch_route") or "").strip()
+    if frontdoor_launch_route != REQUIRED_READY_MOBILE_FRONTDOOR_LAUNCH_ROUTE:
+        failures.append(
+            "Ready mobile handoff frontdoor launch route is not " + REQUIRED_READY_MOBILE_FRONTDOOR_LAUNCH_ROUTE
+        )
+    role_routes = ready_mobile_handoff.get("role_routes") if isinstance(ready_mobile_handoff.get("role_routes"), list) else []
+    role_routes_by_role = {
+        str(item.get("role") or "").strip(): item
+        for item in role_routes
+        if isinstance(item, dict)
+    }
+    for role_name, expected in REQUIRED_READY_MOBILE_ROLE_ROUTES.items():
+        route = role_routes_by_role.get(role_name)
+        if not route:
+            failures.append(f"Ready mobile handoff is missing the {role_name} role route")
+            continue
+        if str(route.get("mode") or "").strip() != expected["mode"]:
+            failures.append(f"Ready mobile handoff {role_name} mode is not {expected['mode']}")
+        if str(route.get("route") or "").strip() != expected["route"]:
+            failures.append(f"Ready mobile handoff {role_name} route is not {expected['route']}")
+        if str(route.get("manifest_path") or "").strip() != expected["manifest_path"]:
+            failures.append(f"Ready mobile handoff {role_name} manifest path is not {expected['manifest_path']}")
+        if str(route.get("manifest_id") or "").strip() != expected["manifest_id"]:
+            failures.append(f"Ready mobile handoff {role_name} manifest id is not {expected['manifest_id']}")
+        if str(route.get("manifest_start_url") or "").strip() != expected["manifest_start_url"]:
+            failures.append(
+                f"Ready mobile handoff {role_name} manifest start_url is not {expected['manifest_start_url']}"
+            )
+        if (
+            str(route.get("session_handoff_route_template") or "").strip()
+            != expected["session_handoff_route_template"]
+        ):
+            failures.append(
+                "Ready mobile handoff "
+                f"{role_name} session handoff route template is not {expected['session_handoff_route_template']}"
+            )
+        if route.get("frontdoor_default") is not expected["frontdoor_default"]:
+            failures.append(
+                "Ready mobile handoff "
+                f"{role_name} frontdoor_default is not {str(expected['frontdoor_default']).lower()}"
+            )
+
+    participate_route_count = int_value(participate_iframe_shell.get("route_count"))
+    participate_iframe_count = int_value(participate_iframe_shell.get("iframe_route_count"))
+    participate_offline_count = int_value(participate_iframe_shell.get("offline_fallback_route_count"))
+    if participate_route_count < MINIMUM_PARTICIPATE_IFRAME_ROUTES:
+        failures.append("Participate iframe shell route count is below required public routes")
+    if participate_iframe_count < MINIMUM_PARTICIPATE_IFRAME_ROUTES:
+        failures.append("Participate iframe shell does not prove both iframe routes")
+    if participate_offline_count != 0:
+        failures.append("Participate iframe shell is using offline fallback routes")
+
+    if downloads_status_browser and downloads_status_browser.get("status") != "pass":
+        failures.append("downloads-status Playwright proof is not pass")
+    if mobile_pwa_viewport and mobile_pwa_viewport.get("status") != "pass":
+        failures.append("mobile PWA viewport Playwright proof is not pass")
+    if frontdoor_navigation and frontdoor_navigation.get("status") != "pass":
+        failures.append("front-door navigation Playwright proof is not pass")
+    if pwa_offline_cache and pwa_offline_cache.get("status") != "pass":
+        failures.append("PWA offline cache Playwright proof is not pass")
+    if blazor_new_runner_menu and blazor_new_runner_menu.get("status") != "pass":
+        failures.append("Blazor new-runner Playwright proof is not pass")
+    role_alias_route_result_rows = role_alias_route_results(role_alias_routes)
+    role_alias_route_results_by_alias = {
+        str(result.get("aliasPath") or "").strip(): result
+        for result in role_alias_route_result_rows
+    }
+    role_alias_route_drift: list[dict[str, Any]] = []
+    if role_alias_routes is not None:
+        if role_alias_routes.get("status") != "pass":
+            failures.append("role alias route redirects drifted")
+        role_alias_base_url = str(role_alias_routes.get("baseUrl") or "").strip()
+        for alias_path, expected_final_route in ROLE_ALIAS_EXPECTED_FINAL_ROUTES.items():
+            route_result = role_alias_route_results_by_alias.get(alias_path)
+            if not route_result:
+                failures.append(f"{alias_path} alias route proof is missing")
+                role_alias_route_drift.append(
+                    {
+                        "aliasPath": alias_path,
+                        "finalRoute": "",
+                        "expectedFinalRoute": expected_final_route,
+                        "pass": False,
+                        "error": "missing result",
+                    }
+                )
+                continue
+            final_route = str(route_result.get("finalRoute") or route_from_url(route_result.get("finalUrl"))).strip()
+            if not role_alias_result_matches_contract(
+                route_result,
+                role_alias_base_url,
+                alias_path,
+                expected_final_route,
+            ):
+                failures.append(
+                    f"{alias_path} alias route proof does not satisfy the exact GET/HEAD private redirect contract"
+                )
+            if final_route != expected_final_route or route_result.get("pass") is not True:
+                drift_result = dict(route_result)
+                role_alias_route_drift.append(drift_result)
+                failures.append(f"{alias_path} resolved to {final_route or '<missing>'} instead of {expected_final_route}")
+    if downloads_status_browser:
+        artifact = downloads_status_browser.get("artifact") if isinstance(downloads_status_browser.get("artifact"), dict) else {}
+        artifact_contract = receipt_contract(artifact)
+        if artifact_contract != OPTIONAL_PLAYWRIGHT_CONTRACTS["downloadsStatusBrowser"]:
+            failures.append(
+                "downloads-status Playwright artifact contract is not "
+                + OPTIONAL_PLAYWRIGHT_CONTRACTS["downloadsStatusBrowser"]
+            )
+        else:
+            browser_status_heading = str(artifact.get("status_redirect_heading") or "").strip()
+            browser_status_heading_expected = str(artifact.get("status_redirect_heading_expected") or "").strip()
+            browser_status_heading_recognized = artifact.get("status_redirect_heading_recognized")
+            browser_status_heading_matches_release_channel = artifact.get("status_redirect_heading_matches_release_channel")
+            browser_status_heading_uses_generic_updated_copy = artifact.get("status_redirect_heading_uses_generic_updated_copy")
+            if not browser_status_heading:
+                failures.append("downloads-status Playwright proof does not record a /status heading")
+            if browser_status_heading_recognized is not True:
+                failures.append("downloads-status Playwright proof does not prove a recognized /status decision heading")
+            if not browser_status_heading_expected:
+                failures.append("downloads-status Playwright proof does not record the expected /status heading")
+            if browser_status_heading_uses_generic_updated_copy is True:
+                failures.append("downloads-status Playwright proof still uses stale generic Updated heading")
+            if browser_status_heading_expected and browser_status_heading_matches_release_channel is not True:
+                failures.append("downloads-status Playwright proof does not prove the /status heading matches release posture")
+    mobile_pwa_viewport_artifact_failures: list[str] = []
+    mobile_pwa_viewport_artifact_current_contract_satisfied = False
+    if mobile_pwa_viewport:
+        artifact = mobile_pwa_viewport.get("artifact") if isinstance(mobile_pwa_viewport.get("artifact"), dict) else {}
+        mobile_pwa_viewport_routes = mobile_pwa_viewport_route_set(artifact)
+        missing_mobile_pwa_viewport_routes = sorted(REQUIRED_MOBILE_PWA_VIEWPORT_ROUTES - mobile_pwa_viewport_routes)
+        expected_mobile_pwa_base_url = str(
+            downloads.get("base_url")
+            or downloads.get("baseUrl")
+            or pwa_static.get("base_url")
+            or pwa_static.get("baseUrl")
+            or ""
+        )
+        mobile_pwa_viewport_artifact_failures = (
+            mobile_pwa_viewport_artifact_contract_failures(
+                artifact,
+                expected_base_url=expected_mobile_pwa_base_url,
+            )
+        )
+        mobile_pwa_viewport_artifact_current_contract_satisfied = not (
+            mobile_pwa_viewport_artifact_failures
+        )
+        failures.extend(mobile_pwa_viewport_artifact_failures)
+    else:
+        mobile_pwa_viewport_routes = set()
+        missing_mobile_pwa_viewport_routes = sorted(REQUIRED_MOBILE_PWA_VIEWPORT_ROUTES)
+    if pwa_offline_cache:
+        artifact = pwa_offline_cache.get("artifact") if isinstance(pwa_offline_cache.get("artifact"), dict) else {}
+        if receipt_contract(artifact) != OPTIONAL_PLAYWRIGHT_CONTRACTS["pwaOfflineCache"]:
+            failures.append(
+                "PWA offline cache Playwright artifact contract is not "
+                + OPTIONAL_PLAYWRIGHT_CONTRACTS["pwaOfflineCache"]
+            )
+        static_paths = string_set(artifact.get("static_paths"))
+        for expected_path in sorted(REQUIRED_PWA_OFFLINE_STATIC_PATHS):
+            if expected_path not in static_paths:
+                failures.append(f"PWA offline cache proof did not cache {expected_path}")
+        if artifact.get("cache_version") != "v17":
+            failures.append("PWA offline cache proof cache version is not v17")
+        if artifact.get("navigation_policy") != "network_only":
+            failures.append("PWA offline cache proof navigation policy is not network_only")
+        if artifact.get("private_state_scope") != "open_tab_only":
+            failures.append("PWA offline cache proof private state scope is not open_tab_only")
+        if artifact.get("query_bearing_requests_cached") is not False:
+            failures.append("PWA offline cache proof cached a query-bearing request")
+        if artifact.get("private_navigation_cached") is not False:
+            failures.append("PWA offline cache proof cached private role navigation")
+        if artifact.get("private_api_cached") is not False:
+            failures.append("PWA offline cache proof cached private Play API data")
+        if artifact.get("personalized_ledger_cached") is not False:
+            failures.append("PWA offline cache proof cached the personalized ledger stream")
+        purged_prefixes = string_set(artifact.get("legacy_private_cache_prefixes_purged"))
+        missing_purged_prefixes = sorted(REQUIRED_PWA_OFFLINE_LEGACY_PRIVATE_CACHE_PREFIXES - purged_prefixes)
+        if missing_purged_prefixes:
+            failures.append(
+                "PWA offline cache proof did not purge legacy private cache prefixes: "
+                + ", ".join(missing_purged_prefixes)
+            )
+        if artifact.get("unrelated_cache_preserved") is not True:
+            failures.append("PWA offline cache proof did not preserve an unrelated cache")
+        role_results = artifact.get("offline_role_fallbacks") if isinstance(artifact.get("offline_role_fallbacks"), list) else []
+        role_results_by_role = {
+            str(item.get("role") or "").strip(): item
+            for item in role_results
+            if isinstance(item, dict)
+        }
+        for role, path in REQUIRED_PWA_OFFLINE_ROLE_FALLBACKS.items():
+            result = role_results_by_role.get(role)
+            if not result:
+                failures.append(f"PWA offline cache proof is missing {role} fail-closed role fallback")
+                continue
+            if result.get("path") != path:
+                failures.append(f"PWA offline cache proof {role} fallback path is not {path}")
+            if int_value(result.get("status")) != 503:
+                failures.append(f"PWA offline cache proof {role} fallback did not return HTTP 503")
+            if "no-store" not in str(result.get("cache_control") or "").lower():
+                failures.append(f"PWA offline cache proof {role} fallback is not no-store")
+            if result.get("private_projection_restored") is not False:
+                failures.append(f"PWA offline cache proof {role} fallback restored private projection state")
+    if blazor_new_runner_menu:
+        artifact = artifact_object(blazor_new_runner_menu.get("artifact"))
+        app_roster_transition = blazor_new_runner_app_roster_transition(artifact)
+        workbench_fallback_route = blazor_new_runner_workbench_route(artifact)
+        if receipt_contract(artifact) != OPTIONAL_PLAYWRIGHT_CONTRACTS["blazorNewRunnerMenu"]:
+            failures.append(
+                "Blazor new-runner Playwright artifact contract is not "
+                + OPTIONAL_PLAYWRIGHT_CONTRACTS["blazorNewRunnerMenu"]
+            )
+        expected_app_href = "app?command=new_character"
+        expected_app_final_suffix = "/blazor/app?command=new_character"
+        app_resolved_href = str(app_roster_transition.get("resolved_new_runner_href") or "").strip()
+        app_final_url = str(app_roster_transition.get("final_url") or "").strip()
+        app_active_workflow = str(app_roster_transition.get("active_workflow") or "").strip()
+        app_command = str(app_roster_transition.get("command") or "").strip()
+        app_startup_command = str(app_roster_transition.get("startup_command") or "").strip()
+        app_dialog_count = int_value(app_roster_transition.get("dialog_count"))
+        app_headline = str(app_roster_transition.get("headline") or "").strip()
+        app_workflow_heading = str(app_roster_transition.get("workflow_heading") or "").strip()
+        app_file_menu_locked = app_roster_transition.get("file_menu_locked_during_dialog")
+        app_new_tool_locked = app_roster_transition.get("new_tool_locked_during_dialog")
+        if not app_roster_transition:
+            failures.append("Blazor new-runner Playwright proof is missing the app roster transition artifact")
+        else:
+            if app_resolved_href != expected_app_href:
+                failures.append("Blazor new-runner Playwright proof did not preserve the app roster new-character href")
+            if not app_final_url.endswith(expected_app_final_suffix):
+                failures.append("Blazor new-runner Playwright proof did not land on the hosted app new-character route")
+            if app_active_workflow != "build-lab":
+                failures.append("Blazor new-runner Playwright proof did not transition app roster into the Build Lab workflow")
+            if app_command != "new-character":
+                failures.append("Blazor new-runner Playwright proof did not switch app roster to command=new-character")
+            if app_startup_command != "new_character":
+                failures.append("Blazor new-runner Playwright proof did not preserve startup command new_character on app roster transition")
+            if app_dialog_count != 1:
+                failures.append("Blazor new-runner Playwright proof did not reopen exactly one startup dialog on the app roster route")
+            if app_headline != "New runner":
+                failures.append("Blazor new-runner Playwright proof did not render the New runner heading on app roster transition")
+            if app_workflow_heading != "Build Lab shell":
+                failures.append("Blazor new-runner Playwright proof did not render the Build Lab shell heading on app roster transition")
+            if app_file_menu_locked is not True:
+                failures.append("Blazor new-runner Playwright proof did not lock the File menu during the app roster startup dialog")
+            if app_new_tool_locked is not True:
+                failures.append("Blazor new-runner Playwright proof did not lock the New tool during the app roster startup dialog")
+        expected_href = "workbench?workspace=blue-workspace&tab=tab-create&command=new_character"
+        expected_final_suffix = "/blazor/workbench?workspace=blue-workspace&tab=tab-create&command=new_character"
+        resolved_href = str(artifact_value_with_fallback(artifact, "resolved_new_runner_href", workbench_fallback_route) or "").strip()
+        final_url = str(artifact_value_with_fallback(artifact, "final_url", workbench_fallback_route) or "").strip()
+        reopened_data_command = str(artifact_value_with_fallback(artifact, "reopened_data_command", workbench_fallback_route) or "").strip()
+        reopened_data_tab = str(artifact_value_with_fallback(artifact, "reopened_data_tab", workbench_fallback_route) or "").strip()
+        dialog_count = int_value(artifact_value_with_fallback(artifact, "dialog_count", workbench_fallback_route))
+        dialog_title = str(artifact_value_with_fallback(artifact, "dialog_title", workbench_fallback_route) or "").strip()
+        if resolved_href != expected_href:
+            failures.append("Blazor new-runner Playwright proof did not preserve the new-character href")
+        if not final_url.endswith(expected_final_suffix):
+            failures.append("Blazor new-runner Playwright proof did not preserve the hosted workbench dialog route")
+        if reopened_data_command != "new_character":
+            failures.append("Blazor new-runner Playwright proof did not keep command=new_character after reopen")
+        if reopened_data_tab != "tab-create":
+            failures.append("Blazor new-runner Playwright proof did not keep tab=tab-create after reopen")
+        if dialog_count != 1:
+            failures.append("Blazor new-runner Playwright proof did not reopen exactly one dialog")
+        if dialog_title != "New runner":
+            failures.append("Blazor new-runner Playwright proof did not reopen the New runner dialog")
+    if frontdoor_navigation:
+        raw_mobile_artifact = frontdoor_navigation.get("mobileArtifact") if isinstance(frontdoor_navigation.get("mobileArtifact"), dict) else {}
+        raw_ledger_artifact = frontdoor_navigation.get("ledgerArtifact") if isinstance(frontdoor_navigation.get("ledgerArtifact"), dict) else {}
+        raw_anchor_artifact = frontdoor_navigation.get("anchorArtifact") if isinstance(frontdoor_navigation.get("anchorArtifact"), dict) else {}
+        mobile_artifact = redact_private_identity(raw_mobile_artifact)
+        ledger_artifact = redact_private_identity(raw_ledger_artifact)
+        anchor_artifact = redact_private_identity(raw_anchor_artifact)
+        frontdoor_navigation_stderr_tail = str(
+            redact_private_identity(frontdoor_navigation.get("stderrTail") or "")
+        ).strip()
+        frontdoor_navigation_artifacts_missing = not mobile_artifact and not ledger_artifact and not anchor_artifact
+        mobile_artifact_privacy_contract_satisfied = frontdoor_mobile_artifact_matches_privacy_contract(
+            raw_mobile_artifact
+        )
+        anchor_artifact_privacy_contract_satisfied = frontdoor_anchor_artifact_matches_current_contract(
+            raw_anchor_artifact
+        )
+        frontdoor_gated_targets = string_set(mobile_artifact.get("gated_targets"))
+        frontdoor_public_targets = string_set(mobile_artifact.get("public_targets"))
+        frontdoor_homepage_lane_text = str(mobile_artifact.get("homepage_lane_text") or "").strip()
+        frontdoor_play_route = str(mobile_artifact.get("play_route") or "").strip()
+        frontdoor_play_sign_in_route = str(mobile_artifact.get("play_sign_in_route") or "").strip()
+        frontdoor_direct_player_route = str(mobile_artifact.get("direct_player_route") or "").strip()
+        frontdoor_final_path = ""
+        frontdoor_final_url = str(mobile_artifact.get("final_url") or "").strip()
+        if frontdoor_final_url:
+            try:
+                frontdoor_final_path = urlparse(frontdoor_final_url).path
+            except ValueError:
+                frontdoor_final_path = ""
+        frontdoor_http_status = int_value(mobile_artifact.get("direct_player_http_status"))
+        frontdoor_pwa_manifest_path = str(mobile_artifact.get("pwa_manifest_path") or "").strip()
+        frontdoor_pwa_role = str(mobile_artifact.get("pwa_role") or "").strip()
+        frontdoor_blazor_shell = str(mobile_artifact.get("blazor_shell") or "").strip()
+        frontdoor_rybbit_tag = str(mobile_artifact.get("rybbit_tag") or "").strip()
+        frontdoor_rybbit_route = str(mobile_artifact.get("rybbit_route") or "").strip()
+        frontdoor_rybbit_mode = str(mobile_artifact.get("rybbit_mode") or "").strip()
+        frontdoor_rybbit_role = str(mobile_artifact.get("rybbit_role") or "").strip()
+        player_handoff_url = str(mobile_artifact.get("player_session_handoff_url") or "").strip()
+        player_handoff_status = str(mobile_artifact.get("player_session_handoff_status") or "").strip()
+        player_handoff_link_text = str(mobile_artifact.get("player_session_handoff_link_text") or "").strip()
+        frontdoor_gm_route = str(mobile_artifact.get("gm_route") or "").strip()
+        frontdoor_gm_final_path = ""
+        frontdoor_gm_final_url = str(mobile_artifact.get("gm_final_url") or "").strip()
+        if frontdoor_gm_final_url:
+            try:
+                frontdoor_gm_final_path = urlparse(frontdoor_gm_final_url).path
+            except ValueError:
+                frontdoor_gm_final_path = ""
+        frontdoor_gm_http_status = int_value(mobile_artifact.get("gm_http_status"))
+        frontdoor_gm_pwa_manifest_path = str(mobile_artifact.get("gm_pwa_manifest_path") or "").strip()
+        frontdoor_gm_pwa_role = str(mobile_artifact.get("gm_pwa_role") or "").strip()
+        frontdoor_gm_blazor_shell = str(mobile_artifact.get("gm_blazor_shell") or "").strip()
+        frontdoor_gm_rybbit_tag = str(mobile_artifact.get("gm_rybbit_tag") or "").strip()
+        frontdoor_gm_rybbit_route = str(mobile_artifact.get("gm_rybbit_route") or "").strip()
+        frontdoor_gm_rybbit_mode = str(mobile_artifact.get("gm_rybbit_mode") or "").strip()
+        frontdoor_gm_rybbit_role = str(mobile_artifact.get("gm_rybbit_role") or "").strip()
+        gm_handoff_url = str(mobile_artifact.get("gm_session_handoff_url") or "").strip()
+        gm_handoff_status = str(mobile_artifact.get("gm_session_handoff_status") or "").strip()
+        gm_handoff_link_text = str(mobile_artifact.get("gm_session_handoff_link_text") or "").strip()
+        frontdoor_anchor_entry_url = str(anchor_artifact.get("entry_url") or "").strip()
+        frontdoor_anchor_final_url = str(anchor_artifact.get("final_url") or "").strip()
+        frontdoor_anchor_final_path = str(anchor_artifact.get("final_pathname") or "").strip()
+        frontdoor_anchor_final_hash = str(anchor_artifact.get("final_hash") or "").strip()
+        frontdoor_anchor_pwa_manifest_path = str(anchor_artifact.get("pwa_manifest_path") or "").strip()
+        frontdoor_anchor_pwa_role = str(anchor_artifact.get("pwa_role") or "").strip()
+        frontdoor_anchor_blazor_shell = str(anchor_artifact.get("blazor_shell") or "").strip()
+        frontdoor_anchor_failure = str(anchor_artifact.get("failure") or "").strip()
+        frontdoor_anchor_current_contract_satisfied = anchor_artifact_privacy_contract_satisfied
+        expected_frontdoor_homepage_lane_text = expected_homepage_lane_text(
+            expected_release_status,
+            expected_release_version,
+            expected_release_channel,
+            expected_release_supportability_state,
+            expected_release_rollout_state,
+        )
+        frontdoor_homepage_lane_matches_release_channel = (
+            frontdoor_homepage_lane_text == expected_frontdoor_homepage_lane_text
+            if expected_frontdoor_homepage_lane_text
+            else None
+        )
+        if frontdoor_navigation_artifacts_missing:
+            if frontdoor_navigation_stderr_tail:
+                normalized_stderr_tail = (
+                    frontdoor_navigation_stderr_tail.replace("\\r\\n", "\n")
+                    .replace("\\n", "\n")
+                    .replace("\\r", "\n")
+                )
+                first_line = normalized_stderr_tail.splitlines()[0].strip()
+                if first_line:
+                    failures.append("front-door navigation Playwright proof failed before artifacts were written: " + first_line)
+        else:
+            if receipt_contract(mobile_artifact) != OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationMobile"]:
+                failures.append(
+                    "front-door navigation mobile artifact contract is not "
+                    + OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationMobile"]
+                )
+            if receipt_contract(ledger_artifact) != OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationLedger"]:
+                failures.append(
+                    "front-door navigation ledger artifact contract is not "
+                    + OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationLedger"]
+                )
+            if receipt_contract(anchor_artifact) != OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"]:
+                failures.append(
+                    "front-door navigation anchor artifact contract is not "
+                    + OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"]
+                )
+            if artifact_contains_raw_private_identity(raw_mobile_artifact):
+                failures.append("front-door navigation mobile artifact contains raw private session or device identity")
+            if artifact_contains_raw_private_identity(raw_anchor_artifact):
+                failures.append("front-door navigation anchor artifact contains raw private session or device identity")
+            if receipt_contract(mobile_artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationMobile"] and not mobile_artifact_privacy_contract_satisfied:
+                failures.append("front-door navigation mobile artifact does not satisfy the redacted proof contract")
+            if receipt_contract(anchor_artifact) == OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"] and not anchor_artifact_privacy_contract_satisfied:
+                failures.append("front-door navigation anchor artifact does not satisfy the redacted proof contract")
+            if "Build" not in frontdoor_gated_targets:
+                failures.append("front-door navigation does not gate Build")
+            if "Build" in frontdoor_public_targets:
+                failures.append("front-door navigation exposes Build as public")
+            if "Play" not in frontdoor_gated_targets:
+                failures.append("front-door navigation does not gate Play")
+            if "Play" in frontdoor_public_targets:
+                failures.append("front-door navigation exposes Play as public")
+            if not frontdoor_homepage_lane_text:
+                failures.append("front-door navigation homepage does not disclose current public lane")
+            if expected_frontdoor_homepage_lane_text and frontdoor_homepage_lane_matches_release_channel is not True:
+                failures.append("front-door navigation homepage current public lane copy does not match release posture")
+            if frontdoor_play_route != "/mobile/player":
+                failures.append("front-door navigation Play route is not /mobile/player")
+            if frontdoor_play_sign_in_route != "/login?next=%2Fmobile%2Fplayer":
+                failures.append("front-door navigation Play sign-in route is not /login?next=%2Fmobile%2Fplayer")
+            if frontdoor_direct_player_route != "/mobile/player":
+                failures.append("front-door navigation direct player route is not /mobile/player")
+            if frontdoor_http_status != 200:
+                failures.append("front-door navigation Play launch did not return HTTP 200")
+            if frontdoor_final_path != "/mobile/player":
+                failures.append("front-door navigation Play launch did not land on /mobile/player")
+            if not visible_role_url_is_path_only(frontdoor_final_url, "/mobile/player"):
+                failures.append("front-door navigation Play launch visible URL is not path-only after sanitization")
+            if mobile_artifact.get("visible_player_url_private_identity_absent") is not True:
+                failures.append("front-door navigation Play launch did not prove private identity was removed from the visible URL")
+            if mobile_artifact.get("player_session_context_present") is not True:
+                failures.append("front-door navigation Play launch did not prove nonempty session context")
+            if mobile_artifact.get("player_device_context_present") is not True:
+                failures.append("front-door navigation Play launch did not prove nonempty device context")
+            if mobile_artifact.get("live_turn_companion_shell") is not True:
+                failures.append("front-door navigation Play launch did not prove the live turn companion shell")
+            if frontdoor_pwa_manifest_path != "/manifest.player.webmanifest":
+                failures.append("front-door navigation Play launch did not activate the player PWA manifest")
+            if frontdoor_pwa_role != "Player":
+                failures.append("front-door navigation Play launch did not prove the Player role")
+            if frontdoor_blazor_shell != "interactive-server":
+                failures.append("front-door navigation Play launch did not prove the interactive Blazor shell")
+            if mobile_artifact.get("rybbit_configured") is not True or frontdoor_rybbit_tag != "mobile_play_shell":
+                failures.append("front-door navigation Play launch did not prove the Rybbit mobile shell config")
+            if frontdoor_rybbit_route != "/mobile/player" or frontdoor_rybbit_mode != "player" or frontdoor_rybbit_role != "Player":
+                failures.append("front-door navigation Play launch did not prove the Player Rybbit role config")
+            if mobile_artifact.get("rybbit_site_id_present") is not True or mobile_artifact.get("rybbit_script_url_allowed") is not True:
+                failures.append("front-door navigation Play launch did not prove the Rybbit provider config")
+            if mobile_artifact.get("rybbit_skip_mobile_paths") is not True:
+                failures.append("front-door navigation Play launch did not prove Rybbit skips mobile paths")
+            if mobile_artifact.get("rybbit_mask_mobile_paths") is not True:
+                failures.append("front-door navigation Play launch did not prove Rybbit masks mobile paths")
+            if mobile_artifact.get("rybbit_masks_private_play_routes") is not True:
+                failures.append("front-door navigation Play launch did not prove Rybbit masks private play routes")
+            if mobile_artifact.get("rybbit_replay_blocks_turn_root") is not True:
+                failures.append("front-door navigation Play launch did not prove Rybbit replay blocks turn content")
+            if not redacted_handoff_url_matches_contract(player_handoff_url, "/mobile/player", "Player"):
+                failures.append("front-door navigation Player session handoff URL is not safely redacted")
+            if mobile_artifact.get("player_session_handoff_private_identity_redacted") is not True:
+                failures.append("front-door navigation Player session handoff proof did not redact private identity")
+            if player_handoff_status != "Session handoff is ready in the link above.":
+                failures.append("front-door navigation Player session handoff did not expose ready status")
+            if player_handoff_link_text != "Open session handoff link":
+                failures.append("front-door navigation Player session handoff did not relabel the visible route")
+            if mobile_artifact.get("player_session_handoff_preserves_session") is not True:
+                failures.append("front-door navigation Player session handoff did not preserve session id")
+            if mobile_artifact.get("player_session_handoff_preserves_role") is not True:
+                failures.append("front-door navigation Player session handoff did not preserve role")
+            if mobile_artifact.get("player_session_handoff_strips_device") is not True:
+                failures.append("front-door navigation Player session handoff leaked sender device id")
+            if mobile_artifact.get("player_session_handoff_sender_device_id_present") is not True:
+                failures.append("front-door navigation Player session handoff did not prove a sender device id was stripped")
+            if frontdoor_gm_route != "/mobile/gm":
+                failures.append("front-door navigation GM switch route is not /mobile/gm")
+            if mobile_artifact.get("gm_route_session_id_present") is not True:
+                failures.append("front-door navigation GM switch did not prove session handoff context")
+            if mobile_artifact.get("gm_route_private_identity_redacted") is not True:
+                failures.append("front-door navigation GM switch proof did not redact private identity")
+            if frontdoor_gm_http_status != 200:
+                failures.append("front-door navigation GM switch did not return HTTP 200")
+            if frontdoor_gm_final_path != "/mobile/gm":
+                failures.append("front-door navigation GM switch did not land on /mobile/gm")
+            if not visible_role_url_is_path_only(frontdoor_gm_final_url, "/mobile/gm"):
+                failures.append("front-door navigation GM visible URL is not path-only after sanitization")
+            if mobile_artifact.get("visible_gm_url_private_identity_absent") is not True:
+                failures.append("front-door navigation GM switch did not prove private identity was removed from the visible URL")
+            if mobile_artifact.get("gm_session_context_present") is not True:
+                failures.append("front-door navigation GM switch did not prove nonempty session context")
+            if mobile_artifact.get("gm_device_context_present") is not True:
+                failures.append("front-door navigation GM switch did not prove nonempty device context")
+            if mobile_artifact.get("gm_live_turn_companion_shell") is not True:
+                failures.append("front-door navigation GM switch did not prove the live turn companion shell")
+            if frontdoor_gm_pwa_manifest_path != "/manifest.gm.webmanifest":
+                failures.append("front-door navigation GM switch did not activate the GM PWA manifest")
+            if frontdoor_gm_pwa_role != "GameMaster":
+                failures.append("front-door navigation GM switch did not prove the GameMaster role")
+            if frontdoor_gm_blazor_shell != "interactive-server":
+                failures.append("front-door navigation GM switch did not prove the interactive Blazor shell")
+            if mobile_artifact.get("gm_rybbit_configured") is not True or frontdoor_gm_rybbit_tag != "mobile_play_shell":
+                failures.append("front-door navigation GM switch did not prove the Rybbit mobile shell config")
+            if frontdoor_gm_rybbit_route != "/mobile/gm" or frontdoor_gm_rybbit_mode != "gm" or frontdoor_gm_rybbit_role != "GameMaster":
+                failures.append("front-door navigation GM switch did not prove the GM Rybbit role config")
+            if mobile_artifact.get("gm_rybbit_site_id_present") is not True or mobile_artifact.get("gm_rybbit_script_url_allowed") is not True:
+                failures.append("front-door navigation GM switch did not prove the Rybbit provider config")
+            if mobile_artifact.get("gm_rybbit_skip_mobile_paths") is not True:
+                failures.append("front-door navigation GM switch did not prove Rybbit skips mobile paths")
+            if mobile_artifact.get("gm_rybbit_mask_mobile_paths") is not True:
+                failures.append("front-door navigation GM switch did not prove Rybbit masks mobile paths")
+            if mobile_artifact.get("gm_rybbit_masks_private_play_routes") is not True:
+                failures.append("front-door navigation GM switch did not prove Rybbit masks private play routes")
+            if mobile_artifact.get("gm_rybbit_replay_blocks_turn_root") is not True:
+                failures.append("front-door navigation GM switch did not prove Rybbit replay blocks turn content")
+            if not redacted_handoff_url_matches_contract(gm_handoff_url, "/mobile/gm", "GameMaster"):
+                failures.append("front-door navigation GM session handoff URL is not safely redacted")
+            if mobile_artifact.get("gm_session_handoff_private_identity_redacted") is not True:
+                failures.append("front-door navigation GM session handoff proof did not redact private identity")
+            if gm_handoff_status != "Session handoff is ready in the link above.":
+                failures.append("front-door navigation GM session handoff did not expose ready status")
+            if gm_handoff_link_text != "Open session handoff link":
+                failures.append("front-door navigation GM session handoff did not relabel the visible route")
+            if mobile_artifact.get("gm_session_handoff_preserves_session") is not True:
+                failures.append("front-door navigation GM session handoff did not preserve session id")
+            if mobile_artifact.get("gm_session_handoff_preserves_role") is not True:
+                failures.append("front-door navigation GM session handoff did not preserve role")
+            if mobile_artifact.get("gm_session_handoff_strips_device") is not True:
+                failures.append("front-door navigation GM session handoff leaked sender device id")
+            if mobile_artifact.get("gm_session_handoff_sender_device_id_present") is not True:
+                failures.append("front-door navigation GM session handoff did not prove a sender device id was stripped")
+            if not frontdoor_anchor_entry_url_matches_contract(frontdoor_anchor_entry_url):
+                failures.append("front-door navigation homepage anchor proof did not start from /#turn-runsite-card")
+            if frontdoor_anchor_final_path != "/mobile/player":
+                failures.append("front-door navigation homepage anchor proof did not land on /mobile/player")
+            if frontdoor_anchor_final_hash != "#turn-runsite-card":
+                failures.append("front-door navigation homepage anchor proof did not preserve #turn-runsite-card")
+            if frontdoor_anchor_pwa_manifest_path != "/manifest.player.webmanifest":
+                failures.append("front-door navigation homepage anchor proof did not activate the player PWA manifest")
+            if frontdoor_anchor_pwa_role != "Player":
+                failures.append("front-door navigation homepage anchor proof did not prove the Player role")
+            if frontdoor_anchor_blazor_shell != "interactive-server":
+                failures.append("front-door navigation homepage anchor proof did not prove the interactive Blazor shell")
+            if not visible_role_url_is_path_only(
+                frontdoor_anchor_final_url,
+                "/mobile/player",
+                "#turn-runsite-card",
+            ):
+                failures.append("front-door navigation homepage anchor visible URL is not path-only after sanitization")
+            if anchor_artifact.get("visible_url_private_identity_absent") is not True:
+                failures.append("front-door navigation homepage anchor did not prove private identity was removed from the visible URL")
+            if anchor_artifact.get("session_context_present") is not True:
+                failures.append("front-door navigation homepage anchor proof did not reach a session-backed player route")
+            if anchor_artifact.get("device_context_present") is not True:
+                failures.append("front-door navigation homepage anchor proof did not reach a device-backed player route")
+            if frontdoor_anchor_failure:
+                failures.append("front-door navigation homepage anchor proof failed: " + frontdoor_anchor_failure)
+
+    preflight_findings = preflight.get("findings") if isinstance(preflight.get("findings"), list) else []
+    preflight_overlay_fingerprint = (
+        preflight.get("overlayBuildInfoSourceFingerprint")
+        if isinstance(preflight.get("overlayBuildInfoSourceFingerprint"), dict)
+        else {}
+    )
+    preflight_overlay_fingerprint_missing_keys = string_list(preflight_overlay_fingerprint.get("missingKeys"))
+    preflight_overlay_fingerprint_mismatched_keys = string_list(preflight_overlay_fingerprint.get("mismatchedKeys"))
+    preflight_overlay_fingerprint_aggregate_matches = (
+        preflight_overlay_fingerprint.get("aggregateMatchesCurrentSource")
+        if isinstance(preflight_overlay_fingerprint.get("aggregateMatchesCurrentSource"), bool)
+        else None
+    )
+    if preflight_overlay_fingerprint_missing_keys:
+        failures.append(
+            "public-edge preflight overlay build info is missing source fingerprint fields: "
+            + ", ".join(preflight_overlay_fingerprint_missing_keys)
+        )
+    if preflight_overlay_fingerprint_mismatched_keys:
+        failures.append(
+            "public-edge preflight overlay build info source fingerprint does not match current source: "
+            + ", ".join(preflight_overlay_fingerprint_mismatched_keys)
+        )
+    result = {
+        "contractName": "chummer.public_edge_postdeploy_gate.v1",
+        "generatedAtUtc": datetime.now(UTC).isoformat(),
+        "status": "pass" if not failures else "fail",
+        "baseUrl": downloads.get("base_url") or pwa_static.get("base_url") or "",
+        "preflightStatus": preflight.get("status"),
+        "preflightActiveLockCount": preflight.get("activeLockCount"),
+        "preflightBlockingLockCount": sum(1 for finding in preflight_findings if isinstance(finding, dict) and finding.get("id") == "active_build_lane"),
+        "preflightForeignLockCount": preflight.get("foreignLockCount"),
+        "preflightIgnoredForeignLockCount": preflight.get("ignoredForeignLockCount"),
+        "preflightFindingCount": len(preflight_findings),
+        "preflightForeignLocksIgnored": preflight.get("foreignLocksIgnored"),
+        "preflightAllowForeignBuildLocks": preflight.get("allowForeignBuildLocks"),
+        "preflightStaleLookingLockCount": preflight.get("staleLookingLockCount"),
+        "preflightStaleForeignLockCount": preflight.get("staleForeignLockCount"),
+        "preflightStaleForeignLocksIgnored": preflight.get("staleForeignLocksIgnored"),
+        "preflightAllowStaleForeignBuildLocks": preflight.get("allowStaleForeignBuildLocks"),
+        "preflightOverlayRoot": preflight.get("overlayRoot"),
+        "preflightOverlayBuildInfoSourceFingerprintAggregateMatchesCurrentSource": preflight_overlay_fingerprint_aggregate_matches,
+        "preflightOverlayBuildInfoSourceFingerprintRecordedAggregateSha256": preflight_overlay_fingerprint.get("recordedAggregateSha256"),
+        "preflightOverlayBuildInfoSourceFingerprintExpectedAggregateSha256": preflight_overlay_fingerprint.get("expectedAggregateSha256"),
+        "preflightOverlayBuildInfoSourceFingerprintMissingKeys": preflight_overlay_fingerprint_missing_keys,
+        "preflightOverlayBuildInfoSourceFingerprintMismatchedKeys": preflight_overlay_fingerprint_mismatched_keys,
+        "downloadsStatus": downloads.get("status"),
+        "downloadsHasMarker": downloads.get("downloads_has_marker"),
+        "statusRedirectHasMarker": downloads.get("status_redirect_has_marker"),
+        "visibleVersion": downloads.get("visible_version"),
+        "statusRedirectVersion": downloads.get("status_redirect_version"),
+        "downloadsVersionMarkerValue": downloads.get("downloads_version_marker_value"),
+        "statusRedirectVersionMarkerValue": downloads.get("status_redirect_version_marker_value"),
+        "downloadsVersionMarkerMatchesReleaseChannel": downloads_version_marker_matches_release_channel,
+        "statusRedirectVersionMarkerMatchesReleaseChannel": status_redirect_version_marker_matches_release_channel,
+        "statusRedirectHeading": status_redirect_heading,
+        "statusRedirectHeadingRecognized": status_redirect_heading_recognized,
+        "statusRedirectHeadingExpected": status_redirect_heading_expected,
+        "statusRedirectHeadingMatchesReleaseChannel": status_redirect_heading_matches_release_channel,
+        "statusRedirectHeadingUsesGenericUpdatedCopy": status_redirect_heading_uses_generic_updated_copy,
+        "expectedReleaseVersion": expected_release_version,
+        "visibleVersionMatchesReleaseChannel": visible_version_matches_release_channel,
+        "statusRedirectVersionMatchesReleaseChannel": status_redirect_version_matches_release_channel,
+        "expectedReleaseStatus": expected_release_status,
+        "expectedReleaseChannel": expected_release_channel,
+        "expectedReleaseSupportabilityState": expected_release_supportability_state,
+        "expectedReleaseRolloutState": expected_release_rollout_state,
+        "releaseManifestHttpStatus": release_manifest_http_status,
+        "releaseManifestStatus": downloads.get("release_manifest_status"),
+        "releaseManifestStatusMatchesReleaseChannel": release_manifest_status_matches_release_channel,
+        "releaseManifestChannel": downloads.get("release_manifest_channel"),
+        "releaseManifestChannelMatchesReleaseChannel": release_manifest_channel_matches_release_channel,
+        "releaseManifestVersion": downloads.get("release_manifest_version"),
+        "releaseManifestVersionMatchesReleaseChannel": release_manifest_version_matches_release_channel,
+        "releaseManifestSupportabilityState": downloads.get("release_manifest_supportability_state"),
+        "releaseManifestSupportabilityMatchesReleaseChannel": release_manifest_supportability_matches_release_channel,
+        "releaseManifestRolloutState": downloads.get("release_manifest_rollout_state"),
+        "releaseManifestRolloutMatchesReleaseChannel": release_manifest_rollout_matches_release_channel,
+        "publicReleaseManifestCopySafe": public_release_copy_safe,
+        "publicReleaseManifestUnsafeCopyMarkers": downloads.get("public_release_unsafe_copy_markers"),
+        "publicReleaseManifestHasPreviewOrReviewCaveat": downloads.get("public_release_has_preview_or_review_caveat"),
+        "releaseManifestCopySafe": release_manifest_copy_safe,
+        "releaseManifestUnsafeCopyMarkers": downloads.get("release_manifest_unsafe_copy_markers"),
+        "releaseManifestHasPreviewOrReviewCaveat": downloads.get("release_manifest_has_preview_or_review_caveat"),
+        "releaseManifestParseError": downloads.get("release_manifest_parse_error"),
+        "pwaStaticStatus": pwa_static.get("status"),
+        "pwaManifestCount": pwa_manifest_count,
+        "rolePwaManifestCount": role_manifest_count,
+        "rolePwaManifests": role_manifests,
+        "pwaAssetCount": pwa_asset_count,
+        "ledgerStreamNonCacheable": service_worker.get("ledger_stream_non_cacheable"),
+        "ledgerStreamPrecached": service_worker.get("ledger_stream_precached"),
+        "pwaRootWorkerKind": service_worker.get("worker_kind"),
+        "pwaRootWorkerCacheVersion": service_worker.get("cache_version"),
+        "pwaDeploymentIdentity": pwa_deployment_identity,
+        "expectedPwaFullDeploymentDigestSha256": normalized_expected_full_deployment_digest,
+        "pwaFullDeploymentDigestSha256": pwa_full_deployment_digest_sha256,
+        "pwaFullDeploymentDigestMatchesExpected": pwa_full_deployment_digest_matches_expected,
+        "mobileLedgerStatus": mobile_ledger.get("status"),
+        "mobileLedgerPayloadStatus": mobile_ledger.get("payload_status"),
+        "mobileLedgerCacheControl": mobile_ledger.get("cache_control"),
+        "mobileLedgerVary": mobile_ledger.get("vary"),
+        "readyMobileHandoffStatus": ready_mobile_handoff.get("status"),
+        "readyMobileHandoffToolIds": ready_mobile_handoff.get("tool_ids"),
+        "readyMobileHandoffPacketRoles": ready_mobile_handoff.get("packet_roles"),
+        "readyMobileHandoffFrontdoorLaunchRoute": ready_mobile_handoff.get("frontdoor_launch_route"),
+        "readyMobileHandoffRoleRoutes": ready_mobile_handoff.get("role_routes"),
+        "participateIframeShellStatus": participate_iframe_shell.get("status"),
+        "participateIframeRouteCount": participate_route_count,
+        "participateIframeRouteIframeCount": participate_iframe_count,
+        "participateIframeRouteOfflineFallbackCount": participate_offline_count,
+        "coreChildContracts": {
+            name: str(child.get("contractName") or child.get("contract_name") or "").strip()
+            for name, child in core_child_receipts.items()
+        },
+        "failures": failures,
+        "childReceipts": {
+            "preflight": preflight,
+            "downloads": downloads,
+            "pwaStatic": pwa_static,
+            "mobileLedger": mobile_ledger,
+            "readyMobileHandoff": ready_mobile_handoff,
+            "participateIframeShell": participate_iframe_shell,
+        },
+    }
+    if online_launch is not None:
+        result["onlineLaunchStatus"] = online_launch.get("status")
+        result["onlineLaunchContract"] = receipt_contract(online_launch)
+        result["onlineLaunchLaunchUrl"] = online_launch.get("launch_url")
+        result["onlineLaunchFinalUrl"] = online_launch.get("final_url")
+        result["onlineLaunchHttpStatus"] = online_launch.get("http_status")
+        result["onlineLaunchHasBlazorMarker"] = online_launch.get("has_blazor_marker")
+        result["onlineLaunchHasRosterMarker"] = online_launch.get("has_roster_marker")
+        result["childReceipts"]["onlineLaunch"] = online_launch
+    if role_alias_routes is not None:
+        result["roleAliasRouteStatus"] = role_alias_routes.get("status")
+        result["roleAliasRouteContract"] = receipt_contract(role_alias_routes)
+        result["roleAliasRouteResults"] = redact_private_identity(role_alias_route_result_rows)
+        result["roleAliasRouteDrift"] = redact_private_identity(role_alias_route_drift)
+    if downloads_status_browser:
+        artifact = downloads_status_browser.get("artifact") if isinstance(downloads_status_browser.get("artifact"), dict) else {}
+        result["downloadsStatusBrowserStatus"] = downloads_status_browser.get("status")
+        result["downloadsStatusBrowserExitCode"] = downloads_status_browser.get("exitCode")
+        result["downloadsStatusBrowserArtifactDir"] = downloads_status_browser.get("artifactDir")
+        result["downloadsStatusBrowserArtifactContract"] = receipt_contract(artifact)
+        result["downloadsStatusBrowserStatusRedirectHeading"] = artifact.get("status_redirect_heading")
+        result["downloadsStatusBrowserStatusRedirectHeadingRecognized"] = artifact.get("status_redirect_heading_recognized")
+        result["downloadsStatusBrowserStatusRedirectHeadingExpected"] = artifact.get("status_redirect_heading_expected")
+        result["downloadsStatusBrowserStatusRedirectHeadingMatchesReleaseChannel"] = artifact.get("status_redirect_heading_matches_release_channel")
+        result["downloadsStatusBrowserStatusRedirectHeadingUsesGenericUpdatedCopy"] = artifact.get("status_redirect_heading_uses_generic_updated_copy")
+        result["childReceipts"]["downloadsStatusBrowser"] = downloads_status_browser
+    if mobile_pwa_viewport:
+        artifact = mobile_pwa_viewport.get("artifact") if isinstance(mobile_pwa_viewport.get("artifact"), dict) else {}
+        result["mobilePwaViewportStatus"] = mobile_pwa_viewport.get("status")
+        result["mobilePwaViewportExitCode"] = mobile_pwa_viewport.get("exitCode")
+        result["mobilePwaViewportArtifactDir"] = mobile_pwa_viewport.get("artifactDir")
+        result["mobilePwaViewportArtifactContract"] = receipt_contract(artifact)
+        result["mobilePwaViewportRouteCount"] = artifact.get("route_count")
+        result["mobilePwaViewportViewportCount"] = artifact.get("viewport_count")
+        result["mobilePwaViewportRoutes"] = sorted(mobile_pwa_viewport_routes)
+        result["mobilePwaViewportMissingRoutes"] = missing_mobile_pwa_viewport_routes
+        result["mobilePwaViewportArtifactCurrentContractSatisfied"] = (
+            mobile_pwa_viewport_artifact_current_contract_satisfied
+        )
+        result["mobilePwaViewportArtifactContractFailures"] = (
+            mobile_pwa_viewport_artifact_failures
+        )
+        result["childReceipts"]["mobilePwaViewport"] = mobile_pwa_viewport
+    if frontdoor_navigation:
+        mobile_artifact = redact_private_identity(
+            frontdoor_navigation.get("mobileArtifact") if isinstance(frontdoor_navigation.get("mobileArtifact"), dict) else {}
+        )
+        ledger_artifact = redact_private_identity(
+            frontdoor_navigation.get("ledgerArtifact") if isinstance(frontdoor_navigation.get("ledgerArtifact"), dict) else {}
+        )
+        anchor_artifact = redact_private_identity(
+            frontdoor_navigation.get("anchorArtifact") if isinstance(frontdoor_navigation.get("anchorArtifact"), dict) else {}
+        )
+        result["frontdoorNavigationStatus"] = frontdoor_navigation.get("status")
+        result["frontdoorNavigationExitCode"] = frontdoor_navigation.get("exitCode")
+        result["frontdoorNavigationArtifactDir"] = frontdoor_navigation.get("artifactDir")
+        result["frontdoorNavigationMobileArtifactContract"] = receipt_contract(mobile_artifact)
+        result["frontdoorNavigationLedgerArtifactContract"] = receipt_contract(ledger_artifact)
+        result["frontdoorNavigationAnchorArtifactContract"] = receipt_contract(anchor_artifact)
+        result["frontdoorNavigationGatedTargets"] = mobile_artifact.get("gated_targets")
+        result["frontdoorNavigationPublicTargets"] = mobile_artifact.get("public_targets")
+        result["frontdoorNavigationHomepageLaneText"] = mobile_artifact.get("homepage_lane_text")
+        result["frontdoorNavigationHomepageLaneExpected"] = expected_frontdoor_homepage_lane_text
+        result["frontdoorNavigationHomepageLaneMatchesReleaseChannel"] = frontdoor_homepage_lane_matches_release_channel
+        result["frontdoorNavigationPlayRoute"] = mobile_artifact.get("play_route")
+        result["frontdoorNavigationPlaySignInRoute"] = mobile_artifact.get("play_sign_in_route")
+        result["frontdoorNavigationDirectPlayerRoute"] = mobile_artifact.get("direct_player_route")
+        result["frontdoorNavigationDirectPlayerHttpStatus"] = mobile_artifact.get("direct_player_http_status")
+        result["frontdoorNavigationFinalUrl"] = mobile_artifact.get("final_url")
+        result["frontdoorNavigationPrivateIdentityRedacted"] = mobile_artifact.get("private_identity_redacted")
+        result["frontdoorNavigationVisiblePlayerUrlPrivateIdentityAbsent"] = mobile_artifact.get("visible_player_url_private_identity_absent")
+        result["frontdoorNavigationPlayerSessionContextPresent"] = mobile_artifact.get("player_session_context_present")
+        result["frontdoorNavigationPlayerDeviceContextPresent"] = mobile_artifact.get("player_device_context_present")
+        result["frontdoorNavigationLiveTurnCompanionShell"] = mobile_artifact.get("live_turn_companion_shell")
+        result["frontdoorNavigationPwaManifestPath"] = mobile_artifact.get("pwa_manifest_path")
+        result["frontdoorNavigationPwaRole"] = mobile_artifact.get("pwa_role")
+        result["frontdoorNavigationBlazorShell"] = mobile_artifact.get("blazor_shell")
+        result["frontdoorNavigationRybbitConfigured"] = mobile_artifact.get("rybbit_configured")
+        result["frontdoorNavigationRybbitTag"] = mobile_artifact.get("rybbit_tag")
+        result["frontdoorNavigationRybbitRoute"] = mobile_artifact.get("rybbit_route")
+        result["frontdoorNavigationRybbitMode"] = mobile_artifact.get("rybbit_mode")
+        result["frontdoorNavigationRybbitRole"] = mobile_artifact.get("rybbit_role")
+        result["frontdoorNavigationRybbitSiteIdPresent"] = mobile_artifact.get("rybbit_site_id_present")
+        result["frontdoorNavigationRybbitScriptUrlPresent"] = mobile_artifact.get("rybbit_script_url_present")
+        result["frontdoorNavigationRybbitScriptUrlAllowed"] = mobile_artifact.get("rybbit_script_url_allowed")
+        result["frontdoorNavigationRybbitSkipPatterns"] = mobile_artifact.get("rybbit_skip_patterns")
+        result["frontdoorNavigationRybbitMaskPatterns"] = mobile_artifact.get("rybbit_mask_patterns")
+        result["frontdoorNavigationRybbitSkipMobilePaths"] = mobile_artifact.get("rybbit_skip_mobile_paths")
+        result["frontdoorNavigationRybbitMaskMobilePaths"] = mobile_artifact.get("rybbit_mask_mobile_paths")
+        result["frontdoorNavigationRybbitMasksPrivatePlayRoutes"] = mobile_artifact.get("rybbit_masks_private_play_routes")
+        result["frontdoorNavigationRybbitReplayBlockSelector"] = mobile_artifact.get("rybbit_replay_block_selector")
+        result["frontdoorNavigationRybbitReplayBlocksTurnRoot"] = mobile_artifact.get("rybbit_replay_blocks_turn_root")
+        result["frontdoorNavigationPlayerSessionHandoffUrl"] = mobile_artifact.get("player_session_handoff_url")
+        result["frontdoorNavigationPlayerSessionHandoffStatus"] = mobile_artifact.get("player_session_handoff_status")
+        result["frontdoorNavigationPlayerSessionHandoffLinkText"] = mobile_artifact.get("player_session_handoff_link_text")
+        result["frontdoorNavigationPlayerSessionHandoffPreservesSession"] = mobile_artifact.get("player_session_handoff_preserves_session")
+        result["frontdoorNavigationPlayerSessionHandoffPreservesRole"] = mobile_artifact.get("player_session_handoff_preserves_role")
+        result["frontdoorNavigationPlayerSessionHandoffStripsDevice"] = mobile_artifact.get("player_session_handoff_strips_device")
+        result["frontdoorNavigationPlayerSessionHandoffSenderDeviceIdPresent"] = mobile_artifact.get("player_session_handoff_sender_device_id_present")
+        result["frontdoorNavigationPlayerSessionHandoffPrivateIdentityRedacted"] = mobile_artifact.get("player_session_handoff_private_identity_redacted")
+        result["frontdoorNavigationGmRoute"] = mobile_artifact.get("gm_route")
+        result["frontdoorNavigationGmRouteSessionIdPresent"] = mobile_artifact.get("gm_route_session_id_present")
+        result["frontdoorNavigationGmRoutePrivateIdentityRedacted"] = mobile_artifact.get("gm_route_private_identity_redacted")
+        result["frontdoorNavigationGmHttpStatus"] = mobile_artifact.get("gm_http_status")
+        result["frontdoorNavigationGmFinalUrl"] = mobile_artifact.get("gm_final_url")
+        result["frontdoorNavigationVisibleGmUrlPrivateIdentityAbsent"] = mobile_artifact.get("visible_gm_url_private_identity_absent")
+        result["frontdoorNavigationGmSessionContextPresent"] = mobile_artifact.get("gm_session_context_present")
+        result["frontdoorNavigationGmDeviceContextPresent"] = mobile_artifact.get("gm_device_context_present")
+        result["frontdoorNavigationGmLiveTurnCompanionShell"] = mobile_artifact.get("gm_live_turn_companion_shell")
+        result["frontdoorNavigationGmPwaManifestPath"] = mobile_artifact.get("gm_pwa_manifest_path")
+        result["frontdoorNavigationGmPwaRole"] = mobile_artifact.get("gm_pwa_role")
+        result["frontdoorNavigationGmBlazorShell"] = mobile_artifact.get("gm_blazor_shell")
+        result["frontdoorNavigationGmRybbitConfigured"] = mobile_artifact.get("gm_rybbit_configured")
+        result["frontdoorNavigationGmRybbitTag"] = mobile_artifact.get("gm_rybbit_tag")
+        result["frontdoorNavigationGmRybbitRoute"] = mobile_artifact.get("gm_rybbit_route")
+        result["frontdoorNavigationGmRybbitMode"] = mobile_artifact.get("gm_rybbit_mode")
+        result["frontdoorNavigationGmRybbitRole"] = mobile_artifact.get("gm_rybbit_role")
+        result["frontdoorNavigationGmRybbitSiteIdPresent"] = mobile_artifact.get("gm_rybbit_site_id_present")
+        result["frontdoorNavigationGmRybbitScriptUrlPresent"] = mobile_artifact.get("gm_rybbit_script_url_present")
+        result["frontdoorNavigationGmRybbitScriptUrlAllowed"] = mobile_artifact.get("gm_rybbit_script_url_allowed")
+        result["frontdoorNavigationGmRybbitSkipPatterns"] = mobile_artifact.get("gm_rybbit_skip_patterns")
+        result["frontdoorNavigationGmRybbitMaskPatterns"] = mobile_artifact.get("gm_rybbit_mask_patterns")
+        result["frontdoorNavigationGmRybbitSkipMobilePaths"] = mobile_artifact.get("gm_rybbit_skip_mobile_paths")
+        result["frontdoorNavigationGmRybbitMaskMobilePaths"] = mobile_artifact.get("gm_rybbit_mask_mobile_paths")
+        result["frontdoorNavigationGmRybbitMasksPrivatePlayRoutes"] = mobile_artifact.get("gm_rybbit_masks_private_play_routes")
+        result["frontdoorNavigationGmRybbitReplayBlockSelector"] = mobile_artifact.get("gm_rybbit_replay_block_selector")
+        result["frontdoorNavigationGmRybbitReplayBlocksTurnRoot"] = mobile_artifact.get("gm_rybbit_replay_blocks_turn_root")
+        result["frontdoorNavigationGmSessionHandoffUrl"] = mobile_artifact.get("gm_session_handoff_url")
+        result["frontdoorNavigationGmSessionHandoffStatus"] = mobile_artifact.get("gm_session_handoff_status")
+        result["frontdoorNavigationGmSessionHandoffLinkText"] = mobile_artifact.get("gm_session_handoff_link_text")
+        result["frontdoorNavigationGmSessionHandoffPreservesSession"] = mobile_artifact.get("gm_session_handoff_preserves_session")
+        result["frontdoorNavigationGmSessionHandoffPreservesRole"] = mobile_artifact.get("gm_session_handoff_preserves_role")
+        result["frontdoorNavigationGmSessionHandoffStripsDevice"] = mobile_artifact.get("gm_session_handoff_strips_device")
+        result["frontdoorNavigationGmSessionHandoffSenderDeviceIdPresent"] = mobile_artifact.get("gm_session_handoff_sender_device_id_present")
+        result["frontdoorNavigationGmSessionHandoffPrivateIdentityRedacted"] = mobile_artifact.get("gm_session_handoff_private_identity_redacted")
+        result["frontdoorNavigationLedgerPrimary"] = ledger_artifact.get("ledger_primary")
+        result["frontdoorNavigationAnchorEntryUrl"] = anchor_artifact.get("entry_url")
+        result["frontdoorNavigationAnchorFinalUrl"] = anchor_artifact.get("final_url")
+        result["frontdoorNavigationAnchorFinalPath"] = anchor_artifact.get("final_pathname")
+        result["frontdoorNavigationAnchorFinalHash"] = anchor_artifact.get("final_hash")
+        result["frontdoorNavigationAnchorPwaManifestPath"] = anchor_artifact.get("pwa_manifest_path")
+        result["frontdoorNavigationAnchorPwaRole"] = anchor_artifact.get("pwa_role")
+        result["frontdoorNavigationAnchorBlazorShell"] = anchor_artifact.get("blazor_shell")
+        result["frontdoorNavigationAnchorPrivateIdentityRedacted"] = anchor_artifact.get("private_identity_redacted")
+        result["frontdoorNavigationAnchorVisibleUrlPrivateIdentityAbsent"] = anchor_artifact.get("visible_url_private_identity_absent")
+        result["frontdoorNavigationAnchorSessionContextPresent"] = anchor_artifact.get("session_context_present")
+        result["frontdoorNavigationAnchorDeviceContextPresent"] = anchor_artifact.get("device_context_present")
+        result["frontdoorNavigationAnchorFailure"] = anchor_artifact.get("failure")
+        result["frontdoorNavigationAnchorArtifactCurrentContractSatisfied"] = frontdoor_anchor_current_contract_satisfied
+        result["childReceipts"]["frontdoorNavigation"] = redact_private_identity(frontdoor_navigation)
+    if pwa_offline_cache:
+        artifact = pwa_offline_cache.get("artifact") if isinstance(pwa_offline_cache.get("artifact"), dict) else {}
+        result["pwaOfflineCacheStatus"] = pwa_offline_cache.get("status")
+        result["pwaOfflineCacheExitCode"] = pwa_offline_cache.get("exitCode")
+        result["pwaOfflineCacheArtifactDir"] = pwa_offline_cache.get("artifactDir")
+        result["pwaOfflineCacheArtifactContract"] = receipt_contract(artifact)
+        result["pwaOfflineCacheCacheVersion"] = artifact.get("cache_version")
+        result["pwaOfflineCacheNavigationPolicy"] = artifact.get("navigation_policy")
+        result["pwaOfflineCachePrivateStateScope"] = artifact.get("private_state_scope")
+        result["pwaOfflineCacheStaticPaths"] = artifact.get("static_paths")
+        result["pwaOfflineCacheOfflineRoleFallbacks"] = artifact.get("offline_role_fallbacks")
+        result["pwaOfflineCacheQueryBearingRequestsCached"] = artifact.get("query_bearing_requests_cached")
+        result["pwaOfflineCachePrivateNavigationCached"] = artifact.get("private_navigation_cached")
+        result["pwaOfflineCachePrivateApiCached"] = artifact.get("private_api_cached")
+        result["pwaOfflineCachePersonalizedLedgerCached"] = artifact.get("personalized_ledger_cached")
+        result["pwaOfflineCacheLegacyPrivateCachePrefixesPurged"] = artifact.get("legacy_private_cache_prefixes_purged")
+        result["pwaOfflineCacheUnrelatedCachePreserved"] = artifact.get("unrelated_cache_preserved")
+        result["childReceipts"]["pwaOfflineCache"] = pwa_offline_cache
+    if blazor_new_runner_menu:
+        artifact = artifact_object(blazor_new_runner_menu.get("artifact"))
+        app_roster_transition = blazor_new_runner_app_roster_transition(artifact)
+        workbench_fallback_route = blazor_new_runner_workbench_route(artifact)
+        result["blazorNewRunnerMenuStatus"] = blazor_new_runner_menu.get("status")
+        result["blazorNewRunnerMenuExitCode"] = blazor_new_runner_menu.get("exitCode")
+        result["blazorNewRunnerMenuArtifactDir"] = blazor_new_runner_menu.get("artifactDir")
+        result["blazorNewRunnerMenuArtifactContract"] = receipt_contract(artifact)
+        result["blazorNewRunnerMenuAppResolvedHref"] = app_roster_transition.get("resolved_new_runner_href")
+        result["blazorNewRunnerMenuAppFinalUrl"] = app_roster_transition.get("final_url")
+        result["blazorNewRunnerMenuAppActiveWorkflow"] = app_roster_transition.get("active_workflow")
+        result["blazorNewRunnerMenuAppCommand"] = app_roster_transition.get("command")
+        result["blazorNewRunnerMenuAppStartupCommand"] = app_roster_transition.get("startup_command")
+        result["blazorNewRunnerMenuAppDialogCount"] = app_roster_transition.get("dialog_count")
+        result["blazorNewRunnerMenuAppHeadline"] = app_roster_transition.get("headline")
+        result["blazorNewRunnerMenuAppWorkflowHeading"] = app_roster_transition.get("workflow_heading")
+        result["blazorNewRunnerMenuAppFileMenuLockedDuringDialog"] = app_roster_transition.get("file_menu_locked_during_dialog")
+        result["blazorNewRunnerMenuAppNewToolLockedDuringDialog"] = app_roster_transition.get("new_tool_locked_during_dialog")
+        result["blazorNewRunnerMenuResolvedHref"] = artifact_value_with_fallback(artifact, "resolved_new_runner_href", workbench_fallback_route)
+        result["blazorNewRunnerMenuFinalUrl"] = artifact_value_with_fallback(artifact, "final_url", workbench_fallback_route)
+        result["blazorNewRunnerMenuReopenedDataCommand"] = artifact_value_with_fallback(artifact, "reopened_data_command", workbench_fallback_route)
+        result["blazorNewRunnerMenuReopenedDataTab"] = artifact_value_with_fallback(artifact, "reopened_data_tab", workbench_fallback_route)
+        result["blazorNewRunnerMenuDialogCount"] = artifact_value_with_fallback(artifact, "dialog_count", workbench_fallback_route)
+        result["blazorNewRunnerMenuDialogTitle"] = artifact_value_with_fallback(artifact, "dialog_title", workbench_fallback_route)
+        result["childReceipts"]["blazorNewRunnerMenu"] = blazor_new_runner_menu
+    return result
+
+
+def run_downloads_status_playwright(
+    base_url: str,
+    artifact_dir: Path,
+    timeout_seconds: float,
+    reuse_existing_artifact: bool = False,
+    reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
+) -> dict[str, Any]:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path = artifact_dir / "DOWNLOADS_STATUS_E2E.generated.json"
+    expected_contract = OPTIONAL_PLAYWRIGHT_CONTRACTS["downloadsStatusBrowser"]
+    playwright_timeout_seconds = max(120, int(timeout_seconds) + 60)
+    if reuse_existing_artifact:
+        reused = maybe_reuse_playwright_artifact(
+            artifact_path=artifact_path,
+            expected_contract=expected_contract,
+            base_url=base_url,
+            timeout_seconds=playwright_timeout_seconds,
+            reuse_artifact_max_age_hours=reuse_artifact_max_age_hours,
+        )
+        if reused is not None:
+            reused["artifactDir"] = str(artifact_dir)
+            return reused
+
+    env = os.environ.copy()
+    env["BASE_URL"] = base_url
+    env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
+    command = [
+        "npx",
+        "playwright",
+        "test",
+        "tests/public/downloads-status.spec.ts",
+        "--workers=1",
+        "--reporter=line",
+    ]
+    exit_code, stdout, stderr, timed_out = run_playwright_command(command, env, playwright_timeout_seconds)
+    artifact, artifact_load_status = load_json_with_status(artifact_path)
+    artifact_contract = receipt_contract(artifact)
+    artifact_pass = artifact_load_status == "loaded" and artifact.get("status") == "pass" and artifact_contract == expected_contract
+    return {
+        "status": "pass" if exit_code == 0 and artifact_pass else "fail",
+        "exitCode": exit_code,
+        "timedOut": timed_out,
+        "timeoutSeconds": playwright_timeout_seconds,
+        "artifactDir": str(artifact_dir),
+        "artifactPath": str(artifact_path),
+        "artifactLoadStatus": artifact_load_status,
+        "artifactContract": artifact_contract,
+        "expectedArtifactContract": expected_contract,
+        "artifact": artifact,
+        "artifactBaseUrlMatchesRequested": artifact_base_url_matches(artifact, base_url),
+        "artifactReused": False,
+        "playwrightExecuted": True,
+        "stdoutTail": stdout[-2000:],
+        "stderrTail": stderr[-2000:],
+    }
+
+
+def run_mobile_pwa_viewport_playwright(
+    base_url: str,
+    artifact_dir: Path,
+    timeout_seconds: float,
+    reuse_existing_artifact: bool = False,
+    reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
+) -> dict[str, Any]:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path = artifact_dir / "MOBILE_PWA_VIEWPORT_SMOKE.generated.json"
+    expected_contract = OPTIONAL_PLAYWRIGHT_CONTRACTS["mobilePwaViewport"]
+    playwright_timeout_seconds = max(300, int(timeout_seconds) + 180)
+    if reuse_existing_artifact:
+        reused = maybe_reuse_playwright_artifact(
+            artifact_path=artifact_path,
+            expected_contract=expected_contract,
+            base_url=base_url,
+            timeout_seconds=playwright_timeout_seconds,
+            reuse_artifact_max_age_hours=reuse_artifact_max_age_hours,
+        )
+        if reused is not None and mobile_pwa_viewport_artifact_matches_current_contract(
+            artifact_object(reused.get("artifact")),
+            expected_base_url=base_url,
+        ):
+            reused["artifactDir"] = str(artifact_dir)
+            reused["artifactCurrentContractSatisfied"] = True
+            reused["artifactContractFailures"] = []
+            return reused
+
+    env = os.environ.copy()
+    env["BASE_URL"] = base_url
+    env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
+    try:
+        artifact_path.unlink()
+    except FileNotFoundError:
+        pass
+    command = [
+        "npx",
+        "playwright",
+        "test",
+        "tests/public/mobile-pwa-viewport-smoke.spec.ts",
+        "--workers=1",
+        "--reporter=line",
+    ]
+    exit_code, stdout, stderr, timed_out = run_playwright_command(command, env, playwright_timeout_seconds)
+    artifact, artifact_load_status = load_json_with_status(artifact_path)
+    artifact_contract = receipt_contract(artifact)
+    artifact_contract_failures = mobile_pwa_viewport_artifact_contract_failures(
+        artifact,
+        expected_base_url=base_url,
+    )
+    artifact_current_contract_satisfied = not artifact_contract_failures
+    artifact_pass = (
+        artifact_load_status == "loaded"
+        and artifact_current_contract_satisfied
+    )
+    return {
+        "status": "pass" if exit_code == 0 and artifact_pass else "fail",
+        "exitCode": exit_code,
+        "timedOut": timed_out,
+        "timeoutSeconds": playwright_timeout_seconds,
+        "artifactDir": str(artifact_dir),
+        "artifactPath": str(artifact_path),
+        "artifactLoadStatus": artifact_load_status,
+        "artifactContract": artifact_contract,
+        "expectedArtifactContract": expected_contract,
+        "artifact": artifact,
+        "artifactBaseUrlMatchesRequested": artifact_base_url_matches(artifact, base_url),
+        "artifactCurrentContractSatisfied": artifact_current_contract_satisfied,
+        "artifactContractFailures": artifact_contract_failures,
+        "artifactReused": False,
+        "playwrightExecuted": True,
+        "stdoutTail": stdout[-2000:],
+        "stderrTail": stderr[-2000:],
+    }
+
+
+def run_pwa_offline_cache_playwright(
+    base_url: str,
+    artifact_dir: Path,
+    timeout_seconds: float,
+    reuse_existing_artifact: bool = False,
+    reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
+) -> dict[str, Any]:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path = artifact_dir / "PWA_OFFLINE_CACHE.generated.json"
+    expected_contract = OPTIONAL_PLAYWRIGHT_CONTRACTS["pwaOfflineCache"]
+    playwright_timeout_seconds = max(180, int(timeout_seconds) + 120)
+    if reuse_existing_artifact:
+        reused = maybe_reuse_playwright_artifact(
+            artifact_path=artifact_path,
+            expected_contract=expected_contract,
+            base_url=base_url,
+            timeout_seconds=playwright_timeout_seconds,
+            reuse_artifact_max_age_hours=reuse_artifact_max_age_hours,
+        )
+        if reused is not None and pwa_offline_artifact_matches_privacy_contract(
+            artifact_object(reused.get("artifact"))
+        ):
+            reused["artifactDir"] = str(artifact_dir)
+            return reused
+
+    env = os.environ.copy()
+    env["BASE_URL"] = base_url
+    env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
+    command = [
+        "npx",
+        "playwright",
+        "test",
+        "tests/public/pwa-offline-cache.spec.ts",
+        "--workers=1",
+        "--reporter=line",
+    ]
+    exit_code, stdout, stderr, timed_out = run_playwright_command(command, env, playwright_timeout_seconds)
+    artifact, artifact_load_status = load_json_with_status(artifact_path)
+    contract = receipt_contract(artifact)
+    contract_ok = contract == expected_contract
+    privacy_contract_ok = pwa_offline_artifact_matches_privacy_contract(artifact)
+    return {
+        "status": "pass" if exit_code == 0 and artifact_load_status == "loaded" and artifact.get("status") == "pass" and contract_ok and privacy_contract_ok else "fail",
+        "exitCode": exit_code,
+        "timedOut": timed_out,
+        "timeoutSeconds": playwright_timeout_seconds,
+        "artifactDir": str(artifact_dir),
+        "artifactPath": str(artifact_path),
+        "artifactLoadStatus": artifact_load_status,
+        "artifactContract": contract,
+        "expectedArtifactContract": expected_contract,
+        "artifact": artifact,
+        "artifactBaseUrlMatchesRequested": artifact_base_url_matches(artifact, base_url),
+        "artifactPrivacyContractSatisfied": privacy_contract_ok,
+        "artifactReused": False,
+        "playwrightExecuted": True,
+        "stdoutTail": stdout[-2000:],
+        "stderrTail": stderr[-2000:],
+    }
+
+
+def run_blazor_new_runner_menu_playwright(
+    base_url: str,
+    artifact_dir: Path,
+    timeout_seconds: float,
+    reuse_existing_artifact: bool = False,
+    reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
+) -> dict[str, Any]:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    artifact_path = artifact_dir / "BLAZOR_NEW_RUNNER_MENU.generated.json"
+    expected_contract = OPTIONAL_PLAYWRIGHT_CONTRACTS["blazorNewRunnerMenu"]
+    playwright_timeout_seconds = max(180, int(timeout_seconds) + 120)
+    if reuse_existing_artifact:
+        reused = maybe_reuse_playwright_artifact(
+            artifact_path=artifact_path,
+            expected_contract=expected_contract,
+            base_url=base_url,
+            timeout_seconds=playwright_timeout_seconds,
+            reuse_artifact_max_age_hours=reuse_artifact_max_age_hours,
+        )
+        if reused is not None:
+            reused["artifactDir"] = str(artifact_dir)
+            return reused
+
+    env = os.environ.copy()
+    env["BASE_URL"] = base_url
+    env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
+    command = [
+        "npx",
+        "playwright",
+        "test",
+        "tests/public/blazor-new-runner-menu.spec.ts",
+        "--workers=1",
+        "--reporter=line",
+    ]
+    exit_code, stdout, stderr, timed_out = run_playwright_command(command, env, playwright_timeout_seconds)
+    artifact, artifact_load_status = load_json_with_status(artifact_path)
+    artifact_contract = receipt_contract(artifact)
+    artifact_pass = artifact_load_status == "loaded" and artifact.get("status") == "pass" and artifact_contract == expected_contract
+    return {
+        "status": "pass" if exit_code == 0 and artifact_pass else "fail",
+        "exitCode": exit_code,
+        "timedOut": timed_out,
+        "timeoutSeconds": playwright_timeout_seconds,
+        "artifactDir": str(artifact_dir),
+        "artifactPath": str(artifact_path),
+        "artifactLoadStatus": artifact_load_status,
+        "artifactContract": artifact_contract,
+        "expectedArtifactContract": expected_contract,
+        "artifact": artifact,
+        "artifactBaseUrlMatchesRequested": artifact_base_url_matches(artifact, base_url),
+        "artifactReused": False,
+        "playwrightExecuted": True,
+        "stdoutTail": stdout[-2000:],
+        "stderrTail": stderr[-2000:],
+    }
+
+
+def run_frontdoor_navigation_playwright(
+    base_url: str,
+    artifact_dir: Path,
+    timeout_seconds: float,
+    reuse_existing_artifact: bool = False,
+    reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
+    expected_homepage_lane_text: str = "",
+) -> dict[str, Any]:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    mobile_artifact_path = artifact_dir / "FRONTDOOR_MOBILE_LAUNCH.generated.json"
+    ledger_artifact_path = artifact_dir / "BLACK_LEDGER_GLOBE_FRONTDOOR.generated.json"
+    anchor_artifact_path = artifact_dir / "FRONTDOOR_MOBILE_ANCHOR_REDIRECT.generated.json"
+    expected_mobile_contract = OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationMobile"]
+    expected_ledger_contract = OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationLedger"]
+    expected_anchor_contract = OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"]
+    playwright_timeout_seconds = max(180, int(timeout_seconds) + 120)
+    if reuse_existing_artifact and mobile_artifact_path.is_file() and ledger_artifact_path.is_file() and anchor_artifact_path.is_file():
+        mobile_artifact, mobile_artifact_load_status = load_json_with_status(mobile_artifact_path)
+        ledger_artifact, ledger_artifact_load_status = load_json_with_status(ledger_artifact_path)
+        anchor_artifact, anchor_artifact_load_status = load_json_with_status(anchor_artifact_path)
+        if (
+            mobile_artifact_load_status == "loaded"
+            and ledger_artifact_load_status == "loaded"
+            and anchor_artifact_load_status == "loaded"
+        ):
+            mobile_contract = receipt_contract(mobile_artifact)
+            ledger_contract = receipt_contract(ledger_artifact)
+            anchor_contract = receipt_contract(anchor_artifact)
+            mobile_generated_at = artifact_generated_at_text(mobile_artifact)
+            ledger_generated_at = artifact_generated_at_text(ledger_artifact)
+            anchor_generated_at = artifact_generated_at_text(anchor_artifact)
+            mobile_age_hours = artifact_age_hours(mobile_artifact)
+            ledger_age_hours = artifact_age_hours(ledger_artifact)
+            anchor_age_hours = artifact_age_hours(anchor_artifact)
+            anchor_current_contract = frontdoor_anchor_artifact_matches_current_contract(anchor_artifact)
+            mobile_privacy_contract = frontdoor_mobile_artifact_matches_privacy_contract(mobile_artifact)
+            mobile_homepage_lane_text = str(mobile_artifact.get("homepage_lane_text") or "").strip()
+            mobile_homepage_lane_matches_expected = (
+                mobile_homepage_lane_text == expected_homepage_lane_text
+                if expected_homepage_lane_text
+                else True
+            )
+            mobile_fresh = (
+                True
+                if reuse_artifact_max_age_hours is None
+                else mobile_age_hours is not None and mobile_age_hours <= reuse_artifact_max_age_hours
+            )
+            ledger_fresh = (
+                True
+                if reuse_artifact_max_age_hours is None
+                else ledger_age_hours is not None and ledger_age_hours <= reuse_artifact_max_age_hours
+            )
+            anchor_fresh = (
+                True
+                if reuse_artifact_max_age_hours is None
+                else anchor_age_hours is not None and anchor_age_hours <= reuse_artifact_max_age_hours
+            )
+            mobile_pass = (
+                str(mobile_artifact.get("status") or "").strip().lower() == "pass"
+                and mobile_contract == expected_mobile_contract
+                and artifact_base_url_matches(mobile_artifact, base_url)
+                and mobile_fresh
+                and mobile_homepage_lane_matches_expected
+                and mobile_privacy_contract
+            )
+            ledger_pass = (
+                str(ledger_artifact.get("status") or "").strip().lower() == "pass"
+                and ledger_contract == expected_ledger_contract
+                and artifact_base_url_matches(ledger_artifact, base_url)
+                and ledger_fresh
+            )
+            anchor_pass = (
+                str(anchor_artifact.get("status") or "").strip().lower() == "pass"
+                and anchor_contract == expected_anchor_contract
+                and artifact_base_url_matches(anchor_artifact, base_url)
+                and anchor_fresh
+                and anchor_current_contract
+            )
+            if mobile_pass and ledger_pass and anchor_pass:
+                return {
+                    "status": "pass",
+                    "exitCode": 0,
+                    "timedOut": False,
+                    "timeoutSeconds": playwright_timeout_seconds,
+                    "artifactDir": str(artifact_dir),
+                    "mobileArtifactPath": str(mobile_artifact_path),
+                    "ledgerArtifactPath": str(ledger_artifact_path),
+                    "anchorArtifactPath": str(anchor_artifact_path),
+                    "mobileArtifactLoadStatus": mobile_artifact_load_status,
+                    "ledgerArtifactLoadStatus": ledger_artifact_load_status,
+                    "anchorArtifactLoadStatus": anchor_artifact_load_status,
+                    "mobileArtifactContract": mobile_contract,
+                    "expectedMobileArtifactContract": expected_mobile_contract,
+                    "ledgerArtifactContract": ledger_contract,
+                    "expectedLedgerArtifactContract": expected_ledger_contract,
+                    "anchorArtifactContract": anchor_contract,
+                    "expectedAnchorArtifactContract": expected_anchor_contract,
+                    "mobileArtifact": redact_private_identity(mobile_artifact),
+                    "ledgerArtifact": redact_private_identity(ledger_artifact),
+                    "anchorArtifact": redact_private_identity(anchor_artifact),
+                    "mobileArtifactBaseUrlMatchesRequested": artifact_base_url_matches(mobile_artifact, base_url),
+                    "ledgerArtifactBaseUrlMatchesRequested": artifact_base_url_matches(ledger_artifact, base_url),
+                    "anchorArtifactBaseUrlMatchesRequested": artifact_base_url_matches(anchor_artifact, base_url),
+                    "mobileArtifactGeneratedAtUtc": mobile_generated_at or None,
+                    "ledgerArtifactGeneratedAtUtc": ledger_generated_at or None,
+                    "anchorArtifactGeneratedAtUtc": anchor_generated_at or None,
+                    "mobileArtifactAgeHours": mobile_age_hours,
+                    "ledgerArtifactAgeHours": ledger_age_hours,
+                    "anchorArtifactAgeHours": anchor_age_hours,
+                    "mobileArtifactFresh": mobile_fresh,
+                    "ledgerArtifactFresh": ledger_fresh,
+                    "anchorArtifactFresh": anchor_fresh,
+                    "mobileHomepageLaneMatchesExpected": mobile_homepage_lane_matches_expected,
+                    "mobileArtifactPrivacyContractSatisfied": mobile_privacy_contract,
+                    "anchorArtifactCurrentContractSatisfied": anchor_current_contract,
+                    "artifactMaxAgeHours": reuse_artifact_max_age_hours,
+                    "artifactReused": True,
+                    "playwrightExecuted": False,
+                    "stdoutTail": "",
+                    "stderrTail": "",
+                }
+
+    env = os.environ.copy()
+    env["BASE_URL"] = base_url
+    env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
+    for artifact_path in (mobile_artifact_path, ledger_artifact_path, anchor_artifact_path):
+        try:
+            artifact_path.unlink()
+        except FileNotFoundError:
+            pass
+    probe_path = artifact_dir / "frontdoor-navigation-proof.cjs"
+    probe_path.write_text(
+        r"""const fs = require('node:fs');
+const path = require('node:path');
+const { chromium } = require(path.join(process.cwd(), 'node_modules', 'playwright'));
+
+const baseUrl = (process.env.BASE_URL || 'https://chummer.run').replace(/\/+$/, '');
+const artifactDir = process.env.CHUMMER_COMPLETION_DIR || process.cwd();
+const mobileViewport = { width: 390, height: 844 };
+const proofTimeoutMs = """
+        + str(int(playwright_timeout_seconds * 1000))
+        + r""";
+const ignoredConsoleErrorFragments = [
+  'Failed to load resource: net::ERR_NETWORK_CHANGED',
+  'Failed to load resource: the server responded with a status of 401',
+  'Failed to send tracking data: TypeError: Failed to fetch',
+  'WebSocket closed with status code: 1006',
+];
+
+function writeJson(fileName, payload) {
+  fs.mkdirSync(artifactDir, { recursive: true });
+  fs.writeFileSync(path.join(artifactDir, fileName), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+}
+
+function assertProof(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function redactPrivateText(value) {
+  return String(value || '').replace(/((?:[?&]|\b)(?:sessionId|deviceId)["']?\s*[:=]\s*["']?)[^&#,}\s"']*/gi, '$1[redacted]');
+}
+
+function redactedPrivateUrl(value) {
+  try {
+    const url = new URL(String(value || ''), baseUrl);
+    for (const key of ['sessionId', 'deviceId']) {
+      if (url.searchParams.has(key)) {
+        url.searchParams.set(key, '[redacted]');
+      }
+    }
+    return url.toString();
+  } catch {
+    return redactPrivateText(value);
+  }
+}
+
+function visibleRoleUrlIsPathOnly(value, expectedPath, expectedHash = '') {
+  try {
+    const url = new URL(String(value || ''), baseUrl);
+    return url.pathname === expectedPath
+      && url.search === ''
+      && url.hash === expectedHash;
+  } catch {
+    return false;
+  }
+}
+
+async function readPrivateContext(page) {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-turn-root]');
+    const client = root && root.__chummerPlayClient ? root.__chummerPlayClient : null;
+    return {
+      sessionId: String((client && client.sessionId) || (root && root.getAttribute('data-session-id')) || ''),
+      deviceId: String((client && client.deviceId) || (root && root.getAttribute('data-device-id')) || ''),
+    };
+  });
+}
+
+async function firstAttributeOrNull(locator, name) {
+  try {
+    return await locator.first().getAttribute(name);
+  } catch {
+    return null;
+  }
+}
+
+async function assertContains(locator, text, label) {
+  const content = (await locator.textContent()) || '';
+  assertProof(content.includes(text), `${label} does not contain ${text}`);
+}
+
+function jsonStringArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return [];
+  }
+  try {
+    const decoded = JSON.parse(raw);
+    if (Array.isArray(decoded)) {
+      return decoded.map((item) => String(item).trim()).filter(Boolean);
+    }
+  } catch {
+  }
+  return [raw];
+}
+
+function analyticsProof(config, spec) {
+  const skipPatterns = new Set(jsonStringArray(config.skipPatterns));
+  const maskPatterns = new Set(jsonStringArray(config.maskPatterns));
+  const scriptUrl = String(config.scriptUrl || '').trim();
+  const siteId = String(config.siteId || '').trim();
+  const proof = {
+    enabled: config.enabled === true,
+    script_url_present: Boolean(scriptUrl),
+    script_url_allowed: scriptUrl.startsWith('https://') || scriptUrl.startsWith('/'),
+    site_id_present: Boolean(siteId),
+    tag: config.tag || '',
+    route: config.route || '',
+    mode: config.mode || '',
+    role: config.role || '',
+    skip_patterns: Array.from(skipPatterns).sort(),
+    mask_patterns: Array.from(maskPatterns).sort(),
+    replay_block_selector: config.replayBlockSelector || '',
+    skip_mobile_paths: skipPatterns.has('/mobile/**'),
+    mask_mobile_paths: maskPatterns.has('/mobile/**'),
+    masks_private_play_routes: maskPatterns.has('/api/play/**'),
+    replay_blocks_turn_root: config.replayBlockSelector === '[data-turn-root]',
+  };
+  proof.pass = proof.enabled
+    && proof.script_url_present
+    && proof.script_url_allowed
+    && proof.site_id_present
+    && proof.tag === 'mobile_play_shell'
+    && proof.route === spec.route
+    && proof.mode === spec.mode
+    && proof.role === spec.role
+    && proof.skip_mobile_paths
+    && proof.mask_mobile_paths
+    && proof.masks_private_play_routes
+    && proof.replay_blocks_turn_root;
+  return proof;
+}
+
+const transientNavigationErrorFragments = [
+  'net::ERR_NETWORK_CHANGED',
+  'net::ERR_CONNECTION_RESET',
+  'net::ERR_TIMED_OUT',
+  'net::ERR_HTTP2_PROTOCOL_ERROR',
+  'net::ERR_QUIC_PROTOCOL_ERROR',
+];
+
+async function gotoWithTransientRetry(page, url, options) {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await page.goto(url, options);
+    } catch (error) {
+      const message = String(error?.message || error || '');
+      const transient = transientNavigationErrorFragments.some((fragment) => message.includes(fragment));
+      if (!transient || attempt === maxAttempts) {
+        throw error;
+      }
+      await page.waitForTimeout(500 * attempt);
+    }
+  }
+  throw new Error(`Navigation retry loop exhausted for ${url}`);
+}
+
+async function main() {
+  const browser = await chromium.launch({
+    channel: (process.env.CHUMMER_PLAYWRIGHT_CHANNEL || 'chromium').trim() || 'chromium',
+    headless: true,
+    args: ['--disable-quic'],
+  });
+  try {
+    const page = await browser.newPage({ viewport: mobileViewport });
+    await page.addInitScript(() => {
+      try {
+        Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+      } catch {
+      }
+    });
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() !== 'error') {
+        return;
+      }
+      const text = message.text();
+      if (!ignoredConsoleErrorFragments.some((fragment) => text.includes(fragment))) {
+        pageErrors.push(text);
+      }
+    });
+
+    await gotoWithTransientRetry(page, baseUrl, { waitUntil: 'domcontentloaded' });
+    const homepageMetrics = await page.evaluate(() => ({
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      overflowX: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth,
+    }));
+
+    const hero = page.locator('[data-homepage-section="hero"]');
+    await assertContains(hero, 'Download Chummer', 'hero');
+    const heroText = ((await hero.innerText()) || '').replace(/\s+/g, ' ').trim();
+    const homepageLaneMatch = heroText.match(/Current public lane:\s*(Stable\.|Preview\. Review required\.|Downloads paused\.)/);
+    const homepageLaneText = homepageLaneMatch ? `Current public lane: ${homepageLaneMatch[1]}` : '';
+    const legacyHomepageLaneMatch = heroText.match(/Current release:\s*(Stable\.|Preview build\.|Downloads paused\.)/);
+    const legacyHomepageLaneText = legacyHomepageLaneMatch ? `Current release: ${legacyHomepageLaneMatch[1]}` : '';
+    assertProof(
+      Boolean(homepageLaneText),
+      legacyHomepageLaneText
+        ? `Homepage still serves legacy release posture copy: ${legacyHomepageLaneText}`
+        : 'Homepage does not disclose current public lane'
+    );
+    const openMenu = hero.locator('.minimal-open-chummer');
+    await assertContains(openMenu.locator('summary'), 'Open Chummer', 'open menu summary');
+    await openMenu.locator('summary').click();
+
+    const buildButton = openMenu.locator('button.site-open-chummer-menu__button[data-disabled-target="/build"]', { hasText: 'Build' }).first();
+    assertProof(await buildButton.count() === 1, 'Build button is missing');
+    assertProof(await buildButton.isDisabled(), 'Build button is not gated');
+    const playButton = openMenu.locator('button.site-open-chummer-menu__button[data-disabled-target="/mobile/player"]', { hasText: 'Play' }).first();
+    assertProof(await playButton.count() === 1, 'Play button is missing');
+    assertProof(await playButton.isDisabled(), 'Play button is not gated');
+    const accountLink = openMenu.getByRole('link', { name: 'Sign in first' }).first();
+    assertProof(await accountLink.count() === 1, 'Sign-in link is missing');
+    assertProof(await openMenu.locator('.site-open-chummer-menu__button[href="/build"]').count() === 0, 'Build is exposed as a public link');
+    assertProof(await openMenu.locator('.site-open-chummer-menu__button[href="/mobile/player"]').count() === 0, 'Play is exposed as a public link');
+    assertProof(await openMenu.locator('.site-open-chummer-menu__button[href="/play"]').count() === 0, 'Legacy /play link is exposed');
+
+    const accountRoute = await accountLink.getAttribute('href');
+    const playRoute = await playButton.getAttribute('data-disabled-target');
+    const playSignInRoute = await playButton.getAttribute('data-sign-in-href');
+    const directPlayerRoute = playRoute;
+    assertProof(playRoute === '/mobile/player', 'Play route is not /mobile/player');
+    assertProof(playSignInRoute === '/login?next=%2Fmobile%2Fplayer', 'Play sign-in route is not /login?next=%2Fmobile%2Fplayer');
+    assertProof(directPlayerRoute === '/mobile/player', 'Play direct route is not /mobile/player');
+    const directPlayerResponse = await page.request.get(new URL(directPlayerRoute || '/mobile/player', baseUrl).toString());
+    await gotoWithTransientRetry(
+      page,
+      new URL(directPlayerRoute || '/mobile/player', baseUrl).toString(),
+      { waitUntil: 'domcontentloaded' },
+    );
+    const playerShell = page.locator('[data-blazor-shell="interactive-server"][data-role="Player"]').first();
+    assertProof(await playerShell.count() === 1, 'Play did not open the interactive Player shell');
+    const pwaManifestPath = await page.locator('link[rel="manifest"]').first().getAttribute('href');
+    const directPlayerTitle = await page.title();
+    const pwaRole = await playerShell.getAttribute('data-role');
+    const blazorShell = await playerShell.getAttribute('data-blazor-shell');
+    const analyticsConfig = await page.locator('#chummer-play-analytics-config').first().textContent();
+    const analytics = analyticsConfig ? JSON.parse(analyticsConfig) : {};
+    const playerAnalyticsProof = analyticsProof(analytics, { route: '/mobile/player', mode: 'player', role: 'Player' });
+    await page.waitForFunction(() => {
+      const visible = new URL(window.location.href);
+      return visible.pathname === '/mobile/player'
+        && visible.search === '';
+    }, null, { timeout: proofTimeoutMs });
+    const finalUrl = page.url();
+    const playerFinalUrl = new URL(finalUrl);
+    const playerPrivateContext = await readPrivateContext(page);
+    const playerSessionId = playerPrivateContext.sessionId;
+    const playerDeviceId = playerPrivateContext.deviceId;
+    assertProof(pageErrors.length === 0, `Unexpected page errors: ${pageErrors.join('; ')}`);
+    assertProof(directPlayerResponse && directPlayerResponse.status() === 200, 'Play did not return HTTP 200');
+    assertProof(new URL(finalUrl).pathname === '/mobile/player', 'Play did not land on /mobile/player');
+    assertProof(visibleRoleUrlIsPathOnly(finalUrl, '/mobile/player'), 'Play did not remove private identity from the visible URL');
+    assertProof(Boolean(playerSessionId), 'Player shell did not establish session context');
+    assertProof(Boolean(playerDeviceId), 'Player shell did not establish device context');
+    assertProof(pwaManifestPath === '/manifest.player.webmanifest', 'Player PWA manifest is not active');
+    assertProof(pwaRole === 'Player', 'Player shell role marker is missing');
+    assertProof(blazorShell === 'interactive-server', 'Blazor interactive shell marker is missing');
+    assertProof(playerAnalyticsProof.pass, 'Rybbit Player mobile shell privacy config is missing');
+    await page.locator('#turn-share-owner-route-button').click();
+    const playerHandoffHandle = await page.waitForFunction(() => {
+      const link = document.getElementById('turn-owner-route-link');
+      const href = link?.getAttribute('href') || '';
+      const status = (document.getElementById('turn-owner-route-share-status')?.textContent || '').trim();
+      if (status !== 'Session handoff is ready in the link above.' || !href) {
+        return null;
+      }
+      return {
+        href: new URL(href, window.location.origin).toString(),
+        text: (link?.textContent || '').trim(),
+        status,
+      };
+    }, null, { timeout: 30000 });
+    const playerHandoff = await playerHandoffHandle.jsonValue();
+    assertProof(Boolean(playerHandoff.href), 'Player session handoff did not expose a URL');
+    const playerHandoffUrl = new URL(playerHandoff.href);
+    assertProof(playerHandoffUrl.pathname === '/mobile/player', 'Player session handoff did not stay on /mobile/player');
+    assertProof(playerHandoffUrl.searchParams.get('sessionId') === playerSessionId, 'Player session handoff did not preserve session id');
+    assertProof(playerHandoffUrl.searchParams.get('role') === 'Player', 'Player session handoff did not preserve role');
+    assertProof(!playerHandoffUrl.searchParams.has('deviceId'), 'Player session handoff leaked sender device id');
+    assertProof(playerHandoff.text === 'Open session handoff link', 'Player session handoff did not expose the handoff link label');
+    const gmLink = page.locator('a.role-button[href^="/mobile/gm"]').first();
+    assertProof(await gmLink.count() === 1, 'GM role switch is missing from the Player shell');
+    const gmRoute = await gmLink.getAttribute('href');
+    const gmRouteUrl = new URL(gmRoute || '/mobile/gm', baseUrl);
+    const gmRouteSessionId = gmRouteUrl.searchParams.get('sessionId') || '';
+    assertProof(gmRouteUrl.pathname === '/mobile/gm', 'GM role switch route is not /mobile/gm');
+    assertProof(Boolean(gmRouteSessionId), 'GM role switch did not carry session context');
+    assertProof(gmRouteSessionId === playerSessionId, 'GM role switch did not preserve session context');
+    assertProof(!gmRouteUrl.searchParams.has('deviceId'), 'GM role switch leaked sender device id');
+    const gmRouteResponse = await page.request.get(new URL(gmRoute || '/mobile/gm', baseUrl).toString());
+    await Promise.all([
+      page.waitForURL('**/mobile/gm**', { timeout: proofTimeoutMs }),
+      gmLink.click({ noWaitAfter: true }),
+    ]);
+    const gmShell = page.locator('[data-blazor-shell="interactive-server"][data-role="GameMaster"]').first();
+    assertProof(await gmShell.count() === 1, 'GM switch did not open the interactive GM shell');
+    const gmPwaManifestPath = await page.locator('link[rel="manifest"]').first().getAttribute('href');
+    const gmRole = await gmShell.getAttribute('data-role');
+    const gmBlazorShell = await gmShell.getAttribute('data-blazor-shell');
+    const gmAnalyticsConfig = await page.locator('#chummer-play-analytics-config').first().textContent();
+    const gmAnalytics = gmAnalyticsConfig ? JSON.parse(gmAnalyticsConfig) : {};
+    const gmAnalyticsProof = analyticsProof(gmAnalytics, { route: '/mobile/gm', mode: 'gm', role: 'GameMaster' });
+    await page.waitForFunction(() => {
+      const visible = new URL(window.location.href);
+      return visible.pathname === '/mobile/gm'
+        && visible.search === '';
+    }, null, { timeout: proofTimeoutMs });
+    const gmFinalUrl = page.url();
+    const gmFinalUrlParsed = new URL(gmFinalUrl);
+    const gmPrivateContext = await readPrivateContext(page);
+    const gmSessionId = gmPrivateContext.sessionId;
+    const gmDeviceId = gmPrivateContext.deviceId;
+    assertProof(gmRouteResponse.status() === 200, 'GM switch did not return HTTP 200');
+    assertProof(new URL(gmFinalUrl).pathname === '/mobile/gm', 'GM switch did not land on /mobile/gm');
+    assertProof(visibleRoleUrlIsPathOnly(gmFinalUrl, '/mobile/gm'), 'GM switch did not remove private identity from the visible URL');
+    assertProof(Boolean(gmSessionId), 'GM shell did not establish session context');
+    assertProof(Boolean(gmDeviceId), 'GM shell did not establish device context');
+    assertProof(gmPwaManifestPath === '/manifest.gm.webmanifest', 'GM PWA manifest is not active');
+    assertProof(gmRole === 'GameMaster', 'GM shell role marker is missing');
+    assertProof(gmBlazorShell === 'interactive-server', 'GM Blazor interactive shell marker is missing');
+    assertProof(gmAnalyticsProof.pass, 'Rybbit GM mobile shell privacy config is missing');
+    await page.locator('#turn-share-owner-route-button').click();
+    const gmHandoffHandle = await page.waitForFunction(() => {
+      const link = document.getElementById('turn-owner-route-link');
+      const href = link?.getAttribute('href') || '';
+      const status = (document.getElementById('turn-owner-route-share-status')?.textContent || '').trim();
+      if (status !== 'Session handoff is ready in the link above.' || !href) {
+        return null;
+      }
+      return {
+        href: new URL(href, window.location.origin).toString(),
+        text: (link?.textContent || '').trim(),
+        status,
+      };
+    }, null, { timeout: 30000 });
+    const gmHandoff = await gmHandoffHandle.jsonValue();
+    assertProof(Boolean(gmHandoff.href), 'GM session handoff did not expose a URL');
+    const gmHandoffUrl = new URL(gmHandoff.href);
+    assertProof(gmHandoffUrl.pathname === '/mobile/gm', 'GM session handoff did not stay on /mobile/gm');
+    assertProof(gmHandoffUrl.searchParams.get('sessionId') === gmSessionId, 'GM session handoff did not preserve session id');
+    assertProof(gmHandoffUrl.searchParams.get('role') === 'GameMaster', 'GM session handoff did not preserve role');
+    assertProof(!gmHandoffUrl.searchParams.has('deviceId'), 'GM session handoff leaked sender device id');
+    assertProof(gmHandoff.text === 'Open session handoff link', 'GM session handoff did not expose the handoff link label');
+
+    writeJson('FRONTDOOR_MOBILE_LAUNCH.generated.json', {
+      contractName: 'chummer.frontdoor_mobile_launch.v2',
+      generated_at_utc: new Date().toISOString(),
+      status: 'pass',
+      base_url: baseUrl,
+      viewport: mobileViewport,
+      homepage_overflow_x: homepageMetrics.overflowX,
+      homepage_lane_text: homepageLaneText,
+      account_route: accountRoute,
+      play_route: playRoute,
+      play_sign_in_route: playSignInRoute,
+      direct_player_route: directPlayerRoute,
+      direct_player_http_status: directPlayerResponse ? directPlayerResponse.status() : 0,
+      direct_player_title: directPlayerTitle,
+      final_url: finalUrl,
+      private_identity_redacted: true,
+      visible_player_url_private_identity_absent: visibleRoleUrlIsPathOnly(finalUrl, '/mobile/player'),
+      player_session_context_present: Boolean(playerSessionId),
+      player_device_context_present: Boolean(playerDeviceId),
+      pwa_role: pwaRole,
+      blazor_shell: blazorShell,
+      live_turn_companion_shell: true,
+      pwa_manifest: pwaManifestPath,
+      pwa_manifest_path: pwaManifestPath,
+      rybbit_configured: playerAnalyticsProof.pass,
+      rybbit_tag: playerAnalyticsProof.tag || '',
+      rybbit_route: playerAnalyticsProof.route || '',
+      rybbit_mode: playerAnalyticsProof.mode || '',
+      rybbit_role: playerAnalyticsProof.role || '',
+      rybbit_site_id_present: playerAnalyticsProof.site_id_present,
+      rybbit_script_url_present: playerAnalyticsProof.script_url_present,
+      rybbit_script_url_allowed: playerAnalyticsProof.script_url_allowed,
+      rybbit_skip_patterns: playerAnalyticsProof.skip_patterns,
+      rybbit_mask_patterns: playerAnalyticsProof.mask_patterns,
+      rybbit_skip_mobile_paths: playerAnalyticsProof.skip_mobile_paths,
+      rybbit_mask_mobile_paths: playerAnalyticsProof.mask_mobile_paths,
+      rybbit_masks_private_play_routes: playerAnalyticsProof.masks_private_play_routes,
+      rybbit_replay_block_selector: playerAnalyticsProof.replay_block_selector,
+      rybbit_replay_blocks_turn_root: playerAnalyticsProof.replay_blocks_turn_root,
+      player_session_handoff_url: redactedPrivateUrl(playerHandoffUrl.toString()),
+      player_session_handoff_status: playerHandoff.status,
+      player_session_handoff_link_text: playerHandoff.text,
+      player_session_handoff_preserves_session: playerHandoffUrl.searchParams.get('sessionId') === playerSessionId,
+      player_session_handoff_preserves_role: playerHandoffUrl.searchParams.get('role') === 'Player',
+      player_session_handoff_strips_device: !playerHandoffUrl.searchParams.has('deviceId'),
+      player_session_handoff_sender_device_id_present: Boolean(playerDeviceId),
+      player_session_handoff_private_identity_redacted: true,
+      gm_route: '/mobile/gm',
+      gm_route_session_id_present: Boolean(gmRouteSessionId),
+      gm_route_private_identity_redacted: true,
+      gm_http_status: gmRouteResponse.status(),
+      gm_final_url: gmFinalUrl,
+      visible_gm_url_private_identity_absent: visibleRoleUrlIsPathOnly(gmFinalUrl, '/mobile/gm'),
+      gm_session_context_present: Boolean(gmSessionId),
+      gm_device_context_present: Boolean(gmDeviceId),
+      gm_live_turn_companion_shell: true,
+      gm_pwa_manifest_path: gmPwaManifestPath,
+      gm_pwa_role: gmRole,
+      gm_blazor_shell: gmBlazorShell,
+      gm_rybbit_configured: gmAnalyticsProof.pass,
+      gm_rybbit_tag: gmAnalyticsProof.tag || '',
+      gm_rybbit_route: gmAnalyticsProof.route || '',
+      gm_rybbit_mode: gmAnalyticsProof.mode || '',
+      gm_rybbit_role: gmAnalyticsProof.role || '',
+      gm_rybbit_site_id_present: gmAnalyticsProof.site_id_present,
+      gm_rybbit_script_url_present: gmAnalyticsProof.script_url_present,
+      gm_rybbit_script_url_allowed: gmAnalyticsProof.script_url_allowed,
+      gm_rybbit_skip_patterns: gmAnalyticsProof.skip_patterns,
+      gm_rybbit_mask_patterns: gmAnalyticsProof.mask_patterns,
+      gm_rybbit_skip_mobile_paths: gmAnalyticsProof.skip_mobile_paths,
+      gm_rybbit_mask_mobile_paths: gmAnalyticsProof.mask_mobile_paths,
+      gm_rybbit_masks_private_play_routes: gmAnalyticsProof.masks_private_play_routes,
+      gm_rybbit_replay_block_selector: gmAnalyticsProof.replay_block_selector,
+      gm_rybbit_replay_blocks_turn_root: gmAnalyticsProof.replay_blocks_turn_root,
+      gm_session_handoff_url: redactedPrivateUrl(gmHandoffUrl.toString()),
+      gm_session_handoff_status: gmHandoff.status,
+      gm_session_handoff_link_text: gmHandoff.text,
+      gm_session_handoff_preserves_session: gmHandoffUrl.searchParams.get('sessionId') === gmSessionId,
+      gm_session_handoff_preserves_role: gmHandoffUrl.searchParams.get('role') === 'GameMaster',
+      gm_session_handoff_strips_device: !gmHandoffUrl.searchParams.has('deviceId'),
+      gm_session_handoff_sender_device_id_present: Boolean(gmDeviceId),
+      gm_session_handoff_private_identity_redacted: true,
+      gated_targets: ['Build', 'Play'],
+      public_targets: [],
+      page_errors: pageErrors.map(redactPrivateText),
+    });
+
+    await page.close({ runBeforeUnload: false }).catch(() => undefined);
+
+    const anchorPage = await browser.newPage({ viewport: mobileViewport });
+    const anchorPageErrors = [];
+    anchorPage.on('pageerror', (error) => anchorPageErrors.push(error.message));
+    anchorPage.on('console', (message) => {
+      if (message.type() !== 'error') {
+        return;
+      }
+      const text = message.text();
+      if (!ignoredConsoleErrorFragments.some((fragment) => text.includes(fragment))) {
+        anchorPageErrors.push(text);
+      }
+    });
+
+    const anchorEntryUrl = new URL('/#turn-runsite-card', baseUrl).toString();
+    let anchorStatus = 'fail';
+    let anchorFailure = '';
+    let anchorFinalUrlText = anchorEntryUrl;
+    let anchorFinalPath = '';
+    let anchorFinalHash = '';
+    let anchorManifestPath = null;
+    let anchorRole = null;
+    let anchorBlazorShell = null;
+    let anchorSessionContextPresent = false;
+    let anchorDeviceContextPresent = false;
+    let anchorVisibleUrlPrivateIdentityAbsent = false;
+    try {
+      await anchorPage.goto(anchorEntryUrl, { waitUntil: 'domcontentloaded' });
+      await anchorPage.waitForFunction(() => {
+        const currentUrl = new URL(window.location.href);
+        return currentUrl.pathname === '/mobile/player'
+          && currentUrl.hash === '#turn-runsite-card'
+          && currentUrl.search === '';
+      }, null, { timeout: proofTimeoutMs });
+      const anchorFinalUrl = new URL(anchorPage.url());
+      anchorFinalUrlText = anchorPage.url();
+      anchorFinalPath = anchorFinalUrl.pathname;
+      anchorFinalHash = anchorFinalUrl.hash;
+      const anchorPlayerShell = anchorPage.locator('[data-blazor-shell="interactive-server"][data-role="Player"]').first();
+      assertProof(await anchorPlayerShell.count() === 1, 'Homepage anchor redirect did not open the interactive Player shell');
+      anchorManifestPath = await firstAttributeOrNull(anchorPage.locator('link[rel="manifest"]'), 'href');
+      anchorRole = await anchorPlayerShell.getAttribute('data-role');
+      anchorBlazorShell = await anchorPlayerShell.getAttribute('data-blazor-shell');
+      const anchorPrivateContext = await readPrivateContext(anchorPage);
+      anchorSessionContextPresent = Boolean(anchorPrivateContext.sessionId);
+      anchorDeviceContextPresent = Boolean(anchorPrivateContext.deviceId);
+      anchorVisibleUrlPrivateIdentityAbsent = visibleRoleUrlIsPathOnly(
+        anchorFinalUrlText,
+        '/mobile/player',
+        '#turn-runsite-card',
+      );
+      assertProof(anchorFinalPath === '/mobile/player', 'Homepage anchor redirect did not land on /mobile/player');
+      assertProof(anchorFinalHash === '#turn-runsite-card', 'Homepage anchor redirect did not preserve #turn-runsite-card');
+      assertProof(anchorVisibleUrlPrivateIdentityAbsent, 'Homepage anchor redirect did not remove private identity from the visible URL');
+      assertProof(anchorSessionContextPresent, 'Homepage anchor redirect did not establish session context');
+      assertProof(anchorDeviceContextPresent, 'Homepage anchor redirect did not establish device context');
+      assertProof(anchorManifestPath === '/manifest.player.webmanifest', 'Homepage anchor redirect did not activate the player PWA manifest');
+      assertProof(anchorRole === 'Player', 'Homepage anchor redirect did not prove the Player role');
+      assertProof(anchorBlazorShell === 'interactive-server', 'Homepage anchor redirect did not prove the interactive Blazor shell');
+      anchorStatus = 'pass';
+    } catch (error) {
+      anchorFailure = redactPrivateText(error && error.message ? error.message : String(error));
+      const anchorObservedUrlText = anchorPage.url();
+      anchorFinalUrlText = redactedPrivateUrl(anchorObservedUrlText);
+      anchorVisibleUrlPrivateIdentityAbsent = visibleRoleUrlIsPathOnly(
+        anchorObservedUrlText,
+        '/mobile/player',
+        '#turn-runsite-card',
+      );
+      try {
+        const anchorObservedUrl = new URL(anchorObservedUrlText);
+        anchorFinalPath = anchorObservedUrl.pathname;
+        anchorFinalHash = anchorObservedUrl.hash;
+      } catch {
+      }
+      anchorManifestPath = await firstAttributeOrNull(anchorPage.locator('link[rel="manifest"]'), 'href');
+      const anchorPlayerShell = anchorPage.locator('[data-blazor-shell="interactive-server"][data-role="Player"]').first();
+      if (await anchorPlayerShell.count() === 1) {
+        anchorRole = await anchorPlayerShell.getAttribute('data-role');
+        anchorBlazorShell = await anchorPlayerShell.getAttribute('data-blazor-shell');
+        const anchorPrivateContext = await readPrivateContext(anchorPage);
+        anchorSessionContextPresent = Boolean(anchorPrivateContext.sessionId);
+        anchorDeviceContextPresent = Boolean(anchorPrivateContext.deviceId);
+      }
+    }
+
+    writeJson('FRONTDOOR_MOBILE_ANCHOR_REDIRECT.generated.json', {
+      contractName: 'chummer.frontdoor_mobile_anchor_redirect.v2',
+      generated_at_utc: new Date().toISOString(),
+      status: anchorStatus,
+      base_url: baseUrl,
+      entry_url: anchorEntryUrl,
+      final_url: anchorFinalUrlText,
+      final_pathname: anchorFinalPath,
+      final_hash: anchorFinalHash,
+      pwa_manifest_path: anchorManifestPath,
+      pwa_role: anchorRole,
+      blazor_shell: anchorBlazorShell,
+      private_identity_redacted: true,
+      visible_url_private_identity_absent: anchorVisibleUrlPrivateIdentityAbsent,
+      session_context_present: anchorSessionContextPresent,
+      device_context_present: anchorDeviceContextPresent,
+      failure: anchorFailure,
+      page_errors: anchorPageErrors.map(redactPrivateText),
+    });
+    await anchorPage.close({ runBeforeUnload: false }).catch(() => undefined);
+
+    const ledgerPage = await browser.newPage();
+    await ledgerPage.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+    const ledgerHero = ledgerPage.locator('[data-homepage-section="hero"]');
+    await assertContains(ledgerHero, 'Chummer', 'ledger hero');
+    await assertContains(ledgerHero, 'A Shadowrun character manager', 'ledger hero');
+    assertProof(await ledgerHero.locator('[data-black-ledger-geoscape-root]').count() === 0, 'Black Ledger geoscape is on the primary homepage');
+    assertProof(await ledgerPage.getByText('Black Ledger').count() === 0, 'Black Ledger copy is on the primary homepage');
+    const heroActionLinks = ledgerHero.locator('.minimal-actions a.button-like');
+    assertProof(await heroActionLinks.count() > 0, 'Primary hero action links are missing');
+    await ledgerHero.locator('.minimal-open-chummer summary').click();
+    const ledgerOpenMenu = ledgerHero.locator('.minimal-open-chummer');
+    const ledgerBuildButton = ledgerOpenMenu.locator('button.site-open-chummer-menu__button', { hasText: 'Build' }).first();
+    const ledgerPlayButton = ledgerOpenMenu.locator('button.site-open-chummer-menu__button[data-disabled-target="/mobile/player"]', { hasText: 'Play' }).first();
+    assertProof(await ledgerBuildButton.count() === 1 && await ledgerBuildButton.isDisabled(), 'Build is not gated on ledger frontdoor check');
+    assertProof(await ledgerPlayButton.count() === 1 && await ledgerPlayButton.isDisabled(), 'Play is not gated on ledger frontdoor check');
+    assertProof(await ledgerOpenMenu.locator('.site-open-chummer-menu__button[href="/build"]').count() === 0, 'Build public link leaked on ledger frontdoor check');
+    assertProof(await ledgerOpenMenu.locator('.site-open-chummer-menu__button[href="/mobile/player"]').count() === 0, 'Play public link leaked on ledger frontdoor check');
+    assertProof(await ledgerOpenMenu.locator('.site-open-chummer-menu__button[href="/play"]').count() === 0, 'Legacy /play link leaked on ledger frontdoor check');
+    const ctaLabels = await heroActionLinks.evaluateAll((items) => items.map((item) => item.textContent ? item.textContent.trim() : ''));
+    writeJson('BLACK_LEDGER_GLOBE_FRONTDOOR.generated.json', {
+      contractName: 'chummer.black_ledger_globe_frontdoor.v1',
+      generated_at_utc: new Date().toISOString(),
+      status: 'pass',
+      base_url: baseUrl,
+      route: '/',
+      cta_labels: ctaLabels,
+      open_menu_targets: ['/login?next=%2Fbuild', '/login?next=%2Fmobile%2Fplayer', '/login?next=%2Faccount%2Faccess'],
+      gated_targets: ['Build', 'Play'],
+      public_targets: [],
+      ledger_primary: false,
+    });
+    await ledgerPage.close({ runBeforeUnload: false }).catch(() => undefined);
+    if (anchorFailure) {
+      throw new Error(anchorFailure);
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+main().catch((error) => {
+  console.error(redactPrivateText(error && error.stack ? error.stack : String(error)));
+  process.exit(1);
+});
+""",
+        encoding="utf-8",
+    )
+    command = ["node", str(probe_path)]
+    exit_code, stdout, stderr, timed_out = run_playwright_command(command, env, playwright_timeout_seconds)
+    mobile_artifact, mobile_artifact_load_status = load_json_with_status(mobile_artifact_path)
+    ledger_artifact, ledger_artifact_load_status = load_json_with_status(ledger_artifact_path)
+    anchor_artifact, anchor_artifact_load_status = load_json_with_status(anchor_artifact_path)
+    mobile_contract = receipt_contract(mobile_artifact)
+    ledger_contract = receipt_contract(ledger_artifact)
+    anchor_contract = receipt_contract(anchor_artifact)
+    mobile_contract_ok = mobile_contract == expected_mobile_contract
+    ledger_contract_ok = ledger_contract == expected_ledger_contract
+    anchor_contract_ok = anchor_contract == expected_anchor_contract
+    mobile_privacy_contract = frontdoor_mobile_artifact_matches_privacy_contract(mobile_artifact)
+    anchor_current_contract = frontdoor_anchor_artifact_matches_current_contract(anchor_artifact)
+    return {
+        "status": "pass" if exit_code == 0 and mobile_artifact_load_status == "loaded" and ledger_artifact_load_status == "loaded" and anchor_artifact_load_status == "loaded" and mobile_artifact.get("status") == "pass" and ledger_artifact.get("status") == "pass" and anchor_artifact.get("status") == "pass" and mobile_contract_ok and ledger_contract_ok and anchor_contract_ok and mobile_privacy_contract and anchor_current_contract else "fail",
+        "exitCode": exit_code,
+        "timedOut": timed_out,
+        "timeoutSeconds": playwright_timeout_seconds,
+        "artifactDir": str(artifact_dir),
+        "mobileArtifactPath": str(mobile_artifact_path),
+        "ledgerArtifactPath": str(ledger_artifact_path),
+        "anchorArtifactPath": str(anchor_artifact_path),
+        "mobileArtifactLoadStatus": mobile_artifact_load_status,
+        "ledgerArtifactLoadStatus": ledger_artifact_load_status,
+        "anchorArtifactLoadStatus": anchor_artifact_load_status,
+        "mobileArtifactContract": mobile_contract,
+        "expectedMobileArtifactContract": expected_mobile_contract,
+        "ledgerArtifactContract": ledger_contract,
+        "expectedLedgerArtifactContract": expected_ledger_contract,
+        "anchorArtifactContract": anchor_contract,
+        "expectedAnchorArtifactContract": expected_anchor_contract,
+        "mobileArtifact": redact_private_identity(mobile_artifact),
+        "ledgerArtifact": redact_private_identity(ledger_artifact),
+        "anchorArtifact": redact_private_identity(anchor_artifact),
+        "mobileArtifactBaseUrlMatchesRequested": artifact_base_url_matches(mobile_artifact, base_url),
+        "ledgerArtifactBaseUrlMatchesRequested": artifact_base_url_matches(ledger_artifact, base_url),
+        "anchorArtifactBaseUrlMatchesRequested": artifact_base_url_matches(anchor_artifact, base_url),
+        "mobileArtifactPrivacyContractSatisfied": mobile_privacy_contract,
+        "anchorArtifactCurrentContractSatisfied": anchor_current_contract,
+        "artifactReused": False,
+        "playwrightExecuted": True,
+        "stdoutTail": redact_private_identity(stdout[-2000:]),
+        "stderrTail": redact_private_identity(stderr[-2000:]),
+    }
+
+
+def orchestrated_main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Run the non-mutating public-edge postdeploy gate.")
+    parser.add_argument("--base-url", required=True)
+    parser.add_argument("--output")
+    parser.add_argument("--timeout-seconds", type=float, default=20.0)
+    parser.add_argument("--skip-preflight", action="store_true", help="Use only for post-fact canonical checks where local build lanes are irrelevant.")
+    parser.add_argument("--strict-preflight", action="store_true", help="Run the child public-edge preflight without foreign or stale build-lock allowances.")
+    parser.add_argument("--require-downloads-status-playwright", action="store_true", help="Require the focused browser proof for /downloads and /status.")
+    parser.add_argument("--playwright-artifact-dir", help="Artifact directory for the downloads-status Playwright proof.")
+    parser.add_argument("--require-mobile-pwa-viewport-playwright", action="store_true", help="Require the focused browser proof for core mobile PWA route viewports.")
+    parser.add_argument("--mobile-pwa-viewport-artifact-dir", help="Artifact directory for the mobile PWA viewport Playwright proof.")
+    parser.add_argument("--require-pwa-offline-cache-playwright", action="store_true", help="Require the focused browser proof for offline Player and GM mobile PWA routes.")
+    parser.add_argument("--pwa-offline-cache-artifact-dir", help="Artifact directory for the PWA offline cache Playwright proof.")
+    parser.add_argument("--require-blazor-new-runner-menu-playwright", action="store_true", help="Require the focused browser proof for the Blazor File > New runner workbench route.")
+    parser.add_argument("--blazor-new-runner-menu-artifact-dir", help="Artifact directory for the Blazor new-runner Playwright proof.")
+    parser.add_argument("--require-frontdoor-navigation-playwright", action="store_true", help="Require the focused browser proof for front-door Build/Play navigation and Black Ledger de-emphasis.")
+    parser.add_argument("--frontdoor-navigation-artifact-dir", help="Artifact directory for the front-door navigation Playwright proof.")
+    parser.add_argument("--reuse-existing-playwright-artifacts", action="store_true", help="Reuse existing Playwright-generated receipts from the supplied artifact directories instead of rerunning browser proofs.")
+    parser.add_argument("--reuse-artifact-max-age-hours", type=float, default=DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS, help="Maximum age for reused Playwright receipts before the browser proof must rerun.")
+    parser.add_argument("--release-channel-receipt", default=str(DEFAULT_RELEASE_CHANNEL_RECEIPT), help="Release-channel receipt used to require visible downloads version parity.")
+    parser.add_argument("--skip-release-version-match", action="store_true", help="Do not require public visible Version text to match the release-channel version.")
+    parser.add_argument("--overlay-root", default="", help="Mounted /app overlay root that public-edge preflight must validate.")
+    parser.add_argument(
+        "--expected-build-info",
+        default="",
+        help="Trusted active overlay build-info used to derive the expected full deployment digest.",
+    )
+    parser.add_argument(
+        "--expected-full-deployment-digest-sha256",
+        default="",
+        help="Independently selected expected full deployment digest; cross-checked against preflight when it runs.",
+    )
+    parser.add_argument(
+        "--expected-pwa-asset-inventory-sha256",
+        default="",
+        help="Sealed preflight PWA asset inventory digest; mandatory when preflight is skipped.",
+    )
+    args = parser.parse_args(argv)
+    if args.skip_preflight and args.strict_preflight:
+        parser.error("--strict-preflight cannot be combined with --skip-preflight")
+    release_channel = {} if args.skip_release_version_match else load_optional_json(Path(args.release_channel_receipt))
+    expected_release_version = "" if args.skip_release_version_match else str(release_channel.get("version") or "").strip()
+    expected_release_status = "" if args.skip_release_version_match else str(release_channel.get("status") or "").strip()
+    expected_release_channel = "" if args.skip_release_version_match else str(
+        release_channel.get("channel") or release_channel.get("channelId") or release_channel.get("channel_id") or ""
+    ).strip()
+    expected_release_supportability_state = "" if args.skip_release_version_match else str(
+        release_channel.get("supportabilityState") or release_channel.get("supportability_state") or ""
+    ).strip()
+    expected_release_rollout_state = "" if args.skip_release_version_match else str(
+        release_channel.get("rolloutState") or release_channel.get("rollout_state") or ""
+    ).strip()
+    expected_frontdoor_homepage_lane = expected_homepage_lane_text(
+        expected_release_status,
+        expected_release_version,
+        expected_release_channel,
+        expected_release_supportability_state,
+        expected_release_rollout_state,
+    ) or ""
+    overlay_root = resolve_public_edge_overlay_root(args.overlay_root)
+    expected_source_root = Path(
+        os.environ.get("CHUMMER_RUN_SERVICES_SOURCE") or RUN_SERVICES_ROOT
+    ).resolve()
+
+    with tempfile.TemporaryDirectory(prefix="chummer-public-edge-postdeploy-") as temp_dir:
+        temp = Path(temp_dir)
+        if args.skip_preflight:
+            preflight = {
+                "contractName": "chummer.public_edge_deploy_preflight.v1",
+                "status": "pass",
+                "activeLockCount": 0,
+                "staleForeignLockCount": 0,
+                "staleLookingLockCount": 0,
+                "staleForeignLocksIgnored": False,
+                "allowStaleForeignBuildLocks": False,
+                "skipped": True,
+                "findings": [],
+            }
+        else:
+            preflight_command = [
+                sys.executable,
+                "scripts/check_public_edge_deploy_preflight.py",
+                "--overlay-root",
+                str(overlay_root),
+            ]
+            if not args.strict_preflight:
+                preflight_command[2:2] = [
+                    "--allow-foreign-build-locks",
+                    "--allow-stale-foreign-build-locks",
+                ]
+            preflight = run_child(
+                preflight_command,
+                temp / "preflight.json",
+                allow_failure=True,
+            )
+
+        configured_expected_digest = str(
+            args.expected_full_deployment_digest_sha256 or ""
+        ).strip()
+        configured_pwa_inventory_digest = str(
+            args.expected_pwa_asset_inventory_sha256 or ""
+        ).strip()
+        if configured_pwa_inventory_digest and re.fullmatch(
+            r"[0-9a-f]{64}", configured_pwa_inventory_digest
+        ) is None:
+            parser.error("configured PWA asset inventory digest must be lowercase SHA-256")
+        if configured_expected_digest:
+            try:
+                configured_expected_digest = require_full_deployment_digest(
+                    configured_expected_digest,
+                    label="configured full deployment digest",
+                )
+            except RuntimeError as exc:
+                parser.error(str(exc))
+        if args.skip_preflight:
+            if not configured_pwa_inventory_digest:
+                parser.error(
+                    "--skip-preflight requires --expected-pwa-asset-inventory-sha256 from a sealed preflight receipt"
+                )
+            expected_pwa_asset_inventory_sha256 = configured_pwa_inventory_digest
+            if configured_expected_digest:
+                expected_full_deployment_digest_sha256 = configured_expected_digest
+                if args.expected_build_info:
+                    try:
+                        build_info_digest = load_expected_full_deployment_digest(
+                            Path(args.expected_build_info),
+                            source_root=expected_source_root,
+                            overlay_root=overlay_root,
+                        )
+                    except RuntimeError as exc:
+                        parser.error(str(exc))
+                    if build_info_digest != configured_expected_digest:
+                        parser.error(
+                            "configured full deployment digest does not match trusted build-info"
+                        )
+            else:
+                expected_build_info_path = (
+                    Path(args.expected_build_info)
+                    if args.expected_build_info
+                    else overlay_root / OVERLAY_BUILD_INFO_RELATIVE_PATH
+                )
+                try:
+                    expected_full_deployment_digest_sha256 = (
+                        load_expected_full_deployment_digest(
+                            expected_build_info_path,
+                            source_root=expected_source_root,
+                            overlay_root=overlay_root,
+                        )
+                    )
+                except RuntimeError as exc:
+                    parser.error(str(exc))
+        else:
+            preflight_pwa = preflight.get("publicPwaStaticProof")
+            preflight_pwa_inventory = (
+                preflight_pwa.get("assetDigestInventory")
+                if isinstance(preflight_pwa, dict)
+                and isinstance(preflight_pwa.get("assetDigestInventory"), dict)
+                else {}
+            )
+            expected_pwa_asset_inventory_sha256 = str(
+                preflight_pwa_inventory.get("sha256") or ""
+            ).strip()
+            if re.fullmatch(
+                r"[0-9a-f]{64}", expected_pwa_asset_inventory_sha256
+            ) is None:
+                parser.error("preflight PWA asset inventory digest is missing or invalid")
+            if (
+                configured_pwa_inventory_digest
+                and configured_pwa_inventory_digest
+                != expected_pwa_asset_inventory_sha256
+            ):
+                parser.error(
+                    "configured PWA asset inventory digest does not match the sealed preflight"
+                )
+            preflight_binding = preflight.get("overlayBuildInfoSourceFingerprint")
+            preflight_digest = (
+                preflight_binding.get("expectedFullDeploymentDigestSha256")
+                if isinstance(preflight_binding, dict)
+                else None
+            )
+            try:
+                expected_full_deployment_digest_sha256 = require_full_deployment_digest(
+                    preflight_digest,
+                    label="preflight full deployment digest",
+                )
+            except RuntimeError as exc:
+                parser.error(str(exc))
+            if (
+                configured_expected_digest
+                and configured_expected_digest
+                != expected_full_deployment_digest_sha256
+            ):
+                parser.error(
+                    "configured full deployment digest does not match the trusted preflight"
+                )
+            if args.expected_build_info:
+                try:
+                    build_info_digest = load_expected_full_deployment_digest(
+                        Path(args.expected_build_info),
+                        source_root=expected_source_root,
+                        overlay_root=overlay_root,
+                    )
+                except RuntimeError as exc:
+                    parser.error(str(exc))
+                if build_info_digest != expected_full_deployment_digest_sha256:
+                    parser.error(
+                        "trusted build-info full deployment digest does not match preflight"
+                    )
+
+        downloads_command = [
+            sys.executable,
+            "scripts/verify_downloads_version_marker.py",
+            "--base-url",
+            args.base_url,
+            "--timeout-seconds",
+            str(args.timeout_seconds),
+            "--release-channel-receipt",
+            args.release_channel_receipt,
+        ]
+        if args.skip_release_version_match:
+            downloads_command.append("--skip-release-version-match")
+        else:
+            downloads_command.append("--allow-non-launch-supported-release-channel")
+        downloads = run_child(
+            downloads_command,
+            temp / "downloads.json",
+            allow_failure=True,
+        )
+        pwa_static = run_child(
+            [
+                sys.executable,
+                "scripts/verify_public_pwa_static_assets.py",
+                "--base-url",
+                args.base_url,
+                "--timeout-seconds",
+                str(args.timeout_seconds),
+                "--expected-full-deployment-digest-sha256",
+                expected_full_deployment_digest_sha256,
+                "--expected-asset-inventory-sha256",
+                expected_pwa_asset_inventory_sha256,
+            ],
+            temp / "pwa-static.json",
+            allow_failure=True,
+        )
+        mobile_ledger = run_child(
+            [
+                sys.executable,
+                "scripts/verify_mobile_pwa_ledger_boundary.py",
+                "--base-url",
+                args.base_url,
+                "--timeout-seconds",
+                str(args.timeout_seconds),
+            ],
+            temp / "mobile-ledger.json",
+            allow_failure=True,
+        )
+        ready_mobile_handoff = run_child(
+            [
+                sys.executable,
+                "scripts/verify_ready_mobile_handoff_contract.py",
+                "--base-url",
+                args.base_url,
+                "--timeout-seconds",
+                str(args.timeout_seconds),
+            ],
+            temp / "ready-mobile-handoff.json",
+            allow_failure=True,
+        )
+        participate_iframe_shell = run_child(
+            [
+                sys.executable,
+                "scripts/verify_participate_iframe_shell.py",
+                "--base-url",
+                args.base_url,
+                "--timeout-seconds",
+                str(args.timeout_seconds),
+            ],
+            temp / "participate-iframe-shell.json",
+            allow_failure=True,
+        )
+        online_launch = run_child(
+            [
+                sys.executable,
+                "scripts/verify_chummer_online_launch.py",
+                "--base-url",
+                args.base_url,
+            ],
+            temp / "online-launch.json",
+            allow_failure=True,
+        )
+
+    downloads_status_browser = None
+    if args.require_downloads_status_playwright:
+        artifact_dir = Path(args.playwright_artifact_dir) if args.playwright_artifact_dir else Path(tempfile.mkdtemp(prefix="chummer-downloads-status-browser-"))
+        downloads_status_browser = run_downloads_status_playwright(
+            args.base_url.rstrip("/"),
+            artifact_dir,
+            args.timeout_seconds,
+            reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
+            reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
+        )
+    mobile_pwa_viewport = None
+    if args.require_mobile_pwa_viewport_playwright:
+        artifact_dir = Path(args.mobile_pwa_viewport_artifact_dir) if args.mobile_pwa_viewport_artifact_dir else Path(tempfile.mkdtemp(prefix="chummer-mobile-pwa-viewport-"))
+        mobile_pwa_viewport = run_mobile_pwa_viewport_playwright(
+            args.base_url.rstrip("/"),
+            artifact_dir,
+            args.timeout_seconds,
+            reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
+            reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
+        )
+    pwa_offline_cache = None
+    if args.require_pwa_offline_cache_playwright:
+        artifact_dir = Path(args.pwa_offline_cache_artifact_dir) if args.pwa_offline_cache_artifact_dir else Path(tempfile.mkdtemp(prefix="chummer-pwa-offline-cache-"))
+        pwa_offline_cache = run_pwa_offline_cache_playwright(
+            args.base_url.rstrip("/"),
+            artifact_dir,
+            args.timeout_seconds,
+            reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
+            reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
+        )
+    blazor_new_runner_menu = None
+    if args.require_blazor_new_runner_menu_playwright:
+        artifact_dir = Path(args.blazor_new_runner_menu_artifact_dir) if args.blazor_new_runner_menu_artifact_dir else Path(tempfile.mkdtemp(prefix="chummer-blazor-new-runner-menu-"))
+        blazor_new_runner_menu = run_blazor_new_runner_menu_playwright(
+            args.base_url.rstrip("/"),
+            artifact_dir,
+            args.timeout_seconds,
+            reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
+            reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
+        )
+    frontdoor_navigation = None
+    if args.require_frontdoor_navigation_playwright:
+        artifact_dir = Path(args.frontdoor_navigation_artifact_dir) if args.frontdoor_navigation_artifact_dir else Path(tempfile.mkdtemp(prefix="chummer-frontdoor-navigation-"))
+        frontdoor_navigation = run_frontdoor_navigation_playwright(
+            args.base_url.rstrip("/"),
+            artifact_dir,
+            args.timeout_seconds,
+            reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
+            reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
+            expected_homepage_lane_text=expected_frontdoor_homepage_lane,
+        )
+    role_alias_routes = probe_role_alias_routes(args.base_url.rstrip("/"), args.timeout_seconds)
+
+    result = compose_status(
+        preflight,
+        downloads,
+        pwa_static,
+        mobile_ledger,
+        ready_mobile_handoff,
+        participate_iframe_shell,
+        downloads_status_browser,
+        mobile_pwa_viewport,
+        frontdoor_navigation,
+        pwa_offline_cache,
+        blazor_new_runner_menu,
+        expected_release_version,
+        False,
+        role_alias_routes,
+        online_launch=online_launch,
+        expected_full_deployment_digest_sha256=(
+            expected_full_deployment_digest_sha256
+        ),
+    )
+    result["skipPreflight"] = args.skip_preflight
+    result["skipReleaseVersionMatch"] = args.skip_release_version_match
+    result["strictPreflight"] = args.strict_preflight and args.skip_preflight is False
+    result["strictInvocation"] = (args.skip_preflight is False and args.skip_release_version_match is False)
+    result["strictNoAllowanceInvocation"] = (
+        args.skip_preflight is False
+        and args.skip_release_version_match is False
+        and args.strict_preflight is True
+    )
+    result["expectedFullDeploymentDigestSha256"] = (
+        expected_full_deployment_digest_sha256
+    )
+    result["expectedPwaAssetInventorySha256"] = (
+        expected_pwa_asset_inventory_sha256
+    )
+    pwa_inventory_receipt = (
+        pwa_static.get("assetDigestInventory")
+        if isinstance(pwa_static.get("assetDigestInventory"), dict)
+        else {}
+    )
+    pwa_inventory_anchor_matches = (
+        pwa_inventory_receipt.get("sealedExpectedSha256")
+        == expected_pwa_asset_inventory_sha256
+        and pwa_inventory_receipt.get("matchesExpected") is True
+        and pwa_inventory_receipt.get("sourceStable") is True
+    )
+    result["pwaAssetInventoryAnchorMatches"] = pwa_inventory_anchor_matches
+    if not pwa_inventory_anchor_matches:
+        result["failures"].append(
+            "PWA asset inventory did not remain bound to the sealed preflight digest"
+        )
+        result["status"] = "fail"
+    if not args.skip_release_version_match and not expected_release_version:
+        result["expectedReleaseVersion"] = ""
+        result["visibleVersionMatchesReleaseChannel"] = False
+        result["statusRedirectVersionMatchesReleaseChannel"] = False
+        result["failures"].append("release channel version is missing")
+        result["status"] = "fail"
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    if args.output:
+        Path(args.output).write_text(rendered, encoding="utf-8")
+    else:
+        sys.stdout.write(rendered)
+    return 0 if result["status"] == "pass" else 1
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the orchestrated flagship gate, with the upstream direct verifier available explicitly."""
+    effective_argv = list(sys.argv[1:] if argv is None else argv)
+    if "--self-contained-direct" in effective_argv:
+        direct_argv = [value for value in effective_argv if value != "--self-contained-direct"]
+        return self_contained_main(direct_argv)
+    return orchestrated_main(effective_argv)
 
 
 if __name__ == "__main__":

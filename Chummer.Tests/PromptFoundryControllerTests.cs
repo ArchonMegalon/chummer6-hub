@@ -32,6 +32,17 @@ public sealed class PromptFoundryControllerTests
     }
 
     [Fact]
+    public void ProviderDoesNotClaimAnUnverifiedMcpConnection()
+    {
+        using var fixture = new Fixture();
+
+        OkObjectResult response = Assert.IsType<OkObjectResult>(fixture.Controller.Provider());
+        PromptArchitectsProviderVerificationProjection provider = Assert.IsType<PromptArchitectsProviderVerificationProjection>(response.Value);
+
+        Assert.False(provider.McpConnectionClaimed);
+    }
+
+    [Fact]
     public async Task CreateDraftReturnsBadRequestForOversizedSummary()
     {
         using var fixture = new Fixture();

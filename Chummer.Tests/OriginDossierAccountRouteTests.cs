@@ -40,6 +40,13 @@ public sealed class OriginDossierAccountRouteTests
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/listen", model.Publication.AudiobookshelfShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/listen", model.Publication.AudiobookshelfAudiobookShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-route/cover", model.Publication.StorySceneCoverUrl);
+        Assert.True(model.Publication.FullStoryVerified);
+        Assert.True(model.Publication.EbookHandoffReady);
+        Assert.StartsWith("OD-", model.Publication.RunnerLinkCode, StringComparison.Ordinal);
+        Assert.Equal(17, model.Publication.RunnerLinkCode!.Length);
+        Assert.Equal(3, model.Publication.PortraitChoices?.Count);
+        Assert.Equal(3, model.Publication.AudiobookVoiceOptions?.Count);
+        Assert.Equal(3, model.Publication.SceneHighlights?.Count);
         Assert.NotNull(model.Publication.ArtifactCapability);
         Assert.Equal("origin-dossier", model.Publication.ArtifactCapability!.HorizonId);
         Assert.Equal("origin-dossier-media", model.Publication.ArtifactCapability.CapabilityId);
@@ -63,7 +70,7 @@ public sealed class OriginDossierAccountRouteTests
     }
 
     [Fact]
-    public void OriginDossierViewExposesReadListenWatchAndCanonAuditTabs()
+    public void OriginDossierViewExposesReadPortraitsListenWatchAndCanonAuditTabs()
     {
         string view = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
@@ -74,12 +81,64 @@ public sealed class OriginDossierAccountRouteTests
 
         Assert.Contains("data-origin-edition-tabs", view, StringComparison.Ordinal);
         Assert.Contains("href=\"#origin-edition-read\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"#origin-edition-links\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"#origin-edition-portraits\"", view, StringComparison.Ordinal);
         Assert.Contains("href=\"#origin-edition-listen\"", view, StringComparison.Ordinal);
         Assert.Contains("href=\"#origin-edition-watch\"", view, StringComparison.Ordinal);
         Assert.Contains("href=\"#origin-edition-canon-audit\"", view, StringComparison.Ordinal);
-        Assert.Contains("Read in Audiobookshelf", view, StringComparison.Ordinal);
+        Assert.Contains("Read the ebook", view, StringComparison.Ordinal);
+        Assert.Contains("Portrait shortlist", view, StringComparison.Ordinal);
         Assert.Contains("Listen in Audiobookshelf", view, StringComparison.Ordinal);
-        Assert.Contains("Watch scene movie", view, StringComparison.Ordinal);
+        Assert.Contains("Watch selected cinematic scene", view, StringComparison.Ordinal);
+        Assert.Contains("data-origin-story-first-order", view, StringComparison.Ordinal);
+        Assert.Contains("var fullStoryReady = publication.FullStoryVerified;", view, StringComparison.Ordinal);
+        Assert.Contains("var bookHandoffReady = publication.EbookHandoffReady;", view, StringComparison.Ordinal);
+        Assert.Contains("data-full-story-verified", view, StringComparison.Ordinal);
+        Assert.Contains("data-ebook-handoff-ready", view, StringComparison.Ordinal);
+        Assert.Contains("var canShowPortraitChoices = bookHandoffReady && hasPortraitChoiceSet;", view, StringComparison.Ordinal);
+        Assert.Contains("Story-first handoff", view, StringComparison.Ordinal);
+        Assert.Contains("finished full story manuscript becomes a private ebook", view, StringComparison.Ordinal);
+        Assert.Contains("Full ebook with fitted cover", view, StringComparison.Ordinal);
+        Assert.Contains("Runner link code", view, StringComparison.Ordinal);
+        Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/story-link", view, StringComparison.Ordinal);
+        Assert.Contains("Link runner", view, StringComparison.Ordinal);
+        Assert.Contains("Three story-fit portraits", view, StringComparison.Ordinal);
+        Assert.Contains("Request audiobook in a chosen voice", view, StringComparison.Ordinal);
+        Assert.Contains("Review important chapter scene summaries", view, StringComparison.Ordinal);
+        Assert.Contains("Choose one cinematic render", view, StringComparison.Ordinal);
+        Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/portrait", view, StringComparison.Ordinal);
+        Assert.Contains("Choose this portrait", view, StringComparison.Ordinal);
+        Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/audiobook", view, StringComparison.Ordinal);
+        Assert.Contains("Request this voice", view, StringComparison.Ordinal);
+        Assert.Contains("/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/cinematic-scene", view, StringComparison.Ordinal);
+        Assert.Contains("Render this scene", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Subscribr-first", view, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task OriginDossierStoryLinkRouteStoresAcceptedRunnerLink()
+    {
+        using var fixture = OriginDossierRouteFixture.Create();
+        fixture.ImportGoldPublication("origin-route", fixture.SubjectId);
+        string peerSubjectId = "subject.origin-peer";
+        fixture.ImportGoldPublication("origin-peer", peerSubjectId);
+        OriginDossierPublicationService service = fixture.OriginDossiers;
+        string peerCode = Assert.Single(service.ListForAccount($"user-{peerSubjectId}", peerSubjectId)).RunnerLinkCode!;
+        AccountsController controller = fixture.CreateController();
+
+        IActionResult result = await controller.LinkOriginDossierRunner(
+            "origin-route",
+            peerCode,
+            "The runners were on the same failed clinic extraction.",
+            CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/account/work/origin-dossiers/origin-route#origin-edition-links", redirect.Url);
+        OriginDossierPublicationViewModel source = service.GetForAccount(fixture.UserId, fixture.SubjectId, "origin-route")!;
+        OriginDossierStoryLinkViewModel link = Assert.Single(source.StoryLinks!);
+        Assert.Equal("origin-peer", link.LinkedProjectId);
+        Assert.Equal("accepted_by_link_code", link.Status);
+        Assert.Contains("clinic extraction", link.Summary, StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()
@@ -183,6 +242,9 @@ public sealed class OriginDossierAccountRouteTests
 
         public HorizonArtifactRequestReceiptStore ArtifactRequestReceipts
             => _provider.GetRequiredService<HorizonArtifactRequestReceiptStore>();
+
+        public OriginDossierPublicationService OriginDossiers
+            => _provider.GetRequiredService<OriginDossierPublicationService>();
 
         public static OriginDossierRouteFixture Create()
         {
@@ -308,16 +370,43 @@ public sealed class OriginDossierAccountRouteTests
                     MovieSubtitlesPath: artifacts.MovieSubtitlesPath,
                     MovieStoryboardPath: artifacts.MovieStoryboardPath,
                     TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath,
-                    FinalNoFallbackNoSentinelAuditReceiptPath: artifacts.FinalNoFallbackNoSentinelAuditReceiptPath));
+                    FinalNoFallbackNoSentinelAuditReceiptPath: artifacts.FinalNoFallbackNoSentinelAuditReceiptPath,
+                    PortraitChoices: BuildPortraitChoices(projectId),
+                    AudiobookVoiceOptions: BuildAudiobookVoiceOptions(),
+                    SceneHighlights: BuildSceneHighlights()));
             return artifacts;
         }
+
+        private static IReadOnlyList<OriginDossierPortraitChoiceDto> BuildPortraitChoices(string projectId)
+            =>
+            [
+                new($"portrait-{projectId}-street", "Street face", "Guarded, rain-cut stare after the clinic debt locks in.", $"https://chummer.run/media/origin-dossier/{projectId}-street.png", true),
+                new($"portrait-{projectId}-clinic", "Clinic light", "Sharper chrome detail and the aftermath of the first compromise.", $"https://chummer.run/media/origin-dossier/{projectId}-clinic.png"),
+                new($"portrait-{projectId}-quiet", "Quiet booth", "A lower-key profile for the scenes where the runner is still hiding.", $"https://chummer.run/media/origin-dossier/{projectId}-quiet.png")
+            ];
+
+        private static IReadOnlyList<OriginDossierAudiobookVoiceOptionDto> BuildAudiobookVoiceOptions()
+            =>
+            [
+                new("voice-noir", "Noir close", "Low, intimate narration for the memoir cut.", true, true),
+                new("voice-wire", "Wire report", "Cooler newsroom delivery for the dossier cut."),
+                new("voice-street", "Street edge", "Rougher cadence for a harder survival read.")
+            ];
+
+        private static IReadOnlyList<OriginDossierSceneHighlightDto> BuildSceneHighlights()
+            =>
+            [
+                new("scene-clinic-rain", "Chapter 2", "Clinic door in rain", "The first illegal favor becomes a visible debt.", true),
+                new("scene-simrig-betrayal", "Chapter 5", "Simrig betrayal", "Trust fractures when the runner learns who sold the footage."),
+                new("scene-burned-safehouse", "Chapter 8", "Burned safehouse", "The runner chooses what to save before the safehouse is lost.")
+            ];
 
         private OriginDossierRouteArtifacts CreateGoldArtifacts(string projectId)
         {
             string projectRoot = Path.Combine(Root, projectId);
             Directory.CreateDirectory(projectRoot);
             string sourcePacketPath = WriteArtifact(projectRoot, "approved-source-packet.json", """{"runnerAlias":"Route Runner","approvedForExternalProcessing":true}""");
-            string providerManuscriptPath = WriteArtifact(projectRoot, "provider-manuscript.md", "Provider-authored Origin Dossier manuscript.");
+            string providerManuscriptPath = WriteArtifact(projectRoot, "provider-manuscript.md", BuildFullStoryManuscript("Route Runner"));
             string bookArtifactPath = WriteArtifact(projectRoot, "book.pdf", "%PDF-1.7\nOrigin Dossier route test book artifact\n");
             string ebookArtifactPath = WriteArtifact(projectRoot, "ebook.epub", "EPUB route test ebook artifact with embedded cover");
             string storySceneCoverPath = WriteArtifact(projectRoot, "story-scene-cover.png", "PNG route test story scene cover artifact");
@@ -348,8 +437,12 @@ public sealed class OriginDossierAccountRouteTests
                     projectRoot,
                     "provider-manuscript.receipt.json",
                     "provider_manuscript_import",
-                    "Inkfluence",
-                    artifactPaths: [providerManuscriptPath]),
+                    "Subscribr",
+                    [
+                        "full_story_manuscript",
+                        "chaptered_story"
+                    ],
+                    [providerManuscriptPath]),
                 HumanizerReceiptPath: WriteReceipt(
                     projectRoot,
                     "undetectable-humanizer.receipt.json",
@@ -362,7 +455,11 @@ public sealed class OriginDossierAccountRouteTests
                     "book.receipt.json",
                     "book_artifact_import",
                     "Inkfluence",
-                    artifactPaths: [bookArtifactPath]),
+                    [
+                        "story_edition_ebook",
+                        "fitted_cover_art"
+                    ],
+                    [bookArtifactPath]),
                 StorySceneCoverPath: storySceneCoverPath,
                 StorySceneCoverReceiptPath: WriteReceipt(
                     projectRoot,
@@ -411,7 +508,12 @@ public sealed class OriginDossierAccountRouteTests
                     "dossier-film.receipt.json",
                     "dossier_video_import",
                     "Magicfit",
-                    artifactPaths: [dossierVideoPath]),
+                    [
+                        "selected_character_face",
+                        "selected_cinematic_scene",
+                        "character_visible_cinematic"
+                    ],
+                    [dossierVideoPath]),
                 TelegramShareDeliveryReceiptPath: WriteTelegramShareReceipt(
                     projectRoot,
                     "telegram-share.receipt.json",
@@ -446,6 +548,51 @@ public sealed class OriginDossierAccountRouteTests
             string path = Path.Combine(projectRoot, fileName);
             File.WriteAllText(path, contents);
             return path;
+        }
+
+        private static string BuildFullStoryManuscript(string runnerAlias)
+        {
+            string[] chapterTitles =
+            [
+                "Rain Before the Name",
+                "The Debt With Teeth",
+                "Clinic Glass",
+                "The Market That Lied",
+                "A Favor Owed Twice",
+                "The Safehouse Ledger",
+                "The Name She Chose",
+                "After the Sirens"
+            ];
+            string[] sceneAnchors =
+            [
+                "the clinic door",
+                "the night market",
+                "the rented booth",
+                "the safehouse stairwell",
+                "the transit platform",
+                "the neon service alley",
+                "the backroom call",
+                "the rain-cut roofline"
+            ];
+
+            var builder = new StringBuilder();
+            for (int chapter = 0; chapter < chapterTitles.Length; chapter++)
+            {
+                builder.AppendLine($"# Chapter {chapter + 1} - {chapterTitles[chapter]}");
+                builder.AppendLine();
+                for (int beat = 0; beat < 18; beat++)
+                {
+                    string anchor = sceneAnchors[(chapter + beat) % sceneAnchors.Length];
+                    builder.AppendLine(
+                        $"{runnerAlias} moves through {anchor} with a choice that belongs to the approved source packet, not to a new rules exception. " +
+                        "The scene holds on concrete action, dialogue, memory, consequence, and the private reason the runner keeps returning to the same dangerous promise. " +
+                        "Contacts notice the cost, rivals misread the silence, and the future GM receives useful relationship pressure without invented ware, qualities, gear, or sourcebook changes. " +
+                        "Each beat leaves enough visual detail for the fitted cover, portrait shortlist, voice direction, and cinematic scene summary while preserving the character sheet as the authority.");
+                    builder.AppendLine();
+                }
+            }
+
+            return builder.ToString();
         }
 
         private static string WriteReceipt(

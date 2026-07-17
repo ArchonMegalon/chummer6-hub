@@ -1,0 +1,39 @@
+{
+  "contract": "play-root-worker-public-edge-projection-v2",
+  "source": "../chummer-play/src/Chummer.Play.Web/wwwroot/service-worker.js",
+  "sourceSha256": "f3cef86bbf454b1a93c8ff9ccfe84f4c83dc7b505901471d702493a37960b83c",
+  "template": "Chummer.Run.Api/service-worker.public-edge.template.js",
+  "templateSha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
+  "requiredInventory": "Chummer.Run.Api/play-pwa-required-inventory.json",
+  "requiredInventorySha256": "cdf7a49e98e7926cae82ea8bff0e219ce9a5a5133b3ef222954046c9d4a51f2a",
+  "projection": "Chummer.Run.Api/wwwroot/service-worker.js",
+  "mirrorContract": "Chummer.Run.Api/play-pwa-mirrors.json",
+  "requiredSourceMarkers": [
+    "const CACHE_VERSION = \"v21\";",
+    "const CACHE_CONTRACT = \"play-source-v2\";",
+    "\"/mobile-install-shell.js\"",
+    "\"/manifest.webmanifest\"",
+    "\"/manifest.observer.webmanifest\"",
+    "event.waitUntil(precacheCriticalShell());"
+  ],
+  "forbiddenSourceMarkers": [
+    "self.skipWaiting()",
+    "self.clients.claim()"
+  ],
+  "requiredProjectionMarkers": [
+    "Deterministic public-edge projection template",
+    "const CACHE_VERSION = \"v19\";",
+    "const CACHE_CONTRACT = \"run-api-projection-v2\";",
+    "const CRITICAL_SHELL_ASSETS = [",
+    "\"/manifest.play.webmanifest\"",
+    "play_public_route_network_unavailable",
+    "event.waitUntil(precacheCriticalShell());"
+  ],
+  "forbiddenProjectionMarkers": [
+    "self.skipWaiting()",
+    "self.clients.claim()",
+    "\"/mobile-turn-companion.js\"",
+    "const CACHE_CONTRACT = \"play-source-v2\";",
+    "\"/manifest.webmanifest\""
+  ]
+}

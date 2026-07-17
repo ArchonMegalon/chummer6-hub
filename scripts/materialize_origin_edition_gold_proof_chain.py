@@ -57,6 +57,8 @@ def load_modules(repo_root: Path) -> SimpleNamespace:
         handoff=load_module(repo_root, "scripts/materialize_origin_dossier_deployed_operator_handoff.py", "origin_deployed_handoff"),
         gold_audit=load_module(repo_root, "scripts/audit_origin_dossier_gold_e2e.py", "origin_gold_audit"),
         runsite=load_module(repo_root, "scripts/materialize_origin_edition_runsite_integration_proof.py", "origin_runsite_proof"),
+        magicai_handshake=load_module(repo_root, "scripts/materialize_magicai_api_handshake_probe.py", "magicai_api_handshake_probe"),
+        provider_account_registry=load_module(repo_root, "scripts/verify_origin_provider_account_registry.py", "origin_provider_account_registry"),
         matrix=load_module(repo_root, "scripts/materialize_origin_edition_gold_completion_matrix.py", "origin_completion_matrix"),
         coverage=load_module(repo_root, "scripts/materialize_origin_edition_gold_requirement_coverage.py", "origin_requirement_coverage"),
     )
@@ -108,9 +110,7 @@ def run_chain(
         portal_restart_plan_path,
         evidence_root=evidence_root,
         branch=Path(context.resolved_namespace),
-        env_file=env_file,
         preflight=portal_preflight_path,
-        context=context,
     )
 
     deployed_probe = modules.deployed_probe.materialize(
@@ -138,6 +138,20 @@ def run_chain(
     runsite_path = branch / "runsite-integration-proof.receipt.json"
     runsite = modules.runsite.materialize(repo_root, ea_root, evidence_root, runsite_path, context)
 
+    magicai_handshake_path = evidence_root / "MAGICAI_API_HANDSHAKE.generated.json"
+    magicai_handshake = modules.magicai_handshake.materialize(repo_root=repo_root, output=magicai_handshake_path)
+
+    provider_account_registry_path = evidence_root / "ORIGIN_PROVIDER_ACCOUNT_REGISTRY_VERIFICATION.generated.json"
+    _, provider_account_registry = modules.provider_account_registry.verify(
+        repo_root / ".state" / "origin-provider-accounts.json",
+        require_all_roles=True,
+    )
+    provider_account_registry_path.parent.mkdir(parents=True, exist_ok=True)
+    provider_account_registry_path.write_text(
+        json.dumps(provider_account_registry, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
     matrix_path = evidence_root / "ORIGIN_EDITION_GOLD_COMPLETION_MATRIX.generated.json"
     matrix = modules.matrix.materialize(evidence_root, matrix_path, context)
 
@@ -151,6 +165,8 @@ def run_chain(
         stage("deployed_operator_handoff", handoff_path, handoff),
         stage("gold_gap_audit", gold_audit_path, gold_audit),
         stage("runsite_integration_proof", runsite_path, runsite),
+        stage("magicai_api_handshake_probe", magicai_handshake_path, magicai_handshake),
+        stage("provider_account_registry", provider_account_registry_path, provider_account_registry),
         stage("completion_matrix", matrix_path, matrix),
         stage("requirement_coverage", coverage_path, coverage),
     ]

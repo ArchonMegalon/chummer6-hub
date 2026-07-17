@@ -1,0 +1,129 @@
+{
+  "contract": "play-install-mirror-required-inventory-v2",
+  "policyId": "chummer.public-play-pwa-mirror.v1",
+  "sourceRepository": "../chummer-play",
+  "assets": [
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/mobile-install-shell.js",
+      "projection": "wwwroot/mobile-install-shell.js",
+      "kind": "exact",
+      "role": "install_shell",
+      "contentType": "application/javascript",
+      "cacheControl": "public, max-age=300, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/mobile.css",
+      "projection": "wwwroot/mobile.css",
+      "kind": "exact",
+      "role": "install_styles",
+      "contentType": "text/css",
+      "cacheControl": "public, max-age=300, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/manifest.webmanifest",
+      "projection": "wwwroot/manifest.play.webmanifest",
+      "kind": "exact",
+      "role": "base_manifest",
+      "contentType": "application/manifest+json",
+      "cacheControl": "public, max-age=300, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/manifest.player.webmanifest",
+      "projection": "wwwroot/manifest.player.webmanifest",
+      "kind": "exact",
+      "role": "player_manifest",
+      "contentType": "application/manifest+json",
+      "cacheControl": "public, max-age=300, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/manifest.gm.webmanifest",
+      "projection": "wwwroot/manifest.gm.webmanifest",
+      "kind": "exact",
+      "role": "gm_manifest",
+      "contentType": "application/manifest+json",
+      "cacheControl": "public, max-age=300, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/manifest.observer.webmanifest",
+      "projection": "wwwroot/manifest.observer.webmanifest",
+      "kind": "exact",
+      "role": "observer_manifest",
+      "contentType": "application/manifest+json",
+      "cacheControl": "public, max-age=300, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/icons/icon-192.png",
+      "projection": "wwwroot/icons/icon-192.png",
+      "kind": "exact",
+      "role": "icon_192_png",
+      "contentType": "image/png",
+      "cacheControl": "public, max-age=300, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/icons/icon-512.png",
+      "projection": "wwwroot/icons/icon-512.png",
+      "kind": "exact",
+      "role": "icon_512_png",
+      "contentType": "image/png",
+      "cacheControl": "public, max-age=300, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/icons/icon-192.svg",
+      "projection": "wwwroot/icons/icon-192.svg",
+      "kind": "exact",
+      "role": "icon_192_svg",
+      "contentType": "image/svg+xml",
+      "cacheControl": "public, max-age=300, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/icons/icon-512.svg",
+      "projection": "wwwroot/icons/icon-512.svg",
+      "kind": "exact",
+      "role": "icon_512_svg",
+      "contentType": "image/svg+xml",
+      "cacheControl": "public, max-age=300, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/mobile/service-worker.js",
+      "projection": "wwwroot/mobile/service-worker.js",
+      "kind": "exact",
+      "role": "scoped_worker",
+      "contentType": "application/javascript",
+      "cacheControl": "no-cache, no-store, must-revalidate"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/service-worker.js",
+      "projection": "wwwroot/service-worker.js",
+      "kind": "transform",
+      "role": "root_worker",
+      "contentType": "application/javascript",
+      "cacheControl": "no-cache, no-store, must-revalidate"
+    }
+  ],
+  "generatorDependencies": [
+    {
+      "path": "scripts/generate_public_play_worker_projection.py",
+      "kind": "python",
+      "role": "generator_script",
+      "contentType": "text/x-python"
+    },
+    {
+      "path": "Chummer.Run.Api/play-worker-projection.json",
+      "kind": "json",
+      "role": "projection_config",
+      "contentType": "application/json"
+    },
+    {
+      "path": "Chummer.Run.Api/service-worker.public-edge.template.js",
+      "kind": "template",
+      "role": "projection_template",
+      "contentType": "application/javascript"
+    },
+    {
+      "path": "Chummer.Run.Api/play-pwa-required-inventory.json",
+      "kind": "json",
+      "role": "required_inventory",
+      "contentType": "application/json"
+    }
+  ]
+}

@@ -11,7 +11,8 @@ import pytest
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "materialize_origin_dossier_deployed_browser_probe.py"
 FAKE_COVER_BYTES = b"\xff\xd8cover-bytes"
-FAKE_BOOK_BYTES = b"PK\x03\x04ebook-bytes"
+FAKE_BOOK_BYTES = b"%PDF-1.7\nbook-bytes"
+FAKE_EBOOK_BYTES = b"PK\x03\x04ebook-bytes"
 FAKE_VIDEO_BYTES = b"\x00\x00\x00\x18ftypmp42movie-bytes"
 FAKE_CANON_AUDIT_BYTES = b'{"status":"pass","tokens":["canon_audit_passed"]}'
 
@@ -59,8 +60,8 @@ def write_import_request(
     audiobook_share_url: str = "https://audiobookshelf.girschele.com/audiobookshelf/share/audio",
     dossier_share_url: str = "https://audiobookshelf.girschele.com/audiobookshelf/share/book",
     legacy_audiobook_share_url: str | None = None,
-    ebook_sha: str | None = None,
-    legacy_book_sha: str | None = None,
+    book_sha: str | None = None,
+    legacy_ebook_sha: str | None = None,
 ) -> None:
     root.mkdir(parents=True, exist_ok=True)
     (root / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json").write_text(
@@ -68,11 +69,13 @@ def write_import_request(
             {
                 "evidence": {
                     "storySceneCoverSha256": hashlib.sha256(FAKE_COVER_BYTES).hexdigest(),
-                    "bookArtifactSha256": legacy_book_sha or hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
-                    "ebookArtifactSha256": ebook_sha or hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
+                    "bookArtifactSha256": book_sha or hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
+                    "ebookArtifactSha256": legacy_ebook_sha or hashlib.sha256(FAKE_EBOOK_BYTES).hexdigest(),
                     "dossierVideoSha256": hashlib.sha256(FAKE_VIDEO_BYTES).hexdigest(),
                 },
                 "importRequest": {
+                    "bookArtifactPath": "/evidence/origin/book.pdf",
+                    "ebookArtifactPath": "/evidence/origin/ebook.epub",
                     "audiobookshelfShareUrl": legacy_audiobook_share_url if legacy_audiobook_share_url is not None else audiobook_share_url,
                     "audiobookshelfAudiobookShareUrl": audiobook_share_url,
                     "audiobookshelfDossierShareUrl": dossier_share_url,
@@ -114,7 +117,7 @@ class FakeSession:
         if url.endswith("/cover"):
             return FakeResponse(200, {"content-type": "image/jpeg"}, content=FAKE_COVER_BYTES)
         if url.endswith("/book"):
-            return FakeResponse(200, {"content-type": "application/epub+zip"}, content=FAKE_BOOK_BYTES)
+            return FakeResponse(200, {"content-type": "application/pdf"}, content=FAKE_BOOK_BYTES)
         if url.endswith("/read"):
             return FakeResponse(302, {"location": "https://audiobookshelf.girschele.com/audiobookshelf/share/book"})
         if url.endswith("/listen"):
@@ -129,15 +132,17 @@ class FakeSession:
             """
             <main data-origin-dossier-detail>
               <article data-story-scene-cover-uses-selected-character-face="true">
-                <img src="https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/cover" alt="Rendered Origin Dossier story scene cover for Kestrel">
+                <img src="https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/cover" alt="Fitted Origin Dossier cover art for Kestrel">
               </article>
               <a href="#origin-edition-read">Read</a>
+              <a href="#origin-edition-portraits">Portraits</a>
               <a href="#origin-edition-listen">Listen</a>
               <a href="#origin-edition-watch">Watch</a>
               <a href="#origin-edition-canon-audit">Canon notes</a>
-              <section id="origin-edition-read" data-origin-edition-tab="read">Read in Audiobookshelf</section>
-              <section id="origin-edition-listen" data-origin-edition-tab="listen">Listen in Audiobookshelf</section>
-              <section id="origin-edition-watch" data-origin-edition-tab="watch">Watch scene movie</section>
+              <section id="origin-edition-read" data-origin-edition-tab="read">Read the ebook</section>
+              <section id="origin-edition-portraits" data-origin-edition-tab="portraits" data-origin-portrait-choice-count="3">Portrait shortlist</section>
+              <section id="origin-edition-listen" data-origin-edition-tab="listen" data-origin-audiobook-voice-count="3">Listen in Audiobookshelf</section>
+              <section id="origin-edition-watch" data-origin-edition-tab="watch" data-origin-scene-highlight-count="4">Watch selected cinematic scene</section>
               <section id="origin-edition-canon-audit"
                        data-origin-edition-tab="canon-audit"
                        data-chummer-owns-canon="true"
@@ -203,12 +208,17 @@ class MissingCanonAuditContentSession(FakeSession):
                     """
                     <main data-origin-dossier-detail>
                       <article data-story-scene-cover-uses-selected-character-face="true">
-                        <img src="https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/cover" alt="Rendered Origin Dossier story scene cover for Kestrel">
+                        <img src="https://chummer.run/account/work/origin-dossiers/varga-mira-kestrel/cover" alt="Fitted Origin Dossier cover art for Kestrel">
                       </article>
                       <a href="#origin-edition-read">Read</a>
+                      <a href="#origin-edition-portraits">Portraits</a>
                       <a href="#origin-edition-listen">Listen</a>
                       <a href="#origin-edition-watch">Watch</a>
                       <a href="#origin-edition-canon-audit">Canon notes</a>
+                      <section id="origin-edition-read" data-origin-edition-tab="read">Read the ebook</section>
+                      <section id="origin-edition-portraits" data-origin-edition-tab="portraits" data-origin-portrait-choice-count="3">Portrait shortlist</section>
+                      <section id="origin-edition-listen" data-origin-edition-tab="listen" data-origin-audiobook-voice-count="3">Listen in Audiobookshelf</section>
+                      <section id="origin-edition-watch" data-origin-edition-tab="watch" data-origin-scene-highlight-count="4">Watch selected cinematic scene</section>
                     </main>
                     """,
                 )
@@ -219,7 +229,7 @@ class MissingReadSectionSession(FakeSession):
     def get(self, url: str, *, allow_redirects: bool = False, timeout: int = 30) -> FakeResponse:
         response = super().get(url, allow_redirects=allow_redirects, timeout=timeout)
         if response.status_code == 200 and "text/html" in response.headers.get("content-type", ""):
-            response.text = response.text.replace('<section id="origin-edition-read" data-origin-edition-tab="read">Read in Audiobookshelf</section>', "")
+            response.text = response.text.replace('<section id="origin-edition-read" data-origin-edition-tab="read">Read the ebook</section>', "")
             response.content = response.text.encode("utf-8")
         return response
 
@@ -407,6 +417,14 @@ def test_deployed_probe_passes_with_owner_token_and_real_route_shape(tmp_path: P
     assert result["logged_in_browser_verified"] is True
     assert result["read_gate_verified"] is True
     assert result["chummer_run_listen_gate_verified"] is True
+    assert result["portrait_choice_count_verified"] is True
+    assert result["audiobook_voice_count_verified"] is True
+    assert result["scene_highlight_count_verified"] is True
+    assert result["ownerPageCounts"] == {
+        "portraitChoices": 3,
+        "audiobookVoiceOptions": 3,
+        "sceneHighlights": 4,
+    }
     assert result["redirect_location_sha256"]["read"] == result["expected_redirect_location_sha256"]["read"]
     assert result["redirect_location_sha256"]["listen"] == result["expected_redirect_location_sha256"]["listen"]
     assert result["audiobook_share_url_trusted"] is True
@@ -463,13 +481,34 @@ def test_deployed_probe_prefers_explicit_audiobook_share_over_legacy_share(tmp_p
     assert result["chummer_run_listen_gate_verified"] is True
 
 
-def test_deployed_probe_prefers_explicit_ebook_hash_over_legacy_book_hash(tmp_path: Path, monkeypatch) -> None:
+def test_deployed_probe_prefers_explicit_book_hash_over_legacy_ebook_hash(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
     write_import_request(
         tmp_path,
-        ebook_sha=hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
-        legacy_book_sha="0" * 64,
+        book_sha=hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
+        legacy_ebook_sha="0" * 64,
     )
+    monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
+    monkeypatch.setattr(module.requests, "Session", FakeSession)
+
+    result = module.materialize(tmp_path, "https://chummer.run", "varga-mira-kestrel", tmp_path / "probe.json")
+
+    assert result["status"] == "pass"
+    assert result["expected_import_sha256"]["book"] == hashlib.sha256(FAKE_BOOK_BYTES).hexdigest()
+    assert result["book_sha_matches_import"] is True
+
+
+def test_deployed_probe_falls_back_to_legacy_ebook_hash_when_book_hash_is_absent(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    write_import_request(
+        tmp_path,
+        book_sha="",
+        legacy_ebook_sha=hashlib.sha256(FAKE_BOOK_BYTES).hexdigest(),
+    )
+    payload_path = tmp_path / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json"
+    payload = json.loads(payload_path.read_text(encoding="utf-8"))
+    payload["evidence"].pop("bookArtifactSha256", None)
+    payload_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     monkeypatch.setenv("CHUMMER_DEPLOYED_E2E_IDENTITY_TOKEN", "secret-session")
     monkeypatch.setattr(module.requests, "Session", FakeSession)
 

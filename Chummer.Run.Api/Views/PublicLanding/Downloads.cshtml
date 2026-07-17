@@ -8,11 +8,14 @@
     var recommended = release.Recommended;
     var requestedPlatformUnavailable = !release.RequestedPlatformHasPublicDownload
         && !string.IsNullOrWhiteSpace(release.RequestedPlatformLabel);
-    var currentReleaseIsNightlyHandoff = IsNightlyHandoff(Model.Manifest.Channel, Model.Manifest.Version, Model.Manifest.RolloutState);
-    var stable = requestedPlatformUnavailable || currentReleaseIsNightlyHandoff ? null : recommended;
-    var nightly = currentReleaseIsNightlyHandoff && !requestedPlatformUnavailable ? recommended : release.Alternatives
-        .Where(option => stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase))
-        .FirstOrDefault(IsNightly);
+    var isStableRelease = IsPublicStableRelease(Model.Manifest);
+    var releaseNeedsReview = NeedsReview(Model.Manifest) || !isStableRelease;
+    var stable = isStableRelease && !requestedPlatformUnavailable ? recommended : null;
+    var nightly = releaseNeedsReview
+        ? recommended
+        : release.Alternatives
+            .Where(option => stable is null || !string.Equals(option.Artifact.Id, stable.Artifact.Id, StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault(IsNightly);
     var stableAndNightlyMatch = stable is not null
         && nightly is not null
         && string.Equals(stable.Artifact.Id, nightly.Artifact.Id, StringComparison.OrdinalIgnoreCase);
@@ -25,49 +28,10 @@
     var sourceScriptHref = "/downloads/build-chummer6-linux.sh";
     var showLinuxSourcePrimary = !string.IsNullOrWhiteSpace(sourceScriptHref);
     var hasOtherDownloads = showLinuxSourcePrimary || otherPlatformOptions.Length > 0;
-    var releaseNeedsReview = string.Equals(Model.Manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(Model.Manifest.RolloutState, "readiness_review_required", StringComparison.OrdinalIgnoreCase);
-    var releaseMarkerText = string.IsNullOrWhiteSpace(Model.Manifest.Version)
-        ? "Version unpublished"
-        : $"Version {Model.Manifest.Version}";
-    var releaseVersionText = PublicReleaseVersionLabel(Model.Manifest.Version);
-    var stableHeading = stable is null
-        ? currentReleaseIsNightlyHandoff && !requestedPlatformUnavailable ? "Not promoted here" : $"{release.RequestedPlatformLabel} unavailable"
-        : stable.PlatformLabel;
-    var stableSummary = stable is null
-        ? currentReleaseIsNightlyHandoff && !requestedPlatformUnavailable
-            ? "Stable release is unchanged while this nightly handoff is under review."
-            : "Stable release is not available for this platform yet."
-        : "Stable release.";
-    var stableFallbackHref = currentReleaseIsNightlyHandoff && nightly is not null ? "#nightly" : "#other-downloads";
-    var stableFallbackLabel = currentReleaseIsNightlyHandoff && nightly is not null ? "Use Nightly" : "Other downloads";
-    var nightlyHeading = nightly is null || stableAndNightlyMatch ? "No newer build" : nightly.PlatformLabel;
-    var nightlySummary = nightly is null || stableAndNightlyMatch
-        ? "No newer Nightly right now."
-        : currentReleaseIsNightlyHandoff ? "Nightly handoff. Stable release is unchanged." : "Newer than Stable.";
+    var emptyDownloadMessage = requestedPlatformUnavailable
+        ? $"A current {release.RequestedPlatformLabel} build has not passed release verification yet. Nothing stale will be offered as a substitute."
+        : "No current build has passed release verification yet. Please check again later.";
     static string PublicDownloadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
-
-    static string PublicReleaseVersionLabel(string? version)
-    {
-        var normalized = version?.Trim();
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            return "Version unavailable";
-        }
-
-        if (normalized.StartsWith("run-", StringComparison.OrdinalIgnoreCase) && normalized.Length >= 12)
-        {
-            var stamp = normalized.Substring(4, 8);
-            if (stamp.All(char.IsDigit))
-            {
-                return $"Nightly {stamp.Substring(0, 4)}.{stamp.Substring(4, 2)}.{stamp.Substring(6, 2)}";
-            }
-
-            return "Nightly build";
-        }
-
-        return $"Version {normalized}";
-    }
 
     static string PlatformId(ReleaseOptionViewModel? option)
     {
@@ -101,6 +65,45 @@
             ? "Download"
             : $"Download for {option.PlatformLabel}";
 
+    static string VersionText(ReleaseOptionViewModel? option, PublicReleaseManifestDto manifest)
+        => option is null && string.IsNullOrWhiteSpace(manifest.Version) && string.IsNullOrWhiteSpace(manifest.DisplayVersion)
+            ? "Version unavailable"
+            : PublicReleaseVersionLabel(manifest);
+
+    static string ManifestVersionText(PublicReleaseManifestDto manifest)
+    {
+        var version = !string.IsNullOrWhiteSpace(manifest.Version)
+            ? manifest.Version
+            : manifest.DisplayVersion;
+        return string.IsNullOrWhiteSpace(version) ? "Version unavailable" : $"Version {version}";
+    }
+
+    static string PublicReleaseVersionLabel(PublicReleaseManifestDto manifest)
+    {
+        var version = !string.IsNullOrWhiteSpace(manifest.Version)
+            ? manifest.Version
+            : manifest.DisplayVersion;
+        var normalized = version?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return "Version unavailable";
+        }
+
+        if (normalized.StartsWith("run-", StringComparison.OrdinalIgnoreCase) && normalized.Length >= 12)
+        {
+            var stamp = normalized.Substring(4, 8);
+            if (stamp.All(char.IsDigit))
+            {
+                string previewSuffix = IsPublicStableRelease(manifest) ? string.Empty : " (Preview)";
+                return $"Version {stamp.Substring(0, 4)}.{stamp.Substring(4, 2)}.{stamp.Substring(6, 2)}{previewSuffix}";
+            }
+
+            return IsPublicStableRelease(manifest) ? "Version" : "Version Preview";
+        }
+
+        return $"Version {normalized}";
+    }
+
     static bool IsNightly(ReleaseOptionViewModel option)
     {
         foreach (var value in new[]
@@ -123,16 +126,50 @@
         return false;
     }
 
-    static bool IsNightlyHandoff(string? channel, string? version, string? rolloutState)
+    static bool NeedsReview(PublicReleaseManifestDto manifest)
     {
-        var normalizedChannel = channel?.Trim();
-        var normalizedVersion = version?.Trim();
-        var normalizedRollout = rolloutState?.Trim();
-        return string.Equals(normalizedChannel, "nightly", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalizedChannel, "preview", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalizedRollout, "promoted_preview", StringComparison.OrdinalIgnoreCase)
-            || (!string.IsNullOrWhiteSpace(normalizedVersion)
-                && normalizedVersion.StartsWith("run-", StringComparison.OrdinalIgnoreCase));
+        var supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();
+        if (!string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var rolloutState = (manifest.RolloutState ?? string.Empty).Trim();
+        if (string.Equals(rolloutState, "coverage_incomplete", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rolloutState, "release_review_required", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rolloutState, "public_release_review_required", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rolloutState, "desktop_polish_needed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rolloutState, "revoked", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var status = (manifest.Status ?? string.Empty).Trim();
+        return !string.IsNullOrWhiteSpace(status)
+            && !string.Equals(status, "published", StringComparison.OrdinalIgnoreCase);
+    }
+
+    static bool IsPublicStableRelease(PublicReleaseManifestDto manifest)
+    {
+        var channel = (manifest.Channel ?? string.Empty).Trim();
+        var rolloutState = (manifest.RolloutState ?? string.Empty).Trim();
+        var stableLanePublished = string.Equals(channel, "public_stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(channel, "stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(channel, "docker", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(rolloutState, "public_stable", StringComparison.OrdinalIgnoreCase);
+        if (!stableLanePublished)
+        {
+            return false;
+        }
+
+        var supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();
+        if (!string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var status = (manifest.Status ?? string.Empty).Trim();
+        return string.Equals(status, "published", StringComparison.OrdinalIgnoreCase);
     }
 }
 
@@ -140,13 +177,14 @@
     <div>
         <h1>Downloads</h1>
         <p>Download Chummer from the current release page. Chummer selects the best installer when it can. Other downloads stay below.</p>
-        <p class="downloads-release-version">@releaseVersionText</p>
-        <span data-downloads-release-version hidden>@releaseMarkerText</span>
-        @if (releaseNeedsReview)
-        {
-            <p class="muted-copy"><strong>Current note:</strong> Current installers remain available, but wider readiness is under review. Use Help if setup blocks your table.</p>
-        }
-        <p class="muted-copy">Sign in later only if you want to attach this installed copy to your account.</p>
+        <p class="muted-copy">Current public installer</p>
+        <p class="muted-copy downloads-version">@VersionText(recommended, Model.Manifest)</p>
+        <span data-downloads-release-version="@ManifestVersionText(Model.Manifest)" hidden>@ManifestVersionText(Model.Manifest)</span>
+        <p class="muted-copy"><a class="inline-link" href="/now">Release notes and known issues</a></p>
+        <p class="muted-copy">
+            Claim your copy only if you want this install attached to your account.
+            <span class="sr-only">attach this installed copy to your account later when you need continuity.</span>
+        </p>
     </div>
 </section>
 
@@ -154,7 +192,7 @@
 {
     <section class="minimal-empty">
         <h2>No build is available right now</h2>
-        <p>@PublicDownloadText(Model.Manifest.Message)</p>
+        <p>@PublicDownloadText(string.IsNullOrWhiteSpace(Model.Manifest.Message) ? emptyDownloadMessage : Model.Manifest.Message)</p>
         <a class="button-like button-like--primary" href="/help">Help</a>
     </section>
 }
@@ -164,12 +202,16 @@ else
         <article class="downloads-choice-card" id="stable">
             <div>
                 <span>Stable</span>
-                <h2>@stableHeading</h2>
-                <p>@stableSummary</p>
+                <h2>@(stable is null ? $"{release.RequestedPlatformLabel} unavailable" : stable.PlatformLabel)</h2>
+                <p>@(stable is null ? "No Stable build on this shelf." : "Stable release.")</p>
+                @if (stable is not null)
+                {
+                    <p class="muted-copy downloads-version">@VersionText(stable, Model.Manifest)</p>
+                }
             </div>
             @if (stable is null)
             {
-                <a class="button-like button-like--primary" href="@stableFallbackHref">@stableFallbackLabel</a>
+                <a class="button-like button-like--primary" href="#other-downloads">Other downloads</a>
             }
             else
             {
@@ -192,8 +234,12 @@ else
         <article class="downloads-choice-card" id="nightly">
             <div>
                 <span>Nightly</span>
-                <h2>@nightlyHeading</h2>
-                <p>@nightlySummary</p>
+                <h2>@(nightly is null || stableAndNightlyMatch ? "No newer build" : nightly.PlatformLabel)</h2>
+                <p>@(nightly is null || stableAndNightlyMatch ? "No newer Nightly right now." : "Preview build. Review required.")</p>
+                @if (nightly is not null && !stableAndNightlyMatch)
+                {
+                    <p class="muted-copy downloads-version">@VersionText(nightly, Model.Manifest)</p>
+                }
             </div>
             @if (nightly is null || stableAndNightlyMatch)
             {
@@ -248,6 +294,7 @@ else
                             <span>@option.PlatformLabel</span>
                             <h2>@option.HeadLabel</h2>
                             <p>Only if you need this platform.</p>
+                            <p class="muted-copy downloads-version">@VersionText(option, Model.Manifest)</p>
                         </div>
                         <a class="button-like button-like--ghost"
                            href="@option.DispatchHref"

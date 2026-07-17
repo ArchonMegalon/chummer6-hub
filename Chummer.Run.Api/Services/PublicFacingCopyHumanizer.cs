@@ -11,6 +11,30 @@ public static partial class PublicFacingCopyHumanizer
     private static readonly ConcurrentDictionary<string, string> CleanCache = new(StringComparer.Ordinal);
     private static readonly (string From, string To)[] Replacements =
     [
+        ("Google OAuth operator evidence is still missing", "Google sign-in review is still missing"),
+        ("Windows installer visual audit source digest does not match promoted installer", "Windows desktop visual review still needs a current promoted build capture"),
+        ("missing coverage: desktop_client", "desktop app coverage is still missing"),
+        ("Import-route parity claims stay review-required because the local release status package is stale", "Install-path parity still needs review because local release details are stale"),
+        ("final release details are still blocked by public route details, live surface parity, and flagship product readiness", "final release details still need public route coverage, live surface parity, and flagship readiness"),
+        ("Pilot defaults are —", "Pilot defaults are in place —"),
+        ("release channel channel", "release channel"),
+        ("stay needs review", "stay under review"),
+        ("stays needs review", "stays under review"),
+        ("desktop_client", "desktop app"),
+        ("flagship product readiness proof is not green", "flagship readiness is not green"),
+        ("launch-critical nested blockers or coverage gaps remain", "launch blockers or coverage gaps remain"),
+        ("raw materializer status is not sufficient for a flagship launch claim", "internal build status alone is not enough for a flagship launch claim"),
+        ("flagship stable lane", "stable release"),
+        ("supportability", "release support"),
+        ("release channel supportability", "release support"),
+        ("release channel release support", "release support"),
+        ("coverage_incomplete", "public route coverage still needs closure"),
+        ("gold_supported", "fully supported"),
+        ("review_required", "needs review"),
+        ("review-required", "needs review"),
+        ("Google OAuth", "Google sign-in"),
+        ("supportable", "fully supported"),
+        ("visual audit", "visual review"),
         ("Public Proof Shelf", "Public Files"),
         ("Proof Shelf", "Files"),
         ("Product Governor", "product decision"),
@@ -49,11 +73,36 @@ public static partial class PublicFacingCopyHumanizer
         ("AI-generated", "made"),
         ("AI generated", "made"),
         ("generated", "prepared"),
-        ("Unmixr AI", "Unmixr"),
+        ("Unmixr AI", "alternate voice"),
+        ("Unmixr", "alternate voice"),
+        ("Inkfluence", "default voice"),
+        ("Audiobookshelf", "private reader"),
+        ("MyFirstBook", "web presentation"),
+        ("MarkupGo", "book renderer"),
+        ("VidBoard", "video renderer"),
+        ("MediaFactory", "media renderer"),
+        ("Media Factory", "media renderer"),
+        ("Magicfit", "scene renderer"),
+        ("MagicAI", "scene renderer"),
+        ("ProductLift", "feedback board"),
+        ("Emailit", "mail delivery"),
+        ("Icanpreneur", "planning path"),
+        ("Teable", "work board"),
+        ("Codex", "Chummer"),
+        ("Fleet", "Chummer"),
+        ("internal_canonical", "private story path"),
+        ("youbooks_grounded_drafting", "guided story draft"),
+        ("inkfluence_narrative_edition", "narrative edition"),
+        ("premium_guided_authoring", "guided manuscript"),
+        ("provider_manuscript_review_required", "manuscript review required"),
+        ("awaiting_provider_manuscript", "awaiting manuscript"),
+        ("ready_for_operator_queue", "ready for review"),
         ("source packet", "source"),
         ("source-bound", "source-based"),
         ("source bound", "source-based"),
         ("provider-backed", "built-in"),
+        ("provider-created", "service-created"),
+        ("provider-authored", "drafted"),
         ("provider", "service"),
         ("provenance", "source"),
         ("authority", "source"),
@@ -193,6 +242,8 @@ public static partial class PublicFacingCopyHumanizer
             cleaned = pattern.Replace(cleaned, to);
         }
 
+        cleaned = AbsoluteWorkspacePathRegex().Replace(cleaned, string.Empty);
+        cleaned = InternalArtifactFileRegex().Replace(cleaned, string.Empty);
         cleaned = ArticleAiRegex().Replace(cleaned, "a");
         cleaned = StandaloneAiRegex().Replace(cleaned, "help");
         cleaned = ArticleHelpRegex().Replace(cleaned, "help");
@@ -205,6 +256,8 @@ public static partial class PublicFacingCopyHumanizer
         cleaned = ServiceReviewPassedRegex().Replace(cleaned, "service ready");
         cleaned = DetailsIsRegex().Replace(cleaned, "$1details are");
         cleaned = ReviewDetailsRegex().Replace(cleaned, "review");
+        cleaned = DanglingInternalReferenceRegex().Replace(cleaned, string.Empty);
+        cleaned = RepeatedPeriodRegex().Replace(cleaned, ".");
         cleaned = DuplicateWhitespaceRegex().Replace(cleaned, " ");
         cleaned = SpaceBeforePunctuationRegex().Replace(cleaned, "$1");
         cleaned = cleaned.Trim();
@@ -274,4 +327,16 @@ public static partial class PublicFacingCopyHumanizer
 
     [GeneratedRegex(@"\breview\s+details\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ReviewDetailsRegex();
+
+    [GeneratedRegex(@"(?:(?:/docker|/Users|/home|/tmp)(?:/[A-Za-z0-9._-]+)+)|(?:[A-Za-z]:\\(?:[^\\\s,;:]+\\)+[^\\\s,;:]+)", RegexOptions.CultureInvariant)]
+    private static partial Regex AbsoluteWorkspacePathRegex();
+
+    [GeneratedRegex(@"\b[A-Z0-9][A-Z0-9_.-]*\.(?:generated|source|prepared)\.(?:json|ya?ml|md)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex InternalArtifactFileRegex();
+
+    [GeneratedRegex(@"\s*:\s*(?=[,.;]|$)", RegexOptions.CultureInvariant)]
+    private static partial Regex DanglingInternalReferenceRegex();
+
+    [GeneratedRegex(@"\.{2,}", RegexOptions.CultureInvariant)]
+    private static partial Regex RepeatedPeriodRegex();
 }

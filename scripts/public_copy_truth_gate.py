@@ -34,6 +34,8 @@ FORBIDDEN_HTML_PHRASES = (
     "sent receipts",
     "release-backed closeout",
     "proof-bound",
+    "Public requests, clear bugs, useful ideas.",
+    '<p class="eyebrow">Board</p>',
 )
 REQUIRED_SOURCE_PHRASES = (
     "public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)",
@@ -54,6 +56,8 @@ FORBIDDEN_SOURCE_PHRASES = (
     "proof-bound",
     "Summary: \"Public requests, clear bugs, useful ideas.\"",
     "release proof, delivery candidates, outbox candidates, sent receipts, and journey receipts are pending or zero",
+    "Public requests, clear bugs, useful ideas.",
+    '<p class="eyebrow">Board</p>',
 )
 
 

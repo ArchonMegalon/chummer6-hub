@@ -112,6 +112,7 @@ public sealed class PublicLandingPwaLedgerStreamTests
         Assert.Equal(JsonValueKind.Null, payload.GetProperty("move_district").ValueKind);
         Assert.Equal(JsonValueKind.Null, payload.GetProperty("continuity").ValueKind);
         Assert.Equal("Follow this world to reveal the live turn headline.", payload.GetProperty("world").GetProperty("turn_headline").GetString());
+        Assert.Equal(JsonValueKind.Null, payload.GetProperty("world").GetProperty("world_turn").ValueKind);
         JsonElement tracker = payload.GetProperty("tracker");
         Assert.Equal(JsonValueKind.Null, tracker.GetProperty("turn_route").ValueKind);
         Assert.Equal(JsonValueKind.Null, tracker.GetProperty("newsreel_route").ValueKind);

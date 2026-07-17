@@ -4,6 +4,7 @@ using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 
@@ -23,7 +24,11 @@ public sealed class CampaignSpineController : ControllerBase
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
     private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
     private readonly LocalReleaseProofArtifactService _localReleaseProof;
+    private readonly IConfiguration _configuration;
+    private readonly HorizonCapabilityService _horizonCapabilities;
     private readonly MediaArtifactHorizonsService? _mediaHorizons;
+    private readonly PropertyquarryApartmentVideoArtifactRequestBridgeService? _propertyquarryApartmentVideoBridge;
+    private readonly HorizonArtifactRequestService? _artifactRequests;
 
     public CampaignSpineController(
         HubIdentityClient identity,
@@ -33,7 +38,10 @@ public sealed class CampaignSpineController : ControllerBase
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
         CampaignFederationOrchestrationService campaignFederation,
         IConfiguration configuration,
-        MediaArtifactHorizonsService? mediaHorizons = null)
+        MediaArtifactHorizonsService? mediaHorizons = null,
+        HorizonCapabilityService? horizonCapabilities = null,
+        PropertyquarryApartmentVideoArtifactRequestBridgeService? propertyquarryApartmentVideoBridge = null,
+        HorizonArtifactRequestService? artifactRequests = null)
     {
         _identity = identity;
         _accounts = accounts;
@@ -41,10 +49,14 @@ public sealed class CampaignSpineController : ControllerBase
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
         _campaignFederation = campaignFederation;
+        _configuration = configuration;
+        _horizonCapabilities = horizonCapabilities ?? new HorizonCapabilityService(configuration);
         _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
         _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
         _localReleaseProof = new LocalReleaseProofArtifactService(configuration);
         _mediaHorizons = mediaHorizons;
+        _propertyquarryApartmentVideoBridge = propertyquarryApartmentVideoBridge;
+        _artifactRequests = artifactRequests;
     }
 
     [HttpGet("me")]
@@ -776,7 +788,8 @@ public sealed class CampaignSpineController : ControllerBase
                     property.JsonRoute,
                     accountHref = $"/account/propertyquarry/{Uri.EscapeDataString(property.Id)}",
                     prepSearchAccountHref = BuildPropertyquarryPrepSearchAccountHref(property.Label, leadWorkspace?.WorkspaceId),
-                    publicTourHref = property.TourActionHref ?? property.TourHref
+                    publicTourHref = property.TourActionHref ?? property.TourHref,
+                    apartmentVideoSourceRef = BuildPropertyquarryApartmentVideoSourceRef(property.Id)
                 },
                 routes = new
                 {
@@ -784,8 +797,10 @@ public sealed class CampaignSpineController : ControllerBase
                     accountRedirectHref = "/account/propertyquarry/open",
                     accountWorkspaceHrefTemplate = "/account/propertyquarry/{propertyId}",
                     workspaceIndexApiHref = "/api/v1/campaign-spine/me/workspace-digests",
-                    continuityApiHrefTemplate = "/api/v1/campaign-spine/me/property-continuity/{propertyId}"
+                    continuityApiHrefTemplate = "/api/v1/campaign-spine/me/property-continuity/{propertyId}",
+                    apartmentVideoRequestApiHrefTemplate = "/api/v1/campaign-spine/me/property-workspaces/{propertyId}/apartment-video"
                 },
+                apartmentVideo = BuildPropertyquarryApartmentVideoLane(property),
                 selectedWorkspace = leadWorkspace is null ? null : new
                 {
                     leadWorkspace.WorkspaceId,
@@ -845,8 +860,10 @@ public sealed class CampaignSpineController : ControllerBase
                     property.Label,
                     property.Style,
                     accountHref = $"/account/propertyquarry/{Uri.EscapeDataString(property.Id)}",
-                    prepSearchAccountHref
+                    prepSearchAccountHref,
+                    apartmentVideoSourceRef = BuildPropertyquarryApartmentVideoSourceRef(property.Id)
                 },
+                apartmentVideo = BuildPropertyquarryApartmentVideoLane(property),
                 continuity = new
                 {
                     workspaceCount = summary.Workspaces.Count,
@@ -872,6 +889,67 @@ public sealed class CampaignSpineController : ControllerBase
             return NotFound();
         }
         catch (InvalidOperationException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpPost("me/property-workspaces/{propertyId}/apartment-video")]
+    [ProducesResponseType<PropertyquarryApartmentVideoArtifactRequestBridgeResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<PropertyquarryApartmentVideoArtifactRequestBridgeResult>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<PropertyquarryApartmentVideoArtifactRequestBridgeResult>> CreateMyPropertyquarryApartmentVideoRequest(
+        [FromRoute] string propertyId,
+        [FromBody] PropertyquarryApartmentVideoRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("propertyquarry apartment video payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            PropertyquarryApartmentVideoArtifactRequestBridgePayload payload = GetPropertyquarryApartmentVideoBridge().Compose(
+                new PropertyquarryApartmentVideoArtifactRequestBridgeRequest(
+                    UserId: user.UserId,
+                    PropertyId: propertyId,
+                    WorkItemId: ResolvePropertyquarryApartmentVideoWorkItemId(propertyId, request.WorkItemId),
+                    Artifacts: request.Artifacts,
+                    RequestedBy: request.RequestedBy,
+                    Visibility: request.Visibility,
+                    ExternalProcessingConsent: request.ExternalProcessingConsent,
+                    Email: subject.Email,
+                    PreferredProvider: request.PreferredProvider,
+                    ConsumeQuota: request.ConsumeQuota,
+                    Subject: request.Subject,
+                    Audience: request.Audience,
+                    Locale: request.Locale,
+                    TruthRefs: request.TruthRefs,
+                    EvidenceRefs: request.EvidenceRefs));
+            HorizonArtifactRequestReceipt receipt = GetHorizonArtifactRequests().BuildRequest(payload.ArtifactRequest, consumeQuota: payload.ConsumeQuota);
+            PropertyquarryApartmentVideoArtifactRequestBridgeResult result = new(payload, receipt);
+            if (string.Equals(receipt.Status, "accepted", StringComparison.OrdinalIgnoreCase))
+            {
+                return Ok(result);
+            }
+
+            return receipt.BlockedReasons.Contains("artifact allowance", StringComparer.OrdinalIgnoreCase)
+                ? StatusCode(StatusCodes.Status429TooManyRequests, result)
+                : StatusCode(StatusCodes.Status400BadRequest, result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (BrilliantDirectoriesBillingUnavailableException ex)
         {
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: ex.Message);
         }
@@ -2011,6 +2089,32 @@ public sealed class CampaignSpineController : ControllerBase
     private static string BuildPropertyquarryPrepLibraryApiHref(string workspaceId, string propertyLabel)
         => $"/api/v1/campaign-spine/me/workspaces/{Uri.EscapeDataString(workspaceId)}/prep-library?queryText={Uri.EscapeDataString(propertyLabel)}";
 
+    private static string BuildPropertyquarryApartmentVideoSourceRef(string propertyId)
+        => $"propertyquarry:{propertyId.Trim()}";
+
+    private static string ResolvePropertyquarryApartmentVideoWorkItemId(string propertyId, string? requestedWorkItemId)
+        => string.IsNullOrWhiteSpace(requestedWorkItemId)
+            ? $"{propertyId.Trim()}-apartment-video"
+            : requestedWorkItemId.Trim();
+
+    private PropertyquarryApartmentVideoLaneViewModel BuildPropertyquarryApartmentVideoLane(MediaArtifactDocument property)
+        => new(
+            RequestApiHref: $"/api/v1/campaign-spine/me/property-workspaces/{Uri.EscapeDataString(property.Id)}/apartment-video",
+            SharedArtifacts: _horizonCapabilities.BuildSharedArtifactSurfaceRoutesViewModel("propertyquarry", "propertyquarry-apartment-video"),
+            ArtifactCapability: _horizonCapabilities.BuildPublicCapabilityViewModel(
+                "propertyquarry",
+                "propertyquarry-apartment-video",
+                BuildPropertyquarryApartmentVideoSourceRef(property.Id),
+                visibility: "private"));
+
+    private PropertyquarryApartmentVideoArtifactRequestBridgeService GetPropertyquarryApartmentVideoBridge()
+        => _propertyquarryApartmentVideoBridge
+            ?? new PropertyquarryApartmentVideoArtifactRequestBridgeService(
+                _mediaHorizons ?? new MediaArtifactHorizonsService(_configuration, _horizonCapabilities));
+
+    private HorizonArtifactRequestService GetHorizonArtifactRequests()
+        => _artifactRequests ?? new HorizonArtifactRequestService(_horizonCapabilities);
+
     private static EditionStudioHeadSummary[] BuildEditionStudioHeadSummaries(AccountCampaignSummary summary)
     {
         RuleEnvironmentRef[] environments = summary.Workspaces.Select(static item => item.RuleEnvironment)
@@ -2094,4 +2198,23 @@ public sealed class CampaignSpineController : ControllerBase
         string AccountHref,
         string PacketJsonHref,
         string PacketMarkdownHref);
+
+    private sealed record PropertyquarryApartmentVideoLaneViewModel(
+        string RequestApiHref,
+        SharedArtifactSurfaceRoutesViewModel SharedArtifacts,
+        PublicHorizonCapabilityViewModel ArtifactCapability);
 }
+
+public sealed record PropertyquarryApartmentVideoRequest(
+    IReadOnlyList<PropertyquarryApartmentVideoArtifactRenderRequest> Artifacts,
+    string? WorkItemId = null,
+    string RequestedBy = "account.owner",
+    string Visibility = "private",
+    bool ExternalProcessingConsent = true,
+    string? PreferredProvider = "magicai",
+    bool ConsumeQuota = true,
+    string? Subject = null,
+    string Audience = "players",
+    string Locale = "en-US",
+    IReadOnlyList<string>? TruthRefs = null,
+    IReadOnlyList<string>? EvidenceRefs = null);

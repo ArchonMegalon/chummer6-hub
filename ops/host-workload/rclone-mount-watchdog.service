@@ -1,0 +1,6 @@
+[Unit]
+Description=Watchdog: restart rclone mounts if unresponsive
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/rclone-mount-watchdog.sh

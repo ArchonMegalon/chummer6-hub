@@ -101,13 +101,13 @@
       {
         "codec_name": "aac",
         "codec_type": "audio",
-        "sample_rate": "96000",
+        "sample_rate": "48000",
         "channels": 1
       }
     ],
     "format": {
-      "duration": "90.000000",
-      "size": "47542518"
+      "duration": "90.007000",
+      "size": "47287652"
     }
   },
   "product_taxonomy_boundary": "core_product_areas_and_expansion_bets_separated",
@@ -195,12 +195,22 @@
       "scripts/build_chummer6_flagship_promo.py"
     ],
     "quality_gate": "scripts/public_video_audio_quality.py --allow-clean-speech-pauses",
+    "coverage_repair": {
+      "completed_at_utc": "2026-07-11T20:08:09Z",
+      "method": "remux_verified_webm_narration_with_bounded_trailing_silence_and_video_stream_copy",
+      "mp4_sha256": "0460e483c066d6800aa2331c24b624d528b39b9db8ef2315fa52f0679614fc06",
+      "video_stream_sha256": "6db96d54a9d9b0b11a9766767455fa64e68716d3e9b976fc51b489e07bff7af2",
+      "video_stream_preserved": true,
+      "audio_stream_duration_seconds": 90.007,
+      "provider_actions": 0,
+      "quota_actions": 0
+    },
     "mp4_quality": {
-      "audio_duration_seconds": 90.0,
+      "audio_duration_seconds": 90.007,
       "max_silence_seconds": 0.0,
-      "max_volume_db": -2.2,
-      "mean_volume_db": -18.1,
-      "media_duration_seconds": 90.0,
+      "max_volume_db": -1.8,
+      "mean_volume_db": -18.2,
+      "media_duration_seconds": 90.007,
       "reasons": [],
       "status": "pass",
       "tail_silence_seconds": 0.0,
@@ -210,10 +220,10 @@
           5500.0,
           7600.0
         ],
-        "highband_p95_ratio": 0.03188,
-        "highband_p99_ratio": 0.129267,
+        "highband_p95_ratio": 0.032261,
+        "highband_p99_ratio": 0.108765,
         "status": "pass",
-        "voiced_frame_count": 587
+        "voiced_frame_count": 588
       }
     },
     "webm_quality": {

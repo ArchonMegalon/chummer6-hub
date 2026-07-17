@@ -43,8 +43,8 @@ def proof_payload(*, status: str = "blocked") -> dict:
         if status == "pass"
         else "stage:deployed_browser_probe,requirement:deployed_owner_read_listen_watch_canon",
         "progress": {
-            "passedStages": 8 if status == "pass" else 2,
-            "totalStages": 8,
+            "passedStages": 10 if status == "pass" else 4,
+            "totalStages": 10,
             "blockedStages": [] if status == "pass" else blocked_stages,
             "blockedRequirements": [] if status == "pass" else ["deployed_owner_read_listen_watch_canon"],
         },
@@ -94,6 +94,18 @@ def proof_payload(*, status: str = "blocked") -> dict:
             },
             {"name": "gold_gap_audit", "path": "/evidence/gold-gap.json", "sha256": sha, "status": status},
             {"name": "runsite_integration_proof", "path": "/evidence/runsite.json", "sha256": sha, "status": "pass"},
+            {
+                "name": "magicai_api_handshake_probe",
+                "path": "/evidence/MAGICAI_API_HANDSHAKE.generated.json",
+                "sha256": sha,
+                "status": "pass",
+            },
+            {
+                "name": "provider_account_registry",
+                "path": "/evidence/ORIGIN_PROVIDER_ACCOUNT_REGISTRY_VERIFICATION.generated.json",
+                "sha256": sha,
+                "status": "pass",
+            },
             {
                 "name": "completion_matrix",
                 "path": "/evidence/matrix.json",
@@ -168,9 +180,9 @@ def test_verifier_require_gold_rejects_pass_chain_with_stale_stage_blockers(tmp_
     payload = proof_payload(status="pass")
     payload["blockedStages"] = ["completion_matrix"]
     payload["stages"][2]["blockers"] = ["owner_playback_e2e_verified"]
-    payload["stages"][6]["blockedRows"] = ["deployed_user_login_read_listen_watch"]
-    payload["stages"][6]["blockedHardGates"] = ["gold_audit_completion_claim_allowed"]
-    payload["stages"][7]["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
+    payload["stages"][8]["blockedRows"] = ["deployed_user_login_read_listen_watch"]
+    payload["stages"][8]["blockedHardGates"] = ["gold_audit_completion_claim_allowed"]
+    payload["stages"][9]["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt, require_gold=True)
@@ -202,7 +214,7 @@ def test_verifier_rejects_pass_chain_with_blocked_rollups_even_without_require_g
     payload["progress"]["blockedStages"] = ["requirement_coverage"]
     payload["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
     payload["progress"]["blockedRequirements"] = ["deployed_owner_read_listen_watch_canon"]
-    payload["stages"][7]["status"] = "blocked"
+    payload["stages"][9]["status"] = "blocked"
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)
@@ -337,10 +349,34 @@ def test_verifier_rejects_blocked_chain_when_runsite_stage_is_not_pass(tmp_path:
     assert "runsite_integration_proof_not_pass" in issues
 
 
+def test_verifier_rejects_blocked_chain_when_magicai_handshake_stage_is_not_pass(tmp_path: Path) -> None:
+    module = load_module()
+    payload = proof_payload(status="blocked")
+    payload["stages"][6]["status"] = "blocked"
+    receipt = write_json(tmp_path / "chain.json", payload)
+
+    ok, issues = module.verify(receipt)
+
+    assert ok is False
+    assert "magicai_api_handshake_probe_not_pass" in issues
+
+
+def test_verifier_rejects_blocked_chain_when_provider_registry_stage_is_not_pass(tmp_path: Path) -> None:
+    module = load_module()
+    payload = proof_payload(status="blocked")
+    payload["stages"][7]["status"] = "blocked"
+    receipt = write_json(tmp_path / "chain.json", payload)
+
+    ok, issues = module.verify(receipt)
+
+    assert ok is False
+    assert "provider_account_registry_not_pass" in issues
+
+
 def test_verifier_rejects_completion_matrix_without_gold_audit_hard_gate(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="blocked")
-    payload["stages"][6]["blockedHardGates"] = []
+    payload["stages"][8]["blockedHardGates"] = []
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)
@@ -352,7 +388,7 @@ def test_verifier_rejects_completion_matrix_without_gold_audit_hard_gate(tmp_pat
 def test_verifier_rejects_blocked_chain_with_unexpected_requirement_coverage_blocker(tmp_path: Path) -> None:
     module = load_module()
     payload = proof_payload(status="blocked")
-    payload["stages"][7]["blockedRequirements"] = ["m4b_premium_audiobook_packaging"]
+    payload["stages"][9]["blockedRequirements"] = ["m4b_premium_audiobook_packaging"]
     receipt = write_json(tmp_path / "chain.json", payload)
 
     ok, issues = module.verify(receipt)

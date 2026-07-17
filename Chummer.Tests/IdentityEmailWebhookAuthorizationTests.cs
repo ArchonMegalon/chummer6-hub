@@ -111,6 +111,9 @@ public sealed class IdentityEmailWebhookAuthorizationTests
         public IdentityEmailDeliveryStatusResponse GetStatus()
             => throw new NotSupportedException();
 
+        public void RecordStartGuardrailBlock(string email, string deliveryMode, string previewNote)
+            => throw new NotSupportedException();
+
         public IdentityEmailWebhookAckResponse RecordEmailitWebhook(JsonElement payload)
         {
             RecordedWebhookCount++;

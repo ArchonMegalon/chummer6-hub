@@ -34,6 +34,7 @@ public sealed class PublicAccountCopyTests
         Assert.Contains("AccountSupportLabel: authenticated ? \"Open account support\" : \"Open private form\"", controller, StringComparison.Ordinal);
         Assert.Contains("action=\"/auth/email/start\"", authEntryView, StringComparison.Ordinal);
         Assert.Contains("<p class=\"auth-panel__eyebrow\">@Model.Eyebrow</p>", authEntryView, StringComparison.Ordinal);
+        Assert.Contains("@if (Model.EmailEntryEnabled)", authEntryView, StringComparison.Ordinal);
         Assert.Contains(">Continue with email</button>", authEntryView, StringComparison.Ordinal);
         Assert.Contains("@if (Model.GoogleAvailable)", authEntryView, StringComparison.Ordinal);
         Assert.Contains("Continue with Google", authEntryView, StringComparison.Ordinal);

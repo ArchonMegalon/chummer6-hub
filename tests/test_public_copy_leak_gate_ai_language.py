@@ -94,6 +94,22 @@ def test_minimal_public_routes_block_ai_proof_and_campaign_city_language():
     assert any("lane" in hit for hit in hits)
 
 
+def test_minimal_public_routes_allow_frontdoor_release_posture_copy():
+    module = load_module()
+
+    hits = module.minimal_route_forbidden_hits("Current public lane: Preview. Review required.")
+
+    assert hits == []
+
+
+def test_minimal_public_routes_allow_preview_review_required_copy():
+    module = load_module()
+
+    hits = module.minimal_route_forbidden_hits("Preview build. Review required.")
+
+    assert hits == []
+
+
 def test_minimal_route_detection_keeps_special_routes_out_of_first_visit_tier():
     module = load_module()
 
@@ -141,7 +157,7 @@ def test_participation_external_redirect_fails_because_participate_is_first_part
     class FakeSession:
         def get(self, url: str, timeout: int, allow_redirects: bool):
             assert url == "https://chummer.run/participate"
-            assert timeout == 10
+            assert timeout == module.DEFAULT_TIMEOUT_SECONDS
             assert allow_redirects is False
             return FakeResponse()
 
@@ -208,6 +224,29 @@ def test_verify_route_retries_transient_transport_failure():
     assert session.calls == 2
     assert result.success is True
     assert result.detail is None
+
+
+def test_verify_route_uses_explicit_timeout_override():
+    module = load_module()
+
+    class FakeResponse:
+        status_code = 200
+        text = "<main>Build and maintain Shadowrun characters.</main>"
+        headers = {}
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.seen_timeout = None
+
+        def get(self, url: str, timeout: int, allow_redirects: bool):
+            self.seen_timeout = timeout
+            return FakeResponse()
+
+    session = FakeSession()
+    result = module.verify_route(session, "https://chummer.run", "/", timeout_seconds=33)
+
+    assert result.success is True
+    assert session.seen_timeout == 33
 
 
 def test_provider_scanner_uses_visible_html_text_not_script_or_href_details():

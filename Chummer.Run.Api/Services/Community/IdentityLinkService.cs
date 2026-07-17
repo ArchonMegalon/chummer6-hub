@@ -228,6 +228,11 @@ public sealed class IdentityLinkService
         var providerSubject = AccountService.NormalizeRequired(request.ProviderSubject, nameof(request.ProviderSubject));
         var user = _accounts.EnsureUser(subjectId, subjectId);
         var now = DateTimeOffset.UtcNow;
+        var linkKind = ResolveExternalIdentityLinkKind(provider);
+        var status = ResolveExternalIdentityStatus(provider);
+        var verificationPolicy = ResolveExternalIdentityVerificationPolicy(provider);
+        var displayLabel = AccountService.NormalizeOptional(request.DisplayLabel) ?? providerSubject;
+        var note = ResolveExternalIdentityNote(provider);
 
         lock (_store.Gate)
         {
@@ -236,49 +241,52 @@ public sealed class IdentityLinkService
                 && string.Equals(link.ProviderSubject, providerSubject, StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(link.Status, "revoked", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase));
+            var orphanedConflictIndex = -1;
             if (conflictingIndex >= 0)
             {
-                throw new InvalidOperationException($"This {provider} identity is already linked to another Chummer account.");
+                var conflicting = _store.LinkedIdentities[conflictingIndex];
+                if (_accounts.GetById(conflicting.UserId) is not null)
+                {
+                    throw new InvalidOperationException($"This {provider} identity is already linked to another Chummer account.");
+                }
+
+                orphanedConflictIndex = conflictingIndex;
             }
 
             var existingIndex = _store.LinkedIdentities.FindIndex(link =>
                 string.Equals(link.UserId, user.UserId, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(link.Provider, provider, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(link.ProviderSubject, providerSubject, StringComparison.OrdinalIgnoreCase));
-            if (request.MakePrimary)
+            bool needsPrimaryPromotion = request.MakePrimary
+                && (existingIndex < 0 || !_store.LinkedIdentities[existingIndex].IsPrimary);
+            if (needsPrimaryPromotion)
             {
                 DemotePrimaryAuthLocked(user.UserId);
             }
 
-            var status = provider switch
-            {
-                "telegram" => "linked",
-                _ => "provider_backed"
-            };
-            var verificationPolicy = provider switch
-            {
-                "telegram" => "channel_identity",
-                _ => "provider_backed"
-            };
-            var displayLabel = AccountService.NormalizeOptional(request.DisplayLabel) ?? providerSubject;
-            var note = provider switch
-            {
-                "google" => "Google is the preferred mainstream social bootstrap for Hub onboarding.",
-                "facebook" => "Facebook remains optional and should stay demand-driven rather than default.",
-                "telegram" => "Telegram identity linking is separate from channel/bot routing.",
-                _ => null
-            };
-
             if (existingIndex >= 0)
             {
-                var updated = _store.LinkedIdentities[existingIndex] with
+                var existing = _store.LinkedIdentities[existingIndex];
+                bool resolvedPrimary = request.MakePrimary || existing.IsPrimary;
+                DateTimeOffset? resolvedVerifiedAtUtc = existing.VerifiedAtUtc ?? now;
+                if (string.Equals(existing.DisplayLabel, displayLabel, StringComparison.Ordinal)
+                    && string.Equals(existing.Status, status, StringComparison.Ordinal)
+                    && string.Equals(existing.VerificationPolicy, verificationPolicy, StringComparison.Ordinal)
+                    && existing.IsPrimary == resolvedPrimary
+                    && existing.VerifiedAtUtc == resolvedVerifiedAtUtc
+                    && string.Equals(existing.Note, note, StringComparison.Ordinal))
+                {
+                    return existing;
+                }
+
+                var updated = existing with
                 {
                     DisplayLabel = displayLabel,
                     Status = status,
                     VerificationPolicy = verificationPolicy,
-                    IsPrimary = request.MakePrimary || _store.LinkedIdentities[existingIndex].IsPrimary,
+                    IsPrimary = resolvedPrimary,
                     UpdatedAtUtc = now,
-                    VerifiedAtUtc = now,
+                    VerifiedAtUtc = resolvedVerifiedAtUtc,
                     Note = note
                 };
                 _store.LinkedIdentities[existingIndex] = updated;
@@ -286,11 +294,31 @@ public sealed class IdentityLinkService
                 return updated;
             }
 
+            if (orphanedConflictIndex >= 0)
+            {
+                var orphaned = _store.LinkedIdentities[orphanedConflictIndex];
+                var repaired = orphaned with
+                {
+                    UserId = user.UserId,
+                    LinkKind = linkKind,
+                    DisplayLabel = displayLabel,
+                    Status = status,
+                    VerificationPolicy = verificationPolicy,
+                    IsPrimary = request.MakePrimary,
+                    UpdatedAtUtc = now,
+                    VerifiedAtUtc = orphaned.VerifiedAtUtc ?? now,
+                    Note = note
+                };
+                _store.LinkedIdentities[orphanedConflictIndex] = repaired;
+                _store.PersistLocked();
+                return repaired;
+            }
+
             var created = new LinkedIdentityDto(
                 IdentityLinkId: AccountService.NewId("idl"),
                 UserId: user.UserId,
                 Provider: provider,
-                LinkKind: provider == "telegram" ? "linked_identity" : "social_auth",
+                LinkKind: linkKind,
                 ProviderSubject: providerSubject,
                 DisplayLabel: displayLabel,
                 Status: status,
@@ -305,6 +333,24 @@ public sealed class IdentityLinkService
             return created;
         }
     }
+
+    private static string ResolveExternalIdentityLinkKind(string provider)
+        => provider == "telegram" ? "linked_identity" : "social_auth";
+
+    private static string ResolveExternalIdentityStatus(string provider)
+        => provider == "telegram" ? "linked" : "provider_backed";
+
+    private static string ResolveExternalIdentityVerificationPolicy(string provider)
+        => provider == "telegram" ? "channel_identity" : "provider_backed";
+
+    private static string? ResolveExternalIdentityNote(string provider)
+        => provider switch
+        {
+            "google" => "Google is the preferred mainstream social bootstrap for Hub onboarding.",
+            "facebook" => "Facebook remains optional and should stay demand-driven rather than default.",
+            "telegram" => "Telegram identity linking is separate from channel/bot routing.",
+            _ => null
+        };
 
     public ChannelLinkDto LinkChannel(LinkChannelRequest request)
     {

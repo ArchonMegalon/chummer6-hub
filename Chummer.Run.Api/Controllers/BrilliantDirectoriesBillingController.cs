@@ -53,6 +53,8 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     {
         _ = userId;
         _ = email;
+        bool emailEntryEnabled = ResolveEmailEntryAvailability().Enabled;
+        bool googleAvailable = IsGoogleSignInConfigured();
         HubUserDto? currentUser = await TryGetCurrentUserAsync(cancellationToken).ConfigureAwait(false);
         string? resolvedUserId = TrimToNull(currentUser?.UserId);
         string? resolvedEmail = TrimToNull(currentUser?.Email);
@@ -79,7 +81,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
             return View(
                 "~/Views/Billing/Membership.cshtml",
-                BuildViewModel(page, quota, resolvedUserId, resolvedEmail, currentUser, BuildChrome(currentUser)));
+                BuildViewModel(page, quota, resolvedUserId, resolvedEmail, currentUser, BuildChrome(currentUser), emailEntryEnabled, googleAvailable));
         }
         catch (BrilliantDirectoriesBillingUnavailableException)
         {
@@ -94,7 +96,7 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
             return View(
                 "~/Views/Billing/Membership.cshtml",
-                BuildUnavailableViewModel(resolvedUserId, resolvedEmail, currentUser, BuildChrome(currentUser)));
+                BuildUnavailableViewModel(resolvedUserId, resolvedEmail, currentUser, BuildChrome(currentUser), emailEntryEnabled, googleAvailable));
         }
     }
 
@@ -394,7 +396,9 @@ public sealed class BrilliantDirectoriesBillingController : Controller
         string? userId,
         string? email,
         HubUserDto? currentUser,
-        SiteChromeViewModel chrome)
+        SiteChromeViewModel chrome,
+        bool emailEntryEnabled,
+        bool googleAvailable)
     {
         BillingPlanCardDto? free = page.Plans.SingleOrDefault(item => string.Equals(item.PlanKey, BrilliantDirectoriesBillingConstants.FreePlanKey, StringComparison.OrdinalIgnoreCase));
         BillingPlanCardDto? supporter = page.Plans.SingleOrDefault(item => string.Equals(item.PlanKey, BrilliantDirectoriesBillingConstants.SupporterPlanKey, StringComparison.OrdinalIgnoreCase));
@@ -411,14 +415,18 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             Unavailable: false,
             Heading: page.Heading,
             Summary: page.Summary,
-            ManageMembershipHref: page.ManageMembershipHref);
+            ManageMembershipHref: page.ManageMembershipHref,
+            EmailEntryEnabled: emailEntryEnabled,
+            GoogleAvailable: googleAvailable);
     }
 
     private static BillingMembershipPageViewModel BuildUnavailableViewModel(
         string? userId,
         string? email,
         HubUserDto? currentUser,
-        SiteChromeViewModel chrome)
+        SiteChromeViewModel chrome,
+        bool emailEntryEnabled,
+        bool googleAvailable)
         => new(
             Chrome: chrome,
             Page: null,
@@ -432,7 +440,9 @@ public sealed class BrilliantDirectoriesBillingController : Controller
             Unavailable: true,
             Heading: "Membership",
             Summary: "Supporter is not open right now.",
-            ManageMembershipHref: string.Empty);
+            ManageMembershipHref: string.Empty,
+            EmailEntryEnabled: emailEntryEnabled,
+            GoogleAvailable: googleAvailable);
 
     private static string BuildBillingLoginRedirect()
         => $"/login?next={Uri.EscapeDataString("/account/billing")}";
@@ -564,6 +574,13 @@ public sealed class BrilliantDirectoriesBillingController : Controller
     private static string? TrimToNull(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private HubEmailSignInAvailability ResolveEmailEntryAvailability()
+        => HubEmailSignInPolicy.Resolve(HttpContext?.RequestServices?.GetService<IConfiguration>());
+
+    private bool IsGoogleSignInConfigured()
+        => !string.IsNullOrWhiteSpace(ReadOptionalValue("GOOGLE_OIDC_CLIENT_ID", "GOOGLE_OIDC_CLIENT_ID"))
+           && !string.IsNullOrWhiteSpace(ReadOptionalValue("GOOGLE_OIDC_CLIENT_SECRET", "GOOGLE_OIDC_CLIENT_SECRET"));
+
     private string? ReadOptionalValue(string environmentKey, string configurationKey)
     {
         string? environmentValue = TrimToNull(Environment.GetEnvironmentVariable(environmentKey));
@@ -603,6 +620,9 @@ public sealed class BrilliantDirectoriesBillingController : Controller
 
         return uri.ToString();
     }
+
+    private static bool ResolveBool(string? value, bool defaultValue)
+        => bool.TryParse(value, out bool parsed) ? parsed : defaultValue;
 
     private static string AppendQueryParameter(string url, string name, string value)
     {

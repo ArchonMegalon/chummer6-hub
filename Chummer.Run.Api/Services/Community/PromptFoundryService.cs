@@ -123,7 +123,7 @@ public sealed class PromptFoundryService
             TemplateLibraryTags: true,
             RefineMode: true,
             ShortenMode: true,
-            McpConnectionClaimed: true,
+            McpConnectionClaimed: mcpVerified,
             ApiAvailable: apiAvailable,
             ExportAvailable: exportAvailable,
             ImportAvailable: importAvailable,

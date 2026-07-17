@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "chummer.release-shelf-contract/v1",
+  "layoutMarker": ".release-shelf-layout-v1",
+  "pointerName": "current.json",
+  "generationDirectory": "generations",
+  "generationRouteTemplate": "/downloads/g/{generationId}/",
+  "authoritativeManifestNames": [
+    "RELEASE_CHANNEL.generated.json",
+    "releases.json"
+  ],
+  "forbiddenAuthoritativeRoutePrefixes": [
+    "/downloads/files/",
+    "/downloads/proof/",
+    "/downloads/startup-smoke/",
+    "/downloads/release-evidence/"
+  ],
+  "writerProtocols": {
+    "generationAware": [
+      ".release-shelf-layout-v1",
+      "current.json",
+      "stage_release_shelf_generation",
+      "activate_release_shelf_generation"
+    ],
+    "legacyFailClosed": [
+      ".release-shelf-layout-v1",
+      "current.json",
+      "assert_legacy_release_shelf_target"
+    ]
+  },
+  "releaseModeWriterNames": [
+    "publish-download-bundle.sh",
+    "publish-download-bundle-s3.sh",
+    "publish-latest-nightly-to-downloads.sh"
+  ],
+  "releaseRepositories": [
+    "chummer.run-services",
+    "chummer-presentation",
+    "chummer6-ui",
+    "chummer6-hub",
+    "chummer6-core",
+    "chummer-core-engine"
+  ],
+  "releaseModeWriters": [
+    {
+      "repository": "chummer.run-services",
+      "path": "scripts/publish-download-bundle.sh"
+    },
+    {
+      "repository": "chummer.run-services",
+      "path": "scripts/publish-download-bundle-s3.sh"
+    },
+    {
+      "repository": "chummer.run-services",
+      "path": "scripts/runbook.sh"
+    },
+    {
+      "repository": "chummer.run-services",
+      "path": "scripts/materialize-public-downloads-bundle.sh"
+    },
+    {
+      "repository": "chummer.run-services",
+      "path": "scripts/sync_workspace_portal_manifest_mirrors.py"
+    },
+    {
+      "repository": "chummer-presentation",
+      "path": "scripts/publish-download-bundle.sh"
+    },
+    {
+      "repository": "chummer-presentation",
+      "path": "scripts/publish-download-bundle-s3.sh"
+    },
+    {
+      "repository": "chummer-presentation",
+      "path": "scripts/publish-latest-nightly-to-downloads.sh"
+    },
+    {
+      "repository": "chummer6-ui",
+      "path": "scripts/publish-download-bundle.sh"
+    },
+    {
+      "repository": "chummer6-ui",
+      "path": "scripts/publish-download-bundle-s3.sh"
+    },
+    {
+      "repository": "chummer6-ui",
+      "path": "scripts/publish-latest-nightly-to-downloads.sh"
+    },
+    {
+      "repository": "chummer6-hub",
+      "path": "scripts/publish-download-bundle.sh"
+    },
+    {
+      "repository": "chummer6-hub",
+      "path": "scripts/publish-download-bundle-s3.sh"
+    },
+    {
+      "repository": "chummer6-core",
+      "path": "scripts/publish-download-bundle.sh"
+    },
+    {
+      "repository": "chummer6-core",
+      "path": "scripts/publish-download-bundle-s3.sh"
+    },
+    {
+      "repository": "chummer-core-engine",
+      "path": "scripts/publish-download-bundle.sh"
+    },
+    {
+      "repository": "chummer-core-engine",
+      "path": "scripts/publish-download-bundle-s3.sh"
+    }
+  ]
+}

@@ -234,6 +234,54 @@ class StackConfigSmokeTests(unittest.TestCase):
                 msg=f"{service_name} should restart automatically after host or docker daemon restarts",
             )
 
+    def test_public_edge_cloudflared_shares_the_public_origin_surface(self):
+        public_edge_path = REPO_ROOT / "docker-compose.public-edge.yml"
+        if not public_edge_path.exists():
+            self.skipTest("docker-compose.public-edge.yml is not present for this repository slice")
+
+        payload = load_compose_payload(public_edge_path)
+        services = payload.get("services") or {}
+        tunnel = services.get("chummer-run-cloudflared") or {}
+        portal = services.get("chummer-portal") or {}
+
+        self.assertTrue(tunnel, "public edge should define the Cloudflare tunnel sidecar")
+        self.assertIn(
+            "chummer-portal",
+            tunnel.get("depends_on") or {},
+            msg="cloudflared should wait for the public-edge portal surface before booting",
+        )
+        self.assertIn(
+            "public-origin",
+            tunnel.get("networks") or {},
+            msg="cloudflared should join public-origin so service-name ingress to chummer-portal stays reachable",
+        )
+        self.assertIn(
+            "host.docker.internal:host-gateway",
+            tunnel.get("extra_hosts") or [],
+            msg="cloudflared should retain a host gateway fallback for host-published portal origins",
+        )
+
+        ports = portal.get("ports") or []
+        self.assertIn(
+            "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080",
+            ports,
+            msg="the portal should publish the host-facing public-edge surface on 8091 by default",
+        )
+
+    def test_runbook_bootstraps_cloudflare_tunnel_from_public_edge_compose(self):
+        runbook = (REPO_ROOT / "scripts" / "runbook.sh").read_text(encoding="utf-8")
+
+        self.assertIn(
+            'local compose_file="$REPO_ROOT/docker-compose.public-edge.yml"',
+            runbook,
+            msg="tunnel bootstrap should target the public-edge compose file instead of the legacy stack",
+        )
+        self.assertIn(
+            'run_compose_with_optional_env_file -f "$compose_file" up -d chummer-run-cloudflared',
+            runbook,
+            msg="tunnel bootstrap should start the public-edge tunnel sidecar directly without legacy profiles",
+        )
+
     def test_public_edge_promotes_windows_installer_on_main_shelf(self):
         public_edge_path = REPO_ROOT / "docker-compose.public-edge.yml"
         if not public_edge_path.exists():
@@ -514,6 +562,16 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn("def assert_desktop_surface_ref_consistency(local_payload: dict)", script_text)
         self.assertIn("desktopSurfaceRefs must not surface proof_required tuples", script_text)
         self.assertIn("assert_desktop_surface_ref_consistency(payload)", script_text)
+        self.assertIn("replace_file_atomically() {", script_text)
+        self.assertIn('AUTHORITATIVE_PUBLISHED_ROOT="${CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISHED_ROOT:-$REGISTRY_ROOT/.codex-studio/published}"', script_text)
+        self.assertIn("sync_authoritative_published_manifest() {", script_text)
+        self.assertIn('chmod --reference="$source_path" "$temp_path" 2>/dev/null || chmod 644 "$temp_path"', script_text)
+        self.assertIn('sync_authoritative_published_manifest "$CANONICAL_MANIFEST_PATH" "RELEASE_CHANNEL.generated.json"', script_text)
+        self.assertIn('sync_authoritative_published_manifest "$MANIFEST_PATH" "releases.json"', script_text)
+        self.assertIn('replace_file_atomically "$MANIFEST_PATH" "$PORTAL_MANIFEST_PATH"', script_text)
+        self.assertIn('replace_file_atomically "$CANONICAL_MANIFEST_PATH" "$PORTAL_CANONICAL_MANIFEST_PATH"', script_text)
+        self.assertIn('FLAGSHIP_READINESS_GATE_PATH="${CHUMMER_FLAGSHIP_READINESS_GATE_PATH:-$REPO_ROOT/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json}"', script_text)
+        self.assertIn('materialize_args+=(--flagship-readiness "$FLAGSHIP_READINESS_GATE_PATH")', script_text)
 
     def test_run_services_public_bundle_materializer_recanonicalizes_verifier_owned_release_channel_surfaces(self):
         script_path = REPO_ROOT / "scripts" / "materialize-public-downloads-bundle.sh"
@@ -540,9 +598,67 @@ class StackConfigSmokeTests(unittest.TestCase):
 
         self.assertIn('resolve_public_release_channel_source()', script_text)
         self.assertIn('"$REGISTRY_ROOT/.codex-studio/published/RELEASE_CHANNEL.generated.json"', script_text)
+        self.assertIn('AUTHORITATIVE_PUBLISHED_ROOT="${CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISHED_ROOT:-$REGISTRY_ROOT/.codex-studio/published}"', script_text)
         self.assertIn('PUBLIC_RELEASE_CHANNEL_SOURCE_PATH="$(resolve_public_release_channel_source)"', script_text)
         self.assertIn('detect_auto_disabled_artifact_ids "$combined_files_root" "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH"', script_text)
         self.assertIn('python3 - "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" <<\'PY\'', script_text)
+        registry_index = script_text.index('"$REGISTRY_ROOT/.codex-studio/published/RELEASE_CHANNEL.generated.json"')
+        portal_index = script_text.index('"$REPO_ROOT/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"')
+        ui_index = script_text.index('"$(resolve_ui_downloads_path "RELEASE_CHANNEL.generated.json")"')
+        self.assertLess(registry_index, portal_index)
+        self.assertLess(registry_index, ui_index)
+        self.assertIn("sync_workspace_portal_manifest_mirrors() {", script_text)
+        self.assertIn('local -a mirror_root_candidates=(', script_text)
+        self.assertIn('"$mirror_root/Chummer.Portal/downloads/$source_name"', script_text)
+        self.assertIn('"$mirror_root/Docker/Downloads/$source_name"', script_text)
+        self.assertIn('"$mirror_root/.codex-studio/published/portal/$source_name"', script_text)
+        self.assertIn('"/docker/chummercomplete/chummer6-ui"', script_text)
+        self.assertIn('"/docker/chummercomplete/chummer-presentation"', script_text)
+        self.assertIn("sync_authoritative_published_manifest() {", script_text)
+        self.assertIn('sync_authoritative_published_manifest "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json" "RELEASE_CHANNEL.generated.json"', script_text)
+        self.assertIn('sync_authoritative_published_manifest "$OUTPUT_ROOT/releases.json" "releases.json"', script_text)
+        self.assertIn('sync_workspace_portal_manifest_mirrors "RELEASE_CHANNEL.generated.json"', script_text)
+        self.assertIn('sync_workspace_portal_manifest_mirrors "releases.json"', script_text)
+        self.assertIn("CHUMMER_PUBLIC_DISABLE_WORKSPACE_MANIFEST_MIRRORS", script_text)
+
+    def test_run_services_public_bundle_materializer_inherits_required_platforms_from_release_channel(self):
+        script_path = REPO_ROOT / "scripts" / "materialize-public-downloads-bundle.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        self.assertIn('release_required_desktop_platforms="${CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS:-}"', script_text)
+        self.assertIn('coverage.get("requiredDesktopPlatforms")', script_text)
+        self.assertIn('release_required_desktop_platforms="${release_meta[3]}"', script_text)
+        self.assertIn('release_required_desktop_platforms="linux,windows,macos"', script_text)
+        self.assertIn('CHUMMER_PUBLIC_REQUIRED_DESKTOP_PLATFORMS="$release_required_desktop_platforms"', script_text)
+
+    def test_release_manifest_generators_replace_stale_receipt_backed_artifacts_from_canonical_sources(self):
+        script_paths = [
+            Path("/docker/chummercomplete/chummer6-ui/scripts/generate-releases-manifest.sh"),
+            Path("/docker/chummercomplete/chummer-presentation/scripts/generate-releases-manifest.sh"),
+        ]
+
+        for script_path in script_paths:
+            script_text = script_path.read_text(encoding="utf-8")
+            self.assertIn('repo_root / ".codex-studio" / "published" / "portal" / "files"', script_text)
+            self.assertIn('repo_root.parent / "chummer-presentation" / ".codex-studio" / "published" / "portal" / "files"', script_text)
+            self.assertIn('repo_root.parent / "chummer6-ui" / ".codex-studio" / "published" / "portal" / "files"', script_text)
+            self.assertIn('roots.append(registry_root / ".codex-studio" / "published" / "files")', script_text)
+            self.assertIn('if receipt_matches_download_bytes(payload):', script_text)
+            self.assertIn('if candidate_path.resolve(strict=False) == target_path.resolve(strict=False):', script_text)
+            self.assertIn('shutil.copy2(candidate_path, target_path)', script_text)
+
+    def test_release_manifest_canonicalizers_copy_trust_rollout_posture(self):
+        script_paths = [
+            REPO_ROOT / "scripts" / "generate-releases-manifest.sh",
+            REPO_ROOT / "scripts" / "materialize-public-downloads-bundle.sh",
+        ]
+
+        for script_path in script_paths:
+            script_text = script_path.read_text(encoding="utf-8")
+            self.assertIn('trust_rollout_state = normalized_token(trust_release_channel.get("rolloutState"))', script_text)
+            self.assertIn('payload["rolloutState"] = trust_rollout_state', script_text)
+            self.assertIn('payload["supportabilityState"] = trust_supportability_state', script_text)
+            self.assertIn("Current public release is supported on the promoted routes.", script_text)
 
     def test_run_services_release_upload_scripts_avoid_bash4_array_builtins(self):
         script_paths = [

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Net.Http.Headers;
 using System.Net.WebSockets;
+using Chummer.Run.Api.Services;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -36,20 +37,26 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     private readonly IHttpClientFactory? _httpClientFactory;
     private readonly Uri? _blazorUpstream;
     private readonly Uri? _avaloniaUpstream;
-    private readonly Uri? _playUpstream;
+    private readonly IPublicPlayPrivateRouteDelegator _privatePlayRoutes;
+    private readonly PublicCanonicalOriginPolicy _publicOrigin;
 
-    public LegacySurfaceRedirectController(IHttpClientFactory? httpClientFactory = null, IConfiguration? configuration = null)
+    public LegacySurfaceRedirectController(
+        IHttpClientFactory? httpClientFactory = null,
+        IConfiguration? configuration = null,
+        IPublicPlaySessionAccessPolicy? playSessionAccess = null,
+        PublicCanonicalOriginPolicy? publicOrigin = null,
+        IPublicPlayPrivateRouteDelegator? privatePlayRoutes = null)
     {
         _httpClientFactory = httpClientFactory;
+        _ = playSessionAccess;
+        _privatePlayRoutes = privatePlayRoutes ?? new DenyAllPublicPlayPrivateRouteDelegator();
         _blazorUpstream = ResolveAbsoluteUri(
             configuration?["CHUMMER_PUBLIC_BLAZOR_PROXY_URL"]
             ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_BLAZOR_PROXY_URL"));
         _avaloniaUpstream = ResolveAbsoluteUri(
             configuration?["CHUMMER_PUBLIC_AVALONIA_PROXY_URL"]
             ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_AVALONIA_PROXY_URL"));
-        _playUpstream = ResolveAbsoluteUri(
-            configuration?["CHUMMER_PUBLIC_PLAY_PROXY_URL"]
-            ?? Environment.GetEnvironmentVariable("CHUMMER_PUBLIC_PLAY_PROXY_URL"));
+        _publicOrigin = publicOrigin ?? PublicCanonicalOriginPolicy.CreateUnitTestDefault(configuration);
     }
 
     [HttpGet("/hub")]
@@ -68,6 +75,14 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     [Route("/app/{**path}")]
     public async Task<IActionResult> App(string? path, CancellationToken cancellationToken)
     {
+        if (HttpMethods.IsGet(Request.Method) || HttpMethods.IsHead(Request.Method))
+        {
+            string redirectPath = string.IsNullOrWhiteSpace(path)
+                ? "/blazor/app"
+                : $"/blazor/app/{path.TrimStart('/')}";
+            return Redirect(AppendLocalQueryString(redirectPath, Request.QueryString.Value));
+        }
+
         Uri? appUpstream = _blazorUpstream is null ? null : new Uri(_blazorUpstream, "app/");
         return await ProxyBrowserSurfaceAsync(appUpstream, "/app", path, cancellationToken).ConfigureAwait(false);
     }
@@ -82,11 +97,20 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     [Route("/_blazor")]
     [Route("/_blazor/{**path}")]
     public async Task<IActionResult> PlayBlazorCircuit(string? path, CancellationToken cancellationToken)
-        => await ProxyBrowserSurfaceAsync(
-            _playUpstream,
-            "/_blazor",
-            string.IsNullOrWhiteSpace(path) ? "_blazor" : $"_blazor/{path.TrimStart('/')}",
-            cancellationToken).ConfigureAwait(false);
+    {
+        _ = path;
+        await _privatePlayRoutes.DenyAsync(HttpContext, cancellationToken).ConfigureAwait(false);
+        return new EmptyResult();
+    }
+
+    [AcceptVerbs("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")]
+    [Route("/api/play/{**path}")]
+    public async Task<IActionResult> PlayApi(string? path, CancellationToken cancellationToken)
+    {
+        _ = path;
+        await _privatePlayRoutes.DenyAsync(HttpContext, cancellationToken).ConfigureAwait(false);
+        return new EmptyResult();
+    }
 
     [HttpGet("/session")]
     [HttpGet("/session/{**path}")]
@@ -101,13 +125,14 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     [HttpGet("/coach")]
     [HttpGet("/coach/{**path}")]
     public IActionResult Coach()
-        => Redirect("/downloads");
+        => Redirect("/status");
 
     private async Task<IActionResult> ProxyBrowserSurfaceAsync(
         Uri? upstream,
         string localBasePath,
         string? path,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? proxyApiKey = null)
     {
         if (upstream is null)
         {
@@ -138,6 +163,11 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
         }
 
         CopyRequestHeaders(outbound);
+        if (!string.IsNullOrWhiteSpace(proxyApiKey))
+        {
+            outbound.Headers.Remove("X-Chummer-Play-Api-Key");
+            outbound.Headers.TryAddWithoutValidation("X-Chummer-Play-Api-Key", proxyApiKey);
+        }
 
         HttpResponseMessage response;
         try
@@ -160,7 +190,19 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
         {
             if ((int)response.StatusCode >= 300 && (int)response.StatusCode < 400 && response.Headers.Location is not null)
             {
-                return Redirect(RewriteUpstreamLocation(response.Headers.Location, upstream, localBasePath));
+                if (!PublicProxyRedirectPolicy.TryRewrite(
+                        response.Headers.Location,
+                        upstream,
+                        _publicOrigin.CanonicalOrigin,
+                        localBasePath,
+                        fallbackPath: localBasePath,
+                        out string redirectPath))
+                {
+                    Response.Headers.Remove("Location");
+                    return StatusCode(StatusCodes.Status502BadGateway);
+                }
+
+                return Redirect(redirectPath);
             }
 
             if ((int)response.StatusCode >= 500)
@@ -240,43 +282,6 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
         }
     }
 
-    private static string RewriteUpstreamLocation(Uri location, Uri upstream, string localBasePath)
-    {
-        if (location.IsAbsoluteUri)
-        {
-            if (!Uri.Compare(location, upstream, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase).Equals(0))
-            {
-                return location.ToString();
-            }
-
-            return NormalizeLocalProxyPath(localBasePath, location.PathAndQuery);
-        }
-
-        return NormalizeLocalProxyPath(localBasePath, location.OriginalString);
-    }
-
-    private static string NormalizeLocalProxyPath(string localBasePath, string pathAndQuery)
-    {
-        string candidate = string.IsNullOrWhiteSpace(pathAndQuery) ? string.Empty : pathAndQuery.Trim();
-        if (string.IsNullOrEmpty(candidate) || candidate == "/")
-        {
-            return localBasePath;
-        }
-
-        if (!candidate.StartsWith("/", StringComparison.Ordinal))
-        {
-            candidate = "/" + candidate;
-        }
-
-        if (candidate.StartsWith(localBasePath + "/", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(candidate, localBasePath, StringComparison.OrdinalIgnoreCase))
-        {
-            return candidate;
-        }
-
-        return localBasePath.TrimEnd('/') + candidate;
-    }
-
     private static Uri AppendQueryString(Uri baseUri, string? queryString)
     {
         string query = string.IsNullOrWhiteSpace(queryString) ? string.Empty : queryString.Trim();
@@ -290,6 +295,19 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
         return builder.Uri;
     }
 
+    private static string AppendLocalQueryString(string path, string? queryString)
+    {
+        string query = string.IsNullOrWhiteSpace(queryString) ? string.Empty : queryString.Trim();
+        if (string.IsNullOrEmpty(query))
+        {
+            return path;
+        }
+
+        return query.StartsWith("?", StringComparison.Ordinal)
+            ? path + query
+            : $"{path}?{query}";
+    }
+
     private static Uri? ResolveAbsoluteUri(string? raw)
     {
         string text = string.IsNullOrWhiteSpace(raw) ? string.Empty : raw.Trim();
@@ -300,7 +318,7 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     {
         if (_httpClientFactory is not null)
         {
-            return _httpClientFactory.CreateClient();
+            return _httpClientFactory.CreateClient(PublicProxyRedirectPolicy.HttpClientName);
         }
 
         return new HttpClient(new HttpClientHandler
@@ -318,7 +336,9 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     {
         foreach (var header in Request.Headers)
         {
-            if (HopByHopRequestHeaders.Contains(header.Key))
+            if (HopByHopRequestHeaders.Contains(header.Key)
+                || IsForwardingHeader(header.Key)
+                || string.Equals(header.Key, "X-Chummer-Play-Api-Key", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -328,6 +348,9 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
                 outbound.Content?.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
             }
         }
+
+        outbound.Headers.TryAddWithoutValidation("X-Forwarded-Host", _publicOrigin.CanonicalAuthority);
+        outbound.Headers.TryAddWithoutValidation("X-Forwarded-Proto", _publicOrigin.CanonicalOrigin.Scheme);
 
         outbound.Headers.Referrer = outbound.RequestUri is null
             ? null
@@ -372,6 +395,8 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
         foreach (var header in Request.Headers)
         {
             if (HopByHopRequestHeaders.Contains(header.Key)
+                || IsForwardingHeader(header.Key)
+                || string.Equals(header.Key, "X-Chummer-Play-Api-Key", StringComparison.OrdinalIgnoreCase)
                 || header.Key.StartsWith("Sec-WebSocket-", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
@@ -379,6 +404,9 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
 
             options.SetRequestHeader(header.Key, header.Value.ToString());
         }
+
+        options.SetRequestHeader("X-Forwarded-Host", _publicOrigin.CanonicalAuthority);
+        options.SetRequestHeader("X-Forwarded-Proto", _publicOrigin.CanonicalOrigin.Scheme);
 
         if (Request.Headers.TryGetValue(HeaderNames.SecWebSocketProtocol, out var protocolValues))
         {
@@ -446,4 +474,8 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
         builder.Scheme = uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ? "wss" : "ws";
         return builder.Uri;
     }
+
+    private static bool IsForwardingHeader(string headerName)
+        => string.Equals(headerName, "Forwarded", StringComparison.OrdinalIgnoreCase)
+           || headerName.StartsWith("X-Forwarded-", StringComparison.OrdinalIgnoreCase);
 }

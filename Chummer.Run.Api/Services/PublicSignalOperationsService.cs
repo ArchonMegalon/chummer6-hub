@@ -559,7 +559,7 @@ public sealed class PublicSignalOperationsService
     {
         if (payload.ValueKind != JsonValueKind.Object)
         {
-            throw new ArgumentException("feedback webhook payload must be a JSON object.");
+            throw new ArgumentException("productlift webhook payload must be a JSON object.");
         }
 
         OperationsCanonDocument canonDocument = LoadOperationsCanon();
@@ -571,32 +571,32 @@ public sealed class PublicSignalOperationsService
         string providerEventId = NormalizeIngressToken(
                 TryReadString(payload, "event_id", "eventId", "webhook_id", "id")
                 ?? TryReadString(envelope, "event_id", "eventId", "webhook_id", "id"),
-                "feedback webhook event id")
+                "productlift webhook event id")
             ?? $"sha256:{payloadSha256[..12]}";
         string eventType = NormalizeIngressToken(
                 TryReadString(payload, "type", "event", "action")
                 ?? TryReadString(envelope, "type", "event", "action"),
-                "feedback webhook event type")
+                "productlift webhook event type")
             ?? "unknown";
         string boardLabel = NormalizeIngressLabel(
                 ResolveEntityLabel(item, envelope, payload, fallback: "Unassigned board", "board", "project", "space"),
-                "feedback webhook board label")
+                "productlift webhook board label")
             ?? "Unassigned board";
         string categoryLabel = NormalizeIngressLabel(
                 ResolveEntityLabel(item, envelope, payload, fallback: "Unclassified", "category", "bucket", "group"),
-                "feedback webhook category label")
+                "productlift webhook category label")
             ?? "Unclassified";
         string itemReference = NormalizeIngressLabel(
                 ResolveItemReference(item, envelope, payload, providerEventId),
-                "feedback webhook item reference")
+                "productlift webhook item reference")
             ?? $"provider-event:{providerEventId}";
         string statusLabel = NormalizeIngressLabel(
                 ResolveStatusLabel(item, envelope, payload, eventType),
-                "feedback webhook status label")
+                "productlift webhook status label")
             ?? "Unknown";
         string actionLabel = NormalizeIngressLabel(
                 ResolveActionLabel(eventType, statusLabel),
-                "feedback webhook action label")
+                "productlift webhook action label")
             ?? "Provider event";
         bool closeoutCandidate = IsCloseoutCandidate(eventType, statusLabel);
         MatchedFeedbackCategory matchedCategory = ResolveMatchedCategory(item, envelope, payload, categoryLabel, canonDocument.Taxonomy.Categories);
@@ -2604,18 +2604,49 @@ public sealed class PublicSignalOperationsService
         {
             if (!File.Exists(_storagePath))
             {
-                _logger.LogInformation("PublicSignalOperationsService starting without stored feedback webhook receipts.");
+                _logger.LogInformation("PublicSignalOperationsService starting without stored ProductLift webhook receipts at {StoragePath}.", _storagePath);
                 return;
             }
 
-            string snapshotJson = File.ReadAllText(_storagePath);
-            ProductLiftWebhookReceiptSnapshot snapshot = JsonSerializer.Deserialize<ProductLiftWebhookReceiptSnapshot>(snapshotJson, JsonOptions)
-                ?? throw new InvalidOperationException($"Unable to deserialize feedback webhook receipt snapshot: {_storagePath}");
+            string snapshotJson;
+            try
+            {
+                snapshotJson = File.ReadAllText(_storagePath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogError(ex, "PublicSignalOperationsService could not read the stored ProductLift webhook receipts at {StoragePath}; starting with an empty receipt set.", _storagePath);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(snapshotJson))
+            {
+                _logger.LogWarning("PublicSignalOperationsService found an empty ProductLift webhook receipt snapshot at {StoragePath}; starting with an empty receipt set.", _storagePath);
+                return;
+            }
+
+            ProductLiftWebhookReceiptSnapshot? snapshot;
+            try
+            {
+                snapshot = JsonSerializer.Deserialize<ProductLiftWebhookReceiptSnapshot>(snapshotJson, JsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "PublicSignalOperationsService found an invalid ProductLift webhook receipt snapshot at {StoragePath}; starting with an empty receipt set.", _storagePath);
+                return;
+            }
+
+            if (snapshot is null)
+            {
+                _logger.LogWarning("PublicSignalOperationsService found a null ProductLift webhook receipt snapshot at {StoragePath}; starting with an empty receipt set.", _storagePath);
+                return;
+            }
 
             ApplySnapshotLocked(snapshot);
             _logger.LogInformation(
-                "PublicSignalOperationsService loaded {ReceiptCount} bounded feedback webhook receipts.",
-                _receipts.Count);
+                "PublicSignalOperationsService loaded {ReceiptCount} bounded ProductLift webhook receipts from {StoragePath}.",
+                _receipts.Count,
+                _storagePath);
         }
     }
 
@@ -2834,7 +2865,7 @@ public sealed class PublicSignalOperationsService
             GovernorDecisionRef = NormalizeOptional(receipt.GovernorDecisionRef) ?? DefaultGovernorDecisionSourceRef,
             ReleaseProofReceiptId = NormalizeOptional(receipt.ReleaseProofReceiptId) ?? "proof-pending",
             IdempotencyKey = NormalizeOptional(receipt.IdempotencyKey) ?? "unknown",
-            Summary = NormalizeOptional(receipt.Summary) ?? "A bounded feedback closeout dispatch receipt was stored.",
+            Summary = NormalizeOptional(receipt.Summary) ?? "A bounded ProductLift closeout dispatch receipt was stored.",
             Error = NormalizeOptional(receipt.Error),
             RecoveryAttemptCount = Math.Max(0, receipt.RecoveryAttemptCount),
             LastRecoveryStatus = NormalizeOptional(receipt.LastRecoveryStatus),
@@ -2858,7 +2889,7 @@ public sealed class PublicSignalOperationsService
             ReleaseProofReceiptId = NormalizeOptional(receipt.ReleaseProofReceiptId) ?? "proof-pending",
             RecipientCount = Math.Max(0, receipt.RecipientCount),
             SentCount = Math.Max(0, receipt.SentCount),
-            Summary = NormalizeOptional(receipt.Summary) ?? "A bounded feedback journey receipt was stored."
+            Summary = NormalizeOptional(receipt.Summary) ?? "A bounded ProductLift journey receipt was stored."
         };
     }
 
@@ -2902,7 +2933,7 @@ public sealed class PublicSignalOperationsService
             ReplayCandidateCount = Math.Max(0, run.ReplayCandidateCount),
             DispatchReceiptsCreated = Math.Max(0, run.DispatchReceiptsCreated),
             JourneyReceiptsRecorded = Math.Max(0, run.JourneyReceiptsRecorded),
-            Summary = NormalizeOptional(run.Summary) ?? "A bounded feedback replay run was recorded."
+            Summary = NormalizeOptional(run.Summary) ?? "A bounded ProductLift replay run was recorded."
         };
     }
 
@@ -3390,14 +3421,14 @@ public sealed class PublicSignalOperationsService
                 MarkCloseoutSent(deliveryId, recipient, sourceReceipt, subject, providerMessageId);
                 deliveryState = "sent";
                 statusLabel = "Sent";
-                summary = $"Hub queued and marked sent a bounded feedback closeout for {recipient.UserId} from source receipt {sourceReceipt.ReceiptId}.";
+                summary = $"Hub queued and marked sent a bounded ProductLift closeout for {recipient.UserId} from source receipt {sourceReceipt.ReceiptId}.";
             }
             catch (Exception ex)
             {
                 error = Truncate(ex.Message, 600);
                 deliveryState = "accepted";
                 statusLabel = "Provider accepted";
-                summary = $"Emailit accepted a bounded feedback closeout for {recipient.UserId}, but Hub could not finish the outbox sent receipt.";
+                summary = $"Emailit accepted a bounded ProductLift closeout for {recipient.UserId}, but Hub could not finish the outbox sent receipt.";
                 suppressionCheck = "passed";
             }
         }
@@ -3405,7 +3436,7 @@ public sealed class PublicSignalOperationsService
         {
             error = Truncate(ex.Message, 600);
             suppressionCheck = ResolveSuppressionCheck(error, !string.IsNullOrWhiteSpace(deliveryId));
-            summary = $"Hub could not complete the bounded feedback closeout send for {recipient.UserId} from source receipt {sourceReceipt.ReceiptId}.";
+            summary = $"Hub could not complete the bounded ProductLift closeout send for {recipient.UserId} from source receipt {sourceReceipt.ReceiptId}.";
             if (!string.IsNullOrWhiteSpace(deliveryId))
             {
                 TryMarkCloseoutFailed(deliveryId, error);
@@ -3502,7 +3533,7 @@ public sealed class PublicSignalOperationsService
                 ReleaseProofReceiptId: releaseProofReceiptId,
                 RecipientCount: recipientCount,
                 SentCount: sentCount,
-                Summary: $"Hub wrote a bounded {VoterNotifiedJourneyEventKey} journey receipt from feedback source receipt {sourceReceipt.ReceiptId} after {sentCount} of {recipientCount} first-party closeout send(s) completed.",
+                Summary: $"Hub wrote a bounded {VoterNotifiedJourneyEventKey} journey receipt from ProductLift source receipt {sourceReceipt.ReceiptId} after {sentCount} of {recipientCount} first-party closeout send(s) completed.",
                 PublicClaimAllowed: false,
                 RecordedAtUtc: DateTimeOffset.UtcNow);
             _journeyReceipts.Add(receipt);
@@ -3524,9 +3555,9 @@ public sealed class PublicSignalOperationsService
     {
         string summary = status switch
         {
-            "replayed" => $"Replay materialized {dispatchReceiptsCreated} bounded closeout dispatch update(s) and {journeyReceiptsRecorded} journey update(s) from {replayCandidateCount} ready feedback source item(s).",
-            "ready_without_new_receipts" => $"Replay inspected {replayCandidateCount} ready feedback source item(s), but no new bounded dispatch or journey updates were needed.",
-            _ => $"Replay found no ready feedback closeout source items that still needed bounded dispatch materialization."
+            "replayed" => $"Replay materialized {dispatchReceiptsCreated} bounded closeout dispatch update(s) and {journeyReceiptsRecorded} journey update(s) from {replayCandidateCount} ready ProductLift source item(s).",
+            "ready_without_new_receipts" => $"Replay inspected {replayCandidateCount} ready ProductLift source item(s), but no new bounded dispatch or journey updates were needed.",
+            _ => $"Replay found no ready ProductLift closeout source items that still needed bounded dispatch materialization."
         };
         ProductLiftReconcileRunReceiptState run = new(
             RunReceiptId: $"plreconcile_{Guid.NewGuid():N}",
@@ -3565,7 +3596,7 @@ public sealed class PublicSignalOperationsService
         string summary = status switch
         {
             "recovered" => $"{subjectLabel} finalized {recoveredReceiptCount} bounded closeout receipt(s), held {suppressedReceiptCount} under suppression, and left {blockedReceiptCount} blocked.",
-            "suppressed_only" => $"{subjectLabel} found only suppression-held feedback closeout receipt(s); {suppressedReceiptCount} stayed out of retry.",
+            "suppressed_only" => $"{subjectLabel} found only suppression-held ProductLift closeout receipt(s); {suppressedReceiptCount} stayed out of retry.",
             "blocked" => $"{subjectLabel} inspected {candidateReceiptCount} candidate receipt(s), but none could be finalized without broadening the bounded delivery contract.",
             _ => retryExpiryRun
                 ? "Automatic retry expiry sweep found no bounded provider retry hold whose window had expired."
@@ -3741,7 +3772,7 @@ public sealed class PublicSignalOperationsService
                 StatusLabel = "Sent after recovery",
                 DeliveryState = "sent",
                 ProviderMessageId = providerMessageId,
-                Summary = $"Dispatch recovery retried the bounded feedback closeout for {existing.RecipientRef} and completed the first-party outbox sent record.",
+                Summary = $"Dispatch recovery retried the bounded ProductLift closeout for {existing.RecipientRef} and completed the first-party outbox sent record.",
                 Error = null,
                 SuppressionCheck = "passed",
                 RecoveryAttemptCount = existing.RecoveryAttemptCount + 1,
@@ -3781,7 +3812,7 @@ public sealed class PublicSignalOperationsService
         string recoveryStatus)
         => UpdateDispatchReceipt(receipt.ReceiptId, existing => existing with
         {
-            Summary = $"{summaryLabel}. The bounded feedback closeout receipt for {existing.RecipientRef} remains out of automatic recovery.",
+            Summary = $"{summaryLabel}. The bounded ProductLift closeout receipt for {existing.RecipientRef} remains out of automatic recovery.",
             RecoveryAttemptCount = existing.RecoveryAttemptCount + 1,
             LastRecoveryStatus = recoveryStatus,
             LastRecoveryAtUtc = DateTimeOffset.UtcNow
@@ -4203,7 +4234,7 @@ public sealed class PublicSignalOperationsService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to mark feedback closeout delivery {DeliveryId} as failed.", deliveryId);
+            _logger.LogWarning(ex, "Failed to mark ProductLift closeout delivery {DeliveryId} as failed.", deliveryId);
         }
     }
 
@@ -4522,7 +4553,7 @@ public sealed class PublicSignalOperationsService
 
         if (!readiness.ConsentConfigured)
         {
-            return "A first-party consent or transactional-basis record is still required for feedback closeout.";
+            return "A first-party consent or transactional-basis record is still required for ProductLift closeout.";
         }
 
         if (!readiness.QueueConfigured)
@@ -4677,7 +4708,7 @@ public sealed class PublicSignalOperationsService
 
         if (string.Equals(statusLabel, "Ownership blocked", StringComparison.OrdinalIgnoreCase))
         {
-            return "Recipient matching must stay first-party before feedback closeout can move toward delivery.";
+            return "Recipient matching must stay first-party before ProductLift closeout can move toward delivery.";
         }
 
         if (string.Equals(statusLabel, "Recipient list pending", StringComparison.OrdinalIgnoreCase))
@@ -4692,7 +4723,7 @@ public sealed class PublicSignalOperationsService
 
         if (string.Equals(statusLabel, "Consent basis pending", StringComparison.OrdinalIgnoreCase))
         {
-            return "A first-party consent or transactional-basis record is still required for feedback closeout.";
+            return "A first-party consent or transactional-basis record is still required for ProductLift closeout.";
         }
 
         if (string.Equals(statusLabel, "Queue adapter pending", StringComparison.OrdinalIgnoreCase))
@@ -4770,7 +4801,7 @@ public sealed class PublicSignalOperationsService
 
         if (!readiness.OwnerReady)
         {
-            return "Recipient matching must stay first-party before feedback closeout can move toward delivery.";
+            return "Recipient matching must stay first-party before ProductLift closeout can move toward delivery.";
         }
 
         if (!readiness.ProjectionConfigured)
@@ -4785,7 +4816,7 @@ public sealed class PublicSignalOperationsService
 
         if (!readiness.ConsentConfigured)
         {
-            return "A first-party consent or transactional-basis record is still required for feedback closeout.";
+            return "A first-party consent or transactional-basis record is still required for ProductLift closeout.";
         }
 
         if (!readiness.QueueConfigured)

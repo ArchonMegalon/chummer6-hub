@@ -1,0 +1,12 @@
+{
+  "contractName": "chummer.public-pwa-proof-authority.v1",
+  "policyId": "chummer.public-play-pwa-mirror.v1",
+  "assetPolicyCount": 12,
+  "dependencyPolicyCount": 4,
+  "verifierPath": "scripts/verify_public_pwa_static_assets.py",
+  "verifierSha256": "b5fa1a2863fe19f57cfe1d56ee6961f1eb92ec48829484ad740942e96d2210d7",
+  "generatorPath": "scripts/generate_public_play_worker_projection.py",
+  "generatorSha256": "d05c3610bd44546af5dd5cb4703012395eaccb6cae0ffae8768d4ce9518dbf17",
+  "inventoryPath": "Chummer.Run.Api/play-pwa-required-inventory.json",
+  "inventorySha256": "cdf7a49e98e7926cae82ea8bff0e219ce9a5a5133b3ef222954046c9d4a51f2a"
+}

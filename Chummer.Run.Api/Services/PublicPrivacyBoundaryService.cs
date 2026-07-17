@@ -38,7 +38,16 @@ public sealed class PublicPrivacyBoundaryService
             Id: "provider_traces",
             Label: "Help tools",
             PublicProjection: "Public help may show short answers and source links, not raw transcripts.",
-            SignedInProjection: "Signed-in help may show the answer path without becoming the account record.")
+            SignedInProjection: "Signed-in help may show the answer path without becoming the account record."),
+        new(
+            MarkdownHeading: "Hosted Build workspaces",
+            Id: "hosted_build_workspaces",
+            Label: "Hosted Build workspaces",
+            PublicProjection: "No Hosted Build workspace content is public.",
+            SignedInProjection: "Signed-in account surfaces may show only the owner's live hosted workspaces.",
+            Status: PrivacyLaunchGate.Current.Status,
+            ReviewRequired: PrivacyLaunchGate.Current.ReviewRequired,
+            LaunchBlockingReason: PrivacyLaunchGate.Current.Reason)
     ];
     private static readonly BoundarySurfaceRuleSpec[] BoundarySurfaceRules =
     [
@@ -62,21 +71,30 @@ public sealed class PublicPrivacyBoundaryService
     {
         var document = LoadDocument();
         var (primaryAction, secondaryAction) = BuildActions(pageId);
+        var domains = (document.Domains ?? new List<PublicPrivacyBoundaryDomainDocument>())
+            .Select(domain =>
+            {
+                BoundaryDomainSpec spec = RequireDomainSpec(domain.Id);
+                return new PrivacyBoundaryDomainViewModel(
+                    Label: RequireText(domain.Label, "privacy boundary domain label"),
+                    Owner: RequireText(domain.Owner, $"privacy boundary domain '{domain.Id}' owner"),
+                    RetentionSummary: RequireText(domain.RetentionSummary, $"privacy boundary domain '{domain.Id}' retention summary"),
+                    RedactionSummary: RequireText(domain.RedactionSummary, $"privacy boundary domain '{domain.Id}' redaction summary"),
+                    PublicProjection: RequireText(domain.PublicProjection, $"privacy boundary domain '{domain.Id}' public projection"),
+                    SignedInProjection: RequireText(domain.SignedInProjection, $"privacy boundary domain '{domain.Id}' signed-in projection"),
+                    Status: spec.Status,
+                    ReviewRequired: spec.ReviewRequired,
+                    LaunchBlockingReason: spec.LaunchBlockingReason);
+            })
+            .ToArray();
+        BoundaryDomainSpec? blockingDomain = BoundaryDomains.FirstOrDefault(static domain => domain.ReviewRequired);
 
         return new PrivacyBoundaryPanelViewModel(
             Eyebrow: RequireText(document.Eyebrow, "privacy boundary eyebrow"),
             Heading: RequireText(document.Heading, "privacy boundary heading"),
             Summary: RequireText(document.Summary, "privacy boundary summary"),
             MicroProof: document.MicroProof?.ToArray() ?? Array.Empty<string>(),
-            Domains: (document.Domains ?? new List<PublicPrivacyBoundaryDomainDocument>())
-                .Select(domain => new PrivacyBoundaryDomainViewModel(
-                    Label: RequireText(domain.Label, "privacy boundary domain label"),
-                    Owner: RequireText(domain.Owner, $"privacy boundary domain '{domain.Id}' owner"),
-                    RetentionSummary: RequireText(domain.RetentionSummary, $"privacy boundary domain '{domain.Id}' retention summary"),
-                    RedactionSummary: RequireText(domain.RedactionSummary, $"privacy boundary domain '{domain.Id}' redaction summary"),
-                    PublicProjection: RequireText(domain.PublicProjection, $"privacy boundary domain '{domain.Id}' public projection"),
-                    SignedInProjection: RequireText(domain.SignedInProjection, $"privacy boundary domain '{domain.Id}' signed-in projection")))
-                .ToArray(),
+            Domains: domains,
             SurfaceRules: (document.SurfaceRules ?? new List<PublicPrivacyBoundarySurfaceRuleDocument>())
                 .Select(rule => new PrivacyBoundarySurfaceRuleViewModel(
                     Label: RequireText(rule.Label, $"privacy boundary surface rule '{rule.Id}' label"),
@@ -84,12 +102,16 @@ public sealed class PublicPrivacyBoundaryService
                     BlockedSummary: RequireText(rule.BlockedSummary, $"privacy boundary surface rule '{rule.Id}' blocked summary")))
                 .ToArray(),
             PrimaryAction: primaryAction,
-            SecondaryAction: secondaryAction);
+            SecondaryAction: secondaryAction,
+            Status: blockingDomain?.Status ?? "documented",
+            ReviewRequired: blockingDomain is not null,
+            LaunchBlockingReason: blockingDomain?.LaunchBlockingReason);
     }
 
     public string LoadArtifactJson()
     {
         var document = LoadDocument();
+        BoundaryDomainSpec? blockingDomain = BoundaryDomains.FirstOrDefault(static domain => domain.ReviewRequired);
         var artifact = new PublicPrivacyBoundaryArtifact(
             ContractName: string.IsNullOrWhiteSpace(document.ContractName) ? DefaultContractName : document.ContractName!,
             ContractVersion: document.Version,
@@ -100,14 +122,21 @@ public sealed class PublicPrivacyBoundaryService
             Summary: RequireText(document.Summary, "privacy boundary summary"),
             MicroProof: document.MicroProof?.ToArray() ?? Array.Empty<string>(),
             Domains: (document.Domains ?? new List<PublicPrivacyBoundaryDomainDocument>())
-                .Select(domain => new PublicPrivacyBoundaryArtifactDomain(
-                    Id: RequireText(domain.Id, "privacy boundary domain id"),
-                    Label: RequireText(domain.Label, $"privacy boundary domain '{domain.Id}' label"),
-                    Owner: RequireText(domain.Owner, $"privacy boundary domain '{domain.Id}' owner"),
-                    RetentionSummary: RequireText(domain.RetentionSummary, $"privacy boundary domain '{domain.Id}' retention summary"),
-                    RedactionSummary: RequireText(domain.RedactionSummary, $"privacy boundary domain '{domain.Id}' redaction summary"),
-                    PublicProjection: RequireText(domain.PublicProjection, $"privacy boundary domain '{domain.Id}' public projection"),
-                    SignedInProjection: RequireText(domain.SignedInProjection, $"privacy boundary domain '{domain.Id}' signed-in projection")))
+                .Select(domain =>
+                {
+                    BoundaryDomainSpec spec = RequireDomainSpec(domain.Id);
+                    return new PublicPrivacyBoundaryArtifactDomain(
+                        Id: RequireText(domain.Id, "privacy boundary domain id"),
+                        Label: RequireText(domain.Label, $"privacy boundary domain '{domain.Id}' label"),
+                        Owner: RequireText(domain.Owner, $"privacy boundary domain '{domain.Id}' owner"),
+                        RetentionSummary: RequireText(domain.RetentionSummary, $"privacy boundary domain '{domain.Id}' retention summary"),
+                        RedactionSummary: RequireText(domain.RedactionSummary, $"privacy boundary domain '{domain.Id}' redaction summary"),
+                        PublicProjection: RequireText(domain.PublicProjection, $"privacy boundary domain '{domain.Id}' public projection"),
+                        SignedInProjection: RequireText(domain.SignedInProjection, $"privacy boundary domain '{domain.Id}' signed-in projection"),
+                        Status: spec.Status,
+                        ReviewRequired: spec.ReviewRequired,
+                        LaunchBlockingReason: spec.LaunchBlockingReason);
+                })
                 .ToArray(),
             SurfaceRules: (document.SurfaceRules ?? new List<PublicPrivacyBoundarySurfaceRuleDocument>())
                 .Select(rule => new PublicPrivacyBoundaryArtifactSurfaceRule(
@@ -115,7 +144,17 @@ public sealed class PublicPrivacyBoundaryService
                     Label: RequireText(rule.Label, $"privacy boundary surface rule '{rule.Id}' label"),
                     Summary: RequireText(rule.Summary, $"privacy boundary surface rule '{rule.Id}' summary"),
                     BlockedSummary: RequireText(rule.BlockedSummary, $"privacy boundary surface rule '{rule.Id}' blocked summary")))
-                .ToArray());
+                .ToArray(),
+            Status: blockingDomain?.Status ?? "documented",
+            ReviewRequired: blockingDomain is not null,
+            LaunchBlockingReason: blockingDomain?.LaunchBlockingReason,
+            Scope: PrivacyLaunchGate.Current.Scope,
+            CapabilityContractName: PrivacyLaunchGate.Current.CapabilityContractName,
+            CapabilityContractVersion: PrivacyLaunchGate.Current.CapabilityContractVersion,
+            Facts: PrivacyLaunchGate.Current.Facts,
+            ProhibitedClaims: PrivacyLaunchGate.Current.ProhibitedClaims,
+            BlocksLaunch: PrivacyLaunchGate.Current.BlocksReleaseSupportability,
+            BlockedClaims: PrivacyLaunchGate.Current.BlockedClaims);
 
         return JsonSerializer.Serialize(artifact, JsonOptions);
     }
@@ -161,12 +200,12 @@ public sealed class PublicPrivacyBoundaryService
         {
             Product = "chummer",
             Surface = "public_privacy_boundaries",
-            Version = 1,
+            Version = 2,
             ContractName = DefaultContractName,
             AsOf = privacyPage.UpdatedDate ?? privacyPage.EffectiveDate ?? string.Empty,
             Eyebrow = "Privacy",
-            Heading = "Support and feedback data expire on a clear schedule",
-            Summary = "Chummer keeps only the account, install, help, and feedback details needed to run the product, answer you, and retire temporary logs on schedule.",
+            Heading = "What Chummer stores, hides, and still needs review",
+            Summary = "Chummer keeps account, install, help, feedback, and owner-scoped Hosted Build workspace data. This page separates approved retention rules from Hosted Build recovery and erasure policy that is still under review.",
             MicroProof = privacyPage.SummaryPoints ?? new List<string>(),
             Domains = BoundaryDomains
                 .Select(spec => BuildDomain(spec, retentionDomains))
@@ -267,7 +306,7 @@ public sealed class PublicPrivacyBoundaryService
 
             if (line.StartsWith("Owner:", StringComparison.Ordinal))
             {
-                owner = line["Owner:".Length..].Trim();
+                owner = NormalizeOwner(line["Owner:".Length..]);
                 continue;
             }
 
@@ -422,12 +461,22 @@ public sealed class PublicPrivacyBoundaryService
             ? throw new InvalidOperationException($"{description} is missing required text.")
             : value;
 
+    private static string NormalizeOwner(string value)
+        => value.Replace("`", string.Empty, StringComparison.Ordinal).Trim();
+
+    private static BoundaryDomainSpec RequireDomainSpec(string? id)
+        => BoundaryDomains.FirstOrDefault(domain => string.Equals(domain.Id, id, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException($"privacy boundary domain '{id}' has no projection specification.");
+
     private sealed record BoundaryDomainSpec(
         string MarkdownHeading,
         string Id,
         string Label,
         string PublicProjection,
-        string SignedInProjection);
+        string SignedInProjection,
+        string Status = "documented",
+        bool ReviewRequired = false,
+        string? LaunchBlockingReason = null);
 
     private sealed record BoundarySurfaceRuleSpec(
         string MarkdownHeading,
@@ -449,7 +498,17 @@ public sealed class PublicPrivacyBoundaryService
         string Summary,
         IReadOnlyList<string> MicroProof,
         IReadOnlyList<PublicPrivacyBoundaryArtifactDomain> Domains,
-        IReadOnlyList<PublicPrivacyBoundaryArtifactSurfaceRule> SurfaceRules);
+        IReadOnlyList<PublicPrivacyBoundaryArtifactSurfaceRule> SurfaceRules,
+        string Status,
+        bool ReviewRequired,
+        string? LaunchBlockingReason,
+        string Scope,
+        string CapabilityContractName,
+        int CapabilityContractVersion,
+        IReadOnlyList<string> Facts,
+        IReadOnlyList<string> ProhibitedClaims,
+        bool BlocksLaunch,
+        IReadOnlyList<string> BlockedClaims);
 
     private sealed record PublicPrivacyBoundaryArtifactDomain(
         string Id,
@@ -458,7 +517,10 @@ public sealed class PublicPrivacyBoundaryService
         string RetentionSummary,
         string RedactionSummary,
         string PublicProjection,
-        string SignedInProjection);
+        string SignedInProjection,
+        string Status,
+        bool ReviewRequired,
+        string? LaunchBlockingReason);
 
     private sealed record PublicPrivacyBoundaryArtifactSurfaceRule(
         string Id,

@@ -46,7 +46,8 @@ public sealed class HorizonCapabilityService
             RequiresAuthentication: true,
             PublicVisible: false,
             EnabledByDefault: false,
-            CostClass: "high"),
+            CostClass: "high",
+            OrchestrationLane: HorizonGovernedRenderRequestComposerService.OrchestrationLane),
         new(
             HorizonId: "propertyquarry",
             CapabilityId: "propertyquarry-tour",
@@ -72,7 +73,8 @@ public sealed class HorizonCapabilityService
             RequiresAuthentication: true,
             PublicVisible: false,
             EnabledByDefault: false,
-            CostClass: "high"),
+            CostClass: "high",
+            OrchestrationLane: HorizonGovernedRenderRequestComposerService.OrchestrationLane),
         new(
             HorizonId: "jackpoint",
             CapabilityId: "jackpoint-briefing-video",
@@ -256,7 +258,7 @@ public sealed class HorizonCapabilityService
             ArtifactKind: "premium_authoring_credit",
             PublicLabel: "Premium Authoring Credit",
             CapabilitySlot: "guided_origin_authoring",
-            InternalProviderLane: "First Book ai / Chummer OriginBookEngine",
+            InternalProviderLane: "Subscribr.ai full-story manuscript lane",
             FreeWeeklyLimit: 1,
             SupporterWeeklyLimit: 2,
             RequiresAuthentication: true,
@@ -272,13 +274,14 @@ public sealed class HorizonCapabilityService
             ArtifactKind: "dossier_media",
             PublicLabel: "Dossier Media",
             CapabilitySlot: "approved_origin_media",
-            InternalProviderLane: "Magicfit / Subscribr.ai / First Book ai / MarkupGo / vidBoard / Soundmadeseen",
+            InternalProviderLane: "Subscribr.ai full-story manuscript lane / Magicfit visuals / First Book ai packaging / approved audiobook providers",
             FreeWeeklyLimit: 0,
             SupporterWeeklyLimit: 2,
             RequiresAuthentication: true,
             PublicVisible: false,
             EnabledByDefault: false,
-            CostClass: "high")
+            CostClass: "high",
+            OrchestrationLane: HorizonGovernedRenderRequestComposerService.OrchestrationLane)
     ];
 
     private readonly IConfiguration _configuration;
@@ -493,7 +496,8 @@ public sealed record HorizonCapabilityDefinition(
     string QuotaAuthority = "supporter_weekly",
     string AllowanceWindowKind = "weekly",
     string EntitlementBasisSuffix = "weekly_allowance",
-    string EntitlementScope = "account");
+    string EntitlementScope = "account",
+    string? OrchestrationLane = null);
 
 public sealed record HorizonArtifactSurfaceDefinition(
     string HorizonId,

@@ -2,6 +2,7 @@ using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.InstallLinking;
 using System.Text.Json;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -24,7 +25,10 @@ public sealed class NexusPanContinuityServiceTests
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json")
                 })
                 .Build();
-            InstallLinkingStore store = new(configuration, NullLogger<InstallLinkingStore>.Instance);
+            InstallLinkingStore store = new(
+                configuration,
+                DataProtectionProvider.Create(Path.Combine(tempRoot, "install-linking-keys")),
+                NullLogger<InstallLinkingStore>.Instance);
             NexusPanContinuityService service = new(store);
 
             IReadOnlyList<NexusPanReceipt> receipts = service.ListReceipts();
@@ -64,7 +68,10 @@ public sealed class NexusPanContinuityServiceTests
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json")
                 })
                 .Build();
-            InstallLinkingStore store = new(configuration, NullLogger<InstallLinkingStore>.Instance);
+            InstallLinkingStore store = new(
+                configuration,
+                DataProtectionProvider.Create(Path.Combine(tempRoot, "install-linking-keys")),
+                NullLogger<InstallLinkingStore>.Instance);
             NexusPanContinuityService service = new(store);
 
             using JsonDocument payload = JsonDocument.Parse(service.BuildMobilePwaJson());

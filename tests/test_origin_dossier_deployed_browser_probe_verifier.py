@@ -44,6 +44,9 @@ def probe_payload(*, status: str = "blocked") -> dict:
         "listen_section_visible": passed,
         "watch_tab_visible": passed,
         "watch_section_visible": passed,
+        "portrait_choice_count_verified": passed,
+        "audiobook_voice_count_verified": passed,
+        "scene_highlight_count_verified": passed,
         "canon_audit_tab_visible": passed,
         "canon_audit_section_visible": passed,
         "chummer_canon_owner_visible": passed,
@@ -472,6 +475,7 @@ def test_default_probe_path_uses_origin_edition_env_context(monkeypatch, tmp_pat
     monkeypatch.setenv("CHUMMER_ORIGIN_EDITION_FAMILY_NAME", "Case")
     monkeypatch.setenv("CHUMMER_ORIGIN_EDITION_GIVEN_NAME", "Ari")
     monkeypatch.setenv("CHUMMER_ORIGIN_EDITION_RUNNER_NAME", "Ghost")
+    monkeypatch.setenv("CHUMMER_ORIGIN_EDITION_BASE_URL", "https://chummer.run")
     monkeypatch.delenv("CHUMMER_ORIGIN_EDITION_NAMESPACE", raising=False)
 
     assert module.deployed_browser_probe_from_env() == (

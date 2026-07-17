@@ -1,0 +1,14 @@
+[Unit]
+Description=Recover qBittorrent after cloud-mount write faults
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/qbittorrent-storage-watchdog.sh
+User=root
+Group=root
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full

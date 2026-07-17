@@ -291,6 +291,9 @@ public sealed class ParticipantNotificationTests
                 entryRoute: "/packages/desktop-preview/vote",
                 authProviderFamily: "email",
                 cancellationToken: CancellationToken.None);
+            string storePath = Path.Combine(tempRoot, "community-store.json");
+            DateTime firstWrite = File.GetLastWriteTimeUtc(storePath);
+            await Task.Delay(1100);
             ParticipationOperatorNotificationReceipt? second = await service.NotifyFirstActionIfNeededAsync(
                 user,
                 user.Email,
@@ -298,12 +301,15 @@ public sealed class ParticipantNotificationTests
                 entryRoute: "/packages/desktop-preview/vote",
                 authProviderFamily: "email",
                 cancellationToken: CancellationToken.None);
+            DateTime secondWrite = File.GetLastWriteTimeUtc(storePath);
 
             Assert.NotNull(first);
             Assert.NotNull(second);
             Assert.Equal("suppressed_recipient_missing", first!.Status);
             Assert.Equal("suppressed_recipient_missing", first.Envelope!.ReviewState);
             Assert.Equal(first.ReceiptId, second!.ReceiptId);
+            Assert.Equal(first.AttemptedAtUtc, second.AttemptedAtUtc);
+            Assert.Equal(firstWrite, secondWrite);
             Assert.Empty(requests);
         }
         finally

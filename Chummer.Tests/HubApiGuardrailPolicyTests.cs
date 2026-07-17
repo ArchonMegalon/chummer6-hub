@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Net;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -12,11 +13,47 @@ namespace Chummer.Tests;
 public sealed class HubApiGuardrailPolicyTests
 {
     [Fact]
+    public void Client_key_ignores_untrusted_forwarded_for_header()
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.10");
+        context.Request.Headers["X-Forwarded-For"] = "198.51.100.77";
+
+        string clientKey = HubApiRateLimiterFactory.ResolveClientKey(context);
+
+        Assert.Equal("203.0.113.10", clientKey);
+    }
+
+    [Fact]
+    public void Client_key_without_resolved_remote_address_uses_shared_fallback()
+    {
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = null;
+        context.Request.Headers["X-Forwarded-For"] = "198.51.100.77";
+
+        string clientKey = HubApiRateLimiterFactory.ResolveClientKey(context);
+
+        Assert.Equal("remote-ip-unavailable", clientKey);
+    }
+
+    [Fact]
     public void ReleaseBundleUploadUsesFileTransferBucket()
     {
         var context = new DefaultHttpContext();
         context.Request.Method = HttpMethods.Post;
         context.Request.Path = "/api/internal/releases/bundles";
+
+        string bucket = HubApiGuardrailPolicy.ResolveRateLimitBucket(context.Request);
+
+        Assert.Equal(HubApiGuardrailPolicy.FileTransferBucket, bucket);
+    }
+
+    [Fact]
+    public void Anonymous_compatibility_download_uses_global_file_transfer_bucket()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Get;
+        context.Request.Path = "/downloads/get/guest-readable-artifact";
 
         string bucket = HubApiGuardrailPolicy.ResolveRateLimitBucket(context.Request);
 

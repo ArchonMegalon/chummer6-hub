@@ -171,15 +171,19 @@ SOURCE_MARKERS = {
     ],
     "Chummer.Run.Api/Views/PublicLanding/Status.cshtml": [
         "Status",
-        "<h1>Updated</h1>",
+        "Preview downloads",
+        "Stable downloads",
+        "Downloads paused",
         ">Downloads</a>",
         ">Help</a>",
+        'Replace("Open help", "Use Help", StringComparison.OrdinalIgnoreCase)',
         'aria-label="Status next actions"',
     ],
     "tests/RunServicesSmoke/Program.cs": [
-        'Assert(statusSource.Contains("Status", StringComparison.Ordinal), "status should keep the compact status eyebrow inside the one public decision surface.");',
+        'Assert(statusSource.Contains("Preview downloads", StringComparison.Ordinal), "status should keep an explicit preview heading when the public lane is not stable.");',
         'Assert(statusSource.Contains(">Downloads</a>", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");',
         'Assert(statusSource.Contains(">Help</a>", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");',
+        'Assert(statusSource.Contains("Replace(\\"Open help\\", \\"Use Help\\", StringComparison.OrdinalIgnoreCase)", StringComparison.Ordinal), "status should sanitize Open help copy inside the status body text.");',
     ],
     "scripts/materialize_hub_local_release_proof.py": [
         '"package_id": "next90-m120-hub-public-launch-health"',

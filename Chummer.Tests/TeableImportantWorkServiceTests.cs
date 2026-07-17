@@ -194,6 +194,21 @@ public sealed class TeableImportantWorkServiceTests
     private sealed class FakeTeableHandler : HttpMessageHandler
     {
         private readonly HashSet<string> _fields = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> SupportedFieldTypes = new(StringComparer.Ordinal)
+        {
+            "singleLineText",
+            "longText",
+            "user",
+            "attachment",
+            "checkbox",
+            "multipleSelect",
+            "singleSelect",
+            "date",
+            "number",
+            "rating",
+            "formula",
+            "rollup",
+        };
         public List<LoggedRequest> Requests { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -209,6 +224,7 @@ public sealed class TeableImportantWorkServiceTests
 
             if (request.Method == HttpMethod.Post && path == "/api/base/base-demo/table/")
             {
+                ValidateSupportedFieldTypes(body);
                 return Json(HttpStatusCode.Created, """{"id":"tbl_work"}""");
             }
 
@@ -221,6 +237,7 @@ public sealed class TeableImportantWorkServiceTests
             if (request.Method == HttpMethod.Post && path == "/api/table/tbl_work/field")
             {
                 using JsonDocument document = JsonDocument.Parse(body);
+                AssertSupportedFieldType(document.RootElement);
                 string name = document.RootElement.GetProperty("name").GetString() ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(name))
                 {
@@ -253,6 +270,27 @@ public sealed class TeableImportantWorkServiceTests
             {
                 Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json")
             };
+
+        private static void ValidateSupportedFieldTypes(string body)
+        {
+            using JsonDocument document = JsonDocument.Parse(body);
+            if (!document.RootElement.TryGetProperty("fields", out JsonElement fields)
+                || fields.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (JsonElement field in fields.EnumerateArray())
+            {
+                AssertSupportedFieldType(field);
+            }
+        }
+
+        private static void AssertSupportedFieldType(JsonElement field)
+        {
+            string type = field.GetProperty("type").GetString() ?? string.Empty;
+            Assert.Contains(type, SupportedFieldTypes);
+        }
     }
 
     private sealed record LoggedRequest(HttpMethod Method, string Path, string Body);

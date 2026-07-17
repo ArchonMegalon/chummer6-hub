@@ -22,6 +22,8 @@ public static class HubRequestObservability
     public const string CorrelationItemKey = "chummer.observability.correlation_id";
     public const string MeterName = "Chummer.Run.Api.Requests";
     public const string ActivitySourceName = "Chummer.Run.Api.Requests";
+    public const string MetricRouteFallback = "__unmatched__";
+    public const string MetricMethodFallback = "OTHER";
 
     public static readonly ActivitySource ActivitySource = new(ActivitySourceName);
     public static readonly Meter Meter = new(MeterName);

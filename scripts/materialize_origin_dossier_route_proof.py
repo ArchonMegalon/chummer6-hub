@@ -61,6 +61,15 @@ def sha256_response(response: requests.Response) -> str:
     return hashlib.sha256(response.content or b"").hexdigest()
 
 
+def expected_book_content_type_tokens(book_artifact_path: str) -> tuple[str, ...]:
+    path = str(book_artifact_path or "").strip().lower()
+    if path.endswith(".pdf"):
+        return ("application/pdf",)
+    if path.endswith(".epub"):
+        return ("application/epub+zip", "epub")
+    return ("application/pdf", "application/epub+zip", "epub")
+
+
 def require(condition: bool, message: str, failures: list[str]) -> None:
     if not condition:
         failures.append(message)
@@ -138,9 +147,11 @@ def materialize(
     token = token_for(context, token)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     import_payload = json.loads((evidence_root / "ORIGIN_DOSSIER_LIVE_IMPORT_REQUEST.generated.json").read_text(encoding="utf-8"))
+    request = import_payload.get("importRequest") if isinstance(import_payload.get("importRequest"), dict) else {}
     live_evidence = import_payload.get("evidence") if isinstance(import_payload.get("evidence"), dict) else {}
     expected_cover_sha = str(live_evidence.get("storySceneCoverSha256") or "").strip()
-    expected_book_sha = str(live_evidence.get("ebookArtifactSha256") or live_evidence.get("bookArtifactSha256") or "").strip()
+    expected_book_sha = str(live_evidence.get("bookArtifactSha256") or live_evidence.get("ebookArtifactSha256") or "").strip()
+    expected_book_content_types = expected_book_content_type_tokens(str(request.get("bookArtifactPath") or ""))
     expected_video_sha = str(live_evidence.get("dossierVideoSha256") or "").strip()
     failures: list[str] = []
     with tempfile.TemporaryDirectory(prefix="chummer-origin-route-") as temp_dir:
@@ -202,7 +213,7 @@ def materialize(
                 require(detail.status_code == 200, f"detail status {detail.status_code}", failures)
                 detail_text = detail.text
                 visible_missing_requirements = extract_missing_requirements(detail_text)
-                expected_cover_alt = f"Rendered Origin Dossier story scene cover for {context.runner_name}"
+                expected_cover_alt = f"Fitted Origin Dossier cover art for {context.runner_name}"
                 expected_cover_route = f'{cover_route}"'
                 selected_face_cover_marker_visible = 'data-story-scene-cover-uses-selected-character-face="true"' in detail_text
                 selected_face_cover_alt_visible = expected_cover_alt in detail_text
@@ -227,9 +238,9 @@ def materialize(
                     "data-provider-created-facts-auto-canon=\"false\"",
                     "data-canon-privacy-receipts-present=\"true\"",
                     "data-no-fallback-media-verified=\"true\"",
-                    "Read in Audiobookshelf",
+                    "Read the ebook",
                     "Listen in Audiobookshelf",
-                    "Watch scene movie",
+                    "Watch selected cinematic scene",
                     expected_cover_alt,
                     expected_cover_route,
                 ):
@@ -250,7 +261,11 @@ def materialize(
                 require(cover.status_code == 200, f"cover status {cover.status_code}", failures)
                 require("image/" in cover.headers.get("content-type", ""), "cover content type not image", failures)
                 require(book.status_code == 200, f"book status {book.status_code}", failures)
-                require("epub" in book.headers.get("content-type", "").lower(), "book content type not epub", failures)
+                require(
+                    any(token in book.headers.get("content-type", "").lower() for token in expected_book_content_types),
+                    "book content type mismatch",
+                    failures,
+                )
                 require(video.status_code == 200, f"video status {video.status_code}", failures)
                 require("video/mp4" in video.headers.get("content-type", ""), "video content type not mp4", failures)
                 require(canon_audit.status_code == 200, f"canon audit status {canon_audit.status_code}", failures)
@@ -354,7 +369,9 @@ def materialize(
                     "listenRouteRedirectVerified": listen.headers.get("location") == entry["audiobookshelfAudiobookShareUrl"],
                     "watchRouteVerified": video.status_code == 200 and "video/mp4" in video.headers.get("content-type", ""),
                     "coverRouteVerified": cover.status_code == 200 and "image/" in cover.headers.get("content-type", ""),
-                    "bookRouteVerified": book.status_code == 200 and "epub" in book.headers.get("content-type", "").lower(),
+                    "bookRouteVerified": book.status_code == 200 and any(
+                        token in book.headers.get("content-type", "").lower() for token in expected_book_content_types
+                    ),
                     "canonAuditRouteVerified": canon_audit.status_code == 200 and "application/json" in canon_audit.headers.get("content-type", ""),
                     "cover_sha_matches_import": cover_sha == expected_cover_sha,
                     "book_sha_matches_import": book_sha == expected_book_sha,

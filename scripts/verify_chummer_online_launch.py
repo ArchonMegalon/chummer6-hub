@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin
+from urllib.parse import parse_qs, urljoin, urlparse
 from urllib.request import Request, urlopen
 
 
@@ -17,10 +17,13 @@ DEFAULT_OUTPUT = REPO_ROOT / ".codex-studio" / "published" / "CHUMMER_ONLINE_LAU
 DEFAULT_BASE_URL = "https://chummer.run/"
 LAUNCH_PATH = "/app?command=character_roster"
 USER_AGENT = "ChummerOnlineLaunchGate/1.0"
+EXPECTED_REDIRECT_LAUNCH_PATH = "/blazor/app"
+CONTRACT_NAME = "chummer.online_character_roster_launch.v1"
 
 
 @dataclass
 class LaunchGateResult:
+    contractName: str
     status: str
     launch_url: str
     final_url: str | None
@@ -62,11 +65,49 @@ def excerpt(body: bytes, limit: int = 500) -> str:
     return text[:limit] + "..."
 
 
-def classify_response(http_status: int | None, body: bytes) -> tuple[bool, bool, str | None]:
+def is_redirected_launch_shell(final_url: str | None, lowered_body: str, has_blazor_marker: bool) -> bool:
+    if not final_url or not has_blazor_marker:
+        return False
+
+    parsed_final_url = urlparse(final_url)
+    if parsed_final_url.path.rstrip("/") != EXPECTED_REDIRECT_LAUNCH_PATH:
+        return False
+
+    return (
+        '<base href="/blazor/"' in lowered_body
+        and "manifest.webmanifest" in lowered_body
+        and "window.chummerpwa" in lowered_body
+        and "app.rybbit.io/api/script.js" in lowered_body
+    )
+
+
+def has_launch_roster_menu_markers(lowered_body: str) -> bool:
+    return (
+        "browser-app-classic-menu-bar" in lowered_body
+        and "data-app-menu-root" in lowered_body
+        and "browser-app-classic-toolstrip" in lowered_body
+    )
+
+
+def is_character_roster_launch(final_url: str | None, lowered_body: str) -> bool:
+    if not final_url:
+        return False
+
+    parsed_final_url = urlparse(final_url)
+    if parsed_final_url.path.rstrip("/") != EXPECTED_REDIRECT_LAUNCH_PATH:
+        return False
+
+    query = parse_qs(parsed_final_url.query)
+    commands = query.get("command", [])
+    return any(cmd.lower() == "character_roster" for cmd in commands)
+
+
+def classify_response(http_status: int | None, body: bytes, final_url: str | None = None) -> tuple[bool, bool, str | None]:
     text = body.decode("utf-8", errors="replace")
     lowered = text.lower()
     has_blazor_marker = "_framework/blazor" in lowered or "blazor.web" in lowered or "blazor" in lowered
     has_roster_marker = "character_roster" in lowered or "roster" in lowered
+    has_roster_menu_markers = has_launch_roster_menu_markers(lowered)
 
     if http_status != 200:
         return has_blazor_marker, has_roster_marker, f"http_{http_status or 'missing'}"
@@ -80,6 +121,10 @@ def classify_response(http_status: int | None, body: bytes) -> tuple[bool, bool,
         return has_blazor_marker, has_roster_marker, "not_found_body"
     if not has_blazor_marker:
         return has_blazor_marker, has_roster_marker, "missing_blazor_marker"
+    if is_redirected_launch_shell(final_url, lowered, has_blazor_marker):
+        if is_character_roster_launch(final_url, lowered) and not has_roster_menu_markers:
+            return has_blazor_marker, has_roster_marker, "missing_roster_menu_markers"
+        return has_blazor_marker, has_roster_marker, None
     if not has_roster_marker:
         return has_blazor_marker, has_roster_marker, "missing_roster_marker"
     return has_blazor_marker, has_roster_marker, None
@@ -92,6 +137,7 @@ def verify_launch(base_url: str) -> LaunchGateResult:
         http_status, final_url, body = fetch_url(launch_url)
     except Exception as exc:
         return LaunchGateResult(
+            contractName=CONTRACT_NAME,
             status="fail",
             launch_url=launch_url,
             final_url=None,
@@ -104,8 +150,9 @@ def verify_launch(base_url: str) -> LaunchGateResult:
             body_excerpt="",
         )
 
-    has_blazor_marker, has_roster_marker, failure_reason = classify_response(http_status, body)
+    has_blazor_marker, has_roster_marker, failure_reason = classify_response(http_status, body, final_url=final_url)
     return LaunchGateResult(
+        contractName=CONTRACT_NAME,
         status="pass" if failure_reason is None else "fail",
         launch_url=launch_url,
         final_url=final_url,

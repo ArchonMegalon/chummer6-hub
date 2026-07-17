@@ -15,6 +15,7 @@ public interface IIdentityEmailDeliveryService
 {
     IdentityEmailDeliveryResult DeliverMagicLink(string email, string displayName, string ticketId, string? nextPath, DateTimeOffset expiresAtUtc);
     IdentityEmailDeliveryStatusResponse GetStatus();
+    void RecordStartGuardrailBlock(string email, string deliveryMode, string previewNote);
     IdentityEmailWebhookAckResponse RecordEmailitWebhook(JsonElement payload);
 }
 
@@ -364,6 +365,36 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
         }
     }
 
+    public void RecordStartGuardrailBlock(string email, string deliveryMode, string previewNote)
+    {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        lock (_mutate)
+        {
+            _recentDeliveries.Add(new EmailDeliveryEventState(
+                DeliveryId: $"dly_{Guid.NewGuid():N}",
+                EmailKind: "magic_link_start",
+                TransportKey: "guardrail",
+                DeliveryMode: deliveryMode,
+                Status: "blocked",
+                Delivered: false,
+                RecipientEmail: normalizedEmail,
+                ProviderMessageId: null,
+                FailureReason: previewNote,
+                OccurredAtUtc: DateTimeOffset.UtcNow));
+
+            _recipientStates[normalizedEmail] = new RecipientState(
+                Email: normalizedEmail,
+                State: "blocked",
+                LastEvent: deliveryMode,
+                LastEventAtUtc: DateTimeOffset.UtcNow,
+                Provider: "guardrail",
+                ProviderDetail: previewNote);
+
+            TrimRecentDeliveries();
+            PersistLocked();
+        }
+    }
+
     public IdentityEmailWebhookAckResponse RecordEmailitWebhook(JsonElement payload)
     {
         var eventType = TryReadString(payload, "type")
@@ -450,15 +481,8 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
 
     private IEnumerable<IIdentityEmailTransport> CreateTransportOrder()
     {
-        var orderRaw = (_configuration["IDENTITY_EMAIL_PROVIDER_ORDER"] ?? "emailit_api,smtp").Trim();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var raw in orderRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var raw in ResolveTransportOrderKeys())
         {
-            if (!seen.Add(raw))
-            {
-                continue;
-            }
-
             if (string.Equals(raw, "emailit_api", StringComparison.OrdinalIgnoreCase))
             {
                 yield return new EmailitApiIdentityEmailTransport(_configuration, _logger, _httpClient);
@@ -471,8 +495,46 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
     }
 
     private bool AnyRealTransportConfigured()
-        => !string.IsNullOrWhiteSpace(_configuration["IDENTITY_EMAILIT_API_KEY"]?.Trim())
-           || !string.IsNullOrWhiteSpace(_configuration["IDENTITY_SMTP_HOST"]?.Trim());
+    {
+        var enabled = ResolveTransportOrderKeys();
+        return enabled.Contains("emailit_api", StringComparer.OrdinalIgnoreCase)
+                   && !string.IsNullOrWhiteSpace(_configuration["IDENTITY_EMAILIT_API_KEY"]?.Trim())
+               || enabled.Contains("smtp", StringComparer.OrdinalIgnoreCase)
+                   && !string.IsNullOrWhiteSpace(_configuration["IDENTITY_SMTP_HOST"]?.Trim());
+    }
+
+    private string[] ResolveTransportOrderKeys()
+    {
+        var orderRaw = _configuration["IDENTITY_EMAIL_PROVIDER_ORDER"];
+        if (string.IsNullOrWhiteSpace(orderRaw))
+        {
+            orderRaw = "none";
+        }
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var resolved = new List<string>();
+        foreach (var raw in orderRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!seen.Add(raw))
+            {
+                continue;
+            }
+
+            if (string.Equals(raw, "none", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(raw, "disabled", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (string.Equals(raw, "emailit_api", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(raw, "smtp", StringComparison.OrdinalIgnoreCase))
+            {
+                resolved.Add(raw);
+            }
+        }
+
+        return resolved.ToArray();
+    }
 
     private bool AllowUnsafeInlinePreviewLinks()
     {

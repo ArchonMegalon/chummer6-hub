@@ -12,9 +12,15 @@
 cloudflared.env
 cloudflared.env.*
 .state/
+docs/CODEX_FLAGSHIP_HANDOFF_WEB_BOOK.md
 /build-*.tar.gz
 /build-*.zip
 /nightly_build.zip
+
+# Local analysis and ad-hoc test-publish output.
+/.vexp/
+/Normal/
+/_completion/
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -23,6 +29,8 @@ cloudflared.env.*
 [Dd]ebug/
 [Dd]ebugPublic/
 [Rr]elease/
+!scripts/release/
+!scripts/release/*.py
 [Rr]eleases/
 x64/
 x86/

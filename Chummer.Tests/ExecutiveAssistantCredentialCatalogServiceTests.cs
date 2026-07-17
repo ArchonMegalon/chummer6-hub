@@ -21,13 +21,13 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
                 ["CHUMMER_EA_BLIPAI_APP_PASSWORD"] = "blip-secret",
                 ["CHUMMER_EA_MAGICFIT_TIER"] = "5",
                 ["CHUMMER_EA_MAGICFIT_EMAIL"] = "tibor.girschele@gmail.com",
-                ["CHUMMER_EA_MAGICFIT_PASSWORD"] = "rangersofB5",
+                ["CHUMMER_EA_MAGICFIT_PASSWORD"] = "magicfit-login-secret",
                 ["CHUMMER_EA_MAGICAI_TIER"] = "4",
                 ["MAGICAI_ACCOUNT_PRIMARY_EMAIL"] = "api.one@example.invalid",
                 ["MAGICAI_ACCOUNT_PRIMARY_PASSWORD"] = "magicai-login-secret",
                 ["MAGICAI_ACCOUNT_PRIMARY_API_KEY"] = "magicai-api-secret",
                 ["CHUMMER_EA_MAGICFIT_GM_SESSION_EMAIL"] = "session-account@example.invalid",
-                ["CHUMMER_EA_MAGICFIT_GM_SESSION_PASSWORD"] = "session-rangersofB5",
+                ["CHUMMER_EA_MAGICFIT_GM_SESSION_PASSWORD"] = "session-login-secret",
                 ["PROMPTING_SYSTEMS_API_KEY"] = "pa-secret",
                 ["PROMPT_ARCHITECTS_TIER4_VERIFIED"] = "true",
                 ["PROMPT_ARCHITECTS_API_AVAILABLE"] = "true",
@@ -40,6 +40,10 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
                 ["SUBSCRIBR_WEBHOOK_SECRET"] = "subscribr-webhook-secret",
                 ["SUBSCRIBR_TEAM_ID"] = "team-7",
                 ["SUBSCRIBR_INTEGRATION_CHANNEL_ID"] = "channel-integration",
+                ["CHUMMER_EA_SENDR_TIER"] = "4",
+                ["CHUMMER_EA_SENDR_EMAIL"] = "sendr@example.com",
+                ["CHUMMER_EA_SENDR_PASSWORD"] = "sendr-login-secret",
+                ["CHUMMER_EA_SENDR_API_KEY"] = "sendr-api-secret",
                 ["CHUMMER_EA_UNMIXR_TIER"] = "4",
                 ["CHUMMER_EA_UNMIXR_EMAIL"] = "voice@example.com",
                 ["CHUMMER_EA_UNMIXR_PASSWORD"] = "unmixr-login-secret",
@@ -66,6 +70,13 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.True(magicai.PasswordConfigured);
         Assert.True(magicai.PasswordAltConfigured);
         Assert.Equal("multi_account_pool_configured", magicai.Status);
+        Assert.Equal(1, magicai.DeclaredAccountCount);
+        Assert.Equal(1, magicai.LoginReadyAccountCount);
+        Assert.Equal(1, magicai.ApiKeyReadyAccountCount);
+        Assert.Equal(0, magicai.PendingApiKeyAccountCount);
+        ExecutiveAssistantCredentialSlotEntry magicaiPrimary = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ExecutiveAssistantCredentialSlotEntry>>(magicai.CredentialSlots));
+        Assert.Equal("PRIMARY", magicaiPrimary.Alias, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("configured", magicaiPrimary.Status);
 
         ExecutiveAssistantCredentialEntry promptArchitects = Assert.Single(result.Entries, static entry => entry.ToolId == "prompt_architects");
         Assert.Equal("4", promptArchitects.Tier);
@@ -84,6 +95,14 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.True(subscribr.PasswordAltConfigured);
         Assert.Equal("tracked_video_script_preproduction_lane", subscribr.Status);
 
+        ExecutiveAssistantCredentialEntry sendr = Assert.Single(result.Entries, static entry => entry.ToolId == "sendr");
+        Assert.Equal("4", sendr.Tier);
+        Assert.Equal("s***@e***", sendr.EmailMasked);
+        Assert.True(sendr.EmailConfigured);
+        Assert.True(sendr.PasswordConfigured);
+        Assert.True(sendr.PasswordAltConfigured);
+        Assert.Equal("api_configured_login_available", sendr.Status);
+
         ExecutiveAssistantCredentialEntry magicfitSession = Assert.Single(result.Entries, static entry => entry.ToolId == "magicfit_session");
         Assert.Equal("5", magicfitSession.Tier);
         Assert.Equal("s***@e***", magicfitSession.EmailMasked);
@@ -100,8 +119,8 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.Equal("configured", unmixr.Status);
 
         string serialized = System.Text.Json.JsonSerializer.Serialize(result);
-        Assert.DoesNotContain("rangersofB5", serialized, StringComparison.Ordinal);
-        Assert.DoesNotContain("session-rangersofB5", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("magicfit-login-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("session-login-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("magicai-login-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("magicai-api-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("pa-secret", serialized, StringComparison.Ordinal);
@@ -110,6 +129,8 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.DoesNotContain("subscribr-webhook-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("team-7", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("channel-integration", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("sendr-login-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("sendr-api-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("unmixr-login-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("unmixr-api-secret", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("voice-123", serialized, StringComparison.Ordinal);
@@ -140,6 +161,10 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.Equal("missing", magicai.Status);
         Assert.False(magicai.PasswordConfigured);
         Assert.False(magicai.PasswordAltConfigured);
+        Assert.Equal(0, magicai.DeclaredAccountCount);
+        Assert.Equal(0, magicai.LoginReadyAccountCount);
+        Assert.Equal(0, magicai.ApiKeyReadyAccountCount);
+        Assert.Equal(0, magicai.PendingApiKeyAccountCount);
 
         ExecutiveAssistantCredentialEntry promptArchitects = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "prompt_architects");
         Assert.Equal("missing", promptArchitects.Status);
@@ -149,6 +174,10 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
 
         ExecutiveAssistantCredentialEntry subscribr = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "subscribr");
         Assert.Equal("missing", subscribr.Status);
+
+        ExecutiveAssistantCredentialEntry sendr = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "sendr");
+        Assert.Equal("missing", sendr.Status);
+        Assert.False(sendr.PasswordAltConfigured);
 
         ExecutiveAssistantCredentialEntry magicfitSession = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "magicfit_session");
         Assert.Equal("missing", magicfitSession.Status);
@@ -180,10 +209,54 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
         Assert.True(magicai.PasswordConfigured);
         Assert.False(magicai.PasswordAltConfigured);
         Assert.Equal("login_only", magicai.Status);
+        Assert.Equal(1, magicai.DeclaredAccountCount);
+        Assert.Equal(1, magicai.LoginReadyAccountCount);
+        Assert.Equal(0, magicai.ApiKeyReadyAccountCount);
+        Assert.Equal(1, magicai.PendingApiKeyAccountCount);
+        ExecutiveAssistantCredentialSlotEntry runsitePoolAccount = Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ExecutiveAssistantCredentialSlotEntry>>(magicai.CredentialSlots));
+        Assert.Equal("RUNSITE_01", runsitePoolAccount.Alias, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("login_only", runsitePoolAccount.Status);
 
         string serialized = System.Text.Json.JsonSerializer.Serialize(service.GetCatalog());
         Assert.DoesNotContain("shared-password", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("runsite@example.invalid", serialized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetCatalog_tracks_magicai_pool_counts_across_multiple_declared_accounts_without_leaking_emails_or_keys()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_EA_MAGICAI_TIER"] = "4",
+                ["MAGICAI_ACCOUNT_01_EMAIL"] = "one@example.invalid",
+                ["MAGICAI_ACCOUNT_01_PASSWORD"] = "pw-one",
+                ["MAGICAI_ACCOUNT_02_EMAIL"] = "two@example.invalid",
+                ["MAGICAI_ACCOUNT_02_PASSWORD"] = "pw-two",
+                ["MAGICAI_ACCOUNT_02_API_KEY"] = "api-two",
+                ["MAGICAI_ACCOUNT_03_API_KEY"] = "api-three"
+            })
+            .Build();
+
+        ExecutiveAssistantCredentialCatalogService service = new(configuration);
+
+        ExecutiveAssistantCredentialEntry magicai = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "magicai");
+        IReadOnlyList<ExecutiveAssistantCredentialSlotEntry> slots = Assert.IsAssignableFrom<IReadOnlyList<ExecutiveAssistantCredentialSlotEntry>>(magicai.CredentialSlots);
+
+        Assert.Equal(3, magicai.DeclaredAccountCount);
+        Assert.Equal(2, magicai.LoginReadyAccountCount);
+        Assert.Equal(2, magicai.ApiKeyReadyAccountCount);
+        Assert.Equal(1, magicai.PendingApiKeyAccountCount);
+        Assert.Equal(3, slots.Count);
+        Assert.Contains(slots, static slot => slot.Alias == "01" && slot.Status == "login_only");
+        Assert.Contains(slots, static slot => slot.Alias == "02" && slot.Status == "configured");
+        Assert.Contains(slots, static slot => slot.Alias == "03" && slot.Status == "api_key_only");
+
+        string serialized = System.Text.Json.JsonSerializer.Serialize(service.GetCatalog());
+        Assert.DoesNotContain("one@example.invalid", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("two@example.invalid", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("api-two", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("api-three", serialized, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -203,6 +276,54 @@ public sealed class ExecutiveAssistantCredentialCatalogServiceTests
 
         ExecutiveAssistantCredentialEntry magicfitSession = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "magicfit_session");
         Assert.Equal("ready_but_not_isolated", magicfitSession.Status);
+    }
+
+    [Fact]
+    public void GetCatalog_marks_sendr_api_key_only_ready_without_leaking_key()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_EA_SENDR_TIER"] = "4",
+                ["SENDR_API_KEY"] = "sendr-fallback-api-secret"
+            })
+            .Build();
+
+        ExecutiveAssistantCredentialCatalogService service = new(configuration);
+
+        ExecutiveAssistantCredentialEntry sendr = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "sendr");
+        Assert.Equal("4", sendr.Tier);
+        Assert.False(sendr.EmailConfigured);
+        Assert.False(sendr.PasswordConfigured);
+        Assert.True(sendr.PasswordAltConfigured);
+        Assert.Equal("api_configured", sendr.Status);
+
+        string serialized = System.Text.Json.JsonSerializer.Serialize(service.GetCatalog());
+        Assert.DoesNotContain("sendr-fallback-api-secret", serialized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetCatalog_marks_sendr_api_token_alias_ready_without_leaking_token()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_EA_SENDR_TIER"] = "4",
+                ["SENDR_API_TOKEN"] = "sendr-token-secret"
+            })
+            .Build();
+
+        ExecutiveAssistantCredentialCatalogService service = new(configuration);
+
+        ExecutiveAssistantCredentialEntry sendr = Assert.Single(service.GetCatalog().Entries, static entry => entry.ToolId == "sendr");
+        Assert.Equal("4", sendr.Tier);
+        Assert.False(sendr.EmailConfigured);
+        Assert.False(sendr.PasswordConfigured);
+        Assert.True(sendr.PasswordAltConfigured);
+        Assert.Equal("api_configured", sendr.Status);
+
+        string serialized = System.Text.Json.JsonSerializer.Serialize(service.GetCatalog());
+        Assert.DoesNotContain("sendr-token-secret", serialized, StringComparison.Ordinal);
     }
 
     [Fact]

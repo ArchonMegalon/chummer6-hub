@@ -45,6 +45,47 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
         Assert.StartsWith("/login?next=", redirect.Url, StringComparison.Ordinal);
         Assert.Contains("%2Faccount%2Faccess%2Finstall-link%3FinstallationId%3Dins-unauth", redirect.Url, StringComparison.Ordinal);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public async Task Browser_install_link_login_return_path_does_not_relay_hostile_credentials()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.QueryString = new QueryString(
+            "?accessToken=top-secret&ticket=top-ticket&claimCode=top-claim&apiKey=top-key");
+
+        IActionResult result = await fixture.Controller.BrowserInstallLink(
+            installationId: "ins-safe",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "windows",
+            arch: "x64",
+            installLinkCallbackUri: "http://127.0.0.1:47761/install-link/callback?state=desktop&nonce=callback-proof&accessToken=nested-secret&unknown=nested-unknown#ticket=fragment-ticket",
+            cancellationToken: CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        string decoded = redirect.Url!;
+        for (int pass = 0; pass < 8; pass++)
+        {
+            decoded = Uri.UnescapeDataString(decoded);
+        }
+
+        Assert.Contains("installationId=ins-safe", decoded, StringComparison.Ordinal);
+        Assert.Contains("state=desktop", decoded, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-secret", decoded, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-ticket", decoded, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-claim", decoded, StringComparison.Ordinal);
+        Assert.DoesNotContain("top-key", decoded, StringComparison.Ordinal);
+        Assert.DoesNotContain("nested-secret", decoded, StringComparison.Ordinal);
+        Assert.DoesNotContain("nested-unknown", decoded, StringComparison.Ordinal);
+        Assert.DoesNotContain("fragment-ticket", decoded, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -75,6 +116,7 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
         ProblemDetails details = Assert.IsType<ProblemDetails>(problem.Value);
         Assert.Equal("install-link callback uri is invalid.", details.Detail);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
     }
 
     [Fact]
@@ -125,6 +167,40 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal("ins-browser-route", callback.InstallationId);
         Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
         Assert.Contains($"code={Uri.EscapeDataString(callback.CallbackCode)}", callbackHref, StringComparison.Ordinal);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public async Task Install_linking_api_success_applies_private_no_store_response_headers()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/api/v1/install-linking/me";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        ActionResult<InstallLinkingSummaryDto> result = await fixture.Controller.GetSummary(CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
+    }
+
+    [Fact]
+    public void Install_linking_api_error_applies_private_no_store_response_headers()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/api/v1/install-linking/redeem";
+
+        ActionResult<RedeemInstallClaimResponseDto> result = fixture.Controller.Redeem(request: null);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        AssertSensitiveResponseHeaders(fixture.Controller.Response.Headers);
     }
 
     [Theory]
@@ -401,6 +477,17 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         return true;
     }
 
+    private static void AssertSensitiveResponseHeaders(IHeaderDictionary headers)
+    {
+        Assert.Equal("private, no-store, max-age=0", headers.CacheControl.ToString());
+        Assert.Equal("no-store, max-age=0", headers["CDN-Cache-Control"].ToString());
+        Assert.Equal("no-store, max-age=0", headers["Cloudflare-CDN-Cache-Control"].ToString());
+        Assert.Equal("no-store", headers["Surrogate-Control"].ToString());
+        Assert.Equal("no-cache", headers.Pragma.ToString());
+        Assert.Equal("0", headers.Expires.ToString());
+        Assert.Equal("no-referrer", headers["Referrer-Policy"].ToString());
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
@@ -481,8 +568,11 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
                 NullLogger<HubIdentityClient>.Instance);
             CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(communityStore);
-            InstallLinkingStore installLinkingStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
             IDataProtectionProvider dataProtection = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
+            InstallLinkingStore installLinkingStore = new(
+                configuration,
+                dataProtection,
+                NullLogger<InstallLinkingStore>.Instance);
             AccountDesktopLaunchTicketService desktopLaunchTickets = new(dataProtection, configuration);
 
             Identity = identity;

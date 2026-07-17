@@ -73,9 +73,7 @@ public sealed class PublicTrustPulseService
                 static payload => string.Equals(payload.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal),
                 "hub local release status");
             FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
-            ImportRouteParityProofGuardSnapshot importRouteGuard = localReleaseProof is null
-                ? new ImportRouteParityProofGuardSnapshot(true, null)
-                : _importRouteParityProofGuard.Evaluate();
+            ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
             bool readinessReviewRequired = readiness?.RequiresReview == true;
             string? readinessReason = readinessReviewRequired
                 ? readiness!.ReviewRequiredSummary
@@ -97,7 +95,10 @@ public sealed class PublicTrustPulseService
                 summary = AppendDistinctSentence(
                     summary,
                     $"Import-route parity claims stay review-required because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
-                launchReadiness = $"Hold parity claims on public routes, support surfaces, and publication lanes because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.";
+                string importRouteReadiness = $"Hold parity claims on public routes, support surfaces, and publication lanes because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.";
+                launchReadiness = readinessReviewRequired
+                    ? AppendDistinctSentence(launchReadiness, importRouteReadiness)
+                    : importRouteReadiness;
             }
 
             string? localReleaseProofStatus = adoptionHealth?.LocalReleaseProofStatus ?? localReleaseProof?.Status;
@@ -179,15 +180,8 @@ public sealed class PublicTrustPulseService
             return existing;
         }
 
-        string trimmed = existing.Trim();
-        string separator = EndsWithSentencePunctuation(trimmed) ? " " : ". ";
-        return $"{trimmed}{separator}{sentence}";
+        return $"{existing.Trim().TrimEnd('.')} {sentence}";
     }
-
-    private static bool EndsWithSentencePunctuation(string value)
-        => value.EndsWith(".", StringComparison.Ordinal)
-           || value.EndsWith("!", StringComparison.Ordinal)
-           || value.EndsWith("?", StringComparison.Ordinal);
 
     private TPayload? LoadOptionalArtifact<TPayload>(
         string? path,

@@ -35,6 +35,7 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             BuildPromptArchitectsEntry(),
             BuildPayFunnelsEntry(),
             BuildSubscribrEntry(),
+            BuildSendrEntry(),
             BuildUnmixrEntry(),
             BuildInventoryOnlyEntry("joggai", "4", "tracked_in_discovery"),
             BuildInventoryOnlyEntry("dadan", "candidate", "inventory_only"),
@@ -174,7 +175,12 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             PasswordConfigured: state.HasPassword,
             PasswordAltConfigured: state.HasApiKey,
             MirrorsDefault: false,
-            Status: status);
+            Status: status,
+            DeclaredAccountCount: state.DeclaredAccountCount,
+            LoginReadyAccountCount: state.LoginReadyAccountCount,
+            ApiKeyReadyAccountCount: state.ApiKeyReadyAccountCount,
+            PendingApiKeyAccountCount: state.PendingApiKeyAccountCount,
+            CredentialSlots: state.CredentialSlots);
     }
 
     private ExecutiveAssistantCredentialEntry BuildPromptArchitectsEntry()
@@ -245,6 +251,38 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             PasswordAltConfigured: mapped,
             MirrorsDefault: false,
             Status: apiConfigured && mapped ? "tracked_video_script_preproduction_lane" : "missing");
+    }
+
+    private ExecutiveAssistantCredentialEntry BuildSendrEntry()
+    {
+        const string tierKey = "CHUMMER_EA_SENDR_TIER";
+        const string emailKey = "CHUMMER_EA_SENDR_EMAIL";
+        const string passwordKey = "CHUMMER_EA_SENDR_PASSWORD";
+        const string apiKey = "CHUMMER_EA_SENDR_API_KEY";
+        const string fallbackApiKey = "SENDR_API_KEY";
+        const string apiTokenKey = "SENDR_API_TOKEN";
+
+        string? email = GetValue(emailKey);
+        bool loginConfigured = !string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(GetValue(passwordKey));
+        bool apiConfigured = !string.IsNullOrWhiteSpace(GetValue(apiKey))
+            || !string.IsNullOrWhiteSpace(GetValue(fallbackApiKey))
+            || !string.IsNullOrWhiteSpace(GetValue(apiTokenKey));
+        string status = apiConfigured
+            ? loginConfigured ? "api_configured_login_available" : "api_configured"
+            : loginConfigured ? "login_only" : "missing";
+
+        return new ExecutiveAssistantCredentialEntry(
+            ToolId: "sendr",
+            Tier: GetValue(tierKey) ?? "4",
+            EmailKey: emailKey,
+            PasswordKey: passwordKey,
+            PasswordAltKey: apiKey,
+            EmailMasked: MaskEmail(email),
+            EmailConfigured: !string.IsNullOrWhiteSpace(email),
+            PasswordConfigured: !string.IsNullOrWhiteSpace(GetValue(passwordKey)),
+            PasswordAltConfigured: apiConfigured,
+            MirrorsDefault: true,
+            Status: status);
     }
 
     private ExecutiveAssistantCredentialEntry BuildUnmixrEntry()
@@ -343,9 +381,19 @@ public sealed class ExecutiveAssistantCredentialCatalogService
         bool hasLogin = false;
         bool hasApiKey = false;
         bool anyDeclared = false;
+        int declaredAccountCount = 0;
+        int loginReadyAccountCount = 0;
+        int apiKeyReadyAccountCount = 0;
+        int pendingApiKeyAccountCount = 0;
+        List<ExecutiveAssistantCredentialSlotEntry> credentialSlots = [];
 
-        void Consider(string? email, string? password, string? apiKey)
+        void Consider(string alias, string? email, string? password, string? apiKey)
         {
+            bool emailConfigured = !string.IsNullOrWhiteSpace(email);
+            bool passwordConfigured = !string.IsNullOrWhiteSpace(password);
+            bool apiKeyConfigured = !string.IsNullOrWhiteSpace(apiKey);
+            bool declared = emailConfigured || passwordConfigured || apiKeyConfigured;
+            bool loginReady = emailConfigured && passwordConfigured;
             if (!string.IsNullOrWhiteSpace(email))
             {
                 hasEmail = true;
@@ -365,17 +413,48 @@ public sealed class ExecutiveAssistantCredentialCatalogService
                 anyDeclared = true;
             }
 
-            if (!string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(password))
+            if (loginReady)
             {
                 hasLogin = true;
             }
+
+            if (!declared)
+            {
+                return;
+            }
+
+            declaredAccountCount++;
+            if (loginReady)
+            {
+                loginReadyAccountCount++;
+            }
+
+            if (apiKeyConfigured)
+            {
+                apiKeyReadyAccountCount++;
+            }
+
+            if (loginReady && !apiKeyConfigured)
+            {
+                pendingApiKeyAccountCount++;
+            }
+
+            credentialSlots.Add(new ExecutiveAssistantCredentialSlotEntry(
+                Alias: alias,
+                EmailMasked: MaskEmail(email),
+                EmailConfigured: emailConfigured,
+                PasswordConfigured: passwordConfigured,
+                ApiKeyConfigured: apiKeyConfigured,
+                Status: BuildMagicAiSlotStatus(emailConfigured, passwordConfigured, apiKeyConfigured)));
         }
 
         Consider(
+            "primary",
             GetValue("CHUMMER_EA_MAGICAI_EMAIL"),
             GetValue("CHUMMER_EA_MAGICAI_PASSWORD"),
             GetValue("CHUMMER_EA_MAGICAI_API_KEY"));
 
+        HashSet<string> prefixes = [];
         foreach (string key in _configuration.AsEnumerable().Select(item => item.Key).OrderBy(static item => item, StringComparer.Ordinal))
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -383,15 +462,20 @@ public sealed class ExecutiveAssistantCredentialCatalogService
                 continue;
             }
 
-            Match match = Regex.Match(key, @"^MAGICAI_ACCOUNT_[A-Za-z0-9_]+_EMAIL$");
+            Match match = Regex.Match(key, @"^(MAGICAI_ACCOUNT_[A-Za-z0-9_]+)_(EMAIL|PASSWORD|API_KEY)$");
             if (!match.Success)
             {
                 continue;
             }
 
-            string prefix = key[..^"_EMAIL".Length];
+            prefixes.Add(match.Groups[1].Value);
+        }
+
+        foreach (string prefix in prefixes.Order(StringComparer.Ordinal))
+        {
             Consider(
-                GetValue(key),
+                prefix["MAGICAI_ACCOUNT_".Length..],
+                GetValue($"{prefix}_EMAIL"),
                 GetValue($"{prefix}_PASSWORD"),
                 GetValue($"{prefix}_API_KEY"));
         }
@@ -402,7 +486,34 @@ public sealed class ExecutiveAssistantCredentialCatalogService
             HasPassword: hasPassword,
             HasLogin: hasLogin,
             HasApiKey: hasApiKey,
-            AnyDeclared: anyDeclared);
+            AnyDeclared: anyDeclared,
+            DeclaredAccountCount: declaredAccountCount,
+            LoginReadyAccountCount: loginReadyAccountCount,
+            ApiKeyReadyAccountCount: apiKeyReadyAccountCount,
+            PendingApiKeyAccountCount: pendingApiKeyAccountCount,
+            CredentialSlots: credentialSlots
+                .OrderBy(static item => item.Alias, StringComparer.OrdinalIgnoreCase)
+                .ToArray());
+    }
+
+    private static string BuildMagicAiSlotStatus(bool emailConfigured, bool passwordConfigured, bool apiKeyConfigured)
+    {
+        if (emailConfigured && passwordConfigured && apiKeyConfigured)
+        {
+            return "configured";
+        }
+
+        if (emailConfigured && passwordConfigured)
+        {
+            return "login_only";
+        }
+
+        if (apiKeyConfigured)
+        {
+            return "api_key_only";
+        }
+
+        return "declared_missing_credentials";
     }
 
     private ExecutiveAssistantCredentialEntry BuildSingleKeyEntry(
@@ -607,6 +718,19 @@ public sealed record ExecutiveAssistantCredentialEntry(
     bool PasswordConfigured,
     bool PasswordAltConfigured,
     bool MirrorsDefault,
+    string Status,
+    int DeclaredAccountCount = 0,
+    int LoginReadyAccountCount = 0,
+    int ApiKeyReadyAccountCount = 0,
+    int PendingApiKeyAccountCount = 0,
+    IReadOnlyList<ExecutiveAssistantCredentialSlotEntry>? CredentialSlots = null);
+
+public sealed record ExecutiveAssistantCredentialSlotEntry(
+    string Alias,
+    string? EmailMasked,
+    bool EmailConfigured,
+    bool PasswordConfigured,
+    bool ApiKeyConfigured,
     string Status);
 
 internal readonly record struct MagicAiPoolState(
@@ -615,6 +739,11 @@ internal readonly record struct MagicAiPoolState(
     bool HasPassword,
     bool HasLogin,
     bool HasApiKey,
-    bool AnyDeclared);
+    bool AnyDeclared,
+    int DeclaredAccountCount,
+    int LoginReadyAccountCount,
+    int ApiKeyReadyAccountCount,
+    int PendingApiKeyAccountCount,
+    IReadOnlyList<ExecutiveAssistantCredentialSlotEntry> CredentialSlots);
 
 internal readonly record struct PathInfo(string FullName);

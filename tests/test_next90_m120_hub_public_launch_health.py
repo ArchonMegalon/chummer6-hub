@@ -237,6 +237,23 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(">Help</a>", result.stderr)
 
+    def test_verifier_fails_when_smoke_drops_status_copy_sanitizer_assertion(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="next90-m120-status-sanitizer-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
+            smoke_text = smoke_path.read_text(encoding="utf-8")
+            fixed_assertion = 'Assert(statusSource.Contains("Replace(\\"Open help\\", \\"Use Help\\", StringComparison.OrdinalIgnoreCase)", StringComparison.Ordinal), "status should sanitize Open help copy inside the status body text.");'
+            smoke_path.write_text(
+                smoke_text.replace(fixed_assertion, "// status copy sanitizer assertion removed", 1),
+                encoding="utf-8",
+            )
+
+            result = self.run_verifier(temp_root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Replace(\\"Open help\\", \\"Use Help\\", StringComparison.OrdinalIgnoreCase)', result.stderr)
+
     def test_verifier_fails_when_release_proof_duplicates_package_receipt_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-proof-duplicate-") as temp_dir:
             temp_root = Path(temp_dir)

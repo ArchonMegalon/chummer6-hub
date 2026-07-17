@@ -10,6 +10,7 @@ using Chummer.Run.AI.Services.Ops;
 using Chummer.Run.AI.Services.Spider;
 using Chummer.Run.AI.Services.Transcription;
 using Chummer.Run.AI.Services.Newspaper;
+using Chummer.Run.AI.Security;
 using CanonicalTranscriptionProvider = Chummer.Run.Contracts.Transcription.ITranscriptionProvider;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -124,8 +125,11 @@ var app = builder.Build();
 
 app.UseHttpsRedirection();
 
+app.UseMiddleware<AiMutationAuthorizationMiddleware>();
+
 app.UseAuthorization();
 
+app.MapAiPublicEndpoints();
 app.MapControllers();
 
 app.Run();

@@ -5,54 +5,115 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account surface-minimal";
     var antiForgery = Antiforgery.GetAndStoreTokens(Context);
+    var isAccessSection = Model.AccessInstallations is not null;
 }
-<section class="minimal-page-hero">
-    <div>
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h1>@Model.Heading</h1>
-        <p>@Model.Summary</p>
-        @if (Model.Highlights.Count > 0)
-        {
-            <ul class="minimal-hero__points">
-                @foreach (var highlight in Model.Highlights)
-                {
-                    <li>@highlight</li>
-                }
-            </ul>
-        }
-        <div class="minimal-actions">
-            <a class="button-like button-like--ghost" href="@Model.BackHref">@Model.BackLabel</a>
-        </div>
-    </div>
-</section>
-
-@if (Model.AccessInstallations is { Count: > 0 })
+@if (isAccessSection)
 {
-    <section class="minimal-section minimal-section--tight">
-        <div class="minimal-section__lead">
-            <p class="eyebrow">Linked copies</p>
-            <h2>Manage attached installs</h2>
-            <p>Unlink a copy here if it should stop following this account.</p>
-        </div>
-        <div class="minimal-lane-grid minimal-platform-list">
-            @foreach (var installation in Model.AccessInstallations)
+    <section class="minimal-page-hero" data-account-access aria-labelledby="account-access-title">
+        <div>
+            <a class="account-access__back" href="@Model.BackHref">@Model.BackLabel</a>
+            <h1 id="account-access-title">@Model.Heading</h1>
+            <p>@Model.Summary</p>
+            @if (Model.Highlights.Count > 0)
             {
-                <article class="minimal-lane-card">
-                    <span class="tag">Copy</span>
-                    <h2>@installation.Title</h2>
-                    <p>@installation.Summary</p>
-                    <div class="minimal-actions">
+                <ul class="minimal-hero__points" role="status" aria-live="polite">
+                    @foreach (var highlight in Model.Highlights)
+                    {
+                        <li>@highlight</li>
+                    }
+                </ul>
+            }
+            <div class="minimal-actions">
+                <a class="button-like button-like--primary" data-account-access-primary href="@Model.Cards[0].PrimaryHref">@Model.Cards[0].PrimaryLabel</a>
+            </div>
+            @if (Model.AccessInstallations!.Count == 0)
+            {
+                <p class="account-access__empty">No linked copies yet.</p>
+            }
+        </div>
+    </section>
+
+    @if (Model.AccessInstallations!.Count > 0)
+    {
+        <section class="minimal-section minimal-section--tight" data-account-access-copies aria-labelledby="account-access-copies-title">
+            <div class="minimal-section__lead">
+                <h2 id="account-access-copies-title">Linked copies</h2>
+            </div>
+            <div class="settings-summary-list">
+                @foreach (var installation in Model.AccessInstallations!)
+                {
+                    <article class="settings-summary-row">
+                        <div>
+                            <strong>@installation.Title</strong>
+                            @if (!string.IsNullOrWhiteSpace(installation.Summary))
+                            {
+                                <details class="minimal-details">
+                                    <summary>Copy details</summary>
+                                    <p>@installation.Summary</p>
+                                </details>
+                            }
+                        </div>
                         @if (installation.CanUnlink)
                         {
                             <form method="post" action="/account/access/unlink">
                                 <input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken" />
                                 <input type="hidden" name="installationId" value="@installation.InstallationId" />
-                                <button class="button-like button-like--ghost" type="submit">Unlink</button>
+                                <button class="button-like button-like--ghost" type="submit" aria-label="Unlink @installation.Title">Unlink</button>
                             </form>
                         }
                         else
                         {
-                            <span class="muted-copy">Open this copy once before unlinking it here.</span>
+                            <span class="muted-copy">Open this copy once to enable unlinking.</span>
+                        }
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="minimal-section account-access__help" aria-label="Install help">
+        <details class="minimal-details account-access__recovery">
+            <summary>Need help with an install?</summary>
+            <p>Recover or relink a copy, or continue an existing install case.</p>
+            <a href="/account/support">Open install help</a>
+        </details>
+    </section>
+}
+else
+{
+    <section class="minimal-page-hero">
+        <div>
+            <p class="eyebrow">@Model.Eyebrow</p>
+            <h1>@Model.Heading</h1>
+            <p>@Model.Summary</p>
+            @if (Model.Highlights.Count > 0)
+            {
+                <ul class="minimal-hero__points">
+                    @foreach (var highlight in Model.Highlights)
+                    {
+                        <li>@highlight</li>
+                    }
+                </ul>
+            }
+            <div class="minimal-actions">
+                <a class="button-like button-like--ghost" href="@Model.BackHref">@Model.BackLabel</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="minimal-section">
+        <div class="minimal-lane-grid minimal-platform-list">
+            @foreach (var card in Model.Cards)
+            {
+                <article class="minimal-lane-card">
+                    <span class="tag">@card.Eyebrow</span>
+                    <h2>@card.Title</h2>
+                    <p>@card.Summary</p>
+                    <div class="minimal-actions">
+                        <a class="button-like button-like--primary" href="@card.PrimaryHref">@card.PrimaryLabel</a>
+                        @if (!string.IsNullOrWhiteSpace(card.SecondaryHref) && !string.IsNullOrWhiteSpace(card.SecondaryLabel))
+                        {
+                            <a class="button-like button-like--ghost" href="@card.SecondaryHref">@card.SecondaryLabel</a>
                         }
                     </div>
                 </article>
@@ -60,23 +121,3 @@
         </div>
     </section>
 }
-
-<section class="minimal-section">
-    <div class="minimal-lane-grid minimal-platform-list">
-        @foreach (var card in Model.Cards)
-        {
-            <article class="minimal-lane-card">
-                <span class="tag">@card.Eyebrow</span>
-                <h2>@card.Title</h2>
-                <p>@card.Summary</p>
-                <div class="minimal-actions">
-                    <a class="button-like button-like--primary" href="@card.PrimaryHref">@card.PrimaryLabel</a>
-                    @if (!string.IsNullOrWhiteSpace(card.SecondaryHref) && !string.IsNullOrWhiteSpace(card.SecondaryLabel))
-                    {
-                        <a class="button-like button-like--ghost" href="@card.SecondaryHref">@card.SecondaryLabel</a>
-                    }
-                </div>
-            </article>
-        }
-    </div>
-</section>

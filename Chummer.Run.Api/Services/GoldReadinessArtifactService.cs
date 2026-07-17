@@ -188,7 +188,102 @@ public sealed record GoldReadinessSnapshot(
     string? Verdict,
     DateTimeOffset? GeneratedAtUtc,
     IReadOnlyList<GoldReadinessRuleAuthorityBlocker> RuleAuthorityBlockers,
-    IReadOnlyList<string> Failures);
+    IReadOnlyList<string> Failures)
+{
+    public bool IsGoldReady
+        => string.Equals(Status, "pass", StringComparison.OrdinalIgnoreCase)
+           && string.Equals(Verdict, "GOLD_READY", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsClosureReceiptCycleOnlyBlocked
+        => !IsGoldReady
+           && Failures.Count > 0
+           && Failures.All(IsClosureReceiptCycleFailure);
+
+    public string PublicGapSummary
+    {
+        get
+        {
+            string[] blockers = Failures
+                .Select(HumanizeFailure)
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(3)
+                .ToArray();
+
+            return blockers.Length == 0
+                ? "final release checks are not green"
+                : $"final release checks are still blocked by {JoinHumanList(blockers)}";
+        }
+    }
+
+    private static string HumanizeFailure(string value)
+    {
+        string normalized = NormalizeToken(value.Replace(" failed", string.Empty, StringComparison.OrdinalIgnoreCase));
+        if (normalized.StartsWith("operator_release_dashboard ", StringComparison.Ordinal))
+        {
+            return normalized.Replace("operator_release_dashboard", "operator dashboard").Replace('_', ' ').Replace('-', ' ');
+        }
+
+        return normalized switch
+        {
+            "windows_installer_visual_audit" => "native Windows installer proof",
+            "release_ready" => "release readiness checks",
+            "public_edge_postdeploy_gate" => "public edge postdeploy checks",
+            "operator_release_dashboard" => "operator dashboard checks",
+            "design_quality_gate" => "design quality checks",
+            "public_route_proof" => "public route checks",
+            _ => string.IsNullOrWhiteSpace(normalized)
+                ? "release checks"
+                : normalized.Replace('_', ' ').Replace('-', ' ')
+        };
+    }
+
+    private static string JoinHumanList(IReadOnlyList<string> items)
+    {
+        if (items.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        if (items.Count == 1)
+        {
+            return items[0];
+        }
+
+        if (items.Count == 2)
+        {
+            return $"{items[0]} and {items[1]}";
+        }
+
+        return $"{string.Join(", ", items.Take(items.Count - 1))}, and {items[^1]}";
+    }
+
+    private static string NormalizeToken(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Trim().ToLowerInvariant();
+
+    private static bool IsClosureReceiptCycleFailure(string value)
+    {
+        string normalized = NormalizeToken(value);
+        if (normalized.EndsWith(" failed", StringComparison.Ordinal))
+        {
+            normalized = normalized[..^" failed".Length].TrimEnd();
+        }
+
+        return normalized switch
+        {
+            "public_edge_postdeploy_gate" => true,
+            "public_edge_postdeploy_gate semantic proof" => true,
+            "operator_release_dashboard" => true,
+            "operator_release_dashboard has failing required checks" => true,
+            "operator_release_dashboard has stale required checks" => true,
+            "release_ready" => true,
+            "release_ready semantic proof" => true,
+            _ => false
+        };
+    }
+}
 
 public sealed record GoldReadinessRuleAuthorityBlocker(
     string RulesetId,

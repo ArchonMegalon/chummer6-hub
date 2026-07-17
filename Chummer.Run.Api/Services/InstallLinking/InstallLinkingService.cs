@@ -19,60 +19,142 @@ public sealed class InstallLinkingService
     private const int MaxArchLength = 32;
     private const int MaxPublicKeyLength = 256;
     private const int MaxHostLabelLength = 256;
+    private const int MaxPendingClaimTicketsPerPrincipal = 16;
+    private const int MaxDownloadReceiptsPerPrincipalPerHour = 128;
+    private const int MaxPendingBrowserCallbacksPerPrincipal = 8;
     private static readonly TimeSpan DefaultClaimTicketLifetime = TimeSpan.FromDays(1);
     private static readonly TimeSpan DefaultBrowserCallbackLifetime = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan GrantLifetime = TimeSpan.FromDays(30);
-    private readonly InstallLinkingStore _store;
+    private readonly Func<InstallLinkingStore> _storeAccessor;
+    private InstallLinkingStore _store => _storeAccessor();
     private readonly TimeSpan _claimTicketLifetime;
     private readonly TimeSpan _browserCallbackLifetime;
+    private readonly int _maxPendingClaimTicketsPerPrincipal;
+    private readonly int _maxDownloadReceiptsPerPrincipalPerHour;
+    private readonly int _maxPendingBrowserCallbacksPerPrincipal;
+    private readonly IInstallLinkingStoreReadinessProbe? _readinessProbe;
 
-    public InstallLinkingService(InstallLinkingStore store, IConfiguration configuration)
+    public InstallLinkingService(
+        InstallLinkingStore store,
+        IConfiguration configuration,
+        IInstallLinkingStoreReadinessProbe? readinessProbe = null)
+        : this(
+            () => store ?? throw new ArgumentNullException(nameof(store)),
+            configuration,
+            readinessProbe)
     {
-        _store = store;
+    }
+
+    public InstallLinkingService(
+        InstallLinkingStoreAccess storeAccess,
+        IConfiguration configuration,
+        IInstallLinkingStoreReadinessProbe readinessProbe)
+        : this(
+            (storeAccess ?? throw new ArgumentNullException(nameof(storeAccess))).GetRequired,
+            configuration,
+            readinessProbe)
+    {
+    }
+
+    private InstallLinkingService(
+        Func<InstallLinkingStore> storeAccessor,
+        IConfiguration configuration,
+        IInstallLinkingStoreReadinessProbe? readinessProbe)
+    {
+        _storeAccessor = storeAccessor;
+        ArgumentNullException.ThrowIfNull(configuration);
+        _readinessProbe = readinessProbe;
         _claimTicketLifetime = ResolveClaimTicketLifetime(configuration);
         _browserCallbackLifetime = ResolveBrowserCallbackLifetime(configuration);
+        _maxPendingClaimTicketsPerPrincipal = ResolveBoundedLimit(
+            configuration["CHUMMER_INSTALL_LINKING_MAX_PENDING_CLAIM_TICKETS_PER_PRINCIPAL"],
+            MaxPendingClaimTicketsPerPrincipal,
+            64);
+        _maxDownloadReceiptsPerPrincipalPerHour = ResolveBoundedLimit(
+            configuration["CHUMMER_INSTALL_LINKING_MAX_DOWNLOAD_RECEIPTS_PER_PRINCIPAL_PER_HOUR"],
+            MaxDownloadReceiptsPerPrincipalPerHour,
+            512);
+        _maxPendingBrowserCallbacksPerPrincipal = ResolveBoundedLimit(
+            configuration["CHUMMER_INSTALL_LINKING_MAX_PENDING_BROWSER_CALLBACKS_PER_PRINCIPAL"],
+            MaxPendingBrowserCallbacksPerPrincipal,
+            32);
     }
 
     public DownloadDispatchResult IssueDownload(
         PublicReleaseManifestDto manifest,
         PublicReleaseArtifactDto artifact,
         string? userId,
-        string? subjectId)
+        string? subjectId,
+        bool forceNewClaim = false)
     {
         var now = DateTimeOffset.UtcNow;
         var normalizedUserId = NormalizeOptional(userId);
         var normalizedSubjectId = NormalizeOptional(subjectId);
+        string? generationId = NormalizeOptional(manifest.GenerationId);
+        string? artifactSha256 = generationId is null
+            ? null
+            : NormalizeRequiredArtifactSha256(artifact.Sha256);
+        string installAccessClass = NormalizeAccessClass(artifact.InstallAccessClass);
+        if (normalizedUserId is null && normalizedSubjectId is null)
+        {
+            if (string.Equals(
+                    installAccessClass,
+                    InstallAccessClasses.AccountRequired,
+                    StringComparison.Ordinal))
+            {
+                throw new InstallLinkingOperationException(
+                    StatusCodes.Status401Unauthorized,
+                    "Account sign-in is required for this download.");
+            }
+
+            // Anonymous guest-readable delivery (open-public or account-recommended) is already
+            // covered by endpoint/global limiting and has no claim secret to recover. Return an
+            // ephemeral correlation receipt instead of turning unauthenticated traffic into
+            // synchronous protect + full-snapshot fsync work.
+            return new DownloadDispatchResult(
+                CreateDownloadReceipt(
+                    manifest,
+                    artifact,
+                    normalizedUserId,
+                    normalizedSubjectId,
+                    claimTicket: null,
+                    installAccessClass: installAccessClass,
+                    now: now),
+                ClaimTicket: null);
+        }
+
+        EnsureDurableStoreReady();
         lock (_store.Gate)
         {
             ExpireTicketsLocked(now);
+            EnforceRecentReceiptLimitLocked(normalizedUserId, normalizedSubjectId, now);
 
             InstallClaimTicketDto? claimTicket = null;
             if (normalizedUserId is not null || normalizedSubjectId is not null)
             {
-                claimTicket = FindReusableTicketLocked(artifact.Id, normalizedUserId, normalizedSubjectId, now)
-                    ?? CreateClaimTicketLocked(manifest, artifact, normalizedUserId, normalizedSubjectId, now);
+                claimTicket = forceNewClaim ? null : FindReusableTicketLocked(
+                            artifact.Id,
+                            generationId,
+                            artifactSha256,
+                            normalizedUserId,
+                            normalizedSubjectId,
+                            now);
+                if (claimTicket is null)
+                {
+                    EnforcePendingTicketLimitLocked(normalizedUserId, normalizedSubjectId, now);
+                    claimTicket = CreateClaimTicketLocked(manifest, artifact, normalizedUserId, normalizedSubjectId, now);
+                }
                 _store.ClaimTicketsById[claimTicket.TicketId] = claimTicket;
             }
 
-            var receipt = new DownloadReceiptDto(
-                ReceiptId: NewId("dlr"),
-                ArtifactId: artifact.Id,
-                ArtifactLabel: artifact.PlatformLabel ?? artifact.Platform,
-                FileName: artifact.FileName ?? Path.GetFileName(artifact.Url),
-                DownloadUrl: artifact.Url,
-                Channel: manifest.Channel,
-                Version: manifest.Version,
-                Head: NormalizeOptional(artifact.Head) ?? "desktop",
-                Platform: NormalizeOptional(artifact.PlatformId) ?? NormalizeOptional(artifact.Platform) ?? "unknown",
-                Arch: NormalizeOptional(artifact.Arch) ?? "unknown",
-                Kind: NormalizeOptional(artifact.Kind) ?? InferKind(artifact),
-                InstallAccessClass: NormalizeAccessClass(artifact.InstallAccessClass),
-                IssuedAtUtc: now,
-                UserId: normalizedUserId,
-                SubjectId: normalizedSubjectId,
-                ClaimTicketId: claimTicket?.TicketId,
-                ClaimCode: claimTicket?.ClaimCode,
-                ClaimTicketExpiresAtUtc: claimTicket?.ExpiresAtUtc);
+            DownloadReceiptDto receipt = CreateDownloadReceipt(
+                manifest,
+                artifact,
+                normalizedUserId,
+                normalizedSubjectId,
+                claimTicket,
+                installAccessClass,
+                now);
 
             _store.ReceiptsById[receipt.ReceiptId] = receipt;
 
@@ -89,6 +171,11 @@ public sealed class InstallLinkingService
 
     public InstallLinkingSummaryDto GetSummary(string? userId, string? subjectId, int maxItems = 8)
     {
+        if (!IsDurableStoreReady())
+        {
+            return new InstallLinkingSummaryDto([], [], [], [], []);
+        }
+
         var normalizedUserId = NormalizeOptional(userId);
         var normalizedSubjectId = NormalizeOptional(subjectId);
         lock (_store.Gate)
@@ -133,6 +220,7 @@ public sealed class InstallLinkingService
 
     public RedeemInstallClaimResponseDto RedeemClaim(RedeemInstallClaimRequestDto request)
     {
+        EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(request);
 
         var normalizedClaimCode = NormalizeClaimCode(request.ClaimCode)
@@ -220,6 +308,7 @@ public sealed class InstallLinkingService
 
     public RefreshInstallationGrantResponseDto RefreshGrant(RefreshInstallationGrantRequestDto request)
     {
+        EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(request);
 
         var installationId = NormalizeRequired(request.InstallationId, nameof(request.InstallationId), MaxInstallationIdLength);
@@ -278,6 +367,7 @@ public sealed class InstallLinkingService
 
     public RevokeInstallationGrantResponseDto RevokeGrant(RevokeInstallationGrantRequestDto request)
     {
+        EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(request);
 
         var installationId = NormalizeRequired(request.InstallationId, nameof(request.InstallationId), MaxInstallationIdLength);
@@ -328,6 +418,7 @@ public sealed class InstallLinkingService
                 _store.GrantsById[revokedGrant.GrantId] = revokedGrant;
             }
 
+            RevokeBrowserCallbacksForInstallationLocked(installationId);
             _store.PersistLocked();
             return new RevokeInstallationGrantResponseDto(revokedInstallation, revokedGrants);
         }
@@ -338,6 +429,7 @@ public sealed class InstallLinkingService
         string? userId,
         string? subjectId)
     {
+        EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(request);
 
         string? normalizedInstallationId = NormalizeOptional(request.InstallationId)
@@ -358,18 +450,22 @@ public sealed class InstallLinkingService
             _store.InstallationsById.TryGetValue(normalizedInstallationId, out ClaimedInstallationDto? existingInstallation);
             EnsureInstallationIdentityAvailable(existingInstallation, normalizedUserId, normalizedSubjectId);
 
-            InstallBrowserCallbackDto callback = FindReusableBrowserCallbackLocked(
+            InstallBrowserCallbackDto? callback = FindReusableBrowserCallbackLocked(
                     normalizedInstallationId,
                     normalizedUserId,
                     normalizedSubjectId,
                     normalizedCallbackUri,
-                    now)
-                ?? CreateBrowserCallbackLocked(request with
+                    now);
+            if (callback is null)
+            {
+                EnforcePendingCallbackLimitLocked(normalizedUserId, normalizedSubjectId, now);
+                callback = CreateBrowserCallbackLocked(request with
                 {
                     InstallationId = normalizedInstallationId,
                     ArtifactId = normalizedArtifactId,
                     CallbackUri = normalizedCallbackUri
                 }, normalizedUserId, normalizedSubjectId, now);
+            }
 
             _store.BrowserCallbacksById[callback.CallbackId] = callback;
             _store.PersistLocked();
@@ -383,6 +479,7 @@ public sealed class InstallLinkingService
 
     public ExchangeInstallBrowserCallbackResponseDto ExchangeBrowserCallback(ExchangeInstallBrowserCallbackRequestDto request)
     {
+        EnsureDurableStoreReady();
         ArgumentNullException.ThrowIfNull(request);
 
         string? normalizedCallbackCode = NormalizeBrowserCallbackCode(request.CallbackCode)
@@ -421,23 +518,44 @@ public sealed class InstallLinkingService
 
             if (string.Equals(callback.Status, InstallBrowserCallbackStates.Redeemed, StringComparison.OrdinalIgnoreCase))
             {
-                if (existingInstallation is null)
+                if (existingInstallation is null
+                    || !string.Equals(
+                        existingInstallation.Status,
+                        ClaimedInstallationStates.Active,
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback was redeemed but the installation record is missing.");
+                    throw new InstallLinkingOperationException(
+                        StatusCodes.Status409Conflict,
+                        "browser callback no longer resolves to an active installation.");
                 }
 
-                ClaimedInstallationDto refreshedInstallation = UpsertInstallationLocked(existingInstallation, callback, request, now);
-                InstallationGrantDto grant = FindReusableGrantLocked(refreshedInstallation.InstallationId, now)
-                    ?? CreateGrantLocked(refreshedInstallation, now);
-                refreshedInstallation = refreshedInstallation with
+                string? originalGrantId = NormalizeOptional(callback.GrantId);
+                if (originalGrantId is null
+                    || !string.Equals(
+                        existingInstallation.GrantId,
+                        originalGrantId,
+                        StringComparison.OrdinalIgnoreCase)
+                    || !_store.GrantsById.TryGetValue(originalGrantId, out InstallationGrantDto? originalGrant)
+                    || !string.Equals(
+                        originalGrant.InstallationId,
+                        existingInstallation.InstallationId,
+                        StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(
+                        originalGrant.Status,
+                        InstallationGrantStates.Active,
+                        StringComparison.OrdinalIgnoreCase)
+                    || originalGrant.ExpiresAtUtc <= now)
                 {
-                    GrantId = grant.GrantId,
-                    UpdatedAtUtc = now
-                };
-                _store.InstallationsById[refreshedInstallation.InstallationId] = refreshedInstallation;
-                _store.GrantsById[grant.GrantId] = grant;
-                _store.PersistLocked();
-                return new ExchangeInstallBrowserCallbackResponseDto(callback, refreshedInstallation, grant, AlreadyClaimed: true);
+                    throw new InstallLinkingOperationException(
+                        StatusCodes.Status409Conflict,
+                        "browser callback no longer resolves to its original active grant.");
+                }
+
+                return new ExchangeInstallBrowserCallbackResponseDto(
+                    callback,
+                    existingInstallation,
+                    originalGrant,
+                    AlreadyClaimed: true);
             }
 
             ClaimedInstallationDto installation = UpsertInstallationLocked(existingInstallation, callback, request, now);
@@ -449,7 +567,8 @@ public sealed class InstallLinkingService
             };
             callback = callback with
             {
-                Status = InstallBrowserCallbackStates.Redeemed
+                Status = InstallBrowserCallbackStates.Redeemed,
+                GrantId = issuedGrant.GrantId
             };
 
             _store.InstallationsById[installation.InstallationId] = installation;
@@ -462,6 +581,11 @@ public sealed class InstallLinkingService
 
     public ClaimedInstallationDto? ResolveInstallationForGrant(string? installationId, string? accessToken)
     {
+        if (!IsDurableStoreReady())
+        {
+            return null;
+        }
+
         string? normalizedInstallationId;
         string? normalizedAccessToken;
         try
@@ -505,14 +629,36 @@ public sealed class InstallLinkingService
         }
     }
 
-    public bool CanDownloadArtifactWithClaimCode(string? artifactId, string? claimCode)
+    public bool CanDownloadArtifactWithClaimCode(
+        string? artifactId,
+        string? generationId,
+        string? artifactSha256,
+        bool allowLegacyUnbound,
+        string? claimCode)
     {
-        return ResolveClaimTicketForDownload(artifactId, claimCode) is not null;
+        return ResolveClaimTicketForDownload(
+            artifactId,
+            generationId,
+            artifactSha256,
+            allowLegacyUnbound,
+            claimCode) is not null;
     }
 
-    public InstallClaimTicketDto? ResolveClaimTicketForDownload(string? artifactId, string? claimCode)
+    public InstallClaimTicketDto? ResolveClaimTicketForDownload(
+        string? artifactId,
+        string? generationId,
+        string? artifactSha256,
+        bool allowLegacyUnbound,
+        string? claimCode)
     {
+        if (!IsDurableStoreReady())
+        {
+            return null;
+        }
+
         string? normalizedArtifactId = NormalizeOptional(artifactId);
+        string? normalizedGenerationId = NormalizeOptional(generationId);
+        string? normalizedArtifactSha256 = NormalizeArtifactSha256OrNull(artifactSha256);
         string? normalizedClaimCode = NormalizeClaimCode(claimCode);
         if (normalizedArtifactId is null || normalizedClaimCode is null)
         {
@@ -535,6 +681,28 @@ public sealed class InstallLinkingService
                 return null;
             }
 
+            string? ticketGenerationId = NormalizeOptional(ticket.GenerationId);
+            string? ticketArtifactSha256 = NormalizeArtifactSha256OrNull(ticket.ArtifactSha256);
+            if ((ticketGenerationId is null) != (ticketArtifactSha256 is null))
+            {
+                return null;
+            }
+
+            if (ticketGenerationId is null)
+            {
+                if (!allowLegacyUnbound || normalizedGenerationId is not null)
+                {
+                    return null;
+                }
+            }
+            else if (normalizedGenerationId is null
+                     || normalizedArtifactSha256 is null
+                     || !string.Equals(ticketGenerationId, normalizedGenerationId, StringComparison.Ordinal)
+                     || !FixedTimeEquals(ticketArtifactSha256!, normalizedArtifactSha256))
+            {
+                return null;
+            }
+
             if (ticket.ExpiresAtUtc <= now)
             {
                 return null;
@@ -547,9 +715,16 @@ public sealed class InstallLinkingService
         }
     }
 
-    private InstallClaimTicketDto? FindReusableTicketLocked(string artifactId, string? userId, string? subjectId, DateTimeOffset now)
+    private InstallClaimTicketDto? FindReusableTicketLocked(
+        string artifactId,
+        string? generationId,
+        string? artifactSha256,
+        string? userId,
+        string? subjectId,
+        DateTimeOffset now)
         => _store.ClaimTicketsById.Values
             .Where(item => string.Equals(item.ArtifactId, artifactId, StringComparison.OrdinalIgnoreCase))
+            .Where(item => ReleaseBindingMatches(item, generationId, artifactSha256))
             .Where(item => string.Equals(item.Status, InstallClaimTicketStates.Pending, StringComparison.OrdinalIgnoreCase))
             .Where(item => item.ExpiresAtUtc > now)
             .Where(item => MatchesIdentity(item.UserId, item.SubjectId, userId, subjectId))
@@ -587,6 +762,10 @@ public sealed class InstallLinkingService
         DateTimeOffset now)
     {
         var expiresAtUtc = now.Add(_claimTicketLifetime);
+        string? generationId = NormalizeOptional(manifest.GenerationId);
+        string? artifactSha256 = generationId is null
+            ? null
+            : NormalizeRequiredArtifactSha256(artifact.Sha256);
         return new InstallClaimTicketDto(
             TicketId: NewId("ict"),
             ClaimCode: NewClaimCode(),
@@ -599,7 +778,62 @@ public sealed class InstallLinkingService
             CreatedAtUtc: now,
             ExpiresAtUtc: expiresAtUtc,
             UserId: userId,
-            SubjectId: subjectId);
+            SubjectId: subjectId,
+            GenerationId: generationId,
+            ArtifactSha256: artifactSha256);
+    }
+
+    private static DownloadReceiptDto CreateDownloadReceipt(
+        PublicReleaseManifestDto manifest,
+        PublicReleaseArtifactDto artifact,
+        string? userId,
+        string? subjectId,
+        InstallClaimTicketDto? claimTicket,
+        string installAccessClass,
+        DateTimeOffset now)
+        => new(
+            ReceiptId: NewId("dlr"),
+            ArtifactId: artifact.Id,
+            ArtifactLabel: artifact.PlatformLabel ?? artifact.Platform,
+            FileName: artifact.FileName ?? Path.GetFileName(artifact.Url),
+            DownloadUrl: artifact.Url,
+            Channel: manifest.Channel,
+            Version: manifest.Version,
+            Head: NormalizeOptional(artifact.Head) ?? "desktop",
+            Platform: NormalizeOptional(artifact.PlatformId) ?? NormalizeOptional(artifact.Platform) ?? "unknown",
+            Arch: NormalizeOptional(artifact.Arch) ?? "unknown",
+            Kind: NormalizeOptional(artifact.Kind) ?? InferKind(artifact),
+            InstallAccessClass: installAccessClass,
+            IssuedAtUtc: now,
+            UserId: userId,
+            SubjectId: subjectId,
+            ClaimTicketId: claimTicket?.TicketId,
+            ClaimCode: claimTicket?.ClaimCode,
+            ClaimTicketExpiresAtUtc: claimTicket?.ExpiresAtUtc);
+
+    private static bool ReleaseBindingMatches(
+        InstallClaimTicketDto ticket,
+        string? generationId,
+        string? artifactSha256)
+    {
+        string? ticketGenerationId = NormalizeOptional(ticket.GenerationId);
+        string? ticketArtifactSha256 = NormalizeArtifactSha256OrNull(ticket.ArtifactSha256);
+        string? normalizedGenerationId = NormalizeOptional(generationId);
+        string? normalizedArtifactSha256 = NormalizeArtifactSha256OrNull(artifactSha256);
+        if ((ticketGenerationId is null) != (ticketArtifactSha256 is null))
+        {
+            return false;
+        }
+
+        if (ticketGenerationId is null)
+        {
+            return normalizedGenerationId is null;
+        }
+
+        return normalizedGenerationId is not null
+            && normalizedArtifactSha256 is not null
+            && string.Equals(ticketGenerationId, normalizedGenerationId, StringComparison.Ordinal)
+            && FixedTimeEquals(ticketArtifactSha256!, normalizedArtifactSha256);
     }
 
     private InstallBrowserCallbackDto CreateBrowserCallbackLocked(
@@ -749,6 +983,11 @@ public sealed class InstallLinkingService
 
     private InstallationGrantDto CreateGrantLocked(ClaimedInstallationDto installation, DateTimeOffset now)
     {
+        // Every new grant terminates every older browser bearer for this installation. The
+        // callback-exchange path deliberately restores only the callback that created this exact
+        // grant after this method returns, preserving lost-response retry without allowing an
+        // older callback to reveal a subsequently rotated token.
+        RevokeBrowserCallbacksForInstallationLocked(installation.InstallationId);
         foreach (InstallationGrantDto activeGrant in _store.GrantsById.Values
                      .Where(item => string.Equals(item.InstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase))
                      .Where(item => string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
@@ -797,15 +1036,27 @@ public sealed class InstallLinkingService
         var dirty = false;
         foreach (InstallBrowserCallbackDto callback in _store.BrowserCallbacksById.Values.ToArray())
         {
-            if (!string.Equals(callback.Status, InstallBrowserCallbackStates.Pending, StringComparison.OrdinalIgnoreCase)
-                || callback.ExpiresAtUtc > now)
+            if (callback.ExpiresAtUtc > now)
+            {
+                continue;
+            }
+
+            bool pending = string.Equals(
+                callback.Status,
+                InstallBrowserCallbackStates.Pending,
+                StringComparison.OrdinalIgnoreCase);
+            if (!pending
+                && string.IsNullOrEmpty(callback.CallbackCode)
+                && callback.CallbackUri is null)
             {
                 continue;
             }
 
             _store.BrowserCallbacksById[callback.CallbackId] = callback with
             {
-                Status = InstallBrowserCallbackStates.Expired
+                Status = pending ? InstallBrowserCallbackStates.Expired : callback.Status,
+                CallbackCode = string.Empty,
+                CallbackUri = null
             };
             dirty = true;
         }
@@ -813,6 +1064,24 @@ public sealed class InstallLinkingService
         if (dirty)
         {
             _store.PersistLocked();
+        }
+    }
+
+    private void RevokeBrowserCallbacksForInstallationLocked(string installationId)
+    {
+        foreach (InstallBrowserCallbackDto callback in _store.BrowserCallbacksById.Values
+                     .Where(item => string.Equals(
+                         item.InstallationId,
+                         installationId,
+                         StringComparison.OrdinalIgnoreCase))
+                     .ToArray())
+        {
+            _store.BrowserCallbacksById[callback.CallbackId] = callback with
+            {
+                Status = InstallBrowserCallbackStates.Revoked,
+                CallbackCode = string.Empty,
+                CallbackUri = null
+            };
         }
     }
 
@@ -839,6 +1108,91 @@ public sealed class InstallLinkingService
             _store.PersistLocked();
         }
     }
+
+    private void EnforceRecentReceiptLimitLocked(string? userId, string? subjectId, DateTimeOffset now)
+    {
+        if (userId is null && subjectId is null)
+        {
+            return;
+        }
+
+        DateTimeOffset cutoff = now.AddHours(-1);
+        int count = 0;
+        foreach (DownloadReceiptDto receipt in _store.ReceiptsById.Values)
+        {
+            if (receipt.IssuedAtUtc >= cutoff
+                && MatchesIdentity(receipt.UserId, receipt.SubjectId, userId, subjectId)
+                && ++count >= _maxDownloadReceiptsPerPrincipalPerHour)
+            {
+                throw IssuanceLimitReached();
+            }
+        }
+    }
+
+    private void EnforcePendingTicketLimitLocked(string? userId, string? subjectId, DateTimeOffset now)
+    {
+        int count = 0;
+        foreach (InstallClaimTicketDto ticket in _store.ClaimTicketsById.Values)
+        {
+            if (ticket.ExpiresAtUtc > now
+                && string.Equals(ticket.Status, InstallClaimTicketStates.Pending, StringComparison.OrdinalIgnoreCase)
+                && MatchesIdentity(ticket.UserId, ticket.SubjectId, userId, subjectId)
+                && ++count >= _maxPendingClaimTicketsPerPrincipal)
+            {
+                throw IssuanceLimitReached();
+            }
+        }
+    }
+
+    private void EnforcePendingCallbackLimitLocked(string? userId, string? subjectId, DateTimeOffset now)
+    {
+        int count = 0;
+        foreach (InstallBrowserCallbackDto callback in _store.BrowserCallbacksById.Values)
+        {
+            if (callback.ExpiresAtUtc > now
+                && string.Equals(callback.Status, InstallBrowserCallbackStates.Pending, StringComparison.OrdinalIgnoreCase)
+                && MatchesIdentity(callback.UserId, callback.SubjectId, userId, subjectId)
+                && ++count >= _maxPendingBrowserCallbacksPerPrincipal)
+            {
+                throw IssuanceLimitReached();
+            }
+        }
+    }
+
+    private static InstallLinkingOperationException IssuanceLimitReached()
+        => new(StatusCodes.Status429TooManyRequests, "install-link issuance limit reached.");
+
+    private bool IsDurableStoreReady()
+    {
+        if (_readinessProbe is null)
+        {
+            return _store.IsHealthy;
+        }
+
+        try
+        {
+            return _readinessProbe.Evaluate().Ready && _store.IsHealthy;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void EnsureDurableStoreReady()
+    {
+        if (!IsDurableStoreReady())
+        {
+            throw new InstallLinkingOperationException(
+                StatusCodes.Status503ServiceUnavailable,
+                "Install-linking is temporarily unavailable.");
+        }
+    }
+
+    private static int ResolveBoundedLimit(string? configured, int fallback, int maximum)
+        => int.TryParse(configured, out int parsed)
+            ? Math.Clamp(parsed, 1, maximum)
+            : fallback;
 
     private static bool MatchesIdentity(string? rowUserId, string? rowSubjectId, string? userId, string? subjectId)
         => (!string.IsNullOrWhiteSpace(userId) && string.Equals(rowUserId, userId, StringComparison.OrdinalIgnoreCase))
@@ -941,6 +1295,28 @@ public sealed class InstallLinkingService
 
     private static string? NormalizeBrowserCallbackCode(string? value)
         => NormalizeOptional(value, "callback code", MaxCallbackCodeLength);
+
+    private static string NormalizeRequiredArtifactSha256(string? value)
+        => NormalizeArtifactSha256OrNull(value)
+            ?? throw new InvalidOperationException("generation-bound install claims require an exact artifact SHA-256.");
+
+    private static string? NormalizeArtifactSha256OrNull(string? value)
+    {
+        string? normalized = NormalizeOptional(value)?.ToLowerInvariant();
+        return normalized is not null
+               && normalized.Length == 64
+               && normalized.All(static character => Uri.IsHexDigit(character))
+            ? normalized
+            : null;
+    }
+
+    private static bool FixedTimeEquals(string left, string right)
+    {
+        byte[] leftBytes = System.Text.Encoding.ASCII.GetBytes(left);
+        byte[] rightBytes = System.Text.Encoding.ASCII.GetBytes(right);
+        return leftBytes.Length == rightBytes.Length
+            && CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
+    }
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -27,6 +27,8 @@
 * play API aggregation and hosted session coordination
 * orchestration-side Coach/Spider/Director surfaces
 * hosted external-integration routing that is not render-only media execution
+* the Chummer `governed_spatial_render_v1` bridge and orchestration from approved runsite, campaign, run, scene, actor, provided-outcome, permission, and audience refs
+* consumer-owned spatial compose/build authorization refs, private audience/access truth, provider-redacted product meaning, takedown intake, and Chummer user-visible closeout
 
 ## Must not own
 
@@ -35,6 +37,8 @@
 * shared UI-kit primitives
 * long-term registry persistence ownership after the registry split
 * long-term render execution ownership after the media-factory split
+* governed spatial provider selection/adapters, authoritative compose receipt, provider jobs, retries/cancellation, idempotency or quota journal mutation
+* governed spatial immutable output-manifest ownership, render-asset lifecycle/deletion execution, provider-deletion evidence, or private provider execution receipts
 * raw participant Codex/OpenAI auth caches or device-auth secrets
 * provider-credit accounting or provider-secret storage
 * Fleet worker execution or landing authority
@@ -52,7 +56,33 @@ Canonical hosted package plane:
 * `Chummer.Control.Contracts`
 * `Chummer.World.Contracts`
 
+Hub consumes, but does not own or source-copy:
+
+* `Chummer.Media.Contracts`, including `governed_spatial_render_v1`
+
 Mixed contract planes are temporary debt, not acceptable end state.
+
+## Governed spatial-render bridge rule
+
+Amendment state is `proposed_for_independent_re_review`; implementation, provider execution, quota use, mirror publication, and release widening remain blocked.
+
+Allowed dependency direction:
+
+* Hub validates Chummer purpose, permissions, private audience, immutable truth/outcome refs, and a time-limited consumer authorization
+* Hub sends the canonical provider-neutral request through `Chummer.Media.Contracts`
+* media-factory returns an authoritative zero-burn compose receipt or a provider-redacted build projection
+* Hub gives that projection campaign/user meaning and, for public artifacts, requests publication or revocation from Registry
+
+Forbidden dependency direction:
+
+* Hub must not call a spatial provider, speak a provider-specific request, select a provider route, enqueue or own a render job, or persist provider-private task/account/trace data
+* Hub must not reserve, consume, retry, cancel, compensate, or infer media quota state; it supplies the authorization ref while media-factory owns atomic accounting
+* Hub must not own the immutable output manifest, artifact lifecycle, provider-deletion receipt, or encrypted private execution receipt
+* Hub must not accept an `ea.*` contract alias, an EA-owned readiness projection, or a source-copied spatial DTO
+
+The generic `runsite_continuous_walkthrough` request remains valid without encounter fields.
+`runsite_private_encounter_preview` is a separate private, audience-allowlisted recipe that consumes immutable mechanics and approved-outcome refs without calculating or mutating them.
+It is never PropertyQuarry input, public RUNSITE meaning, live-session truth, tactical authority, or a VTT claim.
 
 ## Boundary truth
 

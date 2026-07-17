@@ -36,10 +36,10 @@
         ?? Model.BoundedFailureReason
         ?? "No visible publication history is attached to this public page yet.";
     var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-detail-view" : "/signup?next=%2Fartifacts";
-    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open saved pages" : "Create account for saved pages";
+    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open saved pages" : "Claim your copy for saved pages";
     var signedInShelfSummary = Model.Chrome.Authenticated
         ? "Your library keeps public and private returns together in one calmer place."
-        : "Public discovery works without an account. Sign in only when you want your private pages, campaign return, and creator next steps in one library.";
+        : "Public discovery works without an account. Claim your copy only when you want your private pages, campaign return, and creator next steps in one library.";
     var creatorConciergeHref = $"/artifacts/publications/{Uri.EscapeDataString(Model.Publication.PublicationId)}/concierge";
     var testimonialConciergeHref = $"/testimonials/concierge?publicationId={Uri.EscapeDataString(Model.Publication.PublicationId)}";
     var routeChoices = new[]
@@ -76,7 +76,7 @@
             Badge = "Account return",
             Title = Model.Chrome.Authenticated
                 ? "Your saved pages keep public and private returns together"
-                : "Create an account only when you want saved pages too",
+                : "Claim your copy when you want saved pages too",
             Summary = signedInShelfSummary,
             Href = signedInShelfHref,
             Label = signedInShelfLabel,
@@ -115,7 +115,7 @@
         <span>@HumanizeStatus(Model.Publication.PublicationStatus, "Published")</span>
         <strong>@HumanizeStatus(Model.Publication.TrustBand, "Draft")</strong>
         <span>@PublicationAvailabilityLabel(Model.Publication.Discoverable)</span>
-        <span>Status: @routeStateLabel</span>
+        <span>Current: @routeStateLabel</span>
     </div>
 </section>
 

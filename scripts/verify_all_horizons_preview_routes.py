@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 
@@ -62,7 +61,7 @@ def main() -> int:
             }
         )
 
-    verdict = "GLOBAL_FLAGSHIP_READY" if not failures else "NOT_READY"
+    verdict = "FLAGSHIP_FRONT_READY" if not failures else "NOT_READY"
     (COMPLETION / "HORIZON_STATUS_MATRIX.generated.yaml").write_text(
         "\n".join(
             ["version: 1", "horizons:"]
@@ -81,6 +80,8 @@ def main() -> int:
     )
     (COMPLETION / "FINAL_ALL_HORIZONS_FLAGSHIP_VERDICT.md").write_text(
         f"{verdict}\n\n"
+        "Scope: public route/controller/manifest coverage for shipped and preview horizons only.\n"
+        "This artifact does not prove release-channel stability, desktop installer proof, or global flagship launch truth.\n\n"
         f"Checked {len(ROUTES)} product-area and expansion routes against controller and public manifest.\n"
         + ("" if not failures else f"\nRemaining failing routes: {', '.join(failures)}.\n"),
         encoding="utf-8",

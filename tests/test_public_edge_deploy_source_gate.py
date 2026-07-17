@@ -369,6 +369,50 @@ services:
 def test_public_edge_rebuild_scripts_call_source_gate() -> None:
     script_paths = [
         ROOT / "scripts" / "e2e-hub.sh",
+        ROOT / "scripts" / "e2e-portal.sh",
+        ROOT / "scripts" / "migration-loop.sh",
+        ROOT / "scripts" / "ai" / "hub_closeout.sh",
+    ]
+
+    for script_path in script_paths:
+        script = script_path.read_text(encoding="utf-8")
+        assert "CHUMMER_PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" in script
+        assert "scripts/check_public_edge_deploy_preflight.py" in script
+        rebuild_match = re.search(
+            r'(?:docker|"\$BUILD_PROVENANCE_DOCKER_BINARY") compose[^\n]+up -d --build',
+            script,
+        )
+        assert rebuild_match is not None
+        assert script.index("scripts/check_public_edge_deploy_preflight.py") < rebuild_match.start()
+        if script_path.name != "e2e-portal.sh":
+            assert "CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE" in script
+            assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD" in script
+            assert "scripts/verify_public_edge_deploy_source.py" in script
+            assert "--expected-head" in script
+        assert (
+            "docker compose" in script
+            or '"$BUILD_PROVENANCE_DOCKER_BINARY" compose' in script
+        )
+
+
+def test_hub_closeout_preflight_cannot_be_disabled() -> None:
+    script = (
+        ROOT / "scripts" / "ai" / "hub_closeout.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "Public-edge deploy preflight is mandatory and cannot be disabled." in script
+    assert "exit 2" in script
+    assert re.search(
+        r"if \[\[ \"\$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE\" == \"0\".*?exit 2.*?"
+        r"python3 scripts/check_public_edge_deploy_preflight.py",
+        script,
+        re.DOTALL,
+    )
+
+
+def test_public_edge_rebuild_source_gate_still_covers_source_checked_scripts() -> None:
+    script_paths = [
+        ROOT / "scripts" / "e2e-hub.sh",
         ROOT / "scripts" / "migration-loop.sh",
         ROOT / "scripts" / "ai" / "hub_closeout.sh",
     ]

@@ -255,7 +255,7 @@ def final_bundle_receipt(path: Path, *, blocked_surface: str | None = None) -> P
     )
 
 
-def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
+def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool, magicai_handshake_pass: bool = True) -> None:
     branch = root / "origin.chummer.run/Varga/Mira/Kestrel"
     ebook_bytes = b"epub"
     pdf_bytes = b"pdf"
@@ -481,6 +481,26 @@ def seed_bundle(root: Path, *, deployed_pass: bool, gold_pass: bool) -> None:
                     "RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN": True,
                     "RYBBIT_CHUMMER_RUN_ALLOW_SAME_HOST_PROXY": True,
                 },
+            },
+        },
+    )
+    write_json(
+        root / "MAGICAI_API_HANDSHAKE.generated.json",
+        {
+            "contractName": "chummer.magicai_api_handshake_probe.v1",
+            "status": "pass" if magicai_handshake_pass else "blocked",
+            "provider": "magicai",
+            "providerSurface": "omagic_api",
+            "httpStatus": 200 if magicai_handshake_pass else 403,
+            "noCreditBurnExpected": True,
+            "controlledLiveProviderPilot": magicai_handshake_pass,
+            "summary": {
+                "json": magicai_handshake_pass,
+                "path_count": 11 if magicai_handshake_pass else 0,
+            },
+            "privacy": {
+                "rawCredentialExposed": False,
+                "envValuesExposed": False,
             },
         },
     )
@@ -1618,6 +1638,25 @@ def test_completion_matrix_blocks_when_runsite_secret_values_stored(tmp_path: Pa
     assert result["status"] == "blocked"
     assert row["flags"]["secret_values_not_stored"] is False
     assert "secret_values_not_stored" in row["failedFlags"]
+
+
+def test_completion_matrix_blocks_when_magicai_live_handshake_does_not_prove_controlled_pilot(tmp_path: Path) -> None:
+    module = load_module()
+    seed_bundle(tmp_path, deployed_pass=True, gold_pass=True)
+    handshake_path = tmp_path / "MAGICAI_API_HANDSHAKE.generated.json"
+    handshake = json.loads(handshake_path.read_text(encoding="utf-8"))
+    handshake["controlledLiveProviderPilot"] = False
+    write_json(handshake_path, handshake)
+
+    result = module.materialize(tmp_path, tmp_path / "matrix.json")
+    row = next(item for item in result["rows"] if item["id"] == "magicai_no_credit_burn_api_handshake")
+
+    assert result["status"] == "blocked"
+    assert "magicai_no_credit_burn_api_handshake" in result["blockedRows"]
+    assert "controlled_live_provider_pilot_verified" in result["blockedHardGates"]
+    assert row["status"] == "blocked"
+    assert row["flags"]["controlled_live_provider_pilot"] is False
+    assert "controlled_live_provider_pilot" in row["failedFlags"]
 
 
 def test_completion_matrix_accepts_absolute_paths_inside_origin_namespace(tmp_path: Path) -> None:

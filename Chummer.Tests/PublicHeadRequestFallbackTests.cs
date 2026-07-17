@@ -24,6 +24,7 @@ public sealed class PublicHeadRequestFallbackTests
             "/pwa",
             "/play",
             "/player",
+            "/jammer",
             "/gm",
             "/observer",
             "/play/anarchy",

@@ -15,48 +15,50 @@
         2 => $"{publicPlatformLabels[0]} and {publicPlatformLabels[1]} downloads are live.",
         _ => $"{string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]} downloads are live."
     };
+
+    static bool IsPublishedStableRelease(PublicReleaseManifestDto manifest)
+    {
+        var stableLanePublished = string.Equals((manifest.Channel ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((manifest.Channel ?? string.Empty).Trim(), "stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((manifest.Channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((manifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase);
+        return stableLanePublished
+            && string.Equals((manifest.SupportabilityState ?? string.Empty).Trim(), "gold_supported", StringComparison.OrdinalIgnoreCase)
+            && string.Equals((manifest.Status ?? string.Empty).Trim(), "published", StringComparison.OrdinalIgnoreCase);
+    }
+
+    var isStableRelease = IsPublishedStableRelease(Model.Manifest);
+    var heading = Model.ReleaseExperience.Recommended is null
+        ? "Downloads paused"
+        : isStableRelease ? "Stable downloads" : "Preview downloads";
     var statusLine = Model.ReleaseExperience.Recommended is null
         ? "Downloads are paused."
-        : publicPlatformSummary;
-    var releaseMarkerText = string.IsNullOrWhiteSpace(Model.Manifest.Version)
-        ? "Version unpublished"
-        : $"Version {Model.Manifest.Version}";
-    var releaseVersionText = PublicReleaseVersionLabel(Model.Manifest.Version);
+        : isStableRelease ? publicPlatformSummary : $"{publicPlatformSummary} Stable is still unavailable.";
 
-    static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
-
-    static string PublicReleaseVersionLabel(string? version)
+    static string PublicStatusText(string? value)
     {
-        var normalized = version?.Trim();
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            return "Version unavailable";
-        }
-
-        if (normalized.StartsWith("run-", StringComparison.OrdinalIgnoreCase) && normalized.Length >= 12)
-        {
-            var stamp = normalized.Substring(4, 8);
-            if (stamp.All(char.IsDigit))
-            {
-                return $"Nightly {stamp.Substring(0, 4)}.{stamp.Substring(4, 2)}.{stamp.Substring(6, 2)}";
-            }
-
-            return "Nightly build";
-        }
-
-        return $"Version {normalized}";
+        var humanized = UndetectableHumanizerCopyAdapter.Humanize(value);
+        return humanized.Replace("Open help", "Use Help", StringComparison.OrdinalIgnoreCase);
     }
+
+    static string ManifestVersionText(PublicReleaseManifestDto manifest)
+    {
+        var version = !string.IsNullOrWhiteSpace(manifest.Version)
+            ? manifest.Version
+            : manifest.DisplayVersion;
+        return string.IsNullOrWhiteSpace(version) ? "Version unavailable" : $"Version {version}";
+    }
+
 }
 
 <section class="minimal-page-hero minimal-status-pill">
     <div>
         <p class="eyebrow">Now</p>
-        <h1>Updated</h1>
+        <h1>@heading</h1>
         <p>@PublicStatusText(statusLine)</p>
-        <p class="downloads-release-version">@releaseVersionText</p>
-        <span data-downloads-release-version hidden>@releaseMarkerText</span>
         <p class="muted-copy">@PublicStatusText(Model.ReleaseSummary)</p>
-        <p class="muted-copy"><strong>Current caution:</strong> @PublicStatusText(Model.CautionSummary)</p>
+        <p class="muted-copy">@PublicStatusText(Model.CautionSummary)</p>
+        <span data-downloads-release-version="@ManifestVersionText(Model.Manifest)" hidden>@ManifestVersionText(Model.Manifest)</span>
         <div class="minimal-actions" aria-label="Status next actions">
             <a class="button-like button-like--primary" href="/downloads" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Downloads">Downloads</a>
             <a class="button-like button-like--ghost" href="/help" data-analytics-event="status_next_action" data-analytics-surface="status_decision" data-analytics-label="Help">Help</a>

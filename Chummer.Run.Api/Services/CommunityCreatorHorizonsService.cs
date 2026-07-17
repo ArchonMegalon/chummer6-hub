@@ -135,7 +135,8 @@ public sealed class CommunityCreatorHorizonsService
     ];
 
     private readonly CommunityStore _communityStore;
-    private readonly InstallLinkingStore _installLinkingStore;
+    private readonly InstallLinkingStore? _installLinkingStore;
+    private readonly InstallLinkingStoreAccess? _installLinkingStoreAccess;
     private readonly PublicCreatorPublicationDiscoveryService _publicCreatorDiscovery;
 
     public CommunityCreatorHorizonsService(
@@ -145,6 +146,17 @@ public sealed class CommunityCreatorHorizonsService
     {
         _communityStore = communityStore;
         _installLinkingStore = installLinkingStore;
+        _publicCreatorDiscovery = publicCreatorDiscovery;
+    }
+
+    public CommunityCreatorHorizonsService(
+        CommunityStore communityStore,
+        InstallLinkingStoreAccess installLinkingStoreAccess,
+        PublicCreatorPublicationDiscoveryService publicCreatorDiscovery)
+    {
+        _communityStore = communityStore;
+        _installLinkingStoreAccess = installLinkingStoreAccess
+            ?? throw new ArgumentNullException(nameof(installLinkingStoreAccess));
         _publicCreatorDiscovery = publicCreatorDiscovery;
     }
 
@@ -188,10 +200,21 @@ public sealed class CommunityCreatorHorizonsService
     public RunnerPassportPublicSummary BuildPassportSummary()
     {
         CommunityHubPublicSummary community = BuildCommunitySummary();
-        lock (_installLinkingStore.Gate)
+        if (!TryGetInstallLinkingStore(out InstallLinkingStore installLinkingStore))
+        {
+            return new RunnerPassportPublicSummary(
+                0,
+                [],
+                community.OpenRuns.Count,
+                community.PendingJoinCount,
+                _communityStore.ParticipationNotificationReceipts.Count,
+                DateTimeOffset.UtcNow);
+        }
+
+        lock (installLinkingStore.Gate)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            ClaimedInstallationDto[] activeInstallations = _installLinkingStore.InstallationsById.Values
+            ClaimedInstallationDto[] activeInstallations = installLinkingStore.InstallationsById.Values
                 .Where(item => string.Equals(item.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(static item => item.UpdatedAtUtc)
                 .ToArray();
@@ -215,10 +238,20 @@ public sealed class CommunityCreatorHorizonsService
     public SignalDeckPublicSummary BuildSignalDeckSummary()
     {
         CommunityHubPublicSummary community = BuildCommunitySummary();
-        lock (_installLinkingStore.Gate)
+        if (!TryGetInstallLinkingStore(out InstallLinkingStore installLinkingStore))
+        {
+            return new SignalDeckPublicSummary(
+                0,
+                community.OpenRuns.Count,
+                community.PendingJoinCount,
+                _communityStore.ParticipationNotificationReceipts.Count,
+                DateTimeOffset.UtcNow);
+        }
+
+        lock (installLinkingStore.Gate)
         {
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            int activeInstallations = _installLinkingStore.InstallationsById.Values.Count(
+            int activeInstallations = installLinkingStore.InstallationsById.Values.Count(
                 item => string.Equals(item.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase));
             return new SignalDeckPublicSummary(
                 ActiveInstallationCount: activeInstallations,
@@ -233,9 +266,19 @@ public sealed class CommunityCreatorHorizonsService
     {
         CommunityHubPublicSummary community = BuildCommunitySummary();
         CreatorOsPublicSummary creator = BuildCreatorSummary();
-        lock (_installLinkingStore.Gate)
+        if (!TryGetInstallLinkingStore(out InstallLinkingStore installLinkingStore))
         {
-            int activeInstallations = _installLinkingStore.InstallationsById.Values.Count(
+            return new LivingWorldPublicSummary(
+                0,
+                community.OpenRuns.Count,
+                _communityStore.ParticipationNotificationReceipts.Count,
+                creator.ReturnLoopCount,
+                DateTimeOffset.UtcNow);
+        }
+
+        lock (installLinkingStore.Gate)
+        {
+            int activeInstallations = installLinkingStore.InstallationsById.Values.Count(
                 item => string.Equals(item.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase));
             return new LivingWorldPublicSummary(
                 ActiveInstallationCount: activeInstallations,
@@ -244,6 +287,17 @@ public sealed class CommunityCreatorHorizonsService
                 ReturnLoopPublicationCount: creator.ReturnLoopCount,
                 LastUpdatedUtc: DateTimeOffset.UtcNow);
         }
+    }
+
+    private bool TryGetInstallLinkingStore(out InstallLinkingStore store)
+    {
+        if (_installLinkingStore is not null)
+        {
+            store = _installLinkingStore;
+            return true;
+        }
+
+        return _installLinkingStoreAccess!.TryGet(out store);
     }
 
     public string BuildCommunityMarkdown(string id)

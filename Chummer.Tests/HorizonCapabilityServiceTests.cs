@@ -43,4 +43,19 @@ public sealed class HorizonCapabilityServiceTests
         Assert.Contains("MagicAI", internalHealth.InternalProviderLane, StringComparison.OrdinalIgnoreCase);
         Assert.Null(publicSafeHealth.InternalProviderLane);
     }
+
+    [Fact]
+    public void SharedEaGovernedRenderLaneCoversRunsitePropertyquarryAndOriginMedia()
+    {
+        HorizonCapabilityService capabilities = new(new ConfigurationBuilder().Build());
+
+        HorizonCapabilityDefinition runsite = capabilities.GetCapability("runsite", "scene_render");
+        HorizonCapabilityDefinition propertyquarry = capabilities.GetCapability("propertyquarry", "apartment_video");
+        HorizonCapabilityDefinition origin = capabilities.GetCapability("origin-dossier", "dossier_media");
+
+        Assert.Equal(HorizonGovernedRenderRequestComposerService.OrchestrationLane, runsite.OrchestrationLane);
+        Assert.Equal(HorizonGovernedRenderRequestComposerService.OrchestrationLane, propertyquarry.OrchestrationLane);
+        Assert.Equal(HorizonGovernedRenderRequestComposerService.OrchestrationLane, origin.OrchestrationLane);
+        Assert.Contains("Magicfit", origin.InternalProviderLane, StringComparison.OrdinalIgnoreCase);
+    }
 }

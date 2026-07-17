@@ -50,7 +50,9 @@ public sealed class InternalExecutiveAssistantCredentialsControllerTests
         {
             ["FLEET_INTERNAL_API_TOKEN"] = "internal-token",
             ["CHUMMER_EA_MAGICFIT_EMAIL"] = "media@example.invalid",
-            ["CHUMMER_EA_MAGICFIT_PASSWORD"] = "media-secret"
+            ["CHUMMER_EA_MAGICFIT_PASSWORD"] = "media-secret",
+            ["MAGICAI_ACCOUNT_01_EMAIL"] = "magicai-1@example.invalid",
+            ["MAGICAI_ACCOUNT_01_PASSWORD"] = "magicai-password"
         });
         controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer internal-token";
 
@@ -59,11 +61,18 @@ public sealed class InternalExecutiveAssistantCredentialsControllerTests
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var catalog = Assert.IsType<ExecutiveAssistantCredentialCatalogResult>(ok.Value);
         ExecutiveAssistantCredentialEntry magicfit = Assert.Single(catalog.Entries, static entry => entry.ToolId == "magicfit");
+        ExecutiveAssistantCredentialEntry magicai = Assert.Single(catalog.Entries, static entry => entry.ToolId == "magicai");
         Assert.Equal("m***@e***", magicfit.EmailMasked);
+        Assert.Equal("login_only", magicai.Status);
+        Assert.Equal(1, magicai.DeclaredAccountCount);
+        Assert.Equal(1, magicai.PendingApiKeyAccountCount);
+        Assert.Single(Assert.IsAssignableFrom<IReadOnlyList<ExecutiveAssistantCredentialSlotEntry>>(magicai.CredentialSlots));
 
         string serialized = System.Text.Json.JsonSerializer.Serialize(catalog);
         Assert.DoesNotContain("media@example.invalid", serialized, StringComparison.Ordinal);
         Assert.DoesNotContain("media-secret", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("magicai-1@example.invalid", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("magicai-password", serialized, StringComparison.Ordinal);
     }
 
     private static InternalExecutiveAssistantCredentialsController BuildController(Dictionary<string, string?> values)

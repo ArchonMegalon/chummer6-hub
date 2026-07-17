@@ -22,6 +22,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Tests", "Chummer.Te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.Api.Tests", "Chummer.Run.Api.Tests\Chummer.Run.Api.Tests.csproj", "{514AE514-FD28-4504-B448-19B67C1CA69E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.InstallLinking.Postgres.Tool", "Chummer.InstallLinking.Postgres.Tool\Chummer.InstallLinking.Postgres.Tool.csproj", "{92F765F8-06E9-4BE6-9536-B479050B6785}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Hub.Registry.Contracts", "..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj", "{42E8AE69-505E-49BD-88AE-0FCBD06FA0E3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Chummer.Run.Registry", "..\chummer-hub-registry\Chummer.Run.Registry\Chummer.Run.Registry.csproj", "{D82C9B4E-A2FF-4964-BCB3-AA6BFFF628C4}"
@@ -180,6 +182,18 @@ Global
 		{D82C9B4E-A2FF-4964-BCB3-AA6BFFF628C4}.Release|x64.Build.0 = Release|Any CPU
 		{D82C9B4E-A2FF-4964-BCB3-AA6BFFF628C4}.Release|x86.ActiveCfg = Release|Any CPU
 		{D82C9B4E-A2FF-4964-BCB3-AA6BFFF628C4}.Release|x86.Build.0 = Release|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Debug|x64.Build.0 = Debug|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Debug|x86.Build.0 = Debug|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Release|Any CPU.Build.0 = Release|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Release|x64.ActiveCfg = Release|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Release|x64.Build.0 = Release|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Release|x86.ActiveCfg = Release|Any CPU
+		{92F765F8-06E9-4BE6-9536-B479050B6785}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -63,9 +64,26 @@ def request(url: str) -> urllib.request.Request:
     )
 
 
+def is_retryable_fetch_exception(exc: Exception) -> bool:
+    if isinstance(exc, urllib.error.HTTPError):
+        return False
+    if isinstance(exc, RETRYABLE_FETCH_REASONS):
+        return True
+    if isinstance(exc, urllib.error.URLError):
+        return isinstance(exc.reason, RETRYABLE_FETCH_REASONS)
+    return False
+
+
 def fetch_bytes(url: str) -> bytes:
-    with urllib.request.urlopen(request(url), timeout=60) as response:
-        return response.read()
+    for attempt in range(DEFAULT_FETCH_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(request(url), timeout=DEFAULT_FETCH_TIMEOUT_SECONDS) as response:
+                return response.read()
+        except Exception as exc:
+            if attempt + 1 >= DEFAULT_FETCH_ATTEMPTS or not is_retryable_fetch_exception(exc):
+                raise
+            time.sleep(min(0.5 * (attempt + 1), 1.5))
+    raise RuntimeError("fetch_bytes exhausted retry loop unexpectedly")
 
 
 def fetch_json(url: str) -> Any:
@@ -102,7 +120,8 @@ def build_sidecar_payload(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def verify(base_url: str, verify_script: Path) -> dict[str, Any]:
+def verify(base_url: str, verify_script: Path, output_path: Path | None = None) -> dict[str, Any]:
+    output_path = output_path or OUTPUT_PATH
     base = base_url.rstrip("/")
     manifest_url = normalize_url(base, "/downloads/releases.json")
     failures: list[str] = []
@@ -122,8 +141,8 @@ def verify(base_url: str, verify_script: Path) -> dict[str, Any]:
             "checked_artifacts": [],
             "failures": [f"could not fetch public downloads manifest: {exc}"],
         }
-        OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-        OUTPUT_PATH.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         return payload
 
     downloads = manifest.get("downloads") or []
@@ -271,11 +290,13 @@ def verify(base_url: str, verify_script: Path) -> dict[str, Any]:
         "verify_script_path": str(verify_script),
         "status": "pass" if not failures else "fail",
         "verdict": "LIVE_PUBLIC_WINDOWS_INSTALLER_READY" if not failures else "LIVE_PUBLIC_WINDOWS_INSTALLER_NOT_READY",
+        "checked_artifact_count": len(checked_artifacts),
+        "artifact": checked_artifacts[0] if len(checked_artifacts) == 1 else None,
         "checked_artifacts": checked_artifacts,
         "failures": failures,
     }
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return payload
 
 
@@ -283,12 +304,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Verify that the public Windows bootstrap installer bytes served from the live downloads shelf match manifest metadata and the native payload gate.")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help="Public base URL to verify.")
     parser.add_argument("--verify-script", type=Path, default=DEFAULT_VERIFY_SCRIPT, help="Path to verify-windows-installer-payloads.py.")
+    parser.add_argument("--output", type=Path, default=OUTPUT_PATH, help="Path to write the generated live public Windows installer receipt.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    payload = verify(args.base_url, args.verify_script)
+    payload = verify(args.base_url, args.verify_script, args.output)
     if payload["status"] != "pass":
         raise SystemExit("live public windows installer verification failed")
     print("live_public_windows_installer:ok")

@@ -31,7 +31,7 @@
                 ? "#preview-artifacts"
                 : "#library-route-map";
     var signedInContinuityHref = Model.Chrome.Authenticated ? "#signed-in-detail-view" : "/signup?next=%2Fartifacts";
-    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Open saved pages" : "Create account for saved pages";
+    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Open saved pages" : "Claim your copy for saved pages";
     var routeChoices = new[]
     {
         new
@@ -57,10 +57,10 @@
             Badge = "Account return",
             Title = Model.Chrome.Authenticated
                 ? "Your library keeps public and private returns together"
-                : "Sign in when you want your private pages together with public pages",
+                : "Claim your copy when you want your private pages together with public pages",
             Summary = Model.Chrome.Authenticated
                 ? "Your library keeps aftermath, replay, publication, Signal Deck carry-forward, and campaign next steps together."
-                : "Public pages work without an account. Sign in only when you want private return paths and creator- or campaign-owned next steps.",
+                : "Public pages work without an account. Claim your copy only when you want private return paths and creator- or campaign-owned next steps.",
             Href = signedInContinuityHref,
             Label = signedInContinuityLabel,
             Details = Model.Chrome.Authenticated

@@ -412,7 +412,7 @@
                                         <p class="eyebrow">Campaigns</p>
                                         <h2 class="home-stream__title">Return to the last real session</h2>
                                         @* Campaign return. GM readiness cues. *@
-                                        <p class="home-stream__summary">Runners, campaigns, and active sessions stay visible here so Home can point to the next useful page without turning into the full workbench.</p>
+                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible here so Home can point to the next useful page without turning into the full workbench.</p>
                                         <p class="muted-copy">The short list stays here before you open the deeper campaign pages.</p>
                                     </div>
                                     <div class="app-rail">
@@ -476,7 +476,7 @@
                                             @foreach (var workspace in workspaces)
                                             {
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Campaign</span>
+                                                    <span class="tag">Campaign workspace</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@workspace.CampaignName</h3>
                                                         <p>
@@ -527,7 +527,7 @@
                                                             @if (leadWorkspaceServerPlane is not null
                                                                 && string.Equals(leadWorkspaceServerPlane.Workspace.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
                                                             {
-                                                                <span> Status: @PublicText(leadWorkspaceState?.Label).</span>
+                                                                <span> Current: @PublicText(leadWorkspaceState?.Label).</span>
                                                                 @if (leadWorkspaceServerPlane.ChangePackets.Count > 0)
                                                                 {
                                                                     <span> Change: @PublicText(leadWorkspaceServerPlane.ChangePackets[0].Summary)</span>
@@ -576,7 +576,7 @@
                                                 <article class="app-rail__item">
                                                     <span class="tag">What changed</span>
                                                     <div class="app-rail__copy">
-                                                        <h3>What changed for me</h3>
+                                                        <h3>What changed for you</h3>
                                                         <p>
                                                             @PublicText(leadWorkspaceState?.Label): @PublicText(leadWorkspaceState?.Summary)
                                                             @if (leadNextSessionCarryForward is not null)
@@ -687,7 +687,7 @@
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.TrustBand))
                                                                     {
-                                                                        <span> Status: @HumanizeStatus(leadAftermathShelfEntry.TrustBand, "Draft").</span>
+                                                                        <span> Review: @HumanizeStatus(leadAftermathShelfEntry.TrustBand, "Draft").</span>
                                                                         <span> Available: @(leadAftermathShelfEntry.Discoverable ? "Yes" : "Not yet").</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationSummary))
@@ -704,7 +704,7 @@
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.TrustSummary))
                                                                     {
-                                                                        <span> Status: @leadAftermathCreatorPublication.TrustSummary</span>
+                                                                        <span> Review: @leadAftermathCreatorPublication.TrustSummary</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathCreatorPublication?.ComparisonSummary))
                                                                     {
@@ -1054,7 +1054,7 @@
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationState) || !string.IsNullOrWhiteSpace(output.TrustBand))
                                                                         {
-                                                                            <span> Output status: @HumanizeStatus(output.PublicationState, "Ready") / @HumanizeStatus(output.TrustBand, "Ready").</span>
+                                                                            <span> Output: @HumanizeStatus(output.PublicationState, "Ready") / @HumanizeStatus(output.TrustBand, "Ready").</span>
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                                                         {
@@ -1083,7 +1083,7 @@
                                                 {
                                                     var answer = rulesAnswers[0];
                                                     <article class="app-rail__item">
-                                                        <span class="tag">Rule answer</span>
+                                                        <span class="tag">Rule environments</span>
                                                         <div class="app-rail__copy">
                                                             <h3>@PublicText(answer.Question)</h3>
                                                             <p>
@@ -1153,11 +1153,11 @@
                                                             @PublicText(publication.Summary)
                                                             <span>Background: @HomeText(publication.ProvenanceSummary).</span>
                                                             <span>Visibility: @HumanizeStatus(publication.Visibility, "Shared").</span>
-                                                            <span>Status: @HumanizeStatus(publication.TrustBand, "Draft").</span>
+                                                            <span>Review: @HumanizeStatus(publication.TrustBand, "Draft").</span>
                                                             <span>Discovery: @PublicText(publication.DiscoverySummary)</span>
                                                             @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                                                             {
-                                                                <span> Status: @PublicText(publication.TrustSummary)</span>
+                                                                <span> Review: @PublicText(publication.TrustSummary)</span>
                                                             }
                                                             @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
                                                             {
@@ -1198,7 +1198,7 @@
                                             {
                                                 var device = restoreDevices[0];
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Install return</span>
+                                                    <span class="tag">Device roles</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@PublicText(device.HostLabel)</h3>
                                                         <p>@PublicText(device.RestoreSummary) <span>Role: @PublicText(device.DeviceRole) on @PublicText(device.Platform).</span></p>
@@ -1341,8 +1341,13 @@
   };
   let step = 0;
 
-  const openDialog = () => { dialog.hidden = false; };
-  const closeDialog = () => { dialog.hidden = true; };
+  const modal = ui.bindModalDialog(dialog, {
+    openButtons,
+    closeButtons,
+    initialFocus: "#onboardingDisplayName"
+  });
+  if (!modal) return;
+  const closeDialog = () => modal.close();
 
   const showStep = (index) => {
     step = index;
@@ -1369,15 +1374,13 @@
     nodes.openSetupButton.dataset.defaultLabel = "Open setup";
   };
 
-  openButtons.forEach((button) => button.addEventListener("click", openDialog));
-  closeButtons.forEach((button) => button.addEventListener("click", closeDialog));
   nextButton.addEventListener("click", () => showStep(Math.min(step + 1, panels.length - 1)));
   backButton.addEventListener("click", () => showStep(Math.max(step - 1, 0)));
   showStep(step);
 
-  const setStarterWorkspaceNotice = (message) => {
+  const setStarterWorkspaceNotice = (message, isError = false) => {
     if (!nodes.starterWorkspaceNotice) return;
-    ui.setNotice(nodes.starterWorkspaceNotice, message);
+    ui.setNotice(nodes.starterWorkspaceNotice, message, isError);
   };
 
   nodes.seedStarterWorkspaceButton?.addEventListener("click", async () => {
@@ -1396,7 +1399,7 @@
         window.location.href = "/account/roster";
       });
     } catch (error) {
-      setStarterWorkspaceNotice(ui.describeError(error, "Starter campaign could not be seeded right now."));
+      setStarterWorkspaceNotice(ui.describeError(error, "Starter campaign could not be seeded right now."), true);
     }
   });
 

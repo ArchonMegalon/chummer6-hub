@@ -1,6 +1,7 @@
 @using System.Globalization
 @using Chummer.Run.Api.ViewModels
 @inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment HubWebHostEnvironment
+@inject Chummer.Run.Api.Services.PublicCanonicalOriginPolicy PublicOrigin
 @{
     var chrome = ViewData["Chrome"] as SiteChromeViewModel ?? throw new InvalidOperationException("Site chrome was not provided to the layout.");
     var pageTitle = ViewData["Title"] as string ?? chrome.Title;
@@ -162,7 +163,7 @@
     var contextSidebarHeading = ViewData["ContextSidebarHeading"] as string;
     var contextSidebarSummary = ViewData["ContextSidebarSummary"] as string;
     var contextSidebarLinks = ViewData["ContextSidebarLinks"] as IReadOnlyList<PublicNavigationLink> ?? Array.Empty<PublicNavigationLink>();
-    var requestHost = Context?.Request?.Host.Host?.Trim().TrimEnd('.').ToLowerInvariant() ?? string.Empty;
+    var requestHost = PublicOrigin.CanonicalHost;
     var clickRankSiteId = requestHost is "chummer.run" or "www.chummer.run"
         ? (System.Environment.GetEnvironmentVariable("CLICKRANK_AI_CHUMMER_RUN_SITE_ID") ?? string.Empty).Trim()
         : string.Empty;
@@ -198,13 +199,6 @@
     var rybbitSiteId = requestHost is "chummer.run" or "www.chummer.run"
         ? (System.Environment.GetEnvironmentVariable("RYBBIT_CHUMMER_RUN_SITE_ID") ?? string.Empty).Trim()
         : string.Empty;
-    var requestScheme = Context?.Request?.Scheme ?? "https";
-    var requestHostValue = Context?.Request?.Host.Value ?? string.Empty;
-    var resolvedRequestHost = requestHost is "chummer.run" or "www.chummer.run"
-        ? "https://chummer.run"
-        : string.IsNullOrWhiteSpace(requestHostValue)
-            ? string.Empty
-            : $"{requestScheme}://{requestHostValue}";
     var requestPathBase = Context?.Request?.PathBase.Value ?? string.Empty;
     var requestPath = Context?.Request?.Path.Value ?? string.Empty;
     var requestQuery = Context?.Request?.QueryString.Value ?? string.Empty;
@@ -240,13 +234,15 @@
         ? string.Empty
         : normalizedRequestPath;
     var canonicalUrl = string.Empty;
-    var absoluteRequestUrl = string.IsNullOrWhiteSpace(resolvedRequestHost)
-        ? string.Empty
-        : $"{resolvedRequestHost}{requestPathBase}{(string.IsNullOrWhiteSpace(requestPath) ? "/" : requestPath)}{requestQuery}";
+    var absoluteRequestUrl = PublicOrigin.BuildAbsolute(
+        string.IsNullOrWhiteSpace(requestPath) ? "/" : requestPath,
+        new Microsoft.AspNetCore.Http.QueryString(requestQuery),
+        new Microsoft.AspNetCore.Http.PathString(requestPathBase));
     if (indexablePublicRoute)
     {
-        var canonicalHost = requestHost is "chummer.run" or "www.chummer.run" ? "https://chummer.run" : resolvedRequestHost;
-        canonicalUrl = $"{canonicalHost}{canonicalPath}";
+        canonicalUrl = PublicOrigin.BuildAbsolute(
+            string.IsNullOrWhiteSpace(canonicalPath) ? "/" : canonicalPath,
+            pathBase: new Microsoft.AspNetCore.Http.PathString(requestPathBase));
     }
     var socialUrl = string.IsNullOrWhiteSpace(canonicalUrl) ? absoluteRequestUrl : canonicalUrl;
     object? publicSchema = null;
@@ -292,6 +288,7 @@
     <title>@pageTitle · Chummer</title>
     <meta name="description" content="@chrome.Description" />
     <meta name="theme-color" content="#0f1110" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Chummer" />
@@ -659,7 +656,7 @@
         </div>
     }
 
-    <main id="main" class="site-main">
+    <main id="main" class="site-main" tabindex="-1">
         @RenderBody()
     </main>
 

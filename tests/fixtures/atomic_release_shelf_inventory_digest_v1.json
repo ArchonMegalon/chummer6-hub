@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "chummer.release-shelf.inventory-digest-golden/v1",
+  "encoding": "utf-8",
+  "canonicalJson": "[{\"path\":\"files/alpha & <beta>' package.bin\",\"sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\"},{\"path\":\"files/über-東京.bin\",\"sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"}]",
+  "sha256": "4ee06f122aa525656b07514599189e15166842f482c9b3ac2b674ddb54866ede",
+  "inventory": [
+    {
+      "path": "files/alpha & <beta>' package.bin",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "path": "files/über-東京.bin",
+      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ]
+}

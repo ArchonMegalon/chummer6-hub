@@ -1,0 +1,13 @@
+[Unit]
+Description=Run qBittorrent staging-hygiene recovery periodically
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=12min
+RandomizedDelaySec=1min
+AccuracySec=30s
+Persistent=true
+Unit=qbittorrent-staging-hygiene-watchdog.service
+
+[Install]
+WantedBy=timers.target

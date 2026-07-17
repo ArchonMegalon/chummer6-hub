@@ -15,8 +15,25 @@
         2 => $"Current public installers: {publicPlatformLabels[0]} and {publicPlatformLabels[1]}.",
         _ => $"Current public installers: {string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]}."
     };
+    static bool IsPublishedStableRelease(PublicReleaseManifestDto manifest)
+    {
+        var stableLanePublished = string.Equals((manifest.Channel ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((manifest.Channel ?? string.Empty).Trim(), "stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((manifest.Channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((manifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase);
+        return stableLanePublished
+            && string.Equals((manifest.SupportabilityState ?? string.Empty).Trim(), "gold_supported", StringComparison.OrdinalIgnoreCase)
+            && string.Equals((manifest.Status ?? string.Empty).Trim(), "published", StringComparison.OrdinalIgnoreCase);
+    }
+    var isStableRelease = IsPublishedStableRelease(Model.Manifest);
+    var publicReleasePostureSummary = Model.ReleaseExperience.Recommended is null
+        ? "Current public lane: Downloads paused."
+        : isStableRelease
+            ? "Current public lane: Stable."
+            : "Current public lane: Preview. Review required.";
     var entryHref = Model.Chrome.Authenticated ? "/account" : "/login?next=%2Faccount%2Faccess";
     var entryLabel = Model.Chrome.Authenticated ? "Account" : "Sign in first";
+    var playAnalyticsEvent = "homepage_open_play";
 }
 
 <section class="minimal-hero" data-homepage-section="hero">
@@ -25,27 +42,33 @@
         <p class="minimal-hero__lead">A Shadowrun character manager for clean sheets and faster tables.</p>
         <div class="minimal-actions" aria-label="Main actions">
             <a class="button-like button-like--primary" href="/downloads" title="Download Chummer" aria-label="Download Chummer" data-analytics-event="homepage_open_downloads" data-analytics-surface="minimal_home" data-analytics-label="Download Chummer">Download Chummer</a>
-            <a class="button-like button-like--secondary" href="/media/promo/every-wonder-horizon-promo.mp4" data-analytics-event="homepage_open_promo_video" data-analytics-surface="minimal_home" data-analytics-label="Watch 90 sec">Watch 90 sec</a>
             <details class="site-account-menu site-open-chummer-menu minimal-open-chummer">
                 <summary class="site-account-menu__summary">
                     <span class="site-account-menu__label">Open Chummer</span>
                 </summary>
                 <div class="site-account-menu__panel" aria-label="Open Chummer options">
-                    @if (Model.Chrome.Authenticated)
-                    {
-                        <a class="site-account-menu__link site-open-chummer-menu__button" href="/build" data-analytics-event="homepage_open_build" data-analytics-surface="minimal_home" data-analytics-label="Build">Build</a>
-                        <a class="site-account-menu__link site-open-chummer-menu__button" href="/mobile/player" data-analytics-event="homepage_open_play" data-analytics-surface="minimal_home" data-analytics-label="Play">Play</a>
-                    }
-                    else
-                    {
-                        <button class="site-account-menu__button site-open-chummer-menu__button site-open-chummer-menu__button--disabled" type="button" disabled aria-disabled="true" data-analytics-surface="minimal_home" data-analytics-label="Build">Build</button>
-                        <a class="site-account-menu__link site-open-chummer-menu__button" href="/mobile/player" data-analytics-event="homepage_open_play" data-analytics-surface="minimal_home" data-analytics-label="Play">Play</a>
-                    }
+                    <a class="site-account-menu__link site-open-chummer-menu__button" href="/build" data-mobile-app-handoff="build-mobile-app-handoff" aria-haspopup="dialog" aria-controls="build-mobile-app-handoff" data-public-install-handoff="true" data-analytics-event="homepage_open_build" data-analytics-surface="minimal_home" data-analytics-label="Build">Build</a>
+                    <a class="site-account-menu__link site-open-chummer-menu__button" href="/mobile/player" data-mobile-app-handoff="mobile-app-handoff" aria-haspopup="dialog" aria-controls="mobile-app-handoff" data-public-install-handoff="true" data-analytics-event="@playAnalyticsEvent" data-analytics-surface="minimal_home" data-analytics-label="Play">Play</a>
                     <a class="site-account-menu__link" href="@entryHref" data-analytics-event="homepage_open_account" data-analytics-surface="minimal_home" data-analytics-label="@entryLabel">@entryLabel</a>
+                    <fieldset class="mobile-app-device-picker"
+                              data-mobile-app-device-picker
+                              aria-describedby="mobile-app-device-status">
+                        <legend>Device handoff</legend>
+                        <label><input type="radio" name="mobile-app-device" value="auto" data-mobile-app-device-choice="auto" checked /> Auto</label>
+                        <label><input type="radio" name="mobile-app-device" value="mobile" data-mobile-app-device-choice="mobile" /> Mobile</label>
+                        <label><input type="radio" name="mobile-app-device" value="desktop" data-mobile-app-device-choice="desktop" /> Desktop / QR</label>
+                    </fieldset>
+                    <p class="mobile-app-device-picker__status"
+                       id="mobile-app-device-status"
+                       data-mobile-app-device-status
+                       role="status"
+                       aria-live="polite"
+                       aria-atomic="true">Auto chooses from browser device capabilities.</p>
                 </div>
             </details>
         </div>
         <p class="minimal-meta">@publicPlatformSummary</p>
+        <p class="minimal-meta">@publicReleasePostureSummary</p>
         <p class="minimal-inline-links">
             <a href="@entryHref" data-analytics-event="homepage_open_account" data-analytics-surface="minimal_home" data-analytics-label="@entryLabel">@entryLabel</a>
             <a href="/help" data-analytics-event="homepage_open_help" data-analytics-surface="minimal_home" data-analytics-label="Help">Help</a>
@@ -54,23 +77,69 @@
                 <a href="/participate" data-analytics-event="homepage_open_participate" data-analytics-surface="minimal_home" data-analytics-label="Participate">Participate</a>
             }
         </p>
-        <div class="minimal-runner-rail" aria-label="Example runner starts">
-            <a href="/account/open/example/decker" data-analytics-event="homepage_open_example_runner" data-analytics-surface="minimal_home" data-analytics-label="Kestrel">
-                <span>Kestrel</span>
-                <small>Decker start</small>
-            </a>
-            <a href="/account/open/example/street-samurai" data-analytics-event="homepage_open_example_runner" data-analytics-surface="minimal_home" data-analytics-label="Brick">
-                <span>Brick</span>
-                <small>Street samurai</small>
-            </a>
-            <a href="/account/open/example/face" data-analytics-event="homepage_open_example_runner" data-analytics-surface="minimal_home" data-analytics-label="Whisper">
-                <span>Whisper</span>
-                <small>Face start</small>
-            </a>
-        </div>
     </div>
-    <a class="minimal-hero__visual minimal-hero__visual--screenshot" href="/media/promo/every-wonder-horizon-promo.mp4" aria-label="Watch the Chummer table preview" data-analytics-event="homepage_open_promo_video" data-analytics-surface="minimal_home" data-analytics-label="Preview card">
-        <img src="/media/product/chummer-desktop-runner.png" alt="Chummer desktop character sheet" loading="eager" />
-        <span class="minimal-hero__visual-badge">Watch 90 sec</span>
-    </a>
+    <div class="minimal-hero__visual minimal-hero__visual--preview" aria-label="Chummer preview">
+        <img class="minimal-hero__preview-image" src="/media/product/chummer-desktop-runner.png" alt="Chummer desktop character sheet preview" loading="eager" />
+        <p class="minimal-hero__preview-kicker">Build first</p>
+        <h2>Desktop build. Mobile play packet.</h2>
+        <p class="minimal-hero__preview-copy">Handle the full character sheet before the session, then keep the table view light when play starts.</p>
+        <ul class="minimal-hero__preview-points">
+            <li>Track health, ammo, inventory, and modifiers.</li>
+            <li>Keep quick rolls and odds within reach.</li>
+            <li>Claim your copy only when you want continuity between installs, recovery, and support.</li>
+        </ul>
+        <a class="minimal-hero__preview-video-link" href="/media/promo/every-wonder-horizon-promo.mp4" data-analytics-event="homepage_open_promo_video" data-analytics-surface="minimal_home" data-analytics-label="Product reel">Product reel</a>
+    </div>
 </section>
+
+@await Html.PartialAsync(
+    "~/Views/Shared/_MobileAppHandoff.cshtml",
+    new MobileAppHandoffViewModel(
+        Id: "build-mobile-app-handoff",
+        Target: MobileAppHandoffTarget.Build,
+        Eyebrow: "Chummer Build",
+        Heading: "Open the character builder on your phone",
+        Description: "Scan this code with your phone to open the first-party Chummer character builder web app.",
+        QrAriaLabel: "QR code that opens the Chummer character builder on a phone",
+        LinkLabel: "Character builder link",
+        OpenLabel: "Open Build on this device",
+        OpenAnalyticsEvent: "homepage_open_build_on_this_device"))
+@await Html.PartialAsync(
+    "~/Views/Shared/_MobileAppHandoff.cshtml",
+    new MobileAppHandoffViewModel(
+        Id: "mobile-app-handoff",
+        Target: MobileAppHandoffTarget.Play,
+        Eyebrow: "Chummer Play · Jammer Companion",
+        Heading: "Open the companion on your phone",
+        Description: "Scan this code with your phone to open the first-party Chummer Play web app, also known as Jammer Companion.",
+        QrAriaLabel: "QR code that opens Chummer Play on a phone",
+        LinkLabel: "Mobile app link",
+        OpenLabel: "Open Play on this device",
+        OpenAnalyticsEvent: "homepage_open_play_on_this_device"))
+
+@section Scripts {
+    <script src="~/js/mobile-app-handoff.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            if (window.location.pathname !== "/" || !window.location.hash) {
+                return;
+            }
+
+            const normalizedHash = window.location.hash.split("?")[0];
+            const mobileTurnAnchorTargets = new Set([
+                "#turn-living-world-card",
+                "#turn-now-card",
+                "#turn-trust-card",
+                "#turn-runsite-card",
+                "#turn-resolve-card",
+                "#turn-sync-card",
+                "#turn-history-card"
+            ]);
+            if (!mobileTurnAnchorTargets.has(normalizedHash)) {
+                return;
+            }
+
+            window.location.replace(`/mobile/player${normalizedHash}`);
+        })();
+    </script>
+}

@@ -37,7 +37,6 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class PublicLandingController : Controller
 {
     private const string ReleaseUploadTicketEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TICKET";
-    private const string ReleaseUploadTokenEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TOKEN";
     private const string DefaultBlackLedgerViewerPrimaryHref = "https://my.matterport.com/show/?m=ax2JhiPGk5P";
     private const string DefaultBlackLedgerViewerAlternateHref = "https://www.3dvista.com/samples/new_york_loft.html";
     private const string DefaultBlackLedgerViewerFlyThroughHref = "/media/ledger/tours/black-ledger-3dvista-flythrough.mp4";
@@ -100,6 +99,7 @@ public sealed class PublicLandingController : Controller
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly IConfiguration _configuration;
     private readonly InstallBootstrapTicketService _installBootstrapTickets;
+    private readonly ArtifactDeliveryPolicy _artifactDelivery;
     private readonly PersonalizedInstallScriptService _personalizedInstallScripts;
     private readonly ReleaseUploadTicketService _releaseUploadTickets;
     private readonly WindowsProofInstallerService _windowsProofInstallers;
@@ -109,6 +109,7 @@ public sealed class PublicLandingController : Controller
     private readonly IMemoryCache _hostedBoardHtmlCache;
     private readonly IWebHostEnvironment _webHostEnvironment;
     private readonly ILogger<PublicLandingController> _logger;
+    private readonly PublicCanonicalOriginPolicy _publicOrigin;
 
     [ActivatorUtilitiesConstructor]
     public PublicLandingController(
@@ -169,7 +170,9 @@ public sealed class PublicLandingController : Controller
         HorizonArtifactRequestService? artifactRequests = null,
         HorizonCapabilityService? horizonCapabilities = null,
         HorizonArtifactAccessTokenService? artifactAccessTokens = null,
-        IMemoryCache? hostedBoardHtmlCache = null)
+        IMemoryCache? hostedBoardHtmlCache = null,
+        PublicCanonicalOriginPolicy? publicOrigin = null,
+        ArtifactDeliveryPolicy? artifactDelivery = null)
     {
         _landing = landing;
         _flipLinkDocumentPortal = flipLinkDocumentPortal;
@@ -224,6 +227,7 @@ public sealed class PublicLandingController : Controller
         _supportPresentation = supportPresentation;
         _configuration = configuration;
         _installBootstrapTickets = installBootstrapTickets;
+        _artifactDelivery = artifactDelivery ?? new ArtifactDeliveryPolicy(releases, configuration);
         _personalizedInstallScripts = personalizedInstallScripts;
         _releaseUploadTickets = releaseUploadTickets;
         _windowsProofInstallers = windowsProofInstallers;
@@ -233,6 +237,7 @@ public sealed class PublicLandingController : Controller
         _hostedBoardHtmlCache = hostedBoardHtmlCache ?? new MemoryCache(new MemoryCacheOptions());
         _webHostEnvironment = webHostEnvironment;
         _logger = logger;
+        _publicOrigin = publicOrigin ?? PublicCanonicalOriginPolicy.CreateUnitTestDefault(configuration);
     }
 
     public PublicLandingController(
@@ -439,7 +444,7 @@ public sealed class PublicLandingController : Controller
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var model = new HorizonsPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Maintenance", "Future work stays behind the main app.", "/horizons", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Horizons", "Future work stays behind the main app.", "/horizons", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
             Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, "/horizons"),
@@ -718,12 +723,19 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/admin/packages")]
     [Produces("text/html")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> AdminPackagesPage(CancellationToken cancellationToken)
     {
+        ApplyPrivateAdminDocumentHeaders();
         const string currentPath = "/admin/packages";
         try
         {
-            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var subject = await RequirePrivilegedAdminSubjectAsync(cancellationToken);
+            if (subject is null)
+            {
+                return NotFound();
+            }
+
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var model = await BuildPackageCatalogPageModel(
                 currentPath: currentPath,
@@ -754,12 +766,19 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/admin/providers/clickrank")]
     [Produces("application/json")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> AdminClickRankProviderDashboard(CancellationToken cancellationToken)
     {
+        ApplyPrivateAdminDocumentHeaders();
         const string currentPath = "/admin/providers/clickrank";
         try
         {
-            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var subject = await RequirePrivilegedAdminSubjectAsync(cancellationToken);
+            if (subject is null)
+            {
+                return NotFound();
+            }
+
             _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
 
             JsonElement? providerVerification = ReadCompletionArtifact("CLICKRANK_PROVIDER_VERIFICATION.generated.json");
@@ -846,12 +865,19 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/admin/visibility")]
     [Produces("application/json")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> AdminVisibilityDashboard(CancellationToken cancellationToken)
     {
+        ApplyPrivateAdminDocumentHeaders();
         const string currentPath = "/admin/visibility";
         try
         {
-            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var subject = await RequirePrivilegedAdminSubjectAsync(cancellationToken);
+            if (subject is null)
+            {
+                return NotFound();
+            }
+
             _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
 
             JsonElement? recrawl = ReadCompletionArtifact("CLICKRANK_RECRAWL_VERIFICATION.generated.json");
@@ -1274,6 +1300,7 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> MobileProjectionPage(CancellationToken cancellationToken)
     {
+        ApplyPrivateMobileDocumentHeaders();
         var model = await BuildMobileProjectionPageModel(
             currentPath: "/mobile",
             chromeTitle: "Mobile and PWA entry",
@@ -1282,7 +1309,37 @@ public sealed class PublicLandingController : Controller
             heading: "Mobile and PWA entry",
             intro: "Track the essentials during play, install the shell when the browser allows it, and keep living-world updates behind explicit opt-in.",
             currentRoleKey: "player",
+            installRoleKey: "base",
             primaryAction: new TrustPageActionViewModel("Open play", "/mobile/player", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Desktop downloads", "/downloads", "secondary"),
+            cancellationToken: cancellationToken);
+        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
+    }
+
+    [HttpGet("/mobile/{role}")]
+    [HttpHead("/mobile/{role}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> MobileRoleProjectionPage(string role, CancellationToken cancellationToken)
+    {
+        ApplyPrivateMobileDocumentHeaders();
+        string currentRoleKey = NormalizePlayRole(role);
+        string requestedRoleKey = role.Trim().ToLowerInvariant();
+        if (!string.Equals(requestedRoleKey, currentRoleKey, StringComparison.Ordinal))
+        {
+            return Redirect($"/mobile/{Uri.EscapeDataString(currentRoleKey)}");
+        }
+
+        string currentRoleLabel = ResolvePlayRoleLabel(currentRoleKey);
+        var model = await BuildMobileProjectionPageModel(
+            currentPath: $"/mobile/{Uri.EscapeDataString(currentRoleKey)}",
+            chromeTitle: $"{currentRoleLabel} mobile play",
+            chromeDescription: "Role-aware mobile play entry with reconnect, continuity, and opt-in living-world updates.",
+            eyebrow: "Mobile shell",
+            heading: $"{currentRoleLabel} entry",
+            intro: "Track the essentials during play with a role-aware mobile shell that keeps reconnect expectations and table continuity visible.",
+            currentRoleKey: currentRoleKey,
+            installRoleKey: currentRoleKey,
+            primaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "primary"),
             secondaryAction: new TrustPageActionViewModel("Desktop downloads", "/downloads", "secondary"),
             cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
@@ -1296,98 +1353,29 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/play")]
     [HttpHead("/play")]
     [Produces("text/html")]
-    public async Task<IActionResult> PlayProjectionPage([FromQuery] string? role, CancellationToken cancellationToken)
+    public IActionResult PlayProjectionPage()
     {
-        string currentRoleKey = NormalizePlayRole(role);
-        string currentRoleLabel = ResolvePlayRoleLabel(currentRoleKey);
-        string currentPath = string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)
-            ? "/play"
-            : $"/play?role={Uri.EscapeDataString(currentRoleKey)}";
-        var model = await BuildMobileProjectionPageModel(
-            currentPath: currentPath,
-            chromeTitle: $"{currentRoleLabel} play shell",
-            chromeDescription: "Role-aware play entry with reconnect and continuity inside Chummer.",
-            eyebrow: "Play shell",
-            heading: $"{currentRoleLabel} entry",
-            intro: "The play shell keeps role entry, reconnect expectations, and current continuity visible without pretending a preview route is the product.",
-            currentRoleKey: currentRoleKey,
-            primaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
-            cancellationToken: cancellationToken);
-        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
+        ApplyPrivateMobileDocumentHeaders();
+        string canonicalRole = ResolveCanonicalPlayRoleFromQuery(Request.Query);
+        return Redirect($"/mobile/{canonicalRole}");
     }
 
     [HttpGet("/player")]
     [HttpHead("/player")]
+    [HttpGet("/jammer")]
+    [HttpHead("/jammer")]
     public IActionResult PlayerProjectionAlias()
-        => Redirect("/play?role=player");
-
-    [HttpGet("/mobile/player")]
-    [HttpHead("/mobile/player")]
-    [Produces("text/html")]
-    public async Task<IActionResult> MobilePlayerProjectionPage(CancellationToken cancellationToken)
-    {
-        var model = await BuildMobileProjectionPageModel(
-            currentPath: "/mobile/player",
-            chromeTitle: "Player play shell",
-            chromeDescription: "Player play entry with reconnect and continuity inside Chummer.",
-            eyebrow: "Play shell",
-            heading: "Player entry",
-            intro: "The play shell keeps role entry, reconnect expectations, and current continuity visible without pretending a preview route is the product.",
-            currentRoleKey: "player",
-            primaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
-            cancellationToken: cancellationToken);
-        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
-    }
+        => RedirectToPrivateMobileAlias("/mobile/player");
 
     [HttpGet("/gm")]
     [HttpHead("/gm")]
     public IActionResult GmProjectionAlias()
-        => Redirect("/play?role=gm");
-
-    [HttpGet("/mobile/gm")]
-    [HttpHead("/mobile/gm")]
-    [Produces("text/html")]
-    public async Task<IActionResult> MobileGmProjectionPage(CancellationToken cancellationToken)
-    {
-        var model = await BuildMobileProjectionPageModel(
-            currentPath: "/mobile/gm",
-            chromeTitle: "GM play shell",
-            chromeDescription: "GM play entry with reconnect and continuity inside Chummer.",
-            eyebrow: "Play shell",
-            heading: "GM entry",
-            intro: "The play shell keeps role entry, reconnect expectations, and current continuity visible without pretending a preview route is the product.",
-            currentRoleKey: "gm",
-            primaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
-            cancellationToken: cancellationToken);
-        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
-    }
+        => RedirectToPrivateMobileAlias("/mobile/gm");
 
     [HttpGet("/observer")]
     [HttpHead("/observer")]
     public IActionResult ObserverProjectionAlias()
-        => Redirect("/play?role=observer");
-
-    [HttpGet("/mobile/observer")]
-    [HttpHead("/mobile/observer")]
-    [Produces("text/html")]
-    public async Task<IActionResult> MobileObserverProjectionPage(CancellationToken cancellationToken)
-    {
-        var model = await BuildMobileProjectionPageModel(
-            currentPath: "/mobile/observer",
-            chromeTitle: "Observer play shell",
-            chromeDescription: "Observer play entry with reconnect and continuity inside Chummer.",
-            eyebrow: "Play shell",
-            heading: "Observer entry",
-            intro: "The play shell keeps role entry, reconnect expectations, and current continuity visible without pretending a preview route is the product.",
-            currentRoleKey: "observer",
-            primaryAction: new TrustPageActionViewModel("Open Chummer", "/build", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
-            cancellationToken: cancellationToken);
-        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
-    }
+        => RedirectToPrivateMobileAlias("/mobile/observer");
 
     [HttpGet("/anarchy")]
     [Produces("text/html")]
@@ -1494,12 +1482,20 @@ public sealed class PublicLandingController : Controller
             }
 
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            var ticket = _releaseUploadTickets.Issue(subject);
             var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
             string? templatePath = ResolveWebAssetPath("artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
             if (string.IsNullOrWhiteSpace(templatePath))
             {
                 return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
+            }
+
+            string? hubLocalReleaseProofPath = ResolveWebAssetPath(
+                "proofs",
+                "mac-codex-release",
+                "HUB_LOCAL_RELEASE_PROOF.generated.json");
+            if (string.IsNullOrWhiteSpace(hubLocalReleaseProofPath))
+            {
+                return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload proof is unavailable.");
             }
 
             string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
@@ -1509,8 +1505,7 @@ public sealed class PublicLandingController : Controller
                 bootstrapUrl,
                 ComputeSha256Hex(bootstrapTemplate),
                 hubLocalReleaseProofUrl,
-                ReleaseUploadTicketEnvironmentVariable,
-                ticket.Ticket);
+                ComputeSha256Hex(System.IO.File.ReadAllBytes(hubLocalReleaseProofPath)));
             var model = new ReleaseUploadPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(
                     "Build macOS",
@@ -1519,11 +1514,10 @@ public sealed class PublicLandingController : Controller
                     user.DisplayName,
                     user.Email),
                 Heading: "Build macOS handoff",
-                Summary: "This page mints a short-lived access code and embeds it in the Mac bootstrap command so the release shell can build, publish, and verify without stopping for another secret paste.",
+                Summary: "This page provides a digest-pinned Mac bootstrap command and mints a short-lived upload code only when you ask to copy it.",
                 Command: command,
-                HandoffCode: ticket.Ticket,
+                TicketUrl: BuildAbsoluteUrl("/downloads/release-upload/ticket"),
                 BootstrapUrl: bootstrapUrl,
-                TicketExpiresAtUtc: ticket.Claims.ExpiresAtUtc,
                 UploadUrl: BuildAbsoluteUrl("/api/internal/releases/bundles"),
                 ReadmeUrl: BuildAbsoluteUrl("/artifacts/mac-codex-release-pipeline/readme.md"),
                 VerifyUrl: BuildAbsoluteUrl("/downloads/RELEASE_CHANNEL.generated.json"),
@@ -1543,9 +1537,43 @@ public sealed class PublicLandingController : Controller
         }
     }
 
+    [HttpPost("/downloads/release-upload/ticket")]
+    [Produces("application/json", "application/problem+json")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ReleaseUploadTicket(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            if (!ReleaseUploadAccessPolicy.CanAccess(subject.Email))
+            {
+                return NotFound();
+            }
+
+            var issued = _releaseUploadTickets.Issue(subject);
+            Response.Headers["Cache-Control"] = "private, no-store";
+            Response.Headers["Pragma"] = "no-cache";
+            return Ok(new
+            {
+                ticket = issued.Ticket,
+                expiresAtUtc = issued.Claims.ExpiresAtUtc
+            });
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "Sign in again before minting a release upload access code.");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Release upload ticket could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpGet("/downloads/release-upload/bootstrap.sh")]
     [Produces("text/x-shellscript", "application/problem+json")]
-    public IActionResult ReleaseUploadBootstrapScript([FromQuery] string? ticket, [FromQuery] string? apiToken)
+    public IActionResult ReleaseUploadBootstrapScript()
     {
         string? templatePath = ResolveWebAssetPath("artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
         if (string.IsNullOrWhiteSpace(templatePath))
@@ -1555,74 +1583,47 @@ public sealed class PublicLandingController : Controller
 
         Response.Headers["Cache-Control"] = "private, no-store";
         string bootstrapScript = System.IO.File.ReadAllText(templatePath);
-        string? releaseUploadAuth = ResolveReleaseUploadCommandAuth(
-            ticket,
-            apiToken,
-            out string releaseUploadAuthEnvironmentVariable,
-            out IActionResult? failure);
-        if (failure is not null)
-        {
-            return failure;
-        }
-
-        if (!string.IsNullOrWhiteSpace(releaseUploadAuth))
-        {
-            bootstrapScript =
-                "# Release upload authorization was attached by the signed-in chummer.run handoff.\n" +
-                "export " + releaseUploadAuthEnvironmentVariable + "=" + SingleQuoteShellValue(releaseUploadAuth) + "\n" +
-                bootstrapScript;
-        }
-
         return Content(bootstrapScript, "text/x-shellscript; charset=utf-8", Encoding.UTF8);
     }
 
     [HttpGet("/downloads/release-upload/bootstrap.command")]
     [Produces("text/x-shellscript", "application/problem+json")]
     public async Task<IActionResult> ReleaseUploadBootstrapCommand(
-        [FromQuery] string? ticket,
-        [FromQuery] string? apiToken,
         CancellationToken cancellationToken)
     {
-        string? releaseUploadAuth = ResolveReleaseUploadCommandAuth(
-            ticket,
-            apiToken,
-            out string releaseUploadAuthEnvironmentVariable,
-            out IActionResult? failure);
-        if (failure is not null)
+        try
         {
-            return failure;
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            if (!ReleaseUploadAccessPolicy.CanAccess(subject.Email))
+            {
+                return NotFound();
+            }
         }
-
-        if (string.IsNullOrWhiteSpace(releaseUploadAuth))
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            try
-            {
-                var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-                if (!ReleaseUploadAccessPolicy.CanAccess(subject.Email))
-                {
-                    return NotFound();
-                }
-
-                releaseUploadAuth = _releaseUploadTickets.Issue(subject).Ticket;
-                releaseUploadAuthEnvironmentVariable = ReleaseUploadTicketEnvironmentVariable;
-            }
-            catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
-            {
-                return Problem(
-                    statusCode: StatusCodes.Status401Unauthorized,
-                    detail: "Sign in at /downloads/release-upload or provide a valid ticket/apiToken query value before fetching the release upload command.");
-            }
-            catch (HubRequestAuthException ex)
-            {
-                _logger.LogWarning(ex, "Release upload command could not confirm the signed-in identity.");
-                return Problem(statusCode: ex.StatusCode, detail: ex.Message);
-            }
+            return Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                detail: "Sign in at /downloads/release-upload before fetching the release upload command.");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Release upload command could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
 
         string? templatePath = ResolveWebAssetPath("artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
         if (string.IsNullOrWhiteSpace(templatePath))
         {
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
+        }
+
+        string? hubLocalReleaseProofPath = ResolveWebAssetPath(
+            "proofs",
+            "mac-codex-release",
+            "HUB_LOCAL_RELEASE_PROOF.generated.json");
+        if (string.IsNullOrWhiteSpace(hubLocalReleaseProofPath))
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload proof is unavailable.");
         }
 
         string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
@@ -1632,53 +1633,10 @@ public sealed class PublicLandingController : Controller
             bootstrapUrl,
             ComputeSha256Hex(bootstrapTemplate),
             hubLocalReleaseProofUrl,
-            releaseUploadAuthEnvironmentVariable,
-            releaseUploadAuth);
+            ComputeSha256Hex(System.IO.File.ReadAllBytes(hubLocalReleaseProofPath)));
 
         Response.Headers["Cache-Control"] = "private, no-store";
         return Content(command + "\n", "text/x-shellscript; charset=utf-8", Encoding.UTF8);
-    }
-
-    private string? ResolveReleaseUploadCommandAuth(
-        string? ticket,
-        string? apiToken,
-        out string environmentVariable,
-        out IActionResult? failure)
-    {
-        environmentVariable = ReleaseUploadTicketEnvironmentVariable;
-        failure = null;
-
-        string cleanToken = (apiToken ?? string.Empty).Trim();
-        if (!string.IsNullOrWhiteSpace(cleanToken))
-        {
-            string expectedToken = (_configuration["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(expectedToken) || !FixedTimeEquals(cleanToken, expectedToken))
-            {
-                failure = Problem(
-                    statusCode: StatusCodes.Status401Unauthorized,
-                    detail: "The supplied release upload apiToken is not valid for this chummer.run instance.");
-                return null;
-            }
-
-            environmentVariable = ReleaseUploadTokenEnvironmentVariable;
-            return cleanToken;
-        }
-
-        string cleanTicket = (ticket ?? string.Empty).Trim();
-        if (!string.IsNullOrWhiteSpace(cleanTicket))
-        {
-            if (!_releaseUploadTickets.TryValidate(cleanTicket, out _))
-            {
-                failure = Problem(
-                    statusCode: StatusCodes.Status401Unauthorized,
-                    detail: "The supplied release upload ticket is expired or invalid. Refresh /downloads/release-upload and copy a new command.");
-                return null;
-            }
-
-            return cleanTicket;
-        }
-
-        return null;
     }
 
     private string? ResolveWebAssetPath(params string[] relativeSegments)
@@ -1740,6 +1698,14 @@ public sealed class PublicLandingController : Controller
         var (manifest, artifact) = ResolveInstallDispatchArtifact(artifactId);
         if (artifact is null)
         {
+            ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByArtifactId(
+                _releases.CaptureShelfSnapshot(),
+                artifactId);
+            if (resolution.Failure != ArtifactDeliveryFailure.NotFound)
+            {
+                return PublicArtifactDeliveryDenied(resolution);
+            }
+
             WindowsProofInstallerRecord? proofInstaller = _windowsProofInstallers.FindByArtifactId(artifactId);
             if (proofInstaller is null)
             {
@@ -1782,9 +1748,10 @@ public sealed class PublicLandingController : Controller
                     subject.SubjectId)
                 : null;
             var bootstrapTicket = bootstrapScriptDownload && !string.Equals(bootstrapPlatform, "macos", StringComparison.Ordinal)
-                ? _installBootstrapTickets.Issue(
-                    artifact.Id,
-                    guidedBootstrapArtifacts.Select(candidate => candidate.Id),
+                ? IssueInstallBootstrapTicket(
+                    manifest,
+                    artifact,
+                    guidedBootstrapArtifacts,
                     user.UserId,
                     subject.SubjectId)
                 : null;
@@ -1803,7 +1770,12 @@ public sealed class PublicLandingController : Controller
                 : bootstrapTicket is null
                     ? bootstrapScriptPath
                     : $"{bootstrapScriptPath}{bootstrapQuery}";
-            var rawDownloadHref = option.DirectFileHref;
+            var rawDownloadHref = BuildCredentialBoundArtifactHref(manifest, artifact, option.DirectFileHref);
+            if (!string.IsNullOrWhiteSpace(manifest.GenerationId)
+                && !string.IsNullOrWhiteSpace(dispatch?.ClaimTicket?.ClaimCode))
+            {
+                rawDownloadHref = $"{rawDownloadHref}{QueryString.Create("claimCode", dispatch.ClaimTicket.ClaimCode)}";
+            }
             var downloadHref = bootstrapScriptDownload
                 ? bootstrapScriptHref!
                 : rawDownloadHref;
@@ -1907,10 +1879,14 @@ public sealed class PublicLandingController : Controller
         CancellationToken cancellationToken)
     {
         bool authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        bool generationBoundProof = proofInstaller.LegacyFilePath is null;
+        string primaryDownloadHref = generationBoundProof
+            ? proofInstaller.DownloadUrl
+            : $"/downloads/install/{Uri.EscapeDataString(artifactId)}/supplemental";
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
             "Supplemental Windows installer",
             "Direct Windows installer for support outside the main downloads page.",
-            $"/downloads/install/{artifactId}",
+            primaryDownloadHref,
             cancellationToken: cancellationToken);
         var release = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         string headLabel = string.Equals(proofInstaller.Head, "blazor-desktop", StringComparison.OrdinalIgnoreCase)
@@ -1924,7 +1900,7 @@ public sealed class PublicLandingController : Controller
             DispatchNote: "Use this page when you need this exact installer.",
             ArtifactTitle: $"{headLabel} Windows x64 installer",
             ArtifactSupportLine: "Direct Windows installer.",
-            DownloadHref: $"/downloads/install/{Uri.EscapeDataString(artifactId)}/supplemental",
+            DownloadHref: primaryDownloadHref,
             DownloadLabel: "Download installer",
             TerminalInstallCommand: null,
             BootstrapCommandLabel: null,
@@ -1936,8 +1912,8 @@ public sealed class PublicLandingController : Controller
             AutoStartDownload: true,
             BootstrapScriptDownload: false,
             PromoteSecondaryDownload: false,
-            SecondaryDownloadHref: proofInstaller.DownloadUrl,
-            SecondaryDownloadLabel: "Direct file mirror",
+            SecondaryDownloadHref: generationBoundProof ? null : proofInstaller.DownloadUrl,
+            SecondaryDownloadLabel: generationBoundProof ? null : "Direct file mirror",
             AccountHref: "/downloads",
             AccountLabel: "Back to downloads",
             HelpHref: release.InstallHelpHref,
@@ -2062,7 +2038,10 @@ public sealed class PublicLandingController : Controller
                 HeadId: candidate.Head ?? string.Empty,
                 Title: BuildGuidedBootstrapArtifactTitle(candidate),
                 ShortLabel: BuildGuidedBootstrapShortLabel(candidate),
-                DownloadUrl: BuildAbsoluteUrl($"/downloads/file/{Uri.EscapeDataString(candidate.Id)}"),
+                DownloadUrl: BuildAbsoluteUrl(BuildCredentialBoundArtifactHref(
+                    manifest,
+                    candidate,
+                    $"/downloads/file/{Uri.EscapeDataString(candidate.Id)}")),
                 ClaimUrl: string.Empty,
                 Sha256: candidate.Sha256,
                 PackageName: candidate.FileName ?? Path.GetFileName(candidate.Url),
@@ -2145,7 +2124,11 @@ public sealed class PublicLandingController : Controller
         if (guidedBootstrapDownload)
         {
             string? bootstrapTicket = Request.Query["ticket"].ToString();
-            if (!_installBootstrapTickets.TryValidateForArtifact(bootstrapTicket, artifact.Id, out InstallBootstrapTicketClaims? ticketClaims)
+            if (!TryValidateInstallBootstrapTicket(
+                    bootstrapTicket,
+                    manifest,
+                    artifact,
+                    out InstallBootstrapTicketClaims? ticketClaims)
                 || ticketClaims is null)
             {
                 Response.Headers["Cache-Control"] = "private, no-store";
@@ -2298,9 +2281,7 @@ public sealed class PublicLandingController : Controller
         string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
         bool loadedFromBoard = visiblePosts.Length > 0;
         string? boardShellHref = hostedBoardAvailable ? BuildParticipateBoardRouteHref(normalizedBoardPath) : null;
-        string? embeddedBoardHref = hostedBoardAvailable && hostedBoardUpstream is not null
-            ? BuildParticipateFrameHref(hostedBoardUpstream, normalizedBoardPath)
-            : null;
+        string? embeddedBoardHref = hostedBoardAvailable ? BuildParticipateFrameHref(normalizedBoardPath) : null;
         string? entryHref = subject is null
             ? BuildParticipateSignInHref("/participate")
             : "/account";
@@ -2590,7 +2571,8 @@ public sealed class PublicLandingController : Controller
 
         try
         {
-            using HttpClient client = _httpClientFactory?.CreateClient() ?? new HttpClient();
+            using HttpClient client = _httpClientFactory?.CreateClient(PublicProxyRedirectPolicy.HttpClientName)
+                ?? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
             using CancellationTokenSource timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(HostedBoardPageTimeout);
             using var outbound = new HttpRequestMessage(HttpMethod.Get, target);
@@ -2696,25 +2678,6 @@ public sealed class PublicLandingController : Controller
             string cachePath = string.IsNullOrWhiteSpace(normalizedCachePath) ? "/participate/board" : $"/participate/board/{normalizedCachePath}";
             string staleCacheKey = BuildHostedBoardHtmlCacheKey("participate", localOrigin, localBaseHref, canonicalHref ?? cachePath, normalizedCachePath, embedded);
             if (TryServeHostedBoardHtmlCache(staleCacheKey, allowStale: true, out ContentResult? staleHtml) && staleHtml is not null)
-            {
-                return staleHtml;
-            }
-
-            return embedded
-                ? BuildHostedBoardEmbedFallbackResult(
-                    "Participate",
-                    "Board offline right now",
-                    "Try again shortly. Use Contact for the Chummer5 Discord server.",
-                    primaryHref: "/participate",
-                    primaryLabel: "Retry",
-                    secondaryHref: "/contact",
-                    secondaryLabel: "Contact")
-                : await ParticipateBoardFallbackAsync(cancellationToken, fallbackPath, disableHostedBoard: true).ConfigureAwait(false);
-        }
-        catch (RegexMatchTimeoutException ex)
-        {
-            _logger.LogWarning(ex, "Participate board proxy could not sanitize upstream board HTML.");
-            if (TryServeHostedBoardHtmlCache(cacheKey, allowStale: true, out ContentResult? staleHtml) && staleHtml is not null)
             {
                 return staleHtml;
             }
@@ -2914,13 +2877,10 @@ public sealed class PublicLandingController : Controller
             : $"/participate/board/{normalizedBoardPath}";
     }
 
-    private static string BuildParticipateFrameHref(Uri upstream, string? boardPath = null)
+    private static string BuildParticipateFrameHref(string? boardPath = null)
     {
-        string normalizedBoardPath = NormalizeParticipateBoardPath(boardPath);
-        Uri target = string.IsNullOrWhiteSpace(normalizedBoardPath)
-            ? upstream
-            : ResolveHostedBoardContentUri(upstream, normalizedBoardPath);
-        return target.ToString();
+        string route = BuildParticipateBoardRouteHref(boardPath);
+        return $"{route}?embed=1";
     }
 
     private static string BuildRoadmapBoardEmbedHref(string? boardPath = null)
@@ -3143,6 +3103,40 @@ public sealed class PublicLandingController : Controller
             Query = raw.TrimStart('?')
         };
         return builder.Uri;
+    }
+
+    private void ApplyPrivateMobileDocumentHeaders()
+    {
+        Response.Headers.CacheControl = "private, no-store, no-cache, max-age=0";
+        Response.Headers["CDN-Cache-Control"] = "no-store, max-age=0";
+        Response.Headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
+        Response.Headers["Surrogate-Control"] = "no-store";
+        Response.Headers["Referrer-Policy"] = "no-referrer";
+        Response.Headers["Content-Security-Policy"] = "default-src 'none'; base-uri 'none'; connect-src 'none'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; manifest-src 'self'; script-src 'self'; style-src 'self'; worker-src 'self'";
+        Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["X-Frame-Options"] = "DENY";
+        Response.Headers.Pragma = "no-cache";
+        Response.Headers.Expires = "0";
+    }
+
+    private IActionResult RedirectToPrivateMobileAlias(string targetPath)
+    {
+        ApplyPrivateMobileDocumentHeaders();
+        return Redirect($"{targetPath}#");
+    }
+
+    private void ApplyPrivateAdminDocumentHeaders()
+    {
+        PrivateResponseCacheHeaders.Apply(Response.Headers);
+        Response.Headers["Referrer-Policy"] = "no-referrer";
+    }
+
+    private async Task<AuthenticatedHubSubject?> RequirePrivilegedAdminSubjectAsync(
+        CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject subject = await _identity.RequireFreshSubjectAsync(Request, cancellationToken);
+        return ReleaseUploadAccessPolicy.CanAccess(subject) ? subject : null;
     }
 
     private static string RewriteHostedBoardLocation(Uri location, Uri upstream, string fallbackPath, string localPrefix)
@@ -3946,7 +3940,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
-        rewritten = RemoveHostedBoardProviderComments(rewritten);
+        rewritten = Regex.Replace(
+            rewritten,
+            "<!--.*?ProductLift.*?-->",
+            string.Empty,
+            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+            TimeSpan.FromMilliseconds(250));
         rewritten = Regex.Replace(
             rewritten,
             "<meta[^>]+name=\"generator\"[^>]*>",
@@ -3977,50 +3976,6 @@ document.addEventListener('DOMContentLoaded', function () {
             string.Empty,
             RegexOptions.IgnoreCase | RegexOptions.Singleline,
             TimeSpan.FromMilliseconds(250));
-    }
-
-    private static string RemoveHostedBoardProviderComments(string html)
-    {
-        if (string.IsNullOrEmpty(html))
-        {
-            return string.Empty;
-        }
-
-        const string commentOpen = "<!--";
-        const string commentClose = "-->";
-        string providerName = string.Concat("Product", "Lift");
-        var rewritten = new StringBuilder(html.Length);
-        int cursor = 0;
-
-        while (cursor < html.Length)
-        {
-            int commentStart = html.IndexOf(commentOpen, cursor, StringComparison.Ordinal);
-            if (commentStart < 0)
-            {
-                rewritten.Append(html, cursor, html.Length - cursor);
-                break;
-            }
-
-            int commentEnd = html.IndexOf(commentClose, commentStart + commentOpen.Length, StringComparison.Ordinal);
-            if (commentEnd < 0)
-            {
-                rewritten.Append(html, cursor, html.Length - cursor);
-                break;
-            }
-
-            rewritten.Append(html, cursor, commentStart - cursor);
-            int afterComment = commentEnd + commentClose.Length;
-            int commentLength = afterComment - commentStart;
-            bool isProviderComment = html.IndexOf(providerName, commentStart, commentLength, StringComparison.OrdinalIgnoreCase) >= 0;
-            if (!isProviderComment)
-            {
-                rewritten.Append(html, commentStart, commentLength);
-            }
-
-            cursor = afterComment;
-        }
-
-        return rewritten.ToString();
     }
 
     private static string ReplaceHostedBoardVisibleBrandText(string html)
@@ -4224,7 +4179,7 @@ document.addEventListener('DOMContentLoaded', function () {
     [HttpHead("/build")]
     [Produces("text/html")]
     public IActionResult BuildPage()
-        => Redirect("/app?command=character_roster");
+        => Redirect("/blazor/app?command=character_roster");
 
     [HttpGet("/alice")]
     [HttpHead("/alice")]
@@ -4539,7 +4494,7 @@ document.addEventListener('DOMContentLoaded', function () {
             AftermathRail = new
             {
                 Status = "live",
-                WorkspaceHref = "/account/roster#aftermath-packages",
+                WorkspaceHref = "/account/work#aftermath-packages",
                 ApiRoutes = new[]
                 {
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages",
@@ -4572,28 +4527,29 @@ document.addEventListener('DOMContentLoaded', function () {
             currentPath: "/origin-dossier",
             eyebrow: "Runner origin",
             heading: "Origin Dossier",
-            intro: "Origin Dossier turns an approved runner backstory into a readable story packet before it becomes a video, audiobook, or later ALICE context. The story stays first. The sheet stays authoritative.",
+            intro: "Origin Dossier is being hardened into a real full private story edition first: a full story manuscript turned into a finished ebook with fitting cover art. After that, the player gets three portraits to choose from, an optional voice-selected audiobook request, and chapter scene summaries that drive one chosen character-visible cinematic render. The story stays first. The sheet stays authoritative.",
             sections:
             [
                 new TrustPageSectionViewModel(
-                    "origin_story_first",
-                    "Story first",
-                    "What the player sees first",
-                    "The first artifact should be a readable story packet the player and GM can approve together before the run continues into later media or follow-up help.",
+                    "origin_story_edition",
+                    "Full story first",
+                    "What the player should get first",
+                    "The flagship deliverable is a real private ebook from the approved full story manuscript, not a teaser artifact. Player and GM should be able to approve the same story before the lane widens into later media.",
                     [
-                        "Readable story packet before later media.",
+                        "Full private ebook before later media.",
                         "Approved canon stays separate from mechanics.",
-                        "Player and GM can review the same text."
+                        "Player and GM review the same story."
                     ]),
                 new TrustPageSectionViewModel(
                     "origin_bundle",
-                    "Next",
-                    "Where the story can continue",
-                    "Once the story is approved, the same source can continue into a bounded media bundle without turning narration, portraits, or video into character authority.",
+                    "After the ebook",
+                    "What the approved story can widen into",
+                    "Once the ebook with its fitted cover is approved and handed over, the same source can continue into exactly three story-fit portrait choices, voice-selectable audio, and a chapter-scene shortlist that drives one chosen cinematic render without turning those artifacts into character authority.",
                     [
-                        "PDF booklet.",
-                        "Narrated overview and later audiobook lane.",
-                        "Portrait, scene, and video packet lineage."
+                        "The fitting cover ships with the ebook.",
+                        "Three portraits to choose one from.",
+                        "Optional audiobook request after voice choice.",
+                        "Chapter-scene summaries and one bounded character-visible cinematic render."
                     ]),
                 new TrustPageSectionViewModel(
                     "origin_boundary",
@@ -4608,22 +4564,22 @@ document.addEventListener('DOMContentLoaded', function () {
             ],
             actions:
             [
-                new TrustPageActionViewModel("Open the story booklet", "/docs/origin-dossier-the-name-she-chose", "primary"),
+                new TrustPageActionViewModel("Open the story edition sample", "/docs/origin-dossier-the-name-she-chose", "primary"),
                 new TrustPageActionViewModel("Read the book-studio design", "/docs/origin-book-studio", "secondary"),
-                new TrustPageActionViewModel("Watch the narrated overview", "/origin-dossier/media", "secondary"),
-                new TrustPageActionViewModel("Download the booklet PDF", "/docs/origin-dossier-the-name-she-chose/download.pdf", "ghost")
+                new TrustPageActionViewModel("Watch the story-to-cinema path", "/origin-dossier/media", "secondary"),
+                new TrustPageActionViewModel("Download the sample PDF", "/docs/origin-dossier-the-name-she-chose/download.pdf", "ghost")
             ],
             cancellationToken: cancellationToken,
             summaryPoints:
             [
-                "Story before media",
-                "Approved canon stays bounded",
+                "Full story before media",
+                "Portrait and audio stay downstream",
                 "The sheet remains authoritative"
             ],
             sharedArtifacts: BuildSharedArtifactSurfaceRoutes(surface),
             horizonCapability: BuildPublicHorizonCapability(
                 surface,
-                _mediaHorizons.BuildSourceRef(surface, "public-story-packet")));
+                _mediaHorizons.BuildSourceRef(surface, "public-story-edition")));
         return View("~/Views/PublicLanding/TrustPage.cshtml", model);
     }
 
@@ -4639,19 +4595,19 @@ document.addEventListener('DOMContentLoaded', function () {
             Status = "shipped_mvp",
             PublicBoard = new
             {
-                StoryBookletHref = "/docs/origin-dossier-the-name-she-chose",
-                StoryBookletPdfHref = "/docs/origin-dossier-the-name-she-chose/download.pdf",
+                StoryEditionHref = "/docs/origin-dossier-the-name-she-chose",
+                StoryEditionPdfHref = "/docs/origin-dossier-the-name-she-chose/download.pdf",
                 MediaDispatchHref = "/origin-dossier/media",
                 BookStudioHref = "/docs/origin-book-studio",
-                Summary = "Origin Dossier keeps the approved story packet first, then widens into bounded media on first-party routes."
+                Summary = "Origin Dossier is being hardened toward a full private story ebook with fitted cover first, then three portraits, optional voice-choice audio, and one bounded character-visible cinematic scene on first-party routes."
             },
             SharedArtifacts = BuildSharedArtifactSurfaceRoutes(surface),
             ArtifactCapability = BuildPublicHorizonCapability(
                 surface,
-                _mediaHorizons.BuildSourceRef(surface, "public-story-packet")),
+                _mediaHorizons.BuildSourceRef(surface, "public-story-edition")),
             Boundary = new
             {
-                StoryTruth = "approved_chummer_owned_packet",
+                StoryTruth = "approved_chummer_owned_story_edition",
                 SilentMechanicsMutation = "not_claimed",
                 ProviderTruth = "not_claimed"
             }
@@ -4969,7 +4925,7 @@ document.addEventListener('DOMContentLoaded', function () {
             dispatchRoute: "/table-pulse/debrief",
             sourceId: "live-and-aftermath",
             surface: surface,
-            dispatchTarget: "/account/roster#aftermath-packages",
+            dispatchTarget: "/account/work#aftermath-packages",
             emitRunsiteHeaders: false,
             fallbackQuotaUnavailableMessage: "Unable to confirm debrief packet allowance receipt right now.",
             cancellationToken: cancellationToken);
@@ -5007,7 +4963,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return await DispatchResolvedHorizonArtifactAsync(
             operationLabel: "origin dossier media",
             dispatchRoute: "/origin-dossier/media",
-            sourceId: "public-story-packet",
+            sourceId: "public-story-edition",
             surface: surface,
             dispatchTarget: "/media/horizons/origin-dossier-the-name-she-chose-20260619.mp4",
             emitRunsiteHeaders: false,
@@ -5809,10 +5765,10 @@ document.addEventListener('DOMContentLoaded', function () {
             {
                 AccountEntryHref = "/account/passport",
                 AccountRedirectHref = "/account/passport/open",
-                AccountFallbackHref = "/account/roster#aftermath-packages",
+                AccountFallbackHref = "/account/work#aftermath-packages",
                 LiveNotificationsHref = "/account/ledger/notifications",
                 LeaderBriefingHrefTemplate = "/account/ledger/factions/{factionId}/leader-briefing",
-                AftermathHref = "/account/roster#aftermath-packages",
+                AftermathHref = "/account/work#aftermath-packages",
                 Summary = "Runner Passport keeps account identity connected to the Table Pulse inbox, leader briefings, and the private aftermath return."
             },
             Boundary = new
@@ -7115,13 +7071,13 @@ document.addEventListener('DOMContentLoaded', function () {
         string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_WEBHOOK_SECRET"]?.Trim();
         if (string.IsNullOrWhiteSpace(configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "feedback webhook adapter is not configured.");
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "productlift webhook adapter is not configured.");
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.WebhookSecretHeader].ToString();
         if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "feedback webhook secret mismatch.");
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift webhook secret mismatch.");
         }
 
         try
@@ -7234,13 +7190,13 @@ document.addEventListener('DOMContentLoaded', function () {
         string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_OPERATIONS_SECRET"]?.Trim();
         if (string.IsNullOrWhiteSpace(configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "feedback operations replay is not configured.");
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "productlift operations replay is not configured.");
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
         if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "feedback operations secret mismatch.");
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
         }
 
         return Ok(_signalOperations.ReconcilePendingCloseouts());
@@ -7256,13 +7212,13 @@ document.addEventListener('DOMContentLoaded', function () {
         string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_OPERATIONS_SECRET"]?.Trim();
         if (string.IsNullOrWhiteSpace(configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "feedback operations recovery is not configured.");
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "productlift operations recovery is not configured.");
         }
 
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
         if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "feedback operations secret mismatch.");
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
         }
 
         return Ok(_signalOperations.RecoverDispatchOutcomes());
@@ -7348,7 +7304,7 @@ document.addEventListener('DOMContentLoaded', function () {
         string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
         if (!FixedTimeEquals(suppliedSecret.Trim(), configuredSecret))
         {
-            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "delivery outcome secret mismatch.");
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
         }
 
         try
@@ -7376,7 +7332,7 @@ document.addEventListener('DOMContentLoaded', function () {
         await Task.CompletedTask.ConfigureAwait(false);
         Uri? upstream = ResolveProductLiftHostedRoadmapUri();
         string target = embedded && upstream is not null && !ShouldShortCircuitHostedBoardUpstream(upstream)
-            ? BuildParticipateFrameHref(upstream, normalizedBoardPath)
+            ? BuildParticipateFrameHref(normalizedBoardPath)
             : BuildParticipateBoardRouteHref(normalizedBoardPath);
         return Redirect(target);
     }
@@ -7562,25 +7518,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     secondaryLabel: "Changelog")
                 : await RoadmapBoardFallbackAsync(cancellationToken, fallbackPath, disableHostedBoard: true).ConfigureAwait(false);
         }
-        catch (RegexMatchTimeoutException ex)
-        {
-            _logger.LogWarning(ex, "Roadmap board proxy could not sanitize upstream board HTML.");
-            if (TryServeHostedBoardHtmlCache(cacheKey, allowStale: true, out ContentResult? staleHtml) && staleHtml is not null)
-            {
-                return staleHtml;
-            }
-
-            return embedded
-                ? BuildHostedBoardEmbedFallbackResult(
-                    "Roadmap",
-                    "Board not loading right now",
-                    "Changelog has shipped work. Participate has requests.",
-                    primaryHref: "/roadmap",
-                    primaryLabel: "Retry",
-                    secondaryHref: "/changelog",
-                    secondaryLabel: "Changelog")
-                : await RoadmapBoardFallbackAsync(cancellationToken, fallbackPath, disableHostedBoard: true).ConfigureAwait(false);
-        }
     }
 
     [HttpGet("/changelog")]
@@ -7607,7 +7544,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         PublicTrustPulseSnapshot? pulse = _trustPulse.LoadSnapshot();
         var model = new StatusPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Updated", "Current Chummer release status.", "/status", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Current Chummer release status.", "/status", cancellationToken),
             Manifest: manifest,
             ReleaseTruth: BuildReleaseTruthDisplay(manifest),
             ReleaseExperience: releaseExperience,
@@ -8593,6 +8530,7 @@ document.addEventListener('DOMContentLoaded', function () {
         string heading,
         string intro,
         string currentRoleKey,
+        string installRoleKey,
         TrustPageActionViewModel primaryAction,
         TrustPageActionViewModel secondaryAction,
         CancellationToken cancellationToken)
@@ -8602,15 +8540,47 @@ document.addEventListener('DOMContentLoaded', function () {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
         var continuitySummary = _nexusPan.BuildPublicSummary();
+        TrustPageActionViewModel resolvedPrimaryAction = ResolveMobileProjectionPrimaryAction(
+            primaryAction,
+            currentPath,
+            currentRoleKey,
+            subject is not null);
         SiteChromeViewModel chrome = subject is not null && user is not null
             ? _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email)
             : await BuildPublicOrAuthenticatedChromeAsync(chromeTitle, chromeDescription, currentPath, cancellationToken);
+        string documentTitle = installRoleKey switch
+        {
+            "gm" => "Install Chummer GM Companion",
+            "observer" => "Install Chummer Observer Companion",
+            "player" => "Install Chummer Player Companion",
+            _ => "Install Chummer Play"
+        };
+        string manifestHref = installRoleKey switch
+        {
+            "gm" => "/manifest.gm.webmanifest",
+            "observer" => "/manifest.observer.webmanifest",
+            "player" => "/manifest.player.webmanifest",
+            _ => "/manifest.play.webmanifest"
+        };
+        string appleAppTitle = installRoleKey switch
+        {
+            "gm" => "Chummer GM",
+            "observer" => "Chummer Observer",
+            "player" => "Chummer Player",
+            _ => "Chummer Play"
+        };
+        MobileInstallRoleProfileViewModel roleProfile = BuildMobileInstallRoleProfile(installRoleKey);
         return new MobileProjectionPageViewModel(
             Chrome: chrome,
             Eyebrow: eyebrow,
             Heading: heading,
             Intro: intro,
+            InstallRoleKey: installRoleKey,
+            DocumentTitle: documentTitle,
+            ManifestHref: manifestHref,
+            AppleAppTitle: appleAppTitle,
             CurrentRoleLabel: ResolvePlayRoleLabel(currentRoleKey),
+            RoleProfile: roleProfile,
             InstallabilitySummary: $"This play entry explains reconnect behavior and role entry without pretending a preview shell replaces the app. Claimed installs currently tracked: {continuitySummary.ActiveInstallationCount}; pending recovery items: {continuitySummary.PendingClaimCount + continuitySummary.PendingBrowserCallbackCount}.",
             Roles:
             [
@@ -8618,18 +8588,95 @@ document.addEventListener('DOMContentLoaded', function () {
                 new MobileRoleCardViewModel("GM", "Keep the next scene, continuity, and return status visible without dropping back to legacy aliases.", "/mobile/gm", string.Equals(currentRoleKey, "gm", StringComparison.OrdinalIgnoreCase)),
                 new MobileRoleCardViewModel("Observer", "Join the same play view in a read-mostly role when the table only needs visibility.", "/mobile/observer", string.Equals(currentRoleKey, "observer", StringComparison.OrdinalIgnoreCase))
             ],
-            Capabilities:
-            [
-                new MobileCapabilityCardViewModel("Play entry", "The public page keeps role entry and fallback behavior inside Chummer."),
-                new MobileCapabilityCardViewModel("Offline and reconnect", "Continuity, reconnect, and next safe action remain visible before the network starts wobbling."),
-                new MobileCapabilityCardViewModel("Role-aware entry", "Player, GM, and observer aliases all converge on the same play shell instead of splitting the product into separate stories."),
-                new MobileCapabilityCardViewModel("Claimed install truth", $"Active claimed installs: {continuitySummary.ActiveInstallationCount}; active grants: {continuitySummary.ActiveGrantCount}; observed platforms: {string.Join(", ", continuitySummary.PlatformLabels.DefaultIfEmpty("none yet"))}."),
-                new MobileCapabilityCardViewModel("Downloads stay separate", "Play entry explains table behavior; Downloads still owns platform choice and guided acquisition.")
-            ],
-            PrimaryAction: primaryAction,
+            Capabilities: roleProfile.Capabilities,
+            PrimaryAction: resolvedPrimaryAction,
             SecondaryAction: secondaryAction,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
+    }
+
+    private static MobileInstallRoleProfileViewModel BuildMobileInstallRoleProfile(string roleKey)
+        => roleKey switch
+        {
+            "gm" => new MobileInstallRoleProfileViewModel(
+                RoleKey: "gm",
+                PurposeHeading: "Stage the table without exposing Game Master controls.",
+                PurposeSummary: "Install the GM-labelled shell for scene pacing, table status, and a clean return path to an invitation issued by your table.",
+                PrivacyHeading: "Hidden notes never belong to this public shell.",
+                PrivacySummary: "The install page contains no campaign secrets, unrevealed scene data, private runner sheets, continuity token, or table identifier.",
+                AuthorityHeading: "A GM URL grants no Game Master authority.",
+                AuthoritySummary: "GM controls appear only after a signed-in identity receives an authoritative server-side grant for one specific Play session.",
+                InstallTargetPath: "/mobile/gm",
+                QrAriaLabel: "QR code that opens the clean Chummer GM install page",
+                OpenTargetLabel: "Open the GM install page",
+                Capabilities:
+                [
+                    new MobileCapabilityCardViewModel("Scene pacing", "Return to the table through a trusted invitation without publishing unrevealed scene state."),
+                    new MobileCapabilityCardViewModel("Table status", "Keep reconnect and session readiness visible without caching private campaign data."),
+                    new MobileCapabilityCardViewModel("Invitation return", "The installed shell is only an entry point; the server still decides whether GM access exists.")
+                ]),
+            "observer" => new MobileInstallRoleProfileViewModel(
+                RoleKey: "observer",
+                PurposeHeading: "Follow the table without gaining control.",
+                PurposeSummary: "Install the Observer-labelled shell for a read-mostly return path when a table invitation grants visibility but not player or GM actions.",
+                PrivacyHeading: "Observation does not make private table data public.",
+                PrivacySummary: "The install page contains no runner dossier, hidden GM notes, campaign secret, continuity token, or table identifier.",
+                AuthorityHeading: "An Observer URL grants no table visibility.",
+                AuthoritySummary: "Read-mostly session access appears only after a signed-in identity receives an authoritative observer grant from the server.",
+                InstallTargetPath: "/mobile/observer",
+                QrAriaLabel: "QR code that opens the clean Chummer Observer install page",
+                OpenTargetLabel: "Open the Observer install page",
+                Capabilities:
+                [
+                    new MobileCapabilityCardViewModel("Read-mostly return", "Reopen an authorized table view without acquiring player or GM controls."),
+                    new MobileCapabilityCardViewModel("Shared table status", "See reconnect and availability guidance without caching a private table projection."),
+                    new MobileCapabilityCardViewModel("Invitation boundary", "A trusted invitation and server grant remain mandatory for every observed session.")
+                ]),
+            _ => new MobileInstallRoleProfileViewModel(
+                RoleKey: "player",
+                PurposeHeading: "Keep your runner ready at the table.",
+                PurposeSummary: "Install the Player-labelled shell for condition, quick-action, and reconnect guidance before returning through a trusted table invitation.",
+                PrivacyHeading: "Your character is not embedded in this public shell.",
+                PrivacySummary: "The install page contains no character sheet, inventory, roll history, continuity token, campaign secret, or table identifier.",
+                AuthorityHeading: "A Player URL grants no seat at a table.",
+                AuthoritySummary: "Player controls appear only after a signed-in identity receives an authoritative server-side grant for one specific Play session.",
+                InstallTargetPath: "/mobile/player",
+                QrAriaLabel: "QR code that opens the clean Chummer Player install page",
+                OpenTargetLabel: "Open the Player install page",
+                Capabilities:
+                [
+                    new MobileCapabilityCardViewModel("Runner readiness", "Return to condition and quick-action guidance only after a trusted session invitation is accepted."),
+                    new MobileCapabilityCardViewModel("Reconnect guidance", "Keep the next safe action visible without caching a private character or table response."),
+                    new MobileCapabilityCardViewModel("Seat boundary", "The installed shell never substitutes a URL parameter for a server-issued player grant.")
+                ])
+        };
+
+    private static TrustPageActionViewModel ResolveMobileProjectionPrimaryAction(
+        TrustPageActionViewModel primaryAction,
+        string currentPath,
+        string currentRoleKey,
+        bool authenticated)
+    {
+        if (!string.Equals(primaryAction.Href, "/build", StringComparison.OrdinalIgnoreCase))
+        {
+            return primaryAction;
+        }
+
+        string roleLabel = ResolvePlayRoleLabel(currentRoleKey);
+        string roleRoute = $"/mobile/{Uri.EscapeDataString(currentRoleKey)}";
+        if (!authenticated)
+        {
+            return new TrustPageActionViewModel(
+                $"Sign in for {roleLabel}",
+                $"/login?next={Uri.EscapeDataString(roleRoute)}",
+                primaryAction.Tone);
+        }
+
+        bool alreadyOnRoleRoute = string.Equals(currentPath, roleRoute, StringComparison.OrdinalIgnoreCase);
+        return new TrustPageActionViewModel(
+            alreadyOnRoleRoute ? $"Retry {roleLabel}" : $"Open {roleLabel}",
+            roleRoute,
+            primaryAction.Tone);
     }
 
     private static string BuildMobilePwaLedgerStreamNotOptedInPayload()
@@ -8639,18 +8686,9 @@ document.addEventListener('DOMContentLoaded', function () {
             mode = "mobile_pwa_living_world",
             status = "opt_in_required",
             status_label = "Opt in required",
-            summary = "Black Ledger heat and session continuity updates are available only after account opt-in and followed-world selection in account preferences.",
-            legal_posture = "Public lane stays aggregate only. No private run table state, world heat, followed-world selection, or session continuity payload is published before opt-in.",
+            summary = "Black Ledger live updates are available when you opt in via account preferences.",
+            legal_posture = "Public lane stays aggregate only. No private run table state is published.",
             opt_in_route = "/account",
-            world_gate = "account_opt_in_and_followed_world_selection",
-            heat_visibility = "hidden_until_opt_in",
-            session_visibility = "hidden_until_opt_in",
-            opt_in_required_for = new[]
-            {
-                "black_ledger_heat",
-                "followed_world_updates",
-                "session_continuity"
-            },
             updates_route = "/mobile/pwa/ledger.json",
             generated_at_utc = DateTimeOffset.UtcNow
         }, PublicJsonContentOptions);
@@ -8744,7 +8782,7 @@ document.addEventListener('DOMContentLoaded', function () {
             {
                 world_id = world.WorldId,
                 world_name = world.PublicName,
-                world_turn = world.CurrentTurn,
+                world_turn = (int?)null,
                 turn_headline = "Follow this world to reveal the live turn headline.",
                 safety_note = world.SafetyNote,
                 map_note = world.MapNote
@@ -8778,7 +8816,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 update_interval_seconds = 30,
                 turn_map_route = "/ledger/map",
                 turn_route = (string?)$"/ledger/turns/{world.CurrentTurn}",
-                newsreel_route = (string?)$"/ledger/turns/{world.CurrentTurn}",
+                newsreel_route = (string?)$"/ledger/turns/{world.CurrentTurn}/newsreel.json",
                 world_status = world.Status
             }
             : new
@@ -11256,11 +11294,25 @@ Boundary:
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
     }
 
+    /// <summary>
+    /// Resolves only the documented public role aliases. Missing, repeated, or
+    /// unknown role values deliberately fall back to Player, and the caller
+    /// redirects to a query-free canonical path so unrelated input cannot stay
+    /// in browser history or leak through a referrer.
+    /// </summary>
+    private static string ResolveCanonicalPlayRoleFromQuery(IQueryCollection query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        Microsoft.Extensions.Primitives.StringValues values = query["role"];
+        return values.Count == 1 ? NormalizePlayRole(values[0]) : "player";
+    }
+
     private static string NormalizePlayRole(string? role)
         => role?.Trim().ToLowerInvariant() switch
         {
-            "gm" => "gm",
-            "observer" => "observer",
+            "gm" or "game-master" or "gamemaster" => "gm",
+            "observer" or "spectator" or "viewer" => "observer",
+            "player" or "runner" or "pc" => "player",
             _ => "player"
         };
 
@@ -12801,13 +12853,13 @@ Boundary:
             currentPath: "/docs",
             eyebrow: "Document library",
             heading: "Document Portal",
-            intro: "Start with a Chummer-owned guide or story packet. Read it on Chummer, open the optional viewer boundary, or download the PDF.",
+            intro: "Start with a Chummer-owned guide or story edition. Read it on Chummer, open the optional viewer boundary, or download the PDF.",
             sections:
             [
                 new TrustPageSectionViewModel(
                     "document_portal_featured",
                     "Available now",
-                    "Open a guide or story packet",
+                    "Open a guide or story edition",
                     "The portal stays intentionally narrow: original Chummer-authored documents only, on named first-party routes, with a clear fallback before broader campaign packet rollout.",
                     documents.Select(static item => item.Title).ToArray()),
                 new TrustPageSectionViewModel(
@@ -12833,7 +12885,7 @@ Boundary:
             actions:
             [
                 new TrustPageActionViewModel("Open Quickstart Guide", $"/docs/{firstDocument.Slug}", "primary"),
-                new TrustPageActionViewModel("Open Origin Dossier booklet", "/docs/origin-dossier-the-name-she-chose", "secondary"),
+                new TrustPageActionViewModel("Open Origin Dossier story sample", "/docs/origin-dossier-the-name-she-chose", "secondary"),
                 new TrustPageActionViewModel("Read publication boundary", $"/docs/embed/{firstDocument.Slug}", "ghost"),
                 new TrustPageActionViewModel("Download PDF", $"/docs/{firstDocument.Slug}/download.pdf", "ghost")
             ],
@@ -12892,10 +12944,10 @@ Boundary:
                     "Scope",
                     "What this document is for",
                     string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
-                        ? "Use this booklet to review the approved story packet before later media, audiobook, or assistant follow-up tries to build on it."
+                        ? "Use this sample chapter and excerpt package to review the approved story edition before later portrait, audio, or cinematic work tries to build on it."
                         : "Use the Quickstart Guide to orient a new player without pushing them into a sourcebook PDF, a sprawling docs pile, or private campaign notes.",
                     string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
-                        ? ["Readable story first", "Approved canon boundary", "Later media stays downstream"]
+                        ? ["Readable story edition first", "Approved canon boundary", "Later media stays downstream"]
                         : ["Install posture", "First safe actions", "Clear Chummer orientation"]),
                 new TrustPageSectionViewModel(
                     "document_boundary",
@@ -12954,7 +13006,7 @@ Boundary:
             eyebrow: "Reader view",
             heading: $"{document.Title} reader view",
             intro: string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
-                ? "Open the approved story packet in the embedded reader. The Chummer page and PDF fallback stay available even when the reader is unavailable."
+                ? "Open the approved story edition excerpt in the embedded reader. The Chummer page and PDF fallback stay available even when the reader is unavailable."
                 : "Open the quickstart in the embedded reader. The Chummer page and PDF fallback stay available even when the reader is unavailable.",
             sections:
             [
@@ -12963,10 +13015,10 @@ Boundary:
                     "Contract",
                     "What the reader may do",
                     string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
-                        ? "The reader may present the approved story packet, but the Chummer page and PDF remain the reliable fallback."
+                        ? "The reader may present the approved story edition excerpt, but the Chummer page and PDF remain the reliable fallback."
                         : "The reader may present the guide, but the Chummer page and PDF remain the reliable fallback.",
                     string.Equals(document.Category, "origin-dossier", StringComparison.OrdinalIgnoreCase)
-                        ? ["Presentation only", "Approved story packet only", "Chummer page remains primary"]
+                        ? ["Presentation only", "Approved story excerpt only", "Chummer page remains primary"]
                         : ["Presentation only", "Analytics are engagement-only", "Chummer page remains primary"]),
                 new TrustPageSectionViewModel(
                     "embed_boundary_current_state",
@@ -13113,7 +13165,7 @@ Boundary:
             : FormatParticipateSyncedLabel(publicRequests.SyncedAtUtc);
         Uri? hostedRoadmapUri = ResolveProductLiftHostedRoadmapUri();
         string? hostedRoadmapHref = hostedRoadmapUri is not null && !ShouldShortCircuitHostedBoardUpstream(hostedRoadmapUri)
-            ? BuildRoadmapBoardEmbedHref()
+            ? BuildParticipateFrameHref()
             : null;
         SiteChromeViewModel chrome = (_releases is null || _releaseSelection is null)
             ? _chrome.BuildPublicChrome("Roadmap", "Planned work and current requests.", currentPath)
@@ -13895,24 +13947,21 @@ Boundary:
         ReleaseExperienceViewModel releaseExperience,
         PublicTrustPulseSnapshot? pulse)
     {
-        string updatedAt = $"Updated {BuildLiveVerificationLabel(manifest)}.";
-        string supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();
-
-        if (ReleaseRequiresReview(manifest) || pulse?.ParityClaimsReviewRequired == true)
-        {
-            return $"{updatedAt} Current installers remain available, but wider readiness is under review.";
-        }
+        string asOf = $"As of {BuildLiveVerificationLabel(manifest)}.";
 
         bool checksPassing = string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
             || string.Equals(manifest.ProofStatus, "pass", StringComparison.OrdinalIgnoreCase);
-        if (string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase)
-            || checksPassing
-            || pulse?.ParityClaimsReviewRequired == false)
+        if (IsPublishedStableRelease(manifest))
         {
-            return updatedAt;
+            return $"{asOf} Stable is published.";
         }
 
-        return $"{updatedAt} Open help before wider rollouts.";
+        if (checksPassing || pulse?.ParityClaimsReviewRequired == false)
+        {
+            return $"{asOf} Preview builds are available on this shelf. Stable is not published here yet.";
+        }
+
+        return $"{asOf} Preview builds are available on this shelf. Stable is not published here yet. Preview builds can change before Stable returns.";
     }
 
     private static string BuildPublicStatusReleaseSummary(
@@ -13925,23 +13974,38 @@ Boundary:
         PublicReleaseManifestDto manifest,
         PublicTrustPulseSnapshot? pulse)
     {
-        if (ReleaseRequiresReview(manifest) || pulse?.ParityClaimsReviewRequired == true)
-        {
-            return "Use Downloads for current installers and Help if setup blocks your table.";
-        }
-
         string blockedSummary = BuildBlockedLaunchSummary(manifest, pulse);
         if (!blockedSummary.StartsWith("No blocked", StringComparison.OrdinalIgnoreCase))
         {
             return blockedSummary;
         }
 
+        if (!IsPublishedStableRelease(manifest))
+        {
+            return "Preview builds can change before Stable returns.";
+        }
+
         return "Known issues stay on downloads.";
     }
 
-    private static bool ReleaseRequiresReview(PublicReleaseManifestDto manifest)
-        => string.Equals(manifest.SupportabilityState?.Trim(), "review_required", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(manifest.RolloutState?.Trim(), "readiness_review_required", StringComparison.OrdinalIgnoreCase);
+    private static bool IsPublishedStableRelease(PublicReleaseManifestDto manifest)
+    {
+        bool stableLanePublished = string.Equals((manifest.Channel ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((manifest.Channel ?? string.Empty).Trim(), "stable", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((manifest.Channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((manifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase);
+        if (!stableLanePublished)
+        {
+            return false;
+        }
+
+        if (!string.Equals((manifest.SupportabilityState ?? string.Empty).Trim(), "gold_supported", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return string.Equals((manifest.Status ?? string.Empty).Trim(), "published", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)
     {
@@ -15295,12 +15359,7 @@ Boundary:
     }
 
     private string BuildAbsoluteUrl(string path, QueryString query = default)
-        => UriHelper.BuildAbsolute(
-            Request.Scheme,
-            Request.Host,
-            Request.PathBase,
-            path,
-            query);
+        => _publicOrigin.BuildAbsolute(path, query, Request.PathBase);
 
     private static string? ResolveGuidedBootstrapPlatform(PublicReleaseArtifactDto artifact)
     {
@@ -15480,6 +15539,73 @@ Boundary:
         return builder.ToString();
     }
 
+    private InstallBootstrapTicketIssueResult IssueInstallBootstrapTicket(
+        PublicReleaseManifestDto manifest,
+        PublicReleaseArtifactDto primaryArtifact,
+        IReadOnlyList<PublicReleaseArtifactDto> guidedArtifacts,
+        string? userId,
+        string? subjectId)
+    {
+        if (string.IsNullOrWhiteSpace(manifest.GenerationId))
+        {
+            return _installBootstrapTickets.Issue(
+                primaryArtifact.Id,
+                guidedArtifacts.Select(static candidate => candidate.Id),
+                userId,
+                subjectId);
+        }
+
+        return _installBootstrapTickets.IssueBound(
+            primaryArtifact.Id,
+            _artifactDelivery.BuildCredentialBindings(
+                _releases.CaptureShelfGeneration(manifest.GenerationId),
+                guidedArtifacts),
+            manifest.GenerationId,
+            userId,
+            subjectId);
+    }
+
+    private bool TryValidateInstallBootstrapTicket(
+        string? ticket,
+        PublicReleaseManifestDto manifest,
+        PublicReleaseArtifactDto artifact,
+        out InstallBootstrapTicketClaims? claims)
+        => _installBootstrapTickets.TryValidateForArtifact(
+            ticket,
+            artifact.Id,
+            manifest.GenerationId,
+            artifact.Sha256,
+            allowLegacyUnbound: string.IsNullOrWhiteSpace(manifest.GenerationId),
+            out claims);
+
+    internal static string BuildCredentialBoundArtifactHref(
+        PublicReleaseManifestDto manifest,
+        PublicReleaseArtifactDto artifact,
+        string legacyHref)
+    {
+        if (string.IsNullOrWhiteSpace(manifest.GenerationId))
+        {
+            return legacyHref;
+        }
+
+        if (string.Equals(
+                artifact.InstallAccessClass,
+                InstallAccessClasses.AccountRequired,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return $"/downloads/g/{Uri.EscapeDataString(manifest.GenerationId)}/install/{Uri.EscapeDataString(artifact.Id)}";
+        }
+
+        string fileName = artifact.FileName
+            ?? Path.GetFileName((artifact.Url ?? string.Empty).Split('?', '#')[0]);
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            throw new InvalidOperationException($"generation-bound artifact '{artifact.Id}' has no file name.");
+        }
+
+        return $"/downloads/g/{Uri.EscapeDataString(manifest.GenerationId)}/files/{Uri.EscapeDataString(fileName)}";
+    }
+
     private PersonalizedInstallScriptIssueResult IssuePersonalizedMacInstallScript(
         PublicReleaseManifestDto manifest,
         PublicReleaseArtifactDto primaryArtifact,
@@ -15537,7 +15663,10 @@ Boundary:
                     HeadId: candidate.HeadId,
                     Title: candidate.Title,
                     ShortLabel: candidate.ShortLabel,
-                    DownloadUrl: BuildAbsoluteUrl($"/downloads/file/{Uri.EscapeDataString(candidate.ArtifactId)}"),
+                    DownloadUrl: BuildAbsoluteUrl(BuildCredentialBoundArtifactHref(
+                        manifest,
+                        sourceArtifact,
+                        $"/downloads/file/{Uri.EscapeDataString(candidate.ArtifactId)}")),
                     ClaimCode: claimCode,
                     Sha256: candidate.Sha256,
                     DmgName: candidate.PackageName,
@@ -16378,7 +16507,11 @@ Boundary:
         if (!string.IsNullOrWhiteSpace(bootstrapTicket))
         {
             bootstrapTicket = bootstrapTicket.Trim();
-            if (!_installBootstrapTickets.TryValidateForArtifact(bootstrapTicket, artifact.Id, out InstallBootstrapTicketClaims? ticketClaims)
+            if (!TryValidateInstallBootstrapTicket(
+                    bootstrapTicket,
+                    manifest,
+                    artifact,
+                    out InstallBootstrapTicketClaims? ticketClaims)
                 || ticketClaims is null)
             {
                 Response.Headers["Cache-Control"] = "private, no-store";
@@ -16394,7 +16527,12 @@ Boundary:
         }
         else if (!string.IsNullOrWhiteSpace(claimCode))
         {
-            InstallClaimTicketDto? primaryClaimTicket = _installLinking.ResolveClaimTicketForDownload(artifact.Id, claimCode);
+            InstallClaimTicketDto? primaryClaimTicket = _installLinking.ResolveClaimTicketForDownload(
+                artifact.Id,
+                manifest.GenerationId,
+                artifact.Sha256,
+                allowLegacyUnbound: string.IsNullOrWhiteSpace(manifest.GenerationId),
+                claimCode);
             if (primaryClaimTicket is null
                 || (string.IsNullOrWhiteSpace(primaryClaimTicket.UserId) && string.IsNullOrWhiteSpace(primaryClaimTicket.SubjectId)))
             {
@@ -16438,9 +16576,10 @@ Boundary:
 
         string effectiveBootstrapTicket = !string.IsNullOrWhiteSpace(bootstrapTicket)
             ? bootstrapTicket
-            : _installBootstrapTickets.Issue(
-                artifact.Id,
-                guidedArtifacts.Select(candidate => candidate.Id),
+            : IssueInstallBootstrapTicket(
+                manifest,
+                artifact,
+                guidedArtifacts,
                 userId,
                 subjectId).Ticket;
 
@@ -16448,13 +16587,14 @@ Boundary:
             .Select(candidate =>
             {
                 var candidateOption = _releaseSelection.BuildOption(manifest, candidate, authenticated: true, recommended: false);
+                string directFileHref = BuildCredentialBoundArtifactHref(manifest, candidate, candidateOption.DirectFileHref);
                 return new GuidedBootstrapArtifact(
                     ArtifactId: candidate.Id,
                     HeadId: candidate.Head ?? string.Empty,
                     Title: BuildGuidedBootstrapArtifactTitle(candidate),
                     ShortLabel: BuildGuidedBootstrapShortLabel(candidate),
                     DownloadUrl: BuildAbsoluteUrl(
-                        candidateOption.DirectFileHref,
+                        directFileHref,
                         QueryString.Create("ticket", effectiveBootstrapTicket)),
                     ClaimUrl: BuildAbsoluteUrl(
                         $"/downloads/install/{Uri.EscapeDataString(candidate.Id)}/continue.json",
@@ -16475,19 +16615,34 @@ Boundary:
 
     private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolveInstallDispatchArtifact(string artifactId)
     {
-        PublicReleaseManifestDto rawManifest = _releases.LoadManifest();
-        PublicReleaseManifestDto publicManifest = _releaseSelection.ApplyAccessPolicy(rawManifest);
-        PublicReleaseArtifactDto? artifact = publicManifest.Downloads
-            .FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
-        if (artifact is not null)
+        ReleaseShelfSnapshot snapshot = _releases.CaptureShelfSnapshot();
+        ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByArtifactId(snapshot, artifactId);
+        if (resolution.Allowed)
         {
-            return (publicManifest, artifact);
+            return (resolution.Binding!.Manifest, resolution.Binding.Artifact);
         }
 
-        artifact = rawManifest.Downloads
-            .FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
-        return (rawManifest, artifact);
+        PublicReleaseManifestDto manifest = _artifactDelivery.FilterRevokedArtifacts(
+            snapshot,
+            _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(snapshot)));
+        return (manifest, null);
     }
+
+    private IActionResult PublicArtifactDeliveryDenied(ArtifactDeliveryResolution resolution)
+        => resolution.Failure switch
+        {
+            ArtifactDeliveryFailure.Revoked => StatusCode(StatusCodes.Status410Gone, new
+            {
+                error = resolution.Code,
+                message = "This release artifact has been revoked and cannot be installed with any existing credential."
+            }),
+            ArtifactDeliveryFailure.NotFound => NotFound(),
+            _ => StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = resolution.Code,
+                message = "Artifact delivery truth is unavailable or invalid, so installation is blocked."
+            })
+        };
 
     private static bool IsMacBootstrapArtifact(PublicReleaseArtifactDto artifact)
     {
@@ -17718,7 +17873,7 @@ echo "Help: ${HELP_URL}"
         string aftermathSummary = aftermathCount > 0
             ? $"Aftermath currently holds {aftermathCount} package(s), so remote reactions can return as records and next steps instead of disappearing into flavor-only copy."
             : "No aftermath package is attached yet, so the next-step path stays ready until the next safe action writes one.";
-        string aftermathHref = "/account/roster#aftermath-packages";
+        string aftermathHref = "/account/work#aftermath-packages";
         string summary = "After a Table Pulse Live reaction resolves, the result should survive as a durable next step: Signal Deck keeps the pressure cue visible, and Runner Passport keeps the return story clear.";
         string boundaryLine = "Next steps stay on Chummer pages only. Signal Deck shows current consequence state, and Runner Passport shows public continuity history without leaking private account or moderation detail.";
 
@@ -17747,7 +17902,7 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Aftermath return",
                 Summary: "Any remote reaction that lands as downtime or aftermath stays on the return path instead of becoming orphaned flavor text.",
-                Href: "/account/roster#aftermath-packages",
+                Href: "/account/work#aftermath-packages",
                 StatusLabel: "Return")
         ];
 
@@ -17810,7 +17965,7 @@ echo "Help: ${HELP_URL}"
                 Summary: aftermathCount > 0
                     ? $"{aftermathCount} aftermath package(s) are on the return path, so Passport continuity survives the off-table return."
                     : "Aftermath return stays ready even when the queue is empty, so status does not vanish when a session moves off-table.",
-                Href: "/account/roster#aftermath-packages",
+                Href: "/account/work#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
         ];
 
@@ -17862,7 +18017,7 @@ echo "Help: ${HELP_URL}"
                 Summary: aftermathCount > 0
                     ? $"{aftermathCount} aftermath package(s) are already queued, so Signal Deck pressure survives the off-table return."
                     : "Aftermath return stays attached even when no package is queued yet, so command pressure does not disappear after adjudication.",
-                Href: "/account/roster#aftermath-packages",
+                Href: "/account/work#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed"),
             new(
                 Label: "Public records",
@@ -17924,7 +18079,7 @@ echo "Help: ${HELP_URL}"
                 Summary: aftermathCount > 0
                     ? $"{aftermathCount} aftermath package(s) are already queued, so Living World fallout survives the off-table return."
                     : "Aftermath return stays attached even before the next package is written, so the between-session path stays concrete.",
-                Href: "/account/roster#aftermath-packages",
+                Href: "/account/work#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
         ];
 
@@ -17976,7 +18131,7 @@ echo "Help: ${HELP_URL}"
                 Summary: aftermathCount > 0
                     ? $"{aftermathCount} aftermath package(s) are on the return path, so this board can review fallout instead of losing the thread after adjudication."
                     : "Aftermath return is attached even when the queue is empty, so the board stays connected to follow-up status.",
-                Href: "/account/roster#aftermath-packages",
+                Href: "/account/work#aftermath-packages",
                 StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
         ];
 
@@ -18223,7 +18378,7 @@ echo "Help: ${HELP_URL}"
             SignalDeckPosture: signalDeckPosture,
             RunnerPassportPosture: runnerPassportPosture,
             AftermathPosture: aftermathPosture,
-            AftermathHref: "/account/roster",
+            AftermathHref: "/account/work#aftermath-packages",
             EntryHref: status.NotificationsHref,
             Labels: labels,
             Cues: cues,
@@ -18271,7 +18426,7 @@ echo "Help: ${HELP_URL}"
                 State: "queued",
                 Summary: "Shadow Reply adjudication queued an off-table response packet on the aftermath path.",
                 ReturnLoopAction: "Review downtime obligations",
-                ReturnLoopRoute: "/account/roster#aftermath-packages",
+                ReturnLoopRoute: "/account/work#aftermath-packages",
                 Note: "Table Pulse Live remote reaction: shadow reply"),
             _ => throw new ArgumentException($"Unsupported Table Pulse Live reaction id: {reactionId}", nameof(reactionId))
         };
@@ -18337,7 +18492,7 @@ echo "Help: ${HELP_URL}"
         string aftermathSummary = aftermathCount > 0
             ? $"Aftermath queue has {aftermathCount} package(s) waiting on the return path, so GM review can stay attached to concrete fallout instead of freeform notes."
             : "Aftermath queue is empty right now, so this cockpit is reading state rather than shepherding live fallout packages.";
-        string aftermathHref = "/account/roster#aftermath-packages";
+        string aftermathHref = "/account/work#aftermath-packages";
         string summary = "GM cockpit keeps remote-reaction aftermath on one command path: review consequences, escalate to leader intent, preserve Signal Deck continuity, and keep Runner Passport limited.";
         string boundaryLine = "This cockpit can interpret and escalate current consequence state only. It does not create public scores, mutate world state directly, or reveal private session transcripts.";
         BlackLedgerFollowThroughCueViewModel[] cues =
@@ -18350,7 +18505,7 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Aftermath return",
                 Summary: "Downtime and aftermath consequences stay attached to the return path when a remote reaction resolves off-table.",
-                Href: "/account/roster#aftermath-packages",
+                Href: "/account/work#aftermath-packages",
                 StatusLabel: "Return"),
             new(
                 Label: "Runner Passport",
@@ -18490,32 +18645,41 @@ echo "Help: ${HELP_URL}"
         string bootstrapUrl,
         string bootstrapSha256,
         string hubLocalReleaseProofUrl,
-        string releaseUploadAuthEnvironmentVariable,
-        string releaseUploadAuth)
+        string hubLocalReleaseProofSha256)
     {
-        return "set -euo pipefail; " +
+        return "set +x; set -euo pipefail; " +
+            "python3 -c 'import os,re,sys; names=(\"CHUMMER_UI_EXPECTED_COMMIT\",\"CHUMMER_CORE_EXPECTED_COMMIT\",\"CHUMMER_HUB_EXPECTED_COMMIT\",\"CHUMMER_UI_KIT_EXPECTED_COMMIT\",\"CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT\",\"CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT\",\"CHUMMER_LEGACY_EXPECTED_COMMIT\"); invalid=[name for name in names if re.fullmatch(r\"[0-9A-Fa-f]{40}\", os.environ.get(name, \"\")) is None]; invalid and sys.exit(\"Set reviewed full 40-hex commit pins before running: \" + \", \".join(invalid))'; " +
             "TMP_BOOTSTRAP_SCRIPT=\"$(mktemp)\"; " +
-            "trap 'rm -f \"$TMP_BOOTSTRAP_SCRIPT\"' EXIT; " +
-            "curl -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch setup script; refresh the release page and retry.' >&2; exit 1; }; " +
+            "trap 'unset RELEASE_UPLOAD_AUTH TICKET_FILE TICKET_FILE_MODE; rm -f \"$TMP_BOOTSTRAP_SCRIPT\"' EXIT; " +
+            "curl -q -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch setup script; refresh the release page and retry.' >&2; exit 1; }; " +
             "ACTUAL_BOOTSTRAP_SHA256=\"$(python3 -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' \"$TMP_BOOTSTRAP_SCRIPT\")\"; " +
             "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Setup script check failed; refresh the release page and retry.' >&2; exit 1; }; " +
+            "TICKET_FILE=\"${CHUMMER_RELEASE_UPLOAD_TICKET_FILE:-}\"; " +
+            "if [[ -n \"$TICKET_FILE\" ]]; then " +
+            "RELEASE_UPLOAD_AUTH=\"$(python3 -c 'import os,stat,sys; fd=os.open(sys.argv[1], os.O_RDONLY | os.O_NOFOLLOW); metadata=os.fstat(fd); (stat.S_ISREG(metadata.st_mode) and metadata.st_uid == os.geteuid() and stat.S_IMODE(metadata.st_mode) == 0o600) or sys.exit(\"Release upload authorization file must be a current-owner, regular, non-symlink file with mode 600.\"); raw=os.read(fd, 8193); os.close(fd); (1 <= len(raw) <= 8192 and b\"\\x00\" not in raw) or sys.exit(\"Release upload authorization file must contain 1-8192 bytes.\"); decoded=raw.decode(\"utf-8\"); value=decoded[:-2] if decoded.endswith(\"\\r\\n\") else decoded[:-1] if decoded.endswith((\"\\r\", \"\\n\")) else decoded; (value and \"\\r\" not in value and \"\\n\" not in value) or sys.exit(\"Release upload authorization file must contain exactly one UTF-8 line.\"); sys.stdout.write(value)' \"$TICKET_FILE\")\" || exit 1; " +
+            "else printf 'Release upload access code: ' >&2; IFS= read -r -s RELEASE_UPLOAD_AUTH || { printf '\\n' >&2; echo 'Release upload access code was not read.' >&2; exit 1; }; printf '\\n' >&2; fi; " +
+            "[[ -n \"$RELEASE_UPLOAD_AUTH\" ]] || { echo 'Release upload access code cannot be empty.' >&2; exit 1; }; " +
             "CHUMMER_RELEASE_CHANNEL='preview' " +
             "CHUMMER_ALLOW_UNSIGNED_PREVIEW='1' " +
             "CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='1' " +
             "CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL=" + SingleQuoteShellValue(hubLocalReleaseProofUrl) + " " +
+            "CHUMMER_HUB_LOCAL_RELEASE_PROOF_EXPECTED_SHA256=" + SingleQuoteShellValue(hubLocalReleaseProofSha256) + " " +
             "CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0' " +
             "CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0' " +
             "CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS='4' " +
             "CHUMMER_BOOTSTRAP_EXPECTED_SHA256=" + SingleQuoteShellValue(bootstrapSha256) + " " +
-            releaseUploadAuthEnvironmentVariable + "=" + SingleQuoteShellValue(releaseUploadAuth) + " " +
+            ReleaseUploadTicketEnvironmentVariable + "=\"$RELEASE_UPLOAD_AUTH\" " +
             "bash \"$TMP_BOOTSTRAP_SCRIPT\"";
     }
 
     private static string ComputeSha256Hex(string value)
     {
         byte[] bytes = Encoding.UTF8.GetBytes(value);
-        return Convert.ToHexStringLower(SHA256.HashData(bytes));
+        return ComputeSha256Hex(bytes);
     }
+
+    private static string ComputeSha256Hex(byte[] value)
+        => Convert.ToHexStringLower(SHA256.HashData(value));
 
     internal sealed record MacInstallBootstrapArtifact(
         string ArtifactId,

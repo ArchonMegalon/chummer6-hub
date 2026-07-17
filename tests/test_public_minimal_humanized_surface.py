@@ -170,7 +170,7 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
         "static bool IsNightlyHandoff(string? channel, string? version, string? rolloutState)",
         "static string PublicStatusText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);",
         "var statusLine = Model.ReleaseExperience.Recommended is null",
-        ": publicPlatformSummary;",
+        'Stable is still unavailable.',
         "@PublicStatusText(statusLine)",
     ):
         assert expected in combined
@@ -180,6 +180,8 @@ def test_downloads_and_status_clean_dynamic_release_copy_before_rendering() -> N
         "<p>@package.Summary</p>",
         "<p>@platform.Summary</p>",
         "<p>@Model.ReleaseSummary</p>",
+        'return $"Nightly {stamp.Substring(0, 4)}.{stamp.Substring(4, 2)}.{stamp.Substring(6, 2)} (Version {normalized})";',
+        'return $"Nightly build (Version {normalized})";',
         "var releaseSummaryText = PublicStatusText(Model.ReleaseSummary);",
         "var availabilityText = $\"{releaseAvailabilityLabel}. {compactReleaseSummary}\";",
         "@PublicStatusText(availabilityText)",
@@ -258,26 +260,62 @@ def test_homepage_has_minimal_promo_entry_surface() -> None:
     assert 'href="/downloads#stable"' not in landing
     assert 'href="/downloads#nightly"' not in landing
     assert 'data-analytics-event="homepage_open_downloads"' in landing
-    assert 'data-analytics-event="homepage_open_promo_video"' in landing
     assert 'homepage_open_stable' not in landing
     assert 'homepage_open_nightly' not in landing
-    assert 'class="minimal-hero__visual minimal-hero__visual--screenshot"' in landing
-    assert 'href="/media/promo/every-wonder-horizon-promo.mp4"' in landing
+    assert 'homepage_open_promo_video' in landing
+    assert 'class="minimal-hero__visual minimal-hero__visual--preview"' in landing
+    assert "Desktop build. Mobile play packet." in landing
+    assert 'href="/build"' in landing
+    assert 'href="/mobile/player"' in landing
+    assert 'type="button" disabled aria-disabled="true"' in landing
+    assert "Sign in first" in landing
+    assert 'var playAnalyticsEvent = "homepage_open_play";' in landing
+    assert 'data-analytics-event="homepage_open_build"' in landing
+    assert 'data-analytics-event="@playAnalyticsEvent"' in landing
+    assert 'data-analytics-label="Build">Build</button>' in landing
+    assert 'data-disabled-target="/mobile/player"' in landing
+    assert 'data-sign-in-href="/login?next=%2Fmobile%2Fplayer"' in landing
+    assert 'data-analytics-label="Play">Play</button>' in landing
     assert "/media/product/chummer-desktop-runner.png" in landing
     assert "/media/promo/every-wonder-horizon-promo.mp4" in landing
     assert 'data-homepage-section="runner-roster"' not in landing
     assert landing.count("data-homepage-section=") == 1
-    assert "minimal-runner-rail" in landing
-    assert "Kestrel" in landing
-    assert "Brick" in landing
-    assert "Whisper" in landing
-    assert '/account/open/example/decker' in landing
-    assert '/account/open/example/street-samurai' in landing
-    assert '/account/open/example/face' in landing
+    assert "minimal-runner-rail" not in landing
+    assert "Track health, ammo, inventory, and modifiers." in landing
+    assert "Keep quick rolls and odds within reach." in landing
+    assert "Claim your copy only when you want continuity between installs, recovery, and support." in landing
+    assert "Kestrel" not in landing
+    assert "Brick" not in landing
+    assert "Whisper" not in landing
+    assert '/account/open/example/decker' not in landing
+    assert '/account/open/example/street-samurai' not in landing
+    assert '/account/open/example/face' not in landing
     assert 'href="/login?next=%2Fhome%2Faccess"' not in landing
     assert "/media/promo/every-wonder-horizon-promo.webm" not in landing
     assert "/media/promo/every-wonder-horizon-promo.vtt" not in landing
     assert 'data-homepage-section="downloads"' not in landing
+
+
+def test_landing_redirects_known_mobile_turn_hashes_to_player_shell() -> None:
+    landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
+
+    assert '@section Scripts {' in landing
+    assert 'window.location.pathname !== "/" || !window.location.hash' in landing
+    assert 'const normalizedHash = window.location.hash.split("?")[0];' in landing
+    assert "const mobileTurnAnchorTargets = new Set([" in landing
+    for anchor in (
+        "#turn-living-world-card",
+        "#turn-now-card",
+        "#turn-trust-card",
+        "#turn-runsite-card",
+        "#turn-resolve-card",
+        "#turn-sync-card",
+        "#turn-history-card",
+    ):
+        assert f'"{anchor}"' in landing
+    assert "if (!mobileTurnAnchorTargets.has(normalizedHash)) {" in landing
+    assert 'window.location.replace(`/mobile/player${normalizedHash}`);' in landing
+    assert "window.location.search" not in landing.split("const normalizedHash", 1)[1]
 
 
 def test_pwa_install_assets_do_not_use_internal_release_language() -> None:
@@ -908,21 +946,41 @@ def test_login_surface_uses_plain_account_and_claim_copy_language() -> None:
 
 
 def test_account_access_surface_prioritizes_installs_over_internal_sync_noise() -> None:
-    account = read("Chummer.Run.Api/Views/Accounts/Account.cshtml")
+    section = read("Chummer.Run.Api/Views/Accounts/Section.cshtml")
+    controller = read("Chummer.Run.Api/Controllers/AccountsController.cs")
+    site_css = read("Chummer.Run.Api/wwwroot/css/site.css")
 
-    assert '"access" => "Installs"' in account
-    assert "See linked copies, setup codes, downloads, and install help." in account
-    assert "<summary>Connection details</summary>" in account
-    assert "Recovery codes are only for the already-downloaded app when it asks for one." in account
-    assert "<summary>Recent downloads</summary>" in account
-    assert "<summary>Access grants</summary>" in account
-    assert "<summary>Recovery backup</summary>" in account
-    assert "Pending setup codes" in account
+    assert 'data-account-access aria-labelledby="account-access-title"' in section
+    assert 'data-account-access-primary' in section
+    assert '<h2 id="account-access-copies-title">Linked copies</h2>' in section
+    assert '<summary>Copy details</summary>' in section
+    assert "No linked copies yet." in section
+    assert 'aria-label="Unlink @installation.Title"' in section
+    assert '<summary>Need help with an install?</summary>' in section
+    assert 'href="/account/support">Open install help</a>' in section
+    assert 'Heading: "Install Chummer"' in controller
+    assert 'Summary: "Download Chummer and manage copies linked to this account."' in controller
+    assert '"Download Chummer"' in controller
+    assert ".surface-account [data-account-access-copies]," in site_css
+    assert ".surface-account .account-access__help {\n  width: min(100%, 44rem);" in site_css
+    assert ".route-account-access .site-header__inner--auth" in site_css
+    assert ".route-account-access .site-main {\n    padding-bottom: 2rem;" in site_css
 
     for forbidden in (
         "<h2>Devices &amp; access</h2>",
         "Devices &amp; access",
         "Devices and access",
+        "Recent install handoffs",
+        "Cross-device recovery",
+        "Advanced device recovery",
+        "Offline-ready return",
+        "What stays on this device",
+        "How install linking works",
+        "Pending setup codes",
+        "Connection details",
+        "Recent downloads",
+        "Access grants",
+        "Recovery backup",
         "<summary>Account sync history</summary>",
         "<span>Account access status</span>",
         "<span>Account recovery path</span>",
@@ -940,7 +998,7 @@ def test_account_access_surface_prioritizes_installs_over_internal_sync_noise() 
         "without the internal machinery",
         "access right",
     ):
-        assert forbidden not in account
+        assert forbidden not in section
 
 
 def test_downloads_surface_hides_account_handoff_noise() -> None:
@@ -969,6 +1027,7 @@ def test_downloads_surface_hides_account_handoff_noise() -> None:
     assert "static bool IsNightlyHandoff(string? channel, string? version, string? rolloutState)" in downloads
     assert 'value.Contains("nightly", StringComparison.OrdinalIgnoreCase)' in downloads
     assert "No newer Nightly right now." in downloads
+    assert "Preview build. Review required." in downloads
     assert "Pick one." not in downloads
     assert "Chummer picks the right installer for this browser." not in downloads
     assert "Nightly currently matches Stable" not in downloads
@@ -2210,6 +2269,25 @@ def test_now_page_cleans_dynamic_public_copy_before_rendering() -> None:
         assert forbidden not in now
 
 
+def test_now_page_only_uses_handoff_heading_for_published_gold_release() -> None:
+    now = read("Chummer.Run.Api/Views/PublicLanding/Now.cshtml")
+
+    assert "static bool IsPublishedStableRelease(PublicReleaseManifestDto releaseManifest)" in now
+    assert 'string.Equals((releaseManifest.SupportabilityState ?? string.Empty).Trim(), "gold_supported", StringComparison.OrdinalIgnoreCase)' in now
+    assert 'string.Equals((releaseManifest.Status ?? string.Empty).Trim(), "published", StringComparison.OrdinalIgnoreCase)' in now
+    assert "var isStableRelease = IsPublishedStableRelease(manifest);" in now
+    assert "var currentReleaseHeading = isStableRelease" in now
+
+
+def test_downloads_surface_requires_published_gold_release_before_stable_lane() -> None:
+    downloads = read("Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml")
+
+    assert "static bool IsPublicStableRelease(PublicReleaseManifestDto manifest)" in downloads
+    assert 'var supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();' in downloads
+    assert 'if (!string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase))' in downloads
+    assert 'return string.Equals(status, "published", StringComparison.OrdinalIgnoreCase);' in downloads
+
+
 def test_shared_public_panels_clean_dynamic_copy_before_rendering() -> None:
     privacy = read("Chummer.Run.Api/Views/Shared/_PrivacyBoundaryPanel.cshtml")
     signed_in = read("Chummer.Run.Api/Views/Shared/_SignedInTrustStatusPanel.cshtml")
@@ -2308,7 +2386,7 @@ def test_public_publication_page_uses_account_return_language() -> None:
 
     for expected in (
         "Open saved pages",
-        "Create account for saved pages",
+        "Claim your copy for saved pages",
         "Your library keeps public and private returns together",
         "Choose gallery, downloads, saved pages, or help.",
     ):
@@ -2421,7 +2499,7 @@ def test_publication_detail_page_uses_plain_labels() -> None:
         assert forbidden not in publication
 
     assert "Short summary" in publication
-    assert "Status: @routeStateLabel" in publication
+    assert "Current: @routeStateLabel" in publication
     assert "ViewData[\"SurfaceClass\"] = \"surface-artifacts surface-minimal\";" in publication
     assert "ViewData[\"Title\"] = PublicPublicationText(Model.Publication.Title)" in publication
     assert "@PublicPublicationText(Model.Publication.Title)" in publication
@@ -2551,6 +2629,52 @@ def test_package_pages_use_page_language_instead_of_route_language() -> None:
     assert "Return to the package page" in package_receipt
     assert "account package page" in package_receipt
     assert "Activity stays attached to this package page." in package_detail
+
+
+def test_public_guest_account_copy_prefers_claim_your_copy_language() -> None:
+    landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
+    downloads = read("Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml")
+    shelf = read("Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml")
+    publication = read("Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml")
+    package_detail = read("Chummer.Run.Api/Views/PublicLanding/PackageDetail.cshtml")
+    faq = read("Chummer.Run.Api/Views/PublicLanding/Faq.cshtml")
+    combined = "\n".join((landing, downloads, shelf, publication, package_detail, faq))
+
+    for expected in (
+        "Claim your copy only when you want continuity between installs, recovery, and support.",
+        "Claim your copy only if you want this install attached to your account.",
+        "Claim your copy for saved pages",
+        "Claim your copy when you want your private pages together with public pages",
+        "Claim your copy only when you want private return paths and creator- or campaign-owned next steps.",
+        "Claim your copy only when you want your private pages, campaign return, and creator next steps in one library.",
+        "Claim your copy when you want saved pages too",
+        "Claim your copy only when you want this package history on your account page.",
+        "Claim your copy for recovery and linked installs",
+    ):
+        assert expected in combined
+
+    for forbidden in (
+        "Sign in only when you want continuity.",
+        "Sign in later only if you want to attach this installed copy to your account.",
+        "Create account for saved pages",
+        "Sign in when you want your private pages together with public pages",
+        "Sign in only when you want private return paths and creator- or campaign-owned next steps.",
+        "Sign in only when you want your private pages, campaign return, and creator next steps in one library.",
+        "Create an account only when you want saved pages too",
+        "Sign in only when you want your package history on the account page.",
+        "Create an account for recovery and linked installs",
+    ):
+        assert forbidden not in combined
+
+
+def test_landing_surfaces_current_release_posture_alongside_public_installer_summary() -> None:
+    landing = read("Chummer.Run.Api/Views/PublicLanding/Landing.cshtml")
+
+    assert "Current public installer:" in landing
+    assert "Current public installers:" in landing
+    assert "Current public lane: Stable." in landing
+    assert "Current public lane: Preview. Review required." in landing
+    assert "Current public lane: Downloads paused." in landing
 
 
 def test_mobile_helper_and_anarchy_pages_use_page_and_export_language() -> None:
@@ -3207,7 +3331,7 @@ def test_login_view_is_minimal_auth_surface() -> None:
         'ViewData["HideAuthChrome"] = true;',
         "auth-entry--lean",
         "auth-panel__eyebrow",
-        'class="button-like button-like--secondary auth-panel__primary"',
+        'class="button-like @(Model.EmailEntryEnabled ? "button-like--secondary" : "button-like--primary") auth-panel__primary"',
         "Continue with Google",
         "@Model.SupportLine",
         "@Model.ReturnLine",

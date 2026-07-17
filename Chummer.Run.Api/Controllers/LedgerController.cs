@@ -24,8 +24,9 @@ public sealed class LedgerController : ControllerBase
     private readonly BlackLedgerDispatchService _blackLedgerDispatches;
     private readonly BlackLedgerTickNewsNotificationService _blackLedgerTickNews;
     private readonly BlackLedgerFactionOnboardingService _blackLedgerFactions;
+    private readonly PublicCanonicalOriginPolicy _publicOrigin;
 
-    public LedgerController(AccountService accounts, HubIdentityClient identity, LedgerService ledger, FleetReceiptVerifier receiptVerifier, RewardService rewards, BlackLedgerPublicStatsService blackLedgerPublicStats, BlackLedgerDispatchService blackLedgerDispatches, BlackLedgerTickNewsNotificationService blackLedgerTickNews, BlackLedgerFactionOnboardingService blackLedgerFactions)
+    public LedgerController(AccountService accounts, HubIdentityClient identity, LedgerService ledger, FleetReceiptVerifier receiptVerifier, RewardService rewards, BlackLedgerPublicStatsService blackLedgerPublicStats, BlackLedgerDispatchService blackLedgerDispatches, BlackLedgerTickNewsNotificationService blackLedgerTickNews, BlackLedgerFactionOnboardingService blackLedgerFactions, PublicCanonicalOriginPolicy? publicOrigin = null)
     {
         _accounts = accounts;
         _identity = identity;
@@ -36,6 +37,7 @@ public sealed class LedgerController : ControllerBase
         _blackLedgerDispatches = blackLedgerDispatches;
         _blackLedgerTickNews = blackLedgerTickNews;
         _blackLedgerFactions = blackLedgerFactions;
+        _publicOrigin = publicOrigin ?? PublicCanonicalOriginPolicy.CreateUnitTestDefault();
     }
 
     [HttpPost("receipts")]
@@ -378,7 +380,7 @@ public sealed class LedgerController : ControllerBase
             return NotFound();
         }
 
-        string baseUrl = $"{Request.Scheme}://{Request.Host}";
+        string baseUrl = _publicOrigin.Origin;
         BlackLedgerWorldTickNewsEvent tickNews = _blackLedgerTickNews.BuildSeededWorldEvent(worldId, turn, baseUrl)
             ?? throw new InvalidOperationException("Deterministic world preview is missing its BLACK LEDGER tick-news event.");
         _ = await _blackLedgerTickNews.NotifyTickNewsAsync(tickNews, dryRun: false, policyOverride: null, cancellationToken);
@@ -420,7 +422,7 @@ public sealed class LedgerController : ControllerBase
             return denied;
         }
 
-        string baseUrl = $"{Request.Scheme}://{Request.Host}";
+        string baseUrl = _publicOrigin.Origin;
         BlackLedgerWorldTickNewsEvent? tickNews = _blackLedgerTickNews.BuildSeededWorldEvent(worldId, turn, baseUrl);
         if (tickNews is null)
         {

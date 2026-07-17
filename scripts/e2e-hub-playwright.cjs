@@ -821,24 +821,22 @@ function hasProductLiftParticipateFrame(html) {
   });
 
   await gotoAndAssert(page, pageErrors, '/account/access', async () => {
-    await expectVisible(page, 'text=Installs');
-    await expectBodyText(page, 'Recent install handoffs', '/account/access');
-    await expectBodyText(page, 'Cross-device recovery', '/account/access');
-    await expectBodyText(page, 'Advanced device recovery', '/account/access');
-    await expectBodyText(page, 'Open downloads', '/account/access');
-    await expectBodyText(page, 'How install linking works', '/account/access');
-    await expandDetailsBySummary(page, 'Finish on another device', '/account/access');
-    await expectBodyText(page, 'use before', '/account/access finish-on-another-device');
-    await expectVisible(page, 'text=Copy');
-    await expandDetailsBySummary(page, 'Advanced device recovery', '/account/access');
-    const offlineReturnSummary = page.locator('summary').filter({ hasText: 'Offline-ready return' }).first();
-    if (await offlineReturnSummary.count()) {
-      await expandDetailsBySummary(page, 'Offline-ready return', '/account/access');
-      await expectBodyText(page, 'Offline-ready return', '/account/access');
+    await expectVisible(page, 'h1:has-text("Install Chummer")');
+    await expectBodyText(page, 'Download Chummer', '/account/access');
+    await expectBodyText(page, 'Linked copies', '/account/access');
+    await expectBodyText(page, 'Need help with an install?', '/account/access');
+    assert.equal(await page.locator('[data-account-access-primary]').count(), 1, '/account/access should expose one primary action.');
+    const copyDetails = page.locator('[data-account-access-copies] details').first();
+    if (await copyDetails.count()) {
+      assert.equal(await copyDetails.getAttribute('open'), null, '/account/access copy details should be collapsed initially.');
+      await copyDetails.locator('summary').click();
+      await expectBodyText(page, 'live-audit-host', '/account/access copy details');
+      await expectBodyText(page, '0.0-live-audit on preview', '/account/access copy details');
     }
-    await expandDetailsBySummary(page, 'What stays on this device', '/account/access');
-    await expectBodyText(page, 'What stays on this device', '/account/access');
     const bodyText = await page.locator('body').innerText();
+    for (const noisyLabel of ['Recent install handoffs', 'Cross-device recovery', 'Advanced device recovery', 'Offline-ready return', 'What stays on this device', 'How install linking works']) {
+      assert.equal(bodyText.includes(noisyLabel), false, `/account/access should not lead with ${noisyLabel}.`);
+    }
     assert.equal(bodyText.includes('grant_installation_'), false, '/account/access should not leak raw install grant ids.');
   });
 
@@ -7939,49 +7937,45 @@ function hasProductLiftParticipateFrame(html) {
   });
 
   await gotoAndAssert(page, pageErrors, '/account/settings', async () => {
-    await expectVisible(page, 'text=More settings');
-    await expandDetailsBySummary(page, 'Privacy', '/account/settings');
-    await expectBodyText(page, 'Choose what stays visible while deeper identifiers remain tucked away.', '/account/settings');
-    await expectBodyText(page, 'Visibility', '/account/settings');
-    await expectBodyText(page, 'Recovery posture', '/account/settings');
-    await expectBodyText(page, 'Provider-backed help', '/account/settings');
-
-    await expandDetailsBySummary(page, 'Participation', '/account/settings');
-    await expectBodyText(page, 'Tell Chummer which lanes matter to you and which updates you actually want to hear about.', '/account/settings');
-    await expectBodyText(page, 'Follow upcoming updates', '/account/settings');
-    await expectBodyText(page, 'Invite me when the right beta opens', '/account/settings');
+    await expectVisible(page, 'text=Settings');
+    await expandDetailsBySummary(page, 'Updates', '/account/settings');
+    await expectBodyText(page, 'Choose what Chummer should send or keep quiet about.', '/account/settings');
+    await expectBodyText(page, 'Followed items', '/account/settings');
+    await expectBodyText(page, 'Public profile', '/account/settings');
+    await expectBodyText(page, 'Result updates', '/account/settings');
+    await expectBodyText(page, 'Black Ledger mobile stream', '/account/settings');
     await page.locator('#followHorizons').check();
     await page.locator('#betaInterest').check();
     await Promise.all([
-      expectVisible(page, 'text=Participation settings saved.'),
+      expectVisible(page, 'text=Settings saved.'),
       page.locator('#experienceForm button[type="submit"]').click()
     ]);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await assertNoPageErrors(page, pageErrors, '/account/settings reload');
-    await expandDetailsBySummary(page, 'Participation', '/account/settings reload');
+    await expandDetailsBySummary(page, 'Updates', '/account/settings reload');
     assert.equal(await page.locator('#followHorizons').isChecked(), true, '/account/settings should persist follow-horizons after save.');
     assert.equal(await page.locator('#betaInterest').isChecked(), true, '/account/settings should persist beta-interest after save.');
 
-    await expandDetailsBySummary(page, 'Help and policy', '/account/settings');
-    await expectBodyText(page, 'When you need support, privacy, or preview-use guidance, use the first-party pages instead of guessing.', '/account/settings');
+    await expandDetailsBySummary(page, 'Sign-in and privacy', '/account/settings');
+    await expectBodyText(page, 'Keep sign-in, recovery, and visibility readable without turning this into admin sludge.', '/account/settings');
+    await expectBodyText(page, 'Primary sign-in', '/account/settings');
+    await expectBodyText(page, 'Recovery', '/account/settings');
+    await expectBodyText(page, 'Linked sign-ins', '/account/settings');
+    await expectBodyText(page, 'Linked channels', '/account/settings');
+    await expectBodyText(page, 'Public recognition', '/account/settings');
     assert.equal(await readFirstHref(page, 'a.button-like[href="/help"]', '/account/settings help link'), '/help');
     assert.equal(await readFirstHref(page, 'a.button-like[href="/privacy"]', '/account/settings privacy link'), '/privacy');
-    assert.equal(await readFirstHref(page, 'a.button-like[href="/terms"]', '/account/settings terms link'), '/terms');
-    assert.equal(await readFirstHref(page, 'a.button-like[href="/contact"]', '/account/settings contact link'), '/contact');
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/account/billing"]', '/account/settings membership link'), '/account/billing');
     await assertNoBannedCopy(page, '/account/settings');
   });
 
   await gotoAndAssert(page, pageErrors, '/account/advanced', async () => {
-    await expectVisible(page, 'text=Advanced account details');
-    await expectBodyText(page, 'Hub account id', '/account/advanced');
-    await expectBodyText(page, 'Primary auth', '/account/advanced');
-    await expectBodyText(page, 'Linked identities', '/account/advanced');
-    await expectBodyText(page, 'Linked channels', '/account/advanced');
-    await expectBodyText(page, 'Recovery posture', '/account/advanced');
-    await expectBodyText(page, 'Follow horizons', '/account/advanced');
-    await expectMinimumCount(page, '.detail-grid--account dd', 6, '/account/advanced detail values');
-    assert.equal(parseInt(await readDefinitionValue(page, 'Linked identities', '/account/advanced'), 10) >= 2, true, '/account/advanced should reflect the new recovery-email identity after the verified preview round trip.');
-    await assertNoBannedCopy(page, '/account/advanced');
+    assert.equal(new URL(page.url()).pathname, '/account/settings', '/account/advanced should redirect to /account/settings.');
+    await expectVisible(page, 'text=Settings');
+    await expectBodyText(page, 'Primary sign-in', '/account/advanced redirect');
+    await expectBodyText(page, 'Linked sign-ins', '/account/advanced redirect');
+    await expectBodyText(page, 'Linked channels', '/account/advanced redirect');
+    await assertNoBannedCopy(page, '/account/advanced redirect');
   });
 
   await gotoAndAssert(page, pageErrors, '/account/support', async () => {

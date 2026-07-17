@@ -28,30 +28,11 @@ public sealed class InstallLinkingController : ControllerBase
         "Chummer cannot confirm the current installer for this claimed copy yet. Use support recovery with this install identity attached.";
     private static readonly HashSet<string> InstallLinkCallbackReservedQueryKeys = new(StringComparer.OrdinalIgnoreCase)
     {
-        "artifactId",
-        "code",
-        "accessToken",
-        "applicationVersion",
-        "callbackCode",
-        "channelId",
-        "claimCode",
-        "claimTicketId",
-        "grantId",
-        "headId",
-        "hostLabel",
-        "installAccessClass",
-        "installationId",
-        "installedBuildReceiptId",
-        "releaseChannel",
-        "receiptId",
-        "platform",
-        "platformId",
-        "arch",
-        "publicKey",
-        "ticket",
-        "ticketId",
-        "version",
-        "installLinkMode",
+        "artifactId", "code", "accessToken", "apiKey", "authorization", "applicationVersion",
+        "callbackCode", "channelId", "claimCode", "claimTicketId", "grantId", "headId",
+        "hostLabel", "installAccessClass", "installationId", "installedBuildReceiptId",
+        "releaseChannel", "receiptId", "platform", "platformId", "arch", "publicKey",
+        "secret", "token", "ticket", "ticketId", "version", "installLinkMode",
         "installLinkTransport"
     };
     private readonly HubIdentityClient _identity;
@@ -63,6 +44,7 @@ public sealed class InstallLinkingController : ControllerBase
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly InstallLinkedWorkspaceSnapshotService _workspaceSnapshots;
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
+    private readonly GoldReadinessArtifactService _goldReadiness;
     private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
     private readonly LocalReleaseProofArtifactService _localReleaseProof;
 
@@ -86,6 +68,7 @@ public sealed class InstallLinkingController : ControllerBase
         _supportPresentation = supportPresentation;
         _workspaceSnapshots = workspaceSnapshots ?? new InstallLinkedWorkspaceSnapshotService(new InstallLinkedWorkspaceSnapshotStore(configuration));
         _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
+        _goldReadiness = new GoldReadinessArtifactService(configuration);
         _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
         _localReleaseProof = new LocalReleaseProofArtifactService(configuration);
     }
@@ -94,6 +77,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<InstallLinkingSummaryDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<InstallLinkingSummaryDto>> GetSummary(CancellationToken cancellationToken)
     {
+        ApplySensitiveResponseHeaders();
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
@@ -111,6 +95,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<RedeemInstallClaimResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<RedeemInstallClaimResponseDto> Redeem([FromBody] RedeemInstallClaimRequestDto? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("claim payload is required.");
@@ -131,6 +116,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<RefreshInstallationGrantResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<RefreshInstallationGrantResponseDto> RefreshGrant([FromBody] RefreshInstallationGrantRequestDto? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("grant refresh payload is required.");
@@ -151,6 +137,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<RevokeInstallationGrantResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<RevokeInstallationGrantResponseDto> RevokeGrant([FromBody] RevokeInstallationGrantRequestDto? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("grant revoke payload is required.");
@@ -171,6 +158,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<ExchangeInstallBrowserCallbackResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<ExchangeInstallBrowserCallbackResponseDto> ExchangeBrowserCallback([FromBody] ExchangeInstallBrowserCallbackRequestDto? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("browser callback payload is required.");
@@ -191,6 +179,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<DesktopAccountLaunchExchangeResponseDto>(StatusCodes.Status200OK)]
     public ActionResult<DesktopAccountLaunchExchangeResponseDto> ExchangeDesktopLaunch([FromBody] DesktopAccountLaunchExchangeRequestDto? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("desktop launch payload is required.");
@@ -230,7 +219,7 @@ public sealed class InstallLinkingController : ControllerBase
         [FromQuery] string? installLinkCallbackUri,
         CancellationToken cancellationToken)
     {
-        string returnPath = $"{Request.Path}{Request.QueryString}";
+        ApplySensitiveResponseHeaders();
         try
         {
             string? normalizedCallbackUri = NormalizeCallbackUri(installLinkCallbackUri);
@@ -312,6 +301,14 @@ public sealed class InstallLinkingController : ControllerBase
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
+            string returnPath = HubBrowserAuthService.BuildInstallLinkingNextPath(
+                installationId,
+                headId,
+                applicationVersion,
+                releaseChannel,
+                platform,
+                arch,
+                NormalizeCallbackUri(installLinkCallbackUri)!);
             return Redirect($"/login?next={Uri.EscapeDataString(returnPath)}");
         }
         catch (HubRequestAuthException ex)
@@ -322,6 +319,25 @@ public sealed class InstallLinkingController : ControllerBase
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
+    }
+
+    private void ApplySensitiveResponseHeaders()
+    {
+        HttpContext? httpContext = ControllerContext.HttpContext;
+        if (httpContext is null)
+        {
+            // Direct unit invocation can omit MVC's HttpContext; real requests always provide it.
+            return;
+        }
+
+        IHeaderDictionary headers = httpContext.Response.Headers;
+        headers["Cache-Control"] = "private, no-store, max-age=0";
+        headers["CDN-Cache-Control"] = "no-store, max-age=0";
+        headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
+        headers["Surrogate-Control"] = "no-store";
+        headers["Pragma"] = "no-cache";
+        headers["Expires"] = "0";
+        headers["Referrer-Policy"] = "no-referrer";
     }
 
     private static bool MatchesDesktopLaunchIdentity(ClaimedInstallationDto installation, AccountDesktopLaunchTicketClaims claims)
@@ -514,6 +530,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<DesktopInstallNativeContinuationResponse>(StatusCodes.Status200OK)]
     public ActionResult<DesktopInstallNativeContinuationResponse> ContinueClaimedInstall([FromBody] DesktopInstallNativeContinuationRequest? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("continuation payload is required.");
@@ -597,6 +614,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<InstallLinkedWorkspaceSnapshotListResponse>(StatusCodes.Status200OK)]
     public ActionResult<InstallLinkedWorkspaceSnapshotListResponse> ListClaimedInstallWorkspaces([FromBody] DesktopInstallNativeContinuationRequest? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("workspace snapshot list payload is required.");
@@ -619,6 +637,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<InstallLinkedWorkspaceSnapshotUpsertResponse>(StatusCodes.Status200OK)]
     public ActionResult<InstallLinkedWorkspaceSnapshotUpsertResponse> UpsertClaimedInstallWorkspace([FromBody] InstallLinkedWorkspaceSnapshotUpsertRequest? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("workspace snapshot upsert payload is required.");
@@ -666,6 +685,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<DesktopInstallNativeSupportResponse>(StatusCodes.Status202Accepted)]
     public ActionResult<DesktopInstallNativeSupportResponse> SubmitClaimedInstallSupport([FromBody] DesktopInstallNativeSupportRequest? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("native support payload is required.");
@@ -742,6 +762,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<DesktopInstallNativeUpdateResponse>(StatusCodes.Status200OK)]
     public ActionResult<DesktopInstallNativeUpdateResponse> PlanClaimedInstallUpdate([FromBody] DesktopInstallNativeContinuationRequest? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("update payload is required.");
@@ -809,6 +830,7 @@ public sealed class InstallLinkingController : ControllerBase
     [ProducesResponseType<DesktopInstallNativeRollbackResponse>(StatusCodes.Status200OK)]
     public ActionResult<DesktopInstallNativeRollbackResponse> PlanClaimedInstallRollback([FromBody] DesktopInstallNativeContinuationRequest? request)
     {
+        ApplySensitiveResponseHeaders();
         if (request is null)
         {
             return BadRequest("rollback payload is required.");
@@ -2108,31 +2130,7 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     private static string? NormalizeCallbackUri(string? callbackUri)
-    {
-        if (string.IsNullOrWhiteSpace(callbackUri))
-        {
-            return null;
-        }
-
-        if (!Uri.TryCreate(callbackUri.Trim(), UriKind.Absolute, out Uri? parsed))
-        {
-            return null;
-        }
-
-        if (string.Equals(parsed.Scheme, "chummer", StringComparison.OrdinalIgnoreCase))
-        {
-            bool installLinkTarget = string.Equals(parsed.Host, "install-link", StringComparison.OrdinalIgnoreCase)
-                                     && (string.IsNullOrWhiteSpace(parsed.AbsolutePath)
-                                         || string.Equals(parsed.AbsolutePath, "/", StringComparison.Ordinal));
-            return installLinkTarget ? parsed.ToString() : null;
-        }
-
-        bool localhostHttp = (string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                              || string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
-                             && IsAppLocalCallbackHost(parsed.Host)
-                             && IsAppLocalInstallLinkCallbackPath(parsed.AbsolutePath);
-        return localhostHttp ? parsed.ToString() : null;
-    }
+        => HubBrowserAuthService.SanitizeInstallLinkCallbackUri(callbackUri);
 
     private static bool IsAppLocalCallbackHost(string host)
         => string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
@@ -2179,7 +2177,8 @@ public sealed class InstallLinkingController : ControllerBase
         string platform,
         string arch)
         => QueryHelpers.AddQueryString(
-            StripReservedInstallLinkCallbackState(callbackUri),
+            HubBrowserAuthService.SanitizeInstallLinkCallbackUri(callbackUri)
+                ?? throw new InvalidOperationException("Install-link callback URI is invalid."),
             new Dictionary<string, string?>
             {
                 ["code"] = callbackCode,
@@ -2192,70 +2191,6 @@ public sealed class InstallLinkingController : ControllerBase
                 ["installLinkMode"] = "browser_callback",
                 ["installLinkTransport"] = "grant_callback"
             });
-
-    private static string StripReservedInstallLinkCallbackState(string callbackUri)
-    {
-        if (!Uri.TryCreate(callbackUri, UriKind.Absolute, out Uri? parsed)
-            || (string.IsNullOrEmpty(parsed.Query) && string.IsNullOrEmpty(parsed.Fragment)))
-        {
-            return callbackUri;
-        }
-
-        var builder = new UriBuilder(parsed)
-        {
-            Query = string.Empty,
-            Fragment = string.Empty
-        };
-        string baseUri = builder.Uri.ToString();
-        string withQuery = AddPreservedInstallLinkCallbackComponent(baseUri, parsed.Query, prefix: "?");
-        return AppendPreservedInstallLinkCallbackFragment(withQuery, parsed.Fragment);
-    }
-
-    private static string AddPreservedInstallLinkCallbackComponent(string baseUri, string component, string prefix)
-    {
-        Dictionary<string, string?> preserved = PreserveInstallLinkCallbackComponent(component, prefix);
-        return preserved.Count == 0
-            ? baseUri
-            : QueryHelpers.AddQueryString(baseUri, preserved);
-    }
-
-    private static string AppendPreservedInstallLinkCallbackFragment(string baseUri, string fragment)
-    {
-        Dictionary<string, string?> preserved = PreserveInstallLinkCallbackComponent(fragment, "#");
-        return preserved.Count == 0
-            ? baseUri
-            : $"{baseUri}#{BuildInstallLinkCallbackComponent(preserved)}";
-    }
-
-    private static Dictionary<string, string?> PreserveInstallLinkCallbackComponent(string component, string prefix)
-    {
-        var preserved = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        if (string.IsNullOrEmpty(component)
-            || !component.StartsWith(prefix, StringComparison.Ordinal)
-            || component.Length == prefix.Length
-            || !component.Contains('=', StringComparison.Ordinal))
-        {
-            return preserved;
-        }
-
-        foreach (var item in QueryHelpers.ParseQuery(component[prefix.Length..]))
-        {
-            if (InstallLinkCallbackReservedQueryKeys.Contains(item.Key))
-            {
-                continue;
-            }
-
-            preserved[item.Key] = item.Value.ToString();
-        }
-
-        return preserved;
-    }
-
-    private static string BuildInstallLinkCallbackComponent(Dictionary<string, string?> values)
-        => string.Join(
-            "&",
-            values.Select(static item =>
-                $"{Uri.EscapeDataString(item.Key)}={Uri.EscapeDataString(item.Value ?? string.Empty)}"));
 
     private NativeRouteProofStatus BuildNativeRouteProofStatus(string route, string boundedFailureReason)
     {
@@ -2275,6 +2210,16 @@ public sealed class InstallLinkingController : ControllerBase
                 State: "bounded_failure",
                 RouteReceipt: null,
                 BoundedFailureReason: boundedFailureReason);
+        }
+
+        GoldReadinessSnapshot? goldReadiness = _goldReadiness.LoadSnapshot();
+        if (goldReadiness is { IsGoldReady: false })
+        {
+            string reviewRequiredReason = goldReadiness.PublicGapSummary.Trim().TrimEnd('.');
+            return new NativeRouteProofStatus(
+                State: "bounded_failure",
+                RouteReceipt: BuildRouteReceiptPayload(routeReceipt),
+                BoundedFailureReason: $"Current direct route receipt is attached, but parity claims stay review-required because {reviewRequiredReason}.");
         }
 
         FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();

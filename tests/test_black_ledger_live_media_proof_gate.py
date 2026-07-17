@@ -139,6 +139,16 @@ class BlackLedgerLiveMediaProofGateTests(unittest.TestCase):
             self.assertEqual(payload["attempts"][1]["returncode"], 0)
             self.assertTrue(payload["screenshots"])
 
+    def test_source_retries_transient_navigation_errors_inside_capture(self) -> None:
+        module = load_module()
+
+        self.assertIn('const navigationAttempts = 4;', module.NODE_SCRIPT)
+        self.assertIn('"ERR_NETWORK_CHANGED"', module.NODE_SCRIPT)
+        self.assertIn('"net::ERR_"', module.NODE_SCRIPT)
+        self.assertIn("function isTransientNavigationError", module.NODE_SCRIPT)
+        self.assertIn("await context.close().catch(() => undefined);", module.NODE_SCRIPT)
+        self.assertIn("await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));", module.NODE_SCRIPT)
+
 
 if __name__ == "__main__":
     unittest.main()

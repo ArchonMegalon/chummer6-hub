@@ -1,0 +1,40 @@
+@model MobileAppHandoffViewModel
+@inject Chummer.Run.Api.Services.PublicCanonicalOriginPolicy PublicOrigin
+@{
+    var titleId = $"{Model.Id}-title";
+    var descriptionId = $"{Model.Id}-description";
+    var installNoteId = $"{Model.Id}-install-note";
+    var suggestionId = $"{Model.Id}-suggestion";
+    var qrCardId = $"{Model.Id}-qr-card";
+    var linkId = $"{Model.Id}-link";
+    var targetUrl = PublicOrigin.BuildAbsolute(Model.Path);
+}
+
+<div class="mobile-app-handoff" id="@Model.Id" role="dialog" aria-modal="true" aria-labelledby="@titleId" aria-describedby="@descriptionId @installNoteId @suggestionId" data-mobile-app-handoff-dialog data-mobile-app-path="@targetUrl" data-mobile-app-origin="@PublicOrigin.Origin" hidden>
+    <div class="mobile-app-handoff__panel">
+        <div class="mobile-app-handoff__topline">
+            <div>
+                <p class="eyebrow">@Model.Eyebrow</p>
+                <h2 id="@titleId">@Model.Heading</h2>
+            </div>
+            <button class="button-like button-like--ghost" type="button" data-close-mobile-app-handoff>Close</button>
+        </div>
+        <p id="@descriptionId" class="mobile-app-handoff__description">@Model.Description</p>
+        <p id="@suggestionId" class="mobile-app-handoff__suggestion" data-mobile-app-suggestion role="status">Choose whether to open the app here or send it to a phone.</p>
+        <div class="mobile-app-handoff__qr-card" id="@qrCardId" data-mobile-app-qr-card hidden>
+            <svg class="mobile-app-handoff__qr" data-mobile-app-qr role="img" aria-label="@Model.QrAriaLabel" focusable="false"></svg>
+            <p class="muted-copy" data-mobile-app-qr-status hidden>The QR code is unavailable. Use the link below instead.</p>
+        </div>
+        <p id="@installNoteId" class="muted-copy">The link opens an installable PWA. Your phone browser decides whether and how to offer installation; you can also keep using it in the browser.</p>
+        <div class="mobile-app-handoff__link-field">
+            <label for="@linkId">@Model.LinkLabel</label>
+            <input id="@linkId" type="url" value="@targetUrl" readonly data-mobile-app-link />
+        </div>
+        <div class="stacked-actions mobile-app-handoff__actions">
+            <button class="button-like button-like--secondary" type="button" data-show-mobile-app-qr aria-controls="@qrCardId" aria-expanded="false">Show QR / send to phone</button>
+            <button class="button-like button-like--secondary" type="button" data-copy-mobile-app-link>Copy link</button>
+            <a class="button-like button-like--primary" href="@targetUrl" data-mobile-app-open data-analytics-event="@Model.OpenAnalyticsEvent" data-analytics-surface="mobile_app_handoff" data-analytics-label="@Model.OpenLabel">@Model.OpenLabel</a>
+        </div>
+        <p class="status-copy" data-mobile-app-copy-status hidden></p>
+    </div>
+</div>

@@ -49,7 +49,7 @@ public sealed class FeedbackOperatingLoopViewTests
 
         Assert.Contains("public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)", controller, StringComparison.Ordinal);
         Assert.Contains("\"~/Views/PublicLanding/Roadmap.cshtml\"", controller, StringComparison.Ordinal);
-        Assert.Contains("return Redirect($\"/roadmap{Request.QueryString}\");", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/roadmap/provider-assets/{assetHost}/{**assetPath}\")]", controller, StringComparison.Ordinal);
         Assert.Contains("BuildRoadmapFallbackPageModelAsync", controller, StringComparison.Ordinal);
         Assert.Contains("RoadmapBoardFallbackAsync", controller, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", changelogView, StringComparison.Ordinal);

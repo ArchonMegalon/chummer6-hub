@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Chummer.Run.AI.Security;
 
 namespace Chummer.Run.AI.Services.Booster;
 
@@ -13,6 +14,12 @@ public sealed class BoosterProjectionAccessGuard
 
     public void Require(HttpRequest request)
     {
+        if (request.HttpContext.Items.TryGetValue(AiMutationAuthorizationMiddleware.AuthorizationMarker, out object? authorized)
+            && authorized is true)
+        {
+            return;
+        }
+
         var configured = Normalize(_configuration["BOOSTER_PROJECTION_READ_TOKEN"])
             ?? Normalize(_configuration["FLEET_RECEIPT_SIGNING_SECRET"]);
         if (configured is null)

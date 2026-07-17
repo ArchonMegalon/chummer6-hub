@@ -1940,6 +1940,68 @@ def _is_native_install_linking_route(route: str) -> bool:
     return route == NATIVE_INSTALL_LINKING_ROUTE_PREFIX or route.startswith(f"{NATIVE_INSTALL_LINKING_ROUTE_PREFIX}/")
 
 
+def _release_readiness_reason(value: str) -> str:
+    text = value.strip()
+    replacements = {
+        "flagship product readiness proof did not publish a desktop-client reason.": (
+            "flagship product readiness checks did not publish a desktop-client reason."
+        ),
+    }
+    return replacements.get(text, text)
+
+
+def _append_reason_details(base_reason: str, details: list[str]) -> str:
+    normalized_base = str(base_reason or "").strip()
+    normalized_details = [
+        str(detail).strip().rstrip(".")
+        for detail in details
+        if str(detail).strip()
+    ]
+    if not normalized_base:
+        return " ".join(f"{detail}." for detail in normalized_details).strip()
+    if normalized_base[-1:] not in {".", "!", "?"}:
+        normalized_base += "."
+    if not normalized_details:
+        return normalized_base
+    return normalized_base + " " + " ".join(f"{detail}." for detail in normalized_details)
+
+
+def _effective_readiness_override_reason(readiness_payload: dict, coverage_gap_keys: list[str]) -> str:
+    if str(readiness_payload.get("status") or "").strip().lower() in {"pass", "passed", "ready"}:
+        return ""
+    gate_status_override = readiness_payload.get("gate_status_override")
+    if not isinstance(gate_status_override, dict):
+        return ""
+
+    effective_reason = _release_readiness_reason(str(gate_status_override.get("effective_reason") or "").strip())
+    if effective_reason:
+        return effective_reason
+    base_reason = _release_readiness_reason(str(gate_status_override.get("reason") or "").strip())
+    blockers = _sorted_unique_strings(
+        [
+            str(item).strip()
+            for item in gate_status_override.get("launch_critical_nested_blockers") or []
+            if str(item).strip()
+        ]
+    )
+    normalized_coverage_gap_keys = _sorted_unique_strings(coverage_gap_keys)
+    scoped_coverage_gap_keys = _sorted_unique_strings(
+        [
+            str(item).strip()
+            for item in gate_status_override.get("scoped_coverage_gap_keys") or []
+            if str(item).strip()
+        ]
+    )
+    details: list[str] = []
+    if blockers:
+        details.append("Launch blockers: " + ", ".join(blockers))
+    if normalized_coverage_gap_keys:
+        details.append("Coverage gaps: " + ", ".join(normalized_coverage_gap_keys))
+    if scoped_coverage_gap_keys and scoped_coverage_gap_keys != normalized_coverage_gap_keys:
+        details.append("Scoped coverage gaps: " + ", ".join(scoped_coverage_gap_keys))
+    return _append_reason_details(base_reason, details)
+
+
 def _load_flagship_readiness_snapshot(errors: list[str]) -> dict | None:
     readiness_path = _flagship_readiness_path()
     _verify_evidence_path_has_no_forbidden_markers(errors, readiness_path, "flagship readiness proof")
@@ -1986,6 +2048,19 @@ def _load_flagship_readiness_snapshot(errors: list[str]) -> dict | None:
         for item in coverage_gap_keys
         if str(item).strip()
     ]
+    raw_reason = _release_readiness_reason(
+        str(readiness_audit.get("reason") or "").strip()
+        if isinstance(readiness_audit, dict)
+        else ""
+    )
+    raw_completion_audit_reason = _release_readiness_reason(
+        str(completion_audit.get("reason") or "").strip()
+        if isinstance(completion_audit, dict)
+        else ""
+    )
+    effective_override_reason = _effective_readiness_override_reason(readiness_payload, normalized_coverage_gap_keys)
+    reason = effective_override_reason or raw_reason or "flagship product readiness checks did not publish a desktop-client reason."
+    completion_audit_reason = effective_override_reason or raw_completion_audit_reason
 
     return {
         "status": str(readiness_payload.get("status") or "").strip() or "unknown",
@@ -1993,15 +2068,11 @@ def _load_flagship_readiness_snapshot(errors: list[str]) -> dict | None:
         "generated_at": str(readiness_payload.get("generated_at") or "").strip(),
         "missing_coverage_keys": normalized_coverage_gap_keys,
         "desktop_client_missing": "desktop_client" in {item.casefold() for item in normalized_coverage_gap_keys},
-        "reason": str(readiness_audit.get("reason") or "").strip()
-        if isinstance(readiness_audit, dict)
-        else "",
+        "reason": reason,
         "completion_audit_status": str(completion_audit.get("status") or "").strip()
         if isinstance(completion_audit, dict)
         else "unknown",
-        "completion_audit_reason": str(completion_audit.get("reason") or "").strip()
-        if isinstance(completion_audit, dict)
-        else "",
+        "completion_audit_reason": completion_audit_reason,
         "source_path": str(readiness_path),
     }
 

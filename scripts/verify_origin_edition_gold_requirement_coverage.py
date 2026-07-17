@@ -23,6 +23,7 @@ EXPECTED_REQUIREMENTS = (
     "movie_story_scene_playback",
     "local_authenticated_chummer_route",
     "runsite_handoff_constraints",
+    "controlled_live_provider_pilot",
     "telegram_origin_links",
     "no_fallback_no_sentinel_no_direct_publish_no_secrets",
     "deployed_owner_read_listen_watch_canon",

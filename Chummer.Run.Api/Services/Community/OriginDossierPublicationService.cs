@@ -12,12 +12,19 @@ namespace Chummer.Run.Api.Services.Community;
 public sealed class OriginDossierPublicationService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly IReadOnlyList<string> DefaultApprovedManuscriptProviderTokens = ["Inkfluence", "Youbooks", "First Book", "FirstBook", "Chummer OriginBookEngine"];
+    private static readonly IReadOnlyList<string> DefaultApprovedManuscriptProviderTokens = ["Subscribr"];
     private static readonly IReadOnlyList<string> DefaultApprovedAudiobookProviderTokens = ["Inkfluence", "Unmixr"];
-    private static readonly IReadOnlyList<string> DefaultApprovedVisualProviderTokens = ["Magicfit"];
-    private static readonly IReadOnlyList<string> DefaultApprovedPackagingProviderTokens = ["Inkfluence", "FlipLink", "Runbook Press"];
+    private static readonly IReadOnlyList<string> DefaultPreferredVisualProviderTokens = ["Magicfit"];
+    private static readonly IReadOnlyList<string> DefaultApprovedVisualProviderTokens = DefaultPreferredVisualProviderTokens;
+    private static readonly IReadOnlyList<string> DefaultApprovedPackagingProviderTokens = ["Inkfluence", "FlipLink", "Runbook Press", "Chummer PublicationAssembler"];
     private static readonly IReadOnlyList<string> DefaultTrustedAudiobookshelfHosts = ["audio.chummer.run", "audiobookshelf.chummer.run", "audiobookshelf.girschele.com"];
     private const string SelectedCharacterFaceProofToken = "selected_character_face";
+    private const string FullStoryManuscriptToken = "full_story_manuscript";
+    private const string ChapteredStoryToken = "chaptered_story";
+    private const string StoryEditionEbookToken = "story_edition_ebook";
+    private const string FittedCoverArtToken = "fitted_cover_art";
+    private const string SelectedCinematicSceneToken = "selected_cinematic_scene";
+    private const string CharacterVisibleCinematicToken = "character_visible_cinematic";
     private const string ApprovedSourcePacketToken = "approved_source_packet";
     private const string ExternalProcessingConsentToken = "external_processing_consent";
     private const string CanonAuditPassedToken = "canon_audit_passed";
@@ -25,6 +32,8 @@ public sealed class OriginDossierPublicationService
     private const string PrivacyFindingsZeroToken = "privacy_findings:0";
     private const string OperatorVerifiedLiveRunToken = "operator_verified_live_run";
     private const string ProviderReceiptReferenceToken = "provider_receipt_reference";
+    private const int MinimumFullStoryWordCount = 10_000;
+    private const int MinimumFullStoryChapterCount = 8;
     private readonly IConfiguration _configuration;
     private readonly HorizonCapabilityService? _capabilities;
     private readonly MediaArtifactHorizonsService? _mediaHorizons;
@@ -111,7 +120,20 @@ public sealed class OriginDossierPublicationService
                 .FirstOrDefault(candidate =>
                     IsOwnedBy(candidate, userId, subjectId)
                     && Matches(candidate.ProjectId, projectId));
-            if (entry is null || !BuildViewModel(entry).GoldReady)
+            if (entry is null)
+            {
+                return null;
+            }
+
+            bool allowed = artifactKind.Trim().ToLowerInvariant() switch
+            {
+                "book" => CanAccessBookArtifact(entry),
+                "cover" => CanAccessCoverArtifact(entry),
+                "video" => CanAccessVideoArtifact(entry),
+                "canon-audit" or "canon" or "audit" => CanAccessCanonAuditArtifact(entry),
+                _ => false
+            };
+            if (!allowed)
             {
                 return null;
             }
@@ -159,15 +181,19 @@ public sealed class OriginDossierPublicationService
                 .FirstOrDefault(candidate =>
                     IsOwnedBy(candidate, userId, subjectId)
                     && Matches(candidate.ProjectId, projectId));
-            if (entry is null || !BuildViewModel(entry).GoldReady)
+            if (entry is null)
             {
                 return null;
             }
 
             string? shareUrl = shareKind.Trim().ToLowerInvariant() switch
             {
-                "dossier" or "read" or "ebook" => entry.AudiobookshelfDossierShareUrl,
-                "audiobook" or "listen" => entry.AudiobookshelfAudiobookShareUrl ?? entry.AudiobookshelfShareUrl,
+                "dossier" or "read" or "ebook" => CanAccessDossierShare(entry)
+                    ? entry.AudiobookshelfDossierShareUrl
+                    : null,
+                "audiobook" or "listen" => CanAccessAudiobookShare(entry)
+                    ? entry.AudiobookshelfAudiobookShareUrl ?? entry.AudiobookshelfShareUrl
+                    : null,
                 _ => null
             };
             return IsTrustedAudiobookshelfShareUrl(shareUrl)
@@ -227,6 +253,204 @@ public sealed class OriginDossierPublicationService
         return BuildViewModel(entry);
     }
 
+    public OriginDossierPublicationViewModel? SelectPortraitForAccount(
+        string userId,
+        string subjectId,
+        string projectId,
+        string portraitId)
+        => UpdateOwnedEntry(userId, subjectId, projectId, entry =>
+        {
+            OriginDossierPortraitChoiceDto[] choices = entry.PortraitChoices?.ToArray()
+                ?? Array.Empty<OriginDossierPortraitChoiceDto>();
+            OriginDossierPortraitChoiceDto[] validChoices = choices
+                .Where(IsValidRenderablePortraitChoice)
+                .ToArray();
+            if (!CanAccessDossierShare(entry)
+                || validChoices.Length != 3
+                || !validChoices
+                    .Any(choice => Matches(choice.PortraitId, portraitId)))
+            {
+                return null;
+            }
+
+            return entry with
+            {
+                PortraitChoices = choices
+                    .Select(choice => choice with { Selected = Matches(choice.PortraitId, portraitId) })
+                    .ToArray()
+            };
+        });
+
+    public OriginDossierPublicationViewModel? SelectAudiobookVoiceForAccount(
+        string userId,
+        string subjectId,
+        string projectId,
+        string voiceId)
+        => UpdateOwnedEntry(userId, subjectId, projectId, entry =>
+        {
+            OriginDossierAudiobookVoiceOptionDto[] options = entry.AudiobookVoiceOptions?.ToArray()
+                ?? Array.Empty<OriginDossierAudiobookVoiceOptionDto>();
+            if (!CanAccessDossierShare(entry)
+                || options.Length == 0
+                || !options.Where(IsValidAudiobookVoiceOption)
+                    .Any(option => Matches(option.VoiceId, voiceId)))
+            {
+                return null;
+            }
+
+            return entry with
+            {
+                AudiobookVoiceOptions = options
+                    .Select(option => option with { Selected = Matches(option.VoiceId, voiceId) })
+                    .ToArray()
+            };
+        });
+
+    public OriginDossierPublicationViewModel? SelectCinematicSceneForAccount(
+        string userId,
+        string subjectId,
+        string projectId,
+        string sceneId)
+        => UpdateOwnedEntry(userId, subjectId, projectId, entry =>
+        {
+            OriginDossierSceneHighlightDto[] scenes = entry.SceneHighlights?.ToArray()
+                ?? Array.Empty<OriginDossierSceneHighlightDto>();
+            if (!CanAccessDossierShare(entry)
+                || !HasSelectedPortraitChoice(entry)
+                || scenes.Length == 0
+                || !scenes.Where(IsValidSceneHighlight)
+                    .Any(scene => Matches(scene.SceneId, sceneId)))
+            {
+                return null;
+            }
+
+            return entry with
+            {
+                SceneHighlights = scenes
+                    .Select(scene => scene with { Selected = Matches(scene.SceneId, sceneId) })
+                    .ToArray()
+            };
+        });
+
+    public OriginDossierPublicationViewModel? LinkRunnerForAccount(
+        string userId,
+        string subjectId,
+        string projectId,
+        string runnerLinkCode,
+        string? relationshipSummary)
+    {
+        string normalizedCode = NormalizeRunnerLinkCode(runnerLinkCode);
+        if (normalizedCode.Length != 12)
+        {
+            return null;
+        }
+
+        string? indexPath = ResolveIndexPath();
+        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            lock (_writeGate)
+            {
+                List<OriginDossierPublicationIndexEntry> entries = LoadEntries(indexPath).ToList();
+                int sourceIndex = entries.FindIndex(candidate =>
+                    IsOwnedBy(candidate, userId, subjectId)
+                    && Matches(candidate.ProjectId, projectId));
+                if (sourceIndex < 0)
+                {
+                    return null;
+                }
+
+                OriginDossierPublicationIndexEntry source = EnsureRunnerLinkCode(entries[sourceIndex]);
+                int targetIndex = entries.FindIndex(candidate =>
+                    !Matches(candidate.ProjectId, source.ProjectId ?? string.Empty)
+                    && string.Equals(NormalizeRunnerLinkCode(ResolveRunnerLinkCode(candidate)), normalizedCode, StringComparison.Ordinal));
+                if (targetIndex < 0)
+                {
+                    return null;
+                }
+
+                OriginDossierPublicationIndexEntry target = EnsureRunnerLinkCode(entries[targetIndex]);
+                string summary = CleanStoryLinkSummary(
+                    relationshipSummary,
+                    $"Shared history with {Clean(target.RunnerAlias, "another runner")}.");
+                source = source with
+                {
+                    StoryLinks = UpsertStoryLink(source.StoryLinks, target, "accepted_by_link_code", summary)
+                };
+                target = target with
+                {
+                    StoryLinks = UpsertStoryLink(
+                        target.StoryLinks,
+                        source,
+                        "linked_by_shared_code",
+                        $"Shared history link accepted by {Clean(source.RunnerAlias, "another runner")}.")
+                };
+
+                entries[sourceIndex] = source;
+                entries[targetIndex] = target;
+                PersistEntries(indexPath, entries);
+                return BuildViewModel(source);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Origin Dossier runner story link could not be updated from {IndexPath}.", indexPath);
+            return null;
+        }
+    }
+
+    private OriginDossierPublicationViewModel? UpdateOwnedEntry(
+        string userId,
+        string subjectId,
+        string projectId,
+        Func<OriginDossierPublicationIndexEntry, OriginDossierPublicationIndexEntry?> update)
+    {
+        if (string.IsNullOrWhiteSpace(projectId))
+        {
+            return null;
+        }
+
+        string? indexPath = ResolveIndexPath();
+        if (string.IsNullOrWhiteSpace(indexPath) || !File.Exists(indexPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            lock (_writeGate)
+            {
+                List<OriginDossierPublicationIndexEntry> entries = LoadEntries(indexPath).ToList();
+                int index = entries.FindIndex(candidate =>
+                    IsOwnedBy(candidate, userId, subjectId)
+                    && Matches(candidate.ProjectId, projectId));
+                if (index < 0)
+                {
+                    return null;
+                }
+
+                OriginDossierPublicationIndexEntry? updated = update(entries[index]);
+                if (updated is null)
+                {
+                    return null;
+                }
+
+                entries[index] = updated;
+                PersistEntries(indexPath, entries);
+                return BuildViewModel(updated);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Origin Dossier publication index could not be updated from {IndexPath}.", indexPath);
+            return null;
+        }
+    }
+
     public static OriginDossierPublicationImportResultDto ToImportResult(OriginDossierPublicationViewModel publication)
         => new(
             ProjectId: publication.ProjectId,
@@ -253,7 +477,36 @@ public sealed class OriginDossierPublicationService
             RunnerName: publication.RunnerName,
             OriginEditionNamespace: publication.OriginEditionNamespace,
             AudiobookshelfDossierShareUrl: publication.AudiobookshelfDossierShareUrl,
-            AudiobookshelfAudiobookShareUrl: publication.AudiobookshelfAudiobookShareUrl);
+            AudiobookshelfAudiobookShareUrl: publication.AudiobookshelfAudiobookShareUrl,
+            PortraitChoices: publication.PortraitChoices?.Select(choice => new OriginDossierPortraitChoiceDto(
+                PortraitId: choice.PortraitId,
+                Title: choice.Title,
+                Summary: choice.Summary,
+                PreviewUrl: choice.PreviewUrl,
+                Selected: choice.Selected)).ToArray(),
+            AudiobookVoiceOptions: publication.AudiobookVoiceOptions?.Select(option => new OriginDossierAudiobookVoiceOptionDto(
+                VoiceId: option.VoiceId,
+                Label: option.Label,
+                Summary: option.Summary,
+                Recommended: option.Recommended,
+                Selected: option.Selected)).ToArray(),
+            SceneHighlights: publication.SceneHighlights?.Select(scene => new OriginDossierSceneHighlightDto(
+                SceneId: scene.SceneId,
+                ChapterLabel: scene.ChapterLabel,
+                Title: scene.Title,
+                Summary: scene.Summary,
+                Selected: scene.Selected)).ToArray(),
+            FullStoryVerified: publication.FullStoryVerified,
+            EbookHandoffReady: publication.EbookHandoffReady,
+            RunnerLinkCode: publication.RunnerLinkCode,
+            StoryLinks: publication.StoryLinks?.Select(link => new OriginDossierStoryLinkDto(
+                LinkId: link.LinkId,
+                LinkedRunnerAlias: link.LinkedRunnerAlias,
+                Summary: link.Summary,
+                Status: link.Status,
+                LinkedProjectId: link.LinkedProjectId,
+                LinkedRunnerLinkCode: link.LinkedRunnerLinkCode,
+                IntegrateIntoStory: link.IntegrateIntoStory)).ToArray());
 
     private string? ResolveIndexPath()
     {
@@ -320,7 +573,11 @@ public sealed class OriginDossierPublicationService
     private OriginDossierPublicationViewModel BuildViewModel(OriginDossierPublicationIndexEntry entry)
     {
         IReadOnlyList<string> missing = ResolveMissingRequirements(entry);
+        bool fullStoryVerified = HasFullChapteredStoryManuscript(entry.ProviderManuscriptPath)
+            && HasProviderManuscriptReceipt(entry.ProviderManuscriptPath, entry.ProviderManuscriptReceiptPath);
+        bool ebookHandoffReady = CanAccessDossierShare(entry);
         string projectId = Clean(entry.ProjectId, "origin-dossier");
+        string runnerLinkCode = ResolveRunnerLinkCode(entry);
         return new OriginDossierPublicationViewModel(
             ProjectId: projectId,
             Title: Clean(entry.Title, "Origin Dossier"),
@@ -362,8 +619,152 @@ public sealed class OriginDossierPublicationService
                 ? BuildOwnerUrl(ResolvePublicBaseUrl(), projectId, "listen")
                 : null,
             SharedArtifacts: BuildSharedArtifacts(),
-            ArtifactCapability: BuildPublicArtifactCapability(projectId));
+            ArtifactCapability: BuildPublicArtifactCapability(projectId),
+            PortraitChoices: BuildPortraitChoices(entry.PortraitChoices),
+            AudiobookVoiceOptions: BuildAudiobookVoiceOptions(entry.AudiobookVoiceOptions),
+            SceneHighlights: BuildSceneHighlights(entry.SceneHighlights),
+            FullStoryVerified: fullStoryVerified,
+            EbookHandoffReady: ebookHandoffReady,
+            RunnerLinkCode: runnerLinkCode,
+            RunnerLinkShareUrl: $"{ResolvePublicBaseUrl()}/account/work/origin-dossiers/{Uri.EscapeDataString(projectId)}#origin-edition-links",
+            StoryLinks: BuildStoryLinks(entry.StoryLinks));
     }
+
+    private static IReadOnlyList<OriginDossierPortraitChoiceViewModel> BuildPortraitChoices(
+        IReadOnlyList<OriginDossierPortraitChoiceDto>? choices)
+    {
+        if (choices is null || choices.Count == 0)
+        {
+            return Array.Empty<OriginDossierPortraitChoiceViewModel>();
+        }
+
+        OriginDossierPortraitChoiceDto[] validChoices = choices
+            .Where(static choice => !string.IsNullOrWhiteSpace(choice.PortraitId) && !string.IsNullOrWhiteSpace(choice.Title))
+            .Where(IsValidRenderablePortraitChoice)
+            .ToArray();
+        if (validChoices.Length != 3)
+        {
+            return Array.Empty<OriginDossierPortraitChoiceViewModel>();
+        }
+
+        return validChoices
+            .Select(choice => new OriginDossierPortraitChoiceViewModel(
+                PortraitId: Clean(choice.PortraitId, "portrait"),
+                Title: Clean(choice.Title, "Portrait option"),
+                Summary: Clean(choice.Summary, "Story-fit portrait option."),
+                PreviewUrl: CleanTrustedChummerUrl(choice.PreviewUrl),
+                Selected: choice.Selected))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<OriginDossierAudiobookVoiceOptionViewModel> BuildAudiobookVoiceOptions(
+        IReadOnlyList<OriginDossierAudiobookVoiceOptionDto>? options)
+    {
+        if (options is null || options.Count == 0)
+        {
+            return Array.Empty<OriginDossierAudiobookVoiceOptionViewModel>();
+        }
+
+        return options
+            .Where(static option => !string.IsNullOrWhiteSpace(option.VoiceId) && !string.IsNullOrWhiteSpace(option.Label))
+            .Select(option => new OriginDossierAudiobookVoiceOptionViewModel(
+                VoiceId: Clean(option.VoiceId, "voice"),
+                Label: Clean(option.Label, "Voice"),
+                Summary: Clean(option.Summary, "Narration option."),
+                Recommended: option.Recommended,
+                Selected: option.Selected))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<OriginDossierSceneHighlightViewModel> BuildSceneHighlights(
+        IReadOnlyList<OriginDossierSceneHighlightDto>? scenes)
+    {
+        if (scenes is null || scenes.Count == 0)
+        {
+            return Array.Empty<OriginDossierSceneHighlightViewModel>();
+        }
+
+        return scenes
+            .Where(static scene =>
+                !string.IsNullOrWhiteSpace(scene.SceneId)
+                && !string.IsNullOrWhiteSpace(scene.ChapterLabel)
+                && !string.IsNullOrWhiteSpace(scene.Title))
+            .Select(scene => new OriginDossierSceneHighlightViewModel(
+                SceneId: Clean(scene.SceneId, "scene"),
+                ChapterLabel: Clean(scene.ChapterLabel, "Chapter"),
+                Title: Clean(scene.Title, "Scene"),
+                Summary: Clean(scene.Summary, "Scene highlight."),
+                Selected: scene.Selected))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<OriginDossierStoryLinkViewModel> BuildStoryLinks(
+        IReadOnlyList<OriginDossierStoryLinkDto>? links)
+    {
+        if (links is null || links.Count == 0)
+        {
+            return Array.Empty<OriginDossierStoryLinkViewModel>();
+        }
+
+        return links
+            .Where(static link =>
+                !string.IsNullOrWhiteSpace(link.LinkId)
+                && !string.IsNullOrWhiteSpace(link.LinkedRunnerAlias)
+                && !string.IsNullOrWhiteSpace(link.Summary))
+            .Select(link => new OriginDossierStoryLinkViewModel(
+                LinkId: Clean(link.LinkId, "story-link"),
+                LinkedRunnerAlias: Clean(link.LinkedRunnerAlias, "Linked runner"),
+                Summary: Clean(link.Summary, "Shared history link."),
+                Status: Clean(link.Status, "accepted"),
+                LinkedProjectId: CleanNullable(link.LinkedProjectId),
+                LinkedRunnerLinkCode: FormatRunnerLinkCode(NormalizeRunnerLinkCode(link.LinkedRunnerLinkCode)),
+                IntegrateIntoStory: link.IntegrateIntoStory))
+            .ToArray();
+    }
+
+    private static bool HasPortraitChoiceShortlist(OriginDossierPublicationIndexEntry entry)
+        => entry.PortraitChoices?
+            .Count(IsValidRenderablePortraitChoice) == 3;
+
+    private static bool HasSelectedPortraitChoice(OriginDossierPublicationIndexEntry entry)
+        => entry.PortraitChoices?
+            .Where(IsValidRenderablePortraitChoice)
+            .Take(3)
+            .Any(static choice => choice.Selected) == true;
+
+    private static bool HasAudiobookVoiceChoiceSet(OriginDossierPublicationIndexEntry entry)
+        => entry.AudiobookVoiceOptions?
+            .Any(IsValidAudiobookVoiceOption) == true;
+
+    private static bool HasSelectedAudiobookVoiceChoice(OriginDossierPublicationIndexEntry entry)
+        => entry.AudiobookVoiceOptions?
+            .Where(IsValidAudiobookVoiceOption)
+            .Any(static option => option.Selected) == true;
+
+    private static bool HasSceneHighlightSummaries(OriginDossierPublicationIndexEntry entry)
+        => entry.SceneHighlights?
+            .Any(IsValidSceneHighlight) == true;
+
+    private static bool HasSelectedSceneHighlight(OriginDossierPublicationIndexEntry entry)
+        => entry.SceneHighlights?
+            .Where(IsValidSceneHighlight)
+            .Any(static scene => scene.Selected) == true;
+
+    private static bool IsValidRenderablePortraitChoice(OriginDossierPortraitChoiceDto choice)
+        => !string.IsNullOrWhiteSpace(choice.PortraitId)
+            && !string.IsNullOrWhiteSpace(choice.Title)
+            && !string.IsNullOrWhiteSpace(choice.Summary)
+            && !string.IsNullOrWhiteSpace(CleanTrustedChummerUrl(choice.PreviewUrl));
+
+    private static bool IsValidAudiobookVoiceOption(OriginDossierAudiobookVoiceOptionDto option)
+        => !string.IsNullOrWhiteSpace(option.VoiceId)
+            && !string.IsNullOrWhiteSpace(option.Label);
+
+    private static bool IsValidSceneHighlight(OriginDossierSceneHighlightDto scene)
+        => !string.IsNullOrWhiteSpace(scene.SceneId)
+            && !string.IsNullOrWhiteSpace(scene.ChapterLabel)
+            && !string.IsNullOrWhiteSpace(scene.Title)
+            && !string.IsNullOrWhiteSpace(scene.Summary);
 
     private SharedArtifactSurfaceRoutesViewModel? BuildSharedArtifacts()
     {
@@ -406,13 +807,76 @@ public sealed class OriginDossierPublicationService
             ?? $"{surface.HorizonId}:{normalizedProjectId}:{sourceId}";
     }
 
+    private bool HasStoryCoreReady(OriginDossierPublicationIndexEntry entry)
+        => IsPublishedForOwner(entry.PublicationState)
+            && entry.ProviderAuthoredManuscriptImported
+            && entry.UndetectableHumanizerApplied
+            && HasOriginEditionNamespace(entry)
+            && IsChummerRunOwnerUrl(entry)
+            && !ContainsFakeMarker(entry)
+            && HasArchivedArtifact(entry.SourcePacketPath)
+            && HasSourcePacketReceipt(entry.SourcePacketPath, entry.SourcePacketReceiptPath)
+            && HasArchivedArtifact(entry.ProviderManuscriptPath)
+            && HasFullChapteredStoryManuscript(entry.ProviderManuscriptPath)
+            && HasProviderManuscriptReceipt(entry.ProviderManuscriptPath, entry.ProviderManuscriptReceiptPath)
+            && HasProviderAccountAliasReceipt(entry.ProviderManuscriptAccountAlias, entry.ProviderManuscriptReceiptPath, "CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES", "OriginDossier:ManuscriptAccountAliases")
+            && HasCanonAuditReceipt(entry.SourcePacketPath, entry.ProviderManuscriptPath, entry.CanonAuditReceiptPath)
+            && entry.BookArtifactVerified
+            && IsChummerRunArtifactUrl(entry, entry.BookArtifactUrl, "book")
+            && HasArchivedArtifact(entry.BookArtifactPath)
+            && HasBookArtifactReceipt(entry)
+            && HasProviderAccountAliasReceipt(entry.BookPackagingAccountAlias, entry.BookArtifactReceiptPath, "CHUMMER_ORIGIN_PACKAGING_ACCOUNT_ALIASES", "OriginDossier:PackagingAccountAliases");
+
+    private bool HasStoryCoverReady(OriginDossierPublicationIndexEntry entry)
+        => HasStoryCoreReady(entry)
+            && entry.StorySceneCoverUsesSelectedCharacterFace
+            && IsChummerRunArtifactUrl(entry, entry.StorySceneCoverUrl, "cover")
+            && HasArchivedArtifact(entry.StorySceneCoverPath)
+            && HasStorySceneCoverReceipt(entry)
+            && HasProviderAccountAliasReceipt(entry.StorySceneCoverAccountAlias, entry.StorySceneCoverReceiptPath, "CHUMMER_ORIGIN_VISUAL_ACCOUNT_ALIASES", "OriginDossier:VisualAccountAliases")
+            && HasCoverConsistencyReceipt(entry);
+
+    private bool CanAccessBookArtifact(OriginDossierPublicationIndexEntry entry)
+        => HasStoryCoverReady(entry);
+
+    private bool CanAccessDossierShare(OriginDossierPublicationIndexEntry entry)
+        => HasStoryCoverReady(entry)
+            && IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfDossierShareUrl)
+            && HasArchivedArtifact(entry.EbookArtifactPath)
+            && HasAudiobookshelfDossierImportReceipt(entry);
+
+    private bool CanAccessCoverArtifact(OriginDossierPublicationIndexEntry entry)
+        => HasStoryCoverReady(entry);
+
+    private bool CanAccessAudiobookShare(OriginDossierPublicationIndexEntry entry)
+        => HasStoryCoverReady(entry)
+            && entry.AudiobookshelfPlaybackVerified
+            && IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfAudiobookShareUrl ?? entry.AudiobookshelfShareUrl)
+            && HasArchivedArtifact(entry.AudiobookPath)
+            && HasAudiobookshelfImportReceipt(entry)
+            && HasProviderAccountAliasReceipt(entry.AudiobookProviderAccountAlias, entry.AudiobookshelfImportReceiptPath, "CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES", "OriginDossier:AudioAccountAliases");
+
+    private bool CanAccessVideoArtifact(OriginDossierPublicationIndexEntry entry)
+        => HasStoryCoverReady(entry)
+            && entry.DossierVideoVerified
+            && IsChummerRunArtifactUrl(entry, entry.DossierVideoUrl, "video")
+            && HasArchivedArtifact(entry.DossierVideoPath)
+            && HasArchivedArtifact(entry.MoviePosterPath)
+            && HasDossierVideoReceipt(entry)
+            && HasProviderAccountAliasReceipt(entry.DossierVideoAccountAlias, entry.DossierVideoReceiptPath, "CHUMMER_ORIGIN_VISUAL_ACCOUNT_ALIASES", "OriginDossier:VisualAccountAliases");
+
+    private bool CanAccessCanonAuditArtifact(OriginDossierPublicationIndexEntry entry)
+        => HasStoryCoreReady(entry)
+            && HasArchivedArtifact(entry.CanonAuditReceiptPath)
+            && HasCanonAuditReceipt(entry.SourcePacketPath, entry.ProviderManuscriptPath, entry.CanonAuditReceiptPath);
+
     private IReadOnlyList<string> ResolveMissingRequirements(OriginDossierPublicationIndexEntry entry)
     {
         List<string> missing = new(entry.MissingGoldRequirements ?? Array.Empty<string>());
         AddIfMissing(missing, IsPublishedForOwner(entry.PublicationState), "published_for_owner publication state");
         AddIfMissing(missing, entry.ProviderAuthoredManuscriptImported, "provider-authored manuscript import");
         AddIfMissing(missing, entry.UndetectableHumanizerApplied, "Undetectable Humanizer receipt");
-        AddIfMissing(missing, entry.StorySceneCoverUsesSelectedCharacterFace, "rendered story scene cover with selected character face");
+        AddIfMissing(missing, entry.StorySceneCoverUsesSelectedCharacterFace, "fitted cover art with selected character face");
         AddIfMissing(missing, entry.AudiobookshelfPlaybackVerified, "Audiobookshelf playback verification");
         AddIfMissing(missing, IsChummerRunOwnerUrl(entry), "authenticated chummer.run owner URL");
         AddIfMissing(missing, entry.BookArtifactVerified, "book artifact verification");
@@ -423,11 +887,12 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, IsTrustedAudiobookshelfShareUrl(entry.AudiobookshelfAudiobookShareUrl ?? entry.AudiobookshelfShareUrl), "trusted Audiobookshelf audiobook share URL");
         AddIfMissing(missing, entry.DossierVideoVerified, "dossier video verification");
         AddIfMissing(missing, IsChummerRunArtifactUrl(entry, entry.DossierVideoUrl, "video"), "dossier video URL");
-        AddIfMissing(missing, IsChummerRunArtifactUrl(entry, entry.StorySceneCoverUrl, "cover"), "rendered story scene cover URL");
+        AddIfMissing(missing, IsChummerRunArtifactUrl(entry, entry.StorySceneCoverUrl, "cover"), "fitted cover art URL");
         AddIfMissing(missing, HasArchivedArtifact(entry.SourcePacketPath), "approved source packet artifact path");
         AddIfMissing(missing, HasSourcePacketReceipt(entry.SourcePacketPath, entry.SourcePacketReceiptPath), "approved source packet receipt path");
         AddIfMissing(missing, HasArchivedArtifact(entry.ProviderManuscriptPath), "provider manuscript artifact path");
-        AddIfMissing(missing, HasProviderManuscriptReceipt(entry.ProviderManuscriptPath, entry.ProviderManuscriptReceiptPath), "provider manuscript receipt path");
+        AddIfMissing(missing, HasFullChapteredStoryManuscript(entry.ProviderManuscriptPath), "ebook-length full chaptered story manuscript artifact");
+        AddIfMissing(missing, HasProviderManuscriptReceipt(entry.ProviderManuscriptPath, entry.ProviderManuscriptReceiptPath), "Subscribr full-story manuscript receipt path");
         AddIfMissing(missing, HasProviderAccountAliasReceipt(entry.ProviderManuscriptAccountAlias, entry.ProviderManuscriptReceiptPath, "CHUMMER_ORIGIN_MANUSCRIPT_ACCOUNT_ALIASES", "OriginDossier:ManuscriptAccountAliases"), "provider manuscript account alias");
         AddIfMissing(
             missing,
@@ -444,16 +909,22 @@ public sealed class OriginDossierPublicationService
         AddIfMissing(missing, HasProviderAccountAliasReceipt(entry.BookPackagingAccountAlias, entry.BookArtifactReceiptPath, "CHUMMER_ORIGIN_PACKAGING_ACCOUNT_ALIASES", "OriginDossier:PackagingAccountAliases"), "book packaging account alias");
         AddIfMissing(missing, HasArchivedArtifact(entry.EbookArtifactPath), "ebook artifact path");
         AddIfMissing(missing, HasAudiobookshelfDossierImportReceipt(entry), "Audiobookshelf dossier ebook import receipt path");
-        AddIfMissing(missing, HasArchivedArtifact(entry.StorySceneCoverPath), "story scene cover artifact path");
+        AddIfMissing(missing, HasArchivedArtifact(entry.StorySceneCoverPath), "fitted cover art artifact path");
         AddIfMissing(
             missing,
             HasStorySceneCoverReceipt(entry),
-            "story scene cover receipt path");
+            "fitted cover art receipt path");
         AddIfMissing(
             missing,
             HasProviderAccountAliasReceipt(entry.StorySceneCoverAccountAlias, entry.StorySceneCoverReceiptPath, "CHUMMER_ORIGIN_VISUAL_ACCOUNT_ALIASES", "OriginDossier:VisualAccountAliases"),
-            "story scene cover account alias");
+            "fitted cover art account alias");
         AddIfMissing(missing, HasCoverConsistencyReceipt(entry), "cover consistency receipt path");
+        AddIfMissing(missing, HasPortraitChoiceShortlist(entry), "exactly three story-fit portrait choices");
+        AddIfMissing(missing, HasSelectedPortraitChoice(entry), "selected portrait choice");
+        AddIfMissing(missing, HasAudiobookVoiceChoiceSet(entry), "audiobook voice options");
+        AddIfMissing(missing, HasSelectedAudiobookVoiceChoice(entry), "selected audiobook voice request");
+        AddIfMissing(missing, HasSceneHighlightSummaries(entry), "chapter scene summaries");
+        AddIfMissing(missing, HasSelectedSceneHighlight(entry), "selected cinematic scene summary");
         AddIfMissing(missing, HasArchivedArtifact(entry.AudiobookPath), "audiobook artifact path");
         AddIfMissing(missing, HasAudiobookshelfImportReceipt(entry), "Audiobookshelf import receipt path");
         AddIfMissing(missing, HasProviderAccountAliasReceipt(entry.AudiobookProviderAccountAlias, entry.AudiobookshelfImportReceiptPath, "CHUMMER_ORIGIN_AUDIO_ACCOUNT_ALIASES", "OriginDossier:AudioAccountAliases"), "audiobook provider account alias");
@@ -510,6 +981,11 @@ public sealed class OriginDossierPublicationService
                     && IsTrustedChummerHost(uri))
                 || (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
                     && uri.IsLoopback));
+
+    private static string? CleanTrustedChummerUrl(string? url)
+        => IsHttpUrl(url)
+            ? url!.Trim()
+            : null;
 
     private static bool IsTrustedChummerHost(Uri uri)
     {
@@ -570,6 +1046,12 @@ public sealed class OriginDossierPublicationService
             .ToArray();
         return tokens.Length == 0 ? defaultTokens : tokens;
     }
+
+    private IReadOnlyList<string> ResolvePreferredProviderTokens(
+        string envKey,
+        string configKey,
+        IReadOnlyList<string> defaultTokens)
+        => ResolveApprovedProviderTokens(envKey, configKey, defaultTokens);
 
     private IReadOnlyList<string> ResolveConfiguredProviderAccountAliases(string envKey, string configKey)
         => OriginDossierProviderAccountRegistry.ResolveAliases(
@@ -666,13 +1148,73 @@ public sealed class OriginDossierPublicationService
 
     private bool HasProviderManuscriptReceipt(string? artifactPath, string? receiptPath)
     {
-        if (!HasArtifactReceipt(artifactPath, receiptPath, "provider_manuscript_import", null, ExternalProviderReceiptTokens()))
+        if (!HasArtifactReceipt(artifactPath, receiptPath, "provider_manuscript_import", null, RequiredProviderManuscriptTokens()))
         {
             return false;
         }
 
         return ReceiptProviderMatchesAnyToken(receiptPath, ResolveApprovedProviderTokens("CHUMMER_ORIGIN_MANUSCRIPT_PROVIDER_TOKENS", "OriginDossier:ManuscriptProviderTokens", DefaultApprovedManuscriptProviderTokens));
     }
+
+    private static bool HasFullChapteredStoryManuscript(string? artifactPath)
+    {
+        if (!HasArchivedArtifact(artifactPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            string manuscript = File.ReadAllText(artifactPath!, Encoding.UTF8);
+            return !HasFakeMarker(manuscript)
+                && CountStoryWords(manuscript) >= MinimumFullStoryWordCount
+                && CountChapterMarkers(manuscript) >= MinimumFullStoryChapterCount;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static int CountStoryWords(string value)
+    {
+        int words = 0;
+        bool inWord = false;
+        foreach (char c in value)
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                inWord = true;
+            }
+            else if (inWord)
+            {
+                words++;
+                inWord = false;
+            }
+        }
+
+        return inWord ? words + 1 : words;
+    }
+
+    private static int CountChapterMarkers(string value)
+        => value
+            .Split('\n', StringSplitOptions.TrimEntries)
+            .Count(static line =>
+                line.StartsWith("# Chapter ", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("## Chapter ", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Chapter ", StringComparison.OrdinalIgnoreCase));
 
     private bool HasStorySceneCoverReceipt(OriginDossierPublicationIndexEntry entry)
     {
@@ -691,7 +1233,10 @@ public sealed class OriginDossierPublicationService
             ResolveApprovedProviderTokens(
                 "CHUMMER_ORIGIN_VISUAL_PROVIDER_TOKENS",
                 "OriginDossier:VisualProviderTokens",
-                DefaultApprovedVisualProviderTokens));
+                ResolvePreferredProviderTokens(
+                    "CHUMMER_ORIGIN_VISUAL_PREFERRED_PROVIDER_TOKENS",
+                    "OriginDossier:VisualPreferredProviderTokens",
+                    DefaultPreferredVisualProviderTokens)));
     }
 
     private bool HasProviderAccountAliasReceipt(string? accountAlias, string? receiptPath, string envKey, string configKey)
@@ -765,7 +1310,7 @@ public sealed class OriginDossierPublicationService
                 entry.DossierVideoReceiptPath,
                 "dossier_video_import",
                 null,
-                ExternalProviderReceiptTokens()))
+                RequiredDossierVideoTokens()))
         {
             return false;
         }
@@ -775,12 +1320,15 @@ public sealed class OriginDossierPublicationService
             ResolveApprovedProviderTokens(
                 "CHUMMER_ORIGIN_VISUAL_PROVIDER_TOKENS",
                 "OriginDossier:VisualProviderTokens",
-                DefaultApprovedVisualProviderTokens));
+                ResolvePreferredProviderTokens(
+                    "CHUMMER_ORIGIN_VISUAL_PREFERRED_PROVIDER_TOKENS",
+                    "OriginDossier:VisualPreferredProviderTokens",
+                    DefaultPreferredVisualProviderTokens)));
     }
 
     private bool HasBookArtifactReceipt(OriginDossierPublicationIndexEntry entry)
     {
-        if (!HasArtifactReceipt(entry.BookArtifactPath, entry.BookArtifactReceiptPath, "book_artifact_import", null, ExternalProviderReceiptTokens()))
+        if (!HasArtifactReceipt(entry.BookArtifactPath, entry.BookArtifactReceiptPath, "book_artifact_import", null, RequiredBookArtifactTokens()))
         {
             return false;
         }
@@ -1494,6 +2042,92 @@ public sealed class OriginDossierPublicationService
     private static string? CleanNullable(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private static string CleanStoryLinkSummary(string? value, string fallback)
+    {
+        string clean = Clean(value, fallback);
+        return clean.Length <= 280
+            ? clean
+            : clean[..280].Trim();
+    }
+
+    private static string ResolveRunnerLinkCode(OriginDossierPublicationIndexEntry entry)
+    {
+        string normalizedExisting = NormalizeRunnerLinkCode(entry.RunnerLinkCode);
+        return normalizedExisting.Length == 12
+            ? FormatRunnerLinkCode(normalizedExisting)!
+            : BuildRunnerLinkCode(entry.OwnerUserId, entry.OwnerSubjectId ?? entry.SubjectId, entry.ProjectId);
+    }
+
+    private static OriginDossierPublicationIndexEntry EnsureRunnerLinkCode(OriginDossierPublicationIndexEntry entry)
+    {
+        string code = ResolveRunnerLinkCode(entry);
+        return string.Equals(entry.RunnerLinkCode, code, StringComparison.OrdinalIgnoreCase)
+            ? entry
+            : entry with { RunnerLinkCode = code };
+    }
+
+    private static string BuildRunnerLinkCode(string? ownerUserId, string? subjectId, string? projectId)
+    {
+        string seed = $"{Clean(ownerUserId, "user")}|{Clean(subjectId, "subject")}|{Clean(projectId, "origin-dossier")}";
+        string digest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(seed))).ToUpperInvariant();
+        return FormatRunnerLinkCode(digest[..12])!;
+    }
+
+    private static string NormalizeRunnerLinkCode(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        Span<char> buffer = stackalloc char[value.Length];
+        int written = 0;
+        foreach (char c in value)
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                buffer[written++] = char.ToUpperInvariant(c);
+            }
+        }
+
+        string normalized = new(buffer[..written]);
+        return normalized.StartsWith("OD", StringComparison.Ordinal) && normalized.Length > 2
+            ? normalized[2..]
+            : normalized;
+    }
+
+    private static string? FormatRunnerLinkCode(string? normalizedCode)
+    {
+        string normalized = NormalizeRunnerLinkCode(normalizedCode);
+        return normalized.Length == 12
+            ? $"OD-{normalized[..4]}-{normalized.Substring(4, 4)}-{normalized.Substring(8, 4)}"
+            : null;
+    }
+
+    private static IReadOnlyList<OriginDossierStoryLinkDto> UpsertStoryLink(
+        IReadOnlyList<OriginDossierStoryLinkDto>? existing,
+        OriginDossierPublicationIndexEntry linkedEntry,
+        string status,
+        string summary)
+    {
+        string linkedProjectId = Clean(linkedEntry.ProjectId, "origin-dossier");
+        string linkId = $"story-link:{linkedProjectId}";
+        OriginDossierStoryLinkDto link = new(
+            LinkId: linkId,
+            LinkedRunnerAlias: Clean(linkedEntry.RunnerAlias, "Linked runner"),
+            Summary: summary,
+            Status: Clean(status, "accepted"),
+            LinkedProjectId: linkedProjectId,
+            LinkedRunnerLinkCode: ResolveRunnerLinkCode(linkedEntry),
+            IntegrateIntoStory: true);
+
+        List<OriginDossierStoryLinkDto> links = existing?
+            .Where(item => !string.Equals(item.LinkId, linkId, StringComparison.OrdinalIgnoreCase))
+            .ToList() ?? new List<OriginDossierStoryLinkDto>();
+        links.Add(link);
+        return links;
+    }
+
     private OriginDossierPublicationIndexEntry BuildOwnedEntry(
         HubUserDto user,
         string subjectId,
@@ -1507,6 +2141,8 @@ public sealed class OriginDossierPublicationService
             SubjectId = subjectId,
             OwnerSubjectId = subjectId,
             ProjectId = projectId,
+            RunnerLinkCode = FormatRunnerLinkCode(NormalizeRunnerLinkCode(request.RunnerLinkCode))
+                ?? BuildRunnerLinkCode(user.UserId, subjectId, projectId),
             Title = Clean(request.Title, "Origin Dossier"),
             RunnerAlias = Clean(request.RunnerAlias, "Runner"),
             FamilyName = CleanNullable(request.FamilyName),
@@ -1560,7 +2196,11 @@ public sealed class OriginDossierPublicationService
             MovieStoryboardPath = CleanNullable(request.MovieStoryboardPath),
             TelegramShareDeliveryReceiptPath = CleanNullable(request.TelegramShareDeliveryReceiptPath),
             FinalNoFallbackNoSentinelAuditReceiptPath = CleanNullable(request.FinalNoFallbackNoSentinelAuditReceiptPath),
-            MissingGoldRequirements = request.MissingGoldRequirements ?? Array.Empty<string>()
+            MissingGoldRequirements = request.MissingGoldRequirements ?? Array.Empty<string>(),
+            PortraitChoices = request.PortraitChoices,
+            AudiobookVoiceOptions = request.AudiobookVoiceOptions,
+            SceneHighlights = request.SceneHighlights,
+            StoryLinks = request.StoryLinks
         };
     }
 
@@ -1594,6 +2234,34 @@ public sealed class OriginDossierPublicationService
             BuildOwnerPath(entry, "cover"),
             BuildOriginEditionNamespace(entry),
             SelectedCharacterFaceProofToken,
+            OperatorVerifiedLiveRunToken,
+            ProviderReceiptReferenceToken
+        ];
+
+    private static IReadOnlyList<string> RequiredProviderManuscriptTokens()
+        =>
+        [
+            FullStoryManuscriptToken,
+            ChapteredStoryToken,
+            OperatorVerifiedLiveRunToken,
+            ProviderReceiptReferenceToken
+        ];
+
+    private static IReadOnlyList<string> RequiredBookArtifactTokens()
+        =>
+        [
+            StoryEditionEbookToken,
+            FittedCoverArtToken,
+            OperatorVerifiedLiveRunToken,
+            ProviderReceiptReferenceToken
+        ];
+
+    private static IReadOnlyList<string> RequiredDossierVideoTokens()
+        =>
+        [
+            SelectedCharacterFaceProofToken,
+            SelectedCinematicSceneToken,
+            CharacterVisibleCinematicToken,
             OperatorVerifiedLiveRunToken,
             ProviderReceiptReferenceToken
         ];
@@ -1675,12 +2343,13 @@ public sealed record OriginDossierPublicationArtifact(
 internal sealed record OriginDossierPublicationIndexSnapshot(
     IReadOnlyList<OriginDossierPublicationIndexEntry>? Publications);
 
-internal sealed class OriginDossierPublicationIndexEntry
+internal sealed record OriginDossierPublicationIndexEntry
 {
     public string? OwnerUserId { get; init; }
     public string? SubjectId { get; init; }
     public string? OwnerSubjectId { get; init; }
     public string? ProjectId { get; init; }
+    public string? RunnerLinkCode { get; init; }
     public string? Title { get; init; }
     public string? RunnerAlias { get; init; }
     public string? PublicationState { get; init; }
@@ -1731,4 +2400,8 @@ internal sealed class OriginDossierPublicationIndexEntry
     public string? TelegramShareDeliveryReceiptPath { get; init; }
     public string? FinalNoFallbackNoSentinelAuditReceiptPath { get; init; }
     public IReadOnlyList<string>? MissingGoldRequirements { get; init; }
+    public IReadOnlyList<OriginDossierPortraitChoiceDto>? PortraitChoices { get; init; }
+    public IReadOnlyList<OriginDossierAudiobookVoiceOptionDto>? AudiobookVoiceOptions { get; init; }
+    public IReadOnlyList<OriginDossierSceneHighlightDto>? SceneHighlights { get; init; }
+    public IReadOnlyList<OriginDossierStoryLinkDto>? StoryLinks { get; init; }
 }

@@ -10,17 +10,27 @@
     var hasManageMembershipHref = !string.IsNullOrWhiteSpace(Model.ManageMembershipHref);
     var supporterActive = quota?.SupporterActive == true;
     var showManageSupporterAction = usingSignedInAccount && supporterActive && hasManageMembershipHref;
+    var guestUsesGoogle = !Model.EmailEntryEnabled && Model.GoogleAvailable;
+    var guestSignInUnavailable = !Model.EmailEntryEnabled && !Model.GoogleAvailable;
     var antiForgery = Antiforgery.GetAndStoreTokens(Context);
     var signedInLabel = string.IsNullOrWhiteSpace(Model.SignedInLabel) ? Model.Email ?? Model.UserId : Model.SignedInLabel;
     var primaryActionLabel = !hasUserId
-        ? "Continue with email"
+        ? guestUsesGoogle
+            ? "Continue with Google"
+            : guestSignInUnavailable
+                ? null
+                : "Continue with email"
         : supporterActive
             ? showManageSupporterAction
                 ? "Manage supporter"
                 : null
             : "Become supporter";
     var primaryActionHref = !hasUserId
-        ? "/login?next=%2Faccount%2Fbilling"
+        ? guestUsesGoogle
+            ? "/auth/google/start?next=%2Faccount%2Fbilling"
+            : guestSignInUnavailable
+                ? null
+                : "/login?next=%2Faccount%2Fbilling"
         : showManageSupporterAction
             ? Model.ManageMembershipHref
             : null;
@@ -88,7 +98,13 @@
         }
         else
         {
-            <p class="muted-copy">Email first. Supporter attaches after that step.</p>
+            <p class="muted-copy">
+                @(guestUsesGoogle
+                    ? "Google first. Supporter attaches after that step."
+                    : guestSignInUnavailable
+                        ? "Sign-in is unavailable on this host right now."
+                        : "Email first. Supporter attaches after that step.")
+            </p>
         }
     </article>
 </section>

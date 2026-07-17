@@ -66,6 +66,7 @@ def fake_modules(
         calls.append("portal_restart_plan")
         seen_contexts["portal_restart_plan"] = kwargs.get("context")
         seen_contexts["portal_restart_plan_env_file"] = kwargs.get("env_file")
+        seen_contexts["portal_restart_plan_branch"] = kwargs.get("branch")
         payload = {"status": "not_required", "blockers": [], "next_action": "restart not required", "blocking_reason": ""}
         write_json(output, payload)
         return payload
@@ -97,6 +98,38 @@ def fake_modules(
         write_json(output, payload)
         return payload
 
+    def magicai_handshake(*, repo_root, output, requested_slot=None, endpoint=None):
+        calls.append("magicai_handshake")
+        payload = {
+            "status": "pass",
+            "provider": "magicai",
+            "providerSurface": "omagic_api",
+            "noCreditBurnExpected": True,
+            "controlledLiveProviderPilot": True,
+            "httpStatus": 200,
+            "summary": {"json": True, "path_count": 3},
+        }
+        write_json(output, payload)
+        return payload
+
+    def provider_account_registry(registry, *, require_all_roles=False):
+        calls.append("provider_account_registry")
+        payload = {
+            "status": "pass",
+            "rawSecretValuesStored": False,
+            "accountCount": 6,
+            "enabledRoleCounts": {
+                "audio": 1,
+                "audiobookshelf": 1,
+                "manuscript": 1,
+                "packaging": 1,
+                "telegram": 1,
+                "visual": 1,
+            },
+            "issues": [],
+        }
+        return True, payload
+
     def matrix(evidence_root, output, context=None):
         calls.append("matrix")
         seen_contexts["matrix"] = context
@@ -126,6 +159,8 @@ def fake_modules(
         handoff=SimpleNamespace(materialize=handoff),
         gold_audit=SimpleNamespace(audit=gold_audit),
         runsite=SimpleNamespace(materialize=runsite),
+        magicai_handshake=SimpleNamespace(materialize=magicai_handshake),
+        provider_account_registry=SimpleNamespace(verify=provider_account_registry),
         matrix=SimpleNamespace(materialize=matrix),
         coverage=SimpleNamespace(materialize=coverage),
     )
@@ -187,7 +222,9 @@ def test_gold_proof_chain_uses_origin_edition_context_for_branch_and_project(tmp
     assert seen["project_id"] == "custom-runner"
     assert seen["deployed_output"] == tmp_path / "origin.chummer.run/Case/Ari/Ghost/deployed-chummer-browser-probe.receipt.json"
     assert seen_contexts["deployed_probe"] is context
-    assert seen_contexts["portal_restart_plan"] is context
+    assert seen_contexts["portal_restart_plan"] is None
+    assert seen_contexts["portal_restart_plan_env_file"] is None
+    assert seen_contexts["portal_restart_plan_branch"] == Path("origin.chummer.run/Case/Ari/Ghost")
     assert seen_contexts["handoff"] is context
     assert seen_contexts["runsite"] is context
     assert seen_contexts["matrix"] is context
@@ -210,13 +247,13 @@ def test_gold_proof_chain_blocks_when_completion_matrix_blocks_and_keeps_env_sec
     )
     serialized = output.read_text(encoding="utf-8")
 
-    assert calls == ["portal_preflight", "portal_restart_plan", "deployed_probe", "handoff", "gold_audit", "handoff", "runsite", "matrix", "coverage"]
+    assert calls == ["portal_preflight", "portal_restart_plan", "deployed_probe", "handoff", "gold_audit", "handoff", "runsite", "magicai_handshake", "provider_account_registry", "matrix", "coverage"]
     assert result["status"] == "blocked"
     assert result["updated_at"]
     assert result["next_action"] == "probe done"
     assert "stage:completion_matrix" in result["blocking_reason"]
     assert "requirement:deployed_owner_read_listen_watch_canon" in result["blocking_reason"]
-    assert result["progress"]["totalStages"] == 8
+    assert result["progress"]["totalStages"] == 10
     assert result["progress"]["blockedRequirements"] == ["deployed_owner_read_listen_watch_canon"]
     assert result["goalCompletionClaimAllowed"] is False
     assert result["stages"][-2]["blockedRows"] == ["deployed_user_login_read_listen_watch"]
@@ -247,6 +284,18 @@ def test_gold_proof_chain_passes_only_when_completion_matrix_allows_claim(tmp_pa
     assert result["progress"]["blockedStages"] == []
     assert result["blockedStages"] == []
     assert result["blockedRequirements"] == []
+    assert [stage["name"] for stage in result["stages"]] == [
+        "portal_publication_index_preflight",
+        "portal_restart_plan",
+        "deployed_browser_probe",
+        "deployed_operator_handoff",
+        "gold_gap_audit",
+        "runsite_integration_proof",
+        "magicai_api_handshake_probe",
+        "provider_account_registry",
+        "completion_matrix",
+        "requirement_coverage",
+    ]
 
 
 def test_gold_proof_chain_blocks_when_matrix_passes_but_requirement_coverage_blocks(tmp_path: Path) -> None:
