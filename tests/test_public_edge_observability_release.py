@@ -43,6 +43,31 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
     def setUp(self) -> None:
         self.module = load_module()
         self.now = datetime(2026, 7, 13, 12, 0, tzinfo=UTC)
+        self.release_fixture = tempfile.TemporaryDirectory(
+            prefix="observability-release-channel-"
+        )
+        self.addCleanup(self.release_fixture.cleanup)
+        self.release_channel_path = (
+            Path(self.release_fixture.name) / "RELEASE_CHANNEL.generated.json"
+        )
+        write_json(
+            self.release_channel_path,
+            {
+                "version": "run-observability-fixture",
+                "channel": "preview",
+                "status": "published",
+                "publishedAt": self.module.iso(self.now - timedelta(minutes=5)),
+                "rolloutState": "review_required",
+                "supportabilityState": "review_required",
+                "publicTrustMetrics": {
+                    "proofFreshness": {"status": "stale"},
+                },
+            },
+        )
+
+    def build_receipt(self, **kwargs):
+        kwargs.setdefault("release_channel_path", self.release_channel_path)
+        return self.module.build_receipt(**kwargs)
 
     def proof(
         self,
@@ -55,7 +80,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
         policy_digest = hashlib.sha256(policy_path.read_bytes()).hexdigest()
         timestamp = generated_at or self.now
         release_binding, _, _, failures = self.module.release_candidate_binding(
-            release_channel_path or self.module.DEFAULT_RELEASE_CHANNEL
+            release_channel_path or self.release_channel_path
         )
         self.assertEqual([], failures)
         runtime_binding = self.module.runtime_source_binding(runtime_sources)
@@ -97,7 +122,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
             self.module.DEFAULT_POLICY.read_bytes()
         ).hexdigest()
         release, _, _, release_failures = self.module.release_candidate_binding(
-            self.module.DEFAULT_RELEASE_CHANNEL
+            self.release_channel_path
         )
         self.assertEqual([], release_failures)
         runtime = self.module.runtime_source_binding()
@@ -161,7 +186,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
                 "read_regular_file_bytes",
                 side_effect=changing_read,
             ):
-                receipt = self.module.build_receipt(
+                receipt = self.build_receipt(
                     policy_path=self.module.DEFAULT_POLICY,
                     operator_proof_path=Path(temp_dir) / "missing-proof.json",
                     now=self.now,
@@ -251,14 +276,14 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
 
             expected_proof_digest = hashlib.sha256(proof_path.read_bytes()).hexdigest()
             expected_release_digest = hashlib.sha256(
-                self.module.DEFAULT_RELEASE_CHANNEL.read_bytes()
+                self.release_channel_path.read_bytes()
             ).hexdigest()
             with mock.patch.object(
                 self.module,
                 "validate_operator_attestation",
                 return_value=({"status": "pass", "key_id": "fixture"}, []),
             ):
-                receipt = self.module.build_receipt(
+                receipt = self.build_receipt(
                     policy_path=self.module.DEFAULT_POLICY,
                     operator_proof_path=proof_path,
                     intake_request_path=request_path,
@@ -275,7 +300,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
         self.assertEqual(self.module.iso(self.now), receipt["operator_proof"]["generated_at_utc"])
         self.assertEqual(expected_release_digest, receipt["release_candidate"]["sha256"])
         expected_release, _, _, expected_release_failures = self.module.release_candidate_binding(
-            self.module.DEFAULT_RELEASE_CHANNEL
+            self.release_channel_path
         )
         self.assertEqual([], expected_release_failures)
         self.assertEqual(expected_release["version"], receipt["release_candidate"]["version"])
@@ -290,7 +315,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
 
     def test_gate_fails_closed_when_operator_proof_is_missing(self) -> None:
         with tempfile.TemporaryDirectory(prefix="observability-release-missing-") as temp_dir:
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=Path(temp_dir) / "missing.json",
                 now=self.now,
@@ -313,7 +338,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
             write_json(proof_target, self.proof(self.module.DEFAULT_POLICY))
             proof_path.symlink_to(proof_target)
 
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=proof_path,
                 now=self.now,
@@ -331,7 +356,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
             proof["alert_route"]["receiver_address"] = "private@example.test"
             write_json(proof_path, proof)
 
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=proof_path,
                 now=self.now,
@@ -357,7 +382,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
             proof["monitor_backend"]["deployment_id"] = "TBD"
             write_json(proof_path, proof)
 
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=proof_path,
                 now=self.now,
@@ -377,7 +402,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
             proof_path.write_bytes(b'{"incomplete":')
             expected_digest = hashlib.sha256(proof_path.read_bytes()).hexdigest()
 
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=proof_path,
                 now=self.now,
@@ -399,7 +424,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
                 ),
             )
 
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=proof_path,
                 now=self.now,
@@ -416,7 +441,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
             proof["policy_sha256"] = "0" * 64
             write_json(proof_path, proof)
 
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=proof_path,
                 now=self.now,
@@ -432,7 +457,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
             proof["release_candidate"]["version"] = "different-version"
             write_json(proof_path, proof)
 
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=proof_path,
                 now=self.now,
@@ -458,7 +483,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
             runtime_sources = dict(self.module.DEFAULT_RUNTIME_SOURCES)
             runtime_sources["program"] = changed_program
 
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=proof_path,
                 runtime_sources=runtime_sources,
@@ -478,7 +503,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
             proof_path = Path(temp_dir) / "proof.json"
             write_json(proof_path, self.proof(self.module.DEFAULT_POLICY))
 
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=proof_path,
                 release_channel_path=Path(temp_dir) / "missing-release.json",
@@ -493,7 +518,7 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
     def test_gate_writes_a_failure_receipt_before_returning_nonzero(self) -> None:
         with tempfile.TemporaryDirectory(prefix="observability-release-output-") as temp_dir:
             output = Path(temp_dir) / "receipt.json"
-            receipt = self.module.build_receipt(
+            receipt = self.build_receipt(
                 policy_path=self.module.DEFAULT_POLICY,
                 operator_proof_path=Path(temp_dir) / "missing.json",
                 now=self.now,
