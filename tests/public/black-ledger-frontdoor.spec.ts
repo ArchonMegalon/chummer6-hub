@@ -1,7 +1,8 @@
 import { expect, test } from 'playwright/test';
-import { writeJsonArtifact } from './ux-artifacts';
+import { requiredProofClosureSha256, writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
+const proofClosureSha256 = requiredProofClosureSha256();
 test('homepage stays product-first while ledger remains off the primary path', async ({ page }) => {
   test.setTimeout(60000);
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
@@ -37,6 +38,7 @@ test('homepage stays product-first while ledger remains off the primary path', a
     generated_at_utc: new Date().toISOString(),
     status: 'pass',
     base_url: baseUrl,
+    proof_closure_sha256: proofClosureSha256,
     route: '/',
     cta_labels: await heroActionLinks.evaluateAll((items) => items.map((item) => (item as HTMLAnchorElement).textContent?.trim() ?? '')),
     open_menu_targets: ['/build', '/mobile/player', '/login?next=%2Faccount%2Faccess'],

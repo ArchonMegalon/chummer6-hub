@@ -7,6 +7,7 @@ import json
 import os
 import posixpath
 import re
+import shutil
 import stat
 import tempfile
 import subprocess
@@ -21,16 +22,24 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 try:
     from scripts.publish_public_edge_portal_overlay import (
+        FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_ALGORITHM,
+        FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_CONTRACT_NAME,
+        FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT,
         full_deployment_digest,
         source_fingerprint,
         staged_payload_fingerprint,
+        validate_frontdoor_playwright_proof_closure,
         validate_payload_modes_against_receipt,
     )
 except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
     from publish_public_edge_portal_overlay import (
+        FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_ALGORITHM,
+        FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_CONTRACT_NAME,
+        FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT,
         full_deployment_digest,
         source_fingerprint,
         staged_payload_fingerprint,
+        validate_frontdoor_playwright_proof_closure,
         validate_payload_modes_against_receipt,
     )
 
@@ -42,6 +51,9 @@ except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
+POSTDEPLOY_VERIFIER_LOADED_SHA256 = hashlib.sha256(
+    Path(__file__).read_bytes()
+).hexdigest()
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
@@ -265,6 +277,156 @@ def resolve_playwright_command() -> list[str]:
         return [str(node_modules_root / ".bin" / "playwright")]
 
     return ["npx", "--yes", resolve_playwright_package_spec()]
+
+
+def _assert_no_symlink_path(path: Path, *, label: str) -> None:
+    normalized = Path(os.path.abspath(os.fspath(path.expanduser())))
+    current = Path(normalized.anchor)
+    for component in normalized.parts[1:]:
+        current /= component
+        try:
+            identity = current.lstat()
+        except OSError as exc:
+            raise RuntimeError(f"{label} is unavailable") from exc
+        if stat.S_ISLNK(identity.st_mode):
+            raise RuntimeError(f"{label} contains a symlink component")
+
+
+def _read_runtime_regular_file(path: Path, *, label: str, max_bytes: int) -> bytes:
+    _assert_no_symlink_path(path, label=label)
+    identity = path.lstat()
+    if (
+        not stat.S_ISREG(identity.st_mode)
+        or identity.st_nlink != 1
+        or identity.st_size <= 0
+        or identity.st_size > max_bytes
+    ):
+        raise RuntimeError(f"{label} is not one bounded regular file")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    try:
+        before = os.fstat(descriptor)
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(descriptor, min(64 * 1024, max_bytes - total + 1))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > max_bytes:
+                raise RuntimeError(f"{label} exceeds its size limit")
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    expected_identity = (
+        identity.st_dev,
+        identity.st_ino,
+        identity.st_size,
+        identity.st_mtime_ns,
+        identity.st_ctime_ns,
+        identity.st_nlink,
+    )
+    if expected_identity != (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+        before.st_nlink,
+    ) or expected_identity != (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+        after.st_nlink,
+    ) or total != identity.st_size:
+        raise RuntimeError(f"{label} changed while it was read")
+    return b"".join(chunks)
+
+
+def resolve_pinned_playwright_node_modules_root() -> Path | None:
+    """Resolve only repository-controlled dependency roots for the proof lane."""
+
+    candidates = (
+        ROOT / "node_modules",
+        ROOT.parent / "chummer.run-services" / "node_modules",
+        Path("/docker/chummercomplete/chummer.run-services/node_modules"),
+    )
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = Path(os.path.abspath(os.fspath(candidate)))
+        key = str(normalized)
+        if key in seen:
+            continue
+        seen.add(key)
+        if (
+            (normalized / "playwright" / "package.json").is_file()
+            and (normalized / "playwright" / "cli.js").is_file()
+        ):
+            return normalized
+    return None
+
+
+def resolve_pinned_playwright_runtime(expected_version: str) -> dict[str, Any]:
+    if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", expected_version) is None:
+        raise RuntimeError("sealed Playwright closure has no exact package version")
+    node_modules_root = resolve_pinned_playwright_node_modules_root()
+    if node_modules_root is None:
+        raise RuntimeError("validated local Playwright node_modules root is unavailable")
+    node_modules_root = Path(os.path.abspath(os.fspath(node_modules_root.expanduser())))
+    _assert_no_symlink_path(node_modules_root, label="Playwright node_modules root")
+    if not stat.S_ISDIR(node_modules_root.lstat().st_mode):
+        raise RuntimeError("Playwright node_modules root is not a directory")
+    package_root = node_modules_root / "playwright"
+    package_json_path = package_root / "package.json"
+    cli_path = package_root / "cli.js"
+    package_json_bytes = _read_runtime_regular_file(
+        package_json_path,
+        label="installed Playwright package metadata",
+        max_bytes=256 * 1024,
+    )
+    cli_bytes = _read_runtime_regular_file(
+        cli_path,
+        label="installed Playwright CLI",
+        max_bytes=4 * 1024 * 1024,
+    )
+    try:
+        package_json = strict_json_object(
+            package_json_bytes,
+            label="installed Playwright package metadata",
+        )
+    except StrictJsonContractError as exc:
+        raise RuntimeError("installed Playwright package metadata is invalid") from exc
+    installed_version = str(package_json.get("version") or "").strip()
+    if installed_version != expected_version:
+        raise RuntimeError(
+            "installed Playwright package version does not match the sealed package lock"
+        )
+    node_binary = next(
+        (
+            str(candidate)
+            for candidate in (Path("/usr/bin/node"), Path("/usr/local/bin/node"))
+            if candidate.is_file()
+        ),
+        None,
+    ) or shutil.which("node")
+    if not node_binary:
+        raise RuntimeError("Node.js runtime is unavailable for the sealed Playwright proof")
+    node_path = Path(node_binary)
+    _assert_no_symlink_path(node_path, label="Node.js runtime")
+    return {
+        "status": "pass",
+        "resolutionMode": "validated_local_node_modules_exact_lock_version",
+        "nodeModulesRoot": str(node_modules_root),
+        "nodeBinary": str(node_path),
+        "playwrightCliPath": str(cli_path),
+        "playwrightPackageVersion": installed_version,
+        "packageJsonSha256": hashlib.sha256(package_json_bytes).hexdigest(),
+        "playwrightCliSha256": hashlib.sha256(cli_bytes).hexdigest(),
+        "commandPrefix": [str(node_path), str(cli_path)],
+    }
 
 
 def expected_release_posture(expected_release_channel: str) -> dict[str, str]:
@@ -1528,12 +1690,12 @@ def require_full_deployment_digest(value: object, *, label: str) -> str:
     return normalized
 
 
-def load_expected_full_deployment_digest(
+def load_expected_deployment_identity(
     build_info_path: Path,
     *,
     source_root: Path = RUN_SERVICES_ROOT,
     overlay_root: Path | None = None,
-) -> str:
+) -> dict[str, Any]:
     normalized = Path(os.path.abspath(os.fspath(build_info_path.expanduser())))
     current = Path(normalized.anchor)
     for component in normalized.parts[1:]:
@@ -1602,36 +1764,80 @@ def load_expected_full_deployment_digest(
     recorded_staged_payload_fingerprint = payload.get("stagedPayloadFingerprint")
     recorded_payload_mode_receipt = payload.get("payloadModeReceipt")
     recorded_digest = payload.get("fullDeploymentDigest")
+    recorded_frontdoor_playwright_closure = payload.get(
+        "frontdoorPlaywrightProofClosure"
+    )
     if (
         not isinstance(recorded_source_fingerprint, dict)
         or not isinstance(recorded_staged_payload_fingerprint, dict)
         or not isinstance(recorded_payload_mode_receipt, dict)
         or not isinstance(recorded_digest, dict)
+        or not isinstance(recorded_frontdoor_playwright_closure, dict)
     ):
         raise RuntimeError("trusted overlay build-info deployment identity is incomplete")
-    current_source_fingerprint = source_fingerprint(source_root.resolve())
+    current_source_fingerprint = source_fingerprint(
+        Path(os.path.abspath(os.fspath(source_root.expanduser())))
+    )
+    selected_overlay_root = Path(
+        os.path.abspath(os.fspath(overlay_root or normalized.parents[2]))
+    )
     current_staged_payload_fingerprint = staged_payload_fingerprint(
-        (overlay_root or normalized.parents[2]).resolve()
+        selected_overlay_root
     )
     payload_mode_binding = validate_payload_modes_against_receipt(
-        (overlay_root or normalized.parents[2]).resolve(),
+        selected_overlay_root,
         recorded_payload_mode_receipt,
+    )
+    current_frontdoor_playwright_closure = (
+        validate_frontdoor_playwright_proof_closure(
+            selected_overlay_root
+            / FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT
+        )
     )
     recomputed_digest = full_deployment_digest(
         current_source_fingerprint,
         current_staged_payload_fingerprint,
+    )
+    recorded_postdeploy_verifier_sha256 = str(
+        (recorded_source_fingerprint.get("files") or {})
+        .get("postdeployVerifier", {})
+        .get("sha256", "")
     )
     if (
         recorded_source_fingerprint != current_source_fingerprint
         or recorded_staged_payload_fingerprint != current_staged_payload_fingerprint
         or payload_mode_binding.get("status") != "pass"
         or recorded_digest != recomputed_digest
+        or recorded_frontdoor_playwright_closure
+        != current_frontdoor_playwright_closure
+        or re.fullmatch(r"[0-9a-f]{64}", recorded_postdeploy_verifier_sha256)
+        is None
+        or recorded_postdeploy_verifier_sha256
+        != POSTDEPLOY_VERIFIER_LOADED_SHA256
     ):
         raise RuntimeError("trusted overlay build-info full deployment digest is invalid")
-    return require_full_deployment_digest(
-        recomputed_digest.get("sha256"),
-        label="trusted overlay build-info full deployment digest",
+    return {
+        "fullDeploymentDigestSha256": require_full_deployment_digest(
+            recomputed_digest.get("sha256"),
+            label="trusted overlay build-info full deployment digest",
+        ),
+        "frontdoorPlaywrightProofClosure": current_frontdoor_playwright_closure,
+        "postdeployVerifierSha256": recorded_postdeploy_verifier_sha256,
+    }
+
+
+def load_expected_full_deployment_digest(
+    build_info_path: Path,
+    *,
+    source_root: Path = RUN_SERVICES_ROOT,
+    overlay_root: Path | None = None,
+) -> str:
+    identity = load_expected_deployment_identity(
+        build_info_path,
+        source_root=source_root,
+        overlay_root=overlay_root,
     )
+    return str(identity["fullDeploymentDigestSha256"])
 
 
 def frontdoor_anchor_entry_url_matches_contract(entry_url: str) -> bool:
@@ -2369,6 +2575,19 @@ def coerce_output(value: Any) -> str:
 
 
 def run_playwright_command(command: list[str], env: dict[str, str], timeout_seconds: int) -> tuple[int, str, str, bool]:
+    execution_root = Path(
+        str(env.get("CHUMMER_PLAYWRIGHT_EXECUTION_ROOT") or RUN_SERVICES_ROOT)
+    )
+    execution_root = Path(
+        os.path.abspath(os.fspath(execution_root.expanduser()))
+    )
+    if env.get("CHUMMER_PLAYWRIGHT_EXECUTION_ROOT"):
+        _assert_no_symlink_path(
+            execution_root,
+            label="Playwright execution root",
+        )
+        if not stat.S_ISDIR(execution_root.lstat().st_mode):
+            raise RuntimeError("Playwright execution root is not a directory")
     try:
         completed = subprocess.run(
             command,
@@ -2377,7 +2596,7 @@ def run_playwright_command(command: list[str], env: dict[str, str], timeout_seco
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=env,
-            cwd=RUN_SERVICES_ROOT,
+            cwd=execution_root,
             timeout=timeout_seconds,
         )
     except subprocess.TimeoutExpired as exc:
@@ -3573,6 +3792,43 @@ def compose_status(
         frontdoor_anchor_current_contract_satisfied = (
             frontdoor_anchor_artifact_matches_current_contract(raw_anchor_artifact)
         )
+        frontdoor_proof_closure_sha256 = str(
+            frontdoor_navigation.get("proofClosureSha256") or ""
+        ).strip()
+        frontdoor_proof_closure_status = str(
+            frontdoor_navigation.get("proofClosureStatus") or ""
+        ).strip()
+        frontdoor_proof_closure = artifact_object(
+            frontdoor_navigation.get("proofClosure")
+        )
+        frontdoor_playwright_runtime = artifact_object(
+            frontdoor_navigation.get("playwrightRuntime")
+        )
+        frontdoor_proof_closure_receipt_matches = (
+            frontdoor_proof_closure.get("contractName")
+            == FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_CONTRACT_NAME
+            and frontdoor_proof_closure.get("algorithm")
+            == FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_ALGORITHM
+            and frontdoor_proof_closure.get("status") == "pass"
+            and frontdoor_proof_closure.get("aggregateSha256")
+            == frontdoor_proof_closure_sha256
+        )
+        frontdoor_runtime_matches_closure = (
+            frontdoor_playwright_runtime.get("status") == "pass"
+            and frontdoor_playwright_runtime.get("resolutionMode")
+            == "validated_local_node_modules_exact_lock_version"
+            and frontdoor_playwright_runtime.get("playwrightPackageVersion")
+            == frontdoor_proof_closure.get("playwrightPackageVersion")
+        )
+        frontdoor_artifact_closure_digests = {
+            str(artifact.get("proof_closure_sha256") or "").strip()
+            for artifact in (
+                raw_mobile_artifact,
+                raw_ledger_artifact,
+                raw_anchor_artifact,
+            )
+            if artifact
+        }
         frontdoor_homepage_lane_text = str(
             mobile_artifact.get("homepage_lane_text") or ""
         ).strip()
@@ -3602,6 +3858,25 @@ def compose_status(
                         + first_line
                     )
         else:
+            if (
+                frontdoor_proof_closure_status != "pass"
+                or re.fullmatch(r"[0-9a-f]{64}", frontdoor_proof_closure_sha256)
+                is None
+                or not frontdoor_proof_closure_receipt_matches
+            ):
+                failures.append(
+                    "front-door navigation Playwright proof closure is not digest-bound"
+                )
+            if frontdoor_artifact_closure_digests != {
+                frontdoor_proof_closure_sha256
+            }:
+                failures.append(
+                    "front-door navigation artifacts do not match the executed proof closure"
+                )
+            if not frontdoor_runtime_matches_closure:
+                failures.append(
+                    "front-door navigation Playwright runtime is not exact-version validated"
+                )
             if receipt_contract(mobile_artifact) != OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationMobile"]:
                 failures.append(
                     "front-door navigation mobile artifact contract is not "
@@ -3878,6 +4153,28 @@ def compose_status(
         result["frontdoorNavigationAnchorFailureStage"] = anchor_artifact.get("failure_stage")
         result["frontdoorNavigationAnchorFailureType"] = anchor_artifact.get("failure_type")
         result["frontdoorNavigationAnchorArtifactCurrentContractSatisfied"] = frontdoor_anchor_current_contract_satisfied
+        result["frontdoorNavigationProofClosureStatus"] = frontdoor_navigation.get("proofClosureStatus")
+        result["frontdoorNavigationProofClosureSha256"] = frontdoor_navigation.get("proofClosureSha256")
+        result["frontdoorNavigationPlaywrightRuntimeResolutionMode"] = (
+            artifact_object(frontdoor_navigation.get("playwrightRuntime")).get(
+                "resolutionMode"
+            )
+        )
+        result["frontdoorNavigationPlaywrightPackageVersion"] = (
+            artifact_object(frontdoor_navigation.get("playwrightRuntime")).get(
+                "playwrightPackageVersion"
+            )
+        )
+        result["frontdoorNavigationPlaywrightPackageJsonSha256"] = (
+            artifact_object(frontdoor_navigation.get("playwrightRuntime")).get(
+                "packageJsonSha256"
+            )
+        )
+        result["frontdoorNavigationPlaywrightCliSha256"] = (
+            artifact_object(frontdoor_navigation.get("playwrightRuntime")).get(
+                "playwrightCliSha256"
+            )
+        )
         result["childReceipts"]["frontdoorNavigation"] = redact_private_identity(frontdoor_navigation)
     if pwa_offline_cache:
         artifact = pwa_offline_cache.get("artifact") if isinstance(pwa_offline_cache.get("artifact"), dict) else {}
@@ -4183,6 +4480,8 @@ def run_frontdoor_navigation_playwright(
     reuse_existing_artifact: bool = False,
     reuse_artifact_max_age_hours: float | None = DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS,
     expected_homepage_lane_text: str = "",
+    proof_closure_root: Path | None = None,
+    expected_proof_closure: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     mobile_artifact_path = artifact_dir / "FRONTDOOR_MOBILE_LAUNCH.generated.json"
@@ -4192,6 +4491,63 @@ def run_frontdoor_navigation_playwright(
     expected_ledger_contract = OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationLedger"]
     expected_anchor_contract = OPTIONAL_PLAYWRIGHT_CONTRACTS["frontdoorNavigationAnchor"]
     playwright_timeout_seconds = max(180, int(timeout_seconds) + 120)
+    if proof_closure_root is None:
+        return {
+            "status": "fail",
+            "reason": "frontdoor_playwright_proof_closure_unavailable",
+            "exitCode": None,
+            "timedOut": False,
+            "timeoutSeconds": playwright_timeout_seconds,
+            "artifactDir": str(artifact_dir),
+            "proofClosureStatus": "fail",
+            "proofClosureSha256": "",
+            "playwrightExecuted": False,
+            "artifactReused": False,
+            "stdoutTail": "",
+            "stderrTail": "frontdoor Playwright proof closure is required",
+        }
+    proof_closure_root = Path(
+        os.path.abspath(os.fspath(Path(proof_closure_root).expanduser()))
+    )
+    try:
+        proof_closure = validate_frontdoor_playwright_proof_closure(
+            proof_closure_root
+        )
+        proof_closure_sha256 = str(
+            proof_closure.get("aggregateSha256") or ""
+        ).strip()
+        if not isinstance(expected_proof_closure, dict) or (
+            proof_closure != expected_proof_closure
+        ):
+            raise RuntimeError(
+                "frontdoor Playwright proof closure does not match trusted build-info"
+            )
+        playwright_runtime = resolve_pinned_playwright_runtime(
+            str(proof_closure.get("playwrightPackageVersion") or "").strip()
+        )
+    except (OSError, RuntimeError) as exc:
+        return {
+            "status": "fail",
+            "reason": "frontdoor_playwright_proof_closure_invalid",
+            "exitCode": None,
+            "timedOut": False,
+            "timeoutSeconds": playwright_timeout_seconds,
+            "artifactDir": str(artifact_dir),
+            "proofClosureStatus": "fail",
+            "proofClosureSha256": "",
+            "playwrightRuntime": {},
+            "playwrightExecuted": False,
+            "artifactReused": False,
+            "stdoutTail": "",
+            "stderrTail": str(exc),
+        }
+
+    def artifact_matches_proof_closure(artifact: dict[str, Any]) -> bool:
+        return (
+            str(artifact.get("proof_closure_sha256") or "").strip()
+            == proof_closure_sha256
+        )
+
     if reuse_existing_artifact and mobile_artifact_path.is_file() and ledger_artifact_path.is_file() and anchor_artifact_path.is_file():
         mobile_artifact, mobile_artifact_load_status = load_json_with_status(mobile_artifact_path)
         ledger_artifact, ledger_artifact_load_status = load_json_with_status(ledger_artifact_path)
@@ -4241,6 +4597,7 @@ def run_frontdoor_navigation_playwright(
                 and mobile_fresh
                 and mobile_homepage_lane_matches_expected
                 and mobile_privacy_contract
+                and artifact_matches_proof_closure(mobile_artifact)
             )
             ledger_pass = (
                 str(ledger_artifact.get("status") or "").strip().lower() == "pass"
@@ -4248,6 +4605,7 @@ def run_frontdoor_navigation_playwright(
                 and artifact_base_url_matches(ledger_artifact, base_url)
                 and ledger_fresh
                 and ledger_current_contract
+                and artifact_matches_proof_closure(ledger_artifact)
             )
             anchor_pass = (
                 str(anchor_artifact.get("status") or "").strip().lower() == "pass"
@@ -4255,6 +4613,7 @@ def run_frontdoor_navigation_playwright(
                 and artifact_base_url_matches(anchor_artifact, base_url)
                 and anchor_fresh
                 and anchor_current_contract
+                and artifact_matches_proof_closure(anchor_artifact)
             )
             if mobile_pass and ledger_pass and anchor_pass:
                 return {
@@ -4294,6 +4653,10 @@ def run_frontdoor_navigation_playwright(
                     "mobileArtifactPrivacyContractSatisfied": mobile_privacy_contract,
                     "ledgerArtifactCurrentContractSatisfied": ledger_current_contract,
                     "anchorArtifactCurrentContractSatisfied": anchor_current_contract,
+                    "proofClosureStatus": "pass",
+                    "proofClosureSha256": proof_closure_sha256,
+                    "proofClosure": proof_closure,
+                    "playwrightRuntime": playwright_runtime,
                     "artifactMaxAgeHours": reuse_artifact_max_age_hours,
                     "artifactReused": True,
                     "playwrightExecuted": False,
@@ -4304,17 +4667,38 @@ def run_frontdoor_navigation_playwright(
     env = os.environ.copy()
     env["BASE_URL"] = base_url
     env["CHUMMER_COMPLETION_DIR"] = str(artifact_dir)
+    env["CHUMMER_FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_SHA256"] = (
+        proof_closure_sha256
+    )
+    env["CHUMMER_PLAYWRIGHT_EXECUTION_ROOT"] = str(proof_closure_root)
+    node_modules_root = str(playwright_runtime["nodeModulesRoot"])
+    # The proof subprocess may inherit operational browser settings, but not
+    # Node's ambient preloading/module-resolution hooks.  Its executable specs
+    # and dependency root are selected by the validated closure above.
+    for untrusted_code_loading_name in (
+        "CHUMMER_PLAYWRIGHT_BIN",
+        "CHUMMER_PLAYWRIGHT_NODE_MODULES_ROOT",
+        "CHUMMER_PLAYWRIGHT_PACKAGE_SPEC",
+        "NODE_OPTIONS",
+        "NODE_PATH",
+        "PW_TEST_REPORTER",
+        "PW_TEST_SOURCE_TRANSFORM",
+        "PW_TEST_SOURCE_TRANSFORM_SCOPE",
+    ):
+        env.pop(untrusted_code_loading_name, None)
+    env["NODE_PATH"] = node_modules_root
     for artifact_path in (mobile_artifact_path, ledger_artifact_path, anchor_artifact_path):
         try:
             artifact_path.unlink()
         except FileNotFoundError:
             pass
     command = [
-        "npx",
-        "playwright",
+        *playwright_runtime["commandPrefix"],
         "test",
         "tests/public/frontdoor-mobile-launch.spec.ts",
         "tests/public/black-ledger-frontdoor.spec.ts",
+        "--config=playwright.config.ts",
+        f"--output={artifact_dir / '.playwright-output'}",
         "--workers=1",
         "--reporter=line",
     ]
@@ -4358,6 +4742,9 @@ def run_frontdoor_navigation_playwright(
         and mobile_privacy_contract
         and ledger_current_contract
         and anchor_current_contract
+        and artifact_matches_proof_closure(mobile_artifact)
+        and artifact_matches_proof_closure(ledger_artifact)
+        and artifact_matches_proof_closure(anchor_artifact)
     )
     return {
         "status": "pass" if proof_passed else "fail",
@@ -4387,6 +4774,10 @@ def run_frontdoor_navigation_playwright(
         "mobileArtifactPrivacyContractSatisfied": mobile_privacy_contract,
         "ledgerArtifactCurrentContractSatisfied": ledger_current_contract,
         "anchorArtifactCurrentContractSatisfied": anchor_current_contract,
+        "proofClosureStatus": "pass",
+        "proofClosureSha256": proof_closure_sha256,
+        "proofClosure": proof_closure,
+        "playwrightRuntime": playwright_runtime,
         "artifactReused": False,
         "playwrightExecuted": True,
         "stdoutTail": redact_private_identity(stdout[-2000:]),
@@ -4603,6 +4994,32 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
                         "trusted build-info full deployment digest does not match preflight"
                     )
 
+        expected_frontdoor_playwright_proof_closure: dict[str, Any] = {}
+        if args.require_frontdoor_navigation_playwright:
+            trusted_build_info_path = (
+                Path(args.expected_build_info)
+                if args.expected_build_info
+                else overlay_root / OVERLAY_BUILD_INFO_RELATIVE_PATH
+            )
+            try:
+                trusted_deployment_identity = load_expected_deployment_identity(
+                    trusted_build_info_path,
+                    source_root=expected_source_root,
+                    overlay_root=overlay_root,
+                )
+            except RuntimeError as exc:
+                parser.error(str(exc))
+            if (
+                trusted_deployment_identity["fullDeploymentDigestSha256"]
+                != expected_full_deployment_digest_sha256
+            ):
+                parser.error(
+                    "trusted build-info full deployment digest does not match selected deployment identity"
+                )
+            expected_frontdoor_playwright_proof_closure = dict(
+                trusted_deployment_identity["frontdoorPlaywrightProofClosure"]
+            )
+
         downloads_command = [
             sys.executable,
             "scripts/verify_downloads_version_marker.py",
@@ -4735,6 +5152,10 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
             reuse_existing_artifact=args.reuse_existing_playwright_artifacts,
             reuse_artifact_max_age_hours=args.reuse_artifact_max_age_hours,
             expected_homepage_lane_text=expected_frontdoor_homepage_lane,
+            proof_closure_root=(
+                overlay_root / FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT
+            ),
+            expected_proof_closure=expected_frontdoor_playwright_proof_closure,
         )
     role_alias_routes = probe_role_alias_routes(args.base_url.rstrip("/"), args.timeout_seconds)
 

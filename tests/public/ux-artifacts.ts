@@ -18,6 +18,14 @@ export function completionPath(fileName: string): string {
   return path.join(ensureCompletionDir(), fileName);
 }
 
+export function requiredProofClosureSha256(): string {
+  const value = process.env.CHUMMER_FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_SHA256?.trim() || '';
+  if (!/^[0-9a-f]{64}$/.test(value)) {
+    throw new Error('frontdoor Playwright proof closure digest is missing or invalid');
+  }
+  return value;
+}
+
 export function writeJsonArtifact(fileName: string, payload: unknown): void {
   writeFileSync(completionPath(fileName), `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
 }

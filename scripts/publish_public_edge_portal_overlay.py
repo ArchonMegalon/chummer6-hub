@@ -13,6 +13,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import secrets
 import shutil
 import signal
@@ -94,6 +95,27 @@ VERIFICATION_PROGRAM_SOURCES = {
     "downloadsVersionMarker": DOWNLOADS_VERSION_MARKER_SCRIPT_PATH,
     "liveSurfaceParity": LIVE_SURFACE_PARITY_SCRIPT_PATH,
 }
+FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_CONTRACT_NAME = (
+    "chummer.frontdoor_playwright_proof_closure.v1"
+)
+FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_ALGORITHM = (
+    "sha256-canonical-relative-path-content-size-playwright-version-v1"
+)
+FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT = (
+    Path("proof-authority") / "frontdoor-playwright"
+)
+FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_MANIFEST = (
+    "FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE.generated.json"
+)
+FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_FILES = (
+    Path("package.json"),
+    Path("package-lock.json"),
+    Path("playwright.config.ts"),
+    Path("tests") / "public" / "ux-artifacts.ts",
+    Path("tests") / "public" / "frontdoor-mobile-launch.spec.ts",
+    Path("tests") / "public" / "black-ledger-frontdoor.spec.ts",
+    Path("Chummer.Run.Api") / "Views" / "PublicLanding" / "Landing.cshtml",
+)
 RETIRED_PUBLIC_PLAY_PROXY_ENV_NAMES = frozenset(
     {
         "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED",
@@ -143,6 +165,13 @@ ISOLATED_BUILD_WORKSPACE_COPY_MAP = {
         Path("global.json"),
         Path(".dockerignore"),
         Path("docker-compose.public-edge.yml"),
+        Path("package.json"),
+        Path("package-lock.json"),
+        Path("playwright.config.ts"),
+        Path("tests") / "public" / "ux-artifacts.ts",
+        Path("tests") / "public" / "frontdoor-mobile-launch.spec.ts",
+        Path("tests") / "public" / "black-ledger-frontdoor.spec.ts",
+        Path("scripts") / "verify_public_edge_postdeploy_gate.py",
         Path("scripts") / "generate_public_play_worker_projection.py",
         Path("scripts") / "public_edge_payload_modes.py",
         Path("scripts") / "strict_json_contract.py",
@@ -291,6 +320,7 @@ OVERLAY_PASS_RECEIPT_REQUIRED_TRUE_FIELDS = tuple(
     }
 )
 CRITICAL_SOURCE_FINGERPRINT_FILES = {
+    "postdeployVerifier": Path("scripts") / "verify_public_edge_postdeploy_gate.py",
     "landing": Path("Chummer.Run.Api") / "Views" / "PublicLanding" / "Landing.cshtml",
     "downloads": Path("Chummer.Run.Api") / "Views" / "PublicLanding" / "Downloads.cshtml",
     "status": Path("Chummer.Run.Api") / "Views" / "PublicLanding" / "Status.cshtml",
@@ -1078,6 +1108,250 @@ def _read_stable_fingerprint_file(path: Path) -> tuple[bytes, int]:
             f"fingerprinted input pathname no longer identifies the bytes read: {path}"
         )
     return b"".join(chunks), stat.S_IMODE(after.st_mode)
+
+
+def _frontdoor_playwright_package_version(
+    package_json_bytes: bytes,
+    package_lock_bytes: bytes,
+) -> tuple[str, str]:
+    try:
+        package_json = strict_json_object(
+            package_json_bytes,
+            label="frontdoor Playwright package.json",
+        )
+        package_lock = strict_json_object(
+            package_lock_bytes,
+            label="frontdoor Playwright package-lock.json",
+        )
+    except StrictJsonContractError as exc:
+        raise RuntimeError("frontdoor Playwright dependency metadata is invalid") from exc
+    dev_dependencies = package_json.get("devDependencies")
+    packages = package_lock.get("packages")
+    if not isinstance(dev_dependencies, dict) or not isinstance(packages, dict):
+        raise RuntimeError("frontdoor Playwright dependency metadata is incomplete")
+    declared_spec = str(dev_dependencies.get("playwright") or "").strip()
+    root_package = packages.get("")
+    installed_package = packages.get("node_modules/playwright")
+    if not isinstance(root_package, dict) or not isinstance(installed_package, dict):
+        raise RuntimeError("frontdoor Playwright package lock is incomplete")
+    locked_root_dependencies = root_package.get("devDependencies")
+    locked_spec = (
+        str(locked_root_dependencies.get("playwright") or "").strip()
+        if isinstance(locked_root_dependencies, dict)
+        else ""
+    )
+    version = str(installed_package.get("version") or "").strip()
+    if not declared_spec or declared_spec != locked_spec:
+        raise RuntimeError("frontdoor Playwright declaration and lock root drifted")
+    if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?", version) is None:
+        raise RuntimeError("frontdoor Playwright package lock has no exact version")
+    return version, declared_spec
+
+
+def frontdoor_playwright_proof_closure_from_source(source_root: Path) -> dict[str, Any]:
+    source_root = normalized_absolute_path(source_root)
+    assert_no_symlink_components(source_root, label="frontdoor Playwright proof source root")
+    rows: list[dict[str, Any]] = []
+    payloads: dict[str, bytes] = {}
+    for relative_path in FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_FILES:
+        path = source_root / relative_path
+        assert_no_symlink_components(path, label="frontdoor Playwright proof source")
+        payload, _ = _read_stable_fingerprint_file(path)
+        normalized = relative_path.as_posix()
+        payloads[normalized] = payload
+        rows.append(
+            {
+                "relativePath": normalized,
+                "sha256": sha256_bytes(payload),
+                "sizeBytes": len(payload),
+            }
+        )
+    rows.sort(key=lambda row: str(row["relativePath"]))
+    version, declared_spec = _frontdoor_playwright_package_version(
+        payloads["package.json"],
+        payloads["package-lock.json"],
+    )
+    digest_input = {
+        "files": rows,
+        "playwrightPackageVersion": version,
+    }
+    return {
+        "contractName": FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_CONTRACT_NAME,
+        "algorithm": FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_ALGORITHM,
+        "status": "pass",
+        "aggregateSha256": sha256_text(
+            json.dumps(digest_input, sort_keys=True, separators=(",", ":"))
+        ),
+        "fileCount": len(rows),
+        "files": rows,
+        "playwrightDeclaredSpec": declared_spec,
+        "playwrightPackageVersion": version,
+    }
+
+
+def _frontdoor_playwright_closure_manifest_bytes(receipt: dict[str, Any]) -> bytes:
+    payload = {
+        key: receipt[key]
+        for key in (
+            "contractName",
+            "algorithm",
+            "status",
+            "aggregateSha256",
+            "fileCount",
+            "files",
+            "playwrightDeclaredSpec",
+            "playwrightPackageVersion",
+        )
+    }
+    return (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def validate_frontdoor_playwright_proof_closure(
+    closure_root: Path,
+    *,
+    expected_source_root: Path | None = None,
+) -> dict[str, Any]:
+    closure_root = normalized_absolute_path(closure_root)
+    assert_no_symlink_components(closure_root, label="frontdoor Playwright proof closure root")
+    manifest_path = closure_root / FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_MANIFEST
+    manifest_bytes, _ = _read_stable_fingerprint_file(manifest_path)
+    try:
+        manifest = strict_json_object(
+            manifest_bytes,
+            label="frontdoor Playwright proof closure manifest",
+        )
+    except StrictJsonContractError as exc:
+        raise RuntimeError("frontdoor Playwright proof closure manifest is invalid") from exc
+    required_keys = {
+        "contractName",
+        "algorithm",
+        "status",
+        "aggregateSha256",
+        "fileCount",
+        "files",
+        "playwrightDeclaredSpec",
+        "playwrightPackageVersion",
+    }
+    if set(manifest) != required_keys:
+        raise RuntimeError("frontdoor Playwright proof closure manifest key set drifted")
+    if (
+        manifest.get("contractName") != FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_CONTRACT_NAME
+        or manifest.get("algorithm") != FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_ALGORITHM
+        or manifest.get("status") != "pass"
+    ):
+        raise RuntimeError("frontdoor Playwright proof closure manifest contract drifted")
+    manifest_rows = manifest.get("files")
+    if not isinstance(manifest_rows, list):
+        raise RuntimeError("frontdoor Playwright proof closure file rows are invalid")
+    expected_paths = {
+        relative_path.as_posix()
+        for relative_path in FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_FILES
+    }
+    actual_paths: set[str] = set()
+    actual_rows: list[dict[str, Any]] = []
+    payloads: dict[str, bytes] = {}
+    for row in manifest_rows:
+        if not isinstance(row, dict) or set(row) != {"relativePath", "sha256", "sizeBytes"}:
+            raise RuntimeError("frontdoor Playwright proof closure file row is invalid")
+        relative_text = str(row.get("relativePath") or "")
+        relative_path = Path(relative_text)
+        if (
+            not relative_text
+            or relative_path.is_absolute()
+            or relative_path.as_posix() != relative_text
+            or any(part in {"", ".", ".."} for part in relative_path.parts)
+            or relative_text not in expected_paths
+            or relative_text in actual_paths
+        ):
+            raise RuntimeError("frontdoor Playwright proof closure path set drifted")
+        digest = str(row.get("sha256") or "")
+        size = row.get("sizeBytes")
+        if (
+            re.fullmatch(r"[0-9a-f]{64}", digest) is None
+            or not isinstance(size, int)
+            or isinstance(size, bool)
+            or size < 0
+        ):
+            raise RuntimeError("frontdoor Playwright proof closure file binding is invalid")
+        path = closure_root / relative_path
+        assert_no_symlink_components(path, label="frontdoor Playwright proof closure file")
+        payload, _ = _read_stable_fingerprint_file(path)
+        if len(payload) != size or sha256_bytes(payload) != digest:
+            raise RuntimeError("frontdoor Playwright proof closure file digest drifted")
+        actual_paths.add(relative_text)
+        payloads[relative_text] = payload
+        actual_rows.append(
+            {
+                "relativePath": relative_text,
+                "sha256": digest,
+                "sizeBytes": size,
+            }
+        )
+    if actual_paths != expected_paths or manifest.get("fileCount") != len(expected_paths):
+        raise RuntimeError("frontdoor Playwright proof closure exact file set drifted")
+    observed_file_paths = {
+        str(row.get("path") or "")
+        for row in fingerprint_rows_for_path(closure_root, Path("."))
+    }
+    if observed_file_paths != expected_paths | {FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_MANIFEST}:
+        raise RuntimeError("frontdoor Playwright proof closure contains unbound files")
+    actual_rows.sort(key=lambda row: str(row["relativePath"]))
+    version, declared_spec = _frontdoor_playwright_package_version(
+        payloads["package.json"],
+        payloads["package-lock.json"],
+    )
+    digest_input = {
+        "files": actual_rows,
+        "playwrightPackageVersion": version,
+    }
+    aggregate = sha256_text(
+        json.dumps(digest_input, sort_keys=True, separators=(",", ":"))
+    )
+    if (
+        manifest.get("files") != actual_rows
+        or manifest.get("aggregateSha256") != aggregate
+        or manifest.get("playwrightDeclaredSpec") != declared_spec
+        or manifest.get("playwrightPackageVersion") != version
+    ):
+        raise RuntimeError("frontdoor Playwright proof closure aggregate binding drifted")
+    if expected_source_root is not None:
+        expected = frontdoor_playwright_proof_closure_from_source(expected_source_root)
+        if manifest != expected:
+            raise RuntimeError("frontdoor Playwright proof closure does not match its isolated source")
+    return dict(manifest)
+
+
+def materialize_frontdoor_playwright_proof_closure(
+    source_root: Path,
+    staging_root: Path,
+) -> dict[str, Any]:
+    expected = frontdoor_playwright_proof_closure_from_source(source_root)
+    closure_root = staging_root / FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT
+    if closure_root.exists() or closure_root.is_symlink():
+        observed = validate_frontdoor_playwright_proof_closure(
+            closure_root,
+            expected_source_root=source_root,
+        )
+        if observed != expected:
+            raise RuntimeError("existing frontdoor Playwright proof closure drifted")
+        return observed
+    assert_no_symlink_components(closure_root, label="frontdoor Playwright proof closure root")
+    closure_root.mkdir(parents=True, exist_ok=False)
+    for relative_path in FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_FILES:
+        source_path = source_root / relative_path
+        payload, _ = _read_stable_fingerprint_file(source_path)
+        destination_path = closure_root / relative_path
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_bytes(destination_path, payload)
+    atomic_write_bytes(
+        closure_root / FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_MANIFEST,
+        _frontdoor_playwright_closure_manifest_bytes(expected),
+    )
+    fsync_directory(closure_root)
+    return validate_frontdoor_playwright_proof_closure(
+        closure_root,
+        expected_source_root=source_root,
+    )
 
 
 def fingerprint_rows_for_path(
@@ -2887,6 +3161,10 @@ def write_overlay_build_info(
             "overlay build-info cannot bind a payload with unsafe runtime modes"
         )
     built_staged_payload_fingerprint = staged_payload_fingerprint(root)
+    frontdoor_playwright_proof_closure = validate_frontdoor_playwright_proof_closure(
+        root / FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT,
+        expected_source_root=source_root,
+    )
     landing_forbidden_marker_checks = verification.get(
         "landingForbiddenMarkerChecks"
     )
@@ -3015,6 +3293,7 @@ def write_overlay_build_info(
         "localLiveSurfaceParityStatus": str((verification.get("localLiveSurfaceParity") or {}).get("status") or "").strip(),
         "localLiveSurfaceParityFailureCount": int((verification.get("localLiveSurfaceParity") or {}).get("failureCount") or 0),
         "sourceFingerprint": built_source_fingerprint,
+        "frontdoorPlaywrightProofClosure": frontdoor_playwright_proof_closure,
         "stagedPayloadFingerprint": built_staged_payload_fingerprint,
         "payloadModeReceipt": payload_mode_receipt,
         "fullDeploymentDigest": full_deployment_digest(
@@ -4514,6 +4793,7 @@ def materialize(
     copied_source_wwwroot = False
     copied_codex_design = False
     copied_black_ledger = False
+    frontdoor_playwright_proof_closure: dict[str, Any] = {}
     verification: dict[str, Any] = {
         "status": "skipped",
         "reason": "publish_failed",
@@ -4573,6 +4853,12 @@ def materialize(
         copied_source_wwwroot = merge_optional_tree(source_wwwroot, staging_root / "wwwroot")
         copied_codex_design = copy_optional_tree(codex_design_source, staging_root / ".codex-design")
         copied_black_ledger = copy_optional_tree(black_ledger_source, staging_root / "black-ledger")
+        frontdoor_playwright_proof_closure = (
+            materialize_frontdoor_playwright_proof_closure(
+                overlay_payload_source_root,
+                staging_root,
+            )
+        )
         compose_mountpoints_created = ensure_required_compose_mountpoints(staging_root)
         normalized_mode_receipt = normalize_payload_modes(staging_root)
         payload_mode_normalization = {
@@ -4949,6 +5235,7 @@ def materialize(
         "copiedSourceWwwroot": copied_source_wwwroot,
         "copiedCodexDesign": copied_codex_design,
         "copiedBlackLedger": copied_black_ledger,
+        "frontdoorPlaywrightProofClosure": frontdoor_playwright_proof_closure,
         "verification": verification,
         "stagedPayloadIntegrityCheck": staged_payload_integrity_check,
         "payloadModeNormalization": payload_mode_normalization,

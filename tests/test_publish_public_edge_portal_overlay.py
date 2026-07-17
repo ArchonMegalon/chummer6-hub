@@ -39,6 +39,44 @@ def make_source_tree(root: Path) -> None:
         encoding="utf-8",
     )
     (root / ".dockerignore").write_text("**/bin/**\n**/obj/**\n", encoding="utf-8")
+    (root / "package.json").write_text(
+        json.dumps(
+            {
+                "private": True,
+                "devDependencies": {"playwright": "^1.53.0"},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (root / "package-lock.json").write_text(
+        json.dumps(
+            {
+                "name": "fixture",
+                "lockfileVersion": 3,
+                "packages": {
+                    "": {"devDependencies": {"playwright": "^1.53.0"}},
+                    "node_modules/playwright": {"version": "1.60.0"},
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (root / "playwright.config.ts").write_text(
+        "export default { testDir: './tests/public' };\n",
+        encoding="utf-8",
+    )
+    (root / "tests" / "public").mkdir(parents=True, exist_ok=True)
+    for proof_name in (
+        "ux-artifacts.ts",
+        "frontdoor-mobile-launch.spec.ts",
+        "black-ledger-frontdoor.spec.ts",
+    ):
+        (root / "tests" / "public" / proof_name).write_text(
+            f"// sealed fixture: {proof_name}\n",
+            encoding="utf-8",
+        )
     (root / "docker-compose.public-edge.yml").write_text(
         "services:\n  chummer-portal:\n    image: chummer-run-api:local\n",
         encoding="utf-8",
@@ -59,6 +97,7 @@ def make_source_tree(root: Path) -> None:
         "strict_json_contract.py",
         "validate_public_pwa_proof_authority.py",
         "verify_public_pwa_static_assets.py",
+        "verify_public_edge_postdeploy_gate.py",
     ):
         (root / "scripts" / script_name).write_text(
             f"# {script_name}\n",
@@ -118,6 +157,12 @@ def write_staged_build_info(
         if source_fingerprint is not None
         else module.source_fingerprint(source_root)
     )
+    frontdoor_playwright_proof_closure = (
+        module.materialize_frontdoor_playwright_proof_closure(
+            source_root,
+            staging_root,
+        )
+    )
     module.normalize_payload_modes(staging_root)
     built_staged_payload_fingerprint = module.staged_payload_fingerprint(staging_root)
     payload_mode_receipt = module.validate_payload_modes(staging_root)
@@ -125,6 +170,9 @@ def write_staged_build_info(
         json.dumps(
             {
                 "sourceFingerprint": built_source_fingerprint,
+                "frontdoorPlaywrightProofClosure": (
+                    frontdoor_playwright_proof_closure
+                ),
                 "stagedPayloadFingerprint": built_staged_payload_fingerprint,
                 "payloadModeReceipt": payload_mode_receipt,
                 "fullDeploymentDigest": module.full_deployment_digest(
@@ -1736,6 +1784,106 @@ def test_materialize_isolated_build_workspace_copies_build_and_overlay_payload_c
         / "marker.txt"
     ).is_file()
     assert not (build_root / "workspace" / "fleet" / "repos" / "chummer-media-factory" / "docs").exists()
+
+
+def test_frontdoor_playwright_proof_closure_is_exact_digest_bound_and_mutation_fails(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    staging_root = tmp_path / "staging"
+    staging_root.mkdir()
+
+    receipt = module.materialize_frontdoor_playwright_proof_closure(
+        REPO_ROOT,
+        staging_root,
+    )
+    closure_root = (
+        staging_root / module.FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT
+    )
+
+    assert receipt["status"] == "pass"
+    assert receipt["fileCount"] == 7
+    assert receipt["playwrightPackageVersion"] == "1.60.0"
+    assert len(receipt["aggregateSha256"]) == 64
+    assert {row["relativePath"] for row in receipt["files"]} == {
+        "package.json",
+        "package-lock.json",
+        "playwright.config.ts",
+        "tests/public/ux-artifacts.ts",
+        "tests/public/frontdoor-mobile-launch.spec.ts",
+        "tests/public/black-ledger-frontdoor.spec.ts",
+        "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
+    }
+    assert module.validate_frontdoor_playwright_proof_closure(closure_root) == receipt
+
+    mobile_spec = closure_root / "tests/public/frontdoor-mobile-launch.spec.ts"
+    mobile_spec.write_text(
+        mobile_spec.read_text(encoding="utf-8") + "\n// unbound mutation\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(RuntimeError, match="file digest drifted"):
+        module.validate_frontdoor_playwright_proof_closure(closure_root)
+
+
+def test_staged_payload_fingerprint_binds_frontdoor_playwright_proof_closure(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    staging_root = tmp_path / "staging"
+    staging_root.mkdir()
+    (staging_root / "state").mkdir()
+    (staging_root / "Chummer.Run.Api.dll").write_bytes(b"assembly")
+    module.ensure_required_compose_mountpoints(staging_root)
+    module.materialize_frontdoor_playwright_proof_closure(REPO_ROOT, staging_root)
+    module.normalize_payload_modes(staging_root)
+
+    before = module.staged_payload_fingerprint(staging_root)
+    closure_spec = (
+        staging_root
+        / module.FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT
+        / "tests/public/frontdoor-mobile-launch.spec.ts"
+    )
+    closure_spec.write_bytes(closure_spec.read_bytes() + b"\n// staged mutation\n")
+    module.normalize_payload_modes(staging_root)
+    after = module.staged_payload_fingerprint(staging_root)
+
+    assert before["aggregateSha256"] != after["aggregateSha256"]
+    assert any(
+        row["path"].endswith("tests/public/frontdoor-mobile-launch.spec.ts")
+        for row in module.staged_payload_rows(staging_root)
+    )
+
+
+def test_frontdoor_playwright_proof_closure_rejects_unbound_file(tmp_path: Path) -> None:
+    module = load_module()
+    staging_root = tmp_path / "staging"
+    staging_root.mkdir()
+    module.materialize_frontdoor_playwright_proof_closure(REPO_ROOT, staging_root)
+    closure_root = (
+        staging_root / module.FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT
+    )
+    unbound = closure_root / "tests/public/old-frontdoor.spec.ts"
+    unbound.parent.mkdir(parents=True, exist_ok=True)
+    unbound.write_text("throw new Error('old proof');\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="contains unbound files"):
+        module.validate_frontdoor_playwright_proof_closure(closure_root)
+
+
+def test_build_input_fingerprint_binds_frontdoor_playwright_proof_and_postdeploy_runner() -> None:
+    module = load_module()
+    paths = {str(row["path"]) for row in module.build_input_rows(REPO_ROOT)}
+
+    prefix = REPO_ROOT.name
+    assert {
+        f"{prefix}/package.json",
+        f"{prefix}/package-lock.json",
+        f"{prefix}/playwright.config.ts",
+        f"{prefix}/tests/public/ux-artifacts.ts",
+        f"{prefix}/tests/public/frontdoor-mobile-launch.spec.ts",
+        f"{prefix}/tests/public/black-ledger-frontdoor.spec.ts",
+        f"{prefix}/scripts/verify_public_edge_postdeploy_gate.py",
+    }.issubset(paths)
 
 
 def test_build_input_fingerprint_preserves_symlinked_copy_plan_root(tmp_path: Path) -> None:

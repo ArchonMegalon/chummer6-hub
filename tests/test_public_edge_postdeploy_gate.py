@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -11,6 +12,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
+
+from scripts import publish_public_edge_portal_overlay as overlay_publisher
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -641,6 +644,59 @@ def test_resolve_playwright_command_prefers_shared_node_modules_root(monkeypatch
 
     assert module.resolve_playwright_command() == [str(bin_dir / "playwright")]
     assert module.resolve_playwright_node_modules_root() == shared_root
+
+
+def test_pinned_playwright_runtime_requires_exact_installed_lock_version(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    node_modules = tmp_path / "node_modules"
+    package_root = node_modules / "playwright"
+    package_root.mkdir(parents=True)
+    (package_root / "package.json").write_text(
+        json.dumps({"name": "playwright", "version": "1.60.0"}),
+        encoding="utf-8",
+    )
+    (package_root / "cli.js").write_text("console.log('playwright');\n", encoding="utf-8")
+    monkeypatch.setattr(
+        module,
+        "resolve_pinned_playwright_node_modules_root",
+        lambda: node_modules,
+    )
+
+    receipt = module.resolve_pinned_playwright_runtime("1.60.0")
+
+    assert receipt["status"] == "pass"
+    assert receipt["playwrightPackageVersion"] == "1.60.0"
+    assert receipt["resolutionMode"] == "validated_local_node_modules_exact_lock_version"
+    with pytest.raises(RuntimeError, match="does not match the sealed package lock"):
+        module.resolve_pinned_playwright_runtime("1.59.0")
+
+
+def test_pinned_playwright_runtime_rejects_symlinked_node_modules_root(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    real_root = tmp_path / "real-node-modules"
+    package_root = real_root / "playwright"
+    package_root.mkdir(parents=True)
+    (package_root / "package.json").write_text(
+        json.dumps({"name": "playwright", "version": "1.60.0"}),
+        encoding="utf-8",
+    )
+    (package_root / "cli.js").write_text("console.log('playwright');\n", encoding="utf-8")
+    alias_root = tmp_path / "node_modules"
+    alias_root.symlink_to(real_root, target_is_directory=True)
+    monkeypatch.setattr(
+        module,
+        "resolve_pinned_playwright_node_modules_root",
+        lambda: alias_root,
+    )
+
+    with pytest.raises(RuntimeError, match="contains a symlink component"):
+        module.resolve_pinned_playwright_runtime("1.60.0")
 
 
 def test_playwright_browser_proofs_delete_stale_artifacts_before_running(monkeypatch, tmp_path) -> None:
@@ -1590,15 +1646,39 @@ def passing_pwa_offline_browser_proof() -> dict[str, object]:
     }
 
 
-def passing_frontdoor_navigation(homepage_lane_text: str = "Current public lane: Stable.") -> dict[str, object]:
+def passing_frontdoor_navigation(
+    homepage_lane_text: str = "Current public lane: Stable.",
+    proof_closure_sha256: str = "d" * 64,
+) -> dict[str, object]:
     return {
         "status": "pass",
         "exitCode": 0,
         "artifactDir": "/tmp/chummer-frontdoor-navigation",
+        "proofClosureStatus": "pass",
+        "proofClosureSha256": proof_closure_sha256,
+        "proofClosure": {
+            "contractName": (
+                overlay_publisher.FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_CONTRACT_NAME
+            ),
+            "algorithm": (
+                overlay_publisher.FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_ALGORITHM
+            ),
+            "status": "pass",
+            "aggregateSha256": proof_closure_sha256,
+            "playwrightPackageVersion": "1.60.0",
+        },
+        "playwrightRuntime": {
+            "status": "pass",
+            "resolutionMode": "validated_local_node_modules_exact_lock_version",
+            "playwrightPackageVersion": "1.60.0",
+            "packageJsonSha256": "e" * 64,
+            "playwrightCliSha256": "f" * 64,
+        },
         "mobileArtifact": {
             "contractName": "chummer.frontdoor_mobile_install_boundary.v2",
             "status": "pass",
             "base_url": "https://chummer.run",
+            "proof_closure_sha256": proof_closure_sha256,
             "homepage_lane_text": homepage_lane_text,
             "public_install_targets": ["/build", "/mobile/player"],
             "device_routing": "auto_ua_ch_mobile_direct",
@@ -1618,6 +1698,7 @@ def passing_frontdoor_navigation(homepage_lane_text: str = "Current public lane:
             "contractName": "chummer.black_ledger_globe_frontdoor.v1",
             "status": "pass",
             "base_url": "https://chummer.run",
+            "proof_closure_sha256": proof_closure_sha256,
             "route": "/",
             "open_menu_targets": [
                 "/build",
@@ -1632,6 +1713,7 @@ def passing_frontdoor_navigation(homepage_lane_text: str = "Current public lane:
             "contractName": "chummer.frontdoor_mobile_anchor_redirect.v2",
             "status": "pass",
             "base_url": "https://chummer.run",
+            "proof_closure_sha256": proof_closure_sha256,
             "entry_had_query": True,
             "final_pathname": "/mobile/player",
             "final_search": "",
@@ -1645,9 +1727,13 @@ def write_passing_frontdoor_artifacts(
     *,
     homepage_lane_text: str = "Current public lane: Stable.",
     anchor_entry_had_query: bool = True,
+    proof_closure_sha256: str = "d" * 64,
 ) -> None:
     generated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-    proof = passing_frontdoor_navigation(homepage_lane_text)
+    proof = passing_frontdoor_navigation(
+        homepage_lane_text,
+        proof_closure_sha256,
+    )
     artifacts = (
         ("FRONTDOOR_MOBILE_LAUNCH.generated.json", proof["mobileArtifact"]),
         ("BLACK_LEDGER_GLOBE_FRONTDOOR.generated.json", proof["ledgerArtifact"]),
@@ -1659,6 +1745,20 @@ def write_passing_frontdoor_artifacts(
         if file_name == "FRONTDOOR_MOBILE_ANCHOR_REDIRECT.generated.json":
             artifact["entry_had_query"] = anchor_entry_had_query
         (artifact_dir / file_name).write_text(json.dumps(artifact), encoding="utf-8")
+
+
+def materialize_frontdoor_proof_closure(tmp_path: Path) -> tuple[Path, dict[str, object]]:
+    staging_root = tmp_path / "proof-overlay"
+    staging_root.mkdir()
+    receipt = overlay_publisher.materialize_frontdoor_playwright_proof_closure(
+        REPO_ROOT,
+        staging_root,
+    )
+    closure_root = (
+        staging_root
+        / overlay_publisher.FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_RELATIVE_ROOT
+    )
+    return closure_root, receipt
 
 
 def test_postdeploy_gate_passes_when_all_child_receipts_pass() -> None:
@@ -1858,7 +1958,14 @@ def test_trusted_build_info_digest_rejects_coherent_self_assertion(
     tmp_path: Path,
 ) -> None:
     module = load_module()
-    source = {"aggregateSha256": "a" * 64}
+    source = {
+        "aggregateSha256": "a" * 64,
+        "files": {
+            "postdeployVerifier": {
+                "sha256": module.POSTDEPLOY_VERIFIER_LOADED_SHA256,
+            }
+        },
+    }
     staged = {
         "algorithm": "sha256-canonical-path-content-size-posix-mode-runtime-mount-exclusions-v3",
         "aggregateSha256": "b" * 64,
@@ -1868,10 +1975,18 @@ def test_trusted_build_info_digest_rejects_coherent_self_assertion(
         ],
     }
     overlay_root = tmp_path / "active" / "app"
+    overlay_root.mkdir(parents=True)
+    frontdoor_playwright_proof_closure = (
+        overlay_publisher.materialize_frontdoor_playwright_proof_closure(
+            REPO_ROOT,
+            overlay_root,
+        )
+    )
     build_info_path = overlay_root / module.OVERLAY_BUILD_INFO_RELATIVE_PATH
-    build_info_path.parent.mkdir(parents=True)
+    build_info_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "sourceFingerprint": source,
+        "frontdoorPlaywrightProofClosure": frontdoor_playwright_proof_closure,
         "stagedPayloadFingerprint": staged,
         "payloadModeReceipt": {"contractName": "fixture"},
         "fullDeploymentDigest": module.full_deployment_digest(source, staged),
@@ -1890,6 +2005,34 @@ def test_trusted_build_info_digest_rejects_coherent_self_assertion(
         source_root=tmp_path,
         overlay_root=overlay_root,
     ) == payload["fullDeploymentDigest"]["sha256"]
+
+    recorded_closure = payload["frontdoorPlaywrightProofClosure"]
+    payload["frontdoorPlaywrightProofClosure"] = {
+        **frontdoor_playwright_proof_closure,
+        "aggregateSha256": "0" * 64,
+    }
+    build_info_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="full deployment digest is invalid"):
+        module.load_expected_deployment_identity(
+            build_info_path,
+            source_root=tmp_path,
+            overlay_root=overlay_root,
+        )
+    payload["frontdoorPlaywrightProofClosure"] = recorded_closure
+
+    source["files"]["postdeployVerifier"]["sha256"] = "0" * 64
+    payload["fullDeploymentDigest"] = module.full_deployment_digest(source, staged)
+    build_info_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="full deployment digest is invalid"):
+        module.load_expected_deployment_identity(
+            build_info_path,
+            source_root=tmp_path,
+            overlay_root=overlay_root,
+        )
+    source["files"]["postdeployVerifier"]["sha256"] = (
+        module.POSTDEPLOY_VERIFIER_LOADED_SHA256
+    )
+    payload["fullDeploymentDigest"] = module.full_deployment_digest(source, staged)
 
     drifted_staged = {
         **staged,
@@ -3631,6 +3774,15 @@ def test_postdeploy_gate_can_require_frontdoor_navigation_browser_proof() -> Non
     assert result["frontdoorNavigationAnchorFailureStage"] is None
     assert result["frontdoorNavigationAnchorFailureType"] is None
     assert result["frontdoorNavigationAnchorArtifactCurrentContractSatisfied"] is True
+    assert result["frontdoorNavigationProofClosureStatus"] == "pass"
+    assert result["frontdoorNavigationProofClosureSha256"] == "d" * 64
+    assert (
+        result["frontdoorNavigationPlaywrightRuntimeResolutionMode"]
+        == "validated_local_node_modules_exact_lock_version"
+    )
+    assert result["frontdoorNavigationPlaywrightPackageVersion"] == "1.60.0"
+    assert result["frontdoorNavigationPlaywrightPackageJsonSha256"] == "e" * 64
+    assert result["frontdoorNavigationPlaywrightCliSha256"] == "f" * 64
 
     failing = module.compose_status(
         preflight,
@@ -4601,7 +4753,17 @@ def test_frontdoor_navigation_probe_runs_authoritative_public_install_specs(
     tmp_path,
 ) -> None:
     module = load_module()
+    closure_root, closure = materialize_frontdoor_proof_closure(tmp_path)
     captured: dict[str, object] = {}
+    monkeypatch.setenv("NODE_OPTIONS", "--require=/tmp/hostile-node-preload.cjs")
+    monkeypatch.setenv("NODE_PATH", "/tmp/hostile-node-modules")
+    monkeypatch.setenv(
+        "CHUMMER_PLAYWRIGHT_NODE_MODULES_ROOT",
+        "/tmp/hostile-node-modules",
+    )
+    monkeypatch.setenv("PW_TEST_REPORTER", "/tmp/hostile-reporter.cjs")
+    monkeypatch.setenv("PW_TEST_SOURCE_TRANSFORM", "/tmp/hostile-transform.cjs")
+    monkeypatch.setenv("PW_TEST_SOURCE_TRANSFORM_SCOPE", str(closure_root))
 
     def fake_run_playwright_command(command, env, timeout_seconds):  # noqa: ANN001
         captured["command"] = command
@@ -4615,26 +4777,153 @@ def test_frontdoor_navigation_probe_runs_authoritative_public_install_specs(
         "http://127.0.0.1:58182",
         tmp_path,
         20.0,
+        proof_closure_root=closure_root,
+        expected_proof_closure=closure,
     )
 
-    assert captured["command"] == [
-        "npx",
-        "playwright",
+    command = captured["command"]
+    assert isinstance(command, list)
+    assert command[:3] == [
+        "/usr/bin/node",
+        "/docker/chummercomplete/chummer.run-services/node_modules/playwright/cli.js",
         "test",
+    ]
+    assert command[3:5] == [
         "tests/public/frontdoor-mobile-launch.spec.ts",
         "tests/public/black-ledger-frontdoor.spec.ts",
+    ]
+    assert "--config=playwright.config.ts" in command
+    assert f"--output={tmp_path / '.playwright-output'}" in command
+    assert command[-2:] == [
         "--workers=1",
         "--reporter=line",
     ]
     assert captured["env"]["BASE_URL"] == "http://127.0.0.1:58182"
     assert captured["env"]["CHUMMER_COMPLETION_DIR"] == str(tmp_path)
+    assert captured["env"]["CHUMMER_PLAYWRIGHT_EXECUTION_ROOT"] == str(closure_root)
+    assert captured["env"]["CHUMMER_FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_SHA256"] == closure["aggregateSha256"]
+    assert captured["env"]["NODE_PATH"] == (
+        "/docker/chummercomplete/chummer.run-services/node_modules"
+    )
+    assert "NODE_OPTIONS" not in captured["env"]
+    assert "/tmp/hostile-node-modules" not in captured["env"]["NODE_PATH"]
+    assert "CHUMMER_PLAYWRIGHT_NODE_MODULES_ROOT" not in captured["env"]
+    assert "PW_TEST_REPORTER" not in captured["env"]
+    assert "PW_TEST_SOURCE_TRANSFORM" not in captured["env"]
+    assert "PW_TEST_SOURCE_TRANSFORM_SCOPE" not in captured["env"]
     assert captured["timeout_seconds"] == 180
     assert not (tmp_path / "frontdoor-navigation-proof.cjs").exists()
     assert result["status"] == "fail"
 
 
+def test_frontdoor_navigation_rejects_symlinked_or_untrusted_proof_closure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    closure_root, closure = materialize_frontdoor_proof_closure(tmp_path)
+    alias_root = tmp_path / "proof-closure-alias"
+    alias_root.symlink_to(closure_root, target_is_directory=True)
+    monkeypatch.setattr(
+        module,
+        "run_playwright_command",
+        lambda *_args, **_kwargs: pytest.fail("untrusted closure must not execute"),
+    )
+
+    symlinked = module.run_frontdoor_navigation_playwright(
+        "https://chummer.run",
+        tmp_path / "artifacts-symlinked",
+        20.0,
+        proof_closure_root=alias_root,
+        expected_proof_closure=closure,
+    )
+    mismatched_expected = dict(closure)
+    mismatched_expected["aggregateSha256"] = "0" * 64
+    untrusted = module.run_frontdoor_navigation_playwright(
+        "https://chummer.run",
+        tmp_path / "artifacts-untrusted",
+        20.0,
+        proof_closure_root=closure_root,
+        expected_proof_closure=mismatched_expected,
+    )
+
+    assert symlinked["status"] == "fail"
+    assert "symlink component" in symlinked["stderrTail"]
+    assert untrusted["status"] == "fail"
+    assert "does not match trusted build-info" in untrusted["stderrTail"]
+
+
+def test_frontdoor_navigation_rejects_nested_spec_symlink_before_execution(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    closure_root, closure = materialize_frontdoor_proof_closure(tmp_path)
+    spec_path = closure_root / "tests/public/frontdoor-mobile-launch.spec.ts"
+    outside = tmp_path / "outside-frontdoor.spec.ts"
+    outside.write_bytes(spec_path.read_bytes())
+    spec_path.unlink()
+    spec_path.symlink_to(outside)
+    monkeypatch.setattr(
+        module,
+        "run_playwright_command",
+        lambda *_args, **_kwargs: pytest.fail("symlinked spec must not execute"),
+    )
+
+    result = module.run_frontdoor_navigation_playwright(
+        "https://chummer.run",
+        tmp_path / "artifacts",
+        20.0,
+        proof_closure_root=closure_root,
+        expected_proof_closure=closure,
+    )
+
+    assert result["status"] == "fail"
+    assert "symlink component" in result["stderrTail"]
+
+
+def test_clean_checkout_frontdoor_closure_playwright_list_uses_pinned_dependency_root(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    closure_root, closure = materialize_frontdoor_proof_closure(tmp_path)
+    runtime = module.resolve_pinned_playwright_runtime(
+        str(closure["playwrightPackageVersion"])
+    )
+    env = {
+        **os.environ,
+        "BASE_URL": "https://example.test",
+        "CHUMMER_COMPLETION_DIR": str(tmp_path / "artifacts"),
+        "CHUMMER_FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_SHA256": str(
+            closure["aggregateSha256"]
+        ),
+        "CHUMMER_PLAYWRIGHT_EXECUTION_ROOT": str(closure_root),
+        "NODE_PATH": str(runtime["nodeModulesRoot"]),
+    }
+    command = [
+        *runtime["commandPrefix"],
+        "test",
+        "tests/public/frontdoor-mobile-launch.spec.ts",
+        "tests/public/black-ledger-frontdoor.spec.ts",
+        "--config=playwright.config.ts",
+        "--list",
+    ]
+
+    exit_code, stdout, stderr, timed_out = module.run_playwright_command(
+        command,
+        env,
+        60,
+    )
+
+    assert exit_code == 0, stderr
+    assert timed_out is False
+    assert "Total: 4 tests" in stdout
+    assert "MODULE_NOT_FOUND" not in stderr
+
+
 def test_frontdoor_navigation_can_reuse_existing_artifacts(monkeypatch, tmp_path) -> None:
     module = load_module()
+    closure_root, closure = materialize_frontdoor_proof_closure(tmp_path)
     (tmp_path / "FRONTDOOR_MOBILE_LAUNCH.generated.json").write_text(
         json.dumps(
             {
@@ -4678,7 +4967,10 @@ def test_frontdoor_navigation_can_reuse_existing_artifacts(monkeypatch, tmp_path
         encoding="utf-8",
     )
 
-    write_passing_frontdoor_artifacts(tmp_path)
+    write_passing_frontdoor_artifacts(
+        tmp_path,
+        proof_closure_sha256=str(closure["aggregateSha256"]),
+    )
 
     def unexpected_run(*args, **kwargs):  # noqa: ANN001
         raise AssertionError("Playwright should not run when reusable frontdoor artifacts already exist.")
@@ -4690,6 +4982,8 @@ def test_frontdoor_navigation_can_reuse_existing_artifacts(monkeypatch, tmp_path
         tmp_path,
         20.0,
         reuse_existing_artifact=True,
+        proof_closure_root=closure_root,
+        expected_proof_closure=closure,
     )
 
     assert result["status"] == "pass"
@@ -4712,7 +5006,12 @@ def test_frontdoor_navigation_can_reuse_existing_artifacts(monkeypatch, tmp_path
 
 def test_frontdoor_navigation_rejects_raw_private_reuse_and_redacts_receipt_logs(monkeypatch, tmp_path) -> None:
     module = load_module()
-    write_passing_frontdoor_artifacts(tmp_path)
+    closure_root, closure = materialize_frontdoor_proof_closure(tmp_path)
+    closure_sha256 = str(closure["aggregateSha256"])
+    write_passing_frontdoor_artifacts(
+        tmp_path,
+        proof_closure_sha256=closure_sha256,
+    )
     mobile_path = tmp_path / "FRONTDOOR_MOBILE_LAUNCH.generated.json"
     anchor_path = tmp_path / "FRONTDOOR_MOBILE_ANCHOR_REDIRECT.generated.json"
     mobile = json.loads(mobile_path.read_text(encoding="utf-8"))
@@ -4731,7 +5030,10 @@ def test_frontdoor_navigation_rejects_raw_private_reuse_and_redacts_receipt_logs
 
     def fake_run_playwright_command(command, env, timeout_seconds):  # noqa: ANN001
         captured["command"] = command
-        write_passing_frontdoor_artifacts(tmp_path)
+        write_passing_frontdoor_artifacts(
+            tmp_path,
+            proof_closure_sha256=closure_sha256,
+        )
         return (
             0,
             "navigated sessionId=reuse-private-session\n",
@@ -4746,6 +5048,8 @@ def test_frontdoor_navigation_rejects_raw_private_reuse_and_redacts_receipt_logs
         tmp_path,
         20.0,
         reuse_existing_artifact=True,
+        proof_closure_root=closure_root,
+        expected_proof_closure=closure,
     )
 
     serialized = json.dumps(result)
@@ -4800,6 +5104,8 @@ def test_postdeploy_gate_fails_closed_and_redacts_raw_frontdoor_child_receipt() 
 
 def test_frontdoor_navigation_reruns_when_reused_homepage_lane_text_mismatches_expected(monkeypatch, tmp_path) -> None:
     module = load_module()
+    closure_root, closure = materialize_frontdoor_proof_closure(tmp_path)
+    closure_sha256 = str(closure["aggregateSha256"])
     generated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     (tmp_path / "FRONTDOOR_MOBILE_LAUNCH.generated.json").write_text(
         json.dumps(
@@ -4848,6 +5154,7 @@ def test_frontdoor_navigation_reruns_when_reused_homepage_lane_text_mismatches_e
     write_passing_frontdoor_artifacts(
         tmp_path,
         homepage_lane_text="Current public lane: Preview. Review required.",
+        proof_closure_sha256=closure_sha256,
     )
     captured: dict[str, object] = {}
 
@@ -4898,7 +5205,10 @@ def test_frontdoor_navigation_reruns_when_reused_homepage_lane_text_mismatches_e
             ),
             encoding="utf-8",
         )
-        write_passing_frontdoor_artifacts(tmp_path)
+        write_passing_frontdoor_artifacts(
+            tmp_path,
+            proof_closure_sha256=closure_sha256,
+        )
         return 0, "", "", False
 
     monkeypatch.setattr(module, "run_playwright_command", fake_run_playwright_command)
@@ -4909,6 +5219,8 @@ def test_frontdoor_navigation_reruns_when_reused_homepage_lane_text_mismatches_e
         20.0,
         reuse_existing_artifact=True,
         expected_homepage_lane_text="Current public lane: Stable.",
+        proof_closure_root=closure_root,
+        expected_proof_closure=closure,
     )
 
     assert "command" in captured
@@ -4920,6 +5232,8 @@ def test_frontdoor_navigation_reruns_when_reused_homepage_lane_text_mismatches_e
 
 def test_frontdoor_navigation_reuses_canonical_anchor_artifact(monkeypatch, tmp_path) -> None:
     module = load_module()
+    closure_root, closure = materialize_frontdoor_proof_closure(tmp_path)
+    closure_sha256 = str(closure["aggregateSha256"])
     generated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     (tmp_path / "FRONTDOOR_MOBILE_LAUNCH.generated.json").write_text(
         json.dumps(
@@ -4964,7 +5278,10 @@ def test_frontdoor_navigation_reuses_canonical_anchor_artifact(monkeypatch, tmp_
         encoding="utf-8",
     )
 
-    write_passing_frontdoor_artifacts(tmp_path)
+    write_passing_frontdoor_artifacts(
+        tmp_path,
+        proof_closure_sha256=closure_sha256,
+    )
     captured: dict[str, object] = {}
 
     def fake_run_playwright_command(command, env, timeout_seconds):  # noqa: ANN001
@@ -5020,6 +5337,8 @@ def test_frontdoor_navigation_reuses_canonical_anchor_artifact(monkeypatch, tmp_
         tmp_path,
         20.0,
         reuse_existing_artifact=True,
+        proof_closure_root=closure_root,
+        expected_proof_closure=closure,
     )
 
     assert "command" not in captured
@@ -5034,6 +5353,7 @@ def test_frontdoor_navigation_reuses_canonical_anchor_artifact(monkeypatch, tmp_
 
 def test_frontdoor_navigation_clears_stale_artifacts_and_surfaces_failed_anchor_artifact(monkeypatch, tmp_path) -> None:
     module = load_module()
+    closure_root, closure = materialize_frontdoor_proof_closure(tmp_path)
     (tmp_path / "FRONTDOOR_MOBILE_LAUNCH.generated.json").write_text(
         json.dumps(
             {
@@ -5090,7 +5410,13 @@ def test_frontdoor_navigation_clears_stale_artifacts_and_surfaces_failed_anchor_
 
     monkeypatch.setattr(module, "run_playwright_command", fake_run_playwright_command)
 
-    result = module.run_frontdoor_navigation_playwright("https://chummer.run", tmp_path, 20.0)
+    result = module.run_frontdoor_navigation_playwright(
+        "https://chummer.run",
+        tmp_path,
+        20.0,
+        proof_closure_root=closure_root,
+        expected_proof_closure=closure,
+    )
 
     assert result["status"] == "fail"
     assert result["mobileArtifactContract"] == ""
