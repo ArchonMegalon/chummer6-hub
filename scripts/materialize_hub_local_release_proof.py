@@ -1139,7 +1139,6 @@ def main() -> int:
             "/home/work",
             "/account/access",
             "/account/work",
-            "/account/roster",
             "/account/support",
             "/contact",
             "/downloads",

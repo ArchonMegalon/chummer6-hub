@@ -179,17 +179,24 @@ QUEUE_PROOF_LINES = [
 
 def expected_current_proof_routes() -> list[str]:
     release_channel_path = REPO_ROOT / "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
-    payload = json.loads(release_channel_path.read_text(encoding="utf-8"))
-    install_routes = sorted(
-        {
-            f"/downloads/install/{str(item.get('artifactId') or item.get('id') or '').strip()}"
-            for collection_name in ("artifacts", "downloads")
-            for item in payload.get(collection_name, [])
-            if isinstance(item, dict)
-            and str(item.get("kind") or "").strip().lower() == "installer"
-            and str(item.get("artifactId") or item.get("id") or "").strip()
-        }
-    )
+    if release_channel_path.is_file():
+        payload = json.loads(release_channel_path.read_text(encoding="utf-8"))
+        install_routes = sorted(
+            {
+                f"/downloads/install/{str(item.get('artifactId') or item.get('id') or '').strip()}"
+                for collection_name in ("artifacts", "downloads")
+                for item in payload.get(collection_name, [])
+                if isinstance(item, dict)
+                and str(item.get("kind") or "").strip().lower() == "installer"
+                and str(item.get("artifactId") or item.get("id") or "").strip()
+            }
+        )
+    else:
+        install_routes = [
+            "/downloads/install/avalonia-linux-x64-installer",
+            "/downloads/install/avalonia-osx-arm64-installer",
+            "/downloads/install/avalonia-win-x64-installer",
+        ]
     additional_install_routes = [
         route for route in install_routes if route != "/downloads/install/avalonia-linux-x64-installer"
     ]
@@ -749,22 +756,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn("/api/v1/install-linking/continuation", proof)
             payload = json.loads(proof)
             self.assertEqual("chummer6-hub", payload["package_repo"])
-            self.assertEqual(
-                [
-                    "/downloads/install/avalonia-linux-x64-installer",
-                    "/home/access",
-                    "/home/work",
-                    "/account/access",
-                    "/account/work",
-                    "/account/roster",
-                    "/account/support",
-                    "/contact",
-                    "/downloads",
-                    "/downloads/install/avalonia-osx-arm64-installer",
-                    "/downloads/install/avalonia-win-x64-installer",
-                ],
-                payload["proof_routes"],
-            )
+            self.assertEqual(expected_current_proof_routes(), payload["proof_routes"])
             m102_package = next(
                 item
                 for item in payload["successor_queue_packages"]

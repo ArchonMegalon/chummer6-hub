@@ -1557,14 +1557,10 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
             if values != expected[key]:
                 missing.append(f"{path}: {receipt_id}.{key} must match {expected[key]!r}")
 
-        receipt_routes = receipt.get("routes")
-        if isinstance(receipt_routes, list):
-            for route in receipt_routes:
-                if isinstance(route, str) and route not in proof_route_set:
-                    missing.append(
-                        f"{path}: proof_routes missing package-scoped receipt route {route} for {receipt_id}"
-                    )
-
+        # Package receipts may name authenticated detail routes such as
+        # /account/roster. The top-level proof_routes field is the Registry
+        # projection and is intentionally limited to its canonical public
+        # prefix plus installer routes.
         summary = receipt.get("summary")
         if not isinstance(summary, str):
             missing.append(f"{path}: {receipt_id}.summary must be a string")
