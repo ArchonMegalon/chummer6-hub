@@ -6,8 +6,11 @@
   - or persistent compatibility metadata outside registry ownership.
 - Reject any change that collapses identity subjects, product users, groups, rewards, and entitlements into one undifferentiated table or DTO family:
   - Hub must keep principal, user-account, group, fact-ledger, reward-journal, and entitlement-journal concepts separate.
-- Reject if media orchestration, render-provider execution, or preview lifecycle logic appears in `chummer6-hub`:
-  - this remains owned by `chummer6-media-factory` unless explicitly mirrored at API boundaries.
+- Permit the `governed_spatial_render_v1` Hub bridge only when it translates approved Chummer truth, audience, permission, and time-limited consumer authorization refs into `Chummer.Media.Contracts`, then consumes a provider-redacted projection.
+- Reject render-provider selection/execution, provider jobs, retries/cancellation, media idempotency or quota mutation, immutable output-manifest/lifecycle ownership, provider-deletion evidence, or private execution receipts in `chummer6-hub`:
+  - those remain owned by `chummer6-media-factory`; Hub owns bridge/orchestration, product meaning, takedown intake, and user-visible closeout only.
+- Reject a source-copied spatial DTO, an `ea.*` contract alias, PropertyQuarry encounter-preview input, or any Hub/EA readiness projection based on prose, provider names, environment variables, historical evidence, stale evidence, or compose-only success.
+- Require the non-combat walkthrough to work with encounter fields absent and keep the private encounter preview outside public RUNSITE, live mechanics, tactical/VTT authority, and PropertyQuarry meaning.
 - Reject any change that moves play/runtime contracts or session behavior into `chummer6-hub`:
   - `Chummer.Play.Contracts` and hosted play-shell contracts must remain consumed and boundary-respected.
 - Reject any change that stores raw participant Codex/OpenAI auth caches or device-auth secrets in Hub:

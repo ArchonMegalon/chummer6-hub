@@ -18,9 +18,50 @@ from chummer_content_provider_contracts import (
 )
 
 
+def clean_story_link_text(value: str, fallback: str, *, max_length: int | None = None) -> str:
+    clean = value.strip() or fallback
+    if max_length is not None and len(clean) > max_length:
+        return clean[:max_length].strip()
+    return clean
+
+
+def parse_accepted_story_links(items: list[str]) -> list[dict[str, str]]:
+    links: list[dict[str, str]] = []
+    seen_link_ids: set[str] = set()
+    for item in items:
+        parts = [part.strip() for part in item.split("|", 4)]
+        if len(parts) != 5:
+            raise ValueError(
+                "expected LINK_ID|LINKED_RUNNER_REF|LINKED_RUNNER_ALIAS|RELATIONSHIP_SUMMARY|CONSENT_RECEIPT_REF"
+            )
+        link_id, linked_runner_ref, linked_runner_alias, summary, consent_receipt_ref = parts
+        if not link_id or not linked_runner_ref or not linked_runner_alias or not consent_receipt_ref:
+            raise ValueError(f"accepted story link has required blank fields: {item!r}")
+        normalized_link_id = link_id.lower()
+        if normalized_link_id in seen_link_ids:
+            raise ValueError(f"duplicate accepted story link id: {link_id}")
+        seen_link_ids.add(normalized_link_id)
+        links.append(
+            {
+                "link_id": link_id,
+                "linked_runner_ref": linked_runner_ref,
+                "linked_runner_alias": linked_runner_alias,
+                "relationship_summary": clean_story_link_text(
+                    summary,
+                    f"Shared history with {linked_runner_alias}.",
+                    max_length=280,
+                ),
+                "consent_receipt_ref": consent_receipt_ref,
+                "integration_scope": "origin_story_context_only",
+            }
+        )
+    return links
+
+
 def build_packet(args: argparse.Namespace) -> dict:
     origin_canon_path = require_existing_file(args.origin_canon_path)
     mechanics_snapshot_path = require_existing_file(args.mechanics_snapshot_path)
+    accepted_story_links = parse_accepted_story_links(args.accepted_story_link)
     packet = {
         "contract_name": "chummer.content_source_packet.v1",
         "packet_id": args.packet_id.strip(),
@@ -52,6 +93,16 @@ def build_packet(args: argparse.Namespace) -> dict:
             "mechanics_snapshot_sha256": sha256_file(mechanics_snapshot_path),
             "public_projection": args.public_projection.strip(),
             "gm_secret_included": args.gm_secret_included,
+            "accepted_runner_story_link_ids": [
+                link["link_id"] for link in accepted_story_links
+            ],
+            "shared_history_links": accepted_story_links,
+            "shared_history_policy": {
+                "requires_player_consent": True,
+                "requires_gm_review": args.shared_history_gm_review_required,
+                "provider_may_access_linked_runner_artifacts": False,
+                "integration_scope": "origin_story_context_only",
+            },
         },
         "expires_at": parse_iso_utc(args.expires_at),
     }
@@ -79,6 +130,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mechanics-snapshot-path", required=True)
     parser.add_argument("--public-projection", default="player_safe")
     parser.add_argument("--gm-secret-included", type=parse_bool, default=False)
+    parser.add_argument(
+        "--accepted-story-link",
+        action="append",
+        default=[],
+        help="LINK_ID|LINKED_RUNNER_REF|LINKED_RUNNER_ALIAS|RELATIONSHIP_SUMMARY|CONSENT_RECEIPT_REF",
+    )
+    parser.add_argument("--shared-history-gm-review-required", type=parse_bool, default=True)
     parser.add_argument("--source-head", action="append", default=[], help="KEY=VALUE")
     parser.add_argument("--source", action="append", default=[], help="PATH|AUTHORITY|CLASSIFICATION")
     parser.add_argument("--allowed-claim", action="append", default=[])

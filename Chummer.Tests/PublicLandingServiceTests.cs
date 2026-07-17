@@ -99,6 +99,18 @@ public sealed class PublicLandingServiceTests
         Assert.Contains(document.PublicRoutes!, static route =>
             string.Equals(route.Path, "/downloads/concierge", StringComparison.Ordinal)
             && string.Equals(route.Purpose, "guided_download_wrapper", StringComparison.Ordinal));
+        Assert.Contains(document.PublicRoutes!, static route =>
+            string.Equals(route.Path, "/horizons", StringComparison.Ordinal)
+            && string.Equals(route.Purpose, "working_horizons_summary", StringComparison.Ordinal));
+        Assert.Contains(document.PublicRoutes!, static route =>
+            string.Equals(route.Path, "/player", StringComparison.Ordinal)
+            && string.Equals(route.RequiredRedirectLocationPrefix, "/mobile/player", StringComparison.Ordinal));
+        Assert.Contains(document.PublicRoutes!, static route =>
+            string.Equals(route.Path, "/jammer", StringComparison.Ordinal)
+            && string.Equals(route.RequiredRedirectLocationPrefix, "/mobile/player", StringComparison.Ordinal));
+        Assert.Contains(document.PublicRoutes!, static route =>
+            string.Equals(route.Path, "/gm", StringComparison.Ordinal)
+            && string.Equals(route.RequiredRedirectLocationPrefix, "/mobile/gm", StringComparison.Ordinal));
         Assert.Contains(document.RegisteredRoutes!, static route =>
             string.Equals(route.Path, "/account/packages", StringComparison.Ordinal)
             && string.Equals(route.Purpose, "tracked_package_summary", StringComparison.Ordinal));

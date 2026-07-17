@@ -13,7 +13,7 @@
         ? "/account/roster"
         : $"/account/campaigns/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}";
     var selectedRunAftermathHref = selectedRunWorkspace is null
-        ? "/account/roster#aftermath-packages"
+        ? "/account/work#aftermath-packages"
         : $"/account/campaigns/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#aftermath-packages";
     var selectedRunCarryForwardHref = selectedRunWorkspace is null
         ? "/account/roster#selected-next-session-carry-forward"

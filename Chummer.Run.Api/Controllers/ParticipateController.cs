@@ -161,19 +161,9 @@ public sealed class ParticipateController : Controller
         string? supporterHref = subject is null ? null : ResolveParticipateSupporterHref();
 
         return new FirstPartyParticipateBoardViewModel(
-            Chrome: subject is null
-                ? _chrome.BuildPublicChrome(
-                    "Participate",
-                    "Public requests, clear bugs, useful ideas.",
-                    currentPath)
-                : _chrome.BuildAuthenticatedChrome(
-                    "Participate",
-                    "Public requests, clear bugs, useful ideas.",
-                    currentPath,
-                    string.IsNullOrWhiteSpace(subject.DisplayName) ? "Signed in" : subject.DisplayName,
-                    subject.Email),
+            Chrome: BuildParticipateShellChrome(currentPath, subject),
             Heading: "Participate",
-            Summary: "Public requests, clear bugs, useful ideas.",
+            Summary: "Participate",
             StatusLabel: hostedBoardAvailable ? "Open" : "Offline",
             Posts: Array.Empty<FirstPartyParticipatePostViewModel>(),
             FallbackItems: Array.Empty<ParticipateItemViewModel>(),
@@ -192,6 +182,26 @@ public sealed class ParticipateController : Controller
             EntryLabel: entryLabel,
             EntrySummary: entrySummary);
     }
+
+    private static SiteChromeViewModel BuildParticipateShellChrome(string currentPath, AuthenticatedHubSubject? subject)
+        => new(
+            Title: "Participate",
+            Description: "Participate",
+            CurrentPath: currentPath,
+            PrimaryNavigation: Array.Empty<PublicNavigationLink>(),
+            SecondaryNavigation: Array.Empty<PublicNavigationLink>(),
+            UtilityNavigation: Array.Empty<PublicNavigationLink>(),
+            HeaderActions: Array.Empty<SiteChromeActionViewModel>(),
+            PublicPrimaryCta: null,
+            Authenticated: subject is not null,
+            SignedInLabel: subject is null
+                ? null
+                : string.IsNullOrWhiteSpace(subject.DisplayName)
+                    ? "Signed in"
+                    : subject.DisplayName,
+            FooterCanonicalSource: string.Empty,
+            FooterGeneratedNote: string.Empty,
+            PublicSignalNavigation: Array.Empty<PublicNavigationLink>());
 
     private bool ShouldShortCircuitHostedBoardUpstream(Uri? upstream)
         => upstream is not null

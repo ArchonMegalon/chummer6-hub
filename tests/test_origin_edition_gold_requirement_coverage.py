@@ -66,6 +66,7 @@ def test_requirement_coverage_blocks_only_deployed_owner_requirement_for_current
     seed_matrix(tmp_path, deployed_pass=False)
 
     result = module.materialize(tmp_path, tmp_path / "coverage.json")
+    live_provider = next(item for item in result["requirements"] if item["id"] == "controlled_live_provider_pilot")
 
     assert result["status"] == "blocked"
     assert result["updated_at"]
@@ -74,6 +75,7 @@ def test_requirement_coverage_blocks_only_deployed_owner_requirement_for_current
     assert result["progress"]["blockedRequirements"] == ["deployed_owner_read_listen_watch_canon"]
     assert result["goalCompletionClaimAllowed"] is False
     assert result["blockedRequirements"] == ["deployed_owner_read_listen_watch_canon"]
+    assert live_provider["status"] == "proved"
     deployed = next(item for item in result["requirements"] if item["id"] == "deployed_owner_read_listen_watch_canon")
     assert deployed["blockedRows"] == ["deployed_user_login_read_listen_watch"]
     assert deployed["blockedHardGates"] == ["gold_audit_completion_claim_allowed"]

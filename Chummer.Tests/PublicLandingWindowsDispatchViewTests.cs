@@ -43,12 +43,14 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("Create account to get preview", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Download Chummer from the current release page.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Chummer selects the best installer when it can. Other downloads stay below.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Nothing stale will be offered as a substitute.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("No current build has passed release verification yet.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("attach this installed copy to your account", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<span>Stable</span>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"stable\"", downloadsView, StringComparison.Ordinal);
         Assert.Contains("data-release-lane=\"nightly\"", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Stable release.", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Newer than Stable.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("No Stable build on this shelf.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Preview build. Review required.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("<summary>Other downloads</summary>", downloadsView, StringComparison.Ordinal);
         Assert.Contains("No sudo. Updates default to notify.", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("var showLinuxSourcePrimary = true;", downloadsView, StringComparison.Ordinal);
@@ -58,8 +60,7 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("<h2>Help</h2>", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Use Help for install or update trouble.", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Need help?", downloadsView, StringComparison.Ordinal);
-        Assert.DoesNotContain("Release notes", downloadsView, StringComparison.Ordinal);
-        Assert.DoesNotContain("Known issues", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Release notes and known issues", downloadsView, StringComparison.Ordinal);
     }
 
     private static int CountOccurrences(string text, string needle)

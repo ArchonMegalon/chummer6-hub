@@ -6,9 +6,11 @@ import csv
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from functools import lru_cache
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,14 +18,30 @@ from typing import Any
 
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_ROOT = Path(__file__).resolve().parent
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+
+from magicai_pool_registry import env_assignments as shared_env_assignments
+from magicai_pool_registry import magicai_platform_audit as shared_magicai_platform_audit
+from magicai_pool_registry import magicai_pool_counts as shared_magicai_pool_counts
+
 PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 DEFAULT_OUTPUT = PUBLISHED_ROOT / "TEABLE_IMPORTANT_WORK.generated.json"
 DEFAULT_CSV_OUTPUT = PUBLISHED_ROOT / "TEABLE_IMPORTANT_WORK.csv"
+DEFAULT_MAGICAI_PLATFORM_AUDIT = PUBLISHED_ROOT / "MAGICAI_PLATFORM_ACCESS.generated.json"
+DEFAULT_ORIGIN_GOLD_PROOF_CHAIN = Path("/docker/chummercomplete/.tmp/origin-dossier-fresh-gold/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json")
 DEFAULT_TEABLE_ORIGIN = "https://app.teable.ai"
 DEFAULT_API_BASE_URL = "https://app.teable.ai/api"
 DEFAULT_HUB_BASE_URL = "https://chummer.run"
 DEFAULT_TABLE_NAME = "Chummer Important Work"
 DEFAULT_DB_TABLE_NAME = "chummer_important_work"
+DEFAULT_HTTP_TIMEOUT_SECONDS = 15.0
+DEFAULT_SYNC_DEADLINE_SECONDS = 180.0
+DEFAULT_BATCH_SIZE = 10
+DEFAULT_TRANSIENT_RETRY_LIMIT = 2
+DEFAULT_RETRY_BACKOFF_SECONDS = 0.5
+WINDOWS_VISUAL_AUDIT_RECEIPT = PUBLISHED_ROOT / "WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json"
 
 
 @dataclass(frozen=True)
@@ -59,7 +77,288 @@ def now_iso() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def important_work_items() -> list[ImportantWorkItem]:
+def env_assignments(path: Path) -> dict[str, str]:
+    return shared_env_assignments(path)
+
+
+@lru_cache(maxsize=1)
+def local_env_assignments() -> dict[str, str]:
+    return env_assignments(RUN_SERVICES_ROOT / ".env")
+
+
+def configured_value(*keys: str) -> str | None:
+    for key in keys:
+        value = normalize(os.environ.get(key))
+        if value is not None:
+            return value
+    assignments = local_env_assignments()
+    for key in keys:
+        value = normalize(assignments.get(key))
+        if value is not None:
+            return value
+    return None
+
+
+def read_json_object(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def file_contains(path: Path, needles: tuple[str, ...]) -> bool:
+    if not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return all(needle in text for needle in needles)
+
+
+def count_phrase(count: int, singular: str, plural: str | None = None) -> str:
+    label = singular if count == 1 else (plural or f"{singular}s")
+    return f"{count} {label}"
+
+
+def magicai_pool_readiness(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, int]:
+    return shared_magicai_pool_counts(env_assignments(repo_root / ".env"))
+
+
+def magicai_platform_audit(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, Any]:
+    return shared_magicai_platform_audit(repo_root)
+
+
+def render_lane_readiness(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, bool]:
+    return {
+        "governed_render_contract": file_contains(
+            repo_root / "Chummer.Run.Api/Services/Community/HorizonGovernedRenderRequestComposerService.cs",
+            (
+                'public const string OrchestrationLane = "ea_governed_render";',
+                'public const string ContractName = "chummer6-hub.horizon_governed_render_request.v1";',
+            ),
+        ),
+        "runsite_bridge": file_contains(
+            repo_root / "Chummer.Run.Api/Services/RunsiteOrientationArtifactRequestBridgeService.cs",
+            (
+                'private const string DefaultPreferredProvider = "magicai";',
+                'ArtifactKindOrCapabilityId: "runsite-scene-render"',
+                "GovernedRenderRequest: new HorizonGovernedRenderRequestCreateRequest(",
+            ),
+        ),
+        "propertyquarry_bridge": file_contains(
+            repo_root / "Chummer.Run.Api/Services/PropertyquarryApartmentVideoArtifactRequestBridgeService.cs",
+            (
+                'private const string DefaultPreferredProvider = "magicai";',
+                'ArtifactKindOrCapabilityId: "propertyquarry-apartment-video"',
+                "GovernedRenderRequest: new HorizonGovernedRenderRequestCreateRequest(",
+                "propertyquarry:property-packet",
+                "propertyquarry:property-continuity",
+            ),
+        ),
+        "propertyquarry_internal_controller": file_contains(
+            repo_root / "Chummer.Run.Api/Controllers/InternalPropertyquarryApartmentVideoController.cs",
+            (
+                '[HttpPost("/api/internal/propertyquarry/apartment-videos/requests")]',
+                '[HttpPost("/api/internal/propertyquarry/apartment-videos/artifact-requests")]',
+                "PropertyquarryApartmentVideoArtifactRequestBridgeResult",
+            ),
+        ),
+        "propertyquarry_signed_in_route": file_contains(
+            repo_root / "Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+            (
+                '[HttpPost("me/property-workspaces/{propertyId}/apartment-video")]',
+                "PropertyquarryApartmentVideoRequest",
+                "BuildPropertyquarryApartmentVideoLane(property)",
+                "apartmentVideoRequestApiHrefTemplate",
+            ),
+        ),
+    }
+
+
+def origin_gold_proof_status(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, Any]:
+    local_path = repo_root / ".tmp/origin-dossier-fresh-gold/ORIGIN_EDITION_GOLD_PROOF_CHAIN.generated.json"
+    payload = read_json_object(local_path)
+    if payload is None and repo_root.resolve() == RUN_SERVICES_ROOT.resolve():
+        payload = read_json_object(DEFAULT_ORIGIN_GOLD_PROOF_CHAIN)
+    payload = payload or {}
+    ready = (
+        payload.get("status") == "pass"
+        and payload.get("finalVerdict") == "ORIGIN_EDITION_GOLD_READY"
+        and payload.get("goalCompletionClaimAllowed") is True
+    )
+    progress = payload.get("progress") if isinstance(payload.get("progress"), dict) else {}
+    return {
+        "ready": ready,
+        "status": str(payload.get("status") or "").strip(),
+        "finalVerdict": str(payload.get("finalVerdict") or "").strip(),
+        "passedStages": progress.get("passedStages"),
+        "totalStages": progress.get("totalStages"),
+    }
+
+
+def origin_visuals_magicai_runtime(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, str]:
+    pool = magicai_pool_readiness(repo_root)
+    audit = magicai_platform_audit(repo_root)
+    lane = render_lane_readiness(repo_root)
+    gold = origin_gold_proof_status(repo_root)
+    render_lane_ready = all(lane.values())
+    pending = pool["pending_api_key_count"]
+    api_ready = pool["api_key_ready_count"]
+    declared = pool["declared_count"]
+    login_ready = pool["login_ready_count"]
+    pending_blocker_count = (
+        audit["pending_blocked_count"]
+        + audit["pending_login_failed_count"]
+        + audit["pending_unverified_count"]
+    )
+
+    if render_lane_ready and audit["attempted"] and audit["pending_mintable_count"] > 0:
+        status = "live-gold-pass-api-keys-pending"
+    elif render_lane_ready and audit["attempted"] and pending > 0 and pending_blocker_count > 0:
+        status = "live-gold-pass-api-key-path-blocked"
+    elif render_lane_ready and pending > 0:
+        status = "live-gold-pass-api-keys-pending"
+    elif render_lane_ready and api_ready > 0:
+        status = "live-gold-pass-render-lane-ready"
+    elif render_lane_ready and declared > 0:
+        status = "live-gold-pass-pool-declared"
+    elif render_lane_ready:
+        status = "live-gold-pass-pool-missing"
+    else:
+        status = "live-gold-pass-render-lane-pending"
+    if gold["ready"]:
+        if status == "live-gold-pass-api-key-path-blocked":
+            status = "origin-gold-ready-api-key-path-blocked"
+        elif status == "live-gold-pass-api-keys-pending":
+            status = "origin-gold-ready-api-keys-pending"
+        else:
+            status = "origin-gold-ready"
+
+    if audit["attempted"]:
+        constraints: list[str] = []
+        if audit["pending_blocked_count"]:
+            constraints.append(f"{count_phrase(audit['pending_blocked_count'], 'slot')} {'is' if audit['pending_blocked_count'] == 1 else 'are'} currently API-forbidden")
+        if audit["pending_login_failed_count"]:
+            constraints.append(f"{count_phrase(audit['pending_login_failed_count'], 'slot')} currently {'fails' if audit['pending_login_failed_count'] == 1 else 'fail'} platform login")
+        if audit["pending_unverified_count"]:
+            constraints.append(f"{count_phrase(audit['pending_unverified_count'], 'slot')} still {'needs' if audit['pending_unverified_count'] == 1 else 'need'} a fresh live probe")
+        if audit["pending_mintable_count"] > 0:
+            action_bits = [f"mint the remaining MagicAI/omagic API keys for {count_phrase(audit['pending_mintable_count'], 'mintable slot')}"]
+        elif constraints:
+            action_bits = ["clear the remaining MagicAI/omagic API key path blockers"]
+        else:
+            action_bits = ["keep the MagicAI/omagic API key pool verified"]
+        if constraints:
+            action_bits.append(", ".join(constraints))
+        action_fragment = "; ".join(action_bits)
+    else:
+        action_fragment = f"mint the remaining MagicAI/omagic API keys for {pending} of {login_ready or declared} declared login-ready pool slots"
+
+    proof_stage_fragment = ""
+    if gold["passedStages"] is not None and gold["totalStages"] is not None:
+        proof_stage_fragment = f" ({gold['passedStages']}/{gold['totalStages']} proof stages)"
+    next_action = (
+        f"Origin Dossier Gold is {'ready' if gold['ready'] else 'not yet fully proven'}"
+        f"{proof_stage_fragment}; "
+        f"keep the deployed owner proof green on chummer.run, keep Magicfit as the preferred visual lane, "
+        f"and {action_fragment}; the shared EA render lane is {'ready' if render_lane_ready else 'still being wired'} for Runsite and Propertyquarry via internal EA skills."
+    )
+
+    return {
+        "status": status,
+        "next_action": next_action,
+    }
+
+
+def windows_installer_visual_audit_runtime(repo_root: Path = RUN_SERVICES_ROOT) -> dict[str, str]:
+    published_root = repo_root / ".codex-studio" / "published"
+    payload = read_json_object(published_root / WINDOWS_VISUAL_AUDIT_RECEIPT.name)
+    if payload is None and repo_root.resolve() == RUN_SERVICES_ROOT.resolve():
+        payload = read_json_object(WINDOWS_VISUAL_AUDIT_RECEIPT)
+    payload = payload or {}
+
+    artifact = payload.get("artifact") if isinstance(payload.get("artifact"), dict) else {}
+    startup = payload.get("startupReceipt") if isinstance(payload.get("startupReceipt"), dict) else {}
+    visual = payload.get("visualAuditSource") if isinstance(payload.get("visualAuditSource"), dict) else {}
+    failures = payload.get("failures") if isinstance(payload.get("failures"), list) else []
+    failed_gates = payload.get("failed_gates") if isinstance(payload.get("failed_gates"), list) else []
+    raw_status = str(payload.get("status") or "").strip().lower()
+    promoted_sha = str(artifact.get("actualSha256") or artifact.get("sha256") or "").strip()
+    startup_matches_promoted = startup.get("artifactDigestMatchesPromoted")
+    visual_sha = str(visual.get("artifactSha256") or "").strip()
+    visual_matches_promoted = visual.get("artifactDigestMatchesPromoted")
+    status_is_effective_pass = (
+        raw_status in {"pass", "passed", "ready"}
+        and not failures
+        and not failed_gates
+        and payload.get("pass") is not False
+        and payload.get("source_digest_matches_promoted") is not False
+        and (
+            not startup
+            or (
+                str(startup.get("status") or "").strip().lower() in {"pass", "passed", "ready"}
+                and startup_matches_promoted is not False
+            )
+        )
+        and (
+            not visual
+            or (
+                str(visual.get("status") or "").strip().lower() in {"pass", "passed", "ready"}
+                and visual_matches_promoted is not False
+            )
+        )
+    )
+
+    if status_is_effective_pass:
+        return {
+            "status": "current-shelf-visual-proof-pass",
+            "cadence": "each promoted Windows artifact",
+            "source": "Windows installer visual audit receipt",
+            "why_it_matters": "The Windows installer is a launch-critical desktop first impression and its native screenshots now match the promoted shelf artifact.",
+            "next_action": "Keep the native Windows visual audit refreshed for every promoted Windows installer digest before release-ready and final-gold claims.",
+            "acceptance_gate": "Windows installer visual audit stays pass, the native screenshot source digest matches the promoted installer SHA, and final-gold no longer fails on this lane.",
+        }
+
+    if (
+        payload.get("source_digest_matches_promoted") is False
+        or visual_matches_promoted is False
+        or (promoted_sha and visual_sha and promoted_sha != visual_sha)
+    ):
+        return {
+            "status": "native-visual-recapture-needed",
+            "cadence": "now; before release-ready",
+            "source": "Operator dashboard and Windows installer visual audit receipt",
+            "why_it_matters": "The promoted Windows installer is live, but the native visual audit source still belongs to a different installer digest.",
+            "next_action": (
+                "Run the native Windows visual recapture for promoted installer digest "
+                f"{promoted_sha}, import the proof bundle with "
+                "scripts/import_windows_installer_gold_proof_artifact.py --intake-request "
+                ".codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --verify, "
+                "let that --verify import rerun the full post-import gate chain, "
+                "then rerun release-ready, the operator dashboard, and final-gold."
+            ),
+            "acceptance_gate": (
+                "WINDOWS_INSTALLER_VISUAL_AUDIT.source.json records artifactSha256 "
+                f"{promoted_sha}, required install-progress and completion screenshots pass at default and scaled DPI, "
+                "verify_windows_installer_visual_audit.py passes, and final-gold no longer fails on Windows installer visual audit."
+            ),
+        }
+
+    reason = "; ".join(str(item) for item in failures if str(item).strip()) or "Windows installer visual audit receipt is missing or failing."
+    return {
+        "status": "visual-proof-blocked",
+        "cadence": "now; before release-ready",
+        "source": "Operator dashboard and Windows installer visual audit receipt",
+        "why_it_matters": "The Windows installer is a launch-critical desktop first impression and must have native visual proof before any flagship claim.",
+        "next_action": f"Resolve the Windows installer visual audit blocker: {reason}",
+        "acceptance_gate": "verify_windows_installer_visual_audit.py passes for the promoted Windows installer and final-gold no longer fails on this lane.",
+    }
+
+
+def important_work_items(repo_root: Path = RUN_SERVICES_ROOT) -> list[ImportantWorkItem]:
+    origin_visuals_runtime = origin_visuals_magicai_runtime(repo_root)
+    windows_visual_runtime = windows_installer_visual_audit_runtime(repo_root)
     return [
         ImportantWorkItem(
             item_id="desktop-premium-ui-polish",
@@ -118,8 +417,8 @@ def important_work_items() -> list[ImportantWorkItem]:
             cadence="daily until released",
             source="Product direction",
             why_it_matters="The feature should feel like creating a book, not filling an internal options form.",
-            next_action="Verify the next installed desktop build starts from race/metatype and archetype, shows the story first, labels the primary handoff as a book before audio/video, and preserves authenticated read/listen/watch/canon-audit owner routes.",
-            acceptance_gate="A user can start a dossier, read the story first, open the FlipLink-style book, then request audio/video and access private read/listen/watch/canon-audit routes only as the signed-in owner.",
+            next_action="Verify the next installed desktop build starts from race/metatype and archetype, hands over a real full story ebook with fitting cover art first, then exactly three story-fit portraits, then voice-choice audiobook request, then chapter-scene summaries for one chosen character-visible cinematic render, while preserving authenticated read/listen/watch/canon-audit owner routes.",
+            acceptance_gate="A user can start a dossier, receive the real full story ebook with fitting cover art first, choose one of three story-fit portraits, request a voice-choice audiobook, choose one scene from the chapter shortlist for a character-visible render, and access private read/listen/watch/canon-audit routes only as the signed-in owner.",
         ),
         ImportantWorkItem(
             item_id="origin-dossier-alice-seed",
@@ -143,7 +442,7 @@ def important_work_items() -> list[ImportantWorkItem]:
             source="Product direction",
             why_it_matters="A dossier should read like a deliberate character book, not generated filler or a form summary.",
             next_action="Run the generated story through the Undetectable Humanizer LTD lane before FlipLink/book, audiobook, video, and Alice ingestion; keep advanced steering collapsed by default.",
-            acceptance_gate="Origin Dossier E2E proves race/archetype first, story-first review, humanized prose, book-first output, voice choice, video option, and Alice using the final story.",
+            acceptance_gate="Origin Dossier E2E proves race/archetype first, story-first review, humanized prose, Subscribr-authored full story, fitting cover art, three story-fit portraits, voice choice, chapter-scene shortlist, one chosen character-visible render, and Alice using the final story.",
         ),
         ImportantWorkItem(
             item_id="alice-build-from-scratch",
@@ -222,24 +521,24 @@ def important_work_items() -> list[ImportantWorkItem]:
             title="Windows installer premium design",
             area="Installer",
             priority="P0",
-            status="candidate-proof-passed",
-            cadence="next scheduled publish",
-            source="User and visual audit",
-            why_it_matters="The installer is the first desktop impression; the candidate build now has compact progress and completion text with native screenshots.",
-            next_action="Promote the fixed Windows build at the next 08:00 Europe/Vienna release window and verify the same visual proof against the promoted shelf installer.",
-            acceptance_gate="Promoted Windows installer screenshots at 100 percent and 150 percent DPI show no clipping and use the compact progress and completion copy.",
+            status=windows_visual_runtime["status"],
+            cadence=windows_visual_runtime["cadence"],
+            source=windows_visual_runtime["source"],
+            why_it_matters=windows_visual_runtime["why_it_matters"],
+            next_action=windows_visual_runtime["next_action"],
+            acceptance_gate=windows_visual_runtime["acceptance_gate"],
         ),
         ImportantWorkItem(
             item_id="windows-installer-current-shelf-proof",
             title="Current Windows shelf installer proof",
             area="Release",
             priority="P0",
-            status="blocked-until-next-publish",
-            cadence="next scheduled 08:00 publish",
-            source="UI run 27878634601 and Windows installer gold proof run 27878949995",
-            why_it_matters="The fixed installer passes native candidate proof, but the current live shelf still points at the older promoted installer digest.",
-            next_action="At the next scheduled morning publish, promote UI commit 4c5f62eb or newer, then rerun the native installer gold proof against the promoted shelf artifact.",
-            acceptance_gate="The promoted Windows installer artifact SHA matches the proof receipt and final gold no longer fails on the Windows installer visual audit.",
+            status=windows_visual_runtime["status"],
+            cadence=windows_visual_runtime["cadence"],
+            source=windows_visual_runtime["source"],
+            why_it_matters=windows_visual_runtime["why_it_matters"],
+            next_action=windows_visual_runtime["next_action"],
+            acceptance_gate=windows_visual_runtime["acceptance_gate"],
         ),
         ImportantWorkItem(
             item_id="aur-linux-package",
@@ -458,16 +757,28 @@ def important_work_items() -> list[ImportantWorkItem]:
             acceptance_gate="Subscribr can draft from approved sources only; publication remains disabled until separate human approval.",
         ),
         ImportantWorkItem(
+            item_id="sendr-black-ledger-outreach-lane",
+            title="Sendr Tier 4 Black Ledger outreach lane",
+            area="Provider governance",
+            priority="P1",
+            status="draft-review-gated",
+            cadence="weekly until pilot receipt",
+            source="Sendr Tier 4 guide",
+            why_it_matters="Black Ledger needs relationship-building distribution without giving Sendr rules, editorial, release, support, sponsor-contract, or private-data truth.",
+            next_action="Use the Sendr provider-lane contract, campaign packet verifier, dry-run campaign receipt, reply/engagement batch receipt, and suppression-sync verifier before any sponsor, guest, creator, or launch outreach; keep WhatsApp, direct send, and auto-reply disabled.",
+            acceptance_gate="A sponsor-pilot packet with provider-lane metadata, recipient-basis receipt, engagement batch receipt, suppression-sync pass, message-copy hash, platform-policy check, and human approval receipt exist before any limited Sendr send is claimed.",
+        ),
+        ImportantWorkItem(
             item_id="origin-visuals-magicfit-runsite-magicai",
             title="Magicfit origin visuals and MagicAI runsite pool",
             area="Provider governance",
             priority="P1",
-            status="active",
+            status=origin_visuals_runtime["status"],
             cadence="daily until stable",
             source="Provider account update",
             why_it_matters="Origin Dossier visual proofs should stay on the preferred Magicfit lane, book/PDF/ebook packaging should have its own governed provider account role, and Runsite scene renders plus Propertyquarry apartment videos should use the multi-account MagicAI/omagic pool through internal EA skills.",
-            next_action="Keep Magicfit as the approved Origin Dossier visual receipt lane, require packaging account aliases on book artifact receipts when configured, keep provider credit reservation audit-only checks read-only across free/supporter tiers, mint missing omagic API keys, keep empty key slots explicit in env until minted, and route runsite/propertyquarry render requests through internal-only EA capability surfaces.",
-            acceptance_gate="Origin Dossier accepts Magicfit-backed visual receipts, validates configured packaging provider receipts, proves no-credit-burn provider readiness audits and free/supporter credit gates, Runsite and Propertyquarry expose internal render capability receipts, and Teable reflects the split without exposing raw provider credentials.",
+            next_action=origin_visuals_runtime["next_action"],
+            acceptance_gate="Deployed Origin Dossier owner proof stays pass on chummer.run, packaging and visual receipt policy remain truthful, no-credit-burn provider readiness audits and free/supporter credit gates stay enforced, Runsite and Propertyquarry share one internal render capability receipt contract, and Teable/env reflect provider account state without exposing raw credentials.",
         ),
         ImportantWorkItem(
             item_id="code-quality-specialization-pass",
@@ -603,7 +914,110 @@ def normalize(value: str | None) -> str | None:
     return text or None
 
 
-def send_json(method: str, url: str, api_key: str, payload: dict[str, Any] | None = None, timeout: int = 60) -> Any:
+def resolve_duration_seconds(value: object, default: float) -> float:
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        return default
+    return seconds if seconds > 0 else default
+
+
+def resolve_http_timeout_seconds() -> float:
+    return resolve_duration_seconds(
+        configured_value("CHUMMER_TEABLE_HTTP_TIMEOUT_SECONDS"),
+        DEFAULT_HTTP_TIMEOUT_SECONDS,
+    )
+
+
+def resolve_sync_deadline_seconds() -> float:
+    return resolve_duration_seconds(
+        configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_SYNC_DEADLINE_SECONDS"),
+        DEFAULT_SYNC_DEADLINE_SECONDS,
+    )
+
+
+def operation_deadline(start_monotonic: float, deadline_seconds: float | None) -> float | None:
+    if deadline_seconds is None or deadline_seconds <= 0:
+        return None
+    return start_monotonic + deadline_seconds
+
+
+def bounded_timeout_seconds(
+    requested_timeout_seconds: float,
+    *,
+    deadline_monotonic: float | None,
+    label: str,
+) -> float:
+    timeout_seconds = max(1.0, float(requested_timeout_seconds))
+    if deadline_monotonic is None:
+        return timeout_seconds
+    remaining = deadline_monotonic - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError(f"{label}_deadline_exceeded")
+    return max(1.0, min(timeout_seconds, remaining))
+
+
+def chunked(items: list[Any], batch_size: int) -> list[list[Any]]:
+    effective_batch_size = max(1, int(batch_size))
+    return [items[index : index + effective_batch_size] for index in range(0, len(items), effective_batch_size)]
+
+
+def is_transient_teable_error(error: BaseException) -> bool:
+    text = str(error).strip().lower()
+    if "deadline_exceeded" in text:
+        return False
+    return any(
+        token in text
+        for token in (
+            "timed out",
+            "timeout",
+            "teable_transport_error:",
+            "teable_http_408:",
+            "teable_http_425:",
+            "teable_http_429:",
+            "teable_http_500:",
+            "teable_http_502:",
+            "teable_http_503:",
+            "teable_http_504:",
+            "teable_batch_update_count_mismatch:",
+            "teable_batch_create_count_mismatch:",
+            "teable_invalid_json_response",
+        )
+    )
+
+
+def sleep_before_teable_retry(
+    retry_number: int,
+    *,
+    retry_backoff_seconds: float,
+    deadline_monotonic: float | None,
+) -> None:
+    delay_seconds = max(0.0, float(retry_backoff_seconds)) * (2 ** max(0, retry_number - 1))
+    if delay_seconds <= 0:
+        return
+    if deadline_monotonic is not None:
+        remaining = deadline_monotonic - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("teable_sync_deadline_exceeded")
+        delay_seconds = min(delay_seconds, remaining)
+    time.sleep(delay_seconds)
+
+
+def send_json(
+    method: str,
+    url: str,
+    api_key: str,
+    payload: dict[str, Any] | None = None,
+    timeout: float | None = None,
+    *,
+    deadline_monotonic: float | None = None,
+) -> Any:
+    requested_timeout_seconds = resolve_http_timeout_seconds() if timeout is None else float(timeout)
+    effective_timeout_seconds = bounded_timeout_seconds(
+        requested_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+        label="teable_request",
+    )
     data: bytes | None = None
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -617,18 +1031,41 @@ def send_json(method: str, url: str, api_key: str, payload: dict[str, Any] | Non
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=headers, method=method.upper())
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=effective_timeout_seconds) as response:
             body = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"teable_http_{exc.code}:{body[:240]}") from exc
+    except urllib.error.URLError as exc:
+        reason = str(exc.reason or "").strip()
+        if "timed out" in reason.lower():
+            raise RuntimeError(f"teable_timeout_after_{effective_timeout_seconds:g}s") from exc
+        raise RuntimeError(f"teable_transport_error:{reason[:180]}") from exc
+    except TimeoutError as exc:
+        detail = str(exc) or f"teable_timeout_after_{effective_timeout_seconds:g}s"
+        raise RuntimeError(detail[:180]) from exc
     if not body.strip():
         return {}
-    return json.loads(body)
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("teable_invalid_json_response") from exc
 
 
-def discover_base_id(api_base_url: str, api_key: str) -> str | None:
-    response = send_json("GET", f"{api_base_url}/base/access/all", api_key)
+def discover_base_id(
+    api_base_url: str,
+    api_key: str,
+    *,
+    request_timeout_seconds: float,
+    deadline_monotonic: float | None = None,
+) -> str | None:
+    response = send_json(
+        "GET",
+        f"{api_base_url}/base/access/all",
+        api_key,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
     if not isinstance(response, list):
         return None
     ids = [str(entry.get("id") or "").strip() for entry in response if isinstance(entry, dict) and str(entry.get("id") or "").strip()]
@@ -643,8 +1080,22 @@ def matches_table(entry: dict[str, Any], table_name: str) -> bool:
     return table_name.strip().lower() in names or DEFAULT_DB_TABLE_NAME.lower() in names
 
 
-def resolve_or_create_table(api_base_url: str, api_key: str, base_id: str, table_name: str) -> str:
-    tables = send_json("GET", f"{api_base_url}/base/{urllib.parse.quote(base_id)}/table", api_key)
+def resolve_or_create_table(
+    api_base_url: str,
+    api_key: str,
+    base_id: str,
+    table_name: str,
+    *,
+    request_timeout_seconds: float,
+    deadline_monotonic: float | None = None,
+) -> str:
+    tables = send_json(
+        "GET",
+        f"{api_base_url}/base/{urllib.parse.quote(base_id)}/table",
+        api_key,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
     if isinstance(tables, list):
         for table in tables:
             if isinstance(table, dict) and matches_table(table, table_name):
@@ -658,14 +1109,34 @@ def resolve_or_create_table(api_base_url: str, api_key: str, base_id: str, table
         "fieldKeyType": "name",
         "fields": [teable_field_definition(field) for field in REQUIRED_FIELDS],
     }
-    created = send_json("POST", f"{api_base_url}/base/{urllib.parse.quote(base_id)}/table/", api_key, payload)
+    created = send_json(
+        "POST",
+        f"{api_base_url}/base/{urllib.parse.quote(base_id)}/table/",
+        api_key,
+        payload,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
     if not isinstance(created, dict) or not normalize(str(created.get("id") or "")):
         raise RuntimeError("teable_table_create_missing_id")
     return str(created["id"])
 
 
-def ensure_fields(api_base_url: str, api_key: str, table_id: str) -> None:
-    response = send_json("GET", f"{api_base_url}/table/{urllib.parse.quote(table_id)}/field?filterHidden=false", api_key)
+def ensure_fields(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    *,
+    request_timeout_seconds: float,
+    deadline_monotonic: float | None = None,
+) -> None:
+    response = send_json(
+        "GET",
+        f"{api_base_url}/table/{urllib.parse.quote(table_id)}/field?filterHidden=false",
+        api_key,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
     existing = set()
     if isinstance(response, list):
         for field in response:
@@ -676,16 +1147,131 @@ def ensure_fields(api_base_url: str, api_key: str, table_id: str) -> None:
     for field in REQUIRED_FIELDS:
         if str(field["name"]).lower() in existing:
             continue
-        send_json("POST", f"{api_base_url}/table/{urllib.parse.quote(table_id)}/field", api_key, teable_field_definition(field))
+        send_json(
+            "POST",
+            f"{api_base_url}/table/{urllib.parse.quote(table_id)}/field",
+            api_key,
+            teable_field_definition(field),
+            timeout=request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
+        )
 
 
-def find_existing_record(api_base_url: str, api_key: str, table_id: str, item_id: str) -> str | None:
+def existing_record_ids_by_item_id(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    *,
+    request_timeout_seconds: float,
+    deadline_monotonic: float | None = None,
+) -> dict[str, str]:
+    response = send_json(
+        "GET",
+        f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record?fieldKeyType=name&take=1000",
+        api_key,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
+    if not isinstance(response, dict) or not isinstance(response.get("records"), list):
+        raise RuntimeError("teable_record_list_invalid_response")
+
+    result: dict[str, str] = {}
+    for record in response["records"]:
+        if not isinstance(record, dict):
+            continue
+        fields = record.get("fields") if isinstance(record.get("fields"), dict) else {}
+        item_id = normalize(str(fields.get("Item Id") or ""))
+        record_id = normalize(str(record.get("id") or ""))
+        if not item_id or not record_id:
+            continue
+        if item_id in result and result[item_id] != record_id:
+            raise RuntimeError(f"teable_duplicate_item_id:{item_id}")
+        result[item_id] = record_id
+    return result
+
+
+def update_record_batch(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    items: list[tuple[ImportantWorkItem, str]],
+    synced_at: str,
+    *,
+    request_timeout_seconds: float,
+    deadline_monotonic: float | None = None,
+) -> int:
+    if not items:
+        return 0
+    response = send_json(
+        "PATCH",
+        f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record",
+        api_key,
+        {
+            "fieldKeyType": "name",
+            "typecast": True,
+            "records": [
+                {"id": record_id, "fields": teable_fields_for_row(item, synced_at)}
+                for item, record_id in items
+            ],
+        },
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
+    if not isinstance(response, list) or len(response) != len(items):
+        raise RuntimeError(f"teable_batch_update_count_mismatch:{len(items)}")
+    return len(items)
+
+
+def create_record_batch(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    items: list[ImportantWorkItem],
+    synced_at: str,
+    *,
+    request_timeout_seconds: float,
+    deadline_monotonic: float | None = None,
+) -> int:
+    if not items:
+        return 0
+    response = send_json(
+        "POST",
+        f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record",
+        api_key,
+        {
+            "fieldKeyType": "name",
+            "typecast": True,
+            "records": [
+                {"fields": teable_fields_for_row(item, synced_at)}
+                for item in items
+            ],
+        },
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
+    records = response.get("records") if isinstance(response, dict) else None
+    if not isinstance(records, list) or len(records) != len(items):
+        raise RuntimeError(f"teable_batch_create_count_mismatch:{len(items)}")
+    return len(items)
+
+
+def find_existing_record(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    item_id: str,
+    *,
+    request_timeout_seconds: float,
+    deadline_monotonic: float | None = None,
+) -> str | None:
     safe_item_id = item_id.replace("'", "\\'")
     filter_by_tql = urllib.parse.quote(f"{{Item Id}} = '{safe_item_id}'")
     response = send_json(
         "GET",
         f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record?fieldKeyType=name&take=1&filterByTql={filter_by_tql}",
         api_key,
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
     )
     if not isinstance(response, dict):
         return None
@@ -700,15 +1286,33 @@ def find_existing_record(api_base_url: str, api_key: str, table_id: str, item_id
     return None
 
 
-def upsert_record(api_base_url: str, api_key: str, table_id: str, item: ImportantWorkItem, synced_at: str) -> str:
+def upsert_record(
+    api_base_url: str,
+    api_key: str,
+    table_id: str,
+    item: ImportantWorkItem,
+    synced_at: str,
+    *,
+    request_timeout_seconds: float,
+    deadline_monotonic: float | None = None,
+) -> str:
     fields = teable_fields_for_row(item, synced_at)
-    record_id = find_existing_record(api_base_url, api_key, table_id, item.item_id)
+    record_id = find_existing_record(
+        api_base_url,
+        api_key,
+        table_id,
+        item.item_id,
+        request_timeout_seconds=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+    )
     if record_id:
         send_json(
             "PATCH",
             f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record/{urllib.parse.quote(record_id)}",
             api_key,
             {"fieldKeyType": "name", "typecast": True, "record": {"fields": fields}},
+            timeout=request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
         )
         return "updated"
     send_json(
@@ -716,6 +1320,8 @@ def upsert_record(api_base_url: str, api_key: str, table_id: str, item: Importan
         f"{api_base_url}/table/{urllib.parse.quote(table_id)}/record",
         api_key,
         {"fieldKeyType": "name", "typecast": True, "records": [{"fields": fields}]},
+        timeout=request_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
     )
     return "created"
 
@@ -727,35 +1333,84 @@ def sync_to_teable(
     base_id: str | None,
     table_id: str | None,
     table_name: str,
+    request_timeout_seconds: float,
+    sync_deadline_seconds: float | None,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    transient_retry_limit: int = DEFAULT_TRANSIENT_RETRY_LIMIT,
+    retry_backoff_seconds: float = DEFAULT_RETRY_BACKOFF_SECONDS,
 ) -> dict[str, Any]:
     started_at = now_iso()
+    started_monotonic = time.monotonic()
+    deadline_monotonic = operation_deadline(started_monotonic, sync_deadline_seconds)
+    effective_batch_size = max(1, int(batch_size))
+    effective_retry_limit = max(0, int(transient_retry_limit))
+    rows = important_work_items()
     if not api_key:
         return {
             "state": "blocked",
             "attempted": True,
             "started_at_utc": started_at,
+            "request_timeout_seconds": request_timeout_seconds,
+            "sync_deadline_seconds": sync_deadline_seconds,
+            "batch_size": effective_batch_size,
+            "transient_retry_limit": effective_retry_limit,
             "synced_count": 0,
-            "failed_count": len(important_work_items()),
+            "failed_count": len(rows),
             "errors": ["teable_api_key_missing"],
         }
     resolved_base_id = base_id
     resolved_table_id = table_id
     try:
+        bounded_timeout_seconds(
+            request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
+            label="teable_sync",
+        )
         if not resolved_table_id:
             if not resolved_base_id:
-                resolved_base_id = discover_base_id(api_base_url, api_key)
+                resolved_base_id = discover_base_id(
+                    api_base_url,
+                    api_key,
+                    request_timeout_seconds=request_timeout_seconds,
+                    deadline_monotonic=deadline_monotonic,
+                )
             if not resolved_base_id:
                 return {
                     "state": "blocked",
                     "attempted": True,
                     "started_at_utc": started_at,
+                    "request_timeout_seconds": request_timeout_seconds,
+                    "sync_deadline_seconds": sync_deadline_seconds,
+                    "batch_size": effective_batch_size,
+                    "transient_retry_limit": effective_retry_limit,
                     "synced_count": 0,
-                    "failed_count": len(important_work_items()),
+                    "failed_count": len(rows),
                     "errors": ["teable_base_id_required_when_table_id_is_missing"],
                 }
-            resolved_table_id = resolve_or_create_table(api_base_url, api_key, resolved_base_id, table_name)
-        ensure_fields(api_base_url, api_key, resolved_table_id)
+            resolved_table_id = resolve_or_create_table(
+                api_base_url,
+                api_key,
+                resolved_base_id,
+                table_name,
+                request_timeout_seconds=request_timeout_seconds,
+                deadline_monotonic=deadline_monotonic,
+            )
+        ensure_fields(
+            api_base_url,
+            api_key,
+            resolved_table_id,
+            request_timeout_seconds=request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
+        )
+        existing_record_ids = existing_record_ids_by_item_id(
+            api_base_url,
+            api_key,
+            resolved_table_id,
+            request_timeout_seconds=request_timeout_seconds,
+            deadline_monotonic=deadline_monotonic,
+        )
     except Exception as exc:
+        deadline_exceeded = "deadline_exceeded" in str(exc)
         return {
             "state": "failed",
             "attempted": True,
@@ -765,24 +1420,129 @@ def sync_to_teable(
             "base_id": resolved_base_id,
             "table_id": resolved_table_id,
             "table_name": table_name,
+            "request_timeout_seconds": request_timeout_seconds,
+            "sync_deadline_seconds": sync_deadline_seconds,
+            "batch_size": effective_batch_size,
+            "transient_retry_limit": effective_retry_limit,
+            "deadline_exceeded": deadline_exceeded,
             "synced_count": 0,
-            "failed_count": len(important_work_items()),
+            "failed_count": len(rows),
             "errors": [f"teable_setup:{str(exc)[:180]}"],
         }
     synced_at = now_iso()
     created = 0
     updated = 0
     errors: list[str] = []
-    for item in important_work_items():
-        try:
-            result = upsert_record(api_base_url, api_key, resolved_table_id, item, synced_at)
-            if result == "created":
-                created += 1
-            else:
-                updated += 1
-        except Exception as exc:  # pragma: no cover - exact provider failures are integration-level.
-            errors.append(f"{item.item_id}:{str(exc)[:180]}")
-    failed = len(errors)
+    deadline_exceeded = False
+    last_item_id: str | None = None
+    retry_count = 0
+    reconciled_create_count = 0
+    completed_batch_count = 0
+
+    update_items = [
+        (item, existing_record_ids[item.item_id])
+        for item in rows
+        if item.item_id in existing_record_ids
+    ]
+    create_items = [item for item in rows if item.item_id not in existing_record_ids]
+    batches: list[tuple[str, list[Any]]] = [
+        *[("update", batch) for batch in chunked(update_items, effective_batch_size)],
+        *[("create", batch) for batch in chunked(create_items, effective_batch_size)],
+    ]
+    for action, batch_items in batches:
+        if not batch_items:
+            continue
+        original_batch_items = list(batch_items)
+        pending_batch_items = list(batch_items)
+        first_item = original_batch_items[0][0] if action == "update" else original_batch_items[0]
+        last_item = original_batch_items[-1][0] if action == "update" else original_batch_items[-1]
+        last_item_id = last_item.item_id
+        batch_retry_count = 0
+        while pending_batch_items:
+            try:
+                bounded_timeout_seconds(
+                    request_timeout_seconds,
+                    deadline_monotonic=deadline_monotonic,
+                    label="teable_sync",
+                )
+                if action == "update":
+                    updated += update_record_batch(
+                        api_base_url,
+                        api_key,
+                        resolved_table_id,
+                        pending_batch_items,
+                        synced_at,
+                        request_timeout_seconds=request_timeout_seconds,
+                        deadline_monotonic=deadline_monotonic,
+                    )
+                else:
+                    created += create_record_batch(
+                        api_base_url,
+                        api_key,
+                        resolved_table_id,
+                        pending_batch_items,
+                        synced_at,
+                        request_timeout_seconds=request_timeout_seconds,
+                        deadline_monotonic=deadline_monotonic,
+                    )
+                pending_batch_items = []
+                completed_batch_count += 1
+            except Exception as exc:  # pragma: no cover - exact provider failures are integration-level.
+                error_text = str(exc)
+                if "deadline_exceeded" in error_text:
+                    deadline_exceeded = True
+                    errors.append(f"{action}:{first_item.item_id}..{last_item.item_id}:{error_text[:180]}")
+                    break
+                if not is_transient_teable_error(exc) or batch_retry_count >= effective_retry_limit:
+                    errors.append(f"{action}:{first_item.item_id}..{last_item.item_id}:{error_text[:180]}")
+                    break
+
+                if action == "create":
+                    try:
+                        refreshed_record_ids = existing_record_ids_by_item_id(
+                            api_base_url,
+                            api_key,
+                            resolved_table_id,
+                            request_timeout_seconds=request_timeout_seconds,
+                            deadline_monotonic=deadline_monotonic,
+                        )
+                    except Exception as reconciliation_error:
+                        errors.append(
+                            f"create:{first_item.item_id}..{last_item.item_id}:"
+                            f"ambiguous_create_reconciliation_failed:{str(reconciliation_error)[:128]}"
+                        )
+                        break
+                    confirmed_items = [
+                        item for item in pending_batch_items if item.item_id in refreshed_record_ids
+                    ]
+                    if confirmed_items:
+                        confirmed_count = len(confirmed_items)
+                        created += confirmed_count
+                        reconciled_create_count += confirmed_count
+                        pending_batch_items = [
+                            item for item in pending_batch_items if item.item_id not in refreshed_record_ids
+                        ]
+                        if not pending_batch_items:
+                            completed_batch_count += 1
+                            break
+
+                batch_retry_count += 1
+                retry_count += 1
+                try:
+                    sleep_before_teable_retry(
+                        batch_retry_count,
+                        retry_backoff_seconds=retry_backoff_seconds,
+                        deadline_monotonic=deadline_monotonic,
+                    )
+                except TimeoutError as retry_deadline_error:
+                    deadline_exceeded = True
+                    errors.append(
+                        f"{action}:{first_item.item_id}..{last_item.item_id}:{str(retry_deadline_error)}"
+                    )
+                    break
+        if deadline_exceeded:
+            break
+    failed = len(rows) - created - updated
     return {
         "state": "passed" if failed == 0 else "failed",
         "attempted": True,
@@ -792,6 +1552,16 @@ def sync_to_teable(
         "base_id": resolved_base_id,
         "table_id": resolved_table_id,
         "table_name": table_name,
+        "request_timeout_seconds": request_timeout_seconds,
+        "sync_deadline_seconds": sync_deadline_seconds,
+        "batch_size": effective_batch_size,
+        "batch_count": len(batches),
+        "completed_batch_count": completed_batch_count,
+        "transient_retry_limit": effective_retry_limit,
+        "retry_count": retry_count,
+        "reconciled_create_count": reconciled_create_count,
+        "deadline_exceeded": deadline_exceeded,
+        "last_item_id": last_item_id,
         "synced_count": created + updated,
         "created_count": created,
         "updated_count": updated,
@@ -800,7 +1570,21 @@ def sync_to_teable(
     }
 
 
-def send_hub_json(method: str, url: str, token: str, payload: dict[str, Any] | None = None, timeout: int = 60) -> Any:
+def send_hub_json(
+    method: str,
+    url: str,
+    token: str,
+    payload: dict[str, Any] | None = None,
+    timeout: float | None = None,
+    *,
+    deadline_monotonic: float | None = None,
+) -> Any:
+    requested_timeout_seconds = resolve_http_timeout_seconds() if timeout is None else float(timeout)
+    effective_timeout_seconds = bounded_timeout_seconds(
+        requested_timeout_seconds,
+        deadline_monotonic=deadline_monotonic,
+        label="hub_request",
+    )
     data: bytes | None = None
     headers = {
         "Authorization": f"Bearer {token}",
@@ -812,11 +1596,19 @@ def send_hub_json(method: str, url: str, token: str, payload: dict[str, Any] | N
         headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, headers=headers, method=method.upper())
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with urllib.request.urlopen(request, timeout=effective_timeout_seconds) as response:
             body = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"hub_http_{exc.code}:{body[:240]}") from exc
+    except urllib.error.URLError as exc:
+        reason = str(exc.reason or "").strip()
+        if "timed out" in reason.lower():
+            raise RuntimeError(f"hub_timeout_after_{effective_timeout_seconds:g}s") from exc
+        raise RuntimeError(f"hub_transport_error:{reason[:180]}") from exc
+    except TimeoutError as exc:
+        detail = str(exc) or f"hub_timeout_after_{effective_timeout_seconds:g}s"
+        raise RuntimeError(detail[:180]) from exc
     if not body.strip():
         return {}
     return json.loads(body)
@@ -844,7 +1636,12 @@ def important_work_item_to_hub_request(item: ImportantWorkItem) -> dict[str, Any
     }
 
 
-def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any]:
+def seed_hub_store(
+    *,
+    hub_base_url: str,
+    hub_token: str | None,
+    request_timeout_seconds: float,
+) -> dict[str, Any]:
     started_at = now_iso()
     rows = important_work_items()
     if not hub_token:
@@ -852,6 +1649,7 @@ def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any
             "state": "blocked",
             "attempted": True,
             "started_at_utc": started_at,
+            "request_timeout_seconds": request_timeout_seconds,
             "recorded_count": 0,
             "failed_count": len(rows),
             "errors": ["hub_internal_token_missing"],
@@ -861,7 +1659,13 @@ def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any
     endpoint = f"{hub_base_url.rstrip('/')}/api/internal/community/important-work"
     for item in rows:
         try:
-            send_hub_json("POST", endpoint, hub_token, important_work_item_to_hub_request(item))
+            send_hub_json(
+                "POST",
+                endpoint,
+                hub_token,
+                important_work_item_to_hub_request(item),
+                timeout=request_timeout_seconds,
+            )
             recorded += 1
         except Exception as exc:  # pragma: no cover - live edge behavior is integration-level.
             errors.append(f"{item.item_id}:{str(exc)[:180]}")
@@ -871,6 +1675,7 @@ def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any
         "started_at_utc": started_at,
         "finished_at_utc": now_iso(),
         "hub_base_url": hub_base_url.rstrip("/"),
+        "request_timeout_seconds": request_timeout_seconds,
         "recorded_count": recorded,
         "failed_count": len(errors),
         "errors": errors,
@@ -878,10 +1683,10 @@ def seed_hub_store(*, hub_base_url: str, hub_token: str | None) -> dict[str, Any
 
 
 def resolve_api_base_url() -> str:
-    explicit_api = normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_BASE_URL")) or normalize(os.environ.get("TEABLE_API_BASE_URL"))
+    explicit_api = configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_API_BASE_URL", "TEABLE_API_BASE_URL")
     if explicit_api:
         return explicit_api.rstrip("/")
-    configured_base = normalize(os.environ.get("TEABLE_BASE_URL")) or normalize(os.environ.get("TEABLE_RUNTIME_BASE_URL"))
+    configured_base = configured_value("TEABLE_BASE_URL", "TEABLE_RUNTIME_BASE_URL")
     if not configured_base:
         return DEFAULT_API_BASE_URL
     configured_base = configured_base.rstrip("/")
@@ -893,14 +1698,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--csv-output", type=Path, default=None, help="Write a Teable import CSV beside the JSON receipt.")
     parser.add_argument("--seed-hub", action="store_true", help="Record the same work rows into the Chummer Hub internal store before Teable sync.")
-    parser.add_argument("--hub-base-url", default=normalize(os.environ.get("CHUMMER_PUBLIC_BASE_URL")) or normalize(os.environ.get("CHUMMER_HUB_BASE_URL")) or DEFAULT_HUB_BASE_URL)
-    parser.add_argument("--hub-token", default=normalize(os.environ.get("FLEET_INTERNAL_API_TOKEN")) or normalize(os.environ.get("CHUMMER_HUB_INTERNAL_API_TOKEN")))
+    parser.add_argument("--hub-base-url", default=configured_value("CHUMMER_PUBLIC_BASE_URL", "CHUMMER_HUB_BASE_URL") or DEFAULT_HUB_BASE_URL)
+    parser.add_argument("--hub-token", default=configured_value("FLEET_INTERNAL_API_TOKEN", "CHUMMER_HUB_INTERNAL_API_TOKEN"))
     parser.add_argument("--sync", action="store_true", help="Upsert rows into Teable. Dry-run artifact only by default.")
     parser.add_argument("--api-base-url", default=resolve_api_base_url())
-    parser.add_argument("--api-key", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY")) or normalize(os.environ.get("TEABLE_API_KEY")))
-    parser.add_argument("--base-id", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID")))
-    parser.add_argument("--table-id", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_ID")))
-    parser.add_argument("--table-name", default=normalize(os.environ.get("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_NAME")) or DEFAULT_TABLE_NAME)
+    parser.add_argument("--api-key", default=configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_API_KEY", "TEABLE_API_KEY"))
+    parser.add_argument("--base-id", default=configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_BASE_ID"))
+    parser.add_argument("--table-id", default=configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_ID"))
+    parser.add_argument("--table-name", default=configured_value("CHUMMER_TEABLE_IMPORTANT_WORK_TABLE_NAME") or DEFAULT_TABLE_NAME)
+    parser.add_argument("--request-timeout-seconds", type=float, default=resolve_http_timeout_seconds())
+    parser.add_argument("--sync-deadline-seconds", type=float, default=resolve_sync_deadline_seconds())
+    parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
+    parser.add_argument("--transient-retry-limit", type=int, default=DEFAULT_TRANSIENT_RETRY_LIMIT)
+    parser.add_argument("--retry-backoff-seconds", type=float, default=DEFAULT_RETRY_BACKOFF_SECONDS)
     return parser.parse_args(argv)
 
 
@@ -911,6 +1721,7 @@ def main(argv: list[str] | None = None) -> int:
         projection["hub_seed"] = seed_hub_store(
             hub_base_url=str(args.hub_base_url),
             hub_token=args.hub_token,
+            request_timeout_seconds=float(args.request_timeout_seconds),
         )
         if projection["hub_seed"]["state"] != "passed":
             projection["status"] = "blocked" if projection["hub_seed"]["state"] == "blocked" else "failed"
@@ -921,6 +1732,11 @@ def main(argv: list[str] | None = None) -> int:
             base_id=args.base_id,
             table_id=args.table_id,
             table_name=args.table_name,
+            request_timeout_seconds=float(args.request_timeout_seconds),
+            sync_deadline_seconds=float(args.sync_deadline_seconds),
+            batch_size=int(args.batch_size),
+            transient_retry_limit=int(args.transient_retry_limit),
+            retry_backoff_seconds=float(args.retry_backoff_seconds),
         )
         if projection["sync"]["state"] != "passed":
             projection["status"] = "blocked" if projection["sync"]["state"] == "blocked" else "failed"

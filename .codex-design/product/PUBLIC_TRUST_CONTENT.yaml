@@ -56,11 +56,12 @@ trust_pages:
     heading: "What Chummer stores, and what it does not"
     intro: "This is the simple privacy picture right now: what your account stores, what stays out, and how support and linked installs work."
     effective_date: "2026-03-25"
-    updated_date: "2026-03-28"
+    updated_date: "2026-07-15"
     summary_points:
       - "The download file stays the same for everyone"
       - "Your account stores sign-in and help history"
       - "Passwords and access keys stay out of your account record"
+      - "Hosted Build workspace recovery and erasure policy is still under review"
     actions:
       - label: "Open account"
         href: "/account"
@@ -88,6 +89,10 @@ trust_pages:
         eyebrow: "Privacy and recognition"
         heading: "Recognition should not force publicity"
         body: "Participation and recognition remain optional layers. Private product use, private support, and a quiet account setup remain valid even while community pages exist."
+      - id: hosted-build-workspaces
+        eyebrow: "Hosted Build workspaces"
+        heading: "Workspace deletion removes the active hosted copy"
+        body: "Hosted Build stores workspace content inside the signed-in owner's boundary. Deleting a hosted workspace removes its active row from the serving store, so it no longer appears in Chummer. Backup and point-in-time-recovery retention, tombstone or lineage retention, restore-time deletion replay, and whole-account erasure do not yet have an approved policy; deletion replay is not implemented. This area remains review_required for launch and release. Chummer does not claim permanent deletion or an unapproved retention window."
   - id: terms
     eyebrow: "Terms"
     heading: "Terms in plain language"

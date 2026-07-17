@@ -21,10 +21,10 @@ public sealed class PublicCanonFileLoader
     public string ResolveRepoRoot(string requiredRelativePath)
     {
         var configured = _configuration["CHUMMER_PUBLIC_CANON_ROOT"];
-        var candidates = new[]
+        var candidates = new string?[]
         {
             configured,
-            Directory.GetCurrentDirectory(),
+            TryGetCurrentDirectory(),
             AppContext.BaseDirectory,
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..")),
             "/docker/chummercomplete/chummer.run-services",
@@ -96,6 +96,18 @@ public sealed class PublicCanonFileLoader
         return File.ReadAllText(path);
     }
 
+    private static string? TryGetCurrentDirectory()
+    {
+        try
+        {
+            return Directory.GetCurrentDirectory();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     private static IEnumerable<string> ExpandRelativePathCandidates(string relativePath)
     {
         string normalized = relativePath.Replace('\\', '/');
@@ -104,6 +116,10 @@ public sealed class PublicCanonFileLoader
         if (normalized.StartsWith(DesignProductPrefix, StringComparison.OrdinalIgnoreCase))
         {
             yield return MirrorProductPrefix + normalized[DesignProductPrefix.Length..];
+        }
+        else if (normalized.StartsWith(MirrorProductPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return DesignProductPrefix + normalized[MirrorProductPrefix.Length..];
         }
     }
 }

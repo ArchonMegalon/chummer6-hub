@@ -227,6 +227,78 @@ public sealed class ReadyForTonightService
                 next_best_screen = "/mobile",
                 install_route = "/downloads",
                 continuity_route = "/play/continuity",
+                pwa_route = "/mobile",
+                frontdoor_launch_route = "/mobile/player",
+                playtime_tools = new[]
+                {
+                    new
+                    {
+                        id = "inventory",
+                        label = "Inventory",
+                        summary = "Keep table-facing gear and carried items visible during play without opening the full builder."
+                    },
+                    new
+                    {
+                        id = "health",
+                        label = "Health",
+                        summary = "Track damage and recovery cues as session notes, not as automatic rules decisions."
+                    },
+                    new
+                    {
+                        id = "ammo",
+                        label = "Ammo",
+                        summary = "Keep ammunition and reload reminders close to the play screen."
+                    },
+                    new
+                    {
+                        id = "modifiers",
+                        label = "Modifiers",
+                        summary = "Surface current table modifiers and GM notes before a roll."
+                    },
+                    new
+                    {
+                        id = "quick_rolls",
+                        label = "Quick rolls and odds",
+                        summary = "Show quick dice entry and chance framing for playtime checks without replacing GM authority."
+                    },
+                    new
+                    {
+                        id = "living_world",
+                        label = "Opt-in living world",
+                        summary = "Black Ledger heat and turn updates stay gated behind account opt-in and followed-world selection."
+                    }
+                },
+                boundaries = new[]
+                {
+                    "The mobile shell supports playtime tracking; character building stays before or after the session.",
+                    "Black Ledger live detail requires account opt-in and followed-world selection.",
+                    "GM remains final authority for modifiers, dice calls, and table consequences."
+                },
+                role_routes = new[]
+                {
+                    new
+                    {
+                        role = "Player",
+                        mode = "player",
+                        route = "/mobile/player",
+                        manifest_path = "/manifest.player.webmanifest",
+                        manifest_id = "/mobile/player",
+                        manifest_start_url = "/mobile/player",
+                        session_handoff_route_template = "/mobile/player?sessionId={sessionId}&role=Player",
+                        frontdoor_default = true
+                    },
+                    new
+                    {
+                        role = "GameMaster",
+                        mode = "gm",
+                        route = "/mobile/gm",
+                        manifest_path = "/manifest.gm.webmanifest",
+                        manifest_id = "/mobile/gm",
+                        manifest_start_url = "/mobile/gm",
+                        session_handoff_route_template = "/mobile/gm?sessionId={sessionId}&role=GameMaster",
+                        frontdoor_default = false
+                    }
+                },
                 packet_routes = PacketAssets.Select(item => new { item.RoleId, markdown = item.MarkdownHref, json = item.JsonHref }).ToArray(),
                 generated_at_utc = DateTimeOffset.UtcNow
             },

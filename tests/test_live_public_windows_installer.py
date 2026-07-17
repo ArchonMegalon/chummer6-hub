@@ -9,6 +9,7 @@ import unittest
 import zipfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "verify_live_public_windows_installer.py"
@@ -178,15 +179,23 @@ class LivePublicWindowsInstallerTests(unittest.TestCase):
     def test_live_public_windows_installer_verifier_passes_for_matching_fixture(self) -> None:
         module = load_module()
         output_path = Path(self.id().replace(".", "_")).with_suffix(".json")
-        module.OUTPUT_PATH = Path("/tmp") / output_path
+        output_path = Path("/tmp") / output_path
         verify_script = self.build_stub_verify_script()
-        payload = module.verify(self.base_url, verify_script)
+        payload = module.verify(self.base_url, verify_script, output_path=output_path)
 
         self.assertEqual("pass", payload["status"])
         self.assertEqual("LIVE_PUBLIC_WINDOWS_INSTALLER_READY", payload["verdict"])
         self.assertEqual([], payload["failures"])
+        self.assertTrue(output_path.is_file())
+        written = json.loads(output_path.read_text(encoding="utf-8"))
+        self.assertEqual("chummer.live_public_windows_installer", written["contract_name"])
+        self.assertEqual("pass", written["status"])
+        self.assertEqual(1, written["checked_artifact_count"])
+        self.assertIsInstance(written["artifact"], dict)
         self.assertEqual(1, len(payload["checked_artifacts"]))
         artifact = payload["checked_artifacts"][0]
+        self.assertEqual(artifact, payload["artifact"])
+        self.assertEqual(artifact, written["artifact"])
         self.assertEqual("pass", artifact["status"])
         self.assertEqual(_LiveDownloadsHandler.installer_sha256, artifact["installer_sha256"])
         self.assertEqual(_LiveDownloadsHandler.payload_sha256, artifact["payload_sha256"])
@@ -208,6 +217,23 @@ class LivePublicWindowsInstallerTests(unittest.TestCase):
 
         self.assertEqual("fail", payload["status"])
         self.assertIn("avalonia-win-x64-installer: payload sidecar releaseVersion does not match", payload["failures"])
+
+    def test_fetch_bytes_retries_timeout_then_succeeds(self) -> None:
+        module = load_module()
+        response = mock.MagicMock()
+        response.__enter__.return_value = response
+        response.__exit__.return_value = False
+        response.read.return_value = b"payload"
+
+        with (
+            mock.patch.object(module.urllib.request, "urlopen", side_effect=[TimeoutError("timed out"), response]) as urlopen,
+            mock.patch.object(module.time, "sleep") as sleep,
+        ):
+            payload = module.fetch_bytes("https://example.test/download")
+
+        self.assertEqual(b"payload", payload)
+        self.assertEqual(2, urlopen.call_count)
+        sleep.assert_called_once()
 
     def test_tracked_release_scripts_include_live_public_windows_installer_gate(self) -> None:
         hub_closeout = HUB_CLOSEOUT.read_text(encoding="utf-8")

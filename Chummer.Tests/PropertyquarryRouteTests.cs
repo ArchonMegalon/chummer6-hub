@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using Chummer.Run.Api;
 using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -60,6 +61,21 @@ public sealed class PropertyquarryRouteTests
         ActionResult<object> continuity = await controller.GetMyPropertyquarryContinuity("northbound-research-lab", CancellationToken.None);
         ObjectResult continuityProblem = Assert.IsType<ObjectResult>(continuity.Result);
         Assert.Equal(StatusCodes.Status401Unauthorized, continuityProblem.StatusCode);
+
+        ActionResult<PropertyquarryApartmentVideoArtifactRequestBridgeResult> apartmentVideo = await controller.CreateMyPropertyquarryApartmentVideoRequest(
+            "northbound-research-lab",
+            new PropertyquarryApartmentVideoRequest(
+                Artifacts:
+                [
+                    new PropertyquarryApartmentVideoArtifactRenderRequest(
+                        Role: "walkthrough",
+                        Payload: "{\"prompt_ref\":\"propertyquarry:northbound-research-lab\"}",
+                        OutputFormat: "mp4")
+                ],
+                ConsumeQuota: false),
+            CancellationToken.None);
+        ObjectResult apartmentVideoProblem = Assert.IsType<ObjectResult>(apartmentVideo.Result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, apartmentVideoProblem.StatusCode);
     }
 
     [Fact]
@@ -82,6 +98,14 @@ public sealed class PropertyquarryRouteTests
         Assert.Equal("/account/propertyquarry", workspace.GetProperty("routes").GetProperty("accountEntryHref").GetString());
         Assert.Equal("/account/propertyquarry/open", workspace.GetProperty("routes").GetProperty("accountRedirectHref").GetString());
         Assert.Equal("/api/v1/campaign-spine/me/property-continuity/{propertyId}", workspace.GetProperty("routes").GetProperty("continuityApiHrefTemplate").GetString());
+        Assert.Equal("/api/v1/campaign-spine/me/property-workspaces/{propertyId}/apartment-video", workspace.GetProperty("routes").GetProperty("apartmentVideoRequestApiHrefTemplate").GetString());
+        JsonElement apartmentVideo = workspace.GetProperty("apartmentVideo");
+        Assert.Equal("/api/v1/campaign-spine/me/property-workspaces/northbound-research-lab/apartment-video", apartmentVideo.GetProperty("requestApiHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me", apartmentVideo.GetProperty("sharedArtifacts").GetProperty("signedInRequestCreateHref").GetString());
+        Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=propertyquarry&artifactKindOrCapabilityId=propertyquarry-apartment-video", apartmentVideo.GetProperty("sharedArtifacts").GetProperty("signedInRequestReceiptHref").GetString());
+        Assert.Equal("propertyquarry-apartment-video", apartmentVideo.GetProperty("artifactCapability").GetProperty("capabilityId").GetString());
+        Assert.Equal("propertyquarry:northbound-research-lab", apartmentVideo.GetProperty("artifactCapability").GetProperty("sourceRef").GetString());
+        Assert.Equal("private", apartmentVideo.GetProperty("artifactCapability").GetProperty("visibility").GetString());
         JsonElement selectedWorkspace = workspace.GetProperty("selectedWorkspace");
         Assert.Equal(JsonValueKind.Object, selectedWorkspace.ValueKind);
         Assert.StartsWith("/account/campaigns/", selectedWorkspace.GetProperty("accountHref").GetString(), StringComparison.Ordinal);
@@ -100,7 +124,41 @@ public sealed class PropertyquarryRouteTests
         Assert.StartsWith("/account/campaigns/", continuity.GetProperty("continuity").GetProperty("workspaceAccountHref").GetString(), StringComparison.Ordinal);
         Assert.Contains("?prepQuery=Northbound%20research%20lab", continuity.GetProperty("continuity").GetProperty("workspaceAccountHref").GetString(), StringComparison.Ordinal);
         Assert.Contains("?queryText=Northbound%20research%20lab", continuity.GetProperty("continuity").GetProperty("prepLibraryApiHref").GetString(), StringComparison.Ordinal);
+        Assert.Equal("propertyquarry-apartment-video", continuity.GetProperty("apartmentVideo").GetProperty("artifactCapability").GetProperty("capabilityId").GetString());
         Assert.Equal("not_exposed", continuity.GetProperty("boundary").GetProperty("providerTruth").GetString());
+    }
+
+    [Fact]
+    public async Task PropertyquarryApartmentVideoRequestReturnsGovernedReceiptWithoutQuotaBurn()
+    {
+        using var fixture = PropertyquarryRouteFixture.Create();
+        CampaignSpineController controller = fixture.CreateCampaignSpineController();
+
+        ActionResult<PropertyquarryApartmentVideoArtifactRequestBridgeResult> result = await controller.CreateMyPropertyquarryApartmentVideoRequest(
+            "northbound-research-lab",
+            new PropertyquarryApartmentVideoRequest(
+                Artifacts:
+                [
+                    new PropertyquarryApartmentVideoArtifactRenderRequest(
+                        Role: "walkthrough",
+                        Payload: "{\"prompt_ref\":\"propertyquarry:northbound-research-lab\"}",
+                        OutputFormat: "mp4",
+                        AspectRatio: "16:9",
+                        DurationProfile: "short",
+                        MaxBytes: 64 * 1024 * 1024)
+                ],
+                ConsumeQuota: false),
+            CancellationToken.None);
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result.Result);
+        PropertyquarryApartmentVideoArtifactRequestBridgeResult payload = Assert.IsType<PropertyquarryApartmentVideoArtifactRequestBridgeResult>(ok.Value);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+        Assert.Equal("accepted", payload.ArtifactRequestReceipt.Status);
+        Assert.Equal("propertyquarry-apartment-video", payload.ArtifactRequestReceipt.CapabilityId);
+        Assert.Equal("propertyquarry:apartment-video:northbound-research-lab:northbound-research-lab-apartment-video", payload.ArtifactRequestReceipt.SourceRef);
+        Assert.NotNull(payload.ArtifactRequestReceipt.GovernedRenderRequest);
+        Assert.Equal("northbound-research-lab", payload.Payload.Property.Id);
+        Assert.False(payload.Payload.ConsumeQuota);
     }
 
     [Fact]
@@ -152,6 +210,7 @@ public sealed class PropertyquarryRouteTests
                     ["CHUMMER_HORIZON_ARTIFACT_REQUEST_RECEIPT_STORE_PATH"] = Path.Combine(root, "horizon-artifact-request-receipts.json"),
                     ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
                     ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["CHUMMER_HORIZON_PROPERTYQUARRY_CAPABILITY_PROPERTYQUARRY_APARTMENT_VIDEO_ENABLED"] = "true",
                     ["CHUMMER_LOCAL_E2E_ACCESS_TOKEN"] = AccessToken,
                     ["CHUMMER_LOCAL_E2E_SUBJECT_ID"] = "subject.propertyquarry-route",
                     ["CHUMMER_LOCAL_E2E_DISPLAY_NAME"] = "Property GM",

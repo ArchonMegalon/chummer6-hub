@@ -71,9 +71,14 @@ public sealed class OriginDossierPublicationServiceTests
         Assert.Equal(2, publications.Count);
         OriginDossierPublicationViewModel gold = publications.Single(publication => publication.ProjectId == "origin-1");
         Assert.True(gold.GoldReady, string.Join(", ", gold.MissingGoldRequirements));
+        Assert.True(gold.FullStoryVerified);
+        Assert.True(gold.EbookHandoffReady);
         Assert.Equal("origin.chummer.run/Varga/Mira/Vanta", gold.OriginEditionNamespace);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-1/read", gold.AudiobookshelfDossierShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-1/listen", gold.AudiobookshelfShareUrl);
+        Assert.Equal(3, gold.PortraitChoices?.Count);
+        Assert.Equal(3, gold.AudiobookVoiceOptions?.Count);
+        Assert.Equal(3, gold.SceneHighlights?.Count);
         Assert.Equal(
             "https://audio.chummer.run/share/origin-1-audiobook",
             service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-1", "listen"));
@@ -107,6 +112,129 @@ public sealed class OriginDossierPublicationServiceTests
         var publications = service.ListForAccount("user-1", "subject-1");
 
         Assert.Empty(publications);
+    }
+
+    [Fact]
+    public void RunnerLinkCodeConnectsTwoOriginStoriesWithoutSharingPrivateArtifacts()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-dossier-publications.json");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new object[]
+                    {
+                        new
+                        {
+                            ownerUserId = "user-alpha",
+                            subjectId = "subject-alpha",
+                            projectId = "origin-alpha",
+                            title = "Alpha Origin",
+                            runnerAlias = "Kestrel",
+                            publicationState = "awaiting_provider_manuscript"
+                        },
+                        new
+                        {
+                            ownerUserId = "user-beta",
+                            subjectId = "subject-beta",
+                            projectId = "origin-beta",
+                            title = "Beta Origin",
+                            runnerAlias = "Switchback",
+                            publicationState = "awaiting_provider_manuscript",
+                            audiobookshelfDossierShareUrl = "https://audio.chummer.run/share/private-beta-dossier"
+                        }
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath,
+                ["CHUMMER_PUBLIC_BASE_URL"] = "https://chummer.run"
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+        string betaCode = Assert.Single(service.ListForAccount("user-beta", "subject-beta")).RunnerLinkCode!;
+
+        OriginDossierPublicationViewModel? linked = service.LinkRunnerForAccount(
+            "user-alpha",
+            "subject-alpha",
+            "origin-alpha",
+            betaCode,
+            "They survived the same botched extraction and owe the same fixer.");
+
+        Assert.NotNull(linked);
+        Assert.StartsWith("OD-", linked!.RunnerLinkCode, StringComparison.Ordinal);
+        OriginDossierStoryLinkViewModel storyLink = Assert.Single(linked.StoryLinks!);
+        Assert.Equal("origin-beta", storyLink.LinkedProjectId);
+        Assert.Equal("Switchback", storyLink.LinkedRunnerAlias);
+        Assert.Equal("accepted_by_link_code", storyLink.Status);
+        Assert.True(storyLink.IntegrateIntoStory);
+        string serialized = JsonSerializer.Serialize(linked);
+        Assert.DoesNotContain("private-beta-dossier", serialized, StringComparison.OrdinalIgnoreCase);
+
+        OriginDossierPublicationViewModel reciprocal = Assert.Single(service.ListForAccount("user-beta", "subject-beta"));
+        OriginDossierStoryLinkViewModel reciprocalLink = Assert.Single(reciprocal.StoryLinks!);
+        Assert.Equal("origin-alpha", reciprocalLink.LinkedProjectId);
+        Assert.Equal("Kestrel", reciprocalLink.LinkedRunnerAlias);
+    }
+
+    [Fact]
+    public void StoryBookAndCoverStayAccessibleBeforeAudiobookAndCinemaFinish()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-dossier-publications.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-book-first");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new object[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            "origin-book-first",
+                            "Glass Rain",
+                            "Vanta",
+                            artifacts,
+                            dossierVideoVerified: false,
+                            audiobookshelfPlaybackVerified: false,
+                            telegramShareDelivered: false)
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+        Assert.False(publication.GoldReady);
+        Assert.True(publication.FullStoryVerified);
+        Assert.True(publication.EbookHandoffReady);
+        Assert.NotNull(service.GetArtifactForAccount("user-1", "subject-1", "origin-book-first", "book"));
+        Assert.NotNull(service.GetArtifactForAccount("user-1", "subject-1", "origin-book-first", "cover"));
+        Assert.NotNull(service.GetArtifactForAccount("user-1", "subject-1", "origin-book-first", "canon-audit"));
+        Assert.Equal(
+            "https://audio.chummer.run/share/origin-book-first-dossier",
+            service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-book-first", "read"));
+        Assert.Null(service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-book-first", "listen"));
+        Assert.Null(service.GetArtifactForAccount("user-1", "subject-1", "origin-book-first", "video"));
     }
 
     [Fact]
@@ -184,7 +312,10 @@ public sealed class OriginDossierPublicationServiceTests
                 MovieSubtitlesPath: artifacts.MovieSubtitlesPath,
                 MovieStoryboardPath: artifacts.MovieStoryboardPath,
                 TelegramShareDeliveryReceiptPath: artifacts.TelegramShareDeliveryReceiptPath,
-                FinalNoFallbackNoSentinelAuditReceiptPath: artifacts.FinalNoFallbackNoSentinelAuditReceiptPath));
+                FinalNoFallbackNoSentinelAuditReceiptPath: artifacts.FinalNoFallbackNoSentinelAuditReceiptPath,
+                PortraitChoices: BuildPortraitChoices("origin-imported"),
+                AudiobookVoiceOptions: BuildAudiobookVoiceOptions(),
+                SceneHighlights: BuildSceneHighlights()));
 
         Assert.True(imported.GoldReady, string.Join(", ", imported.MissingGoldRequirements));
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported", imported.ChummerRunOwnerUrl);
@@ -194,6 +325,9 @@ public sealed class OriginDossierPublicationServiceTests
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/listen", imported.AudiobookshelfAudiobookShareUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/cover", imported.StorySceneCoverUrl);
         Assert.Equal("https://chummer.run/account/work/origin-dossiers/origin-imported/video", imported.DossierVideoUrl);
+        Assert.Equal(3, imported.PortraitChoices?.Count);
+        Assert.Equal(3, imported.AudiobookVoiceOptions?.Count);
+        Assert.Equal(3, imported.SceneHighlights?.Count);
         Assert.Equal(
             "https://audiobookshelf.girschele.com/audiobookshelf/share/origin-imported-audiobook",
             service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-imported", "listen"));
@@ -278,6 +412,407 @@ public sealed class OriginDossierPublicationServiceTests
         Assert.Null(publication.AudiobookshelfShareUrl);
         Assert.Null(service.GetAudiobookshelfShareForAccount("user-1", "subject-1", "origin-untrusted-audio"));
         Assert.Contains("trusted Audiobookshelf share URL", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountRequiresPortraitVoiceAndSceneChoiceSetsBeforeGoldReady()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-dossier-publications.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-missing-story-followthrough");
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new object[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            "origin-missing-story-followthrough",
+                            "Broken Followthrough",
+                            "Vanta",
+                            artifacts,
+                            portraitChoices: BuildPortraitChoices("origin-missing-story-followthrough")
+                                .Take(2)
+                                .Select(static choice => choice with { Selected = false })
+                                .ToArray(),
+                            audiobookVoiceOptions: Array.Empty<OriginDossierAudiobookVoiceOptionDto>(),
+                            sceneHighlights:
+                            [
+                                new OriginDossierSceneHighlightDto(
+                                    "scene-clinic-rain",
+                                    "Chapter 2",
+                                    "Clinic door in rain",
+                                    "The first illegal favor becomes a visible debt.",
+                                    false)
+                            ])
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("exactly three story-fit portrait choices", publication.MissingGoldRequirements);
+        Assert.Contains("selected portrait choice", publication.MissingGoldRequirements);
+        Assert.Contains("audiobook voice options", publication.MissingGoldRequirements);
+        Assert.Contains("selected audiobook voice request", publication.MissingGoldRequirements);
+        Assert.Contains("selected cinematic scene summary", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountRequiresSubscribrReceiptToProveFullChapteredStory()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-short-manuscript.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-short-manuscript");
+        File.WriteAllText(
+            artifacts.ProviderManuscriptReceiptPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    operation = "provider_manuscript_import",
+                    provider = "Subscribr",
+                    status = "verified",
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    deliveredLinks = new[]
+                    {
+                        "operator_verified_live_run",
+                        "provider_receipt_reference:Subscribr:provider_manuscript_import",
+                        $"accountAlias: {OriginManuscriptAccountAlias}"
+                    },
+                    artifactSha256 = new[] { ComputeSha256(artifacts.ProviderManuscriptPath) }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-short-manuscript", "Short Manuscript", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("Subscribr full-story manuscript receipt path", publication.MissingGoldRequirements);
+    }
+
+    [Fact]
+    public void ListForAccountRequiresManuscriptArtifactToContainFullChapteredStory()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-token-only-manuscript.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-token-only-manuscript");
+        File.WriteAllText(artifacts.ProviderManuscriptPath, "Chapter 1\nA short packet is not a full story.");
+        File.WriteAllText(
+            artifacts.ProviderManuscriptReceiptPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    operation = "provider_manuscript_import",
+                    provider = "Subscribr",
+                    status = "verified",
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    deliveredLinks = new[]
+                    {
+                        "operator_verified_live_run",
+                        "provider_receipt_reference:Subscribr:provider_manuscript_import",
+                        $"accountAlias: {OriginManuscriptAccountAlias}",
+                        "full_story_manuscript",
+                        "chaptered_story"
+                    },
+                    artifactSha256 = new[] { ComputeSha256(artifacts.ProviderManuscriptPath) }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-token-only-manuscript", "Token Only Manuscript", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("ebook-length full chaptered story manuscript artifact", publication.MissingGoldRequirements);
+        Assert.Null(service.GetArtifactForAccount("user-1", "subject-1", "origin-token-only-manuscript", "book"));
+    }
+
+
+    [Fact]
+    public void ListForAccountRequiresExactlyThreeStoryFitPortraits()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-extra-portrait.json");
+        string projectId = "origin-extra-portrait";
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, projectId);
+        OriginDossierPortraitChoiceDto[] portraitChoices =
+        [
+            .. BuildPortraitChoices(projectId),
+            new(
+                $"portrait-{projectId}-extra",
+                "Extra face",
+                "A fourth portrait is not part of the committed player choice contract.",
+                $"https://chummer.run/media/origin-dossier/{projectId}-extra.png")
+        ];
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            projectId,
+                            "Extra Portrait",
+                            "Vanta",
+                            artifacts,
+                            portraitChoices: portraitChoices)
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Empty(publication.PortraitChoices!);
+        Assert.Contains("exactly three story-fit portrait choices", publication.MissingGoldRequirements);
+        Assert.Null(service.SelectPortraitForAccount("user-1", "subject-1", projectId, $"portrait-{projectId}-street"));
+    }
+
+    [Fact]
+    public void ListForAccountRequiresCinematicReceiptToProveVisibleSelectedCharacterScene()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-generic-cinematic.json");
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, "origin-generic-cinematic");
+        File.WriteAllText(
+            artifacts.DossierVideoReceiptPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    operation = "dossier_video_import",
+                    provider = "Magicfit",
+                    status = "verified",
+                    completedAtUtc = DateTimeOffset.UtcNow,
+                    deliveredLinks = new[]
+                    {
+                        "operator_verified_live_run",
+                        "provider_receipt_reference:Magicfit:dossier_video_import"
+                    },
+                    artifactSha256 = new[] { ComputeSha256(artifacts.DossierVideoPath) }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new { publications = new[] { BuildIndexEntry("user-1", "subject-1", "origin-generic-cinematic", "Generic Cinematic", "Vanta", artifacts) } },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.False(publication.GoldReady);
+        Assert.Contains("dossier video receipt path", publication.MissingGoldRequirements);
+        Assert.Null(service.GetArtifactForAccount("user-1", "subject-1", "origin-generic-cinematic", "video"));
+    }
+
+    [Fact]
+    public void OwnerChoicesStayLockedUntilEbookHandoffIsVerified()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-choice-before-handoff.json");
+        string projectId = "origin-choice-before-handoff";
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, projectId);
+        File.Delete(artifacts.EbookAudiobookshelfImportReceiptPath);
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            projectId,
+                            "Choice Before Handoff",
+                            "Vanta",
+                            artifacts,
+                            portraitChoices: BuildPortraitChoices(projectId)
+                                .Select(static choice => choice with { Selected = false })
+                                .ToArray(),
+                            audiobookVoiceOptions: BuildAudiobookVoiceOptions()
+                                .Select(static option => option with { Selected = false })
+                                .ToArray(),
+                            sceneHighlights: BuildSceneHighlights()
+                                .Select(static scene => scene with { Selected = false })
+                                .ToArray())
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
+
+        Assert.True(publication.FullStoryVerified);
+        Assert.False(publication.EbookHandoffReady);
+        Assert.Contains("Audiobookshelf dossier ebook import receipt path", publication.MissingGoldRequirements);
+        Assert.Null(service.SelectPortraitForAccount("user-1", "subject-1", projectId, $"portrait-{projectId}-quiet"));
+        Assert.Null(service.SelectAudiobookVoiceForAccount("user-1", "subject-1", projectId, "voice-street"));
+        Assert.Null(service.SelectCinematicSceneForAccount("user-1", "subject-1", projectId, "scene-burned-safehouse"));
+    }
+
+    [Fact]
+    public void OwnerCanSelectPortraitAudiobookVoiceAndCinematicSceneAfterBookHandoff()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-origin-dossier-publications", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        string indexPath = Path.Combine(tempRoot, "origin-dossier-publications.json");
+        string projectId = "origin-owner-choice";
+        OriginDossierArtifactPaths artifacts = CreateGoldArtifacts(tempRoot, projectId);
+        File.WriteAllText(
+            indexPath,
+            JsonSerializer.Serialize(
+                new
+                {
+                    publications = new[]
+                    {
+                        BuildIndexEntry(
+                            "user-1",
+                            "subject-1",
+                            projectId,
+                            "Owner Choice",
+                            "Vanta",
+                            artifacts,
+                            portraitChoices: BuildPortraitChoices(projectId)
+                                .Select(static choice => choice with { Selected = false })
+                                .ToArray(),
+                            audiobookVoiceOptions: BuildAudiobookVoiceOptions()
+                                .Select(static option => option with { Selected = false })
+                                .ToArray(),
+                            sceneHighlights: BuildSceneHighlights()
+                                .Select(static scene => scene with { Selected = false })
+                                .ToArray())
+                    }
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_ORIGIN_DOSSIER_PUBLICATION_INDEX"] = indexPath
+            })
+            .Build();
+        var service = new OriginDossierPublicationService(
+            configuration,
+            NullLogger<OriginDossierPublicationService>.Instance);
+
+        OriginDossierPublicationViewModel beforeChoices = service.GetForAccount("user-1", "subject-1", projectId)!;
+        Assert.False(beforeChoices.GoldReady);
+        Assert.True(beforeChoices.FullStoryVerified);
+        Assert.True(beforeChoices.EbookHandoffReady);
+        Assert.Null(service.SelectCinematicSceneForAccount(
+            "user-1",
+            "subject-1",
+            projectId,
+            "scene-burned-safehouse"));
+
+        OriginDossierPublicationViewModel? afterPortrait = service.SelectPortraitForAccount(
+            "user-1",
+            "subject-1",
+            projectId,
+            $"portrait-{projectId}-quiet");
+        Assert.NotNull(afterPortrait);
+        Assert.Equal($"portrait-{projectId}-quiet", Assert.Single(afterPortrait.PortraitChoices!, static choice => choice.Selected).PortraitId);
+
+        OriginDossierPublicationViewModel? afterVoice = service.SelectAudiobookVoiceForAccount(
+            "user-1",
+            "subject-1",
+            projectId,
+            "voice-street");
+        Assert.NotNull(afterVoice);
+        Assert.Equal("voice-street", Assert.Single(afterVoice.AudiobookVoiceOptions!, static option => option.Selected).VoiceId);
+
+        OriginDossierPublicationViewModel? afterScene = service.SelectCinematicSceneForAccount(
+            "user-1",
+            "subject-1",
+            projectId,
+            "scene-burned-safehouse");
+        Assert.NotNull(afterScene);
+        Assert.Equal("scene-burned-safehouse", Assert.Single(afterScene.SceneHighlights!, static scene => scene.Selected).SceneId);
+
+        OriginDossierPublicationViewModel reloaded = service.GetForAccount("user-1", "subject-1", projectId)!;
+        Assert.True(reloaded.GoldReady, string.Join(", ", reloaded.MissingGoldRequirements));
+        Assert.Equal($"portrait-{projectId}-quiet", Assert.Single(reloaded.PortraitChoices!, static choice => choice.Selected).PortraitId);
+        Assert.Equal("voice-street", Assert.Single(reloaded.AudiobookVoiceOptions!, static option => option.Selected).VoiceId);
+        Assert.Equal("scene-burned-safehouse", Assert.Single(reloaded.SceneHighlights!, static scene => scene.Selected).SceneId);
     }
 
     [Fact]
@@ -400,7 +935,7 @@ public sealed class OriginDossierPublicationServiceTests
         OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
 
         Assert.False(publication.GoldReady);
-        Assert.Contains("provider manuscript receipt path", publication.MissingGoldRequirements);
+        Assert.Contains("Subscribr full-story manuscript receipt path", publication.MissingGoldRequirements);
     }
 
     [Fact]
@@ -455,7 +990,7 @@ public sealed class OriginDossierPublicationServiceTests
                   "accounts": [
                     {
                       "accountAlias": "{{OriginManuscriptAccountAlias}}",
-                      "provider": "Inkfluence",
+                      "provider": "Subscribr",
                       "status": "available",
                       "roles": ["manuscript", "origin"]
                     },
@@ -494,7 +1029,7 @@ public sealed class OriginDossierPublicationServiceTests
               "accounts": [
                 {
                   "accountAlias": "{{OriginManuscriptAccountAlias}}",
-                  "provider": "Inkfluence",
+                  "provider": "Subscribr",
                   "status": "available",
                   "roles": ["manuscript", "origin"]
                 },
@@ -586,7 +1121,7 @@ public sealed class OriginDossierPublicationServiceTests
                   "accounts": [
                     {
                       "accountAlias": "{{OriginManuscriptAccountAlias}}",
-                      "provider": "Inkfluence",
+                      "provider": "Subscribr",
                       "status": "disabled",
                       "roles": ["manuscript", "origin"]
                     },
@@ -843,10 +1378,16 @@ public sealed class OriginDossierPublicationServiceTests
                 new
                 {
                     operation = "provider_manuscript_import",
-                    provider = "Inkfluence",
+                    provider = "Subscribr",
                     status = "verified",
                     completedAtUtc = DateTimeOffset.UtcNow,
-                    deliveredLinks = new[] { "operator_verified_live_run", "provider_receipt_reference:Inkfluence:provider_manuscript_import" },
+                    deliveredLinks = new[]
+                    {
+                        "operator_verified_live_run",
+                        "provider_receipt_reference:Subscribr:provider_manuscript_import",
+                        "full_story_manuscript",
+                        "chaptered_story"
+                    },
                     artifactSha256 = new[] { ComputeSha256(artifacts.ProviderManuscriptPath) }
                 },
                 new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true }));
@@ -887,13 +1428,15 @@ public sealed class OriginDossierPublicationServiceTests
                 new
                 {
                     operation = "provider_manuscript_import",
-                    provider = "Inkfluence",
+                    provider = "Subscribr",
                     status = "verified",
                     completedAtUtc = DateTimeOffset.UtcNow,
                     deliveredLinks = new[]
                     {
                         "operator_verified_live_run",
-                        "provider_receipt_reference:Inkfluence:provider_manuscript_import",
+                        "provider_receipt_reference:Subscribr:provider_manuscript_import",
+                        "full_story_manuscript",
+                        "chaptered_story",
                         $"accountAlias: {OriginManuscriptAccountAlias}_FAKE"
                     },
                     artifactSha256 = new[] { ComputeSha256(artifacts.ProviderManuscriptPath) }
@@ -979,7 +1522,7 @@ public sealed class OriginDossierPublicationServiceTests
         OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
 
         Assert.False(publication.GoldReady);
-        Assert.Contains("story scene cover account alias", publication.MissingGoldRequirements);
+        Assert.Contains("fitted cover art account alias", publication.MissingGoldRequirements);
         Assert.Contains("dossier video account alias", publication.MissingGoldRequirements);
     }
 
@@ -1245,7 +1788,7 @@ public sealed class OriginDossierPublicationServiceTests
         OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
 
         Assert.False(publication.GoldReady);
-        Assert.Contains("story scene cover receipt path", publication.MissingGoldRequirements);
+        Assert.Contains("fitted cover art receipt path", publication.MissingGoldRequirements);
     }
 
     [Fact]
@@ -1295,7 +1838,7 @@ public sealed class OriginDossierPublicationServiceTests
         OriginDossierPublicationViewModel publication = Assert.Single(service.ListForAccount("user-1", "subject-1"));
 
         Assert.False(publication.GoldReady);
-        Assert.Contains("story scene cover receipt path", publication.MissingGoldRequirements);
+        Assert.Contains("fitted cover art receipt path", publication.MissingGoldRequirements);
     }
 
     [Fact]
@@ -1651,7 +2194,7 @@ public sealed class OriginDossierPublicationServiceTests
                   "accounts": [
                     {
                       "accountAlias": "{{OriginManuscriptAccountAlias}}",
-                      "provider": "Inkfluence",
+                      "provider": "Subscribr",
                       "status": "available",
                       "roles": ["manuscript", "origin"]
                     },
@@ -1791,7 +2334,17 @@ public sealed class OriginDossierPublicationServiceTests
         string audiobookshelfHost = "audio.chummer.run",
         string familyName = "Varga",
         string givenName = "Mira",
-        string? runnerName = null)
+        string? runnerName = null,
+        IReadOnlyList<OriginDossierPortraitChoiceDto>? portraitChoices = null,
+        IReadOnlyList<OriginDossierAudiobookVoiceOptionDto>? audiobookVoiceOptions = null,
+        IReadOnlyList<OriginDossierSceneHighlightDto>? sceneHighlights = null,
+        bool providerAuthoredManuscriptImported = true,
+        bool undetectableHumanizerApplied = true,
+        bool bookArtifactVerified = true,
+        bool dossierVideoVerified = true,
+        bool storySceneCoverUsesSelectedCharacterFace = true,
+        bool audiobookshelfPlaybackVerified = true,
+        bool telegramShareDelivered = true)
         => new
         {
             ownerUserId,
@@ -1811,13 +2364,13 @@ public sealed class OriginDossierPublicationServiceTests
             audiobookshelfAudiobookShareUrl = audiobookshelfShareUrl ?? $"https://{audiobookshelfHost}/share/{projectId}-audiobook",
             dossierVideoUrl = $"https://chummer.run/account/work/origin-dossiers/{projectId}/video",
             storySceneCoverUrl = $"https://chummer.run/account/work/origin-dossiers/{projectId}/cover",
-            providerAuthoredManuscriptImported = true,
-            undetectableHumanizerApplied = true,
-            bookArtifactVerified = true,
-            dossierVideoVerified = true,
-            storySceneCoverUsesSelectedCharacterFace = true,
-            audiobookshelfPlaybackVerified = true,
-            telegramShareDelivered = true,
+            providerAuthoredManuscriptImported,
+            undetectableHumanizerApplied,
+            bookArtifactVerified,
+            dossierVideoVerified,
+            storySceneCoverUsesSelectedCharacterFace,
+            audiobookshelfPlaybackVerified,
+            telegramShareDelivered,
             requiresAuthenticatedChummerRunUser = true,
             artifacts.SourcePacketPath,
             artifacts.SourcePacketReceiptPath,
@@ -1845,8 +2398,35 @@ public sealed class OriginDossierPublicationServiceTests
             artifacts.MovieSubtitlesPath,
             artifacts.MovieStoryboardPath,
             artifacts.TelegramShareDeliveryReceiptPath,
-            artifacts.FinalNoFallbackNoSentinelAuditReceiptPath
+            artifacts.FinalNoFallbackNoSentinelAuditReceiptPath,
+            portraitChoices = portraitChoices ?? BuildPortraitChoices(projectId),
+            audiobookVoiceOptions = audiobookVoiceOptions ?? BuildAudiobookVoiceOptions(),
+            sceneHighlights = sceneHighlights ?? BuildSceneHighlights()
         };
+
+    private static IReadOnlyList<OriginDossierPortraitChoiceDto> BuildPortraitChoices(string projectId)
+        =>
+        [
+            new($"portrait-{projectId}-street", "Street face", "Guarded, rain-cut stare after the clinic debt locks in.", $"https://chummer.run/media/origin-dossier/{projectId}-street.png", true),
+            new($"portrait-{projectId}-clinic", "Clinic light", "Sharper chrome detail and the aftermath of the first compromise.", $"https://chummer.run/media/origin-dossier/{projectId}-clinic.png"),
+            new($"portrait-{projectId}-quiet", "Quiet booth", "A lower-key profile for the scenes where the runner is still hiding.", $"https://chummer.run/media/origin-dossier/{projectId}-quiet.png")
+        ];
+
+    private static IReadOnlyList<OriginDossierAudiobookVoiceOptionDto> BuildAudiobookVoiceOptions()
+        =>
+        [
+            new("voice-noir", "Noir close", "Low, intimate narration for the memoir cut.", true, true),
+            new("voice-wire", "Wire report", "Cooler newsroom delivery for the dossier cut."),
+            new("voice-street", "Street edge", "Rougher cadence for a harder survival read.")
+        ];
+
+    private static IReadOnlyList<OriginDossierSceneHighlightDto> BuildSceneHighlights()
+        =>
+        [
+            new("scene-clinic-rain", "Chapter 2", "Clinic door in rain", "The first illegal favor becomes a visible debt.", true),
+            new("scene-simrig-betrayal", "Chapter 5", "Simrig betrayal", "Trust fractures when the runner learns who sold the footage."),
+            new("scene-burned-safehouse", "Chapter 8", "Burned safehouse", "The runner chooses what to save before the safehouse is lost.")
+        ];
 
     private static OriginDossierArtifactPaths CreateGoldArtifacts(
         string tempRoot,
@@ -1868,13 +2448,18 @@ public sealed class OriginDossierPublicationServiceTests
             "Chummer",
             deliveredLinks: ["approved_source_packet", "external_processing_consent"],
             artifactPaths: [sourcePacketPath]);
-        string providerManuscriptPath = WriteArtifact(projectRoot, "provider-manuscript.md", "Provider-authored Origin Dossier manuscript.");
+        string providerManuscriptPath = WriteArtifact(projectRoot, "provider-manuscript.md", BuildFullStoryManuscript(runnerAlias));
         string providerManuscriptReceiptPath = WriteReceipt(
             projectRoot,
             "provider-manuscript.receipt.json",
             "provider_manuscript_import",
-            "Inkfluence",
-            deliveredLinks: [$"accountAlias: {OriginManuscriptAccountAlias}"],
+            "Subscribr",
+            deliveredLinks:
+            [
+                $"accountAlias: {OriginManuscriptAccountAlias}",
+                "full_story_manuscript",
+                "chaptered_story"
+            ],
             artifactPaths: [providerManuscriptPath]);
         string humanizerReceiptPath = WriteReceipt(
             projectRoot,
@@ -1896,6 +2481,7 @@ public sealed class OriginDossierPublicationServiceTests
             "book_artifact_import",
             bookPackagingProvider,
             accountAlias: bookPackagingAccountAlias,
+            deliveredLinks: ["story_edition_ebook", "fitted_cover_art"],
             artifactPaths: [bookArtifactPath]);
         string ebookArtifactPath = WriteArtifact(projectRoot, "ebook.epub", "EPUB Origin Dossier ebook artifact with embedded cover");
         string ebookAudiobookshelfImportReceiptPath = WriteReceipt(
@@ -1953,6 +2539,12 @@ public sealed class OriginDossierPublicationServiceTests
             "dossier_video_import",
             "Magicfit",
             accountAlias: dossierVideoAccountAlias,
+            deliveredLinks:
+            [
+                "selected_character_face",
+                "selected_cinematic_scene",
+                "character_visible_cinematic"
+            ],
             artifactPaths: [dossierVideoPath]);
         string telegramShareDeliveryReceiptPath = WriteTelegramShareDeliveryReceipt(
             projectRoot,
@@ -1994,6 +2586,51 @@ public sealed class OriginDossierPublicationServiceTests
         string path = Path.Combine(projectRoot, fileName);
         File.WriteAllText(path, contents);
         return path;
+    }
+
+    private static string BuildFullStoryManuscript(string runnerAlias)
+    {
+        string[] chapterTitles =
+        [
+            "Rain Before the Name",
+            "The Debt With Teeth",
+            "Clinic Glass",
+            "The Market That Lied",
+            "A Favor Owed Twice",
+            "The Safehouse Ledger",
+            "The Name She Chose",
+            "After the Sirens"
+        ];
+        string[] sceneAnchors =
+        [
+            "the clinic door",
+            "the night market",
+            "the rented booth",
+            "the safehouse stairwell",
+            "the transit platform",
+            "the neon service alley",
+            "the backroom call",
+            "the rain-cut roofline"
+        ];
+
+        var builder = new StringBuilder();
+        for (int chapter = 0; chapter < chapterTitles.Length; chapter++)
+        {
+            builder.AppendLine($"# Chapter {chapter + 1} - {chapterTitles[chapter]}");
+            builder.AppendLine();
+            for (int beat = 0; beat < 18; beat++)
+            {
+                string anchor = sceneAnchors[(chapter + beat) % sceneAnchors.Length];
+                builder.AppendLine(
+                    $"{runnerAlias} moves through {anchor} with a choice that belongs to the approved source packet, not to a new rules exception. " +
+                    "The scene holds on concrete action, dialogue, memory, consequence, and the private reason the runner keeps returning to the same dangerous promise. " +
+                    "Contacts notice the cost, rivals misread the silence, and the future GM receives useful relationship pressure without invented ware, qualities, gear, or sourcebook changes. " +
+                    "Each beat leaves enough visual detail for the fitted cover, portrait shortlist, voice direction, and cinematic scene summary while preserving the character sheet as the authority.");
+                builder.AppendLine();
+            }
+        }
+
+        return builder.ToString();
     }
 
     private static string WriteReceipt(

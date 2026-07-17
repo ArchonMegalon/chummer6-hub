@@ -20,13 +20,13 @@ const supportingSurfaces = [
     id: 'downloads',
     route: '/downloads',
     screenshotPrefix: 'downloads',
-    requiredText: ['Downloads', 'Stable', 'Nightly', 'Stable release', 'Build from source'],
+    requiredText: ['Downloads', 'Version', 'Stable', 'Nightly', 'Stable release.', 'Build from source'],
   },
   {
     id: 'status',
     route: '/status',
     screenshotPrefix: 'status',
-    requiredText: ['Current release', 'Downloads', 'Help'],
+    requiredText: ['Now', 'Version', 'Downloads', 'Help'],
   },
   {
     id: 'ledger-map',

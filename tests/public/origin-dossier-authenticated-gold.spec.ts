@@ -24,14 +24,14 @@ test('signed-in owner can see Origin Dossier cover, tabs, and gated media links 
   ]);
   const page = await context.newPage();
 
-  await page.goto(`${baseUrl}/account/work#origin-dossier-library`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${baseUrl}/account/work?edition=origin#origin-dossier-library`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#origin-dossier-library')).toBeVisible();
   await expect(page.locator('#origin-dossier-library')).toContainText('Route Runner Origin Dossier');
   await expect(page.locator('#origin-dossier-library')).toContainText('Ready');
   await expect(page.locator('#origin-dossier-library')).not.toContainText('Gold ready');
-  await expect(page.getByRole('link', { name: 'Listen in Audiobookshelf' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Read the ebook' })).toHaveAttribute(
     'href',
-    `${baseUrl}/account/work/origin-dossiers/${projectId}/listen`,
+    `${baseUrl}/account/work/origin-dossiers/${projectId}/read`,
   );
 
   await page.getByRole('link', { name: 'Open edition' }).click();
@@ -39,22 +39,28 @@ test('signed-in owner can see Origin Dossier cover, tabs, and gated media links 
   await expect(page.locator('[data-origin-dossier-detail]')).toBeVisible();
   await expect(page.locator('[data-origin-dossier-gold-ready="true"]')).toBeVisible();
   await expect(page.locator('[data-story-scene-cover-uses-selected-character-face="true"]')).toBeVisible();
+  await expect(page.locator('[data-fitted-cover-art-uses-selected-character-face="true"]')).toBeVisible();
   await expect(page.locator('[data-origin-edition-tab="read"]')).toBeVisible();
+  await expect(page.locator('[data-origin-edition-tab="portraits"]')).toBeVisible();
   await expect(page.locator('[data-origin-edition-tab="listen"]')).toBeVisible();
   await expect(page.locator('[data-origin-edition-tab="watch"]')).toBeVisible();
   await expect(page.locator('[data-origin-edition-tab="canon-audit"]')).toBeVisible();
+  await expect(page.locator('[data-origin-portrait-choice-count="3"]')).toBeVisible();
+  await expect(page.locator('[data-origin-audiobook-voice-count="3"]')).toBeVisible();
+  await expect(page.locator('[data-origin-scene-highlight-count="4"]')).toBeVisible();
   const canonAudit = page.locator('#origin-edition-canon-audit[data-origin-edition-tab="canon-audit"]');
   await expect(canonAudit).toHaveAttribute('data-chummer-owns-canon', 'true');
   await expect(canonAudit).toHaveAttribute('data-provider-created-facts-auto-canon', 'false');
   await expect(canonAudit).toHaveAttribute('data-canon-privacy-receipts-present', 'true');
   await expect(canonAudit).toHaveAttribute('data-no-fallback-media-verified', 'true');
-  await expect(page.getByRole('link', { name: 'Read' })).toHaveAttribute('href', '#origin-edition-read');
-  await expect(page.getByRole('link', { name: 'Listen' })).toHaveAttribute('href', '#origin-edition-listen');
-  await expect(page.getByRole('link', { name: 'Watch' })).toHaveAttribute('href', '#origin-edition-watch');
-  await expect(page.getByRole('link', { name: 'Canon notes' })).toHaveAttribute('href', '#origin-edition-canon-audit');
-  const coverImage = page.getByAltText('Rendered Origin Dossier story scene cover for Route Runner');
+  await expect(page.getByRole('link', { name: 'Read', exact: true })).toHaveAttribute('href', '#origin-edition-read');
+  await expect(page.getByRole('link', { name: 'Portraits', exact: true })).toHaveAttribute('href', '#origin-edition-portraits');
+  await expect(page.getByRole('link', { name: 'Listen', exact: true })).toHaveAttribute('href', '#origin-edition-listen');
+  await expect(page.getByRole('link', { name: 'Watch', exact: true })).toHaveAttribute('href', '#origin-edition-watch');
+  await expect(page.getByRole('link', { name: 'Canon notes', exact: true })).toHaveAttribute('href', '#origin-edition-canon-audit');
+  const coverImage = page.getByAltText('Fitted Origin Dossier cover art for Route Runner');
   await expect(coverImage).toHaveAttribute('src', `${baseUrl}/account/work/origin-dossiers/${projectId}/cover`);
-  await expect(page.getByRole('link', { name: 'Read in Audiobookshelf' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Read the ebook' })).toHaveAttribute(
     'href',
     `${baseUrl}/account/work/origin-dossiers/${projectId}/read`,
   );
@@ -66,10 +72,14 @@ test('signed-in owner can see Origin Dossier cover, tabs, and gated media links 
     'href',
     `${baseUrl}/account/work/origin-dossiers/${projectId}/listen`,
   );
-  await expect(page.getByRole('link', { name: 'Watch scene movie' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Watch selected cinematic scene' })).toHaveAttribute(
     'href',
     `${baseUrl}/account/work/origin-dossiers/${projectId}/video`,
   );
+  await expect(page.locator('#origin-edition-read')).toContainText('real full approved story');
+  await expect(page.locator('#origin-edition-portraits')).toContainText('three portraits that fit the story');
+  await expect(page.locator('#origin-edition-listen')).toContainText('request the full audiobook in a chosen voice');
+  await expect(page.locator('#origin-edition-watch')).toContainText('runner visible in it');
 
   const unauthenticatedRequest = await playwrightRequest.newContext({ baseURL: baseUrl });
   const unauthenticatedDetail = await unauthenticatedRequest.get(`/account/work/origin-dossiers/${projectId}`, { maxRedirects: 0 });
@@ -116,17 +126,17 @@ test('signed-in owner can see Origin Dossier cover, tabs, and gated media links 
     live_provider_artifacts_verified: false,
     live_provider_delivery_verified: false,
     remaining_live_requirements: [
-      'provider-authored final story from Inkfluence, Youbooks, or First Book AI',
+      'Subscribr-authored full chaptered story receipt from the configured manuscript lane',
       'Undetectable Humanizer post-processing receipt from the live provider flow',
-      'rendered story-scene cover using the selected character face',
-      'real Inkfluence or Unmixr audiobook artifact imported into Audiobookshelf',
+      'fitted cover art using the selected character face and shipping with the ebook handoff',
+      'real premium audiobook artifact imported into Audiobookshelf',
       'real dossier video artifact',
       'live Telegram delivery receipt',
       'owner opens the deployed chummer.run route and plays the live Audiobookshelf share',
     ],
     base_url: baseUrl,
     project_id: projectId,
-    owner_account_page: `${baseUrl}/account/work#origin-dossier-library`,
+    owner_account_page: `${baseUrl}/account/work?edition=origin#origin-dossier-library`,
     owner_detail_page: `${baseUrl}/account/work/origin-dossiers/${projectId}`,
     selected_face_cover_url: `${baseUrl}/account/work/origin-dossiers/${projectId}/cover`,
     read_url: `${baseUrl}/account/work/origin-dossiers/${projectId}/read`,

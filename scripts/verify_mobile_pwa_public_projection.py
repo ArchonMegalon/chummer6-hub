@@ -2,310 +2,362 @@
 from __future__ import annotations
 
 import argparse
-import html
-import re
-from urllib.parse import urljoin, urlparse
+import importlib.util
+import json
+import sys
+from pathlib import Path
+from typing import Any
+from urllib.parse import urljoin, urlsplit
 
 import requests
 
-from absolute_completion_common import LocalHubApp, completion_path, now_iso, write_json, write_text
+from absolute_completion_common import completion_path, now_iso, write_json, write_text
 
 
-ROUTES = ["/mobile", "/pwa", "/play", "/player", "/gm", "/observer", "/session"]
-EXPECTED_FINAL_ROUTES = {
-    "/mobile": "/mobile",
-    "/pwa": "/mobile",
-    "/play": "/play",
-    "/player": "/play?role=player",
-    "/gm": "/play?role=gm",
-    "/observer": "/play?role=observer",
-    "/session": "/play",
+RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
+AUDIT_JSON_NAME = "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"
+AUDIT_MARKDOWN_NAME = "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.md"
+CONTRACT_NAME = "chummer.mobile_pwa_public_projection.v2"
+RETIRED_ENV_KEYS = {
+    "CHUMMER_PUBLIC_PLAY_PROXY_ENABLED",
+    "CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED",
+    "CHUMMER_PUBLIC_PLAY_PROXY_URL",
+    "CHUMMER_PUBLIC_PLAY_PROXY_API_KEY",
 }
-EXPECTED_SHORTCUTS = {"/mobile", "/play", "/play/continuity"}
-EXPECTED_SHELL_CACHE_PATHS = {"/mobile", "/play", "/play/continuity", "/mobile/pwa.json", "/ready/handoff/mobile.json"}
-EXPECTED_PWA_LEDGER_STATUSES = {"opt_in_required", "no_world_data", "live", "world_not_followed"}
-EXPECTED_NOTIFICATION_ROUTE_PATHS = {"/account/ledger/notifications", "/mobile", "/play", "/play/continuity", "/ledger/map", "/passport"}
-EXPECTED_NOTIFICATION_ROUTE_PREFIXES = {"/account/ledger/factions/", "/ledger/turns/", "/ledger/newsroom/", "/passport/receipts/"}
-EXPECTED_NOTIFICATION_ASSET_PATHS = {"/apple-touch-icon.png", "/favicon.ico", "/favicon.svg", "/pwa-icon.svg"}
-EXPECTED_NOTIFICATION_ASSET_SUFFIXES = {".ico", ".png", ".svg", ".webp"}
-PERSONALIZED_LEDGER_STREAM_ROUTE = "/mobile/pwa/ledger.json"
-SERVICE_WORKER_REGISTRATION_RE = re.compile(r'serviceWorker\.register\("([^"]*service-worker\.js[^"]*)"')
+ROLE_SHELLS = {
+    "player": (
+        "/play?role=player",
+        "/manifest.player.webmanifest",
+        "Chummer Player",
+        "Keep your runner ready at the table.",
+        "Runner readiness",
+        "/mobile/player",
+    ),
+    "gm": (
+        "/play?role=gm",
+        "/manifest.gm.webmanifest",
+        "Chummer GM",
+        "Stage the table without exposing Game Master controls.",
+        "Scene pacing",
+        "/mobile/gm",
+    ),
+    "observer": (
+        "/play?role=observer",
+        "/manifest.observer.webmanifest",
+        "Chummer Observer",
+        "Follow the table without gaining control.",
+        "Read-mostly return",
+        "/mobile/observer",
+    ),
+}
+ROLE_PROBES = (
+    ("player", "/play?role=player", "player"),
+    ("gm", "/play?role=gm", "gm"),
+    ("observer", "/play?role=observer", "observer"),
+    ("gm_secret_extra", "/play?role=gm&secret=must-not-survive&extra=1", "gm"),
+    ("repeated_roles", "/play?role=gm&role=observer&token=must-not-survive", "player"),
+    ("unknown_role", "/play?role=owner&access_token=must-not-survive", "player"),
+    ("mixed_case_alias", "/play?role=GaMe-MaStEr&api_key=must-not-survive", "gm"),
+    ("missing_role_with_secret", "/play?secret=must-not-survive&extra=1", "player"),
+)
+SENSITIVE_REDIRECT_MARKERS = ("secret", "token", "access_token", "api_key", "must-not-survive")
 
 
-def extract_js_string_array(source: str, name: str) -> set[str]:
-    match = re.search(rf"const\s+{re.escape(name)}\s*=\s*(?:new\s+Set\()?\[(.*?)\]\)?;", source, re.DOTALL)
-    if not match:
-        return set()
+def load_static_verifier():
+    path = RUN_SERVICES_ROOT / "scripts" / "verify_public_pwa_static_assets.py"
+    spec = importlib.util.spec_from_file_location("verify_public_pwa_static_assets_for_projection", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not import {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
-    return set(re.findall(r'"([^"]+)"', match.group(1)))
+
+def write_audit_artifacts(payload: dict[str, Any], markdown: str) -> None:
+    destinations = {
+        completion_path(AUDIT_JSON_NAME),
+        PUBLISHED_ROOT / AUDIT_JSON_NAME,
+    }
+    for path in destinations:
+        write_json(path, payload)
+    for path in {
+        completion_path(AUDIT_MARKDOWN_NAME),
+        PUBLISHED_ROOT / AUDIT_MARKDOWN_NAME,
+    }:
+        write_text(path, markdown)
 
 
-def extract_registered_service_worker_path(markup: str) -> str | None:
-    match = SERVICE_WORKER_REGISTRATION_RE.search(markup)
-    if not match:
-        return None
+def compose_topology(source_root: Path, failures: list[str]) -> dict[str, Any]:
+    text = (source_root / "docker-compose.public-edge.yml").read_text(encoding="utf-8")
+    profile_only = 'profiles: ["play-private"]' in text
+    default_off = 'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED:-false}"' in text
+    no_edge_secret = "CHUMMER_PUBLIC_PLAY_PROXY_API_KEY" not in text
+    no_edge_upstream = "CHUMMER_PUBLIC_PLAY_PROXY_URL:" not in text
+    portal_dependencies = text.split("  chummer-portal:", 1)[1].split("    environment:", 1)[0]
+    no_default_dependency = "chummer-play-web:" not in portal_dependencies
+    checks = {
+        "privatePlayProfileOnly": profile_only,
+        "publicProjectionDefaultOff": default_off,
+        "edgeServiceKeyAbsent": no_edge_secret,
+        "edgeUpstreamAbsent": no_edge_upstream,
+        "portalHasNoPlayDependency": no_default_dependency,
+    }
+    for name, passed in checks.items():
+        if not passed:
+            failures.append(f"compose topology failed: {name}")
+    return checks
 
-    return html.unescape(match.group(1))
+
+def source_topology(source_root: Path = RUN_SERVICES_ROOT) -> dict[str, Any]:
+    failures: list[str] = []
+    static_verifier = load_static_verifier()
+    static_assets = static_verifier.verify_source(source_root)
+    if static_assets["status"] != "pass":
+        failures.extend(f"static assets: {failure}" for failure in static_assets["failures"])
+
+    api = source_root / "Chummer.Run.Api"
+    gateway = (api / "Services" / "PublicPlayProxyGateway.cs").read_text(encoding="utf-8")
+    program = (api / "Program.cs").read_text(encoding="utf-8")
+    controller = (api / "Controllers" / "PublicLandingController.cs").read_text(encoding="utf-8")
+    model = (api / "ViewModels" / "SiteViewModels.cs").read_text(encoding="utf-8")
+    view = (api / "Views" / "PublicLanding" / "MobileProjection.cshtml").read_text(encoding="utf-8")
+    env_example = (source_root / ".env.example").read_text(encoding="utf-8")
+    play_action = controller.split("public IActionResult PlayProjectionPage()", 1)[1].split(
+        '[HttpGet("/player")]', 1
+    )[0]
+
+    gateway_checks = {
+        "zeroPublicPaths": "Array.Empty<string>()" in gateway,
+        "alwaysNotMatched": "Task.FromResult(PublicPlayProxyDisposition.NotMatched)" in gateway,
+        "noHttpClient": "IHttpClientFactory" not in gateway and "HttpRequestMessage" not in gateway,
+        "notInRequestPipeline": "playProjectionGateway.TryHandleAsync" not in program and "gateway.TryHandleAsync" not in program,
+    }
+    readiness_checks = {
+        "combinedReadyField": "HubReadyResponse combinedReport = HubReadyResponse.Create(" in program
+        and "report,\n        projection,\n        deploymentIdentity);" in program,
+        "combinedBodyReturned": "Results.Json(\n        combinedReport" in program,
+        "projectionReadinessRoute": '"/api/ready/play-projection"' in program,
+    }
+    role_checks = {
+        "playAppliesPrivateHeaders": "ApplyPrivateMobileDocumentHeaders();" in play_action,
+        "playCanonicalRedirect": "ResolveCanonicalPlayRoleFromQuery(Request.Query)" in play_action
+        and 'return Redirect($"/mobile/{canonicalRole}");' in play_action,
+        "closedRoleAliases": all(alias in controller for alias in ('"game-master"', '"runner"', '"spectator"')),
+        "roleFieldsInModel": all(field in model for field in ("InstallRoleKey", "DocumentTitle", "ManifestHref", "AppleAppTitle", "MobileInstallRoleProfileViewModel")),
+        "viewUsesModelManifest": 'ViewData["MobileManifestHref"] = Model.ManifestHref;' in view,
+        "viewUsesModelRole": 'data-install-role="@roleProfile.RoleKey"' in view,
+        "roleSpecificBody": all(f"roleProfile.{field}" in view for field in ("PurposeHeading", "PrivacyHeading", "AuthorityHeading", "InstallTargetPath", "Capabilities")),
+        "roleSpecificQr": "data-mobile-app-inline-handoff" in view and "data-mobile-app-inline-qr" in view,
+        "installOnly": 'data-play-surface="install-only"' in view and "mobile-turn-companion.js" not in view,
+        "networkClosedCsp": "connect-src 'none'" in controller,
+    }
+    env_checks = {key: f"{key}=" not in env_example for key in RETIRED_ENV_KEYS}
+
+    for group, checks in (
+        ("gateway", gateway_checks),
+        ("readiness", readiness_checks),
+        ("role shell", role_checks),
+        ("env example", env_checks),
+    ):
+        for name, passed in checks.items():
+            if not passed:
+                failures.append(f"{group} failed: {name}")
+
+    topology = compose_topology(source_root, failures)
+    return {
+        "contractName": CONTRACT_NAME,
+        "mode": "source",
+        "generatedAt": now_iso(),
+        "status": "pass" if not failures else "fail",
+        "topology": topology,
+        "gateway": gateway_checks,
+        "readiness": readiness_checks,
+        "roleShell": role_checks,
+        "retiredEnvAbsent": env_checks,
+        "staticAssets": static_assets,
+        "failures": failures,
+    }
+
+
+def live_projection(base_url: str, session: requests.Session | None = None) -> dict[str, Any]:
+    failures: list[str] = []
+    client = session or requests.Session()
+    static_verifier = load_static_verifier()
+    static_assets = static_verifier.verify_live(base_url, 30.0)
+    if static_assets["status"] != "pass":
+        failures.extend(f"static assets: {failure}" for failure in static_assets["failures"])
+
+    ready_response = client.get(f"{base_url.rstrip('/')}/api/ready", timeout=30)
+    try:
+        ready_payload = ready_response.json()
+    except ValueError:
+        ready_payload = {}
+    hub_value = ready_payload.get("hub")
+    hub = hub_value if isinstance(hub_value, dict) else {}
+    projection_value = ready_payload.get("playProjection")
+    projection = projection_value if isinstance(projection_value, dict) else {}
+    deployment_identity_value = ready_payload.get("deploymentIdentity")
+    deployment_identity = (
+        deployment_identity_value if isinstance(deployment_identity_value, dict) else {}
+    )
+    deployment_fingerprint = str(
+        deployment_identity.get("sourceFingerprintSha256") or ""
+    ).strip().lower()
+    readiness_checks = {
+        "http200": ready_response.status_code == 200,
+        "bodyReady": ready_payload.get("ready") is True,
+        "bodyStatus": str(ready_payload.get("status") or "").strip().lower() == "ready",
+        "hubObject": isinstance(hub_value, dict),
+        "hubReady": hub.get("ready") is True,
+        "hubStatus": str(hub.get("status") or "").strip().lower() == "pass",
+        "projectionObject": isinstance(projection_value, dict),
+        "projectionDisabled": projection.get("enabled") is False,
+        "projectionReady": projection.get("ready") is True,
+        "projectionStatus": str(projection.get("status") or "").strip().lower() == "disabled",
+        "deploymentIdentityObject": isinstance(deployment_identity_value, dict),
+        "deploymentIdentityReady": deployment_identity.get("ready") is True,
+        "deploymentIdentityCode": str(deployment_identity.get("code") or "").strip().lower()
+        == "overlay_identity_bound",
+        "deploymentIdentityFingerprint": len(deployment_fingerprint) == 64
+        and all(character in "0123456789abcdef" for character in deployment_fingerprint),
+    }
+    readiness_checks["combinedConsistent"] = all(readiness_checks.values())
+    for name, passed in readiness_checks.items():
+        if not passed:
+            failures.append(f"/api/ready: {name} failed")
+
+    canonical_origin = urlsplit(base_url.rstrip("/"))
+    role_results: dict[str, Any] = {}
+    role_probe_results: dict[str, Any] = {}
+    for probe_name, path, role in ROLE_PROBES:
+        _, manifest, title, purpose, capability, target = ROLE_SHELLS[role]
+        response = client.get(f"{base_url.rstrip('/')}{path}", timeout=30, allow_redirects=True)
+        markup = response.text
+        final_url = urlsplit(getattr(response, "url", ""))
+        history = list(getattr(response, "history", []))
+        redirect_locations = [str(item.headers.get("Location", "")) for item in history]
+        resolved_redirects = [urlsplit(urljoin(f"{base_url.rstrip('/')}/", location)) for location in redirect_locations]
+        clean_history_locations = bool(resolved_redirects) and all(
+            redirect.path == target
+            and not redirect.query
+            and not redirect.fragment
+            and redirect.scheme == canonical_origin.scheme
+            and redirect.netloc == canonical_origin.netloc
+            and not any(marker in location.lower() for marker in SENSITIVE_REDIRECT_MARKERS)
+            for location, redirect in zip(redirect_locations, resolved_redirects, strict=True)
+        )
+        checks = {
+            "status": response.status_code == 200,
+            "exactlyOneRedirect": len(history) == 1,
+            "temporaryRedirect": len(history) == 1 and history[0].status_code == 302,
+            "cleanRedirectLocations": clean_history_locations,
+            "cleanFinalUrl": final_url.scheme == canonical_origin.scheme
+            and final_url.netloc == canonical_origin.netloc
+            and final_url.path == target
+            and not final_url.query
+            and not final_url.fragment,
+            "role": f'data-install-role="{role}"' in markup,
+            "manifest": f'href="{manifest}"' in markup,
+            "title": title in markup,
+            "purpose": purpose in markup,
+            "capability": capability in markup,
+            "cleanOpenTarget": f'href="{target}"' in markup,
+            "roleQr": "data-mobile-app-inline-qr" in markup
+            and f'data-mobile-app-path="{target}"' in markup,
+            "privacyBoundary": f'data-role-privacy-warning="{role}"' in markup,
+            "authorityBoundary": f'data-role-authority-warning="{role}"' in markup,
+            "installOnly": 'data-play-surface="install-only"' in markup,
+            "noBlazor": "/_framework/blazor.web.js" not in markup,
+            "noPrivateScript": "mobile-turn-companion.js" not in markup,
+            "noStore": "no-store" in response.headers.get("Cache-Control", "").lower(),
+            "closedCsp": "connect-src 'none'" in response.headers.get("Content-Security-Policy", ""),
+        }
+        role_probe_results[probe_name] = {
+            "path": path,
+            "expectedRole": role,
+            "expectedTarget": target,
+            "historyCount": len(history),
+            "redirectLocations": redirect_locations,
+            "checks": checks,
+        }
+        if probe_name in ROLE_SHELLS:
+            role_results[probe_name] = checks
+        for name, passed in checks.items():
+            if not passed:
+                failures.append(f"{probe_name} ({path}): {name} failed")
+
+    return {
+        "contractName": CONTRACT_NAME,
+        "mode": "live",
+        "baseUrl": base_url.rstrip("/"),
+        "generatedAt": now_iso(),
+        "status": "pass" if not failures else "fail",
+        "readiness": {
+            "httpStatus": ready_response.status_code,
+            "payload": ready_payload,
+            "checks": readiness_checks,
+        },
+        "roleShells": role_results,
+        "roleProbes": role_probe_results,
+        "staticAssets": static_assets,
+        "failures": failures,
+    }
+
+
+def render_markdown(payload: dict[str, Any]) -> str:
+    return "\n".join(
+        [
+            "# Mobile PWA public projection audit",
+            "",
+            f"- Status: `{payload['status']}`",
+            f"- Mode: `{payload['mode']}`",
+            "- Public edge posture: local install-only assets; remote projection retired.",
+            "- Private Play posture: explicit Compose profile only.",
+            f"- Failure count: `{len(payload['failures'])}`",
+            "",
+        ]
+    )
+
+
+def run(
+    base_url: str = "",
+    mobile_release_proof_path: Path | None = None,
+    *,
+    source_root: Path = RUN_SERVICES_ROOT,
+    session: requests.Session | None = None,
+) -> int:
+    payload = live_projection(base_url, session=session) if base_url else source_topology(source_root)
+    payload["legacyMobileReleaseProof"] = {
+        "path": str(mobile_release_proof_path) if mobile_release_proof_path else "",
+        "gating": False,
+        "reason": "The public edge now verifies its local install-only contract directly.",
+    }
+    write_audit_artifacts(payload, render_markdown(payload))
+    if payload["status"] == "pass":
+        print("mobile_pwa_public_projection:ok")
+        return 0
+    for failure in payload["failures"]:
+        print(f"mobile_pwa_public_projection:error:{failure}")
+    return 1
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Verify the first-party mobile/PWA public projection.")
-    parser.add_argument("--base-url", default="", help="Optional running Hub base URL. When omitted the script launches a temporary local Hub.")
+    parser = argparse.ArgumentParser(description="Verify the local install-only mobile PWA public edge.")
+    parser.add_argument("--base-url", default="")
+    parser.add_argument("--source-root", type=Path, default=RUN_SERVICES_ROOT)
+    parser.add_argument("--mobile-release-proof", type=Path)
     return parser.parse_args()
-
-
-def run(base_url: str) -> int:
-    session = requests.Session()
-    route_results = []
-    for route in ROUTES:
-        response = session.get(f"{base_url}{route}", timeout=30, allow_redirects=True)
-        response.raise_for_status()
-        final_url = response.url
-        parsed_final = urlparse(final_url)
-        final_route = f"{parsed_final.path}{f'?{parsed_final.query}' if parsed_final.query else ''}"
-        route_results.append(
-            {
-                "route": route,
-                "status_code": response.status_code,
-                "final_url": final_url,
-                "final_route": final_route,
-                "expected_final_route": EXPECTED_FINAL_ROUTES[route],
-            }
-        )
-
-    mobile_html = session.get(f"{base_url}/mobile", timeout=30)
-    mobile_html.raise_for_status()
-    continuity_html = session.get(f"{base_url}/play/continuity", timeout=30)
-    continuity_html.raise_for_status()
-    mobile_json_response = session.get(f"{base_url}/mobile/pwa.json", timeout=30)
-    mobile_json_response.raise_for_status()
-    ledger_stream_response = session.get(f"{base_url}/mobile/pwa/ledger.json", timeout=30)
-    ledger_stream_response.raise_for_status()
-    continuity_receipt_paths = (
-        "/play/continuity/history",
-        "/play/continuity/receipts",
-    )
-    receipt_index_response = None
-    receipt_index_route = None
-    for candidate_path in continuity_receipt_paths:
-        response = session.get(f"{base_url}{candidate_path}", timeout=30)
-        if response.status_code == 200:
-            receipt_index_response = response
-            receipt_index_route = candidate_path
-            break
-
-    if receipt_index_response is None:
-        raise RuntimeError(
-            f"continuity receipt route not available on {base_url}; expected one of "
-            f"{', '.join(continuity_receipt_paths)}"
-        )
-    receipt_index_response.raise_for_status()
-    manifest_response = session.get(f"{base_url}/manifest.json", timeout=30)
-    manifest_response.raise_for_status()
-    registered_service_worker_path = extract_registered_service_worker_path(mobile_html.text)
-    service_worker_path = registered_service_worker_path or "/service-worker.js"
-    service_worker_response = session.get(urljoin(f"{base_url}/", service_worker_path.lstrip("/")), timeout=30)
-    service_worker_response.raise_for_status()
-
-    manifest = manifest_response.json()
-    mobile_json = mobile_json_response.json()
-    ledger_stream = ledger_stream_response.json()
-    receipt_index = receipt_index_response.json()
-    service_worker_text = service_worker_response.text
-    precache_urls = extract_js_string_array(service_worker_text, "PRECACHE_URLS")
-    non_cacheable_paths = extract_js_string_array(service_worker_text, "NON_CACHEABLE_PATHS")
-    notification_route_paths = extract_js_string_array(service_worker_text, "NOTIFICATION_ROUTE_PATHS")
-    notification_route_prefixes = extract_js_string_array(service_worker_text, "NOTIFICATION_ROUTE_PREFIXES")
-    notification_asset_paths = extract_js_string_array(service_worker_text, "NOTIFICATION_ASSET_PATHS")
-    notification_asset_suffixes = extract_js_string_array(service_worker_text, "NOTIFICATION_ASSET_SUFFIXES")
-    ledger_stream_cache_control = ledger_stream_response.headers.get("Cache-Control", "")
-    ledger_stream_vary = ledger_stream_response.headers.get("Vary", "")
-    has_manifest_link = 'rel="manifest"' in mobile_html.text and "/manifest.json" in mobile_html.text
-    has_sw_registration = registered_service_worker_path is not None
-    has_install_button = "Install this app" in mobile_html.text
-    has_continuity_action = "/play/continuity" in mobile_html.text
-    shortcut_urls = {shortcut.get("url") for shortcut in (manifest.get("shortcuts") or []) if isinstance(shortcut, dict)}
-    screenshot_count = len(manifest.get("screenshots") or [])
-    has_manifest_id = manifest.get("id") == "/mobile"
-    has_display_override = bool(manifest.get("display_override"))
-    has_expected_shortcuts = EXPECTED_SHORTCUTS.issubset(shortcut_urls)
-    has_expected_shell_cache_paths = EXPECTED_SHELL_CACHE_PATHS.issubset(precache_urls)
-    ledger_stream_not_precached = PERSONALIZED_LEDGER_STREAM_ROUTE not in precache_urls
-    ledger_stream_denied_by_service_worker = PERSONALIZED_LEDGER_STREAM_ROUTE in non_cacheable_paths
-    ledger_stream_has_no_store_header = "no-store" in ledger_stream_cache_control.lower()
-    ledger_stream_has_personalized_vary = "Cookie" in ledger_stream_vary and "Authorization" in ledger_stream_vary
-    has_navigation_preload = "navigationPreload" in service_worker_text
-    has_runtime_cache = "RUNTIME_CACHE" in service_worker_text
-    has_push_handler = 'self.addEventListener("push"' in service_worker_text
-    has_notification_click_handler = 'self.addEventListener("notificationclick"' in service_worker_text
-    has_notification_close_handler = 'self.addEventListener("notificationclose"' in service_worker_text
-    has_notification_route_bounds = (
-        EXPECTED_NOTIFICATION_ROUTE_PATHS.issubset(notification_route_paths)
-        and EXPECTED_NOTIFICATION_ROUTE_PREFIXES.issubset(notification_route_prefixes)
-        and "tryNormalizeNotificationHref(" in service_worker_text
-        and "isAllowedNotificationHref(" in service_worker_text
-    )
-    has_notification_asset_bounds = (
-        EXPECTED_NOTIFICATION_ASSET_PATHS.issubset(notification_asset_paths)
-        and EXPECTED_NOTIFICATION_ASSET_SUFFIXES.issubset(notification_asset_suffixes)
-        and "tryNormalizeNotificationAssetPath(" in service_worker_text
-        and "isAllowedNotificationAssetPath(" in service_worker_text
-    )
-    continuity_receipt_count = len(receipt_index.get("receipts") or [])
-    continuity_boundary_present = bool(receipt_index.get("boundary"))
-    mobile_json_has_routes = (
-        mobile_json.get("install_route") == "/downloads"
-        and mobile_json.get("continuity_route") == "/play/continuity"
-        and mobile_json.get("receipt_index_route") in continuity_receipt_paths
-    )
-    ledger_stream_mode = ledger_stream.get("mode")
-    ledger_stream_status = ledger_stream.get("status")
-    ledger_stream_has_updates_route = ledger_stream.get("updates_route") == "/mobile/pwa/ledger.json"
-    ledger_stream_has_valid_status = ledger_stream_status in EXPECTED_PWA_LEDGER_STATUSES
-    ledger_stream_is_living_world = ledger_stream_mode == "mobile_pwa_living_world"
-    ledger_stream_contract_holds = (
-        isinstance(ledger_stream, dict)
-        and ledger_stream_is_living_world
-        and ledger_stream_has_valid_status
-        and ledger_stream_has_updates_route
-    )
-    role_routes_hold = all(
-        result["final_route"] == result["expected_final_route"]
-        for result in route_results
-    )
-    checks = [
-        has_manifest_link,
-        has_sw_registration,
-        has_install_button,
-        has_continuity_action,
-        has_manifest_id,
-        has_display_override,
-        has_expected_shortcuts,
-        screenshot_count >= 2,
-        has_expected_shell_cache_paths,
-        ledger_stream_not_precached,
-        ledger_stream_denied_by_service_worker,
-        ledger_stream_has_no_store_header,
-        ledger_stream_has_personalized_vary,
-        has_navigation_preload,
-        has_runtime_cache,
-        has_push_handler,
-        has_notification_click_handler,
-        has_notification_close_handler,
-        has_notification_route_bounds,
-        has_notification_asset_bounds,
-        continuity_receipt_count >= 3,
-        continuity_boundary_present,
-        mobile_json_has_routes,
-        ledger_stream_contract_holds,
-        role_routes_hold,
-    ]
-
-    payload = {
-        "contract_name": "chummer.mobile_pwa_public_projection",
-        "status": "pass" if all(checks) else "fail",
-        "generated_at_utc": now_iso(),
-        "base_url": base_url,
-        "route_results": route_results,
-        "manifest": {
-            "id": manifest.get("id"),
-            "start_url": manifest.get("start_url"),
-            "display": manifest.get("display"),
-            "display_override": manifest.get("display_override"),
-            "shortcut_count": len(manifest.get("shortcuts") or []),
-            "icon_count": len(manifest.get("icons") or []),
-            "screenshot_count": screenshot_count,
-            "shortcut_urls": sorted(shortcut_urls),
-        },
-        "service_worker": {
-            "path": service_worker_path,
-            "status_code": service_worker_response.status_code,
-            "has_fetch_handler": "self.addEventListener(\"fetch\"" in service_worker_text,
-            "has_navigation_preload": has_navigation_preload,
-            "has_runtime_cache": has_runtime_cache,
-            "has_expected_shell_cache_paths": has_expected_shell_cache_paths,
-            "ledger_stream_not_precached": ledger_stream_not_precached,
-            "ledger_stream_denied_by_service_worker": ledger_stream_denied_by_service_worker,
-            "has_push_handler": has_push_handler,
-            "has_notification_click_handler": has_notification_click_handler,
-            "has_notification_close_handler": has_notification_close_handler,
-            "has_notification_route_bounds": has_notification_route_bounds,
-            "has_notification_asset_bounds": has_notification_asset_bounds,
-            "notification_route_paths": sorted(notification_route_paths),
-            "notification_route_prefixes": sorted(notification_route_prefixes),
-            "notification_asset_paths": sorted(notification_asset_paths),
-            "notification_asset_suffixes": sorted(notification_asset_suffixes),
-        },
-        "page_assertions": {
-            "has_manifest_link": has_manifest_link,
-            "has_service_worker_registration": has_sw_registration,
-            "has_install_button": has_install_button,
-            "has_continuity_action": has_continuity_action,
-            "role_routes_hold": role_routes_hold,
-            "continuity_page_status_code": continuity_html.status_code,
-        },
-                "continuity": {
-            "receipt_count": continuity_receipt_count,
-            "has_boundary": continuity_boundary_present,
-            "mobile_json_has_routes": mobile_json_has_routes,
-            "receipt_index_route": receipt_index_route,
-        },
-        "ledger_stream": {
-            "status": ledger_stream_status,
-            "mode": ledger_stream_mode,
-            "has_contract": ledger_stream_contract_holds,
-            "cache_control": ledger_stream_cache_control,
-            "vary": ledger_stream_vary,
-            "has_no_store_header": ledger_stream_has_no_store_header,
-            "has_personalized_vary": ledger_stream_has_personalized_vary,
-        },
-    }
-    write_json(completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"), payload)
-    write_text(
-        completion_path("MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.md"),
-        "\n".join(
-            [
-                "# Mobile and PWA public projection audit",
-                "",
-                f"- Generated: {payload['generated_at_utc']}",
-                f"- Manifest start URL: `{payload['manifest']['start_url']}`",
-                f"- Display mode: `{payload['manifest']['display']}`",
-                f"- Display override present: `{has_display_override}`",
-                f"- Manifest screenshots: `{screenshot_count}`",
-                f"- Manifest link present on `/mobile`: `{has_manifest_link}`",
-                f"- Service worker registration present on `/mobile`: `{has_sw_registration}`",
-                f"- Install action visible on `/mobile`: `{has_install_button}`",
-                f"- Continuity action visible on `/mobile`: `{has_continuity_action}`",
-                f"- Service worker fetch handler present: `{payload['service_worker']['has_fetch_handler']}`",
-                f"- Service worker navigation preload present: `{has_navigation_preload}`",
-                f"- Service worker continuity cache paths present: `{has_expected_shell_cache_paths}`",
-                f"- Personalized ledger stream excluded from precache: `{ledger_stream_not_precached}`",
-                f"- Personalized ledger stream denied by service worker: `{ledger_stream_denied_by_service_worker}`",
-                f"- Personalized ledger stream has no-store header: `{ledger_stream_has_no_store_header}`",
-                f"- Personalized ledger stream varies by Cookie and Authorization: `{ledger_stream_has_personalized_vary}`",
-                f"- Service worker push handler present: `{has_push_handler}`",
-                f"- Service worker notification click handler present: `{has_notification_click_handler}`",
-                f"- Service worker notification close handler present: `{has_notification_close_handler}`",
-                f"- Service worker notification route bounds present: `{has_notification_route_bounds}`",
-                f"- Service worker notification asset bounds present: `{has_notification_asset_bounds}`",
-                f"- Role-route redirects hold: `{role_routes_hold}`",
-                f"- Continuity receipt count: `{continuity_receipt_count}`",
-                f"- Continuity boundary present: `{continuity_boundary_present}`",
-            ]
-        ),
-    )
-    if payload["status"] == "pass":
-        print("mobile_pwa_public_projection:ok")
-    return 0 if payload["status"] == "pass" else 1
 
 
 def main() -> int:
     args = parse_args()
-    if args.base_url:
-        return run(args.base_url)
-
-    with LocalHubApp() as app:
-        return run(app.base_url)
+    return run(
+        args.base_url,
+        args.mobile_release_proof,
+        source_root=args.source_root,
+    )
 
 
 if __name__ == "__main__":

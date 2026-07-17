@@ -110,6 +110,71 @@ def make_canonical_manifest() -> dict:
     }
 
 
+def make_hidden_macos_releases_manifest() -> dict:
+    return {
+        "version": "run-20260704-201323",
+        "channel": "preview",
+        "rolloutState": "promoted_preview",
+        "supportabilityState": "preview_supported",
+        "publishedAt": "2026-07-04T20:15:34Z",
+        "status": "published",
+        "downloads": [
+            {
+                "id": "avalonia-osx-arm64-installer",
+                "artifactId": "avalonia-osx-arm64-installer",
+                "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
+                "url": "https://chummer.run/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                "sha256": "d" * 64,
+                "sizeBytes": 1234,
+                "head": "avalonia",
+                "platform": "Avalonia Desktop macOS ARM64 Installer",
+                "platformId": "macos-arm64",
+                "arch": "arm64",
+                "channel": "preview",
+                "channelId": "preview",
+                "installAccessClass": "account_required",
+                "kind": "installer",
+            }
+        ],
+        "proofStatus": "passed",
+        "proofRoutes": ["/downloads/install/avalonia-osx-arm64-installer", "/downloads"],
+    }
+
+
+def make_hidden_macos_canonical_manifest() -> dict:
+    return {
+        "version": "run-20260704-201323",
+        "channel": "preview",
+        "channelId": "preview",
+        "rolloutState": "promoted_preview",
+        "supportabilityState": "preview_supported",
+        "publishedAt": "2026-07-04T20:15:34Z",
+        "status": "published",
+        "releaseProof": {
+            "status": "passed",
+            "proofRoutes": ["/downloads/install/avalonia-osx-arm64-installer", "/downloads"],
+        },
+        "artifacts": [
+            {
+                "id": "avalonia-osx-arm64-installer",
+                "artifactId": "avalonia-osx-arm64-installer",
+                "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
+                "downloadUrl": "https://chummer.run/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                "sha256": "d" * 64,
+                "sizeBytes": 1234,
+                "head": "avalonia",
+                "platform": "macos",
+                "arch": "arm64",
+                "rid": "osx-arm64",
+                "channel": "preview",
+                "channelId": "preview",
+                "installAccessClass": "account_required",
+                "kind": "installer",
+            }
+        ],
+    }
+
+
 def add_windows_bootstrap_artifact(
     *,
     releases_payload: dict,
@@ -176,6 +241,10 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         self.assertEqual(
             MODULE.rid_from_row({"platformId": "macos", "arch": "x64"}),
             "osx-x64",
+        )
+        self.assertEqual(
+            MODULE.rid_from_row({"platformId": "macos-arm64"}),
+            "osx-arm64",
         )
 
     def test_matching_local_and_live_bundle_truth_passes(self) -> None:
@@ -412,6 +481,48 @@ class PublicDownloadShelfTruthGateTests(unittest.TestCase):
         self.assertTrue(
             any("differ for artifact avalonia-linux-x64-installer" in failure for failure in receipt["failures"])
         )
+
+    def test_hidden_macos_runtime_projection_can_match_empty_live_releases_view(self) -> None:
+        releases_payload = make_hidden_macos_releases_manifest()
+        canonical_payload = make_hidden_macos_canonical_manifest()
+        live_releases_payload = {
+            "version": "run-20260704-201323",
+            "channel": "preview",
+            "rolloutState": "release_review_required",
+            "supportabilityState": "review_required",
+            "publishedAt": "2026-07-04T20:15:34Z",
+            "status": "published",
+            "downloads": [],
+        }
+
+        with tempfile.TemporaryDirectory(prefix="download-shelf-truth-hidden-macos-") as temp_root:
+            root = Path(temp_root)
+            local_manifest = root / "releases.json"
+            local_canonical = root / "RELEASE_CHANNEL.generated.json"
+            write_json(local_manifest, releases_payload)
+            write_json(local_canonical, canonical_payload)
+
+            def fake_get(url: str, *args, **kwargs) -> FakeResponse:
+                if url == "https://chummer.run/downloads":
+                    return FakeResponse(url=url, text="<main>No public downloads right now.</main>")
+                if url == "https://chummer.run/downloads/releases.json":
+                    return FakeResponse(url=url, json_payload=live_releases_payload)
+                if url == "https://chummer.run/downloads/RELEASE_CHANNEL.generated.json":
+                    return FakeResponse(url=url, json_payload=canonical_payload)
+                raise AssertionError(f"unexpected GET {url}")
+
+            with mock.patch.object(MODULE.requests, "get", side_effect=fake_get):
+                receipt = MODULE.evaluate(
+                    base_url="https://chummer.run",
+                    local_manifest_path=local_manifest,
+                    local_canonical_manifest_path=local_canonical,
+                    timeout=5.0,
+                    artifact_probes_enabled=False,
+                )
+
+        self.assertEqual(receipt["status"], "pass")
+        self.assertEqual(receipt["live"]["manifest"]["artifactCount"], 0)
+        self.assertEqual(receipt["local"]["projectedPublicManifest"]["artifactCount"], 0)
 
     def test_publish_and_verify_lanes_call_public_download_shelf_truth_gate(self) -> None:
         publish_script = (ROOT / "scripts" / "publish-download-bundle-http.sh").read_text(encoding="utf-8")

@@ -43,6 +43,62 @@ class ChummerOnlineLaunchGateTests(unittest.TestCase):
         self.assertTrue(has_roster)
         self.assertIsNone(reason)
 
+    def test_rejects_redirected_character_roster_launch_without_roster_menu_markers(self) -> None:
+        module = load_module()
+
+        has_blazor, has_roster, reason = module.classify_response(
+            200,
+            (
+                b'<!doctype html><html><head><base href="/blazor/" />'
+                b'<link rel="manifest" href="manifest.webmanifest">'
+                b'<script src="https://app.rybbit.io/api/script.js"></script>'
+                b'</head><body><script src="_framework/blazor.web.js"></script>'
+                b'<script>window.chummerPwa = window.chummerPwa || {};</script></body></html>'
+            ),
+            final_url="https://chummer.run/blazor/app?command=character_roster",
+        )
+
+        self.assertTrue(has_blazor)
+        self.assertFalse(has_roster)
+        self.assertEqual("missing_roster_menu_markers", reason)
+
+    def test_classifies_redirected_non_roster_blazor_launch_shell_as_pass(self) -> None:
+        module = load_module()
+
+        has_blazor, has_roster, reason = module.classify_response(
+            200,
+            (
+                b'<!doctype html><html><head><base href="/blazor/" />'
+                b'<link rel="manifest" href="manifest.webmanifest">'
+                b'<script src="https://app.rybbit.io/api/script.js"></script>'
+                b'</head><body><script src="_framework/blazor.web.js"></script>'
+                b'<script>window.chummerPwa = window.chummerPwa || {};</script></body></html>'
+            ),
+            final_url="https://chummer.run/blazor/app?command=new_character",
+        )
+
+        self.assertTrue(has_blazor)
+        self.assertFalse(has_roster)
+        self.assertIsNone(reason)
+
+    def test_rejects_redirected_non_launch_blazor_shell_without_roster_marker(self) -> None:
+        module = load_module()
+
+        _, has_roster, reason = module.classify_response(
+            200,
+            (
+                b'<!doctype html><html><head><base href="/blazor/" />'
+                b'<link rel="manifest" href="manifest.webmanifest">'
+                b'<script src="https://app.rybbit.io/api/script.js"></script>'
+                b'</head><body><script src="_framework/blazor.web.js"></script>'
+                b'<script>window.chummerPwa = window.chummerPwa || {};</script></body></html>'
+            ),
+            final_url="https://chummer.run/blazor/library",
+        )
+
+        self.assertFalse(has_roster)
+        self.assertEqual("missing_roster_marker", reason)
+
     def test_rejects_missing_app_route_404(self) -> None:
         module = load_module()
 
@@ -80,6 +136,7 @@ raise SystemExit(module.main(["--base-url", "https://chummer.run/", "--output", 
 
             self.assertEqual(result.returncode, 1)
             payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual("chummer.online_character_roster_launch.v1", payload["contractName"])
             self.assertEqual("fail", payload["status"])
             self.assertEqual("http_404", payload["failure_reason"])
             self.assertEqual("https://chummer.run/app?command=character_roster", payload["launch_url"])

@@ -8,7 +8,7 @@ Status: the major route-family redesign slices are already landed in this repo; 
 
 Live observation on 2026-05-06, amended by the 2026-06 minimalist front-door pass:
 
-- `/`, `/downloads`, `/now`, and `/roadmap` carry the normal public route family. `/horizons` is now a noindex maintenance alias for older links, not a product shelf.
+- `/`, `/downloads`, `/now`, and `/roadmap` carry the normal public route family. `/horizons` is now a minimal working-lanes summary for older or direct links, not a product shelf.
 - `/participate` and `/help` still read like a different, flatter product shell. The route family loses visual continuity precisely where the user needs trust and guidance.
 - The current front door strongly communicates "explainable rules truth" but under-projects "campaign command surface", "who this is for", and "why the account-aware return path matters".
 - Install, support, and device-linking truth exists, but it is presented as compliance plumbing rather than as a premium continuity benefit.
@@ -120,7 +120,7 @@ Component families:
 | `/what-is-chummer` | Tell the product story | Repeating downloads or roadmap verbatim | Editorial hero, trust pillars, route family links | Medium | Story blocks only | Primary `downloads`, secondary `status` | Validation examples inline, no release shelf duplication |
 | `/downloads` | Get the user onto the right build safely | Letting extra files crowd the install decision | Shared header, trust rail, help adjacency | Medium | Recommended platform first, details collapsed | Stable and Nightly first, account optional | Build date, platform state, known issues |
 | `/now` | Help users decide install now vs wait | Reading like changelog fluff | Workflow cards, release posture, signed-in return rail | Medium-high | Keep 3 core validation cards, collapse supporting validation | Primary `downloads`, secondary `status` | Live, preview, and caution all explicit |
-| `/horizons` | Compatibility maintenance alias for older links | Being promoted like a product section | Minimal pointer back to Downloads, Help, Status, and Roadmap | Low | One short maintenance page | Primary `downloads`, secondary `roadmap` | Noindex, not promoted |
+| `/horizons` | Minimal working-lanes summary for older or direct links | Being promoted like a product section | Minimal pointer back to Downloads, Help, Status, and Roadmap plus the three active working lanes | Low | One short summary page | Primary `downloads`, secondary `roadmap` | Quiet direction only, not front-door product proof |
 | `/roadmap` | Show milestone-backed direction | Redirecting back to a softer summary shelf | Milestone drawer, planned-work cards, public loop framing | High | Keep cards collapsed by default | Primary detail routes, secondary `status` | Milestone difficulty, claimed state, dependencies |
 | `/artifacts` | Make supporting files tangible | Becoming a junk drawer | Publication gallery, publication rail, route-boundary copy | Medium | Featured file stack | Primary file details, secondary `downloads` | Evidence-first, not hype-first |
 | `/participate` | Route signal safely to public or signed-in lanes | Mixing support, contribution, and roadmap authority | Trust claims, route choice cards, public loop stages | Medium | Two primary paths: public and signed-in | Primary public route, secondary signed-in route | ProductLift boundary, first-party fallback honesty |

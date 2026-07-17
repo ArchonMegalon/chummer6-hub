@@ -1,0 +1,28 @@
+{
+  "contractName": "chummer.privacy_launch_gate",
+  "contractVersion": 1,
+  "capabilityContractName": "chummer.hosted_build_privacy_lifecycle",
+  "capabilityContractVersion": 1,
+  "status": "review_required",
+  "reviewRequired": true,
+  "blocksLaunch": true,
+  "scope": "flagship_launch_and_release_supportability",
+  "facts": [
+    "active-record-delete",
+    "memory-only-recovery",
+    "no-delete-replay",
+    "no-owner-erasure",
+    "production-recovery-unverified"
+  ],
+  "prohibitedClaims": [
+    "permanent-delete",
+    "durable-recovery",
+    "account-erasure"
+  ],
+  "blockedClaims": [
+    "flagship_launch",
+    "public_release_supportability",
+    "hosted_build_recovery_and_erasure"
+  ],
+  "reason": "Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified."
+}

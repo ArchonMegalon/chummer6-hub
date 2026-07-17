@@ -1,10 +1,11 @@
 @model ReleaseUploadPageViewModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     ViewData["Title"] = "Build macOS";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads";
-    var expires = Model.TicketExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'");
     static string PublicReleaseUploadText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
+    var antiForgery = Antiforgery.GetAndStoreTokens(Context);
 }
 
 <section class="recommended-download" id="release-upload-command">
@@ -12,7 +13,8 @@
         <div class="recommended-download__copy">
             <span class="tag">Mac build command</span>
             <h2>Run this on your Mac</h2>
-            <p>The command clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes the upload bundle, and carries the current short-lived access code so the run can finish unattended.</p>
+            <p>The command verifies the setup script and release proof, asks for the short-lived access code without echoing it, then clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes, and verifies.</p>
+            <p>Before running it, export reviewed refs and full 40-hex <code>EXPECTED_COMMIT</code> pins for all seven source repositories. The command stops before downloading the bootstrap when any pin is absent or malformed; the <a href="@Model.ReadmeUrl">runbook</a> lists every required setting.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Command</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadCommand">@Model.Command</pre>
@@ -20,7 +22,7 @@
                     <button class="button-like button-like--secondary" type="button" id="copyReleaseUploadCommandButton">Copy command</button>
                     <a class="button-like button-like--ghost" href="@Model.BootstrapUrl">Open setup script</a>
                 </div>
-                <p class="status-copy">This release command contains a short-lived access code. Use it in the release shell that will run the setup script, and do not paste it into logs or shared chat.</p>
+                <p class="status-copy">The command contains no access code. Copy a fresh code below, run the command, and paste the code at the hidden prompt. For unattended input, place only the code in a regular mode-0600 file and set <code>CHUMMER_RELEASE_UPLOAD_TICKET_FILE</code> to its path.</p>
                 <p class="status-copy">After a successful upload or a failed run, delete the local release work root and temporary packaging files again so the Mac SSD does not fill up. Typical cleanup targets are the `run-...` workspace under `$HOME/work/chummer-release` plus any `CHUMMER_MAC_RELEASE_TMPDIR` and `CHUMMER_DESKTOP_INSTALLER_TMPDIR` contents.</p>
                 <p class="status-copy" id="releaseUploadCommandNotice" hidden></p>
             </div>
@@ -32,15 +34,14 @@
     <article class="recommended-download__card">
         <div class="recommended-download__copy">
             <span class="tag">Short-lived access code</span>
-            <h2>Backup access code</h2>
-            <p>The command above already includes this value. Keep it available only for recovery or for a manually downloaded setup script that still prompts for upload authorization.</p>
+            <h2>Copy a fresh code when the Mac is ready</h2>
+            <p>The code is minted only after you click. It is copied directly to the clipboard and is never embedded in this page or the command.</p>
             <div class="code-panel">
-                <div class="code-panel__label">Access code</div>
-                <pre class="code-panel__value mono-receipt" id="releaseUploadHandoffCode">@Model.HandoffCode</pre>
+                <input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken" />
                 <div class="stacked-actions">
-                    <button class="button-like button-like--secondary" type="button" id="copyReleaseUploadHandoffCodeButton">Copy access code</button>
+                    <button class="button-like button-like--secondary" type="button" id="copyReleaseUploadHandoffCodeButton" data-ticket-url="@Model.TicketUrl">Mint and copy access code</button>
                 </div>
-                <p class="status-copy">Treat the access code as sensitive until it expires. Never export it in shell startup files.</p>
+                <p class="status-copy">Treat the clipboard value as sensitive until it expires. Never put it in command history, process arguments, shell startup files, or shared logs.</p>
                 <p class="status-copy" id="releaseUploadHandoffCodeNotice" hidden></p>
             </div>
         </div>
@@ -61,7 +62,7 @@
 <section class="release-stage">
     <div class="release-stage__integrity">
         <span class="tag">Ticket window</span>
-        <p>Expires @expires.</p>
+        <p>Mint the code immediately before starting the command so the full validity window remains available to the build.</p>
     </div>
     <div class="release-stage__note">
         The command is preconfigured for unsigned release uploads.
@@ -104,7 +105,6 @@
   const commandValue = document.getElementById("releaseUploadCommand");
   const notice = document.getElementById("releaseUploadCommandNotice");
   const copyHandoffCodeButton = document.getElementById("copyReleaseUploadHandoffCodeButton");
-  const handoffCodeValue = document.getElementById("releaseUploadHandoffCode");
   const handoffCodeNotice = document.getElementById("releaseUploadHandoffCodeNotice");
 
   if (copyButton && commandValue && ui?.copyToClipboard) {
@@ -118,13 +118,31 @@
     });
   }
 
-  if (copyHandoffCodeButton && handoffCodeValue && ui?.copyToClipboard) {
+  if (copyHandoffCodeButton && ui?.copyToClipboard) {
     copyHandoffCodeButton.addEventListener("click", async () => {
       try {
-        await ui.copyToClipboard(handoffCodeValue.textContent || "", copyHandoffCodeButton, "Copied");
-        ui.setNotice(handoffCodeNotice, "Release upload access code copied.");
+        const ticketUrl = copyHandoffCodeButton.dataset.ticketUrl || "";
+        const response = await fetch(ticketUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Accept": "application/json",
+            "RequestVerificationToken": ui.getRequestVerificationToken()
+          }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || typeof payload.ticket !== "string" || !payload.ticket) {
+          throw new Error(payload.detail || `Access code request failed (${response.status}).`);
+        }
+
+        await ui.copyToClipboard(payload.ticket, copyHandoffCodeButton, "Copied");
+        payload.ticket = "";
+        const expiresAt = typeof payload.expiresAtUtc === "string"
+          ? new Date(payload.expiresAtUtc).toLocaleString()
+          : "the advertised ticket window";
+        ui.setNotice(handoffCodeNotice, `Fresh release upload access code copied. It expires at ${expiresAt}.`);
       } catch (error) {
-        ui.setNotice(handoffCodeNotice, ui.describeError(error, "Release upload access code copy failed. Copy it manually from the code panel."), true);
+        ui.setNotice(handoffCodeNotice, ui.describeError(error, "Release upload access code could not be minted or copied. Sign in again, then retry."), true);
       }
     });
   }

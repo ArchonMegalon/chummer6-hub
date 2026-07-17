@@ -11,17 +11,23 @@ from typing import Any
 from urllib.parse import urljoin, urlparse
 
 import requests
+import yaml
 
 
 OUT_PATHS = (
     Path("/docker/chummercomplete/chummer-design/_completion/full_product_every_aspect/PUBLIC_DOWNLOAD_SHELF_TRUTH.generated.json"),
     Path("/docker/chummercomplete/_completion/full_product_every_aspect/PUBLIC_DOWNLOAD_SHELF_TRUTH.generated.json"),
 )
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PLATFORM_ACCEPTANCE_PATH = REPO_ROOT / ".codex-design" / "product" / "DESKTOP_PLATFORM_ACCEPTANCE_MATRIX.yaml"
 DEFAULT_LOCAL_MANIFEST = Path("/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/releases.json")
 DEFAULT_LOCAL_CANONICAL_MANIFEST = Path("/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json")
 RETRYABLE_STATUS_CODES = {502, 503, 504}
 DEFAULT_REQUEST_ATTEMPTS = 6
 DEFAULT_RETRY_DELAY_SECONDS = 2.0
+INSTALLER_EXTENSIONS = (".exe", ".deb", ".msi", ".dmg", ".pkg", ".msix")
+ACCOUNT_REQUIRED = "account_required"
+OPEN_PUBLIC = "open_public"
 
 
 def now_iso() -> str:
@@ -162,6 +168,14 @@ def rid_from_row(row: dict[str, Any]) -> str:
     platform_id = normalize_token(row.get("platformId"))
     if platform_id.startswith(("win-", "linux-", "osx-")):
         return platform_id
+    if "-" in platform_id:
+        platform_token, arch_token = platform_id.split("-", 1)
+        if platform_token in {"windows", "win"} and arch_token:
+            return f"win-{arch_token}"
+        if platform_token == "linux" and arch_token:
+            return f"linux-{arch_token}"
+        if platform_token in {"mac", "macos", "osx"} and arch_token:
+            return f"osx-{arch_token}"
     arch = normalize_token(row.get("arch"))
     if platform_id and arch:
         if platform_id in {"windows", "win"}:
@@ -225,8 +239,12 @@ def compare_views(
     right_value: dict[str, Any],
     *,
     failures: list[str],
+    ignore_keys: set[str] | None = None,
 ) -> None:
+    ignored = ignore_keys or set()
     for key in sorted(set(left_value) | set(right_value)):
+        if key in ignored:
+            continue
         if left_value.get(key) != right_value.get(key):
             failures.append(
                 f"{left_name} and {right_name} differ for {key}: {left_value.get(key)!r} != {right_value.get(key)!r}"
@@ -255,6 +273,248 @@ def compare_artifact_indexes(
                 f"{left_name} and {right_name} differ for artifact {artifact_id}: "
                 f"{json.dumps(left_rows[artifact_id], sort_keys=True)} != {json.dumps(right_rows[artifact_id], sort_keys=True)}"
             )
+
+
+def normalize_platform_family(value: Any) -> str:
+    token = normalize_token(value)
+    if token in {"win", "windows"}:
+        return "windows"
+    if token == "linux":
+        return "linux"
+    if token in {"mac", "macos", "osx"}:
+        return "macos"
+    return token
+
+
+def platform_family_from_row(row: dict[str, Any]) -> str:
+    rid = rid_from_row(row)
+    if rid.startswith("win-"):
+        return "windows"
+    if rid.startswith("linux-"):
+        return "linux"
+    if rid.startswith("osx-"):
+        return "macos"
+
+    platform_id = normalize_platform_family(row.get("platformId"))
+    if platform_id:
+        return platform_id
+
+    platform_label = normalize_optional_text(row.get("platform"))
+    if "windows" in platform_label.lower():
+        return "windows"
+    if "linux" in platform_label.lower():
+        return "linux"
+    if "mac" in platform_label.lower() or "osx" in platform_label.lower():
+        return "macos"
+    return ""
+
+
+def artifact_kind_from_row(row: dict[str, Any]) -> str:
+    kind = normalize_token(row.get("kind"))
+    if kind:
+        return kind
+    file_name = normalize_optional_text(row.get("fileName"))
+    if file_name.endswith(".tar.gz") or file_name.endswith(".zip"):
+        return "archive"
+    if file_name.endswith((".dmg", ".pkg")):
+        return "installer"
+    if file_name.endswith(INSTALLER_EXTENSIONS):
+        return "installer"
+    return ""
+
+
+def is_installer_row(row: dict[str, Any]) -> bool:
+    kind = artifact_kind_from_row(row)
+    if kind in {"installer", "dmg", "pkg", "msix"}:
+        return True
+    file_name = normalize_optional_text(row.get("fileName")).lower()
+    return file_name.endswith(INSTALLER_EXTENSIONS)
+
+
+def uses_mac_bootstrap_flow(row: dict[str, Any]) -> bool:
+    if platform_family_from_row(row) != "macos":
+        return False
+    file_name = normalize_optional_text(row.get("fileName")).lower()
+    url = normalize_optional_text(row.get("url") or row.get("downloadUrl")).lower()
+    kind = artifact_kind_from_row(row)
+    return kind in {"installer", "dmg", "pkg"} or file_name.endswith((".dmg", ".pkg")) or url.endswith((".dmg", ".pkg"))
+
+
+def normalized_proof_status(payload: dict[str, Any]) -> str:
+    value = (
+        payload.get("proofStatus")
+        or (payload.get("releaseProof") or {}).get("status")
+    )
+    token = normalize_token(value)
+    return "passed" if token in {"pass", "passed", "ready"} else token
+
+
+def proof_routes(payload: dict[str, Any]) -> list[str]:
+    routes = payload.get("proofRoutes")
+    if not isinstance(routes, list):
+        routes = (payload.get("releaseProof") or {}).get("proofRoutes")
+    if not isinstance(routes, list):
+        return []
+    return [normalize_optional_text(route) for route in routes if normalize_optional_text(route)]
+
+
+def has_explicit_artifact_proof(payload: dict[str, Any], row: dict[str, Any]) -> bool:
+    routes = proof_routes(payload)
+    if not routes:
+        return False
+    artifact_id = normalize_optional_text(row.get("artifactId") or row.get("id"))
+    file_name = normalize_optional_text(row.get("fileName"))
+    for route in routes:
+        if (
+            f"/downloads/install/{artifact_id}" in route
+            or artifact_id in route
+            or (file_name and file_name in route)
+        ):
+            return True
+    return False
+
+
+def default_install_access_class(platform: str, kind: str) -> str:
+    normalized_platform = normalize_platform_family(platform)
+    normalized_kind = normalize_token(kind)
+    if normalized_platform == "macos" and normalized_kind in {"installer", "portable", "dmg", "pkg"}:
+        return ACCOUNT_REQUIRED
+    return OPEN_PUBLIC
+
+
+def resolve_effective_install_access_class(row: dict[str, Any], payload: dict[str, Any]) -> str:
+    if is_installer_row(row) and platform_family_from_row(row) in {"windows", "linux"}:
+        return OPEN_PUBLIC
+    raw_access_class = normalize_token(row.get("installAccessClass"))
+    if raw_access_class in {ACCOUNT_REQUIRED, OPEN_PUBLIC, "account_recommended"}:
+        return raw_access_class
+    return default_install_access_class(platform_family_from_row(row), artifact_kind_from_row(row))
+
+
+def load_platform_acceptance() -> dict[str, dict[str, Any]]:
+    if not PLATFORM_ACCEPTANCE_PATH.is_file():
+        return {}
+    payload = yaml.safe_load(PLATFORM_ACCEPTANCE_PATH.read_text(encoding="utf-8")) or {}
+    platforms = payload.get("platforms")
+    if not isinstance(platforms, list):
+        return {}
+    indexed: dict[str, dict[str, Any]] = {}
+    for row in platforms:
+        if not isinstance(row, dict):
+            continue
+        key = normalize_platform_family(row.get("id"))
+        if key:
+            indexed[key] = row
+    return indexed
+
+
+def compatibility_row_from_canonical(artifact: dict[str, Any], canonical: dict[str, Any]) -> dict[str, Any]:
+    platform = normalize_platform_family(artifact.get("platform"))
+    arch = normalize_optional_text(artifact.get("arch"))
+    kind = artifact_kind_from_row(artifact)
+    rid = normalize_optional_text(artifact.get("rid"))
+    if not rid and platform and arch:
+        platform_prefix = {
+            "windows": "win",
+            "linux": "linux",
+            "macos": "osx",
+        }.get(platform, platform)
+        rid = f"{platform_prefix}-{arch}"
+    return {
+        "id": normalize_optional_text(artifact.get("artifactId") or artifact.get("id")),
+        "artifactId": normalize_optional_text(artifact.get("artifactId") or artifact.get("id")),
+        "platform": normalize_optional_text(artifact.get("platformLabel") or artifact.get("platform")),
+        "platformId": f"{platform}-{arch}" if platform and arch else platform or None,
+        "url": normalize_optional_text(artifact.get("downloadUrl") or artifact.get("url")),
+        "sha256": normalize_optional_text(artifact.get("sha256")),
+        "sizeBytes": safe_int(artifact.get("sizeBytes")),
+        "format": "tar.gz" if normalize_optional_text(artifact.get("fileName")).endswith(".tar.gz") else Path(normalize_optional_text(artifact.get("fileName"))).suffix.lower().lstrip("."),
+        "flavor": kind,
+        "kind": kind,
+        "rid": rid or None,
+        "head": normalize_optional_text(artifact.get("head")),
+        "arch": arch or None,
+        "fileName": normalize_optional_text(artifact.get("fileName")),
+        "channelId": normalize_optional_text(artifact.get("channelId") or artifact.get("channel") or canonical.get("channelId") or canonical.get("channel")) or None,
+        "channel": normalize_optional_text(artifact.get("channel") or artifact.get("channelId") or canonical.get("channelId") or canonical.get("channel")) or None,
+        "version": normalize_optional_text(artifact.get("version") or artifact.get("releaseVersion") or canonical.get("version")) or None,
+        "releaseVersion": normalize_optional_text(artifact.get("releaseVersion") or artifact.get("version") or canonical.get("version")) or None,
+        "compatibilityState": artifact.get("compatibilityState"),
+        "compatibilityReason": artifact.get("compatibilityReason"),
+        "installerMode": artifact.get("installerMode"),
+        "payloadFileName": artifact.get("payloadFileName"),
+        "payloadDownloadUrl": artifact.get("payloadDownloadUrl"),
+        "payloadSha256": artifact.get("payloadSha256"),
+        "payloadSizeBytes": artifact.get("payloadSizeBytes"),
+        "installAccessClass": normalize_optional_text(artifact.get("installAccessClass")) or default_install_access_class(platform, kind),
+    }
+
+
+def is_public_shelf_visible(row: dict[str, Any], payload: dict[str, Any], platform_acceptance: dict[str, dict[str, Any]]) -> bool:
+    if not is_installer_row(row):
+        return False
+    if uses_mac_bootstrap_flow(row) and not has_explicit_artifact_proof(payload, row):
+        return False
+
+    platform = platform_acceptance.get(platform_family_from_row(row))
+    if not platform:
+        return True
+
+    if normalize_token(platform.get("public_shelf_status")) == "buildable_not_publicly_promoted":
+        return False
+
+    if (
+        uses_mac_bootstrap_flow(row)
+        and normalize_token(payload.get("rolloutState")) == "public_stable"
+        and normalized_proof_status(payload) == "passed"
+        and has_explicit_artifact_proof(payload, row)
+    ):
+        return True
+
+    visibility = normalize_token(platform.get("public_manifest_visibility"))
+    if visibility in {
+        "visible_as_account_gated_setup_script_release",
+        "visible_as_account_gated_setup_script_preview",
+    }:
+        return (
+            normalize_token(payload.get("status")) == "published"
+            and uses_mac_bootstrap_flow(row)
+            and (
+                normalize_token(payload.get("rolloutState")) == "public_stable"
+                or resolve_effective_install_access_class(row, payload) == ACCOUNT_REQUIRED
+            )
+            and has_explicit_artifact_proof(payload, row)
+        )
+
+    if visibility in {"visible_after_signed_notarized_promotion", "visible_as_public_archive_preview"}:
+        return normalized_proof_status(payload) == "passed" and has_explicit_artifact_proof(payload, row)
+
+    return True
+
+
+def projected_public_manifest_summary(canonical_payload: dict[str, Any], *, base_url: str) -> dict[str, Any]:
+    platform_acceptance = load_platform_acceptance()
+    projected_rows: list[dict[str, Any]] = []
+    for artifact in canonical_payload.get("artifacts") or []:
+        if not isinstance(artifact, dict):
+            continue
+        row = compatibility_row_from_canonical(artifact, canonical_payload)
+        if not is_public_shelf_visible(row, canonical_payload, platform_acceptance):
+            continue
+        row["installAccessClass"] = resolve_effective_install_access_class(row, canonical_payload)
+        projected_rows.append(row)
+
+    projected_payload = {
+        "version": canonical_payload.get("version"),
+        "publicVersion": canonical_payload.get("publicVersion"),
+        "channel": canonical_payload.get("channelId") or canonical_payload.get("channel"),
+        "rolloutState": canonical_payload.get("rolloutState"),
+        "supportabilityState": canonical_payload.get("supportabilityState"),
+        "publishedAt": canonical_payload.get("publishedAt"),
+        "status": canonical_payload.get("status"),
+        "downloads": projected_rows,
+    }
+    return manifest_summary(projected_payload, base_url=base_url)
 
 
 def manifest_summary(payload: dict[str, Any], *, base_url: str) -> dict[str, Any]:
@@ -378,6 +638,8 @@ def evaluate(
     local_canonical_summary = manifest_summary(local_canonical_payload, base_url=base)
     live_manifest_summary = manifest_summary(live_releases_payload, base_url=base)
     live_canonical_summary = manifest_summary(live_canonical_payload, base_url=base)
+    local_projected_summary = projected_public_manifest_summary(local_canonical_payload, base_url=base)
+    live_projected_summary = projected_public_manifest_summary(live_canonical_payload, base_url=base)
 
     failures: list[str] = []
 
@@ -389,18 +651,20 @@ def evaluate(
         failures=failures,
     )
     compare_views(
+        "live projected public manifest",
+        live_projected_summary["topLevel"],
         "live releases.json",
         live_manifest_summary["topLevel"],
-        "live RELEASE_CHANNEL.generated.json",
-        live_canonical_summary["topLevel"],
         failures=failures,
+        ignore_keys={"rolloutState", "supportabilityState"},
     )
     compare_views(
-        "local releases.json",
-        local_manifest_summary["topLevel"],
+        "local projected public manifest",
+        local_projected_summary["topLevel"],
         "live releases.json",
         live_manifest_summary["topLevel"],
         failures=failures,
+        ignore_keys={"rolloutState", "supportabilityState"},
     )
     compare_views(
         "local RELEASE_CHANNEL.generated.json",
@@ -418,26 +682,20 @@ def evaluate(
         failures=failures,
     )
     compare_artifact_indexes(
-        "live releases.json",
-        live_manifest_summary["artifacts"],
-        "live RELEASE_CHANNEL.generated.json",
-        live_canonical_summary["artifacts"],
-        failures=failures,
-    )
-    compare_artifact_indexes(
-        "local releases.json",
-        local_manifest_summary["artifacts"],
+        "live projected public manifest",
+        live_projected_summary["artifacts"],
         "live releases.json",
         live_manifest_summary["artifacts"],
         failures=failures,
     )
     compare_artifact_indexes(
-        "local RELEASE_CHANNEL.generated.json",
-        local_canonical_summary["artifacts"],
-        "live RELEASE_CHANNEL.generated.json",
-        live_canonical_summary["artifacts"],
+        "local projected public manifest",
+        local_projected_summary["artifacts"],
+        "live releases.json",
+        live_manifest_summary["artifacts"],
         failures=failures,
     )
+    compare_artifact_indexes("local RELEASE_CHANNEL.generated.json", local_canonical_summary["artifacts"], "live RELEASE_CHANNEL.generated.json", live_canonical_summary["artifacts"], failures=failures)
 
     page_artifact_ids = extract_page_artifact_ids(downloads_response.text)
     live_public_artifact_ids = sorted(
@@ -485,6 +743,7 @@ def evaluate(
             "manifestPath": str(local_manifest_path),
             "canonicalManifestPath": str(local_canonical_manifest_path),
             "manifest": local_manifest_summary,
+            "projectedPublicManifest": local_projected_summary,
             "canonicalManifest": local_canonical_summary,
         },
         "live": {
@@ -492,6 +751,7 @@ def evaluate(
             "releasesStatusCode": live_releases_response.status_code,
             "canonicalStatusCode": live_canonical_response.status_code,
             "manifest": live_manifest_summary,
+            "projectedPublicManifest": live_projected_summary,
             "canonicalManifest": live_canonical_summary,
             "pageArtifactIds": page_artifact_ids,
             "publicArtifactIds": live_public_artifact_ids,
@@ -499,15 +759,13 @@ def evaluate(
         },
         "alignment": {
             "localManifestsAligned": (
-                local_manifest_summary["topLevel"] == local_canonical_summary["topLevel"]
-                and local_manifest_summary["artifacts"] == local_canonical_summary["artifacts"]
+                local_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
             ),
             "liveManifestsAligned": (
-                live_manifest_summary["topLevel"] == live_canonical_summary["topLevel"]
-                and live_manifest_summary["artifacts"] == live_canonical_summary["artifacts"]
+                live_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
             ),
             "localMatchesLive": (
-                local_manifest_summary == live_manifest_summary
+                local_projected_summary["artifacts"] == live_manifest_summary["artifacts"]
                 and local_canonical_summary == live_canonical_summary
             ),
             "pageArtifactIdsAligned": not unknown_page_artifact_ids and not missing_page_artifact_ids,

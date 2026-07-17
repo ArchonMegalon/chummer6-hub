@@ -19,17 +19,12 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   if (heroActions.map((text) => text.trim()).join('|') !== 'Download Chummer') {
     failures.push(`homepage: expected one Download Chummer hero action, found ${heroActions.join(', ')}`);
   }
-  const heroImage = desktop.locator('.minimal-hero__visual img');
-  const heroMediaLink = desktop.locator('.minimal-hero__visual[href="/media/promo/every-wonder-horizon-promo.mp4"]');
-  await expect(heroImage).toBeVisible();
-  await expect(heroMediaLink).toHaveCount(1);
-  const heroImageLoaded = await heroImage.evaluate((node) => {
-    const image = node as HTMLImageElement;
-    return image.complete && (image.naturalWidth > 0 || image.naturalHeight > 0);
-  });
-  if (!heroImageLoaded) {
-    failures.push('homepage: hero image did not load');
-  }
+  const heroPreview = desktop.locator('.minimal-hero__visual--preview');
+  await expect(heroPreview).toBeVisible();
+  await expect(heroPreview).toContainText('Desktop build. Mobile play packet.');
+  await expect(heroPreview).toContainText('Track health, ammo, inventory, and modifiers.');
+  await expect(desktop.locator('.minimal-hero__visual--screenshot')).toHaveCount(0);
+  await expect(desktop.locator('.minimal-runner-rail')).toHaveCount(0);
   await expect(desktop.locator('[data-homepage-section="workflow"]')).toHaveCount(0);
   await expect(desktop.locator('[data-homepage-section="downloads"]')).toHaveCount(0);
   await expect(desktop.locator('.minimal-inline-links')).toContainText('Help');
@@ -57,8 +52,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   results.push({
     surface: 'home',
     inline_nav_visible: false,
-    hero_image_loaded: heroImageLoaded,
-    promo_video_entry: '/media/promo/every-wonder-horizon-promo.mp4',
+    hero_preview_visible: true,
     first_viewport_fits: !!heroBox && heroBox.y + heroBox.height <= 768,
     promoted_platforms: homepagePromotedPlatforms,
   });
@@ -92,23 +86,19 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
   results.push({ surface: 'downloads', stable_visible: true, nightly_visible: true, promoted_platforms: promotedPlatforms });
 
   await desktop.goto(`${baseUrl}/status`, { waitUntil: 'domcontentloaded' });
-  const statusHero = desktop.locator('.minimal-page-hero.minimal-status-pill');
-  const nextActions = statusHero.locator('.minimal-actions a.button-like');
-  await expect(statusHero).toBeVisible();
-  await expect(statusHero).toContainText('Current release');
-  await expect(statusHero.getByRole('link', { name: 'Downloads' })).toBeVisible();
-  await expect(statusHero.getByRole('link', { name: 'Help' })).toBeVisible();
-  const nextActionCount = await nextActions.count();
-  if (nextActionCount !== 2) {
-    failures.push(`status: expected exactly 2 next actions, found ${nextActionCount}`);
-  }
+  await expect(desktop).toHaveURL(/\/status(?:[?#].*)?$/);
+  await expect(desktop.getByRole('heading', { name: /Preview downloads|Stable downloads|Downloads paused/ })).toBeVisible();
+  await expect(desktop.locator('body')).toContainText('Now');
+  await expect(desktop.locator('body')).toContainText(/downloads are live|download is live|Downloads are paused|No public installer right now/);
+  await expect(desktop.getByRole('link', { name: 'Downloads' })).toBeVisible();
+  await expect(desktop.getByRole('link', { name: 'Help' })).toBeVisible();
   const statusText = await desktop.locator('body').innerText();
-  for (const forbidden of ['Signed-in return', 'Status poster', 'At a glance', 'Release and next step.', 'Current caution.']) {
+  for (const forbidden of ['Signed-in return', 'Status poster', 'At a glance', 'Release and next step.', 'Current caution.', 'Platforms', 'Nightly', 'Build from source']) {
     if (statusText.includes(forbidden)) {
       failures.push(`status: contains retired secondary surface "${forbidden}"`);
     }
   }
-  results.push({ surface: 'status', next_action_count: nextActionCount });
+  results.push({ surface: 'status', redirected_to_downloads: false });
 
   await desktop.close();
 
@@ -128,7 +118,7 @@ test('public surfaces stay minimal and first-task oriented', async ({ browser })
       '',
       `- Generated: ${new Date().toISOString()}`,
       `- Base URL: ${baseUrl}`,
-      '- Checks: homepage starts with one download action, avoids duplicate homepage download strips, downloads exposes lane buttons for every promoted release platform, status uses compact next-action rail.',
+      '- Checks: homepage starts with one download action, keeps a compact preview card instead of promo chrome, avoids duplicate homepage download strips, downloads exposes lane buttons for every promoted release platform, status uses compact next-action rail.',
       '',
       ...results.map((result) => `- ${String(result.surface)} checked`),
       ...(failures.length > 0 ? ['', '## Failures', '', ...failures.map((failure) => `- ${failure}`)] : []),

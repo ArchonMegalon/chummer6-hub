@@ -27,6 +27,7 @@ OUTPUT_PATH = Path(
 MOBILE_PWA_PROOF = PUBLISHED / "MOBILE_PWA_PUBLIC_PROJECTION_AUDIT.generated.json"
 BLAZOR_PWA_PROOF = PRESENTATION_PUBLISHED / "BLAZOR_PWA_PUBLIC_EDGE_PROOF.generated.json"
 BLAZOR_EXECUTION_HORIZON = PRESENTATION_PUBLISHED / "BLAZOR_PUBLIC_EDGE_EXECUTION_HORIZON.generated.json"
+CHUMMER5A_DESKTOP_WORKFLOW_PARITY_PROOF = PRESENTATION_PUBLISHED / "CHUMMER5A_DESKTOP_WORKFLOW_PARITY.generated.json"
 EXPECTED_CONTRACT = "chummer.blazor_execution_horizon_bridge"
 
 
@@ -58,6 +59,7 @@ def main() -> int:
     mobile, mobile_error = load_json(MOBILE_PWA_PROOF)
     blazor_pwa, blazor_pwa_error = load_json(BLAZOR_PWA_PROOF)
     horizon, horizon_error = load_json(BLAZOR_EXECUTION_HORIZON)
+    desktop_parity, desktop_parity_error = load_json(CHUMMER5A_DESKTOP_WORKFLOW_PARITY_PROOF)
 
     for error in [mobile_error, blazor_pwa_error, horizon_error]:
         if error:
@@ -71,11 +73,19 @@ def main() -> int:
     boundary = horizon.get("boundary") if isinstance(horizon.get("boundary"), dict) else {}
     near_term_proven = str(near_term.get("status") or "").strip() == "proven"
     mid_term_status = str(mid_term.get("status") or "").strip() or "missing"
+    long_term_parity_status = str(desktop_parity.get("status") or "").strip().lower() if not desktop_parity_error else ""
+    long_term_proven = (
+        long_term_parity_status in {"pass", "passed", "ready"} and mid_term_status == "proven"
+    )
     no_smoke_to_full = boundary.get("does_not_upgrade_smoke_to_full") is True
     full_requires_full_receipt = boundary.get("full_scope_requires_current_passing_full_receipt") is True
 
     if not mobile_pass:
         failures.append("Hub mobile/PWA public projection proof is not passing.")
+        failures.extend(
+            f"Hub mobile/PWA public projection: {failure}"
+            for failure in mobile.get("failures", [])
+        )
     if not blazor_pwa_pass:
         failures.append("Blazor hosted PWA public-edge proof is not passing.")
     if not horizon_pass:
@@ -90,7 +100,11 @@ def main() -> int:
     verdict = (
         "mobile_pwa_and_blazor_smoke_integrated_full_matrix_not_proven"
         if mid_term_status != "proven"
-        else "mobile_pwa_and_blazor_full_matrix_integrated"
+        else (
+            "mobile_pwa_and_blazor_full_matrix_and_long_term_browser_parity_integrated"
+            if long_term_proven
+            else "mobile_pwa_and_blazor_full_matrix_integrated"
+        )
     )
     payload = {
         "contract_name": EXPECTED_CONTRACT,
@@ -102,6 +116,8 @@ def main() -> int:
                 "path": str(MOBILE_PWA_PROOF),
                 "status": normalize_status(mobile) or "missing",
                 "contract_name": str(mobile.get("contract_name") or "").strip(),
+                "failures": mobile.get("failures", []),
+                "route_drift": mobile.get("route_drift", []),
                 "pass": mobile_pass,
             },
             "blazor_hosted_pwa_public_edge": {
@@ -119,6 +135,9 @@ def main() -> int:
                 "mid_term_full_matrix_status": mid_term_status,
                 "mid_term_full_required_workflow_family_count": mid_term.get("required_workflow_family_count", 0),
                 "mid_term_full_covered_workflow_family_count": mid_term.get("covered_workflow_family_count", 0),
+                "long_term_full_browser_parity_status": "proven" if long_term_proven else "not_proven",
+                "long_term_full_browser_parity_proof_status": long_term_parity_status or "missing",
+                "long_term_full_browser_parity_path": str(CHUMMER5A_DESKTOP_WORKFLOW_PARITY_PROOF),
                 "pass": horizon_pass and near_term_proven and no_smoke_to_full and full_requires_full_receipt,
             },
         },
@@ -126,12 +145,15 @@ def main() -> int:
             "does_not_upgrade_smoke_to_full": no_smoke_to_full,
             "full_matrix_requires_current_passing_full_scope_receipt": full_requires_full_receipt,
             "hub_mobile_pwa_projection_is_not_blazor_full_execution": True,
+            "does_not_upgrade_full_matrix_to_long_term_browser_parity": True,
+            "long_term_browser_parity_requires_full_matrix_and_desktop_workflow_parity": True,
         },
         "failures": failures,
         "notes": [
             "This Hub bridge keeps mobile/PWA readiness, Blazor PWA installability, and Blazor hosted execution horizons visible together.",
             "A passing bridge does not mean the full live Blazor public-edge execution matrix is proven unless mid_term_full_matrix_status is proven.",
             "Living-world opt-in and Black Ledger mobile projection remain Hub-owned; Blazor hosted execution breadth remains presentation-owned.",
+            "Long-term browser parity is only claimed if mid-term execution is proven and desktop workflow parity proof is currently passing.",
         ],
     }
 

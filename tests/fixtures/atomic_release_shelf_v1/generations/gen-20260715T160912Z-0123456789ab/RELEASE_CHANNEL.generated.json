@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "chummer.release-channel/v1",
+  "generationId": "gen-20260715T160912Z-0123456789ab",
+  "version": "run-fixture-20260715-160912",
+  "channel": "preview",
+  "publishedAt": "2026-07-15T16:09:12Z",
+  "artifacts": [
+    {
+      "artifactId": "avalonia-osx-arm64-installer",
+      "fileName": "chummer-fixture.dmg",
+      "downloadUrl": "/downloads/g/gen-20260715T160912Z-0123456789ab/files/chummer-fixture.dmg"
+    }
+  ],
+  "proofRoutes": [
+    "/downloads/g/gen-20260715T160912Z-0123456789ab/proof/mac/release-proof.json"
+  ],
+  "startupSmokeReceipts": [
+    {
+      "url": "/downloads/g/gen-20260715T160912Z-0123456789ab/startup-smoke/startup-smoke-avalonia-osx-arm64.receipt.json"
+    }
+  ],
+  "releaseEvidence": [
+    {
+      "url": "/downloads/g/gen-20260715T160912Z-0123456789ab/release-evidence/public-promotion.json"
+    }
+  ]
+}

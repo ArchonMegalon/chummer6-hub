@@ -34,9 +34,7 @@ public sealed class FlagshipReadinessArtifactService
                 return null;
             }
 
-            string? reason = FirstNonEmpty(
-                payload.FlagshipReadinessAudit?.Reason,
-                payload.CompletionAudit?.Reason);
+            string? reason = ResolveReason(payload);
 
             return new FlagshipReadinessSnapshot(
                 Status: payload.Status,
@@ -62,22 +60,68 @@ public sealed class FlagshipReadinessArtifactService
         var relativePath = DefaultReadinessRelativePath.Replace('/', Path.DirectorySeparatorChar);
         string? canonRoot = _configuration["CHUMMER_PUBLIC_CANON_ROOT"]?.Trim();
         string? configuredFallbackPath = _configuration[ReadinessFallbackFileKey]?.Trim();
-        string[] candidates = new string?[]
+        string? canonCandidate = !string.IsNullOrWhiteSpace(canonRoot)
+            ? Path.GetFullPath(Path.Combine(canonRoot, relativePath))
+            : null;
+        string appBaseCandidate = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath));
+        string appBaseRepoCandidate = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath));
+        string? currentDirectory = TryGetCurrentDirectory();
+        string? currentDirectoryCandidate = currentDirectory is not null
+            ? Path.GetFullPath(Path.Combine(currentDirectory, relativePath))
+            : null;
+        string? parentDirectoryCandidate = currentDirectory is not null
+            ? Path.GetFullPath(Path.Combine(currentDirectory, "..", relativePath))
+            : null;
+
+        List<string> candidates =
+        [
+            .. new string?[]
             {
-                !string.IsNullOrWhiteSpace(canonRoot) ? Path.GetFullPath(Path.Combine(canonRoot, relativePath)) : null,
-                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
-                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
-                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),
-                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath)),
+                canonCandidate,
+                currentDirectoryCandidate,
+                parentDirectoryCandidate,
+            }
+            .OfType<string>()
+            .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))
+        ];
+
+        bool hasWorkspaceCandidate = candidates.Any(File.Exists);
+        if (!hasWorkspaceCandidate)
+        {
+            candidates.AddRange(
+                new[]
+                {
+                    appBaseCandidate,
+                    appBaseRepoCandidate,
+                });
+        }
+
+        candidates.AddRange(
+            new string?[]
+            {
                 !string.IsNullOrWhiteSpace(configuredFallbackPath) ? Path.GetFullPath(configuredFallbackPath) : null,
                 DefaultFleetReadinessPath
             }
             .OfType<string>()
-            .Where(static candidate => !string.IsNullOrWhiteSpace(candidate))
+            .Where(static candidate => !string.IsNullOrWhiteSpace(candidate)));
+
+        string[] distinctCandidates = candidates
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        return ResolveFreshestReadinessPath(candidates)
-            ?? candidates.FirstOrDefault(File.Exists);
+        return ResolveFreshestReadinessPath(distinctCandidates)
+            ?? distinctCandidates.FirstOrDefault(File.Exists);
+    }
+
+    private static string? TryGetCurrentDirectory()
+    {
+        try
+        {
+            return Directory.GetCurrentDirectory();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private static string? ResolveFreshestReadinessPath(IEnumerable<string> candidates)
@@ -93,8 +137,8 @@ public sealed class FlagshipReadinessArtifactService
             }
 
             if (selectedGeneratedAt is null
-                || (isPass && !selectedIsPass)
-                || (isPass == selectedIsPass && generatedAt > selectedGeneratedAt.Value))
+                || generatedAt > selectedGeneratedAt.Value
+                || (generatedAt == selectedGeneratedAt.Value && isPass && !selectedIsPass))
             {
                 selectedPath = candidate;
                 selectedGeneratedAt = generatedAt;
@@ -147,18 +191,131 @@ public sealed class FlagshipReadinessArtifactService
     private static string? FirstNonEmpty(params string?[] values)
         => values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
 
+    private static string? ResolveReason(FlagshipReadinessPayload payload)
+    {
+        string? rawReason = FirstNonEmpty(
+            payload.FlagshipReadinessAudit?.Reason,
+            payload.CompletionAudit?.Reason);
+        bool readinessIsPass = string.Equals(payload.Status, "pass", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(payload.Status, "passed", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(payload.Status, "ready", StringComparison.OrdinalIgnoreCase);
+        if (readinessIsPass || payload.GateStatusOverride is null)
+        {
+            return rawReason;
+        }
+
+        if (!string.IsNullOrWhiteSpace(payload.GateStatusOverride.EffectiveReason))
+        {
+            return payload.GateStatusOverride.EffectiveReason;
+        }
+
+        string? overrideReason = payload.GateStatusOverride.Reason;
+        string[] blockers = UniqueNonEmpty(payload.GateStatusOverride.LaunchCriticalNestedBlockers);
+        string[] coverageGaps = UniqueNonEmpty(payload.FlagshipReadinessAudit?.CoverageGapKeys, payload.GateStatusOverride.CoverageGapKeys);
+        string[] scopedCoverageGaps = UniqueNonEmpty(payload.FlagshipReadinessAudit?.ScopedCoverageGapKeys, payload.GateStatusOverride.ScopedCoverageGapKeys);
+
+        List<string> details = [];
+        if (blockers.Length > 0)
+        {
+            details.Add("Launch blockers: " + string.Join(", ", blockers));
+        }
+
+        if (coverageGaps.Length > 0)
+        {
+            details.Add("Coverage gaps: " + string.Join(", ", coverageGaps));
+        }
+
+        if (scopedCoverageGaps.Length > 0 && !scopedCoverageGaps.SequenceEqual(coverageGaps, StringComparer.OrdinalIgnoreCase))
+        {
+            details.Add("Scoped coverage gaps: " + string.Join(", ", scopedCoverageGaps));
+        }
+
+        if (!string.IsNullOrWhiteSpace(overrideReason))
+        {
+            return AppendReasonDetails(overrideReason!, details);
+        }
+
+        if (details.Count > 0)
+        {
+            return string.Join(" ", details.Select(static detail => detail.Trim().TrimEnd('.') + "."));
+        }
+
+        return rawReason;
+    }
+
+    private static string AppendReasonDetails(string baseReason, IReadOnlyList<string> details)
+    {
+        string normalizedBase = baseReason.Trim();
+        string[] normalizedDetails = details
+            .Where(static detail => !string.IsNullOrWhiteSpace(detail))
+            .Select(static detail => detail.Trim().TrimEnd('.'))
+            .ToArray();
+        if (normalizedBase.Length == 0)
+        {
+            return string.Join(" ", normalizedDetails.Select(static detail => detail + "."));
+        }
+
+        if (normalizedBase[^1] is not ('.' or '!' or '?'))
+        {
+            normalizedBase += ".";
+        }
+
+        if (normalizedDetails.Length == 0)
+        {
+            return normalizedBase;
+        }
+
+        return normalizedBase + " " + string.Join(" ", normalizedDetails.Select(static detail => detail + "."));
+    }
+
+    private static string[] UniqueNonEmpty(params IReadOnlyList<string>?[] values)
+    {
+        List<string> result = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        foreach (IReadOnlyList<string>? collection in values)
+        {
+            if (collection is null)
+            {
+                continue;
+            }
+
+            foreach (string? item in collection)
+            {
+                string candidate = item?.Trim() ?? string.Empty;
+                if (candidate.Length == 0 || !seen.Add(candidate))
+                {
+                    continue;
+                }
+
+                result.Add(candidate);
+            }
+        }
+
+        return result.ToArray();
+    }
+
     private sealed record FlagshipReadinessPayload(
         [property: JsonPropertyName("contract_name")] string? ContractName,
         [property: JsonPropertyName("status")] string? Status,
         [property: JsonPropertyName("completion_audit")] FlagshipReadinessAuditPayload? CompletionAudit,
-        [property: JsonPropertyName("flagship_readiness_audit")] FlagshipReadinessAuditPayload? FlagshipReadinessAudit);
+        [property: JsonPropertyName("flagship_readiness_audit")] FlagshipReadinessAuditPayload? FlagshipReadinessAudit,
+        [property: JsonPropertyName("gate_status_override")] GateStatusOverridePayload? GateStatusOverride);
 
     private sealed record FlagshipReadinessAuditPayload(
         [property: JsonPropertyName("reason")] string? Reason,
+        [property: JsonPropertyName("coverage_gap_keys")] IReadOnlyList<string>? CoverageGapKeys,
+        [property: JsonPropertyName("scoped_coverage_gap_keys")] IReadOnlyList<string>? ScopedCoverageGapKeys,
         [property: JsonPropertyName("warning_coverage_keys")] IReadOnlyList<string>? WarningCoverageKeys,
         [property: JsonPropertyName("scoped_warning_coverage_keys")] IReadOnlyList<string>? ScopedWarningCoverageKeys,
         [property: JsonPropertyName("missing_coverage_keys")] IReadOnlyList<string>? MissingCoverageKeys,
         [property: JsonPropertyName("scoped_missing_coverage_keys")] IReadOnlyList<string>? ScopedMissingCoverageKeys);
+
+    private sealed record GateStatusOverridePayload(
+        [property: JsonPropertyName("reason")] string? Reason,
+        [property: JsonPropertyName("effective_reason")] string? EffectiveReason,
+        [property: JsonPropertyName("launch_critical_nested_blockers")] IReadOnlyList<string>? LaunchCriticalNestedBlockers,
+        [property: JsonPropertyName("coverage_gap_keys")] IReadOnlyList<string>? CoverageGapKeys,
+        [property: JsonPropertyName("scoped_coverage_gap_keys")] IReadOnlyList<string>? ScopedCoverageGapKeys);
 }
 
 public sealed record FlagshipReadinessSnapshot(
@@ -174,6 +331,18 @@ public sealed record FlagshipReadinessSnapshot(
            || ScopedWarningCoverageKeys.Contains("desktop_client", StringComparer.OrdinalIgnoreCase)
            || MissingCoverageKeys.Contains("desktop_client", StringComparer.OrdinalIgnoreCase)
            || ScopedMissingCoverageKeys.Contains("desktop_client", StringComparer.OrdinalIgnoreCase);
+
+    public bool IsFinalGoldClosureOnlyBlocked
+        => !string.Equals(Status, "pass", StringComparison.OrdinalIgnoreCase)
+           && !string.Equals(Status, "passed", StringComparison.OrdinalIgnoreCase)
+           && !string.Equals(Status, "ready", StringComparison.OrdinalIgnoreCase)
+           && WarningCoverageKeys.Count == 0
+           && ScopedWarningCoverageKeys.Count == 0
+           && MissingCoverageKeys.Count == 0
+           && ScopedMissingCoverageKeys.Count == 0
+           && !string.IsNullOrWhiteSpace(Reason)
+           && Reason.Contains("final gold janitor state is 'fail'", StringComparison.OrdinalIgnoreCase)
+           && Reason.Contains("final gold janitor verdict is 'NOT_GOLD'", StringComparison.OrdinalIgnoreCase);
 
     public string DesktopClientGapSummary
         => !string.IsNullOrWhiteSpace(Reason)

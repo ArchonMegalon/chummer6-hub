@@ -12,7 +12,8 @@ from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import yaml
-import re
+from materialize_google_oauth_linking_proof import verify_receipt as verify_google_oauth_linking_receipt
+from materialize_portable_receipts_audit import scan_published_receipts
 
 
 RUN_SERVICES_ROOT = Path("/docker/chummercomplete/chummer.run-services")
@@ -43,10 +44,19 @@ def load_json(path: Path) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
+def normalized_strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
 def status_is_pass(payload: dict[str, Any] | None) -> bool:
     if not payload:
         return False
-    return str(payload.get("status") or "").strip().lower() in PASS_STATUSES
+    status = str(payload.get("status") or "").strip().lower()
+    failures = normalized_strings(payload.get("failures"))
+    failed_gates = normalized_strings(payload.get("failed_gates"))
+    return status in PASS_STATUSES and not failures and not failed_gates
 
 
 def rel(path: Path) -> str:
@@ -134,7 +144,7 @@ def validate_canonical_domain() -> dict[str, Any]:
     canonical = payload.get("canonical_public_domain") if payload else None
     status = str(payload.get("status") or "").strip().lower() if payload else "missing"
     alias_state = (payload.get("domain_status") or {}).get("chummer6.run") if payload else None
-    ok = status in PASS_STATUSES and canonical == "chummer.run" and alias_state == "not_used" and route_required
+    ok = status_is_pass(payload) and canonical == "chummer.run" and alias_state == "not_used" and route_required
     return build_check(
         key="canonical_domain_policy",
         abs_ids=["ABS-016"],
@@ -220,18 +230,8 @@ def validate_live_support_flow() -> dict[str, Any]:
 
 def validate_live_oauth_linking() -> dict[str, Any]:
     path = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "GOOGLE_OAUTH_LINKING_PROOF.generated.json"
-    script_path = RUN_SERVICES_ROOT / "scripts" / "check-google-oauth-linking.py"
-    source = script_path.read_text(encoding="utf-8") if script_path.is_file() else ""
-    required_tokens = [
-        "requests.Session",
-        "allow_redirects=False",
-        "/auth/google/start",
-        "/account/access",
-        "Location",
-    ]
-    source_ok = all(token in source for token in required_tokens)
-    result = run_command(["python3", str(script_path)], cwd=RUN_SERVICES_ROOT) if script_path.is_file() else None
-    ok = script_path.is_file() and source_ok and result is not None and result.returncode == 0
+    payload = load_json(path)
+    ok, issues = verify_google_oauth_linking_receipt(payload or {}, require_pass=True)
     return build_check(
         key="live_oauth_linking",
         abs_ids=["ABS-005"],
@@ -239,9 +239,9 @@ def validate_live_oauth_linking() -> dict[str, Any]:
         path=path,
         ok=ok,
         detail=(
-            f"script_exists={script_path.is_file()} source_ok={source_ok} "
-            f"exit_code={(result.returncode if result is not None else 'missing')} "
-            f"stdout={(result.stdout.strip() if result is not None else '')!r}"
+            f"status={(payload or {}).get('status')!r} "
+            f"proof_contract_version={(payload or {}).get('proof_contract_version')!r} "
+            f"issues={issues}"
         ),
     )
 
@@ -293,41 +293,9 @@ def validate_human_parity() -> dict[str, Any]:
 
 def validate_portable_receipts_audit() -> dict[str, Any]:
     path = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "PORTABLE_RECEIPTS_AUDIT.generated.json"
-    roots = [
-        RUN_SERVICES_ROOT / ".codex-studio" / "published",
-        PRESENTATION_ROOT / ".codex-studio" / "published",
-        CORE_ROOT / ".codex-studio" / "published",
-    ]
-    scanned = 0
-    machine_specific_hits: list[str] = []
-    for root in roots:
-        if not root.is_dir():
-            continue
-        for candidate in root.glob("*.json"):
-            scanned += 1
-            try:
-                payload = json.loads(candidate.read_text(encoding="utf-8", errors="ignore"))
-                found_home_path = False
-
-                def walk(node: Any) -> bool:
-                    if isinstance(node, dict):
-                        for value in node.values():
-                            if walk(value):
-                                return True
-                        return False
-                    if isinstance(node, list):
-                        for item in node:
-                            if walk(item):
-                                return True
-                        return False
-                    if isinstance(node, str):
-                        return re.search(r"/home/[^/\s\"']+/", node) is not None
-                    return False
-
-                if walk(payload):
-                    machine_specific_hits.append(str(candidate))
-            except Exception:
-                machine_specific_hits.append(str(candidate))
+    scan = scan_published_receipts(excluded_paths=[path])
+    scanned = int(scan.get("scanned_artifact_count") or 0)
+    machine_specific_hits = scan.get("machine_specific_hits") or []
     ok = scanned > 0 and not machine_specific_hits
     return build_check(
         key="portable_receipts_audit",

@@ -46,7 +46,10 @@ public sealed class PublicParticipateSnapshotService
     public PublicParticipateSnapshot GetSnapshot()
     {
         PublicParticipateSnapshot snapshot = Snapshot;
-        QueueRefreshIfDue(snapshot);
+        if (!ShouldShortCircuitHostedBoardUpstream(ResolveProductLiftHostedBoardUri()))
+        {
+            QueueRefreshIfDue(snapshot);
+        }
         return snapshot;
     }
 

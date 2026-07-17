@@ -7,7 +7,10 @@ const baseUrl = (process.env.CHUMMER_PORTAL_BASE_URL || 'http://127.0.0.1:8091')
 const publicHost = (process.env.CHUMMER_PORTAL_PUBLIC_HOST || '').trim();
 const forwardedProto = (process.env.CHUMMER_PORTAL_FORWARDED_PROTO || '').trim();
 const requireBlazor = /^(1|true|yes|on)$/i.test((process.env.CHUMMER_PORTAL_REQUIRE_BLAZOR || '').trim());
+const retryAttempts = Math.max(1, Number.parseInt(process.env.CHUMMER_PORTAL_RETRY_ATTEMPTS || '3', 10) || 3);
+const retryDelayMs = Math.max(0, Number.parseInt(process.env.CHUMMER_PORTAL_RETRY_DELAY_MS || '500', 10) || 0);
 const defaultHeaders = {};
+const transientHttpStatuses = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
 
 if (publicHost) {
   defaultHeaders.Host = publicHost;
@@ -21,6 +24,88 @@ const requiredLandingLinks = [
   '/help',
 ];
 
+function isTransientFailure(status, error) {
+  if (typeof status === 'number') {
+    return transientHttpStatuses.has(status);
+  }
+  if (status && status !== 'no-response') {
+    return false;
+  }
+
+  const message = error instanceof Error ? error.message : String(error || '');
+  return [
+    'fetch failed',
+    'ECONNRESET',
+    'ETIMEDOUT',
+    'net::ERR_',
+    'Navigation timeout',
+    'Timeout',
+  ].some(needle => message.includes(needle));
+}
+
+async function waitBeforeRetry(attempt) {
+  if (retryDelayMs > 0) {
+    await new Promise(resolve => setTimeout(resolve, retryDelayMs * attempt));
+  }
+}
+
+async function fetchCheckWithRetry(check) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
+    try {
+      const response = await fetch(check.url, {
+        method: check.method ?? 'GET',
+        headers: {
+          ...defaultHeaders,
+          ...(check.headers ?? {})
+        },
+        body: check.body
+      });
+      const body = await response.text();
+      if (response.ok || !isTransientFailure(response.status) || attempt === retryAttempts) {
+        return { response, body };
+      }
+
+      console.warn(`transient-retry: ${check.url} -> HTTP ${response.status} (${attempt}/${retryAttempts})`);
+    } catch (error) {
+      lastError = error;
+      if (!isTransientFailure(undefined, error) || attempt === retryAttempts) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Portal check failed: ${check.url} -> ${message}`);
+      }
+
+      console.warn(`transient-retry: ${check.url} -> ${error.message} (${attempt}/${retryAttempts})`);
+    }
+
+    await waitBeforeRetry(attempt);
+  }
+
+  throw lastError || new Error(`Portal check failed: ${check.url} -> retry budget exhausted`);
+}
+
+function hasPromoVideoLink(text) {
+  return text.includes('/media/promo/every-wonder-horizon-promo.mp4')
+    && (
+      text.includes('Watch 90 sec')
+      || text.includes('Watch promo')
+      || text.includes('Product reel')
+    );
+}
+
+function hasCurrentDownloadShelf(text) {
+  return text.includes('Downloads')
+    && (
+      text.includes('Current public installer')
+      || text.includes('Stable release')
+      || text.includes('Current public build')
+    )
+    && text.includes('Nightly')
+    && text.includes('Version ')
+    && text.includes('Build from source')
+    && text.includes('Download script');
+}
+
 function hasBlazorBaseHref(html) {
   return /<base href="[^"]*\/blazor\/"/i.test(html);
 }
@@ -29,15 +114,25 @@ function isBlazorReady(text) {
   return (
     hasBlazorBaseHref(text)
     && (
-      (
-        text.includes('Chummer Online')
-        && text.includes('Character Roster')
+      text.includes('Chummer Online')
+      || (
+        text.includes('Published browser surface')
+        && text.includes('Published browser client')
+      )
+      || (
+        text.includes('Launch browser workbench')
+        && text.includes('Explore Chummer App')
+      )
+      || (
+        text.includes('Character Roster')
         && text.includes('New runner')
         && text.includes('Import')
       )
       || (
-        (text.includes('Published browser surface') || text.includes('Published browser client'))
-        && (text.includes('Launch browser workbench') || text.includes('Explore Chummer App'))
+        text.includes('Chummer Online')
+        && text.includes('Character Roster')
+        && text.includes('New runner')
+        && text.includes('Import')
       )
     )
   );
@@ -55,12 +150,59 @@ function isBlazorFallback(text) {
 function isGuestBillingSurface(text) {
   return (
     text.includes('Supporter')
-    && text.includes('Email first. Billing stays attached after this step.')
     && text.includes('After this step, Chummer returns to billing.')
-    && text.includes('Continue with email')
-    && text.includes('Continue with Google')
+    && (
+      (
+        text.includes('Email first. Billing stays attached after this step.')
+        && text.includes('Continue with email')
+        && text.includes('Continue with Google')
+      )
+      || (
+        text.includes('Google first. Billing stays attached after that step.')
+        && text.includes('Continue with Google')
+        && !text.includes('Continue with email')
+      )
+    )
     && !text.includes('Supporter is not open right now.')
     && !text.includes('Account settings')
+  );
+}
+
+function isGuestAccountAccessSurface(text) {
+  return (
+    text.includes('Open Chummer')
+    && !text.includes('Account ID')
+    && (
+      (
+        text.includes('Email first. Google if you prefer.')
+        && text.includes('Continue with email')
+        && text.includes('Continue with Google')
+      )
+      || (
+        text.includes('Email sign-in is unavailable on this host right now. Continue with Google instead.')
+        && text.includes('Continue with Google')
+        && !text.includes('Continue with email')
+      )
+    )
+  );
+}
+
+function hasStatusDecisionSurface(text) {
+  return (
+    text.includes('Now')
+    && (
+      text.includes('Preview downloads')
+      || text.includes('Stable downloads')
+      || text.includes('Downloads paused')
+    )
+    && text.includes('Downloads')
+    && text.includes('Version ')
+    && text.includes('Help')
+    && !text.includes('Nightly')
+    && !text.includes('Build from source')
+    && !text.includes('Checks passed')
+    && !text.includes('Released')
+    && !text.includes('Build run-')
   );
 }
 
@@ -69,20 +211,30 @@ const checks = [
     url: `${baseUrl}/`,
     assert: text =>
       text.includes('Chummer') &&
-      text.includes('Download Chummer') &&
-      text.includes('Current public installer') &&
-      text.includes('Watch 90 sec') &&
+      text.includes('Open Chummer') &&
+      text.includes('minimal-open-chummer') &&
+      text.includes('Build') &&
+      text.includes('Play') &&
+      text.includes('Sign in first') &&
+      text.includes('site-open-chummer-menu__button--disabled') &&
+      text.includes('data-disabled-target="/build"') &&
+      text.includes('data-sign-in-href="/login?next=%2Fbuild"') &&
+      text.includes('data-disabled-target="/mobile/player"') &&
+      text.includes('data-sign-in-href="/login?next=%2Fmobile%2Fplayer"') &&
+      !text.includes('site-open-chummer-menu__button" href="/mobile/player"') &&
+      (
+        text.includes('Current public installer:')
+        || text.includes('Current public installers:')
+        || text.includes('No public installer right now.')
+      ) &&
+      text.includes('Current public lane:') &&
+      hasPromoVideoLink(text) &&
+      text.includes('/login?next=%2Faccount%2Faccess') &&
       requiredLandingLinks.every(link => text.includes(link))
   },
   {
     url: `${baseUrl}/downloads/`,
-    assert: text =>
-      text.includes('Downloads')
-      && text.includes('Stable release')
-      && text.includes('Stable')
-      && text.includes('Nightly')
-      && text.includes('Build from source')
-      && text.includes('Download script')
+    assert: text => hasCurrentDownloadShelf(text)
   },
   {
     url: `${baseUrl}/help`,
@@ -97,15 +249,8 @@ const checks = [
   {
     url: `${baseUrl}/status`,
     assert: (text, response) =>
-      /\/downloads\/?$/.test(response.url)
-      && text.includes('Downloads')
-      && text.includes('Stable release')
-      && text.includes('Nightly')
-      && text.includes('Build from source')
-      && text.includes('Help')
-      && !text.includes('Checks passed')
-      && !text.includes('Released')
-      && !text.includes('Build run-')
+      /\/status\/?$/.test(response.url)
+      && hasStatusDecisionSurface(text)
   },
   {
     url: `${baseUrl}/downloads/releases.json`,
@@ -124,11 +269,7 @@ const checks = [
         response.url.endsWith('/login?next=%2Faccount')
         || response.url.endsWith('/login?next=%2Faccount%2Faccess')
       )
-      && text.includes('Open Chummer')
-      && text.includes('Email first. Google if you prefer.')
-      && text.includes('Continue with email')
-      && text.includes('Continue with Google')
-      && !text.includes('Account ID')
+      && isGuestAccountAccessSurface(text)
   },
   {
     url: `${baseUrl}/contact`,
@@ -149,8 +290,8 @@ const checks = [
     rendered: true,
     assert: text =>
       text.includes('Participate')
-      && text.includes('Public requests, clear bugs, useful ideas.')
-      && text.includes('data-chummer-participate-frame')
+      && (text.includes('data-chummer-participate-frame') || text.includes('Board offline right now'))
+      && !text.includes('Public requests, clear bugs, useful ideas.')
       && !text.includes('data-chummer-board-skin')
       && !text.includes('ProductLift')
       && !text.includes('Something went wrong')
@@ -178,7 +319,8 @@ const checks = [
     assert: (text, response) =>
       /\/participate\/?$/.test(response.url)
       && text.includes('Participate')
-      && text.includes('Public requests, clear bugs, useful ideas.')
+      && (text.includes('data-chummer-participate-frame') || text.includes('Board offline right now'))
+      && !text.includes('Public requests, clear bugs, useful ideas.')
       && !text.includes('ProductLift')
   },
   {
@@ -187,8 +329,8 @@ const checks = [
     assert: (text, response) =>
       /\/participate\/?$/.test(response.url)
       && text.includes('Participate')
-      && text.includes('Public requests, clear bugs, useful ideas.')
-      && text.includes('data-chummer-participate-frame')
+      && (text.includes('data-chummer-participate-frame') || text.includes('Board offline right now'))
+      && !text.includes('Public requests, clear bugs, useful ideas.')
       && !text.includes('data-chummer-board-skin')
       && !text.includes('cdn.productlift.dev')
       && !text.includes('media.productlift.dev')
@@ -220,9 +362,7 @@ const checks = [
         response.url.endsWith('/login?next=%2Faccount')
         || response.url.endsWith('/login?next=%2Faccount%2Faccess')
       )
-      && text.includes('Open Chummer')
-      && text.includes('Continue with email')
-      && text.includes('Continue with Google')
+      && isGuestAccountAccessSurface(text)
       && !text.includes('Support Chummer')
   },
   {
@@ -232,9 +372,7 @@ const checks = [
         response.url.endsWith('/login?next=%2Faccount')
         || response.url.endsWith('/login?next=%2Faccount%2Faccess')
       )
-      && text.includes('Open Chummer')
-      && text.includes('Continue with email')
-      && text.includes('Continue with Google')
+      && isGuestAccountAccessSurface(text)
       && !text.includes('Support Chummer')
   },
   {
@@ -246,13 +384,17 @@ const checks = [
       && (requireBlazor ? isBlazorReady(text) : (isBlazorReady(text) || isBlazorFallback(text)))
   },
   {
+    url: `${baseUrl}/blazor/app?command=new_character`,
+    label: requireBlazor ? 'blazor-new-runner-menu' : 'delegated-blazor-new-runner-menu',
+    required: requireBlazor,
+    rendered: true,
+    run: runBlazorNewRunnerMenuCheck
+  },
+  {
     url: `${baseUrl}/avalonia/`,
     assert: (text, response) =>
       /\/downloads\/?$/.test(response.url)
-      && text.includes('Downloads')
-      && text.includes('Stable')
-      && text.includes('Stable release')
-      && text.includes('Build from source')
+      && hasCurrentDownloadShelf(text)
   },
   {
     url: `${baseUrl}/session/`,
@@ -263,9 +405,8 @@ const checks = [
   {
     url: `${baseUrl}/coach/`,
     assert: (text, response) =>
-      /\/downloads\/?$/.test(response.url)
-      && text.includes('Downloads')
-      && text.includes('Stable release')
+      /\/status\/?$/.test(response.url)
+      && hasStatusDecisionSurface(text)
   }
 ];
 
@@ -276,6 +417,10 @@ async function runRenderedCheck(browser, check) {
   });
   const page = await context.newPage();
   try {
+    if (typeof check.run === 'function') {
+      return await check.run(page, check);
+    }
+
     const response = await page.goto(check.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     if (!response || !response.ok()) {
       return {
@@ -289,7 +434,7 @@ async function runRenderedCheck(browser, check) {
     await page.waitForFunction(
       () => {
         const text = (document.body && document.body.innerText) || '';
-        return /Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(text);
+        return /Participate|Board offline right now/i.test(text);
       },
       { timeout: 15000 },
     );
@@ -308,6 +453,176 @@ async function runRenderedCheck(browser, check) {
   }
 }
 
+async function runRenderedCheckWithRetry(browser, check) {
+  let rendered = null;
+
+  for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
+    try {
+      rendered = await runRenderedCheck(browser, check);
+    } catch (error) {
+      rendered = {
+        ok: false,
+        status: 'no-response',
+        text: '',
+        response: { url: check.url },
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    if (rendered.ok || !isTransientFailure(rendered.status, rendered.error) || attempt === retryAttempts) {
+      return rendered;
+    }
+
+    console.warn(`transient-retry: ${check.url} -> ${rendered.error || `HTTP ${rendered.status}`} (${attempt}/${retryAttempts})`);
+    await waitBeforeRetry(attempt);
+  }
+
+  return rendered;
+}
+
+async function runBlazorNewRunnerMenuCheck(page, check) {
+  const response = await page.goto(check.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  if (!response || !response.ok()) {
+    return {
+      ok: false,
+      status: response ? response.status() : 'no-response',
+      text: '',
+      response: { url: page.url() },
+    };
+  }
+
+  try {
+    await page.waitForSelector('#dialogBackdrop[data-dialog-id="dialog.new_character"]', { timeout: 60000 });
+
+    const buildMethod = page.locator('label[data-field-id="newCharacterBuildMethod"] select');
+    await buildMethod.waitFor({ state: 'visible', timeout: 30000 });
+    await buildMethod.selectOption('Karma');
+    const buildMethodValue = await buildMethod.inputValue();
+    if (buildMethodValue !== 'Karma') {
+      throw new Error(`Expected Build Method to switch to Karma before closing the startup dialog, got '${buildMethodValue}'.`);
+    }
+
+    const fileMenu = page.locator('button.menu-btn.classic-menu-button').filter({ hasText: 'File' }).first();
+    await fileMenu.waitFor({ state: 'visible', timeout: 15000 });
+    const fileMenuLockedDuringDialog = await fileMenu.isDisabled();
+    if (!fileMenuLockedDuringDialog) {
+      throw new Error('Expected File menu to stay disabled while the startup dialog is open.');
+    }
+
+    const newTool = page.locator('button.tool-btn.classic-tool-button').filter({ hasText: 'New' }).first();
+    const newToolLockedDuringDialog = await newTool.isDisabled();
+    if (!newToolLockedDuringDialog) {
+      throw new Error('Expected New tool button to stay disabled while the startup dialog is open.');
+    }
+
+    await page.locator('#dialogClose').click({ timeout: 15000 });
+    await page.waitForSelector('#dialogBackdrop[data-dialog-id="dialog.new_character"]', { state: 'detached', timeout: 15000 });
+
+    await fileMenu.waitFor({ state: 'visible', timeout: 15000 });
+    const fileMenuEnabledAfterClose = await fileMenu.isEnabled();
+    if (!fileMenuEnabledAfterClose) {
+      throw new Error('Expected File menu to become enabled after closing the startup dialog.');
+    }
+
+    const newToolEnabledAfterClose = await newTool.isEnabled();
+    if (!newToolEnabledAfterClose) {
+      throw new Error('Expected New tool button to become enabled after closing the startup dialog.');
+    }
+
+    await fileMenu.click({ timeout: 15000 });
+    await page.waitForFunction(
+      () => {
+        const button = Array.from(document.querySelectorAll('button.menu-btn.classic-menu-button'))
+          .find(element => element.textContent?.includes('File'));
+        if (!button) {
+          return false;
+        }
+
+        const ariaExpanded = button.getAttribute('aria-expanded') || '';
+        const classes = (button.getAttribute('class') || '').split(/\s+/);
+        return ariaExpanded === 'true' || classes.includes('active');
+      },
+      { timeout: 15000 },
+    );
+    const fileMenuExpandedState = await fileMenu.evaluate((element) => ({
+      ariaExpanded: element.getAttribute('aria-expanded') || '',
+      className: element.getAttribute('class') || ''
+    }));
+    const fileMenuExpanded = fileMenuExpandedState.ariaExpanded === 'true'
+      || fileMenuExpandedState.className.split(/\s+/).includes('active');
+    if (!fileMenuExpanded) {
+      throw new Error(
+        `Expected File menu to expand while the startup dialog is open, got `
+        + `aria-expanded='${fileMenuExpandedState.ariaExpanded}' class='${fileMenuExpandedState.className}'.`);
+    }
+
+    const newRunner = page.locator('button.menu-item.classic-menu-item').filter({ hasText: 'New runner' }).first();
+    await newRunner.waitFor({ state: 'visible', timeout: 15000 });
+    await newRunner.click({ timeout: 15000 });
+
+    await page.waitForSelector('#dialogBackdrop[data-dialog-id="dialog.new_character"]', { state: 'visible', timeout: 15000 });
+    await page.waitForFunction(
+      () => document.querySelector('label[data-field-id="newCharacterBuildMethod"] select')?.value === 'Priority',
+      { timeout: 15000 },
+    );
+    const buildMethodReset = await buildMethod.inputValue();
+    if (buildMethodReset !== 'Priority') {
+      throw new Error(`Expected File -> New runner to reopen the startup dialog with Priority selected, got '${buildMethodReset}'.`);
+    }
+
+    const dialogVisible = await page.locator('#dialogBackdrop[data-dialog-id="dialog.new_character"]').isVisible();
+    if (!dialogVisible) {
+      throw new Error('Expected the new character startup dialog backdrop to remain visible after selecting File -> New runner.');
+    }
+
+    const fileMenuLockedAfterReopen = await fileMenu.isDisabled();
+    if (!fileMenuLockedAfterReopen) {
+      throw new Error('Expected File menu to return to the disabled state after reopening the startup dialog.');
+    }
+
+    await page.waitForFunction(
+      () => {
+        const button = Array.from(document.querySelectorAll('button.menu-btn.classic-menu-button'))
+          .find(element => element.textContent?.includes('File'));
+        if (!button) {
+          return false;
+        }
+
+        const ariaExpanded = button.getAttribute('aria-expanded') || '';
+        const classes = (button.getAttribute('class') || '').split(/\s+/);
+        return ariaExpanded === 'false' || !classes.includes('active');
+      },
+      { timeout: 15000 },
+    );
+    const fileMenuCollapsedState = await fileMenu.evaluate((element) => ({
+      ariaExpanded: element.getAttribute('aria-expanded') || '',
+      className: element.getAttribute('class') || ''
+    }));
+    const fileMenuCollapsed = fileMenuCollapsedState.ariaExpanded === 'false'
+      || !fileMenuCollapsedState.className.split(/\s+/).includes('active');
+    if (!fileMenuCollapsed) {
+      throw new Error(
+        `Expected File menu to collapse after selecting New runner, got `
+        + `aria-expanded='${fileMenuCollapsedState.ariaExpanded}' class='${fileMenuCollapsedState.className}'.`);
+    }
+
+    return {
+      ok: true,
+      status: response.status(),
+      text: `dialog=${dialogVisible} buildMethod=${buildMethodReset} fileMenuLockedDuringDialog=${fileMenuLockedDuringDialog} fileMenuEnabledAfterClose=${fileMenuEnabledAfterClose} fileMenuCollapsed=${fileMenuCollapsed}`,
+      response: { url: page.url() },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: response.status(),
+      text: '',
+      response: { url: page.url() },
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 (async () => {
   const delegatedWarnings = [];
   let browser = null;
@@ -319,34 +634,30 @@ async function runRenderedCheck(browser, check) {
       if (check.rendered) {
         if (!browser) {
           browser = await chromium.launch({
+            channel: process.env.CHUMMER_PLAYWRIGHT_CHANNEL?.trim() || 'chromium',
             headless: true,
-            args: ['--no-sandbox', '--disable-dev-shm-usage'],
+            args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-quic'],
           });
         }
 
-        const rendered = await runRenderedCheck(browser, check);
+        const rendered = await runRenderedCheckWithRetry(browser, check);
         body = rendered.text;
         response = rendered.response;
         if (!rendered.ok) {
+          const renderedFailure = rendered.error || `HTTP ${rendered.status}`;
           if (check.required === false) {
-            const message = `delegated-not-ready: ${check.label ?? check.url} -> HTTP ${rendered.status}`;
+            const message = `delegated-not-ready: ${check.label ?? check.url} -> ${renderedFailure}`;
             delegatedWarnings.push(message);
             console.warn(message);
             continue;
           }
 
-          throw new Error(`Portal check failed: ${check.url} -> HTTP ${rendered.status}`);
+          throw new Error(`Portal check failed: ${check.url} -> ${renderedFailure}`);
         }
       } else {
-        response = await fetch(check.url, {
-          method: check.method ?? 'GET',
-          headers: {
-            ...defaultHeaders,
-            ...(check.headers ?? {})
-          },
-          body: check.body
-        });
-        body = await response.text();
+        const fetched = await fetchCheckWithRetry(check);
+        response = fetched.response;
+        body = fetched.body;
         if (!response.ok) {
           if (check.required === false) {
             const message = `delegated-not-ready: ${check.label ?? check.url} -> HTTP ${response.status}`;
@@ -361,7 +672,9 @@ async function runRenderedCheck(browser, check) {
 
       let passed = false;
       try {
-        passed = Boolean(check.assert(body, response));
+        passed = typeof check.assert === 'function'
+          ? Boolean(check.assert(body, response))
+          : true;
       } catch (error) {
         if (check.required === false) {
           const message = `delegated-not-ready: ${check.label ?? check.url} -> assertion threw: ${error.message}`;

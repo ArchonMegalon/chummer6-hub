@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Plex stream watchdog hourly
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=10m
+Persistent=true
+Unit=plex-stream-watchdog.service
+
+[Install]
+WantedBy=timers.target

@@ -79,6 +79,19 @@ def pass_value_to_int(value: Any) -> int | None:
         except ValueError:
             return None
     return None
+
+
+def normalized_strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def payload_has_semantic_failures(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    return bool(normalized_strings(payload.get("failures")) or normalized_strings(payload.get("failed_gates")))
+
 PASS0_ARTIFACTS = [
     "REPO_INVENTORY.yaml",
     "CANON_TRUTH_MAP.md",
@@ -351,6 +364,8 @@ def record_has_gate_id(payload: Any, gate_id: str) -> bool:
 
 def record_is_passing(payload: Any) -> bool:
     if not isinstance(payload, dict):
+        return False
+    if payload_has_semantic_failures(payload):
         return False
     if payload.get("ok") is True or payload.get("passed") is True or payload.get("success") is True:
         return True
@@ -764,6 +779,8 @@ def extract_entry_list(entry: dict[str, Any], keys: tuple[str, ...]) -> list[dic
 
 
 def command_receipt_ok(entry: dict[str, Any]) -> bool:
+    if payload_has_semantic_failures(entry):
+        return False
     if entry.get("ok") is True or entry.get("passed") is True or entry.get("success") is True:
         return True
     status = str(entry.get("status") or entry.get("result") or entry.get("state") or entry.get("outcome") or "").strip().lower()
@@ -1399,7 +1416,7 @@ def release_gates_coverage_check() -> dict[str, Any]:
         if not owner or status not in PASS_STATUSES.union({"blocked", "blocked_external", "not_mounted"}) or not proof:
             structured_missing.append(gate_id)
             continue
-        if status in PASS_STATUSES:
+        if status in PASS_STATUSES and not payload_has_semantic_failures(entry):
             if not command_receipt_binding(entry, inventory, live_state):
                 structured_missing.append(gate_id)
                 continue

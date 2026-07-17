@@ -156,7 +156,7 @@
     var selectedWorkspaceCampaignMemory = selectedWorkspaceServerPlane?.CampaignMemory ?? selectedWorkspace?.CampaignMemory;
     var selectedWorkspaceCampaignMemoryEvidence = selectedWorkspaceCampaignMemory?.EvidenceLines.FirstOrDefault();
     var selectedWorkspaceAftermathHref = selectedWorkspace is null
-        ? "/account/roster#aftermath-packages"
+        ? "/account/work#aftermath-packages"
         : $"/account/campaigns/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#aftermath-packages";
     var selectedWorkspaceCarryForwardHref = selectedWorkspace is null
         ? "/account/roster#selected-next-session-carry-forward"
@@ -195,7 +195,7 @@
         ? "/account/roster"
         : $"/account/campaigns/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}";
     var selectedRunAftermathHref = selectedRunWorkspace is null
-        ? "/account/roster#aftermath-packages"
+        ? "/account/work#aftermath-packages"
         : $"/account/campaigns/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#aftermath-packages";
     var selectedRunCarryForwardHref = selectedRunWorkspace is null
         ? "/account/roster#selected-next-session-carry-forward"
@@ -789,7 +789,7 @@
                     @if (Model.GoogleAvailable)
                     {
                         <div class="stacked-actions">
-                            <a class="button-like button-like--secondary" href="/auth/google/link?next=/account/profile">@(googleLink is null ? "Link Google" : "Refresh Google link")</a>
+                            <a class="button-like button-like--secondary" href="/auth/google/link?next=/account/settings">@(googleLink is null ? "Link Google" : "Refresh Google link")</a>
                         </div>
                     }
                 </section>
@@ -1510,14 +1510,14 @@
                 <section class="settings-section" data-account-panel id="origin-dossier-library">
                     <div class="settings-section__header">
                         <h2>Origin Dossier library</h2>
-                        <p>Finished dossiers appear here. Read, listen, and video open once the private files are ready for this account.</p>
+                        <p>Finished dossiers appear here. The first handoff is the full ebook with its fitted cover; portraits, audio, and one cinematic scene follow from that same approved story.</p>
                     </div>
                     @if (originDossierPublications.Length == 0)
                     {
                         <article class="app-action-card">
                             <span class="tag">Waiting</span>
                             <h3>No dossier ready yet</h3>
-                            <p>When a dossier is finished, it will appear here with private read, listen, and video links.</p>
+                            <p>When a dossier is finished, it will appear here with the private ebook first, then the later media choices behind the same signed-in route.</p>
                         </article>
                     }
                     else
@@ -1525,10 +1525,15 @@
                         <div class="minimal-three">
                             @foreach (var publication in originDossierPublications)
                             {
+                                var libraryBookHandoffReady = publication.ProviderAuthoredManuscriptImported
+                                    && publication.UndetectableHumanizerApplied
+                                    && publication.BookArtifactVerified
+                                    && publication.StorySceneCoverUsesSelectedCharacterFace;
                                 <article class="app-action-card"
                                          data-origin-dossier-publication
                                          data-origin-dossier-gold-ready="@publication.GoldReady.ToString().ToLowerInvariant()"
                                          data-story-scene-cover-uses-selected-character-face="@publication.StorySceneCoverUsesSelectedCharacterFace.ToString().ToLowerInvariant()"
+                                         data-fitted-cover-art-uses-selected-character-face="@publication.StorySceneCoverUsesSelectedCharacterFace.ToString().ToLowerInvariant()"
                                          data-audiobookshelf-playback-verified="@publication.AudiobookshelfPlaybackVerified.ToString().ToLowerInvariant()"
                                          data-undetectable-humanizer-applied="@publication.UndetectableHumanizerApplied.ToString().ToLowerInvariant()"
                                          data-telegram-share-delivered="@publication.TelegramShareDelivered.ToString().ToLowerInvariant()">
@@ -1539,14 +1544,14 @@
                                     {
                                         <figure class="product-proof__media">
                                             <span class="scene-picture">
-                                                <img src="@publication.StorySceneCoverUrl" alt="Rendered Origin Dossier story scene cover for @PublicText(publication.RunnerAlias)" loading="lazy" />
+                                                <img src="@publication.StorySceneCoverUrl" alt="Fitted Origin Dossier cover art for @PublicText(publication.RunnerAlias)" loading="lazy" />
                                             </span>
-                                            <figcaption class="muted-copy">Selected cover is ready.</figcaption>
+                                            <figcaption class="muted-copy">Fitted cover art is ready.</figcaption>
                                         </figure>
                                     }
                                     else
                                     {
-                                        <p class="muted-copy">Cover unlocks after portrait approval.</p>
+                                        <p class="muted-copy">The cover ships with the ebook handoff once the story and cover review pass.</p>
                                     }
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
@@ -1562,16 +1567,16 @@
                                             <strong>@(publication.BookArtifactVerified ? "Ready" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Video</span>
-                                            <strong>@(publication.DossierVideoVerified ? "Ready" : "Pending")</strong>
-                                        </div>
-                                        <div class="settings-summary-row">
                                             <span>Cover</span>
                                             <strong>@(publication.StorySceneCoverUsesSelectedCharacterFace ? "Ready" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
                                             <span>Audio</span>
                                             <strong>@(publication.AudiobookshelfPlaybackVerified ? "Ready" : "Pending")</strong>
+                                        </div>
+                                        <div class="settings-summary-row">
+                                            <span>Video</span>
+                                            <strong>@(publication.DossierVideoVerified ? "Ready" : "Pending")</strong>
                                         </div>
                                         <div class="settings-summary-row">
                                             <span>Share</span>
@@ -1591,13 +1596,13 @@
                                         </details>
                                     }
                                     <div class="stacked-actions">
-                                        @if (publication.GoldReady && !string.IsNullOrWhiteSpace(publication.AudiobookshelfShareUrl))
+                                        @if (libraryBookHandoffReady && !string.IsNullOrWhiteSpace(publication.AudiobookshelfDossierShareUrl))
                                         {
-                                            <a class="button-like button-like--primary" href="@publication.AudiobookshelfShareUrl" target="_blank" rel="noopener">Listen in Audiobookshelf</a>
+                                            <a class="button-like button-like--primary" href="@publication.AudiobookshelfDossierShareUrl" target="_blank" rel="noopener">Read the ebook</a>
                                         }
                                         else
                                         {
-                                            <span class="button-like button-like--disabled" aria-disabled="true">Audiobookshelf share locked</span>
+                                            <span class="button-like button-like--disabled" aria-disabled="true">Ebook locked</span>
                                         }
                                         <a class="button-like button-like--secondary" href="/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)">Open edition</a>
                                     </div>
@@ -1625,10 +1630,10 @@
             @if (showWorkSection && showCampaignSection)
             {
             <details class="details-drawer"@Html.Raw(openCampaignDetailSection ? " open" : string.Empty)>
-            <summary>Campaigns</summary>
+            <summary>Campaign workspace</summary>
                 <section id="campaigns" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
-                    <h2>Campaigns</h2>
+                    <h2>Campaign workspace</h2>
                     <p>Characters, campaigns, returns, and support stay together here.</p>
                 </div>
                 <div class="settings-summary-list">
@@ -2198,7 +2203,7 @@
                             }
 
                             <details class="details-drawer">
-                                <summary>Rule and continuity health</summary>
+                                <summary>Rule environment and continuity health</summary>
                                 <ul class="muted-copy">
                                     @foreach (var cue in selectedWorkspaceServerPlane.RuleEnvironmentHealth)
                                     {

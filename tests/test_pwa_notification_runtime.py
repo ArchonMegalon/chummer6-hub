@@ -83,6 +83,7 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
               self: {{
                 location: {{ origin: "https://chummer.run" }},
                 registration: {{
+                  scope: "https://chummer.run/",
                   showNotification: async (title, options) => notifications.push({{ title, options }}),
                   navigationPreload: {{ enable: async () => {{}} }}
                 }},
@@ -210,6 +211,7 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
               self: {{
                 location: {{ origin: "https://chummer.run" }},
                 registration: {{
+                  scope: "https://chummer.run/",
                   showNotification: async () => {{}},
                   navigationPreload: {{ enable: async () => {{}} }}
                 }},
@@ -228,13 +230,16 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
             const publicNavigate = {{ url: "https://chummer.run/mobile", mode: "navigate" }};
             const accountNavigate = {{ url: "https://chummer.run/account/ledger/notifications", mode: "navigate" }};
             const apiGet = {{ url: "https://chummer.run/api/v1/ledger/worlds", mode: "same-origin" }};
-            const publicAsset = {{ url: "https://chummer.run/css/site.css", mode: "same-origin" }};
+            const publicAsset = {{ url: "https://chummer.run/mobile.css", mode: "same-origin" }};
             const payload = {{
               publicNavigate: context.isPublicRuntimeCacheableRequest(publicNavigate),
               accountNavigate: context.isPublicRuntimeCacheableRequest(accountNavigate),
               apiGet: context.isPublicRuntimeCacheableRequest(apiGet),
               publicAsset: context.isPublicRuntimeCacheableRequest(publicAsset),
-              publicResponse: context.shouldCacheResponse(publicNavigate, new Response("ok", {{ status: 200 }})),
+              publicResponse: context.shouldCacheResponse(publicAsset, new Response("ok", {{
+                status: 200,
+                headers: {{ "Content-Type": "text/css", "Cache-Control": "public, max-age=300" }}
+              }})),
               accountResponse: context.shouldCacheResponse(accountNavigate, new Response("ok", {{ status: 200 }})),
               validNotificationHref: context.normalizeNotificationHref("/ledger/turns/42?source=pwa"),
               invalidNotificationHref: context.normalizeNotificationHref("/admin/hidden-ops"),
@@ -256,7 +261,7 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
         payload = json.loads(result.stdout)
 
-        self.assertTrue(payload["publicNavigate"])
+        self.assertFalse(payload["publicNavigate"])
         self.assertTrue(payload["publicAsset"])
         self.assertTrue(payload["publicResponse"])
         self.assertFalse(payload["accountNavigate"])

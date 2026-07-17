@@ -94,6 +94,13 @@ def approved_audio_provider_name(*values: object) -> str:
     return PROVIDER_REGISTRY.matched_audio_provider_label(*values)
 
 
+def magicai_api_handshake_receipt_path(evidence_root: Path) -> Path:
+    candidate = evidence_root / "MAGICAI_API_HANDSHAKE.generated.json"
+    if candidate.is_file():
+        return candidate
+    return Path(__file__).resolve().parents[1] / ".codex-studio" / "published" / "MAGICAI_API_HANDSHAKE.generated.json"
+
+
 def is_pass(payload: dict[str, Any]) -> bool:
     return string(payload.get("status")).lower() in {"pass", "approved", "verified", "delivered", "published", "generated"}
 
@@ -166,7 +173,7 @@ def cover_surface_row(path: Path) -> dict[str, Any]:
     flags["all_required_surface_hashes_match_expected"] = False
     row: dict[str, Any] = {
         "id": "cover_consistency_required_surfaces",
-        "label": "Same rendered story-scene cover is proved across ebook, PDF, M4B, Audiobookshelf, movie poster, and Chummer hero",
+        "label": "Same fitted cover art is proved across ebook, PDF, M4B, Audiobookshelf, movie poster, and Chummer hero",
         "path": path.as_posix(),
         "flags": flags,
     }
@@ -512,6 +519,53 @@ def runsite_handoff_row(path: Path) -> dict[str, Any]:
             "requiredOriginGoldCapabilities": sorted(required_capability_names),
         }
     )
+    return row
+
+
+def magicai_handshake_row(path: Path) -> dict[str, Any]:
+    flags = {
+        "receipt_present": path.is_file(),
+        "receipt_passed": False,
+        "provider_magicai": False,
+        "provider_surface_omagic_api": False,
+        "no_credit_burn_expected": False,
+        "controlled_live_provider_pilot": False,
+        "http_status_200": False,
+        "schema_json_returned": False,
+        "schema_paths_present": False,
+        "raw_credential_not_exposed": False,
+        "env_values_not_exposed": False,
+    }
+    row: dict[str, Any] = {
+        "id": "magicai_no_credit_burn_api_handshake",
+        "label": "MagicAI no-credit-burn API handshake proves a real live shared render lane",
+        "path": path.as_posix(),
+        "flags": flags,
+    }
+    if not path.is_file():
+        row["status"] = "missing"
+        row["evidence"] = "receipt_missing"
+        row["failedFlags"] = [key for key, passed in flags.items() if not passed]
+        return row
+    payload = read_json(path)
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    row["sha256"] = sha256_file(path)
+    row["reportedStatus"] = payload.get("status")
+    flags["receipt_passed"] = is_pass(payload)
+    flags["provider_magicai"] = string(payload.get("provider")).lower() == "magicai"
+    flags["provider_surface_omagic_api"] = string(payload.get("providerSurface")).lower() == "omagic_api"
+    flags["no_credit_burn_expected"] = payload.get("noCreditBurnExpected") is True
+    flags["controlled_live_provider_pilot"] = payload.get("controlledLiveProviderPilot") is True
+    flags["http_status_200"] = int(payload.get("httpStatus") or 0) == 200
+    flags["schema_json_returned"] = summary.get("json") is True
+    flags["schema_paths_present"] = int(summary.get("path_count") or 0) > 0
+    privacy = payload.get("privacy") if isinstance(payload.get("privacy"), dict) else {}
+    flags["raw_credential_not_exposed"] = privacy.get("rawCredentialExposed") is False
+    flags["env_values_not_exposed"] = privacy.get("envValuesExposed") is False
+    failed = [key for key, passed in flags.items() if not passed]
+    row["failedFlags"] = failed
+    row["status"] = "proved" if not failed else "blocked"
+    row["evidence"] = "magicai_live_schema_handshake_probe"
     return row
 
 
@@ -1110,6 +1164,7 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
     deployed_probe = read_json(deployed_probe_path) if deployed_probe_path.is_file() else {}
     gold_audit_path = evidence_root / "ORIGIN_EDITION_GOLD_CURRENT_GAP_AUDIT.generated.json"
     gold_audit = read_json(gold_audit_path) if gold_audit_path.is_file() else {}
+    magicai_handshake_path = magicai_api_handshake_receipt_path(evidence_root)
 
     rows: list[dict[str, Any]] = [
         receipt_row("approved_canon_packet_receipt", "Approved runner canon/source packet receipt", evidence_root / "source-packet-approval.receipt.json"),
@@ -1125,7 +1180,7 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         receipt_row("undetectable_humanizer_receipt", "Undetectable Humanizer post-step receipt", evidence_root / "undetectable-humanizer.receipt.json"),
         receipt_row("humanizer_quality_receipt", "Undetectable Humanizer quality gate receipt", evidence_root / "undetectable-humanizer-quality-gate.browseract.normalized.receipt.json"),
         receipt_row("canon_privacy_audit", "Canon/privacy audit receipt", evidence_root / "canon-privacy-audit.receipt.json"),
-        receipt_row("cover_generation_receipt", "Rendered story-scene cover generation receipt", evidence_root / "story-scene-cover.receipt.json"),
+        receipt_row("cover_generation_receipt", "Fitted cover art generation receipt", evidence_root / "story-scene-cover.receipt.json"),
         receipt_row("cover_consistency_receipt", "Cover consistency proof", branch / "cover-consistency-strict.receipt.json"),
         cover_surface_row(branch / "cover-consistency-strict.receipt.json"),
         receipt_row("ebook_import_receipt", "Ebook/PDF packaging and import receipt", evidence_root / "book-artifact-import.receipt.json"),
@@ -1151,6 +1206,7 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         local_authenticated_route_row(branch / "authenticated-chummer-route-live.receipt.json", request, context),
         receipt_row("runsite_integration_proof", "RunSite integration proof", branch / "runsite-integration-proof.receipt.json"),
         runsite_handoff_row(branch / "runsite-integration-proof.receipt.json"),
+        magicai_handshake_row(magicai_handshake_path),
         receipt_row("telegram_delivery_receipt", "Telegram read/listen/watch/open link delivery receipt", Path(string(request.get("telegramShareDeliveryReceiptPath"))) if string(request.get("telegramShareDeliveryReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("telegramShareDeliveryReceiptPath"))),
         telegram_link_bundle_row(branch / "telegram-origin-link-bundle-live.receipt.json", string(request.get("projectId")) or context.project_id, context.base_url, namespace),
         receipt_row("final_no_fallback_no_sentinel_audit", "Final no-fallback/no-sentinel audit", Path(string(request.get("finalNoFallbackNoSentinelAuditReceiptPath"))) if string(request.get("finalNoFallbackNoSentinelAuditReceiptPath")).startswith("/") else live_import_path.parent / string(request.get("finalNoFallbackNoSentinelAuditReceiptPath"))),
@@ -1228,6 +1284,7 @@ def materialize(evidence_root: Path, output: Path, context: OriginEditionContext
         "chummer_movie_story_scene_playback_verified": next((row for row in rows if row.get("id") == "chummer_movie_story_scene_playback_verified"), {}).get("status") == "proved",
         "local_authenticated_route_tabs_verified": next((row for row in rows if row.get("id") == "local_authenticated_route_tabs_verified"), {}).get("status") == "proved",
         "runsite_handoff_constraints_verified": next((row for row in rows if row.get("id") == "runsite_handoff_constraints_verified"), {}).get("status") == "proved",
+        "controlled_live_provider_pilot_verified": next((row for row in rows if row.get("id") == "magicai_no_credit_burn_api_handshake"), {}).get("status") == "proved",
         "no_committed_or_receipt_secrets_claimed": next((row for row in rows if row.get("id") == "secret_hygiene_verified"), {}).get("status") == "proved",
         "gold_audit_completion_claim_allowed": gold_audit.get("goalCompletionClaimAllowed") is True,
     }

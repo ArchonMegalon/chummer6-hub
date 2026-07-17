@@ -11,12 +11,18 @@ import sys
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from magicai_pool_registry import magicai_api_missing_aliases as shared_magicai_api_missing_aliases
+from magicai_pool_registry import magicai_api_ready_aliases as shared_magicai_api_ready_aliases
+from magicai_pool_registry import magicai_declared_aliases as shared_magicai_declared_aliases
+from magicai_pool_registry import magicai_login_ready_aliases as shared_magicai_login_ready_aliases
+from magicai_pool_registry import magicai_platform_audit_summary as shared_magicai_platform_audit_summary
 from origin_edition_context import OriginEditionContext
 from origin_edition_provider_registry import OriginProviderCapabilityRegistry
 
 
 CONTRACT_NAME = "chummer.origin_edition.runsite_integration_proof.v1"
 DEFAULT_EVIDENCE_ROOT = Path("/docker/chummercomplete/.tmp/origin-dossier-fresh-gold")
+DEFAULT_MAGICAI_PLATFORM_AUDIT = Path(".codex-studio/published/MAGICAI_PLATFORM_ACCESS.generated.json")
 
 
 def now_iso() -> str:
@@ -40,6 +46,16 @@ def read_json(path: Path) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise ValueError(f"{path}: expected JSON object")
     return parsed
+
+
+def read_json_object(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
 
 
 def env_assignments(path: Path) -> dict[str, str]:
@@ -123,6 +139,26 @@ def _unmixr_voice_missing_aliases(*assignment_sets: dict[str, str]) -> list[str]
     return missing
 
 
+def _magicai_declared_aliases(*assignment_sets: dict[str, str]) -> list[str]:
+    return shared_magicai_declared_aliases(*assignment_sets)
+
+
+def _magicai_login_ready_aliases(*assignment_sets: dict[str, str]) -> list[str]:
+    return shared_magicai_login_ready_aliases(*assignment_sets)
+
+
+def _magicai_api_ready_aliases(*assignment_sets: dict[str, str]) -> list[str]:
+    return shared_magicai_api_ready_aliases(*assignment_sets)
+
+
+def _magicai_api_missing_aliases(*assignment_sets: dict[str, str]) -> list[str]:
+    return shared_magicai_api_missing_aliases(*assignment_sets)
+
+
+def _magicai_platform_audit_summary(repo_root: Path) -> dict[str, Any]:
+    return shared_magicai_platform_audit_summary(repo_root, assignment_sets=(env_assignments(repo_root / ".env"),))
+
+
 def _merged_assignments(*assignment_sets: dict[str, str]) -> dict[str, str]:
     assignments: dict[str, str] = {}
     for source in assignment_sets:
@@ -196,10 +232,24 @@ def check_file_contains(name: str, path: Path, needles: list[str], root: Path) -
     return item
 
 
-def provider_inventory_signals(ltd_text: str, ea_env: Path, ea_env_text: str, local_env: Path) -> dict[str, bool]:
+def provider_inventory_signals(ltd_text: str, ea_env: Path, ea_env_text: str, local_env: Path) -> dict[str, Any]:
     registry = OriginProviderCapabilityRegistry.from_env()
-    provider_inventory_text = f"{ltd_text}\n{ea_env_text}".lower()
+    repo_root = local_env.parent.resolve()
+    local_env_text = read_text(local_env) if local_env.is_file() else ""
+    provider_inventory_text = f"{ltd_text}\n{ea_env_text}\n{local_env_text}".lower()
     ea_assignments = env_assignments(ea_env)
+    local_assignments = env_assignments(local_env)
+    merged_assignments = _merged_assignments(local_assignments, ea_assignments)
+    magicai_declared_aliases = _magicai_declared_aliases(local_assignments, ea_assignments)
+    magicai_login_ready_aliases = _magicai_login_ready_aliases(local_assignments, ea_assignments)
+    magicai_api_ready_aliases = _magicai_api_ready_aliases(local_assignments, ea_assignments)
+    magicai_api_missing_aliases = _magicai_api_missing_aliases(local_assignments, ea_assignments)
+    magicai_platform_audit = _magicai_platform_audit_summary(repo_root)
+    pending_login_ready = set(magicai_login_ready_aliases) - set(magicai_api_ready_aliases)
+    accessible_accounts = set(magicai_platform_audit["accessibleAccounts"])
+    forbidden_accounts = set(magicai_platform_audit["forbiddenAccounts"])
+    login_failed_accounts = set(magicai_platform_audit["loginFailedAccounts"])
+    unverified_accounts = set(magicai_platform_audit["unverifiedAccounts"])
     return {
         "crezloTours": "Crezlo Tours" in ltd_text and "EA_CREZLO_LOGIN_EMAIL" in ea_env_text,
         "pano2vr": "Pano2VR" in ltd_text and "PANO2VR_LICENSE_KEY" in ea_env_text,
@@ -208,27 +258,71 @@ def provider_inventory_signals(ltd_text: str, ea_env: Path, ea_env_text: str, lo
         "youbooks": "YouBooks" in ltd_text and "YOUBOOKS_ACCOUNT_EMAILS" in ea_env_text,
         "firstBook": "First Book ai" in ltd_text,
         "inkfluence": env_key_present(local_env, "CHUMMER_EA_INKFLUENCE_BASE_URL"),
+        "magicfit": configured_provider_available(
+            provider_inventory_text,
+            merged_assignments,
+            registry.visual_preferred_provider_tokens,
+        ),
+        "configuredPreferredVisualProvider": configured_provider_available(
+            provider_inventory_text,
+            merged_assignments,
+            registry.visual_preferred_provider_tokens,
+        ),
+        "configuredApprovedVisualProvider": configured_provider_available(
+            provider_inventory_text,
+            merged_assignments,
+            registry.visual_provider_tokens,
+        ),
+        "configuredRenderPoolProvider": configured_provider_available(
+            provider_inventory_text,
+            merged_assignments,
+            registry.render_pool_provider_tokens,
+        ),
+        "magicaiLoginConfigured": bool(magicai_login_ready_aliases),
+        "magicaiApiConfigured": bool(magicai_api_ready_aliases),
+        "magicaiDeclaredAccountCount": len(magicai_declared_aliases),
+        "magicaiLoginReadyAccountCount": len(magicai_login_ready_aliases),
+        "magicaiApiReadyAccountCount": len(magicai_api_ready_aliases),
+        "magicaiAccountsMissingApiKey": magicai_api_missing_aliases,
+        "magicaiPlatformAuditPresent": magicai_platform_audit["present"],
+        "magicaiPlatformAccessibleAccounts": magicai_platform_audit["accessibleAccounts"],
+        "magicaiPlatformForbiddenAccounts": magicai_platform_audit["forbiddenAccounts"],
+        "magicaiPlatformLoginFailedAccounts": magicai_platform_audit["loginFailedAccounts"],
+        "magicaiPlatformUnverifiedAccounts": magicai_platform_audit["unverifiedAccounts"],
+        "magicaiPlatformPendingMintableAccounts": sorted(pending_login_ready & accessible_accounts),
+        "magicaiPlatformPendingForbiddenAccounts": sorted(pending_login_ready & forbidden_accounts),
+        "magicaiPlatformPendingLoginFailedAccounts": sorted(pending_login_ready & login_failed_accounts),
+        "magicaiPlatformPendingUnverifiedAccounts": sorted(pending_login_ready & unverified_accounts),
         "configuredManuscriptProvider": configured_provider_available(
             provider_inventory_text,
-            ea_assignments,
+            merged_assignments,
             registry.manuscript_provider_tokens,
         ),
         "configuredAudioProvider": configured_provider_available(
             provider_inventory_text,
-            ea_assignments,
+            merged_assignments,
             registry.audio_provider_tokens,
             strict_provider_tokens=("unmixr",),
         ),
     }
 
 
-def origin_gold_capability_signals(provider_signals: dict[str, bool]) -> dict[str, bool]:
+def origin_gold_capability_signals(provider_signals: dict[str, Any]) -> dict[str, bool]:
     manuscript_providers = ("inkfluence", "youbooks", "firstBook", "configuredManuscriptProvider")
     audio_providers = ("unmixr", "inkfluence", "configuredAudioProvider")
     return {
         "provider_inventory_present": any(provider_signals.values()),
         "manuscript_or_edition_provider_available": any(provider_signals.get(provider) is True for provider in manuscript_providers),
         "premium_audio_provider_available": any(provider_signals.get(provider) is True for provider in audio_providers),
+        "preferred_visual_provider_available": any(
+            provider_signals.get(provider) is True
+            for provider in ("magicfit", "configuredPreferredVisualProvider")
+        ),
+        "approved_visual_provider_available": any(
+            provider_signals.get(provider) is True
+            for provider in ("magicfit", "configuredApprovedVisualProvider")
+        ),
+        "shared_render_pool_available": provider_signals.get("magicaiApiConfigured") is True,
         "optional_overflow_accounts_do_not_block": True,
     }
 
@@ -287,6 +381,69 @@ def materialize(
 
     checks.append(
         check_file_contains(
+            "shared_governed_render_contract",
+            repo_root / "Chummer.Run.Api/Services/Community/HorizonGovernedRenderRequestComposerService.cs",
+            [
+                'public const string OrchestrationLane = "ea_governed_render";',
+                'public const string ContractName = "chummer6-hub.horizon_governed_render_request.v1";',
+                'blocked.Add("governed render evidence refs");',
+            ],
+            repo_root,
+        )
+    )
+    checks.append(
+        check_file_contains(
+            "runsite_scene_render_bridge",
+            repo_root / "Chummer.Run.Api/Services/RunsiteOrientationArtifactRequestBridgeService.cs",
+            [
+                'private const string DefaultPreferredProvider = "magicai";',
+                'ArtifactKindOrCapabilityId: "runsite-scene-render"',
+                "GovernedRenderRequest: new HorizonGovernedRenderRequestCreateRequest(",
+            ],
+            repo_root,
+        )
+    )
+    checks.append(
+        check_file_contains(
+            "propertyquarry_apartment_video_bridge",
+            repo_root / "Chummer.Run.Api/Services/PropertyquarryApartmentVideoArtifactRequestBridgeService.cs",
+            [
+                'private const string DefaultPreferredProvider = "magicai";',
+                'ArtifactKindOrCapabilityId: "propertyquarry-apartment-video"',
+                "GovernedRenderRequest: new HorizonGovernedRenderRequestCreateRequest(",
+                "propertyquarry:property-packet",
+                "propertyquarry:property-continuity",
+            ],
+            repo_root,
+        )
+    )
+    checks.append(
+        check_file_contains(
+            "propertyquarry_apartment_video_internal_route",
+            repo_root / "Chummer.Run.Api/Controllers/InternalPropertyquarryApartmentVideoController.cs",
+            [
+                '[HttpPost("/api/internal/propertyquarry/apartment-videos/requests")]',
+                '[HttpPost("/api/internal/propertyquarry/apartment-videos/artifact-requests")]',
+                "PropertyquarryApartmentVideoArtifactRequestBridgeResult",
+            ],
+            repo_root,
+        )
+    )
+    checks.append(
+        check_file_contains(
+            "propertyquarry_apartment_video_signed_in_route",
+            repo_root / "Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+            [
+                '[HttpPost("me/property-workspaces/{propertyId}/apartment-video")]',
+                "PropertyquarryApartmentVideoRequest",
+                "BuildPropertyquarryApartmentVideoLane(property)",
+                "apartmentVideoRequestApiHrefTemplate",
+            ],
+            repo_root,
+        )
+    )
+    checks.append(
+        check_file_contains(
             "runsite_handoff_constraints",
             repo_root / "RUNSITE_HANDOFF.md",
             [
@@ -309,9 +466,9 @@ def materialize(
                 "href=\"#origin-edition-listen\"",
                 "href=\"#origin-edition-watch\"",
                 "href=\"#origin-edition-canon-audit\"",
-                "Read in Audiobookshelf",
+                "Read the ebook",
                 "Listen in Audiobookshelf",
-                "Watch scene movie",
+                "Watch selected cinematic scene",
                 "data-chummer-owns-canon=\"true\"",
                 "data-provider-created-facts-auto-canon=\"false\"",
             ],
@@ -337,12 +494,46 @@ def materialize(
             "origin_publication_gold_gate_service",
             repo_root / "Chummer.Run.Api/Services/Community/OriginDossierPublicationService.cs",
             [
-                "Chummer OriginBookEngine",
+                'DefaultApprovedManuscriptProviderTokens = ["Subscribr"]',
+                "FullStoryManuscriptToken",
+                "StoryEditionEbookToken",
+                "CharacterVisibleCinematicToken",
                 "HasFinalNoFallbackNoSentinelReceipt",
                 "HasCoverConsistencyReceipt",
                 "CHUMMER_ORIGIN_AUDIOBOOKSHELF_TRUSTED_HOSTS",
                 "OriginDossier:AudiobookshelfTrustedHosts",
                 "FinalNoFallbackNoSentinelAuditReceiptPath",
+            ],
+            repo_root,
+        )
+    )
+    checks.append(
+        check_file_contains(
+            "origin_provider_account_registry",
+            repo_root / "Chummer.Run.Api/Services/Community/OriginDossierProviderAccountRegistry.cs",
+            [
+                "ResolveAliases(",
+                "ResolveHosts(",
+                '"manuscript"',
+                '"audio"',
+                '"visual"',
+                '"packaging"',
+                '"audiobookshelf"',
+                "DisabledStatuses",
+                "rawRegistry",
+            ],
+            repo_root,
+        )
+    )
+    checks.append(
+        check_file_contains(
+            "origin_provider_account_registry_tests",
+            repo_root / "Chummer.Tests/OriginDossierProviderAccountRegistryTests.cs",
+            [
+                "ManuscriptAndAudioRegistriesResolveOnlyEnabledRoleMatchedAccounts",
+                "AudiobookshelfRegistryNormalizesTrustedHostsFromProviderAccounts",
+                "VisualRegistryDoesNotTreatRunsiteMagicAiSceneAccountsAsOriginVisualAccounts",
+                "PackagingRegistryAcceptsExplicitBookArtifactAccounts",
             ],
             repo_root,
         )
@@ -400,6 +591,43 @@ def materialize(
         "runsiteEnvInspected": local_env.is_file(),
         "eaEnvInspected": ea_env.is_file(),
         "ltdInventoryInspected": ltds.is_file(),
+        "sharedRenderLaneSignals": {
+            "governedRenderContractPresent": check_file_contains(
+                "shared_governed_render_contract",
+                repo_root / "Chummer.Run.Api/Services/Community/HorizonGovernedRenderRequestComposerService.cs",
+                ['public const string OrchestrationLane = "ea_governed_render";'],
+                repo_root,
+            )["status"]
+            == "pass",
+            "runsiteBridgePresent": check_file_contains(
+                "runsite_scene_render_bridge",
+                repo_root / "Chummer.Run.Api/Services/RunsiteOrientationArtifactRequestBridgeService.cs",
+                ['ArtifactKindOrCapabilityId: "runsite-scene-render"'],
+                repo_root,
+            )["status"]
+            == "pass",
+            "propertyquarryBridgePresent": check_file_contains(
+                "propertyquarry_apartment_video_bridge",
+                repo_root / "Chummer.Run.Api/Services/PropertyquarryApartmentVideoArtifactRequestBridgeService.cs",
+                ['ArtifactKindOrCapabilityId: "propertyquarry-apartment-video"'],
+                repo_root,
+            )["status"]
+            == "pass",
+            "propertyquarryInternalRoutePresent": check_file_contains(
+                "propertyquarry_apartment_video_internal_route",
+                repo_root / "Chummer.Run.Api/Controllers/InternalPropertyquarryApartmentVideoController.cs",
+                ['[HttpPost("/api/internal/propertyquarry/apartment-videos/artifact-requests")]'],
+                repo_root,
+            )["status"]
+            == "pass",
+            "propertyquarrySignedInRoutePresent": check_file_contains(
+                "propertyquarry_apartment_video_signed_in_route",
+                repo_root / "Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+                ['[HttpPost("me/property-workspaces/{propertyId}/apartment-video")]'],
+                repo_root,
+            )["status"]
+            == "pass",
+        },
         "sourceFiles": {
             "runsiteEnv": source_metadata(local_env),
             "eaEnv": source_metadata(ea_env),
@@ -417,6 +645,11 @@ def materialize(
         "newestProviderInventorySignals": provider_signals,
         "unmixrVoiceReadyAccounts": _unmixr_voice_ready_aliases(ea_assignments),
         "unmixrAccountsMissingVoiceId": _unmixr_voice_missing_aliases(ea_assignments),
+        "magicaiDeclaredAccounts": _magicai_declared_aliases(env_assignments(local_env), ea_assignments),
+        "magicaiLoginReadyAccounts": _magicai_login_ready_aliases(env_assignments(local_env), ea_assignments),
+        "magicaiApiReadyAccounts": _magicai_api_ready_aliases(env_assignments(local_env), ea_assignments),
+        "magicaiAccountsMissingApiKey": _magicai_api_missing_aliases(env_assignments(local_env), ea_assignments),
+        "magicaiPlatformAccessAudit": _magicai_platform_audit_summary(repo_root),
         "originGoldCapabilitySignals": capability_signals,
     }
     checks.append(

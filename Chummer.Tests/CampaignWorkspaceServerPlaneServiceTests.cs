@@ -112,6 +112,54 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void EntitlementSyncStatusKeepsAccountAccessBlockingReceiptsReviewableAtSurfaceLevel()
+    {
+        WorkspaceRestoreConflictReceiptProjection[] projected = InvokeProjectRestoreConflictReceipts(
+        [
+            new WorkspaceRestoreConflictReceipt(
+                ReceiptId: "duplicate-entitlement",
+                Severity: "blocking",
+                Kind: "entitlement_replication_duplicate_grant",
+                SubjectId: "install-duplicate",
+                Summary: "Duplicate entitlement receipts block restore continuation.",
+                Resolution: "Open account access and rotate duplicate grants.",
+                ObservedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"),
+                Surface: "entitlement_sync",
+                BlocksContinue: true)
+        ]);
+
+        WorkspaceRestoreReceiptStatusProjection status = InvokeBuildRestoreReceiptStatusProjection(
+            Array.Empty<WorkspaceRestoreProvenanceReceipt>(),
+            Array.Empty<WorkspaceRestoreProvenanceRecoveryProjection>(),
+            projected,
+            "EntitlementSync");
+
+        Assert.Equal("review_before_continue", status.ContinuePosture);
+        Assert.Equal("/account/access", status.RecoveryRoute);
+        Assert.Equal("duplicate-entitlement", status.LeadReceiptId);
+        Assert.Equal("blocking_conflict_present", status.ConflictPosture);
+    }
+
+    [Fact]
+    public void WorkspaceRestoreProvenanceRecoveryUsesAccountWorkForGenericWorkspaceReceipts()
+    {
+        WorkspaceRestoreProvenanceRecoveryProjection[] projected = InvokeProjectRestoreProvenanceRecoveryReceipts(
+        [
+            new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: "workspace-current",
+                Kind: "restore_inventory_snapshot",
+                SubjectId: "workspace-restore",
+                Surface: "workspace_restore",
+                Summary: "Workspace restore inventory is current.",
+                Proof: "workspace-inventory",
+                ObservedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"))
+        ]);
+
+        Assert.Equal("/account/work", projected[0].RecoveryRoute);
+        Assert.Equal("safe_to_continue_with_receipt", projected[0].ContinuePosture);
+    }
+
+    [Fact]
     public void RestoreReceiptProjectionCanonicalizesDeclaredSurfaceCasing()
     {
         WorkspaceRestoreProvenanceReceipt[] provenanceReceipts = InvokeProjectRestoreProvenanceReceipts(
@@ -8693,6 +8741,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         return Assert.IsAssignableFrom<WorkspaceRestoreProvenanceReceipt[]>(method.Invoke(null, [receipts]));
     }
 
+    private static WorkspaceRestoreProvenanceRecoveryProjection[] InvokeProjectRestoreProvenanceRecoveryReceipts(
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? receipts)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("ProjectRestoreProvenanceRecoveryReceipts", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("ProjectRestoreProvenanceRecoveryReceipts was not found.");
+
+        return Assert.IsAssignableFrom<WorkspaceRestoreProvenanceRecoveryProjection[]>(method.Invoke(null, [receipts]));
+    }
+
     private static string InvokeResolveRestoreConflictSurface(string? kind)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -8710,6 +8768,22 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             ?? throw new InvalidOperationException("ProjectRestoreConflictReceipts was not found.");
 
         return Assert.IsAssignableFrom<WorkspaceRestoreConflictReceiptProjection[]>(method.Invoke(null, [receipts]));
+    }
+
+    private static WorkspaceRestoreReceiptStatusProjection InvokeBuildRestoreReceiptStatusProjection(
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt> provenanceReceipts,
+        IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> provenanceRecoveryReceipts,
+        IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> conflictReceipts,
+        string scope)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("BuildRestoreReceiptStatusProjection", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("BuildRestoreReceiptStatusProjection was not found.");
+        Type scopeType = method.GetParameters()[3].ParameterType;
+        object? projection = method.Invoke(
+            null,
+            [provenanceReceipts, provenanceRecoveryReceipts, conflictReceipts, Enum.Parse(scopeType, scope)]);
+        return Assert.IsType<WorkspaceRestoreReceiptStatusProjection>(projection);
     }
 
     private static GovernedPrepPacketSummary InvokeResolvePrepPacket(CampaignPrepLibrarySummary prepLibrary, string requestedPacketId)

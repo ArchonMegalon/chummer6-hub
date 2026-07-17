@@ -655,7 +655,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
         Assert.Equal("pass", payload.RootElement.GetProperty("SeparationStatus").GetString());
         Assert.Equal("/account/ledger/notifications", payload.RootElement.GetProperty("LiveRail").GetProperty("NotificationsHref").GetString());
-        Assert.Equal("/account/roster#aftermath-packages", payload.RootElement.GetProperty("AftermathRail").GetProperty("WorkspaceHref").GetString());
+        Assert.Equal("/account/work#aftermath-packages", payload.RootElement.GetProperty("AftermathRail").GetProperty("WorkspaceHref").GetString());
         Assert.Equal(2, payload.RootElement.GetProperty("AftermathRail").GetProperty("ApiRoutes").GetArrayLength());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
@@ -687,7 +687,7 @@ public sealed class PublicLandingDownloadDispatchTests
         using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
         Assert.Equal("origin-dossier", payload.RootElement.GetProperty("Horizon").GetString());
         Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
-        Assert.Equal("/docs/origin-dossier-the-name-she-chose", payload.RootElement.GetProperty("PublicBoard").GetProperty("StoryBookletHref").GetString());
+        Assert.Equal("/docs/origin-dossier-the-name-she-chose", payload.RootElement.GetProperty("PublicBoard").GetProperty("StoryEditionHref").GetString());
         Assert.Equal("/origin-dossier/media", payload.RootElement.GetProperty("PublicBoard").GetProperty("MediaDispatchHref").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
@@ -698,9 +698,9 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", sharedArtifacts.GetProperty("SignedInRequestReceiptDetailHrefTemplate").GetString());
         JsonElement capability = payload.RootElement.GetProperty("ArtifactCapability");
         Assert.Equal("origin-dossier-media", capability.GetProperty("CapabilityId").GetString());
-        Assert.Equal("origin-dossier:public-story-packet", capability.GetProperty("SourceRef").GetString());
+        Assert.Equal("origin-dossier:public-story-edition", capability.GetProperty("SourceRef").GetString());
         JsonElement boundary = payload.RootElement.GetProperty("Boundary");
-        Assert.Equal("approved_chummer_owned_packet", boundary.GetProperty("StoryTruth").GetString());
+        Assert.Equal("approved_chummer_owned_story_edition", boundary.GetProperty("StoryTruth").GetString());
         Assert.Equal("not_claimed", boundary.GetProperty("SilentMechanicsMutation").GetString());
         Assert.Equal("not_claimed", boundary.GetProperty("ProviderTruth").GetString());
         string serialized = JsonSerializer.Serialize(ok.Value);
@@ -775,7 +775,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("approved_origin_media", model.HorizonCapability.CapabilitySlot);
         Assert.Equal("available", model.HorizonCapability.Status);
         Assert.True(model.HorizonCapability.RequestSupported);
-        Assert.Equal("origin-dossier:public-story-packet", model.HorizonCapability.SourceRef);
+        Assert.Equal("origin-dossier:public-story-edition", model.HorizonCapability.SourceRef);
         Assert.NotNull(model.SharedArtifacts);
         Assert.Equal("/api/v1/public/horizons/capabilities", model.SharedArtifacts!.PublicCapabilityCatalogHref);
         Assert.Null(model.SharedArtifacts.PublicCapabilityHealthHref);
@@ -784,13 +784,17 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/api/v1/horizons/quotas/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.SharedArtifacts.SignedInQuotaCatalogHref);
         Assert.Equal("/api/v1/horizons/artifact-requests/me?horizonId=origin-dossier&artifactKindOrCapabilityId=origin-dossier-media", model.SharedArtifacts.SignedInRequestReceiptHref);
         Assert.Equal("/api/v1/horizons/artifact-requests/me/{requestId}", model.SharedArtifacts.SignedInRequestReceiptDetailHrefTemplate);
-        Assert.Contains("story packet", model.Intro, StringComparison.Ordinal);
+        Assert.Contains("full private story edition", model.Intro, StringComparison.Ordinal);
+        Assert.Contains("finished ebook with fitting cover art", model.Intro, StringComparison.Ordinal);
         Assert.Contains("sheet stays authoritative", model.Intro, StringComparison.Ordinal);
+        TrustPageSectionViewModel bundleSection = Assert.Single(model.Sections, section => section.Id == "origin_bundle");
+        Assert.Contains("ebook with its fitted cover", bundleSection.Body, StringComparison.Ordinal);
+        Assert.Contains(bundleSection.Bullets!, point => point.Contains("cover ships with the ebook", StringComparison.Ordinal));
         TrustPageSectionViewModel boundarySection = Assert.Single(model.Sections, section => section.Id == "origin_boundary");
         Assert.Contains("does not get to do", boundarySection.Heading, StringComparison.Ordinal);
         Assert.Contains("does not get to smuggle in ware", boundarySection.Body, StringComparison.Ordinal);
         Assert.Contains(model.Actions, action =>
-            action.Label == "Watch the narrated overview"
+            action.Label == "Watch the story-to-cinema path"
             && action.Href == "/origin-dossier/media");
         string serialized = JsonSerializer.Serialize(model);
         Assert.DoesNotContain("Subscribr", serialized, StringComparison.OrdinalIgnoreCase);
@@ -858,7 +862,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/account/passport", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountEntryHref").GetString());
         Assert.Equal("/account/passport/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
         Assert.Equal("/account/ledger/notifications", payload.RootElement.GetProperty("SignedInBench").GetProperty("LiveNotificationsHref").GetString());
-        Assert.Equal("/account/roster#aftermath-packages", payload.RootElement.GetProperty("SignedInBench").GetProperty("AftermathHref").GetString());
+        Assert.Equal("/account/work#aftermath-packages", payload.RootElement.GetProperty("SignedInBench").GetProperty("AftermathHref").GetString());
         JsonElement sharedArtifacts = payload.RootElement.GetProperty("SharedArtifacts");
         Assert.Equal("/api/v1/public/horizons/capabilities", sharedArtifacts.GetProperty("PublicCapabilityCatalogHref").GetString());
         Assert.Equal("/api/v1/public/horizons/capabilities?horizonId=runner_passport&artifactKindOrCapabilityId=runner_passport-identity-network", sharedArtifacts.GetProperty("PublicCapabilityHealthHref").GetString());
@@ -3610,7 +3614,7 @@ public sealed class PublicLandingDownloadDispatchTests
         IActionResult result = await fixture.Controller.TablePulseDebriefDispatch(CancellationToken.None);
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Equal("/account/roster#aftermath-packages", redirect.Url);
+        Assert.Equal("/account/work#aftermath-packages", redirect.Url);
         Assert.StartsWith("horizon-artifact-", fixture.Controller.Response.Headers["X-Horizon-Artifact-Request-Id"].ToString(), StringComparison.Ordinal);
         HorizonArtifactRequestReceipt receipt = Assert.Single(fixture.ArtifactRequestReceipts.ListRecent("table-pulse", fixture.DispatchUserId, limit: 10));
         Assert.Equal("accepted", receipt.Status);
@@ -3736,7 +3740,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("accepted", receipt.Status);
         Assert.Equal("origin-dossier-media", receipt.CapabilityId);
         Assert.Equal("dossier_media", receipt.ArtifactKind);
-        Assert.Equal("origin-dossier:public-story-packet", receipt.SourceRef);
+        Assert.Equal("origin-dossier:public-story-edition", receipt.SourceRef);
         Assert.Equal(1, receipt.Quota?.WeeklyUsed);
     }
 
@@ -4224,8 +4228,8 @@ public sealed class PublicLandingDownloadDispatchTests
                       "id": "avalonia-osx-arm64-installer",
                       "platform": "Avalonia Desktop macOS ARM64 Installer",
                       "url": "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
-                      "sha256": "a1",
-                      "sizeBytes": 101,
+                      "sha256": "a15e79983b3acaaeacc16a682722359823cc10c6fcf6b765fdfa6b5a566e4265",
+                      "sizeBytes": 12,
                       "head": "avalonia",
                       "platformId": "osx-arm64",
                       "arch": "arm64",
@@ -4237,8 +4241,8 @@ public sealed class PublicLandingDownloadDispatchTests
                       "id": "blazor-desktop-osx-arm64-installer",
                       "platform": "Blazor Desktop macOS ARM64 Installer",
                       "url": "/downloads/files/chummer-blazor-desktop-osx-arm64-installer.dmg",
-                      "sha256": "b2",
-                      "sizeBytes": 202,
+                      "sha256": "c50b69e015820bc4e062f695a7574a522036fc46300bad8cbc831b172dece538",
+                      "sizeBytes": 10,
                       "head": "blazor-desktop",
                       "platformId": "osx-arm64",
                       "arch": "arm64",
@@ -4250,8 +4254,8 @@ public sealed class PublicLandingDownloadDispatchTests
                       "id": "avalonia-osx-x64-installer",
                       "platform": "Avalonia Desktop macOS X64 Installer",
                       "url": "/downloads/files/chummer-avalonia-osx-x64-installer.dmg",
-                      "sha256": "c3",
-                      "sizeBytes": 303,
+                      "sha256": "5db09a1885de5dca3dbaef69bbf877d1a36020fc805865ff6ba9c928f22fa468",
+                      "sizeBytes": 18,
                       "head": "avalonia",
                       "platformId": "osx-x64",
                       "arch": "x64",
@@ -4263,34 +4267,34 @@ public sealed class PublicLandingDownloadDispatchTests
                       "id": "avalonia-win-x64-installer",
                       "platform": "Avalonia Desktop Windows x64 Installer",
                       "url": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
-                      "sha256": "d4",
-                      "sizeBytes": 404,
+                      "sha256": "e03abf34ab5d60ad7e3cb0bdbea0c65f2388942645b66fa5067ea1058c71a27e",
+                      "sizeBytes": 12,
                       "head": "avalonia",
                       "platformId": "win-x64",
                       "arch": "x64",
                       "kind": "installer",
                       "fileName": "chummer-avalonia-win-x64-installer.exe",
-                      "installAccessClass": "account_required"
+                      "installAccessClass": "open_public"
                     },
                     {
                       "id": "blazor-desktop-win-x64-installer",
                       "platform": "Blazor Desktop Windows x64 Installer",
                       "url": "/downloads/files/chummer-blazor-desktop-win-x64-installer.exe",
-                      "sha256": "e5",
-                      "sizeBytes": 505,
+                      "sha256": "d534f45e505d9b7b788f3b016f8c8636495c7272779f42b54c0f93840fb97898",
+                      "sizeBytes": 10,
                       "head": "blazor-desktop",
                       "platformId": "win-x64",
                       "arch": "x64",
                       "kind": "installer",
                       "fileName": "chummer-blazor-desktop-win-x64-installer.exe",
-                      "installAccessClass": "account_required"
+                      "installAccessClass": "open_public"
                     },
                     {
                       "id": "avalonia-linux-x64-installer",
                       "platform": "Avalonia Desktop Linux x64 Installer",
                       "url": "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
-                      "sha256": "f6",
-                      "sizeBytes": 606,
+                      "sha256": "74bb2ad9360b0c30858bfac8b8b1ef51f9cac338fd3a6e8c45a081db7ece1181",
+                      "sizeBytes": 14,
                       "head": "avalonia",
                       "platformId": "linux",
                       "arch": "x64",
@@ -4302,8 +4306,8 @@ public sealed class PublicLandingDownloadDispatchTests
                       "id": "blazor-desktop-linux-x64-installer",
                       "platform": "Blazor Desktop Linux x64 Installer",
                       "url": "/downloads/files/chummer-blazor-desktop-linux-x64-installer.deb",
-                      "sha256": "g7",
-                      "sizeBytes": 707,
+                      "sha256": "84647610cb1ea83085f5adee17c755c47ed71dd704490f1b4efd5b42d2c7fd77",
+                      "sizeBytes": 12,
                       "head": "blazor-desktop",
                       "platformId": "linux",
                       "arch": "x64",
@@ -4333,8 +4337,8 @@ public sealed class PublicLandingDownloadDispatchTests
                       "platformLabel": "Avalonia Desktop macOS ARM64 Installer",
                       "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
                       "downloadUrl": "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
-                      "sha256": "a1",
-                      "sizeBytes": 101,
+                      "sha256": "a15e79983b3acaaeacc16a682722359823cc10c6fcf6b765fdfa6b5a566e4265",
+                      "sizeBytes": 12,
                       "installAccessClass": "account_required"
                     },
                     {
@@ -4346,8 +4350,8 @@ public sealed class PublicLandingDownloadDispatchTests
                       "platformLabel": "Blazor Desktop macOS ARM64 Installer",
                       "fileName": "chummer-blazor-desktop-osx-arm64-installer.dmg",
                       "downloadUrl": "/downloads/files/chummer-blazor-desktop-osx-arm64-installer.dmg",
-                      "sha256": "b2",
-                      "sizeBytes": 202,
+                      "sha256": "c50b69e015820bc4e062f695a7574a522036fc46300bad8cbc831b172dece538",
+                      "sizeBytes": 10,
                       "installAccessClass": "account_required"
                     },
                     {
@@ -4359,8 +4363,8 @@ public sealed class PublicLandingDownloadDispatchTests
                       "platformLabel": "Avalonia Desktop macOS X64 Installer",
                       "fileName": "chummer-avalonia-osx-x64-installer.dmg",
                       "downloadUrl": "/downloads/files/chummer-avalonia-osx-x64-installer.dmg",
-                      "sha256": "c3",
-                      "sizeBytes": 303,
+                      "sha256": "5db09a1885de5dca3dbaef69bbf877d1a36020fc805865ff6ba9c928f22fa468",
+                      "sizeBytes": 18,
                       "installAccessClass": "account_required"
                     },
                     {
@@ -4372,9 +4376,9 @@ public sealed class PublicLandingDownloadDispatchTests
                       "platformLabel": "Avalonia Desktop Windows x64 Installer",
                       "fileName": "chummer-avalonia-win-x64-installer.exe",
                       "downloadUrl": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
-                      "sha256": "d4",
-                      "sizeBytes": 404,
-                      "installAccessClass": "account_required"
+                      "sha256": "e03abf34ab5d60ad7e3cb0bdbea0c65f2388942645b66fa5067ea1058c71a27e",
+                      "sizeBytes": 12,
+                      "installAccessClass": "open_public"
                     },
                     {
                       "artifactId": "blazor-desktop-win-x64-installer",
@@ -4385,9 +4389,9 @@ public sealed class PublicLandingDownloadDispatchTests
                       "platformLabel": "Blazor Desktop Windows x64 Installer",
                       "fileName": "chummer-blazor-desktop-win-x64-installer.exe",
                       "downloadUrl": "/downloads/files/chummer-blazor-desktop-win-x64-installer.exe",
-                      "sha256": "e5",
-                      "sizeBytes": 505,
-                      "installAccessClass": "account_required"
+                      "sha256": "d534f45e505d9b7b788f3b016f8c8636495c7272779f42b54c0f93840fb97898",
+                      "sizeBytes": 10,
+                      "installAccessClass": "open_public"
                     },
                     {
                       "artifactId": "avalonia-linux-x64-installer",
@@ -4398,8 +4402,8 @@ public sealed class PublicLandingDownloadDispatchTests
                       "platformLabel": "Avalonia Desktop Linux x64 Installer",
                       "fileName": "chummer-avalonia-linux-x64-installer.deb",
                       "downloadUrl": "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
-                      "sha256": "f6",
-                      "sizeBytes": 606,
+                      "sha256": "74bb2ad9360b0c30858bfac8b8b1ef51f9cac338fd3a6e8c45a081db7ece1181",
+                      "sizeBytes": 14,
                       "installAccessClass": "account_required"
                     },
                     {
@@ -4411,8 +4415,8 @@ public sealed class PublicLandingDownloadDispatchTests
                       "platformLabel": "Blazor Desktop Linux x64 Installer",
                       "fileName": "chummer-blazor-desktop-linux-x64-installer.deb",
                       "downloadUrl": "/downloads/files/chummer-blazor-desktop-linux-x64-installer.deb",
-                      "sha256": "g7",
-                      "sizeBytes": 707,
+                      "sha256": "84647610cb1ea83085f5adee17c755c47ed71dd704490f1b4efd5b42d2c7fd77",
+                      "sizeBytes": 12,
                       "installAccessClass": "account_required"
                     }
                   ]
@@ -4435,6 +4439,8 @@ public sealed class PublicLandingDownloadDispatchTests
                 ["BRILLIANT_DIRECTORIES_SYNC_SECRET"] = "sync-secret",
                 ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_root, "community-store.json"),
                 ["CHUMMER_KARMA_FORGE_STORE_PATH"] = Path.Combine(_root, "karma-forge-store.json"),
+                ["AllowedHosts"] = "chummer.run",
+                [PublicCanonicalOriginPolicy.CanonicalOriginConfigurationKey] = "https://chummer.run",
                 ["IDENTITY_SERVICE_BASE_URL"] = "http://identity.example"
             };
             if (!string.IsNullOrWhiteSpace(runtimeManifestJson))
@@ -4516,9 +4522,12 @@ public sealed class PublicLandingDownloadDispatchTests
                 Configuration,
                 answerlyPolicy,
                 new AnswerlyHumanizerAdapter(answerlyPolicy, new RuleSafeOutputGate()));
-            InstallLinkingStore = new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance);
-            InstallLinking = new InstallLinkingService(InstallLinkingStore, Configuration);
             IDataProtectionProvider dataProtectionProvider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
+            InstallLinkingStore = new InstallLinkingStore(
+                Configuration,
+                dataProtectionProvider,
+                NullLogger<InstallLinkingStore>.Instance);
+            InstallLinking = new InstallLinkingService(InstallLinkingStore, Configuration);
             InstallBootstrapTickets = new InstallBootstrapTicketService(dataProtectionProvider, Configuration);
             PersonalizedInstallScripts = new PersonalizedInstallScriptService(InstallLinkingStore, Configuration);
             HorizonArtifactAccessTokenService artifactAccessTokens = new(dataProtectionProvider, Configuration);

@@ -8,15 +8,18 @@ public sealed class HorizonArtifactRequestService
     private readonly HorizonCapabilityService _capabilities;
     private readonly HorizonArtifactQuotaService? _quota;
     private readonly HorizonArtifactRequestReceiptStore? _receipts;
+    private readonly HorizonGovernedRenderRequestComposerService _governedRenderRequests;
 
     public HorizonArtifactRequestService(
         HorizonCapabilityService capabilities,
         HorizonArtifactQuotaService? quota = null,
-        HorizonArtifactRequestReceiptStore? receipts = null)
+        HorizonArtifactRequestReceiptStore? receipts = null,
+        HorizonGovernedRenderRequestComposerService? governedRenderRequests = null)
     {
         _capabilities = capabilities;
         _quota = quota;
         _receipts = receipts;
+        _governedRenderRequests = governedRenderRequests ?? new HorizonGovernedRenderRequestComposerService();
     }
 
     public HorizonArtifactRequestReceipt BuildRequest(
@@ -32,6 +35,23 @@ public sealed class HorizonArtifactRequestService
         HorizonCapabilityDefinition capability = _capabilities.GetCapability(request.HorizonId, request.ArtifactKindOrCapabilityId);
         string requestId = BuildRequestId(request, capability, createdAtUtc);
         List<string> blocked = [.. Validate(request, capability, requireEnabledCapability, requireRequestingUser)];
+        HorizonGovernedRenderRequestContract? governedRenderRequest = null;
+        if (request.GovernedRenderRequest is not null)
+        {
+            HorizonGovernedRenderRequestCompositionResult governedRender = _governedRenderRequests.Compose(
+                capability,
+                request.SourceRef,
+                request.GovernedRenderRequest);
+            if (governedRender.Accepted)
+            {
+                governedRenderRequest = governedRender.Contract;
+            }
+            else
+            {
+                blocked.AddRange(governedRender.BlockedReasons);
+            }
+        }
+
         HorizonArtifactQuotaSnapshot? quota = null;
         bool quotaTracked = capability.QuotaTracked;
         HorizonArtifactQuotaRequest quotaRequest = new(
@@ -76,7 +96,8 @@ public sealed class HorizonArtifactRequestService
             BlockedReasons: blocked,
             CreatedAtUtc: createdAtUtc,
             QuotaTracked: quotaTracked,
-            Quota: quota);
+            Quota: quota,
+            GovernedRenderRequest: governedRenderRequest);
         _receipts?.Append(receipt);
         return receipt;
     }
@@ -221,7 +242,8 @@ public sealed record HorizonArtifactRequestCreateRequest(
     string SourceRef,
     string Visibility,
     bool ExternalProcessingConsent,
-    string? Email = null);
+    string? Email = null,
+    HorizonGovernedRenderRequestCreateRequest? GovernedRenderRequest = null);
 
 public sealed record HorizonArtifactRequestReceipt(
     string RequestId,
@@ -238,4 +260,5 @@ public sealed record HorizonArtifactRequestReceipt(
     IReadOnlyList<string> BlockedReasons,
     DateTimeOffset CreatedAtUtc,
     bool QuotaTracked,
-    HorizonArtifactQuotaSnapshot? Quota = null);
+    HorizonArtifactQuotaSnapshot? Quota = null,
+    HorizonGovernedRenderRequestContract? GovernedRenderRequest = null);

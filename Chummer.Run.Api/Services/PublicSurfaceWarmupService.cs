@@ -15,24 +15,60 @@ public sealed class PublicSurfaceWarmupService : IHostedService
         _logger = logger;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _ = cancellationToken;
+        _ = Task.Run(WarmPublicSurface, CancellationToken.None);
+        return Task.CompletedTask;
+    }
+
+    private void WarmPublicSurface()
+    {
+        WarmComponent(
+            "participate_snapshot",
+            () => _services.GetRequiredService<PublicParticipateSnapshotService>().QueueRefreshIfDue());
+        WarmComponent(
+            "billing_store",
+            () => _services.GetRequiredService<BrilliantDirectoriesBillingStore>());
+        WarmComponent(
+            "usage_store",
+            () => _services.GetRequiredService<MyFirstBookUsageStore>());
+        WarmComponent("install_linking", () =>
+        {
+            InstallLinkingStoreReadiness installLinking = _services
+                .GetRequiredService<IInstallLinkingStoreReadinessProbe>()
+                .Evaluate();
+            if (!installLinking.Ready)
+            {
+                _logger.LogError(
+                    "Install-linking durable store warmup is blocked with code {ReadinessCode}.",
+                    installLinking.Code);
+            }
+        });
+        WarmComponent(
+            "landing",
+            () => _services.GetRequiredService<PublicLandingService>().LoadSurface());
+        WarmComponent(
+            "navigation",
+            () => _services.GetRequiredService<PublicNavigationService>().LoadNavigation());
+        WarmComponent(
+            "release_manifest",
+            () => _services.GetRequiredService<PublicReleaseManifestService>().LoadManifest());
+        _logger.LogInformation("Public surface warmup completed.");
+    }
+
+    private void WarmComponent(string component, Action action)
     {
         try
         {
-            _services.GetRequiredService<BrilliantDirectoriesBillingStore>();
-            _services.GetRequiredService<MyFirstBookUsageStore>();
-            _services.GetRequiredService<InstallLinkingStore>();
-            _services.GetRequiredService<PublicLandingService>().LoadSurface();
-            _services.GetRequiredService<PublicNavigationService>().LoadNavigation();
-            _services.GetRequiredService<PublicReleaseManifestService>().LoadManifest();
-            using CancellationTokenSource timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
-            await _services.GetRequiredService<PublicParticipateSnapshotService>().RefreshAsync(timeoutCts.Token).ConfigureAwait(false);
-            _logger.LogInformation("Public surface warmup completed.");
+            action();
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Public surface warmup failed; the first request may pay the initialization cost.");
+            _logger.LogWarning(
+                ex,
+                "Public surface warmup component {WarmupComponent} failed; its first request may pay the initialization cost.",
+                component);
         }
     }
 

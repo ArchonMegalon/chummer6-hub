@@ -81,11 +81,35 @@ public sealed class CommunityStore
     public List<OpenRunScheduleReceiptProjection> OpenRunSchedules { get; } = new();
     public List<OpenRunMeetingHandoffProjection> OpenRunMeetingHandoffs { get; } = new();
     public List<OpenRunCloseoutProjection> OpenRunCloseouts { get; } = new();
+    public Dictionary<string, PlaySessionBinding> PlaySessionsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, PlaySessionParticipant> PlayParticipantsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, PlaySessionInvite> PlayInvitesById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, PlaySessionExchange> PlayExchangesById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, PlaySessionGrant> PlayGrantsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public DateTimeOffset PlayAuthorizationTimeHighWaterUtc { get; internal set; } = DateTimeOffset.UnixEpoch;
     public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public BlackLedgerFactionOnboardingState? BlackLedgerFactionOnboardingState { get; set; }
 
     public void PersistLocked()
     {
+        if (!System.Threading.Monitor.IsEntered(Gate))
+        {
+            lock (Gate)
+            {
+                PersistLocked();
+            }
+
+            return;
+        }
+
+        PlaySessionAuthorizationValidator.ValidateSnapshot(
+            PlaySessionsById.Values,
+            PlayParticipantsById.Values,
+            PlayInvitesById.Values,
+            PlayExchangesById.Values,
+            PlayGrantsById.Values);
+        PlaySessionAuthorizationValidator.ValidateTimeHighWater(PlayAuthorizationTimeHighWaterUtc);
+
         var snapshot = new CommunityStoreSnapshot(
             Users: UsersById.Values.OrderBy(static user => user.UserId, StringComparer.OrdinalIgnoreCase).ToArray(),
             Groups: GroupsById.Values.OrderBy(static group => group.GroupId, StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -178,7 +202,13 @@ public sealed class CommunityStore
             OpenRunMeetingHandoffs: OpenRunMeetingHandoffs.OrderByDescending(static item => item.CreatedAtUtc).ToArray(),
             OpenRunCloseouts: OpenRunCloseouts.OrderByDescending(static item => item.ClosedAtUtc).ToArray(),
             RestoreSummaries: RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase).ToArray(),
-            BlackLedgerFactionOnboarding: BlackLedgerFactionOnboardingState);
+            BlackLedgerFactionOnboarding: BlackLedgerFactionOnboardingState,
+            PlaySessions: PlaySessionsById.Values.OrderBy(static item => item.SessionId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            PlayParticipants: PlayParticipantsById.Values.OrderBy(static item => item.ParticipantId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            PlayInvites: PlayInvitesById.Values.OrderBy(static item => item.InviteId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            PlayExchanges: PlayExchangesById.Values.OrderBy(static item => item.ExchangeId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            PlayGrants: PlayGrantsById.Values.OrderBy(static item => item.GrantId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            PlayAuthorizationTimeHighWaterUtc: PlayAuthorizationTimeHighWaterUtc);
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var tempPath = $"{_storagePath}.tmp";
@@ -246,6 +276,14 @@ public sealed class CommunityStore
 
     private void ApplySnapshotLocked(CommunityStoreSnapshot snapshot)
     {
+        PlaySessionAuthorizationValidator.ValidateSnapshot(
+            snapshot.PlaySessions ?? Array.Empty<PlaySessionBinding>(),
+            snapshot.PlayParticipants ?? Array.Empty<PlaySessionParticipant>(),
+            snapshot.PlayInvites ?? Array.Empty<PlaySessionInvite>(),
+            snapshot.PlayExchanges ?? Array.Empty<PlaySessionExchange>(),
+            snapshot.PlayGrants ?? Array.Empty<PlaySessionGrant>());
+        PlaySessionAuthorizationValidator.ValidateTimeHighWater(snapshot.PlayAuthorizationTimeHighWaterUtc);
+
         UsersById.Clear();
         UserIdBySubjectId.Clear();
         GroupsById.Clear();
@@ -298,6 +336,12 @@ public sealed class CommunityStore
         OpenRunSchedules.Clear();
         OpenRunMeetingHandoffs.Clear();
         OpenRunCloseouts.Clear();
+        PlaySessionsById.Clear();
+        PlayParticipantsById.Clear();
+        PlayInvitesById.Clear();
+        PlayExchangesById.Clear();
+        PlayGrantsById.Clear();
+        PlayAuthorizationTimeHighWaterUtc = snapshot.PlayAuthorizationTimeHighWaterUtc ?? DateTimeOffset.UnixEpoch;
         RestoreByUserId.Clear();
         BlackLedgerFactionOnboardingState = null;
 
@@ -406,6 +450,31 @@ public sealed class CommunityStore
         OpenRunMeetingHandoffs.AddRange(snapshot.OpenRunMeetingHandoffs ?? Array.Empty<OpenRunMeetingHandoffProjection>());
         OpenRunCloseouts.AddRange(snapshot.OpenRunCloseouts ?? Array.Empty<OpenRunCloseoutProjection>());
 
+        foreach (var session in snapshot.PlaySessions ?? Array.Empty<PlaySessionBinding>())
+        {
+            PlaySessionsById[session.SessionId] = session;
+        }
+
+        foreach (var participant in snapshot.PlayParticipants ?? Array.Empty<PlaySessionParticipant>())
+        {
+            PlayParticipantsById[participant.ParticipantId] = participant;
+        }
+
+        foreach (var invite in snapshot.PlayInvites ?? Array.Empty<PlaySessionInvite>())
+        {
+            PlayInvitesById[invite.InviteId] = invite;
+        }
+
+        foreach (var exchange in snapshot.PlayExchanges ?? Array.Empty<PlaySessionExchange>())
+        {
+            PlayExchangesById[exchange.ExchangeId] = exchange;
+        }
+
+        foreach (var grant in snapshot.PlayGrants ?? Array.Empty<PlaySessionGrant>())
+        {
+            PlayGrantsById[grant.GrantId] = grant;
+        }
+
         foreach (var restore in snapshot.RestoreSummaries ?? Array.Empty<WorkspaceRestoreProjection>())
         {
             RestoreByUserId[restore.UserId] = restore;
@@ -414,7 +483,7 @@ public sealed class CommunityStore
         BlackLedgerFactionOnboardingState = snapshot.BlackLedgerFactionOnboarding;
     }
 
-    private static string ResolveStoragePath(IConfiguration configuration)
+    internal static string ResolveStoragePath(IConfiguration configuration)
     {
         var configured = configuration["CHUMMER_COMMUNITY_STORE_PATH"] ?? configuration["Community:StorePath"];
         if (!string.IsNullOrWhiteSpace(configured))
@@ -536,7 +605,13 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<OpenRunMeetingHandoffProjection>? OpenRunMeetingHandoffs = null,
     IReadOnlyList<OpenRunCloseoutProjection>? OpenRunCloseouts = null,
     IReadOnlyList<WorkspaceRestoreProjection>? RestoreSummaries = null,
-    BlackLedgerFactionOnboardingState? BlackLedgerFactionOnboarding = null);
+    BlackLedgerFactionOnboardingState? BlackLedgerFactionOnboarding = null,
+    IReadOnlyList<PlaySessionBinding>? PlaySessions = null,
+    IReadOnlyList<PlaySessionParticipant>? PlayParticipants = null,
+    IReadOnlyList<PlaySessionInvite>? PlayInvites = null,
+    IReadOnlyList<PlaySessionExchange>? PlayExchanges = null,
+    IReadOnlyList<PlaySessionGrant>? PlayGrants = null,
+    DateTimeOffset? PlayAuthorizationTimeHighWaterUtc = null);
 
 public sealed record ImportantWorkItemProjection(
     string ItemId,

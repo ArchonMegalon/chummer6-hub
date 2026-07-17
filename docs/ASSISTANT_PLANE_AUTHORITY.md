@@ -81,6 +81,36 @@ Director is the policy and intake head for higher-level observation and control.
 - grounding for assistant outputs must flow through hosted route audits, prompt lineage, and canonical session/runtime services
 - approval-aware follow-up actions must stay in hosted delivery/action services rather than client-local shortcuts
 
+## HTTP authorization boundary
+
+`Chummer.Run.AI` uses an exact public-route allowlist. Every controller route, including reads, must carry `Authorization: Bearer <token>` before controller routing or model binding runs. `OPTIONS` remains anonymous as a transport preflight and does not return controller data.
+
+- `CHUMMER_AI_INTERNAL_API_TOKEN` is the dedicated credential.
+- `FLEET_INTERNAL_API_TOKEN` is accepted only as a compatibility fallback when the dedicated credential is blank or absent.
+- When neither credential is configured, protected routes fail closed with `503`; they never become anonymous.
+- Missing, malformed, or incorrect bearer credentials return `401` without echoing credential material.
+
+### Route classification
+
+| Access | Routes | Returned data |
+| --- | --- | --- |
+| Anonymous | `GET`/`HEAD /api/health` | Static service name and health state |
+| Anonymous | `GET`/`HEAD /api/v1/ai/capabilities` | Static API version, availability, and protected-route auth posture |
+| Anonymous transport | `OPTIONS *` | No controller data |
+| Internal | `/api/v1/ai/status`, `/prompts`, `/budget/*`, `/skills/adapters`, `/conversations/*`, `/evaluations*` | Provider, prompt, budget, conversation, and evaluation detail |
+| Internal | `/api/v1/ai/support/*`, `/creative/*`, `/session/*`, `/spider/*`, `/gm-ops/*` | Crash, asset, campaign, session, message, and GM data |
+| Internal | `/api/v1/ai/pipeline/*`, `/booster/*`, and every other or unknown route | Operational projections and tenant/group data |
+
+The two anonymous responses are deliberately static and contain no provider configuration, prompt content, identifiers, queues, audit records, or tenant/session state. Exact matching (apart from a trailing slash and path casing) prevents a public path prefix from opening deeper routes.
+
+### Compatibility impact
+
+- Existing anonymous callers of `GET /api/v1/ai/status` and all other AI controller reads must now send the same bearer token already required for mutations.
+- Readiness probes should move to `GET /api/health`; public feature discovery should use `GET /api/v1/ai/capabilities`.
+- Unknown GET routes now return `401` when a token is configured or `503` when no token is configured before routing can return `404`.
+- Booster projection reads still retain their controller-level legacy guard when invoked outside the normal host pipeline. In the hosted pipeline, successful common AI authorization satisfies that secondary guard, so callers do not need two unrelated bearer credentials.
+- This is an internal service boundary, not end-user identity or tenant authorization. If direct end-user access is introduced later, subject and tenant checks must be added rather than treating the shared internal token as user authorization.
+
 ## Current gap
 
 `WL-235` stays open until the hosted verification path proves these surfaces continuously and future assistant features stay on the same governed rails.

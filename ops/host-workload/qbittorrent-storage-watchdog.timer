@@ -1,0 +1,12 @@
+[Unit]
+Description=Run qBittorrent storage watchdog every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=qbittorrent-storage-watchdog.service
+
+[Install]
+WantedBy=timers.target

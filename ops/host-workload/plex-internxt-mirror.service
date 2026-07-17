@@ -1,0 +1,17 @@
+[Unit]
+Description=Mirror Plex Movies, TV, and Requested from pCloud into Internxt
+After=network-online.target rclone-mount@pcloud.service rclone-mount@internxt.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/plex-internxt-mirror.sh
+User=root
+Group=root
+TimeoutStartSec=infinity
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ReadWritePaths=/mnt/internxt /run

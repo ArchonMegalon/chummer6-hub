@@ -142,8 +142,12 @@ public sealed class HubPageChromeServiceTests
         Assert.Contains("@foreach (var action in visibleHeaderActions)", layout, StringComparison.Ordinal);
         Assert.Contains("isOpenChummerAction(action) && !minimalSurface", layout, StringComparison.Ordinal);
         Assert.Contains("site-open-chummer-menu", layout, StringComparison.Ordinal);
-        Assert.Contains("href=\"/build\"", layout, StringComparison.Ordinal);
-        Assert.Contains("href=\"/play\"", layout, StringComparison.Ordinal);
+        Assert.Contains("Sign in first", layout, StringComparison.Ordinal);
+        Assert.Contains("button class=\"site-account-menu__button site-open-chummer-menu__button site-open-chummer-menu__button--disabled\"", layout, StringComparison.Ordinal);
+        Assert.Contains("type=\"button\" disabled aria-disabled=\"true\" data-disabled-target=\"/build\"", layout, StringComparison.Ordinal);
+        Assert.Contains("data-sign-in-href=\"/login?next=%2Fbuild\">Build</button>", layout, StringComparison.Ordinal);
+        Assert.Contains("data-disabled-target=\"/mobile/player\"", layout, StringComparison.Ordinal);
+        Assert.Contains("data-sign-in-href=\"/login?next=%2Fmobile%2Fplayer\"", layout, StringComparison.Ordinal);
     }
 
     [Fact]

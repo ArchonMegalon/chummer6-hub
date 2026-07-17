@@ -197,7 +197,7 @@ CUSTOM_NARRATION: dict[str, list[str]] = {
 
 HORIZON_INTROS: dict[str, str] = {
     "ALICE": "ALICE is for the player who has a cool runner idea and needs to know if it survives contact with the table.",
-    "ORIGIN DOSSIER": "ORIGIN DOSSIER is for turning an approved runner origin into durable canon, media packets, and later ALICE context.",
+    "ORIGIN DOSSIER": "ORIGIN DOSSIER is for turning an approved runner origin into a full private ebook, fitted cover, chosen portrait, optional audiobook, one cinematic scene, and later ALICE context.",
     "KARMA FORGE": "KARMA FORGE is for house rules: the good ones, the risky ones, and the ones everyone forgot they agreed to.",
     "JACKPOINT": "JACKPOINT is for the night after the run, when the table needs a clean recap instead of six contradictory memories.",
     "RUNSITE": "RUNSITE is for mission spaces that should feel playable before the first door opens.",

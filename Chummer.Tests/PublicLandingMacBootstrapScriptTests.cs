@@ -1,5 +1,6 @@
 using System.Reflection;
 using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;
@@ -275,13 +276,14 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.DoesNotContain("export CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH=", script, StringComparison.Ordinal);
         Assert.DoesNotContain("export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH=", script, StringComparison.Ordinal);
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TOKEN='", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_UI_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_CORE_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_HUB_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_UI_KIT_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_HUB_REGISTRY_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_MEDIA_FACTORY_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_LEGACY_REF='Docker'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_REF=\"${CHUMMER_UI_REF:-main}\"", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_CORE_REF=\"${CHUMMER_CORE_REF:-main}\"", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_HUB_REF=\"${CHUMMER_HUB_REF:-main}\"", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_KIT_REF=\"${CHUMMER_UI_KIT_REF:-main}\"", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_HUB_REGISTRY_REF=\"${CHUMMER_HUB_REGISTRY_REF:-main}\"", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_MEDIA_FACTORY_REF=\"${CHUMMER_MEDIA_FACTORY_REF:-main}\"", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_LEGACY_REF=\"${CHUMMER_LEGACY_REF:-Docker}\"", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_HUB_REF='main'", script, StringComparison.Ordinal);
         Assert.DoesNotContain("export CHUMMER_UI_EXPECTED_COMMIT=", script, StringComparison.Ordinal);
         Assert.DoesNotContain("export CHUMMER_CORE_EXPECTED_COMMIT=", script, StringComparison.Ordinal);
         Assert.DoesNotContain("export CHUMMER_HUB_EXPECTED_COMMIT=", script, StringComparison.Ordinal);
@@ -292,7 +294,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
     }
 
     [Fact]
-    public void ReleaseUploadBootstrapCommandPinsDigestAndEmbedsTheCurrentHandoffCode()
+    public void ReleaseUploadBootstrapCommandPinsBothDigestsAndPromptsWithoutEmbeddingAuthorization()
     {
         MethodInfo buildMethod = typeof(PublicLandingController).GetMethod(
             "BuildReleaseUploadBootstrapCommand",
@@ -305,21 +307,84 @@ public sealed class PublicLandingMacBootstrapScriptTests
                 "https://chummer.run/downloads/release-upload/bootstrap.sh",
                 "abc123",
                 "https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json",
-                "CHUMMER_RELEASE_UPLOAD_TICKET",
-                "ticket-xyz"]) ?? throw new InvalidOperationException("command build returned null"));
+                "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"]) ?? throw new InvalidOperationException("command build returned null"));
 
+        Assert.StartsWith("set +x; set -euo pipefail;", command, StringComparison.Ordinal);
+        Assert.Contains("curl -q -fsSL", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_BOOTSTRAP_EXPECTED_SHA256='abc123'", command, StringComparison.Ordinal);
         Assert.Contains("ACTUAL_BOOTSTRAP_SHA256", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='1'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL='https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json'", command, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_HUB_LOCAL_RELEASE_PROOF_EXPECTED_SHA256='dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0'", command, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_RELEASE_UPLOAD_TICKET='ticket-xyz'", command, StringComparison.Ordinal);
+        Assert.Contains("printf 'Release upload access code: ' >&2; IFS= read -r -s RELEASE_UPLOAD_AUTH", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("read -r -s -p", command, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_UPLOAD_TICKET_FILE", command, StringComparison.Ordinal);
+        Assert.Contains("current-owner, regular, non-symlink file with mode 600", command, StringComparison.Ordinal);
+        Assert.Contains("must contain exactly one UTF-8 line", command, StringComparison.Ordinal);
+        Assert.Contains("os.O_NOFOLLOW", command, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_UPLOAD_TICKET=\"$RELEASE_UPLOAD_AUTH\"", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("ticket-xyz", command, StringComparison.Ordinal);
         Assert.DoesNotContain("bootstrap.sh?ticket=", command, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("apiToken=", command, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TOKEN=", command, StringComparison.Ordinal);
         Assert.DoesNotContain("export CHUMMER_RELEASE_UPLOAD_TICKET=", command, StringComparison.Ordinal);
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='1'", command, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            buildMethod.GetParameters(),
+            parameter => string.Equals(parameter.Name, "releaseUploadAuth", StringComparison.Ordinal));
+
+        string[] expectedCommitSettings =
+        [
+            "CHUMMER_UI_EXPECTED_COMMIT",
+            "CHUMMER_CORE_EXPECTED_COMMIT",
+            "CHUMMER_HUB_EXPECTED_COMMIT",
+            "CHUMMER_UI_KIT_EXPECTED_COMMIT",
+            "CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT",
+            "CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT",
+            "CHUMMER_LEGACY_EXPECTED_COMMIT"
+        ];
+        foreach (string setting in expectedCommitSettings)
+        {
+            Assert.Contains(setting, command, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("Set reviewed full 40-hex commit pins before running", command, StringComparison.Ordinal);
+        Assert.True(
+            command.IndexOf("CHUMMER_UI_EXPECTED_COMMIT", StringComparison.Ordinal)
+                < command.IndexOf("TMP_BOOTSTRAP_SCRIPT", StringComparison.Ordinal),
+            "commit-pin preflight must run before the bootstrap is downloaded");
+    }
+
+    [Fact]
+    public void ReleaseUploadPageMintsTicketOnDemandWithoutRenderingItIntoHtml()
+    {
+        string view = File.ReadAllText(
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ReleaseUpload.cshtml"));
+        MethodInfo bootstrapScriptEndpoint = typeof(PublicLandingController).GetMethod(
+            nameof(PublicLandingController.ReleaseUploadBootstrapScript))
+            ?? throw new InvalidOperationException("missing release upload bootstrap script endpoint");
+        MethodInfo bootstrapCommandEndpoint = typeof(PublicLandingController).GetMethod(
+            nameof(PublicLandingController.ReleaseUploadBootstrapCommand))
+            ?? throw new InvalidOperationException("missing release upload bootstrap command endpoint");
+        MethodInfo ticketEndpoint = typeof(PublicLandingController).GetMethod(
+            nameof(PublicLandingController.ReleaseUploadTicket))
+            ?? throw new InvalidOperationException("missing release upload ticket endpoint");
+
+        Assert.Contains("data-ticket-url=\"@Model.TicketUrl\"", view, StringComparison.Ordinal);
+        Assert.Contains("method: \"POST\"", view, StringComparison.Ordinal);
+        Assert.Contains("RequestVerificationToken", view, StringComparison.Ordinal);
+        Assert.Contains("pins for all seven source repositories", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Model.HandoffCode", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Model.TicketExpiresAtUtc", view, StringComparison.Ordinal);
+        Assert.Null(typeof(ReleaseUploadPageViewModel).GetProperty("HandoffCode"));
+        Assert.NotNull(ticketEndpoint.GetCustomAttribute<ValidateAntiForgeryTokenAttribute>());
+        Assert.Empty(bootstrapScriptEndpoint.GetParameters());
+        Assert.DoesNotContain(
+            bootstrapCommandEndpoint.GetParameters(),
+            parameter => string.Equals(parameter.Name, "ticket", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(parameter.Name, "apiToken", StringComparison.OrdinalIgnoreCase));
     }
 
     [Theory]
@@ -461,24 +526,40 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("local registry_ref=\"${CHUMMER_HUB_REGISTRY_REF:-main}\"", template, StringComparison.Ordinal);
         Assert.Contains("umask 077", template, StringComparison.Ordinal);
         Assert.Contains("request_common=(", template, StringComparison.Ordinal);
-        Assert.Contains("\"--config\"", template, StringComparison.Ordinal);
+        Assert.Contains("curl -q --config -", template, StringComparison.Ordinal);
         Assert.Contains("write_release_upload_curl_config()", template, StringComparison.Ordinal);
         Assert.Contains("Authorization: Bearer {escaped}", template, StringComparison.Ordinal);
         Assert.Contains("token = sys.stdin.read()", template, StringComparison.Ordinal);
         Assert.Contains("python3 -c", template, StringComparison.Ordinal);
+        Assert.DoesNotContain("release_upload_curl_config=\"$(mktemp)\"", template, StringComparison.Ordinal);
         Assert.Contains("log_release_upload_response()", template, StringComparison.Ordinal);
-        Assert.Contains(".claimCode = \"[redacted]\"", template, StringComparison.Ordinal);
+        Assert.Contains("render_sanitized_release_upload_response()", template, StringComparison.Ordinal);
+        Assert.Contains("allowed_scalars = (", template, StringComparison.Ordinal);
+        Assert.Contains("suppressedFieldCount", template, StringComparison.Ordinal);
+        Assert.Contains("printing signed install claim credentials is permanently disabled", template, StringComparison.Ordinal);
+        Assert.Contains("release_upload_attempt_receipt.py", template, StringComparison.Ordinal);
+        Assert.Contains("record_upload_attempt_state created", template, StringComparison.Ordinal);
+        Assert.Contains("record_upload_attempt_state request_started", template, StringComparison.Ordinal);
+        Assert.Contains("BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=1", template, StringComparison.Ordinal);
+        Assert.Contains("Do not create or publish another session", template, StringComparison.Ordinal);
+        Assert.Contains("validate_release_response_probe_url", template, StringComparison.Ordinal);
+        Assert.Contains("candidate_authority != canonical_authority", template, StringComparison.Ordinal);
+        Assert.Contains("release upload response contained an unsafe install handoff URL", template, StringComparison.Ordinal);
+        Assert.DoesNotContain("claim code: ", template, StringComparison.Ordinal);
         Assert.DoesNotContain("python3 - \"$config_path\" <<'PY'", template, StringComparison.Ordinal);
         Assert.DoesNotContain("token = sys.argv[2]", template, StringComparison.Ordinal);
         Assert.DoesNotContain("local upload_token=\"$3\"", template, StringComparison.Ordinal);
         Assert.Contains("local keep_upload_response=\"${CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE:-0}\"", template, StringComparison.Ordinal);
         Assert.Contains("BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH=\"$response_path\"", template, StringComparison.Ordinal);
         Assert.Contains("BOOTSTRAP_KEEP_UPLOAD_RESPONSE=\"$keep_upload_response\"", template, StringComparison.Ordinal);
-        Assert.Contains("removed sensitive release upload response file", template, StringComparison.Ordinal);
+        Assert.Contains("removed sanitized release upload response summary", template, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-0", template, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION", template, StringComparison.Ordinal);
         Assert.Contains("local fallback_release_proof_url=\"${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}\"", template, StringComparison.Ordinal);
         Assert.Contains("local fallback_ui_localization_release_gate_url=\"${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}\"", template, StringComparison.Ordinal);
+        Assert.Contains("validate_hub_local_release_proof_with_registry()", template, StringComparison.Ordinal);
+        Assert.Contains("proof = module.load_release_proof(proof_path)", template, StringComparison.Ordinal);
+        Assert.Contains("hub local release proof generation produced a Registry-incompatible receipt", template, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \\", template, StringComparison.Ordinal);
         Assert.Contains("bash scripts/verify-releases-manifest.sh \"$dist_dir/releases.json\"", template, StringComparison.Ordinal);
         Assert.Contains("bash scripts/verify-releases-manifest.sh \"$canonical_verify_url\"", template, StringComparison.Ordinal);

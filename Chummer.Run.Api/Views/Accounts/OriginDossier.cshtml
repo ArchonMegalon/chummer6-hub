@@ -2,21 +2,34 @@
 @{
     ViewData["Title"] = Model.Publication.Title;
     ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-minimal";
+    ViewData["SurfaceClass"] = "surface-minimal surface-origin-dossier";
     var publication = Model.Publication;
-    var canShowCover = publication.StorySceneCoverUsesSelectedCharacterFace
+    var fullStoryReady = publication.FullStoryVerified;
+    var bookHandoffReady = publication.EbookHandoffReady;
+    var canShowCover = bookHandoffReady
         && !string.IsNullOrWhiteSpace(publication.StorySceneCoverUrl);
-    var canRead = publication.GoldReady
+    var canRead = bookHandoffReady
         && !string.IsNullOrWhiteSpace(publication.AudiobookshelfDossierShareUrl);
-    var canOpenBook = publication.GoldReady
-        && publication.BookArtifactVerified
+    var canOpenBook = bookHandoffReady
         && !string.IsNullOrWhiteSpace(publication.BookArtifactUrl);
-    var canListen = publication.GoldReady
+    var canListen = bookHandoffReady
         && publication.AudiobookshelfPlaybackVerified
         && !string.IsNullOrWhiteSpace(publication.AudiobookshelfAudiobookShareUrl);
-    var canWatch = publication.GoldReady
+    var canWatch = bookHandoffReady
         && publication.DossierVideoVerified
         && !string.IsNullOrWhiteSpace(publication.DossierVideoUrl);
+    var portraitChoices = publication.PortraitChoices ?? System.Array.Empty<Chummer.Run.Api.ViewModels.OriginDossierPortraitChoiceViewModel>();
+    var audiobookVoiceOptions = publication.AudiobookVoiceOptions ?? System.Array.Empty<Chummer.Run.Api.ViewModels.OriginDossierAudiobookVoiceOptionViewModel>();
+    var sceneHighlights = publication.SceneHighlights ?? System.Array.Empty<Chummer.Run.Api.ViewModels.OriginDossierSceneHighlightViewModel>();
+    var storyLinks = publication.StoryLinks ?? System.Array.Empty<Chummer.Run.Api.ViewModels.OriginDossierStoryLinkViewModel>();
+    var hasPortraitChoiceSet = portraitChoices.Count == 3;
+    var hasSelectedPortrait = portraitChoices.Any(choice => choice.Selected);
+    var hasAudiobookVoiceOptions = audiobookVoiceOptions.Count > 0;
+    var hasSceneHighlights = sceneHighlights.Count > 0;
+    var canShowPortraitChoices = bookHandoffReady && hasPortraitChoiceSet;
+    var canShowAudiobookVoiceOptions = bookHandoffReady && hasAudiobookVoiceOptions;
+    var canShowSceneHighlights = bookHandoffReady && hasSceneHighlights;
+    var canRequestCinematicScene = canShowSceneHighlights && hasSelectedPortrait;
     const string rightsTooltip = "Not legal advice. Your strongest copyright claim is in the parts you chose, wrote, edited, and approved. Pure model-only wording may be harder to protect by itself in some jurisdictions, so Chummer keeps the canon, outline, and approvals tied to you.";
 }
 
@@ -37,52 +50,67 @@
         <article class="app-action-card app-action-card--primary"
                  data-origin-dossier-gold-ready="@publication.GoldReady.ToString().ToLowerInvariant()"
                  data-story-scene-cover-uses-selected-character-face="@publication.StorySceneCoverUsesSelectedCharacterFace.ToString().ToLowerInvariant()"
+                 data-fitted-cover-art-uses-selected-character-face="@publication.StorySceneCoverUsesSelectedCharacterFace.ToString().ToLowerInvariant()"
                  data-audiobookshelf-playback-verified="@publication.AudiobookshelfPlaybackVerified.ToString().ToLowerInvariant()"
                  data-book-artifact-verified="@publication.BookArtifactVerified.ToString().ToLowerInvariant()"
+                 data-full-story-verified="@publication.FullStoryVerified.ToString().ToLowerInvariant()"
+                 data-ebook-handoff-ready="@publication.EbookHandoffReady.ToString().ToLowerInvariant()"
                  data-dossier-video-verified="@publication.DossierVideoVerified.ToString().ToLowerInvariant()"
                  data-telegram-share-delivered="@publication.TelegramShareDelivered.ToString().ToLowerInvariant()">
             <span class="tag">@(publication.GoldReady ? "Ready" : "Building")</span>
-            <h2>Cover</h2>
+            <h2>Ebook with fitted cover</h2>
             @if (canShowCover)
             {
                 <figure class="product-proof__media">
                     <span class="scene-picture">
-                        <img src="@publication.StorySceneCoverUrl" alt="Rendered Origin Dossier story scene cover for @Clean(publication.RunnerAlias)" loading="eager" />
+                        <img src="@publication.StorySceneCoverUrl" alt="Fitted Origin Dossier cover art for @Clean(publication.RunnerAlias)" loading="eager" />
                     </span>
-                    <figcaption class="muted-copy">Selected cover is ready.</figcaption>
+                    <figcaption class="muted-copy">The fitted cover ships with the ebook handoff.</figcaption>
                 </figure>
             }
             else
             {
-                <p class="muted-copy">Cover unlocks after the portrait is ready.</p>
+                <p class="muted-copy">The first handoff is the full ebook with its fitted cover. Portraits, audio, and cinema stay downstream.</p>
             }
         </article>
         <article class="app-action-card">
             <span class="tag">Edition</span>
-            <h2>Edition status</h2>
+            <h2>Edition pipeline</h2>
             <div class="settings-summary-list">
                 <div class="settings-summary-row">
-                    <span>Story draft</span>
-                    <strong>@(publication.ProviderAuthoredManuscriptImported ? "Ready" : "Waiting")</strong>
+                    <span>Full story</span>
+                    <strong>@(fullStoryReady ? "Verified" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
                     <span>Story polish</span>
                     <strong>@(publication.UndetectableHumanizerApplied ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Book</span>
-                    <strong>@(publication.BookArtifactVerified ? "Ready" : "Waiting")</strong>
+                    <span>Ebook handoff</span>
+                    <strong>@(publication.EbookHandoffReady ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Cover</span>
+                    <span>Fitted cover art</span>
                     <strong>@(publication.StorySceneCoverUsesSelectedCharacterFace ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Audio</span>
+                    <span>Portrait shortlist</span>
+                    <strong>@(hasPortraitChoiceSet ? $"{portraitChoices.Count} ready" : "Waiting")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Voice shortlist</span>
+                    <strong>@(hasAudiobookVoiceOptions ? $"{audiobookVoiceOptions.Count} ready" : "Waiting")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Chapter scenes</span>
+                    <strong>@(hasSceneHighlights ? $"{sceneHighlights.Count} ready" : "Waiting")</strong>
+                </div>
+                <div class="settings-summary-row">
+                    <span>Requested audiobook</span>
                     <strong>@(publication.AudiobookshelfPlaybackVerified ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
-                    <span>Video</span>
+                    <span>Selected cinematic</span>
                     <strong>@(publication.DossierVideoVerified ? "Ready" : "Waiting")</strong>
                 </div>
                 <div class="settings-summary-row">
@@ -121,9 +149,11 @@
     <article class="app-action-card">
         <span class="tag">Owner links</span>
         <h2>Edition</h2>
-        <p>Read, listen, and video open here when this account is cleared for them.</p>
+        <p>The finished full story manuscript becomes a private ebook with its fitted cover first. After that handoff, the player gets three portraits to choose from, can request audio in a chosen voice, and can pick one summarized scene for a character-visible cinematic render.</p>
         <nav class="minimal-actions" aria-label="Origin Edition tabs">
             <a class="button-like button-like--ghost" href="#origin-edition-read">Read</a>
+            <a class="button-like button-like--ghost" href="#origin-edition-links">Shared history</a>
+            <a class="button-like button-like--ghost" href="#origin-edition-portraits">Portraits</a>
             <a class="button-like button-like--ghost" href="#origin-edition-listen">Listen</a>
             <a class="button-like button-like--ghost" href="#origin-edition-watch">Watch</a>
             <a class="button-like button-like--ghost" href="#origin-edition-canon-audit">Canon notes</a>
@@ -131,15 +161,49 @@
     </article>
 </section>
 
+<section class="minimal-section minimal-section--tight" id="origin-edition-order" data-origin-story-first-order>
+    <article class="app-action-card">
+        <span class="tag">Order</span>
+        <h2>Story-first handoff</h2>
+        <div class="settings-summary-list">
+            <div class="settings-summary-row">
+                <span>1. Full ebook with fitted cover</span>
+                <strong>First</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>2. Three story-fit portraits</span>
+                <strong>After handoff</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>3. Choose one portrait</span>
+                <strong>Edition face</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>4. Request audiobook in a chosen voice</span>
+                <strong>Optional</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>5. Review important chapter scene summaries</span>
+                <strong>Story-bound</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>6. Choose one cinematic render</span>
+                <strong>Bounded</strong>
+            </div>
+        </div>
+        <p class="muted-copy">Portrait, audio, and cinema all stay downstream from the same approved book. None of them get to rewrite the runner.</p>
+    </article>
+</section>
+
 <section class="minimal-section minimal-section--tight" id="origin-edition-read" data-origin-edition-tab="read">
     <article class="app-action-card">
         <span class="tag">Read</span>
-        <h2>Dossier ebook</h2>
-        <p>Read the private book edition here.</p>
+        <h2>Private ebook</h2>
+        <p>This is the first flagship deliverable: the real full approved story in a private ebook, handed over with its fitted cover art, with the archived book artifact still available beside it.</p>
         <div class="minimal-actions" aria-label="Origin Edition read actions">
             @if (canRead)
             {
-                <a class="button-like button-like--primary" href="@publication.AudiobookshelfDossierShareUrl" target="_blank" rel="noopener">Read in Audiobookshelf</a>
+                <a class="button-like button-like--primary" href="@publication.AudiobookshelfDossierShareUrl" target="_blank" rel="noopener">Read the ebook</a>
             }
             else
             {
@@ -157,11 +221,129 @@
     </article>
 </section>
 
+<section class="minimal-section minimal-section--tight" id="origin-edition-links" data-origin-edition-tab="shared-history">
+    <article class="app-action-card"
+             data-origin-runner-link-count="@storyLinks.Count"
+             data-origin-runner-link-code-present="@(!string.IsNullOrWhiteSpace(publication.RunnerLinkCode)).ToString().ToLowerInvariant()">
+        <span class="tag">Shared history</span>
+        <h2>Runner link code</h2>
+        <div class="settings-summary-list">
+            <div class="settings-summary-row">
+                <span>This runner</span>
+                <strong>@Clean(publication.RunnerLinkCode)</strong>
+            </div>
+            <div class="settings-summary-row">
+                <span>Accepted links</span>
+                <strong>@storyLinks.Count</strong>
+            </div>
+        </div>
+        <form method="post" action="/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/story-link">
+            @Html.AntiForgeryToken()
+            <label class="field">
+                <span>Other runner code</span>
+                <input name="runnerLinkCode" type="text" autocomplete="off" inputmode="text" placeholder="OD-0000-0000-0000" />
+            </label>
+            <label class="field">
+                <span>Shared history note</span>
+                <textarea name="relationshipSummary" rows="3" maxlength="280" placeholder="Former crew, family debt, first job, shared enemy"></textarea>
+            </label>
+            <div class="minimal-actions">
+                <button class="button-like button-like--secondary" type="submit">Link runner</button>
+            </div>
+        </form>
+        @if (storyLinks.Count > 0)
+        {
+            <div class="settings-summary-list">
+                @foreach (var link in storyLinks)
+                {
+                    <div class="settings-summary-row">
+                        <span>@Clean(link.LinkedRunnerAlias)</span>
+                        <strong>@Clean(link.Status)</strong>
+                    </div>
+                    <p class="muted-copy">@Clean(link.Summary)</p>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="muted-copy">Accepted runner links become approved shared-history context for the next full-story manuscript pass.</p>
+        }
+    </article>
+</section>
+
+<section class="minimal-section minimal-section--tight" id="origin-edition-portraits" data-origin-edition-tab="portraits">
+    <article class="app-action-card"
+             data-origin-portrait-choice-count="@portraitChoices.Count">
+        <span class="tag">Portraits</span>
+        <h2>Portrait shortlist</h2>
+        <p>After the ebook handoff, the player should get exactly three portraits that fit the story and choose one as the edition face.</p>
+        @if (canShowPortraitChoices)
+        {
+            <div class="settings-summary-list">
+                @foreach (var choice in portraitChoices)
+                {
+                    if (!string.IsNullOrWhiteSpace(choice.PreviewUrl))
+                    {
+                        <figure class="product-proof__media">
+                            <span class="scene-picture">
+                                <img src="@choice.PreviewUrl" alt="@Clean(choice.Title)" loading="lazy" />
+                            </span>
+                        </figure>
+                    }
+                    <div class="settings-summary-row">
+                        <span>@Clean(choice.Title)</span>
+                        <strong>@(choice.Selected ? "Selected" : "Option")</strong>
+                    </div>
+                    <p class="muted-copy">@Clean(choice.Summary)</p>
+                    @if (!choice.Selected)
+                    {
+                        <form method="post" action="/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/portrait" class="minimal-actions">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="portraitId" value="@choice.PortraitId" />
+                            <button class="button-like button-like--secondary" type="submit">Choose this portrait</button>
+                        </form>
+                    }
+                }
+            </div>
+        }
+        else
+        {
+            <p class="muted-copy">Portrait choices stay locked until the ebook-with-cover handoff is approved and all three story-fit portrait renders are ready.</p>
+        }
+    </article>
+</section>
+
 <section class="minimal-section minimal-section--tight" id="origin-edition-listen" data-origin-edition-tab="listen">
-    <article class="app-action-card">
+    <article class="app-action-card"
+             data-origin-audiobook-voice-count="@audiobookVoiceOptions.Count">
         <span class="tag">Listen</span>
         <h2>Audiobook</h2>
-        <p>Listen here when the audiobook is ready.</p>
+        <p>Once the ebook is handed over, the player can request the full audiobook in a chosen voice. Playback opens here after the approved render is imported.</p>
+        @if (canShowAudiobookVoiceOptions)
+        {
+            <div class="settings-summary-list">
+                @foreach (var option in audiobookVoiceOptions)
+                {
+                    <div class="settings-summary-row">
+                        <span>@Clean(option.Label)</span>
+                        <strong>@(option.Selected ? "Requested" : option.Recommended ? "Recommended" : "Available")</strong>
+                    </div>
+                    <p class="muted-copy">@Clean(option.Summary)</p>
+                    @if (!option.Selected)
+                    {
+                        <form method="post" action="/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/audiobook" class="minimal-actions">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="voiceId" value="@option.VoiceId" />
+                            <button class="button-like button-like--secondary" type="submit">Request this voice</button>
+                        </form>
+                    }
+                }
+            </div>
+        }
+        else
+        {
+            <p class="muted-copy">Voice choices appear here once the ebook-with-cover handoff and narration options are ready.</p>
+        }
         <div class="minimal-actions" aria-label="Origin Edition listen actions">
             @if (canListen)
             {
@@ -169,25 +351,55 @@
             }
             else
             {
-                <span class="button-like button-like--disabled" aria-disabled="true">Audiobookshelf share locked</span>
+                <span class="button-like button-like--disabled" aria-disabled="true">Audiobook locked</span>
             }
         </div>
     </article>
 </section>
 
 <section class="minimal-section minimal-section--tight" id="origin-edition-watch" data-origin-edition-tab="watch">
-    <article class="app-action-card">
+    <article class="app-action-card"
+             data-origin-scene-highlight-count="@sceneHighlights.Count">
         <span class="tag">Watch</span>
-        <h2>Story scene movie</h2>
-        <p>Watch the selected scene here when the video is ready.</p>
+        <h2>Cinematic scene</h2>
+        <p>The important chapter beats should be summarized here so one scene can be chosen for a character-visible cinematic render with the runner visible in it.</p>
+        @if (canShowSceneHighlights)
+        {
+            <div class="settings-summary-list">
+                @foreach (var scene in sceneHighlights)
+                {
+                    <div class="settings-summary-row">
+                        <span>@Clean(scene.ChapterLabel): @Clean(scene.Title)</span>
+                        <strong>@(scene.Selected ? "Selected" : "Candidate")</strong>
+                    </div>
+                    <p class="muted-copy">@Clean(scene.Summary)</p>
+                    @if (!scene.Selected && canRequestCinematicScene)
+                    {
+                        <form method="post" action="/account/work/origin-dossiers/@Uri.EscapeDataString(publication.ProjectId)/cinematic-scene" class="minimal-actions">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="sceneId" value="@scene.SceneId" />
+                            <button class="button-like button-like--secondary" type="submit">Render this scene</button>
+                        </form>
+                    }
+                }
+            </div>
+            @if (!hasSelectedPortrait)
+            {
+                <p class="muted-copy">Choose one portrait first so the cinematic render has a selected character face to use.</p>
+            }
+        }
+        else
+        {
+            <p class="muted-copy">Chapter scene summaries unlock after the ebook-with-cover handoff and the cinematic shortlist are prepared.</p>
+        }
         <div class="minimal-actions" aria-label="Origin Edition watch actions">
             @if (canWatch)
             {
-                <a class="button-like button-like--primary" href="@publication.DossierVideoUrl" target="_blank" rel="noopener">Watch scene movie</a>
+                <a class="button-like button-like--primary" href="@publication.DossierVideoUrl" target="_blank" rel="noopener">Watch selected cinematic scene</a>
             }
             else
             {
-                <span class="button-like button-like--disabled" aria-disabled="true">Dossier film locked</span>
+                <span class="button-like button-like--disabled" aria-disabled="true">Cinematic render locked</span>
             }
         </div>
     </article>
@@ -206,7 +418,7 @@
             <span>Access notes</span>
             <span class="inline-help-dot" tabindex="0" role="note" title="@rightsTooltip" aria-label="@rightsTooltip">?</span>
         </h2>
-        <p>Chummer keeps the canon. Book, audio, video, cover, and share links stay locked until the edition is ready.</p>
+        <p>Chummer keeps the canon. Book, audio, video, fitted cover art, and share links stay locked until the edition is ready.</p>
         <div class="settings-summary-list">
             <div class="settings-summary-row">
                 <span>Namespace</span>

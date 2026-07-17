@@ -27,6 +27,32 @@ const fs = require("fs");
 const path = require("path");
 const { chromium } = require("playwright");
 
+const navigationAttempts = 4;
+const transientNavigationErrorFragments = [
+  "ERR_NETWORK_CHANGED",
+  "net::ERR_",
+  "Target crashed",
+  "Timeout",
+];
+
+function errorMessage(error) {
+  if (!error) {
+    return "";
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (typeof error.message === "string") {
+    return error.message;
+  }
+  return String(error);
+}
+
+function isTransientNavigationError(error) {
+  const message = errorMessage(error);
+  return transientNavigationErrorFragments.some((fragment) => message.includes(fragment));
+}
+
 async function main() {
   const config = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
   const browser = await chromium.launch({
@@ -40,80 +66,89 @@ async function main() {
   try {
     for (const viewport of config.viewports) {
       for (const route of config.routes) {
-        const context = await browser.newContext({
-          viewport: { width: viewport.width, height: viewport.height },
-          isMobile: !!viewport.mobile,
-          hasTouch: !!viewport.mobile,
-          userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-        });
-        const page = await context.newPage();
-        page.setDefaultNavigationTimeout(90000);
         const url = `${config.baseUrl}${route.path}`;
-        let response = null;
+        let capturedEntry = null;
         let lastError = null;
-        for (let attempt = 0; attempt < 2; attempt += 1) {
+        for (let attempt = 0; attempt < navigationAttempts; attempt += 1) {
+          const context = await browser.newContext({
+            viewport: { width: viewport.width, height: viewport.height },
+            isMobile: !!viewport.mobile,
+            hasTouch: !!viewport.mobile,
+            userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+          });
+          const page = await context.newPage();
+          page.setDefaultNavigationTimeout(90000);
           try {
-            response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 90000 });
+            const response = await page.goto(url, {
+              waitUntil: "domcontentloaded",
+              timeout: attempt === 0 ? 30000 : 90000,
+            });
+            if (!response || response.status() !== 200) {
+              throw new Error(`Unexpected status ${response ? response.status() : "none"} for ${url}`);
+            }
+            await page.waitForTimeout(750);
+            const bodyText = await page.evaluate(() => document.body ? document.body.innerText : "");
+            const matchedNeedle = route.needles.find((needle) => bodyText.includes(needle));
+            if (!matchedNeedle) {
+              throw new Error(`Expected one of [${route.needles.join(", ")}] on ${url}`);
+            }
+            const visualSignals = await page.evaluate(() => {
+              const text = document.body.innerText || "";
+              const lower = text.toLowerCase();
+              const count = (needle) => lower.split(needle.toLowerCase()).length - 1;
+              const media = Array.from(document.querySelectorAll("video,img,picture,canvas,svg,[data-geoscape-panel],[data-geoscape-controls],[data-geoscape-signal-rail]"));
+              let largestMediaArea = 0;
+              for (const element of media) {
+                const rect = element.getBoundingClientRect();
+                largestMediaArea = Math.max(largestMediaArea, Math.round(rect.width * rect.height));
+              }
+              return {
+                textLength: text.length,
+                blackLedgerMentions: count("Black Ledger"),
+                commandMapMentions: count("command map"),
+                globeMentions: count("globe"),
+                factionMentions: count("faction"),
+                pressureMentions: count("pressure"),
+                newsreelMentions: count("newsreel"),
+                videoMentions: count("video"),
+                mediaElementCount: media.length,
+                videoElementCount: document.querySelectorAll("video").length,
+                imageElementCount: document.querySelectorAll("img,picture").length,
+                svgElementCount: document.querySelectorAll("svg").length,
+                geoscapePanelCount: document.querySelectorAll("[data-geoscape-panel]").length,
+                geoscapeControlCount: document.querySelectorAll("[data-geoscape-controls]").length,
+                geoscapeSignalRailCount: document.querySelectorAll("[data-geoscape-signal-rail]").length,
+                largestMediaArea,
+                viewportArea: window.innerWidth * window.innerHeight,
+              };
+            });
+            const screenshotPath = path.join(config.outputRoot, viewport.name, `${route.label}.png`);
+            fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
+            await page.screenshot({ path: screenshotPath, fullPage: false, animations: "disabled", scale: "css" });
+            const screenshotBytes = fs.statSync(screenshotPath).size;
+            capturedEntry = {
+              route: route.path,
+              viewport: viewport.name,
+              finalUrl: page.url(),
+              screenshotPath,
+              screenshotBytes,
+              visualSignals,
+            };
             break;
           } catch (error) {
             lastError = error;
+            if (!isTransientNavigationError(error) || attempt + 1 >= navigationAttempts) {
+              throw error;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+          } finally {
+            await context.close().catch(() => undefined);
           }
         }
-        if (!response && lastError) {
+        if (!capturedEntry && lastError) {
           throw lastError;
         }
-        if (!response || response.status() !== 200) {
-          throw new Error(`Unexpected status ${response ? response.status() : "none"} for ${url}`);
-        }
-        await page.waitForTimeout(750);
-        const bodyText = await page.evaluate(() => document.body ? document.body.innerText : "");
-        const matchedNeedle = route.needles.find((needle) => bodyText.includes(needle));
-        if (!matchedNeedle) {
-          throw new Error(`Expected one of [${route.needles.join(", ")}] on ${url}`);
-        }
-        const visualSignals = await page.evaluate(() => {
-          const text = document.body.innerText || "";
-          const lower = text.toLowerCase();
-          const count = (needle) => lower.split(needle.toLowerCase()).length - 1;
-          const media = Array.from(document.querySelectorAll("video,img,picture,canvas,svg,[data-geoscape-panel],[data-geoscape-controls],[data-geoscape-signal-rail]"));
-          let largestMediaArea = 0;
-          for (const element of media) {
-            const rect = element.getBoundingClientRect();
-            largestMediaArea = Math.max(largestMediaArea, Math.round(rect.width * rect.height));
-          }
-          return {
-            textLength: text.length,
-            blackLedgerMentions: count("Black Ledger"),
-            commandMapMentions: count("command map"),
-            globeMentions: count("globe"),
-            factionMentions: count("faction"),
-            pressureMentions: count("pressure"),
-            newsreelMentions: count("newsreel"),
-            videoMentions: count("video"),
-            mediaElementCount: media.length,
-            videoElementCount: document.querySelectorAll("video").length,
-            imageElementCount: document.querySelectorAll("img,picture").length,
-            svgElementCount: document.querySelectorAll("svg").length,
-            geoscapePanelCount: document.querySelectorAll("[data-geoscape-panel]").length,
-            geoscapeControlCount: document.querySelectorAll("[data-geoscape-controls]").length,
-            geoscapeSignalRailCount: document.querySelectorAll("[data-geoscape-signal-rail]").length,
-            largestMediaArea,
-            viewportArea: window.innerWidth * window.innerHeight,
-          };
-        });
-        const screenshotPath = path.join(config.outputRoot, viewport.name, `${route.label}.png`);
-        fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
-        await page.screenshot({ path: screenshotPath, fullPage: false, animations: "disabled", scale: "css" });
-        const screenshotBytes = fs.statSync(screenshotPath).size;
-        entries.push({
-          route: route.path,
-          viewport: viewport.name,
-          finalUrl: page.url(),
-          screenshotPath,
-          screenshotBytes,
-          visualSignals,
-        });
-        await context.close();
+        entries.push(capturedEntry);
       }
     }
   } finally {

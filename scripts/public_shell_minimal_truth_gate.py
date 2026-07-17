@@ -30,6 +30,7 @@ class RouteContract:
     expected_final_path: str | None = None
     required_all: tuple[str, ...] = ()
     required_any: tuple[str, ...] = ()
+    required_one_of_groups: tuple[tuple[str, ...], ...] = ()
     forbidden: tuple[str, ...] = ()
     require_public_meta_urls: bool = False
 
@@ -43,7 +44,11 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
     billing_contract = RouteContract(
         route="/account/billing",
         expected_final_path="/login",
-        required_all=("Supporter", "Email first. Billing stays attached after this step.", "After this step, Chummer returns to billing.", "Continue with email", "Continue with Google"),
+        required_all=("Supporter", "After this step, Chummer returns to billing.", "Continue with Google"),
+        required_one_of_groups=(
+            ("Email first. Billing stays attached after this step.", "Continue with email"),
+            ("Google first. Billing stays attached after that step.",),
+        ),
         forbidden=("Supporter is not open right now.",),
         require_public_meta_urls=True,
     )
@@ -57,7 +62,11 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
         ),
         RouteContract(
             route="/login?next=%2F",
-            required_all=("Continue with email",),
+            required_all=("Continue with Google",),
+            required_one_of_groups=(
+                ("Email first. Google if you prefer.", "Continue with email"),
+                ("Email sign-in is unavailable on this host right now. Continue with Google instead.",),
+            ),
             require_public_meta_urls=True,
         ),
         billing_contract,
@@ -69,23 +78,26 @@ def build_route_contracts(*, require_brilliant_directories_checkout: bool) -> tu
         ),
         RouteContract(
             route="/status",
-            expected_final_path="/downloads",
-            required_all=("Downloads", "Stable release"),
-            forbidden=("Released", "Checks passed"),
+            expected_final_path="/status",
+            required_all=("Downloads", "Now"),
+            required_any=("Preview downloads", "Stable downloads", "Downloads paused"),
+            forbidden=("Released", "Checks passed", "Updated", "No Stable build on this shelf.", "Preview build. Review required.", "Nightly", "Build from source"),
             require_public_meta_urls=True,
         ),
         RouteContract(
             route="/participate",
             expected_final_path="/participate",
-            required_all=("Participate", "Public requests, clear bugs, useful ideas."),
-            required_any=("Public requests, clear bugs, useful ideas.", "Board offline right now"),
+            required_all=("Participate",),
+            required_any=("data-chummer-participate-frame", "Board offline right now"),
+            forbidden=("Public requests, clear bugs, useful ideas.", '<p class="eyebrow">Board</p>'),
             require_public_meta_urls=True,
         ),
         RouteContract(
             route="/partizipate",
             expected_final_path="/participate",
-            required_all=("Participate", "Public requests, clear bugs, useful ideas."),
-            required_any=("Public requests, clear bugs, useful ideas.", "Board offline right now"),
+            required_all=("Participate",),
+            required_any=("data-chummer-participate-frame", "Board offline right now"),
+            forbidden=("Public requests, clear bugs, useful ideas.", '<p class="eyebrow">Board</p>'),
             require_public_meta_urls=True,
         ),
     )
@@ -197,6 +209,20 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float, allow
                 + ", ".join(required_any)
             )
 
+    if contract.required_one_of_groups:
+        coherent_group_found = any(
+            all(normalize_text(token) in normalized_body for token in group)
+            for group in contract.required_one_of_groups
+        )
+        if not coherent_group_found:
+            rendered_groups = " or ".join(
+                "[" + ", ".join(group) + "]"
+                for group in contract.required_one_of_groups
+            )
+            failures.append(
+                "route does not match any coherent required state: " + rendered_groups
+            )
+
     final_path = urlparse(response.url).path or "/"
     if contract.expected_final_path and final_path != contract.expected_final_path:
         failures.append(f"route resolved to {final_path} instead of {contract.expected_final_path}")
@@ -221,6 +247,7 @@ def fetch_route(base_url: str, contract: RouteContract, *, timeout: float, allow
         "failures": failures,
         "requiredAll": list(required_all),
         "requiredAny": list(required_any),
+        "requiredOneOfGroups": [list(group) for group in contract.required_one_of_groups],
         "forbidden": list(contract.forbidden),
     }
 

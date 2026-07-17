@@ -5,16 +5,24 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 import urllib.error
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from published_path_hygiene import public_base_url_text, published_url_text
+
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REGISTRY_ROOT = Path("/docker/chummercomplete/chummer-hub-registry/.codex-studio/published")
 DEFAULT_OUTPUT = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json"
+DEFAULT_PUBLISHED_PUBLIC_BASE_URL = str(os.environ.get("CHUMMER_PUBLIC_BASE_URL") or "").strip() or "https://chummer.run"
 DEFAULT_PROVIDER_ROOTS = {
     "pcloud": [Path("/mnt/pcloud/Documents/codex-audit/chummer"), Path("/media/pcloud/Documents/codex-audit/chummer")],
     "onedrive": [Path("/mnt/onedrive/Documents/codex-audit/chummer")],
@@ -130,10 +138,12 @@ def verify_provider(name: str, roots: list[Path], rows: list[dict[str, Any]]) ->
 def verify_public_edge(base_url: str, rows: list[dict[str, Any]], timeout: float) -> dict[str, Any]:
     if not base_url:
         return {"status": "skipped", "reason": "no base URL configured", "artifacts": []}
+    published_base_url = public_base_url_text(base_url, fallback=DEFAULT_PUBLISHED_PUBLIC_BASE_URL)
     opener = urllib.request.build_opener(NoRedirectHandler)
     checks = []
     for row in rows:
         url = f"{base_url.rstrip('/')}/downloads/files/{row['file_name']}"
+        published_url = published_url_text(url, public_base_url=published_base_url)
         request = urllib.request.Request(url, headers={"Range": "bytes=0-0", "User-Agent": BROWSER_USER_AGENT})
         account_required_handoff = False
         redirect_location = ""
@@ -177,18 +187,32 @@ def verify_public_edge(base_url: str, rows: list[dict[str, Any]], timeout: float
                 and "/login?next=" in redirect_location
             )
             if not account_required_handoff:
-                checks.append({"id": row["id"], "url": url, "status": "fail", "error": str(exc)})
+                checks.append(
+                    {
+                        "id": row["id"],
+                        "url": published_url,
+                        "status": "fail",
+                        "error": published_url_text(str(exc), public_base_url=published_base_url),
+                    }
+                )
                 continue
         except (urllib.error.URLError, TimeoutError, ValueError) as exc:
-            checks.append({"id": row["id"], "url": url, "status": "fail", "error": str(exc)})
+            checks.append(
+                {
+                    "id": row["id"],
+                    "url": published_url,
+                    "status": "fail",
+                    "error": published_url_text(str(exc), public_base_url=published_base_url),
+                }
+            )
             continue
         checks.append(
             {
                 "id": row["id"],
-                "url": url,
+                "url": published_url,
                 "access_class": row.get("access_class"),
                 "status_code": status_code,
-                "final_url": redirect_location or response_url,
+                "final_url": published_url_text(redirect_location or response_url, public_base_url=published_base_url),
                 "content_range": content_range,
                 "content_length": content_length,
                 "streamed_size": streamed_size,
@@ -204,7 +228,7 @@ def verify_public_edge(base_url: str, rows: list[dict[str, Any]], timeout: float
         )
     return {
         "status": "pass" if checks and all(check["status"] == "pass" for check in checks) else "fail",
-        "base_url": base_url,
+        "base_url": published_base_url,
         "artifacts": checks,
     }
 

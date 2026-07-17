@@ -1,0 +1,23 @@
+[Unit]
+Description=Probe Plex cloud mounts by streaming fixed test files
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/plex-stream-watchdog
+ExecStart=/usr/local/sbin/plex-stream-watchdog.sh
+User=root
+Group=root
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native

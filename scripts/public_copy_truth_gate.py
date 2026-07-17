@@ -15,7 +15,6 @@ PROJECTION_VIEW = RUN_SERVICES_ROOT / "Chummer.Run.Api" / "Views" / "Shared" / "
 
 REQUIRED_HTML_PHRASES = (
     "Participate",
-    "Public requests, clear bugs, useful ideas.",
 )
 FORBIDDEN_HTML_PHRASES = (
     "Something went wrong on our side. Could not load posts.",
@@ -31,12 +30,13 @@ FORBIDDEN_HTML_PHRASES = (
     "sent receipts",
     "release-backed closeout",
     "proof-bound",
+    "Public requests, clear bugs, useful ideas.",
+    '<p class="eyebrow">Board</p>',
 )
 REQUIRED_SOURCE_PHRASES = (
     "public async Task<IActionResult> ParticipateBoardProxy(string? boardPath, CancellationToken cancellationToken)",
     "return Redirect($\"/participate{Request.QueryString}\");",
     "BuildParticipateBoardRouteHref(normalizedBoardPath)",
-    "Current requests",
     "data-chummer-participate-frame",
     "Chummer follow-up is not visible here yet.",
     "account follow-up waits until the shipped path is available on this host",
@@ -50,6 +50,8 @@ FORBIDDEN_SOURCE_PHRASES = (
     "release-backed closeout",
     "proof-bound",
     "release proof, delivery candidates, outbox candidates, sent receipts, and journey receipts are pending or zero",
+    "Public requests, clear bugs, useful ideas.",
+    '<p class="eyebrow">Board</p>',
 )
 
 

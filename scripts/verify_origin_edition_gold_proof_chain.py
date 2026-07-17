@@ -19,6 +19,8 @@ EXPECTED_STAGE_NAMES = [
     "deployed_operator_handoff",
     "gold_gap_audit",
     "runsite_integration_proof",
+    "magicai_api_handshake_probe",
+    "provider_account_registry",
     "completion_matrix",
     "requirement_coverage",
 ]
@@ -185,6 +187,12 @@ def verify(
             runsite = next((stage for stage in stages if isinstance(stage, dict) and stage.get("name") == "runsite_integration_proof"), {})
             if str(runsite.get("status") or "").lower() != "pass":
                 issues.append("runsite_integration_proof_not_pass")
+            magicai_handshake = next((stage for stage in stages if isinstance(stage, dict) and stage.get("name") == "magicai_api_handshake_probe"), {})
+            if str(magicai_handshake.get("status") or "").lower() != "pass":
+                issues.append("magicai_api_handshake_probe_not_pass")
+            provider_account_registry = next((stage for stage in stages if isinstance(stage, dict) and stage.get("name") == "provider_account_registry"), {})
+            if str(provider_account_registry.get("status") or "").lower() != "pass":
+                issues.append("provider_account_registry_not_pass")
             completion = next((stage for stage in stages if isinstance(stage, dict) and stage.get("name") == "completion_matrix"), {})
             blocked_rows = completion.get("blockedRows") if isinstance(completion.get("blockedRows"), list) else []
             if "deployed_user_login_read_listen_watch" not in blocked_rows:

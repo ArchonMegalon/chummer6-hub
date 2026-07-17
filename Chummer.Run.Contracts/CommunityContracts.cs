@@ -105,7 +105,12 @@ public sealed record OriginDossierPublicationImportRequest(
     string? AudiobookProviderAccountAlias = null,
     string? StorySceneCoverAccountAlias = null,
     string? DossierVideoAccountAlias = null,
-    string? BookPackagingAccountAlias = null);
+    string? BookPackagingAccountAlias = null,
+    IReadOnlyList<OriginDossierPortraitChoiceDto>? PortraitChoices = null,
+    IReadOnlyList<OriginDossierAudiobookVoiceOptionDto>? AudiobookVoiceOptions = null,
+    IReadOnlyList<OriginDossierSceneHighlightDto>? SceneHighlights = null,
+    string? RunnerLinkCode = null,
+    IReadOnlyList<OriginDossierStoryLinkDto>? StoryLinks = null);
 
 public sealed record OriginDossierPublicationImportResultDto(
     string ProjectId,
@@ -132,7 +137,44 @@ public sealed record OriginDossierPublicationImportResultDto(
     string? RunnerName = null,
     string? OriginEditionNamespace = null,
     string? AudiobookshelfDossierShareUrl = null,
-    string? AudiobookshelfAudiobookShareUrl = null);
+    string? AudiobookshelfAudiobookShareUrl = null,
+    IReadOnlyList<OriginDossierPortraitChoiceDto>? PortraitChoices = null,
+    IReadOnlyList<OriginDossierAudiobookVoiceOptionDto>? AudiobookVoiceOptions = null,
+    IReadOnlyList<OriginDossierSceneHighlightDto>? SceneHighlights = null,
+    bool FullStoryVerified = false,
+    bool EbookHandoffReady = false,
+    string? RunnerLinkCode = null,
+    IReadOnlyList<OriginDossierStoryLinkDto>? StoryLinks = null);
+
+public sealed record OriginDossierPortraitChoiceDto(
+    string PortraitId,
+    string Title,
+    string Summary,
+    string? PreviewUrl = null,
+    bool Selected = false);
+
+public sealed record OriginDossierAudiobookVoiceOptionDto(
+    string VoiceId,
+    string Label,
+    string Summary,
+    bool Recommended = false,
+    bool Selected = false);
+
+public sealed record OriginDossierSceneHighlightDto(
+    string SceneId,
+    string ChapterLabel,
+    string Title,
+    string Summary,
+    bool Selected = false);
+
+public sealed record OriginDossierStoryLinkDto(
+    string LinkId,
+    string LinkedRunnerAlias,
+    string Summary,
+    string Status = "accepted",
+    string? LinkedProjectId = null,
+    string? LinkedRunnerLinkCode = null,
+    bool IntegrateIntoStory = true);
 
 public sealed record OriginDossierProviderCreditReservationRequest(
     string? UserId,

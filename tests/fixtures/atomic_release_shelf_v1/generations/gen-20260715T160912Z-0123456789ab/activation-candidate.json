@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "chummer.release-shelf.activation-candidate/v1",
+  "generationId": "gen-20260715T160912Z-0123456789ab",
+  "releaseVersion": "run-fixture-20260715-160912",
+  "channel": "preview",
+  "publishedAt": "2026-07-15T16:09:12Z",
+  "manifests": {
+    "canonical": {
+      "path": "/downloads/g/gen-20260715T160912Z-0123456789ab/RELEASE_CHANNEL.generated.json",
+      "sha256": "2186bb64f8f813d54c47a89444bb0afe79104579b718275f2a746239ac3829f9"
+    },
+    "compatibility": {
+      "path": "/downloads/g/gen-20260715T160912Z-0123456789ab/releases.json",
+      "sha256": "3ed1433aa3335737e599c5c631e0210726d87842f5440adb60c97f1916ba6742"
+    }
+  },
+  "inventoryDigest": "sha256:47c07b4a56faf5213f2bcab7707b0330d74821311bfa30683bcddca54c795a83",
+  "inventory": [
+    {
+      "path": "files/chummer-fixture.dmg",
+      "sha256": "88ddb97095aea5bff47175327c9f799b2363ef775e23329854ae68765f332c83"
+    },
+    {
+      "path": "proof/mac/release-proof.json",
+      "sha256": "31c8d595a7fc23025e3c423539ddd70a2c385a3cf074651deb44740dd507c34b"
+    },
+    {
+      "path": "release-evidence/public-promotion.json",
+      "sha256": "31c8d595a7fc23025e3c423539ddd70a2c385a3cf074651deb44740dd507c34b"
+    },
+    {
+      "path": "startup-smoke/startup-smoke-avalonia-osx-arm64.receipt.json",
+      "sha256": "31c8d595a7fc23025e3c423539ddd70a2c385a3cf074651deb44740dd507c34b"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[Unit]
+Description=Keep rebuildable caches from starving Plex/rclone media cache
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/media-cache-guard.sh
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/var/cache /var/lib/docker /var/log /run

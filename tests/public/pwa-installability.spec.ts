@@ -3,11 +3,14 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('public play shell exposes manifest, service worker, notifications, and live installability copy', async ({ page, request }) => {
+test('public play shell exposes manifest, service worker, notifications, and privacy-honest installability copy', async ({ page, request }) => {
+  test.setTimeout(90000);
   await page.goto(`${baseUrl}/play`, { waitUntil: 'domcontentloaded' });
 
   await expect(page.locator('body')).toContainText('Installable app shell live');
-  await expect(page.locator('body')).toContainText('Offline and reconnect lane cached');
+  await expect(page.locator('body')).toContainText('Static app assets stay available offline');
+  await expect(page.locator('body')).toContainText('Private table state reconnects from the server');
+  await expect(page.locator('body')).not.toContainText('Offline and reconnect lane cached');
   await expect(page.locator('body')).not.toContainText('installability proof pending');
   const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href');
   expect(manifestHref).toBeTruthy();
@@ -16,7 +19,7 @@ test('public play shell exposes manifest, service worker, notifications, and liv
   expect(manifestResponse.status()).toBe(200);
   const manifest = await manifestResponse.json();
 
-  const serviceWorkerState = await page.evaluate(async () => {
+  const readServiceWorkerState = async () => page.evaluate(async () => {
     if (!('serviceWorker' in navigator)) {
       return { supported: false, controller: false, ready: false, scriptURL: null };
     }
@@ -26,15 +29,20 @@ test('public play shell exposes manifest, service worker, notifications, and liv
       return { supported: true, controller: !!navigator.serviceWorker.controller, ready: false, scriptURL: null };
     }
 
-    try {
-      const readyRegistration = await navigator.serviceWorker.ready;
-      const worker = readyRegistration.active ?? readyRegistration.waiting ?? readyRegistration.installing;
-      return { supported: true, controller: !!navigator.serviceWorker.controller, ready: true, scriptURL: worker?.scriptURL ?? null };
-    } catch {
-      const worker = registration.active ?? registration.waiting ?? registration.installing;
-      return { supported: true, controller: !!navigator.serviceWorker.controller, ready: false, scriptURL: worker?.scriptURL ?? null };
-    }
+    const worker = registration.active ?? registration.waiting ?? registration.installing;
+    return {
+      supported: true,
+      controller: !!navigator.serviceWorker.controller,
+      ready: !!registration.active,
+      scriptURL: worker?.scriptURL ?? null,
+    };
   });
+
+  await expect.poll(async () => (await readServiceWorkerState()).scriptURL ?? '', {
+    timeout: 15000,
+  }).toContain('/service-worker.js');
+
+  const serviceWorkerState = await readServiceWorkerState();
   const serviceWorkerScriptUrl = serviceWorkerState.scriptURL || `${baseUrl}/service-worker.js`;
   const swResponse = await request.get(serviceWorkerScriptUrl);
   expect(swResponse.status()).toBe(200);
@@ -71,8 +79,9 @@ test('public play shell exposes manifest, service worker, notifications, and liv
     status: serviceWorkerState.supported ? 'pass' : 'fail',
     base_url: baseUrl,
     route: '/play',
-    truthful_copy: 'Installable app shell live; offline and reconnect lane cached.',
+    truthful_copy: 'Installable app shell live; static app assets stay available offline; private table state reconnects from the server.',
     installability_posture: 'live_public_installable_shell',
+    private_navigation_cache_posture: 'network_only',
     registration: serviceWorkerState,
   });
 });

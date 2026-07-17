@@ -12,7 +12,7 @@
         <p class="page-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.Intro)</p>
         <p class="ledger-flagship__support">Inbox opens on the world board first, then shows what happened for this turn.</p>
         <div class="trust-claim__details">
-            <span>Status: @UndetectableHumanizerCopyAdapter.Humanize(Model.Status.StatusLabel)</span>
+            <span>Current: @UndetectableHumanizerCopyAdapter.Humanize(Model.Status.StatusLabel)</span>
             <span>Policy: @UndetectableHumanizerCopyAdapter.Humanize(Model.Status.Policy)</span>
             <span>Updates: @Model.Status.ReceiptCount</span>
         </div>
@@ -77,7 +77,7 @@
             <p class="editorial-copy">@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.Summary)</p>
         </div>
         <div class="trust-claim__details">
-            <span>Status: @UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.VerdictLabel)</span>
+            <span>Current: @UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.VerdictLabel)</span>
             <span>@UndetectableHumanizerCopyAdapter.Humanize(Model.TablePulsePacket.ConsentPosture)</span>
         </div>
         <div class="route-choice-grid route-choice-grid--three">
@@ -299,7 +299,7 @@
                 <h3>@UndetectableHumanizerCopyAdapter.Humanize(message.Heading)</h3>
                 <p>@UndetectableHumanizerCopyAdapter.Humanize(message.Summary)</p>
                 <div class="route-choice-card__details">
-                    <span>Status: @UndetectableHumanizerCopyAdapter.Humanize(message.StatusLabel)</span>
+                    <span>Current: @UndetectableHumanizerCopyAdapter.Humanize(message.StatusLabel)</span>
                     <a href="@message.Href">@UndetectableHumanizerCopyAdapter.Humanize(message.CtaLabel)</a>
                 </div>
             </article>

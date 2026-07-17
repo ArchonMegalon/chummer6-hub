@@ -19,6 +19,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     private readonly ReleaseSelectionService _releaseSelection;
     private readonly InstallLinkingService _installLinking;
     private readonly InstallBootstrapTicketService _installBootstrapTickets;
+    private readonly ArtifactDeliveryPolicy _artifactDelivery;
     private readonly HubIdentityClient _identity;
     private readonly IConfiguration _configuration;
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
@@ -34,7 +35,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         InstallBootstrapTicketService installBootstrapTickets,
         HubIdentityClient identity,
         IConfiguration configuration,
-        ILogger<DownloadsCompatibilityController> logger)
+        ILogger<DownloadsCompatibilityController> logger,
+        ArtifactDeliveryPolicy? artifactDelivery = null)
     {
         _releases = releases;
         _windowsProofInstallers = windowsProofInstallers;
@@ -42,6 +44,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         _releaseSelection = releaseSelection;
         _installLinking = installLinking;
         _installBootstrapTickets = installBootstrapTickets;
+        _artifactDelivery = artifactDelivery ?? new ArtifactDeliveryPolicy(releases, configuration);
         _identity = identity;
         _configuration = configuration;
         _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
@@ -52,28 +55,490 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     [HttpGet("/downloads/releases.json")]
     public IActionResult ReleaseManifest()
     {
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        ReleaseShelfSnapshot snapshot = _releases.CaptureShelfSnapshot();
+        TryApplyCanonicalManifestNoStoreHeaders(snapshot);
+        PublicReleaseManifestDto manifest = _artifactDelivery.FilterRevokedArtifacts(
+            snapshot,
+            _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(snapshot)));
         return Ok(manifest);
     }
 
     [HttpGet("/downloads/RELEASE_CHANNEL.generated.json")]
     public IActionResult CanonicalReleaseManifest()
     {
-        string? filteredManifest = _releases.LoadCanonicalManifestJson();
+        ReleaseShelfSnapshot snapshot = _releases.CaptureShelfSnapshot();
+        if (ControllerContext.HttpContext is HttpContext httpContext)
+        {
+            ApplyCanonicalManifestNoStoreHeaders(httpContext.Response.Headers);
+            ApplyGenerationHeader(httpContext.Response.Headers, snapshot);
+        }
+
+        string? filteredManifest = _releases.LoadCanonicalManifestJson(snapshot);
         return filteredManifest is null
             ? NotFound()
             : Content(filteredManifest, "application/json; charset=utf-8");
     }
 
+    [HttpGet("/downloads/g/{generationId}/releases.json")]
+    public IActionResult GenerationReleaseManifest([FromRoute] string generationId)
+    {
+        ReleaseShelfSnapshot? snapshot = TryCaptureGeneration(generationId);
+        if (snapshot is null)
+        {
+            return NotFound();
+        }
+
+        TryApplyGenerationHeader(snapshot);
+        TryApplyImmutableGenerationHeaders();
+        byte[]? manifestBytes = _releases.LoadGenerationCompatibilityManifestBytes(snapshot);
+        return manifestBytes is null
+            ? NotFound()
+            : File(manifestBytes, "application/json; charset=utf-8");
+    }
+
+    [HttpGet("/downloads/g/{generationId}/RELEASE_CHANNEL.generated.json")]
+    public IActionResult GenerationCanonicalReleaseManifest([FromRoute] string generationId)
+    {
+        ReleaseShelfSnapshot? snapshot = TryCaptureGeneration(generationId);
+        if (snapshot is null)
+        {
+            return NotFound();
+        }
+
+        TryApplyGenerationHeader(snapshot);
+        TryApplyImmutableGenerationHeaders();
+        byte[]? manifestBytes = _releases.LoadGenerationCanonicalManifestBytes(snapshot);
+        return manifestBytes is null
+            ? NotFound()
+            : File(manifestBytes, "application/json; charset=utf-8");
+    }
+
     [HttpGet("/downloads/aur-packages.json")]
     public IActionResult AurPackagesManifest()
-        => Ok(_aurPackages.LoadCatalog());
+    {
+        ReleaseShelfSnapshot snapshot = _releases.CaptureShelfSnapshot();
+        TryApplyGenerationHeader(snapshot);
+        return Ok(_aurPackages.LoadCatalog(snapshot));
+    }
+
+    [HttpGet("/downloads/g/{generationId}/aur-packages.json")]
+    public IActionResult GenerationAurPackagesManifest([FromRoute] string generationId)
+    {
+        ReleaseShelfSnapshot? snapshot = TryCaptureGeneration(generationId);
+        if (snapshot is null)
+        {
+            return NotFound();
+        }
+
+        TryApplyGenerationHeader(snapshot);
+        TryApplyImmutableGenerationHeaders();
+        return Ok(_aurPackages.LoadCatalog(snapshot));
+    }
 
     [HttpGet("/downloads/supplemental/windows")]
     [HttpGet("/downloads/proof/windows")]
+    [HttpGet("/downloads/proof/windows/current")]
     public IActionResult WindowsProofInstallers()
     {
-        var installers = _windowsProofInstallers.LoadCatalog();
+        WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureCurrentProof();
+        if (proof is not null)
+        {
+            return BuildWindowsProofCatalog(proof);
+        }
+
+        return _windowsProofInstallers.LegacyShelfFallbackEnabled
+            ? BuildLegacyWindowsProofCatalog(_releases.CaptureShelfSnapshot())
+            : WindowsProofMissing();
+    }
+
+    [HttpGet("/downloads/g/{generationId}/proof/windows")]
+    [HttpGet("/downloads/proof/windows/generations/{generationId}")]
+    public IActionResult GenerationWindowsProofInstallers([FromRoute] string generationId)
+    {
+        WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureProofGeneration(generationId);
+        if (proof is not null)
+        {
+            return BuildWindowsProofCatalog(proof);
+        }
+
+        if (!_windowsProofInstallers.LegacyShelfFallbackEnabled)
+        {
+            return NotFound();
+        }
+
+        ReleaseShelfSnapshot? legacy = TryCaptureGeneration(generationId);
+        return legacy is null ? NotFound() : BuildLegacyWindowsProofCatalog(legacy);
+    }
+
+    [HttpGet("/downloads/proof/windows/candidates/{candidateVersion}")]
+    public IActionResult CandidateWindowsProofInstallers([FromRoute] string candidateVersion)
+    {
+        WindowsProofDeliverySnapshot? proof =
+            _windowsProofInstallers.CaptureProofCandidate(candidateVersion);
+        return proof is null ? NotFound() : BuildWindowsProofCatalog(proof);
+    }
+
+    [HttpGet("/downloads/supplemental/windows/{fileName}")]
+    [HttpHead("/downloads/supplemental/windows/{fileName}")]
+    [HttpGet("/downloads/proof/windows/{fileName}")]
+    [HttpHead("/downloads/proof/windows/{fileName}")]
+    public IActionResult DownloadWindowsProofInstaller([FromRoute] string fileName)
+    {
+        WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureCurrentProof();
+        if (proof is not null)
+        {
+            WindowsProofDeliveryArtifact? artifact =
+                _windowsProofInstallers.FindProofInstallerByFileName(proof, fileName);
+            return artifact is null
+                ? NotFound()
+                : BuildWindowsProofArtifactFileResult(proof, artifact);
+        }
+
+        return _windowsProofInstallers.LegacyShelfFallbackEnabled
+            ? DownloadLegacyWindowsProofInstaller(_releases.CaptureShelfSnapshot(), fileName, byArtifactId: false)
+            : NotFound();
+    }
+
+    [HttpGet("/downloads/g/{generationId}/proof/windows/{fileName}")]
+    [HttpHead("/downloads/g/{generationId}/proof/windows/{fileName}")]
+    public IActionResult DownloadGenerationWindowsProofInstaller(
+        [FromRoute] string generationId,
+        [FromRoute] string fileName)
+    {
+        WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureProofGeneration(generationId);
+        if (proof is not null)
+        {
+            WindowsProofDeliveryArtifact? artifact =
+                _windowsProofInstallers.FindProofInstallerByFileName(proof, fileName);
+            return artifact is null
+                ? NotFound()
+                : BuildWindowsProofArtifactFileResult(proof, artifact);
+        }
+
+        if (!_windowsProofInstallers.LegacyShelfFallbackEnabled)
+        {
+            return NotFound();
+        }
+
+        ReleaseShelfSnapshot? legacy = TryCaptureGeneration(generationId);
+        return legacy is null
+            ? NotFound()
+            : DownloadLegacyWindowsProofInstaller(legacy, fileName, byArtifactId: false);
+    }
+
+    [HttpGet("/downloads/install/{artifactId}/supplemental")]
+    [HttpHead("/downloads/install/{artifactId}/supplemental")]
+    [HttpGet("/downloads/install/{artifactId}/proof")]
+    [HttpHead("/downloads/install/{artifactId}/proof")]
+    public IActionResult DownloadWindowsProofInstallerByArtifactId([FromRoute] string artifactId)
+    {
+        WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureCurrentProof();
+        if (proof is not null)
+        {
+            WindowsProofDeliveryArtifact? artifact = _windowsProofInstallers.FindProofArtifact(
+                proof,
+                artifactId,
+                WindowsProofDeliveryRoles.Installer);
+            return artifact is null
+                ? NotFound()
+                : BuildWindowsProofArtifactFileResult(proof, artifact);
+        }
+
+        return _windowsProofInstallers.LegacyShelfFallbackEnabled
+            ? DownloadLegacyWindowsProofInstaller(_releases.CaptureShelfSnapshot(), artifactId, byArtifactId: true)
+            : NotFound();
+    }
+
+    [HttpGet("/downloads/g/{generationId}/install/{artifactId}/supplemental")]
+    [HttpHead("/downloads/g/{generationId}/install/{artifactId}/supplemental")]
+    [HttpGet("/downloads/g/{generationId}/install/{artifactId}/proof")]
+    [HttpHead("/downloads/g/{generationId}/install/{artifactId}/proof")]
+    public IActionResult DownloadGenerationWindowsProofInstallerByArtifactId(
+        [FromRoute] string generationId,
+        [FromRoute] string artifactId)
+    {
+        WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureProofGeneration(generationId);
+        if (proof is not null)
+        {
+            WindowsProofDeliveryArtifact? artifact = _windowsProofInstallers.FindProofArtifact(
+                proof,
+                artifactId,
+                WindowsProofDeliveryRoles.Installer);
+            return artifact is null
+                ? NotFound()
+                : BuildWindowsProofArtifactFileResult(proof, artifact);
+        }
+
+        if (!_windowsProofInstallers.LegacyShelfFallbackEnabled)
+        {
+            return NotFound();
+        }
+
+        ReleaseShelfSnapshot? legacy = TryCaptureGeneration(generationId);
+        return legacy is null
+            ? NotFound()
+            : DownloadLegacyWindowsProofInstaller(legacy, artifactId, byArtifactId: true);
+    }
+
+    [HttpGet("/downloads/proof/windows/current/artifacts/{artifactId}/{role}")]
+    [HttpHead("/downloads/proof/windows/current/artifacts/{artifactId}/{role}")]
+    public IActionResult DownloadCurrentWindowsProofArtifact(
+        [FromRoute] string artifactId,
+        [FromRoute] string role)
+    {
+        WindowsProofDeliverySnapshot? proof = _windowsProofInstallers.CaptureCurrentProof();
+        if (proof is null)
+        {
+            return NotFound();
+        }
+
+        WindowsProofDeliveryArtifact? artifact =
+            _windowsProofInstallers.FindProofArtifact(proof, artifactId, role);
+        return artifact is null
+            ? NotFound()
+            : BuildWindowsProofArtifactFileResult(proof, artifact);
+    }
+
+    [HttpGet("/downloads/proof/windows/generations/{generationId}/artifacts/{artifactId}/{role}")]
+    [HttpHead("/downloads/proof/windows/generations/{generationId}/artifacts/{artifactId}/{role}")]
+    public IActionResult DownloadGenerationWindowsProofArtifact(
+        [FromRoute] string generationId,
+        [FromRoute] string artifactId,
+        [FromRoute] string role)
+    {
+        WindowsProofDeliverySnapshot? proof =
+            _windowsProofInstallers.CaptureProofGeneration(generationId);
+        if (proof is null)
+        {
+            return NotFound();
+        }
+
+        WindowsProofDeliveryArtifact? artifact =
+            _windowsProofInstallers.FindProofArtifact(proof, artifactId, role);
+        return artifact is null
+            ? NotFound()
+            : BuildWindowsProofArtifactFileResult(proof, artifact);
+    }
+
+    [HttpGet("/downloads/proof/windows/candidates/{candidateVersion}/artifacts/{artifactId}/{role}")]
+    [HttpHead("/downloads/proof/windows/candidates/{candidateVersion}/artifacts/{artifactId}/{role}")]
+    public IActionResult DownloadCandidateWindowsProofArtifact(
+        [FromRoute] string candidateVersion,
+        [FromRoute] string artifactId,
+        [FromRoute] string role)
+    {
+        WindowsProofDeliverySnapshot? proof =
+            _windowsProofInstallers.CaptureProofCandidate(candidateVersion);
+        if (proof is null)
+        {
+            return NotFound();
+        }
+
+        WindowsProofDeliveryArtifact? artifact =
+            _windowsProofInstallers.FindProofArtifact(proof, artifactId, role);
+        return artifact is null
+            ? NotFound()
+            : BuildWindowsProofArtifactFileResult(proof, artifact);
+    }
+
+    [HttpGet("/downloads/proof/windows/candidates/{candidateVersion}/files/{fileName}")]
+    [HttpHead("/downloads/proof/windows/candidates/{candidateVersion}/files/{fileName}")]
+    public IActionResult DownloadCandidateWindowsProofFile(
+        [FromRoute] string candidateVersion,
+        [FromRoute] string fileName)
+    {
+        WindowsProofDeliverySnapshot? proof =
+            _windowsProofInstallers.CaptureProofCandidate(candidateVersion);
+        if (proof is null)
+        {
+            return NotFound();
+        }
+
+        WindowsProofDeliveryArtifact? artifact =
+            _windowsProofInstallers.FindProofArtifactByFileName(proof, fileName);
+        return artifact is null
+            ? NotFound()
+            : BuildWindowsProofArtifactFileResult(proof, artifact);
+    }
+
+    [HttpGet("/downloads/proof/windows/candidates/{candidateVersion}/{role}")]
+    [HttpHead("/downloads/proof/windows/candidates/{candidateVersion}/{role}")]
+    public IActionResult DownloadCandidateWindowsProofRole(
+        [FromRoute] string candidateVersion,
+        [FromRoute] string role)
+        => DownloadUniqueCandidateWindowsProofRole(candidateVersion, role, evidenceOnly: false);
+
+    [HttpGet("/downloads/proof/windows/candidates/{candidateVersion}/evidence/{role}")]
+    [HttpHead("/downloads/proof/windows/candidates/{candidateVersion}/evidence/{role}")]
+    public IActionResult DownloadCandidateWindowsProofEvidence(
+        [FromRoute] string candidateVersion,
+        [FromRoute] string role)
+        => DownloadUniqueCandidateWindowsProofRole(candidateVersion, role, evidenceOnly: true);
+
+    private IActionResult DownloadUniqueCandidateWindowsProofRole(
+        string candidateVersion,
+        string role,
+        bool evidenceOnly)
+    {
+        WindowsProofDeliverySnapshot? proof =
+            _windowsProofInstallers.CaptureProofCandidate(candidateVersion);
+        if (proof is null)
+        {
+            return NotFound();
+        }
+
+        WindowsProofDeliveryArtifact? artifact =
+            _windowsProofInstallers.FindUniqueProofArtifactByRole(proof, role);
+        if (artifact is null)
+        {
+            return NotFound();
+        }
+
+        bool isPrimaryAsset = artifact.Role is WindowsProofDeliveryRoles.Installer
+            or WindowsProofDeliveryRoles.BootstrapPayload
+            or WindowsProofDeliveryRoles.BootstrapMetadata;
+        if (evidenceOnly == isPrimaryAsset)
+        {
+            return NotFound();
+        }
+
+        return BuildWindowsProofArtifactFileResult(proof, artifact);
+    }
+
+    private IActionResult BuildWindowsProofCatalog(WindowsProofDeliverySnapshot proof)
+    {
+        ArtifactDeliveryDecision? denied = proof.Artifacts
+            .Select(artifact => _artifactDelivery.EvaluateGlobalRevocation(artifact.ArtifactId, artifact.Sha256))
+            .FirstOrDefault(static decision => !decision.Allowed);
+        if (denied is not null)
+        {
+            return ArtifactDeliveryDenied(denied);
+        }
+
+        TryApplyWindowsProofHeaders(proof);
+        WindowsProofDeliveryArtifact[] installers = proof.Artifacts
+            .Where(static artifact => string.Equals(
+                artifact.Role,
+                WindowsProofDeliveryRoles.Installer,
+                StringComparison.Ordinal))
+            .ToArray();
+        if (installers.Length == 0)
+        {
+            return WindowsProofMissing();
+        }
+
+        return Ok(new
+        {
+            status = "proof_only",
+            supportabilityState = "review_required",
+            publicTrustPosture = "blocked",
+            canonicalRelease = false,
+            cfAccessGated = true,
+            generationId = proof.GenerationId,
+            candidateVersion = proof.CandidateVersion,
+            proof.CreatedAt,
+            proof.ActivatedAt,
+            proof.RevocationGeneration,
+            message = "Private Windows test candidate. This is not the canonical release shelf and must not be treated as a supported or stable build.",
+            downloads = installers.Select(installer => new
+            {
+                installer.ArtifactId,
+                installer.FileName,
+                installer.Head,
+                installer.Rid,
+                installer.Sha256,
+                installer.SizeBytes,
+                installer.CurrentDownloadUrl,
+                installer.GenerationDownloadUrl,
+                installer.CandidateDownloadUrl,
+                payloadUrl = FindSiblingProofUrl(proof, installer.ArtifactId, WindowsProofDeliveryRoles.BootstrapPayload),
+                metadataUrl = FindSiblingProofUrl(proof, installer.ArtifactId, WindowsProofDeliveryRoles.BootstrapMetadata),
+                signingEvidenceUrl = FindSiblingProofUrl(proof, installer.ArtifactId, WindowsProofDeliveryRoles.Signing),
+                startupSmokeEvidenceUrl = FindSiblingProofUrl(proof, installer.ArtifactId, WindowsProofDeliveryRoles.StartupSmoke),
+                visualHandoffUrl = FindSiblingProofUrl(proof, installer.ArtifactId, WindowsProofDeliveryRoles.VisualHandoff),
+                visualExitEvidenceUrl = FindSiblingProofUrl(proof, installer.ArtifactId, WindowsProofDeliveryRoles.VisualExit)
+            })
+        });
+    }
+
+    private static string? FindSiblingProofUrl(
+        WindowsProofDeliverySnapshot proof,
+        string artifactId,
+        string role)
+        => proof.Artifacts.FirstOrDefault(artifact =>
+            string.Equals(artifact.ArtifactId, artifactId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(artifact.Role, role, StringComparison.Ordinal))?.CandidateDownloadUrl;
+
+    private IActionResult BuildWindowsProofArtifactFileResult(
+        WindowsProofDeliverySnapshot proof,
+        WindowsProofDeliveryArtifact artifact)
+    {
+        ArtifactDeliveryDecision delivery = _artifactDelivery.EvaluateGlobalRevocation(
+            artifact.ArtifactId,
+            artifact.Sha256);
+        if (!delivery.Allowed)
+        {
+            return ArtifactDeliveryDenied(delivery);
+        }
+
+        Stream? stream = _windowsProofInstallers.OpenVerifiedProofArtifact(proof, artifact);
+        if (stream is null)
+        {
+            return NotFound();
+        }
+
+        TryApplyWindowsProofHeaders(proof);
+        bool enableRanges = string.Equals(
+                artifact.Role,
+                WindowsProofDeliveryRoles.Installer,
+                StringComparison.Ordinal)
+            || string.Equals(
+                artifact.Role,
+                WindowsProofDeliveryRoles.BootstrapPayload,
+                StringComparison.Ordinal);
+        return File(
+            stream,
+            artifact.ContentType,
+            artifact.FileName,
+            enableRangeProcessing: enableRanges);
+    }
+
+    private void TryApplyWindowsProofHeaders(WindowsProofDeliverySnapshot proof)
+    {
+        if (ControllerContext.HttpContext is not HttpContext httpContext)
+        {
+            return;
+        }
+
+        ApplyCanonicalManifestNoStoreHeaders(httpContext.Response.Headers);
+        httpContext.Response.Headers["Referrer-Policy"] = "no-referrer";
+        httpContext.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        httpContext.Response.Headers["X-Robots-Tag"] = "noindex, nofollow, noarchive";
+        httpContext.Response.Headers["X-Chummer-Install-Tier"] = "proof_only";
+        httpContext.Response.Headers["X-Chummer-Supportability-State"] = "review_required";
+        httpContext.Response.Headers["X-Chummer-Public-Trust-Posture"] = "blocked";
+        httpContext.Response.Headers["X-Chummer-Canonical-Release"] = "false";
+        httpContext.Response.Headers["X-Chummer-Windows-Proof-Generation"] = proof.GenerationId;
+        httpContext.Response.Headers["X-Chummer-Windows-Proof-Candidate"] = proof.CandidateVersion;
+    }
+
+    private IActionResult BuildLegacyWindowsProofCatalog(ReleaseShelfSnapshot snapshot)
+    {
+        TryApplyGenerationHeader(snapshot);
+        IReadOnlyList<WindowsProofInstallerRecord> installers =
+            _windowsProofInstallers.LoadCatalog(snapshot);
+        ArtifactDeliveryDecision? invalidDecision = installers
+            .Select(installer => _artifactDelivery.EvaluateGlobalRevocation(installer.ArtifactId, installer.Sha256))
+            .FirstOrDefault(static decision => decision.Failure is ArtifactDeliveryFailure.InvalidContract
+                or ArtifactDeliveryFailure.RevocationTruthUnavailable);
+        if (invalidDecision is not null)
+        {
+            return ArtifactDeliveryDenied(invalidDecision);
+        }
+
+        installers = installers
+            .Where(installer => _artifactDelivery.EvaluateGlobalRevocation(installer.ArtifactId, installer.Sha256).Allowed)
+            .ToArray();
         if (installers.Count == 0)
         {
             return NotFound(new
@@ -100,88 +565,180 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         });
     }
 
-    [HttpGet("/downloads/supplemental/windows/{fileName}")]
-    [HttpHead("/downloads/supplemental/windows/{fileName}")]
-    [HttpGet("/downloads/proof/windows/{fileName}")]
-    [HttpHead("/downloads/proof/windows/{fileName}")]
-    public IActionResult DownloadWindowsProofInstaller([FromRoute] string fileName)
+    private IActionResult DownloadLegacyWindowsProofInstaller(
+        ReleaseShelfSnapshot snapshot,
+        string value,
+        bool byArtifactId)
     {
-        var installer = _windowsProofInstallers.FindByFileName(fileName);
+        WindowsProofInstallerRecord? installer = byArtifactId
+            ? _windowsProofInstallers.FindByArtifactId(snapshot, value)
+            : _windowsProofInstallers.FindByFileName(snapshot, value);
         if (installer is null)
         {
             return NotFound();
         }
 
-        ApplyProofInstallerHeaders(Response.Headers);
-        ApplyRouteProofHeaders(
-            Response.Headers,
-            "No current release status record is attached to the Windows installer output route.",
-            "/downloads/supplemental/windows/{fileName}",
-            "/downloads/install/{artifactId}/supplemental",
-            "/downloads/proof/windows/{fileName}",
-            "/downloads/install/{artifactId}/proof",
-            $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}");
-        return PhysicalFile(
-            installer.FilePath,
-            "application/octet-stream",
-            installer.FileName,
-            enableRangeProcessing: true);
-    }
-
-    [HttpGet("/downloads/install/{artifactId}/supplemental")]
-    [HttpHead("/downloads/install/{artifactId}/supplemental")]
-    [HttpGet("/downloads/install/{artifactId}/proof")]
-    [HttpHead("/downloads/install/{artifactId}/proof")]
-    public IActionResult DownloadWindowsProofInstallerByArtifactId([FromRoute] string artifactId)
-    {
-        var installer = _windowsProofInstallers.FindByArtifactId(artifactId);
-        if (installer is null)
+        ArtifactDeliveryDecision delivery = _artifactDelivery.EvaluateGlobalRevocation(
+            installer.ArtifactId,
+            installer.Sha256);
+        if (!delivery.Allowed)
         {
-            return NotFound();
+            return ArtifactDeliveryDenied(delivery);
         }
 
+        TryApplyGenerationHeader(snapshot);
         ApplyProofInstallerHeaders(Response.Headers);
-        ApplyRouteProofHeaders(
-            Response.Headers,
-            "No current release status record is attached to the Windows installer artifact route.",
-            $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}/supplemental",
-            "/downloads/install/{artifactId}/supplemental",
-            $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}/proof",
-            "/downloads/install/{artifactId}/proof",
-            $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}");
-        return PhysicalFile(
-            installer.FilePath,
-            "application/octet-stream",
-            installer.FileName,
-            enableRangeProcessing: true);
+        return BuildWindowsProofInstallerFileResult(snapshot, installer);
     }
+
+    private IActionResult WindowsProofMissing()
+        => NotFound(new
+        {
+            status = "missing",
+            message = "No private Windows proof candidate is available right now."
+        });
 
     private static void ApplyProofInstallerHeaders(IHeaderDictionary headers)
     {
         headers["Cache-Control"] = "private, no-store, max-age=0";
+        headers["CDN-Cache-Control"] = "no-store, max-age=0";
+        headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
+        headers["Surrogate-Control"] = "no-store";
         headers["Pragma"] = "no-cache";
         headers["Expires"] = "0";
         headers["X-Chummer-Install-Tier"] = "supplemental";
+        headers["X-Content-Type-Options"] = "nosniff";
+    }
+
+    private IActionResult BuildWindowsProofInstallerFileResult(
+        ReleaseShelfSnapshot snapshot,
+        WindowsProofInstallerRecord installer)
+    {
+        ReleaseShelfVerifiedFile? verified = _windowsProofInstallers.OpenVerifiedInstaller(
+            snapshot,
+            installer);
+        if (verified is null)
+        {
+            return NotFound();
+        }
+
+        // FileStreamResult owns the still-verified descriptor for the response lifetime.
+        return File(
+            verified.Stream,
+            "application/octet-stream",
+            installer.FileName,
+            enableRangeProcessing: true);
+    }
+
+    private static void ApplyCanonicalManifestNoStoreHeaders(IHeaderDictionary headers)
+    {
+        headers["Cache-Control"] = "private, no-store, max-age=0";
+        headers["CDN-Cache-Control"] = "no-store, max-age=0";
+        headers["Cloudflare-CDN-Cache-Control"] = "no-store, max-age=0";
+        headers["Surrogate-Control"] = "no-store";
+        headers["Pragma"] = "no-cache";
+        headers["Expires"] = "0";
+    }
+
+    private static void ApplyCredentialResponseNoStoreHeaders(IHeaderDictionary headers)
+    {
+        ApplyCanonicalManifestNoStoreHeaders(headers);
+        headers["Referrer-Policy"] = "no-referrer";
+    }
+
+    private static bool HasCredentialQuery(HttpRequest request)
+        => request.Query.ContainsKey("ticket") || request.Query.ContainsKey("claimCode");
+
+    private void TryApplyCredentialResponseNoStoreHeaders()
+    {
+        if (ControllerContext.HttpContext is not HttpContext httpContext
+            || !HasCredentialQuery(Request))
+        {
+            return;
+        }
+
+        ApplyCredentialResponseNoStoreHeaders(httpContext.Response.Headers);
+    }
+
+    private static void ApplyGenerationHeader(
+        IHeaderDictionary headers,
+        ReleaseShelfSnapshot snapshot)
+    {
+        if (!string.IsNullOrWhiteSpace(snapshot.GenerationId))
+        {
+            headers["X-Chummer-Release-Generation"] = snapshot.GenerationId;
+        }
+    }
+
+    private void TryApplyCanonicalManifestNoStoreHeaders(ReleaseShelfSnapshot snapshot)
+    {
+        if (ControllerContext.HttpContext is not HttpContext httpContext)
+        {
+            return;
+        }
+
+        ApplyCanonicalManifestNoStoreHeaders(httpContext.Response.Headers);
+        ApplyGenerationHeader(httpContext.Response.Headers, snapshot);
+    }
+
+    private void TryApplyGenerationHeader(ReleaseShelfSnapshot snapshot)
+    {
+        if (ControllerContext.HttpContext is HttpContext httpContext)
+        {
+            ApplyGenerationHeader(httpContext.Response.Headers, snapshot);
+        }
+    }
+
+    private void TryApplyImmutableGenerationHeaders()
+    {
+        if (ControllerContext.HttpContext is HttpContext httpContext)
+        {
+            if (HasCredentialQuery(httpContext.Request))
+            {
+                ApplyCredentialResponseNoStoreHeaders(httpContext.Response.Headers);
+            }
+            else
+            {
+                httpContext.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+            }
+        }
+    }
+
+    private ReleaseShelfSnapshot? TryCaptureGeneration(string generationId)
+    {
+        try
+        {
+            return _releases.CaptureShelfGeneration(generationId);
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     [HttpGet("/downloads/get/{artifactId}")]
     public async Task<IActionResult> DownloadArtifact([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
-        var (manifest, artifact) = ResolveManifestArtifact(artifactId);
-        if (artifact is null)
+        TryApplyCredentialResponseNoStoreHeaders();
+        ReleaseShelfSnapshot snapshot = _releases.CaptureShelfSnapshot();
+        TryApplyGenerationHeader(snapshot);
+        ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByArtifactId(snapshot, artifactId);
+        if (!resolution.Allowed)
         {
-            return NotFound();
+            return ArtifactDeliveryDenied(resolution);
         }
 
-        var filePath = _releases.ResolveDownloadFilePath(artifact);
-        if (filePath is null)
-        {
-            return NotFound();
-        }
+        ArtifactDeliveryBinding binding = resolution.Binding!;
+        PublicReleaseManifestDto manifest = binding.Manifest;
+        PublicReleaseArtifactDto artifact = binding.Artifact;
 
         var encodedArtifactId = Uri.EscapeDataString(artifact.Id);
         var subject = await TryGetOptionalSubjectAsync(cancellationToken);
-        var requiresAccount = _releaseSelection.RequiresAccount(artifact);
+        bool requiresAccount = binding.RequiresAccount;
         if (subject is not null && requiresAccount)
         {
             return Redirect($"/downloads/install/{encodedArtifactId}");
@@ -201,27 +758,27 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             "/downloads/get/{artifactId}",
             $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}");
 
-        return PhysicalFile(
-            filePath,
+        return BuildVerifiedArtifactFileResult(
+            binding,
             "application/octet-stream",
-            artifact.FileName ?? Path.GetFileName(filePath),
+            binding.FileName,
             enableRangeProcessing: true);
     }
 
     [HttpGet("/downloads/file/{artifactId}")]
     public async Task<IActionResult> DownloadResolvedArtifactFile([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
-        var (manifest, artifact) = ResolveManifestArtifact(artifactId);
-        if (artifact is null)
+        TryApplyCredentialResponseNoStoreHeaders();
+        ReleaseShelfSnapshot snapshot = _releases.CaptureShelfSnapshot();
+        TryApplyGenerationHeader(snapshot);
+        ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByArtifactId(snapshot, artifactId);
+        if (!resolution.Allowed)
         {
-            return NotFound();
+            return ArtifactDeliveryDenied(resolution);
         }
 
-        var filePath = _releases.ResolveDownloadFilePath(artifact);
-        if (filePath is null)
-        {
-            return NotFound();
-        }
+        ArtifactDeliveryBinding binding = resolution.Binding!;
+        PublicReleaseArtifactDto artifact = binding.Artifact;
 
         if (ControllerContext?.HttpContext is null)
         {
@@ -231,13 +788,20 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         string? bootstrapTicket = Request.Query["ticket"].ToString();
         if (!string.IsNullOrWhiteSpace(bootstrapTicket))
         {
-            if (_installBootstrapTickets.TryValidateForArtifact(bootstrapTicket, artifact.Id, out _))
+            if (_installBootstrapTickets.TryValidateForArtifactRole(
+                    bootstrapTicket,
+                    artifact.Id,
+                    binding.Role,
+                    snapshot.GenerationId,
+                    binding.Sha256,
+                    allowLegacyUnbound: snapshot.IsLegacy,
+                    out _))
             {
                 Response.Headers["Cache-Control"] = "private, no-store";
-                return PhysicalFile(
-                    filePath,
+                return BuildVerifiedArtifactFileResult(
+                    binding,
                     "application/octet-stream",
-                    artifact.FileName ?? Path.GetFileName(filePath),
+                    binding.FileName,
                     enableRangeProcessing: true);
             }
 
@@ -252,13 +816,18 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         string? claimCode = Request.Query["claimCode"].ToString();
         if (!string.IsNullOrWhiteSpace(claimCode))
         {
-            if (_installLinking.CanDownloadArtifactWithClaimCode(artifact.Id, claimCode))
+            if (_installLinking.CanDownloadArtifactWithClaimCode(
+                    artifact.Id,
+                    snapshot.GenerationId,
+                    artifact.Sha256,
+                    allowLegacyUnbound: snapshot.IsLegacy,
+                    claimCode))
             {
                 Response.Headers["Cache-Control"] = "private, no-store";
-                return PhysicalFile(
-                    filePath,
+                return BuildVerifiedArtifactFileResult(
+                    binding,
                     "application/octet-stream",
-                    artifact.FileName ?? Path.GetFileName(filePath),
+                    binding.FileName,
                     enableRangeProcessing: true);
             }
 
@@ -271,7 +840,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         }
 
         var subject = await TryGetOptionalSubjectAsync(cancellationToken);
-        if (subject is null && _releaseSelection.RequiresAccount(artifact))
+        if (subject is null && binding.RequiresAccount)
         {
             return Redirect(BuildInstallLoginHref(artifact));
         }
@@ -282,37 +851,266 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             $"/downloads/file/{Uri.EscapeDataString(artifact.Id)}",
             "/downloads/file/{artifactId}",
             $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}");
-        return PhysicalFile(
-            filePath,
+        return BuildVerifiedArtifactFileResult(
+            binding,
             "application/octet-stream",
-            artifact.FileName ?? Path.GetFileName(filePath),
+            binding.FileName,
             enableRangeProcessing: true);
     }
 
     [HttpGet("/downloads/files/{**path}")]
     public async Task<IActionResult> DownloadFile([FromRoute] string? path, CancellationToken cancellationToken)
     {
-        var (manifest, artifact) = ResolvePublicManifestArtifactByPath(path);
-        bool matchedBootstrapSidecar = false;
-        if (artifact is null)
-        {
-            var bootstrapSidecar = ResolveBootstrapPayloadArtifactByPath(path);
-            if (bootstrapSidecar.Artifact is null)
-            {
-                return DownloadAurPackageFile(path);
-            }
+        TryApplyCredentialResponseNoStoreHeaders();
+        ReleaseShelfSnapshot snapshot = _releases.CaptureShelfSnapshot();
+        return await DownloadFileFromSnapshot(snapshot, path, generationBound: false, cancellationToken);
+    }
 
-            manifest = bootstrapSidecar.Manifest;
-            artifact = bootstrapSidecar.Artifact;
-            matchedBootstrapSidecar = true;
-        }
+    [HttpGet("/downloads/install/{artifactId}/payload")]
+    [HttpHead("/downloads/install/{artifactId}/payload")]
+    public Task<IActionResult> DownloadCurrentArtifactPayload(
+        [FromRoute] string artifactId,
+        CancellationToken cancellationToken)
+    {
+        TryApplyCredentialResponseNoStoreHeaders();
+        return DownloadArtifactRoleFromSnapshot(
+            _releases.CaptureShelfSnapshot(),
+            artifactId,
+            ArtifactDeliveryRoles.Payload,
+            retainedRawPath: false,
+            cancellationToken);
+    }
 
-        var filePath = _releases.ResolveDownloadFilePath(path);
-        if (filePath is null)
+    [HttpGet("/downloads/install/{artifactId}/metadata")]
+    [HttpHead("/downloads/install/{artifactId}/metadata")]
+    public Task<IActionResult> DownloadCurrentArtifactPayloadMetadata(
+        [FromRoute] string artifactId,
+        CancellationToken cancellationToken)
+    {
+        TryApplyCredentialResponseNoStoreHeaders();
+        return DownloadArtifactRoleFromSnapshot(
+            _releases.CaptureShelfSnapshot(),
+            artifactId,
+            ArtifactDeliveryRoles.PayloadMetadata,
+            retainedRawPath: false,
+            cancellationToken);
+    }
+
+    [HttpGet("/downloads/g/{generationId}/install/{artifactId}")]
+    [HttpHead("/downloads/g/{generationId}/install/{artifactId}")]
+    public async Task<IActionResult> DownloadGenerationArtifact(
+        [FromRoute] string generationId,
+        [FromRoute] string artifactId,
+        CancellationToken cancellationToken)
+    {
+        TryApplyCredentialResponseNoStoreHeaders();
+        ReleaseShelfSnapshot? snapshot = TryCaptureGeneration(generationId);
+        if (snapshot is null)
         {
             return NotFound();
         }
 
+        TryApplyGenerationHeader(snapshot);
+        ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByArtifactId(snapshot, artifactId);
+        if (!resolution.Allowed)
+        {
+            return ArtifactDeliveryDenied(resolution);
+        }
+
+        ArtifactDeliveryBinding binding = resolution.Binding!;
+        PublicReleaseManifestDto manifest = binding.Manifest;
+        PublicReleaseArtifactDto artifact = binding.Artifact;
+        string fileName = binding.FileName;
+        if (!binding.RequiresAccount)
+        {
+            TryApplyImmutableGenerationHeaders();
+            return BuildVerifiedArtifactFileResult(
+                binding,
+                ResolveDirectFileContentType(fileName, matchedBootstrapSidecar: false),
+                fileName,
+                enableRangeProcessing: true);
+        }
+
+        Response.Headers["Cache-Control"] = "private, no-store";
+        string? bootstrapTicket = Request.Query["ticket"].ToString();
+        if (!string.IsNullOrWhiteSpace(bootstrapTicket))
+        {
+            if (!_installBootstrapTickets.TryValidateForArtifactRole(
+                    bootstrapTicket,
+                    artifact.Id,
+                    binding.Role,
+                    snapshot.GenerationId,
+                    binding.Sha256,
+                    allowLegacyUnbound: false,
+                    out _))
+            {
+                return Unauthorized(new
+                {
+                    error = "invalid_or_expired_install_ticket",
+                    message = "The install command expired. Open the signed-in Downloads page and copy a fresh install command."
+                });
+            }
+
+            return BuildVerifiedArtifactFileResult(
+                binding,
+                ResolveDirectFileContentType(fileName, matchedBootstrapSidecar: false),
+                fileName,
+                enableRangeProcessing: true);
+        }
+
+        string? claimCode = Request.Query["claimCode"].ToString();
+        if (!string.IsNullOrWhiteSpace(claimCode))
+        {
+            if (!_installLinking.CanDownloadArtifactWithClaimCode(
+                    artifact.Id,
+                    snapshot.GenerationId,
+                    artifact.Sha256,
+                    allowLegacyUnbound: false,
+                    claimCode))
+            {
+                return Unauthorized(new
+                {
+                    error = "invalid_or_expired_claim_code",
+                    message = "The claim code for this download is no longer valid. Open the signed-in Downloads page and request a fresh install."
+                });
+            }
+
+            return BuildVerifiedArtifactFileResult(
+                binding,
+                ResolveDirectFileContentType(fileName, matchedBootstrapSidecar: false),
+                fileName,
+                enableRangeProcessing: true);
+        }
+
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is null)
+        {
+            string nextPath = $"/downloads/g/{Uri.EscapeDataString(snapshot.GenerationId!)}/install/{Uri.EscapeDataString(artifact.Id)}";
+            return Redirect($"/login?next={Uri.EscapeDataString(nextPath)}");
+        }
+
+        DownloadDispatchResult dispatch = _installLinking.IssueDownload(
+            manifest,
+            artifact,
+            userId: null,
+            subjectId: subject.SubjectId);
+        if (dispatch.ClaimTicket is null)
+        {
+            return StatusCode(StatusCodes.Status409Conflict, new
+            {
+                error = "generation_bound_credential_unavailable",
+                message = "A generation-bound install credential could not be issued. Open Downloads and try again."
+            });
+        }
+
+        Response.Headers["X-Chummer-Download-Receipt-Id"] = dispatch.Receipt.ReceiptId;
+        return BuildVerifiedArtifactFileResult(
+            binding,
+            ResolveDirectFileContentType(fileName, matchedBootstrapSidecar: false),
+            fileName,
+            enableRangeProcessing: true);
+    }
+
+    [HttpGet("/downloads/g/{generationId}/files/{**path}")]
+    public async Task<IActionResult> DownloadGenerationFile(
+        [FromRoute] string generationId,
+        [FromRoute] string? path,
+        CancellationToken cancellationToken)
+    {
+        TryApplyCredentialResponseNoStoreHeaders();
+        ReleaseShelfSnapshot snapshot;
+        try
+        {
+            snapshot = _releases.CaptureShelfGeneration(generationId);
+        }
+        catch (InvalidDataException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException)
+        {
+            return NotFound();
+        }
+
+        return await DownloadFileFromSnapshot(snapshot, path, generationBound: true, cancellationToken);
+    }
+
+    [HttpGet("/downloads/g/{generationId}/install/{artifactId}/payload")]
+    [HttpHead("/downloads/g/{generationId}/install/{artifactId}/payload")]
+    public Task<IActionResult> DownloadGenerationArtifactPayload(
+        [FromRoute] string generationId,
+        [FromRoute] string artifactId,
+        CancellationToken cancellationToken)
+        => DownloadGenerationArtifactRole(generationId, artifactId, ArtifactDeliveryRoles.Payload, cancellationToken);
+
+    [HttpGet("/downloads/g/{generationId}/install/{artifactId}/metadata")]
+    [HttpHead("/downloads/g/{generationId}/install/{artifactId}/metadata")]
+    public Task<IActionResult> DownloadGenerationArtifactPayloadMetadata(
+        [FromRoute] string generationId,
+        [FromRoute] string artifactId,
+        CancellationToken cancellationToken)
+        => DownloadGenerationArtifactRole(generationId, artifactId, ArtifactDeliveryRoles.PayloadMetadata, cancellationToken);
+
+    private Task<IActionResult> DownloadGenerationArtifactRole(
+        string generationId,
+        string artifactId,
+        string role,
+        CancellationToken cancellationToken)
+    {
+        TryApplyCredentialResponseNoStoreHeaders();
+        ReleaseShelfSnapshot? snapshot = TryCaptureGeneration(generationId);
+        return snapshot is null
+            ? Task.FromResult<IActionResult>(NotFound())
+            : DownloadArtifactRoleFromSnapshot(snapshot, artifactId, role, retainedRawPath: false, cancellationToken);
+    }
+
+    private async Task<IActionResult> DownloadArtifactRoleFromSnapshot(
+        ReleaseShelfSnapshot snapshot,
+        string artifactId,
+        string role,
+        bool retainedRawPath,
+        CancellationToken cancellationToken)
+    {
+        ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByArtifactId(snapshot, artifactId, role);
+        return !resolution.Allowed
+            ? ArtifactDeliveryDenied(resolution)
+            : await DownloadResolvedBindingFromSnapshot(
+                resolution.Binding!,
+                retainedRawPath,
+                cancellationToken);
+    }
+
+    private async Task<IActionResult> DownloadFileFromSnapshot(
+        ReleaseShelfSnapshot snapshot,
+        string? path,
+        bool generationBound,
+        CancellationToken cancellationToken)
+    {
+        ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByPath(snapshot, path);
+        if (resolution.Failure == ArtifactDeliveryFailure.NotFound)
+        {
+            return DownloadAurPackageFile(snapshot, path);
+        }
+
+        if (!resolution.Allowed)
+        {
+            return ArtifactDeliveryDenied(resolution);
+        }
+
+        return await DownloadResolvedBindingFromSnapshot(
+            resolution.Binding!,
+            retainedRawPath: generationBound,
+            cancellationToken);
+    }
+
+    private async Task<IActionResult> DownloadResolvedBindingFromSnapshot(
+        ArtifactDeliveryBinding binding,
+        bool retainedRawPath,
+        CancellationToken cancellationToken)
+    {
+        ReleaseShelfSnapshot snapshot = binding.Snapshot;
+        PublicReleaseArtifactDto artifact = binding.Artifact;
+        TryApplyGenerationHeader(snapshot);
         if (ControllerContext?.HttpContext is null)
         {
             return NotFound();
@@ -321,10 +1119,23 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         string? bootstrapTicket = Request.Query["ticket"].ToString();
         if (!string.IsNullOrWhiteSpace(bootstrapTicket))
         {
-            if (_installBootstrapTickets.TryValidateForArtifact(bootstrapTicket, artifact.Id, out _))
+            if (_installBootstrapTickets.TryValidateForArtifactRole(
+                    bootstrapTicket,
+                    artifact.Id,
+                    binding.Role,
+                    snapshot.GenerationId,
+                    binding.Sha256,
+                    allowLegacyUnbound: snapshot.IsLegacy,
+                    out _))
             {
                 Response.Headers["Cache-Control"] = "private, no-store";
-                return PhysicalFile(filePath, "application/octet-stream", enableRangeProcessing: true);
+                return BuildVerifiedArtifactFileResult(
+                    binding,
+                    ResolveDirectFileContentType(
+                        binding.FileName,
+                        binding.Role == ArtifactDeliveryRoles.PayloadMetadata),
+                    fileDownloadName: null,
+                    enableRangeProcessing: true);
             }
 
             Response.Headers["Cache-Control"] = "private, no-store";
@@ -338,10 +1149,20 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         string? claimCode = Request.Query["claimCode"].ToString();
         if (!string.IsNullOrWhiteSpace(claimCode))
         {
-            if (_installLinking.CanDownloadArtifactWithClaimCode(artifact.Id, claimCode))
+            if (binding.Role == ArtifactDeliveryRoles.Primary
+                && _installLinking.CanDownloadArtifactWithClaimCode(
+                    artifact.Id,
+                    snapshot.GenerationId,
+                    binding.Sha256,
+                    allowLegacyUnbound: snapshot.IsLegacy,
+                    claimCode))
             {
                 Response.Headers["Cache-Control"] = "private, no-store";
-                return PhysicalFile(filePath, "application/octet-stream", enableRangeProcessing: true);
+                return BuildVerifiedArtifactFileResult(
+                    binding,
+                    "application/octet-stream",
+                    fileDownloadName: null,
+                    enableRangeProcessing: true);
             }
 
             Response.Headers["Cache-Control"] = "private, no-store";
@@ -352,41 +1173,146 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             });
         }
 
-        var encodedArtifactId = Uri.EscapeDataString(artifact.Id);
-        var subject = await TryGetOptionalSubjectAsync(cancellationToken);
-        var requiresAccount = _releaseSelection.RequiresAccount(artifact);
-        if (subject is not null && requiresAccount)
+        if (!binding.RequiresAccount)
         {
-            return Redirect($"/downloads/install/{encodedArtifactId}");
+            if (!snapshot.IsLegacy)
+            {
+                TryApplyImmutableGenerationHeaders();
+            }
+
+            return BuildVerifiedArtifactFileResult(
+                binding,
+                ResolveDirectFileContentType(
+                    binding.FileName,
+                    binding.Role == ArtifactDeliveryRoles.PayloadMetadata),
+                fileDownloadName: null,
+                enableRangeProcessing: true);
         }
 
-        if (requiresAccount)
+        if (retainedRawPath)
+        {
+            Response.Headers["Cache-Control"] = "private, no-store";
+            return StatusCode(StatusCodes.Status409Conflict, new
+            {
+                error = "generation_bound_credential_required",
+                message = "This retained release generation requires its generation-bound install ticket or claim code. Use the install command issued for this exact release."
+            });
+        }
+
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        if (subject is null)
         {
             return Redirect(BuildInstallLoginHref(artifact));
         }
 
+        Response.Headers["Cache-Control"] = "private, no-store";
         ApplyRouteProofHeaders(
             Response.Headers,
             "No current release status record is attached to the public file-output route.",
-            "/downloads/files/{**path}",
-            $"/downloads/install/{encodedArtifactId}");
-        return PhysicalFile(
-            filePath,
-            ResolveDirectFileContentType(Path.GetFileName(filePath), matchedBootstrapSidecar),
+            snapshot.IsLegacy
+                ? "/downloads/files/{**path}"
+                : $"/downloads/g/{snapshot.GenerationId}/install/{Uri.EscapeDataString(artifact.Id)}",
+            $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}");
+        return BuildVerifiedArtifactFileResult(
+            binding,
+            ResolveDirectFileContentType(
+                binding.FileName,
+                binding.Role == ArtifactDeliveryRoles.PayloadMetadata),
+            fileDownloadName: null,
             enableRangeProcessing: true);
     }
 
-    private IActionResult DownloadAurPackageFile(string? path)
+    private IActionResult BuildVerifiedArtifactFileResult(
+        ArtifactDeliveryBinding binding,
+        string contentType,
+        string? fileDownloadName,
+        bool enableRangeProcessing)
     {
-        AurPackageEntry? package = _aurPackages.FindByFileName(path);
+        ReleaseShelfVerifiedFile? verified = _artifactDelivery.OpenVerifiedFile(binding);
+        if (verified is null)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = "artifact_bytes_unavailable",
+                message = "The selected release bytes did not match their exact delivery contract."
+            });
+        }
+
+        // FileStreamResult owns and disposes the verified stream after the response completes.
+        return string.IsNullOrWhiteSpace(fileDownloadName)
+            ? File(verified.Stream, contentType, enableRangeProcessing: enableRangeProcessing)
+            : File(verified.Stream, contentType, fileDownloadName, enableRangeProcessing: enableRangeProcessing);
+    }
+
+    private IActionResult ArtifactDeliveryDenied(ArtifactDeliveryResolution resolution)
+        => resolution.Failure switch
+        {
+            ArtifactDeliveryFailure.NotFound => NotFound(),
+            ArtifactDeliveryFailure.Revoked => StatusCode(StatusCodes.Status410Gone, new
+            {
+                error = resolution.Code,
+                message = "This release artifact has been revoked and cannot be downloaded with any credential."
+            }),
+            _ => StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = resolution.Code,
+                message = "Artifact delivery truth is unavailable or invalid, so the download is blocked."
+            })
+        };
+
+    private IActionResult ArtifactDeliveryDenied(ArtifactDeliveryDecision decision)
+        => decision.Failure switch
+        {
+            ArtifactDeliveryFailure.Revoked => StatusCode(StatusCodes.Status410Gone, new
+            {
+                error = decision.Code,
+                message = "This release artifact has been revoked and cannot be downloaded with any credential."
+            }),
+            ArtifactDeliveryFailure.NotFound => NotFound(),
+            _ => StatusCode(StatusCodes.Status503ServiceUnavailable, new
+            {
+                error = decision.Code,
+                message = "Artifact delivery truth is unavailable or invalid, so the download is blocked."
+            })
+        };
+
+    private IActionResult DownloadAurPackageFile(
+        ReleaseShelfSnapshot snapshot,
+        string? path)
+    {
+        AurPackageEntry? package = _aurPackages.FindByFileName(snapshot, path);
         if (package is null)
         {
             return NotFound();
         }
 
         string fileName = Path.GetFileName((path ?? string.Empty).Trim());
-        string? filePath = _aurPackages.ResolvePackageFilePath(fileName);
-        if (filePath is null)
+        string? packageSha256 = ResolveAurPackageFileSha256(package, fileName);
+        if (packageSha256 is null)
+        {
+            return NotFound();
+        }
+
+        ArtifactDeliveryDecision delivery = _artifactDelivery.EvaluateGlobalRevocation(
+            package.UpstreamArtifactId,
+            package.UpstreamArtifactSha256);
+        if (!delivery.Allowed)
+        {
+            return ArtifactDeliveryDenied(delivery);
+        }
+
+        ArtifactDeliveryDecision sidecarDelivery = _artifactDelivery.EvaluateGlobalRevocation(
+            package.UpstreamArtifactId,
+            packageSha256);
+        if (!sidecarDelivery.Allowed)
+        {
+            return ArtifactDeliveryDenied(sidecarDelivery);
+        }
+
+        string? legacyFilePath = snapshot.IsLegacy
+            ? _aurPackages.ResolvePackageFilePath(snapshot, fileName)
+            : string.Empty;
+        if (legacyFilePath is null)
         {
             return NotFound();
         }
@@ -398,7 +1324,48 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             "/downloads");
         Response.Headers["X-Chummer-Install-Tier"] = "arch-sidecar";
         Response.Headers["X-Chummer-Upstream-Artifact-Id"] = package.UpstreamArtifactId;
-        return PhysicalFile(filePath, "application/octet-stream", fileName, enableRangeProcessing: true);
+        return BuildVerifiedInventoryFileResult(
+            snapshot,
+            fileName,
+            legacyFilePath,
+            "application/octet-stream",
+            fileName,
+            enableRangeProcessing: true);
+    }
+
+    private static string? ResolveAurPackageFileSha256(AurPackageEntry package, string fileName)
+        => string.Equals(fileName, package.SourceArchiveFileName, StringComparison.Ordinal)
+            ? package.SourceArchiveSha256
+            : string.Equals(fileName, package.PkgbuildFileName, StringComparison.Ordinal)
+                ? package.PkgbuildSha256
+                : string.Equals(fileName, package.SrcinfoFileName, StringComparison.Ordinal)
+                    ? package.SrcinfoSha256
+                    : null;
+
+    private IActionResult BuildVerifiedInventoryFileResult(
+        ReleaseShelfSnapshot snapshot,
+        string relativeFilePath,
+        string legacyPhysicalPath,
+        string contentType,
+        string? fileDownloadName,
+        bool enableRangeProcessing)
+    {
+        if (snapshot.IsLegacy)
+        {
+            return string.IsNullOrWhiteSpace(fileDownloadName)
+                ? PhysicalFile(legacyPhysicalPath, contentType, enableRangeProcessing: enableRangeProcessing)
+                : PhysicalFile(legacyPhysicalPath, contentType, fileDownloadName, enableRangeProcessing: enableRangeProcessing);
+        }
+
+        ReleaseShelfVerifiedFile? verified = snapshot.OpenVerifiedFile($"files/{relativeFilePath}");
+        if (verified is null)
+        {
+            return NotFound();
+        }
+
+        return string.IsNullOrWhiteSpace(fileDownloadName)
+            ? File(verified.Stream, contentType, enableRangeProcessing: enableRangeProcessing)
+            : File(verified.Stream, contentType, fileDownloadName, enableRangeProcessing: enableRangeProcessing);
     }
 
     private void ApplyRouteProofHeaders(
@@ -547,194 +1514,6 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         string encodedArtifactId = Uri.EscapeDataString(artifact.Id);
         string nextPath = $"/downloads/install/{encodedArtifactId}";
         return $"/login?next={Uri.EscapeDataString(nextPath)}";
-    }
-
-    private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolveManifestArtifact(string artifactId)
-    {
-        PublicReleaseManifestDto rawManifest = _releases.LoadManifest();
-        PublicReleaseManifestDto publicManifest = _releaseSelection.ApplyAccessPolicy(rawManifest);
-        PublicReleaseArtifactDto? artifact = publicManifest.Downloads
-            .FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
-        if (artifact is not null)
-        {
-            return (publicManifest, artifact);
-        }
-
-        artifact = rawManifest.Downloads
-            .FirstOrDefault(item => string.Equals(item.Id, artifactId, StringComparison.OrdinalIgnoreCase));
-        return (rawManifest, artifact);
-    }
-
-    private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolvePublicManifestArtifactByPath(string? path)
-    {
-        string? normalized = string.IsNullOrWhiteSpace(path)
-            ? null
-            : path.Trim().TrimStart('/');
-        if (normalized is null)
-        {
-            var emptyManifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-            return (emptyManifest, null);
-        }
-
-        string targetFile = Path.GetFileName(normalized.Split('?', '#')[0]);
-        if (string.IsNullOrWhiteSpace(targetFile))
-        {
-            var emptyManifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-            return (emptyManifest, null);
-        }
-
-        PublicReleaseManifestDto rawManifest = _releases.LoadManifest();
-        PublicReleaseManifestDto manifest = _releaseSelection.ApplyAccessPolicy(rawManifest);
-        PublicReleaseArtifactDto? artifact = manifest.Downloads.FirstOrDefault(item =>
-        {
-            string? fileName = item.FileName;
-            if (string.IsNullOrWhiteSpace(fileName))
-            {
-                string rawUrl = item.Url ?? string.Empty;
-                string withoutQuery = rawUrl.Split('?', '#')[0];
-                fileName = Path.GetFileName(withoutQuery);
-            }
-
-            return string.Equals(fileName, targetFile, StringComparison.OrdinalIgnoreCase);
-        });
-
-        if (artifact is not null)
-        {
-            return (manifest, artifact);
-        }
-
-        artifact = rawManifest.Downloads.FirstOrDefault(item =>
-        {
-            string? fileName = item.FileName;
-            if (string.IsNullOrWhiteSpace(fileName))
-            {
-                string rawUrl = item.Url ?? string.Empty;
-                string withoutQuery = rawUrl.Split('?', '#')[0];
-                fileName = Path.GetFileName(withoutQuery);
-            }
-
-            return string.Equals(fileName, targetFile, StringComparison.OrdinalIgnoreCase);
-        });
-
-        return (rawManifest, artifact);
-    }
-
-    private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolveBootstrapPayloadArtifactByPath(string? path)
-    {
-        string? normalized = string.IsNullOrWhiteSpace(path)
-            ? null
-            : path.Trim().TrimStart('/');
-        if (normalized is null)
-        {
-            var emptyManifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-            return (emptyManifest, null);
-        }
-
-        string targetFile = Path.GetFileName(normalized.Split('?', '#')[0]);
-        if (string.IsNullOrWhiteSpace(targetFile))
-        {
-            var emptyManifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-            return (emptyManifest, null);
-        }
-
-        string? installerArtifactId = FindInstallerArtifactIdByBootstrapPayloadFileName(targetFile);
-        if (!string.IsNullOrWhiteSpace(installerArtifactId))
-        {
-            return ResolveManifestArtifact(installerArtifactId);
-        }
-
-        string? inferredInstallerFileName = InferInstallerFileNameFromBootstrapPayloadFileName(targetFile);
-        if (string.IsNullOrWhiteSpace(inferredInstallerFileName))
-        {
-            var emptyManifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-            return (emptyManifest, null);
-        }
-
-        return ResolvePublicManifestArtifactByPath(inferredInstallerFileName);
-    }
-
-    private string? FindInstallerArtifactIdByBootstrapPayloadFileName(string targetFile)
-    {
-        string? canonicalManifestJson = _releases.LoadCanonicalManifestJson();
-        if (string.IsNullOrWhiteSpace(canonicalManifestJson))
-        {
-            return null;
-        }
-
-        try
-        {
-            using JsonDocument document = JsonDocument.Parse(canonicalManifestJson);
-            if (!document.RootElement.TryGetProperty("artifacts", out JsonElement artifacts)
-                || artifacts.ValueKind != JsonValueKind.Array)
-            {
-                return null;
-            }
-
-            foreach (JsonElement artifact in artifacts.EnumerateArray())
-            {
-                if (artifact.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                string payloadFileName = artifact.TryGetProperty("payloadFileName", out JsonElement payloadFileNameElement)
-                    ? (payloadFileNameElement.GetString() ?? string.Empty).Trim()
-                    : string.Empty;
-                string payloadDownloadUrl = artifact.TryGetProperty("payloadDownloadUrl", out JsonElement payloadDownloadUrlElement)
-                    ? (payloadDownloadUrlElement.GetString() ?? string.Empty).Trim()
-                    : string.Empty;
-                string payloadDownloadFileName = string.IsNullOrWhiteSpace(payloadDownloadUrl)
-                    ? string.Empty
-                    : Path.GetFileName(payloadDownloadUrl.Split('?', '#')[0]);
-
-                bool matchesPayloadZip =
-                    string.Equals(payloadFileName, targetFile, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(payloadDownloadFileName, targetFile, StringComparison.OrdinalIgnoreCase);
-                bool matchesPayloadMetadata =
-                    (!string.IsNullOrWhiteSpace(payloadFileName)
-                        && string.Equals(payloadFileName + ".json", targetFile, StringComparison.OrdinalIgnoreCase))
-                    || (!string.IsNullOrWhiteSpace(payloadDownloadFileName)
-                        && string.Equals(payloadDownloadFileName + ".json", targetFile, StringComparison.OrdinalIgnoreCase));
-                if (!matchesPayloadZip && !matchesPayloadMetadata)
-                {
-                    continue;
-                }
-
-                if (!artifact.TryGetProperty("artifactId", out JsonElement artifactIdElement))
-                {
-                    continue;
-                }
-
-                string? artifactId = artifactIdElement.GetString()?.Trim();
-                if (!string.IsNullOrWhiteSpace(artifactId))
-                {
-                    return artifactId;
-                }
-            }
-        }
-        catch (JsonException ex)
-        {
-            _logger.LogDebug(ex, "Skipping bootstrap payload sidecar resolution after canonical manifest JSON parse failure.");
-        }
-
-        return null;
-    }
-
-    private static string? InferInstallerFileNameFromBootstrapPayloadFileName(string targetFile)
-    {
-        string normalized = targetFile.Trim();
-        if (normalized.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-        {
-            normalized = normalized[..^".json".Length];
-        }
-
-        if (!normalized.StartsWith("chummer-", StringComparison.OrdinalIgnoreCase)
-            || !normalized.EndsWith("-payload.zip", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        return normalized[..^"-payload.zip".Length] + "-installer.exe";
     }
 
     private static string ResolveDirectFileContentType(string fileName, bool matchedBootstrapSidecar)

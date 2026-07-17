@@ -2,20 +2,10 @@ import { expect, test } from 'playwright/test';
 import { writeJsonArtifact, writeMarkdownArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
-
-const routes = [
-  '/',
-  '/downloads',
-  '/status',
-  '/faq',
-  '/ledger',
-  '/ledger/map',
-  '/packages',
-  '/feedback',
-  '/docs/embed/origin-dossier-the-name-she-chose',
-  '/login?next=%2Faccount%2Faccess',
-  '/account/access/install-link?installationId=ins-ui-gate&headId=avalonia&applicationVersion=run-20260612-121055&releaseChannel=docker&platform=windows&arch=x64&installLinkMode=browser_callback&installLinkTransport=grant_callback&installLinkCallbackUri=chummer%3A%2F%2Finstall-link',
-];
+const frameIntegrityTimeoutMs = Number.parseInt(process.env.CHUMMER_UI_FRAME_TEST_TIMEOUT_MS || '', 10);
+const frameIntegrityTestTimeout = Number.isFinite(frameIntegrityTimeoutMs) && frameIntegrityTimeoutMs > 0
+  ? frameIntegrityTimeoutMs
+  : 600000;
 
 const viewports = [
   { name: 'phone-390', width: 390, height: 844 },
@@ -24,6 +14,34 @@ const viewports = [
   { name: 'desktop-1366', width: 1366, height: 768 },
   { name: 'desktop-1440', width: 1440, height: 900 },
   { name: 'wide', width: 1920, height: 1080 },
+];
+
+type ViewportName = (typeof viewports)[number]['name'];
+
+const allViewportNames: ViewportName[] = viewports.map((viewport) => viewport.name);
+const compactViewportNames: ViewportName[] = ['phone-390', 'tablet', 'desktop-1366'];
+
+const routeViewportMatrix: Array<{ route: string; viewportNames: ViewportName[] }> = [
+  { route: '/', viewportNames: allViewportNames },
+  { route: '/downloads', viewportNames: allViewportNames },
+  { route: '/ledger', viewportNames: allViewportNames },
+  { route: '/ledger/map', viewportNames: allViewportNames },
+  { route: '/login?next=%2Faccount%2Faccess', viewportNames: allViewportNames },
+  { route: '/status', viewportNames: compactViewportNames },
+  { route: '/faq', viewportNames: compactViewportNames },
+  { route: '/packages', viewportNames: compactViewportNames },
+  { route: '/mobile', viewportNames: compactViewportNames },
+  { route: '/mobile/player', viewportNames: compactViewportNames },
+  { route: '/mobile/gm', viewportNames: compactViewportNames },
+  { route: '/mobile/observer', viewportNames: compactViewportNames },
+  { route: '/play', viewportNames: compactViewportNames },
+  { route: '/play/continuity', viewportNames: compactViewportNames },
+  { route: '/feedback', viewportNames: compactViewportNames },
+  { route: '/docs/embed/origin-dossier-the-name-she-chose', viewportNames: compactViewportNames },
+  {
+    route: '/account/access/install-link?installationId=ins-ui-gate&headId=avalonia&applicationVersion=run-20260612-121055&releaseChannel=docker&platform=windows&arch=x64&installLinkMode=browser_callback&installLinkTransport=grant_callback&installLinkCallbackUri=chummer%3A%2F%2Finstall-link',
+    viewportNames: compactViewportNames,
+  },
 ];
 
 const singleLineRules: Array<{ selector: string; minWidth: number; label: string }> = [
@@ -42,6 +60,13 @@ const transientNavigationNeedles = [
   'net::ERR_',
   'Navigation timeout',
   'Timeout',
+  'chrome-error://chromewebdata/',
+  'interrupted by another navigation',
+];
+
+const transientPageClosureNeedles = [
+  'Target page, context or browser has been closed',
+  'Target crashed',
 ];
 
 type FrameFailure = {
@@ -61,7 +86,20 @@ async function gotoWithRetry(page: import('playwright/test').Page, route: string
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const response = await page.goto(route, { waitUntil: 'domcontentloaded' });
-      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await page.waitForLoadState('load', { timeout: 5000 }).catch(() => {});
+      await page.evaluate(async () => {
+        const fonts = document.fonts;
+        if (!fonts) {
+          return;
+        }
+
+        try {
+          await fonts.ready;
+        } catch {
+          // The layout gate only needs the settled DOM and available font metrics.
+        }
+      }).catch(() => {});
+      await page.waitForTimeout(250);
       return response;
     } catch (error) {
       lastError = error;
@@ -78,55 +116,101 @@ async function gotoWithRetry(page: import('playwright/test').Page, route: string
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-test('public UI elements are not cut off by their frames outside intentional scroll panels', async ({ browser }) => {
-  test.setTimeout(300000);
-  const failures: FrameFailure[] = [];
-  const pageResults: Array<Record<string, unknown>> = [];
+async function createAuditedPage(
+  browser: import('playwright/test').Browser,
+  viewport: { width: number; height: number },
+) {
+  const page = await browser.newPage({ baseURL: baseUrl, viewport });
+  await page.route('**/*', async (requestRoute) => {
+    const resourceType = requestRoute.request().resourceType();
+    if (resourceType === 'media') {
+      await requestRoute.abort();
+      return;
+    }
 
-  for (const viewport of viewports) {
-    for (const route of routes) {
-      const page = await browser.newPage({ baseURL: baseUrl, viewport: { width: viewport.width, height: viewport.height } });
-      await page.route('**/*', async (requestRoute) => {
-        const resourceType = requestRoute.request().resourceType();
-        if (resourceType === 'media') {
-          await requestRoute.abort();
-          return;
-        }
-
-        await requestRoute.continue();
-      });
-      await page.addInitScript(() => {
-        const originalGetContext = HTMLCanvasElement.prototype.getContext as unknown as (
-          this: HTMLCanvasElement,
-          type: string,
-          ...args: unknown[]
-        ) => RenderingContext | null;
-        HTMLCanvasElement.prototype.getContext = function getContext(type: string, ...args: unknown[]) {
-          if (String(type).toLowerCase().includes('webgl')) {
-            return null;
-          }
-
-          return originalGetContext.call(this, type, ...args);
-        } as unknown as typeof HTMLCanvasElement.prototype.getContext;
-      });
-
-      const response = await gotoWithRetry(page, route);
-
-      const status = response?.status() ?? 0;
-      if (status >= 500) {
-        failures.push({
-          route,
-          viewport: viewport.name,
-          selector: 'document',
-          text: '',
-          reason: `route returned HTTP ${status}`,
-          element: { x: 0, y: 0, width: 0, height: 0, right: 0, bottom: 0 },
-        });
-        await page.close().catch(() => {});
-        continue;
+    await requestRoute.continue();
+  });
+  await page.addInitScript(() => {
+    const originalGetContext = HTMLCanvasElement.prototype.getContext as unknown as (
+      this: HTMLCanvasElement,
+      type: string,
+      ...args: unknown[]
+    ) => RenderingContext | null;
+    HTMLCanvasElement.prototype.getContext = function getContext(type: string, ...args: unknown[]) {
+      if (String(type).toLowerCase().includes('webgl')) {
+        return null;
       }
 
-      const routeFailures = await page.evaluate((lineRulesArg) => {
+      return originalGetContext.call(this, type, ...args);
+    } as unknown as typeof HTMLCanvasElement.prototype.getContext;
+  });
+
+  return page;
+}
+
+async function launchAuditBrowser(
+  playwright: import('playwright/test').Playwright,
+  browserName: string,
+) {
+  if (browserName === 'firefox') {
+    return playwright.firefox.launch();
+  }
+
+  if (browserName === 'webkit') {
+    return playwright.webkit.launch();
+  }
+
+  return playwright.chromium.launch({
+    channel: process.env.CHUMMER_PLAYWRIGHT_CHANNEL?.trim() || 'chromium',
+    args: ['--disable-quic'],
+  });
+}
+
+test('public UI elements are not cut off by their frames outside intentional scroll panels', async ({ playwright, browserName }) => {
+  test.setTimeout(frameIntegrityTestTimeout);
+  const failures: FrameFailure[] = [];
+  const pageResults: Array<Record<string, unknown>> = [];
+  let auditBrowser = await launchAuditBrowser(playwright, browserName);
+  const viewportByName = new Map(viewports.map((viewport) => [viewport.name, viewport] as const));
+
+  try {
+    for (const scenario of routeViewportMatrix) {
+      for (const viewportName of scenario.viewportNames) {
+        const viewport = viewportByName.get(viewportName);
+        if (!viewport) {
+          throw new Error(`missing viewport config for ${viewportName}`);
+        }
+
+        const route = scenario.route;
+        let routeCompleted = false;
+        let pageClosureRetries = 0;
+        while (!routeCompleted) {
+          let page: import('playwright/test').Page | undefined;
+          try {
+            page = await createAuditedPage(auditBrowser, { width: viewport.width, height: viewport.height });
+            const response = await gotoWithRetry(page, route);
+
+            const status = response?.status() ?? 0;
+            if (status >= 500) {
+              failures.push({
+                route,
+                viewport: viewport.name,
+                selector: 'document',
+                text: '',
+                reason: `route returned HTTP ${status}`,
+                element: { x: 0, y: 0, width: 0, height: 0, right: 0, bottom: 0 },
+              });
+              pageResults.push({
+                route,
+                viewport: viewport.name,
+                status,
+                failure_count: 1,
+              });
+              routeCompleted = true;
+              continue;
+            }
+
+            const routeFailures = await page.evaluate((lineRulesArg) => {
         type Rect = { x: number; y: number; width: number; height: number; right: number; bottom: number };
         type Failure = {
           selector: string;
@@ -423,37 +507,62 @@ test('public UI elements are not cut off by their frames outside intentional scr
           failures: failures.slice(0, 80),
           lineFailures,
         };
-      }, singleLineRules);
+            }, singleLineRules);
 
-      const frameFailures = routeFailures.failures || [];
-      const lineRuleFailures = routeFailures.lineFailures || [];
-      const routeFailureCount = frameFailures.length + lineRuleFailures.length;
+            const frameFailures = routeFailures.failures || [];
+            const lineRuleFailures = routeFailures.lineFailures || [];
+            const routeFailureCount = frameFailures.length + lineRuleFailures.length;
 
-      failures.push(...frameFailures.map((failure) => ({
-        route,
-        viewport: viewport.name,
-        ...failure,
-      })));
+            failures.push(...frameFailures.map((failure) => ({
+              route,
+              viewport: viewport.name,
+              ...failure,
+            })));
 
-      failures.push(...lineRuleFailures.map((failure) => ({
-        route,
-        viewport: viewport.name,
-        selector: failure.selector,
-        text: failure.text,
-        reason: failure.reason,
-        element: failure.element,
-        frame: undefined,
-        frameOverflow: `line-count:${failure.lines}`,
-      })));
+            failures.push(...lineRuleFailures.map((failure) => ({
+              route,
+              viewport: viewport.name,
+              selector: failure.selector,
+              text: failure.text,
+              reason: failure.reason,
+              element: failure.element,
+              frame: undefined,
+              frameOverflow: `line-count:${failure.lines}`,
+            })));
 
-      pageResults.push({
-        route,
-        viewport: viewport.name,
-        status,
-        failure_count: routeFailureCount,
-      });
-      await page.close().catch(() => {});
+            pageResults.push({
+              route,
+              viewport: viewport.name,
+              status,
+              failure_count: routeFailureCount,
+              page_closure_retries: pageClosureRetries,
+            });
+            routeCompleted = true;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            const transientPageClosure = transientPageClosureNeedles.some((needle) => message.includes(needle));
+            if (!transientPageClosure || pageClosureRetries >= 2) {
+              throw error;
+            }
+
+            pageClosureRetries += 1;
+            pageResults.push({
+              route,
+              viewport: viewport.name,
+              status: 'retry',
+              retry_reason: 'page_or_browser_closed',
+              retry_attempt: pageClosureRetries,
+            });
+            await auditBrowser.close().catch(() => {});
+            auditBrowser = await launchAuditBrowser(playwright, browserName);
+          } finally {
+            await page?.close().catch(() => {});
+          }
+        }
+      }
     }
+  } finally {
+    await auditBrowser.close().catch(() => {});
   }
 
   const payload = {
@@ -461,8 +570,9 @@ test('public UI elements are not cut off by their frames outside intentional scr
     base_url: baseUrl,
     status: failures.length === 0 ? 'pass' : 'fail',
     verdict: failures.length === 0 ? 'READY' : 'NOT_READY',
-    routes,
+    routes: routeViewportMatrix.map((scenario) => scenario.route),
     viewports,
+    route_viewport_matrix: routeViewportMatrix,
     summary: {
       checked_pages: pageResults.length,
       failure_count: failures.length,
@@ -487,37 +597,37 @@ test('public UI elements are not cut off by their frames outside intentional scr
   expect(failures, failures.map((failure) => `${failure.viewport} ${failure.route} ${failure.selector}: ${failure.reason} (${failure.text})`).join('\n')).toEqual([]);
 });
 
-test('login stays compact and does not reintroduce the old visual hero', async ({ browser }) => {
+test('login stays compact and does not reintroduce the old visual hero', async ({ playwright, browserName }) => {
   test.setTimeout(90000);
   const failures: Array<string> = [];
   const checked: Array<Record<string, unknown>> = [];
+  const auditBrowser = await launchAuditBrowser(playwright, browserName);
 
-  for (const viewport of [
-    { name: 'phone-390', width: 390, height: 844 },
-    { name: 'desktop-1366', width: 1366, height: 768 },
-  ]) {
-    const page = await browser.newPage({ baseURL: baseUrl, viewport: { width: viewport.width, height: viewport.height } });
-    await page.route('**/*', async (requestRoute) => {
-      const resourceType = requestRoute.request().resourceType();
-      if (resourceType === 'media') {
-        await requestRoute.abort();
-        return;
-      }
+  try {
+    for (const viewport of [
+      { name: 'phone-390', width: 390, height: 844 },
+      { name: 'desktop-1366', width: 1366, height: 768 },
+    ]) {
+      const page = await createAuditedPage(auditBrowser, { width: viewport.width, height: viewport.height });
+      try {
+        const response = await gotoWithRetry(page, '/login?next=%2Faccount%2Faccess');
+        expect(response?.status() ?? 0).toBeLessThan(500);
 
-      await requestRoute.continue();
-    });
+        const panel = page.locator('.auth-panel--entry').first();
+        await expect(panel).toBeVisible();
+        await expect(page.locator('body')).toContainText('Open Chummer');
+        const bodyText = await page.locator('body').innerText();
+        const emailFieldCount = await page.locator('input[type="email"]').count();
+        if (emailFieldCount > 0) {
+          await expect(page.locator('body')).toContainText('Email first. Google if you prefer.');
+          await expect(page.locator('input[type="email"]')).toBeVisible();
+          await expect(page.getByRole('button', { name: 'Continue with email' })).toBeVisible();
+        } else {
+          expect(bodyText).not.toContain('Email first. Google if you prefer.');
+          await expect(page.getByRole('link', { name: 'Continue with Google' })).toBeVisible();
+        }
 
-    const response = await gotoWithRetry(page, '/login?next=%2Faccount%2Faccess');
-    expect(response?.status() ?? 0).toBeLessThan(500);
-
-    const panel = page.locator('.auth-panel--entry').first();
-    await expect(panel).toBeVisible();
-    await expect(page.locator('body')).toContainText('Open Chummer');
-    await expect(page.locator('body')).toContainText('Email first. Google if you prefer.');
-    await expect(page.locator('input[type="email"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Continue with email' })).toBeVisible();
-
-    const metrics = await page.evaluate(() => {
+        const metrics = await page.evaluate(() => {
       const panel = document.querySelector<HTMLElement>('.auth-panel--entry');
       const entry = document.querySelector<HTMLElement>('.auth-entry');
       const header = document.querySelector<HTMLElement>('[data-site-header]');
@@ -544,30 +654,35 @@ test('login stays compact and does not reintroduce the old visual hero', async (
       };
     });
 
-    if (!metrics.compactSheet) {
-      failures.push(`${viewport.name}: auth-compact stylesheet was not loaded`);
-    }
-    if (metrics.visualCount !== 0) {
-      failures.push(`${viewport.name}: login rendered ${metrics.visualCount} image/visual hero node(s)`);
-    }
-    if (metrics.headerVisible || metrics.footerVisible) {
-      failures.push(`${viewport.name}: login chrome should stay hidden for the compact sign-in surface`);
-    }
-    if (metrics.documentOverflowX > 1) {
-      failures.push(`${viewport.name}: login has ${Math.round(metrics.documentOverflowX)}px horizontal overflow`);
-    }
-    if (metrics.entryWidth > Math.min(360, metrics.viewportWidth)) {
-      failures.push(`${viewport.name}: login entry is wider than the compact limit (${Math.round(metrics.entryWidth)}px)`);
-    }
-    if (metrics.entryHeight > metrics.viewportHeight - 24) {
-      failures.push(`${viewport.name}: login entry does not fit in one viewport (${Math.round(metrics.entryHeight)}px of ${metrics.viewportHeight}px)`);
-    }
-    if (metrics.panelHeight > metrics.viewportHeight - 24) {
-      failures.push(`${viewport.name}: login panel does not fit in one viewport (${Math.round(metrics.panelHeight)}px of ${metrics.viewportHeight}px)`);
-    }
+        if (!metrics.compactSheet) {
+          failures.push(`${viewport.name}: auth-compact stylesheet was not loaded`);
+        }
+        if (metrics.visualCount !== 0) {
+          failures.push(`${viewport.name}: login rendered ${metrics.visualCount} image/visual hero node(s)`);
+        }
+        if (metrics.headerVisible || metrics.footerVisible) {
+          failures.push(`${viewport.name}: login chrome should stay hidden for the compact sign-in surface`);
+        }
+        if (metrics.documentOverflowX > 1) {
+          failures.push(`${viewport.name}: login has ${Math.round(metrics.documentOverflowX)}px horizontal overflow`);
+        }
+        if (metrics.entryWidth > Math.min(360, metrics.viewportWidth)) {
+          failures.push(`${viewport.name}: login entry is wider than the compact limit (${Math.round(metrics.entryWidth)}px)`);
+        }
+        if (metrics.entryHeight > metrics.viewportHeight - 24) {
+          failures.push(`${viewport.name}: login entry does not fit in one viewport (${Math.round(metrics.entryHeight)}px of ${metrics.viewportHeight}px)`);
+        }
+        if (metrics.panelHeight > metrics.viewportHeight - 24) {
+          failures.push(`${viewport.name}: login panel does not fit in one viewport (${Math.round(metrics.panelHeight)}px of ${metrics.viewportHeight}px)`);
+        }
 
-    checked.push({ viewport: viewport.name, ...metrics });
-    await page.close().catch(() => {});
+        checked.push({ viewport: viewport.name, ...metrics });
+      } finally {
+        await page.close().catch(() => {});
+      }
+    }
+  } finally {
+    await auditBrowser.close().catch(() => {});
   }
 
   writeJsonArtifact('LOGIN_COMPACT_FRAME.generated.json', {

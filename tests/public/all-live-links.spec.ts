@@ -1,7 +1,9 @@
 import { expect, request, test } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
-const baseUrl = 'https://chummer.run';
+const baseUrl = new URL(
+  process.env.BASE_URL ?? process.env.CHUMMER_HUB_BASE_URL ?? 'https://chummer.run',
+).origin;
 const routes = [
   '/',
   '/downloads',

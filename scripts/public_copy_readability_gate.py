@@ -16,11 +16,9 @@ ROUTE_REQUIREMENTS = {
     ],
     "/feedback": [
         "Participate",
-        "Public requests, clear bugs, useful ideas.",
     ],
     "/participate": [
         "Participate",
-        "Public requests, clear bugs, useful ideas.",
     ],
 }
 PARTICIPATE_SOURCE_REQUIREMENTS = (
@@ -32,6 +30,8 @@ ROUTE_FORBIDDEN = (
     "Top voters decide roadmap",
     "Guaranteed implementation",
     "Public bug reports are support tickets",
+    "Public requests, clear bugs, useful ideas.",
+    '<p class="eyebrow">Board</p>',
 )
 ACCOUNT_SOURCE_REQUIREMENTS = (
     "Participation state",

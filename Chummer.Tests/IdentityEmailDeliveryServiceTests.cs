@@ -12,6 +12,61 @@ namespace Chummer.Tests;
 
 public sealed class IdentityEmailDeliveryServiceTests
 {
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void DeliverMagicLinkFailsClosedWhenProviderOrderConfigValueIsBlank(string configuredOrder)
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-run-identity-email-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            HttpRequestMessage? capturedRequest = null;
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["IDENTITY_EMAIL_PROVIDER_ORDER"] = configuredOrder,
+                    ["IDENTITY_EMAILIT_API_KEY"] = "secret-emailit-key",
+                    ["IDENTITY_EMAILIT_FROM_EMAIL"] = "concierge@chummer.run",
+                    ["IDENTITY_EMAILIT_FROM_NAME"] = "Chummer Concierge",
+                    ["CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH"] = Path.Combine(tempRoot, "identity-email-delivery.json")
+                })
+                .Build();
+
+            var service = new IdentityEmailDeliveryService(
+                configuration,
+                NullLogger<IdentityEmailDeliveryService>.Instance,
+                new HttpClient(new StubHttpMessageHandler(request =>
+                {
+                    capturedRequest = request;
+                    return new HttpResponseMessage(HttpStatusCode.Accepted)
+                    {
+                        Content = new StringContent("{\"data\":{\"id\":\"email_123\"}}", Encoding.UTF8, "application/json")
+                    };
+                })));
+
+            IdentityEmailDeliveryResult result = service.DeliverMagicLink(
+                email: "runner@example.invalid",
+                displayName: "Runner Demo",
+                ticketId: "ticket-emailit-blank-order",
+                nextPath: "/home",
+                expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
+
+            Assert.False(result.Delivered);
+            Assert.Equal("email_delivery_unavailable", result.DeliveryMode);
+            Assert.Null(capturedRequest);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public void DeliverMagicLinkUsesEmailitCompliantIdempotencyKey()
     {
@@ -26,6 +81,7 @@ public sealed class IdentityEmailDeliveryServiceTests
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["IDENTITY_EMAIL_PROVIDER_ORDER"] = "emailit_api",
                     ["IDENTITY_EMAILIT_API_KEY"] = "secret-emailit-key",
                     ["IDENTITY_EMAILIT_FROM_EMAIL"] = "concierge@chummer.run",
                     ["IDENTITY_EMAILIT_FROM_NAME"] = "Chummer Concierge",
@@ -156,6 +212,157 @@ public sealed class IdentityEmailDeliveryServiceTests
             Assert.Equal("preview_inline_link", result.DeliveryMode);
             Assert.True(result.ExposeInlinePreviewTicket);
             Assert.Contains("development preview callback link", result.PreviewNote, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void StartEmailEntryRateLimitsImmediateRetryForSameRecipient()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-run-identity-email-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ASPNETCORE_ENVIRONMENT"] = "Production",
+                    ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["IDENTITY_EMAIL_START_WINDOW_SECONDS"] = "900",
+                    ["IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_WINDOW"] = "10",
+                    ["IDENTITY_EMAIL_START_MAX_ATTEMPTS_PER_RECIPIENT_PER_WINDOW"] = "3",
+                    ["IDENTITY_EMAIL_START_MIN_SECONDS_BETWEEN_RECIPIENT_ATTEMPTS"] = "120",
+                    ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json"),
+                    ["CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH"] = Path.Combine(tempRoot, "identity-email-delivery.json")
+                })
+                .Build();
+            var delivery = new IdentityEmailDeliveryService(
+                configuration,
+                NullLogger<IdentityEmailDeliveryService>.Instance,
+                new HttpClient(new StubHttpMessageHandler(_ => throw new InvalidOperationException("No transport should be called."))));
+            var access = new IdentityAccessService(
+                configuration,
+                NullLogger<IdentityAccessService>.Instance,
+                delivery);
+
+            EmailAuthStartResponse first = access.StartEmailEntry(new EmailAuthStartRequest(
+                Email: "runner@example.invalid",
+                DisplayName: "Runner Demo",
+                NextPath: "/home"));
+            EmailAuthStartResponse second = access.StartEmailEntry(new EmailAuthStartRequest(
+                Email: "runner@example.invalid",
+                DisplayName: "Runner Demo",
+                NextPath: "/home"));
+
+            Assert.Equal("email_delivery_unavailable", first.DeliveryMode);
+            Assert.Equal("email_start_rate_limited", second.DeliveryMode);
+            Assert.Equal(string.Empty, second.TicketId);
+            Assert.Contains("cooling down", second.PreviewNote, StringComparison.OrdinalIgnoreCase);
+
+            IdentityEmailDeliveryStatusResponse status = delivery.GetStatus();
+            Assert.Contains(
+                status.RecentDeliveries,
+                item => item.TransportKey == "guardrail"
+                        && item.DeliveryMode == "email_start_rate_limited"
+                        && item.RecipientEmail == "runner@example.invalid");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void StartEmailEntryCanBeDisabledBeforeDelivery()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-run-identity-email-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ASPNETCORE_ENVIRONMENT"] = "Production",
+                    ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["IDENTITY_EMAIL_START_ENABLED"] = "false",
+                    ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json")
+                })
+                .Build();
+            var delivery = new CountingDelivery();
+            var access = new IdentityAccessService(
+                configuration,
+                NullLogger<IdentityAccessService>.Instance,
+                delivery);
+
+            EmailAuthStartResponse response = access.StartEmailEntry(new EmailAuthStartRequest(
+                Email: "runner@example.invalid",
+                DisplayName: "Runner Demo",
+                NextPath: "/home"));
+
+            Assert.Equal("email_start_disabled", response.DeliveryMode);
+            Assert.Equal(string.Empty, response.TicketId);
+            Assert.Equal(0, delivery.CallCount);
+            Assert.Equal(1, delivery.BlockedCallCount);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void StartEmailEntryPauseFlagBlocksDeliveryBeforeEmailStartToggle()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "chummer-run-identity-email-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            string pauseFlagPath = Path.Combine(tempRoot, "auth_signin_automation_paused.flag");
+            File.WriteAllText(
+                pauseFlagPath,
+                "paused by user request on 2026-07-08: do not send Chummer sign-in emails without explicit approval");
+
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ASPNETCORE_ENVIRONMENT"] = "Production",
+                    ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                    ["IDENTITY_EMAIL_START_ENABLED"] = "true",
+                    ["CHUMMER_IDENTITY_STORE_PATH"] = Path.Combine(tempRoot, "identity-store.json"),
+                    ["CHUMMER_AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG"] = pauseFlagPath
+                })
+                .Build();
+            var delivery = new CountingDelivery();
+            var access = new IdentityAccessService(
+                configuration,
+                NullLogger<IdentityAccessService>.Instance,
+                delivery);
+
+            EmailAuthStartResponse response = access.StartEmailEntry(new EmailAuthStartRequest(
+                Email: "runner@example.invalid",
+                DisplayName: "Runner Demo",
+                NextPath: "/home"));
+
+            Assert.Equal("email_start_paused", response.DeliveryMode);
+            Assert.Equal(string.Empty, response.TicketId);
+            Assert.Contains("paused by user request", response.PreviewNote, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(0, delivery.CallCount);
+            Assert.Equal(1, delivery.BlockedCallCount);
         }
         finally
         {
@@ -324,6 +531,10 @@ public sealed class IdentityEmailDeliveryServiceTests
                 Recipients: Array.Empty<IdentityEmailRecipientStateResponse>(),
                 GeneratedAtUtc: DateTimeOffset.UtcNow);
 
+        public void RecordStartGuardrailBlock(string email, string deliveryMode, string previewNote)
+        {
+        }
+
         public IdentityEmailDeliveryResult DeliverMagicLink(
             string email,
             string displayName,
@@ -352,6 +563,10 @@ public sealed class IdentityEmailDeliveryServiceTests
                 Recipients: Array.Empty<IdentityEmailRecipientStateResponse>(),
                 GeneratedAtUtc: DateTimeOffset.UtcNow);
 
+        public void RecordStartGuardrailBlock(string email, string deliveryMode, string previewNote)
+        {
+        }
+
         public IdentityEmailDeliveryResult DeliverMagicLink(
             string email,
             string displayName,
@@ -362,6 +577,44 @@ public sealed class IdentityEmailDeliveryServiceTests
                 DeliveryMode: "preview_inline_link",
                 PreviewNote: "spoofed preview mode without ticket exposure",
                 Delivered: false);
+
+        public IdentityEmailWebhookAckResponse RecordEmailitWebhook(System.Text.Json.JsonElement payload) =>
+            new(
+                Provider: "test",
+                Status: "accepted",
+                RecordedEvents: 0,
+                ReceivedAtUtc: DateTimeOffset.UtcNow);
+    }
+
+    private sealed class CountingDelivery : IIdentityEmailDeliveryService
+    {
+        public int CallCount { get; private set; }
+        public int BlockedCallCount { get; private set; }
+
+        public IdentityEmailDeliveryStatusResponse GetStatus() =>
+            new(
+                RecentDeliveries: Array.Empty<IdentityEmailDeliveryEventResponse>(),
+                Recipients: Array.Empty<IdentityEmailRecipientStateResponse>(),
+                GeneratedAtUtc: DateTimeOffset.UtcNow);
+
+        public void RecordStartGuardrailBlock(string email, string deliveryMode, string previewNote)
+        {
+            BlockedCallCount++;
+        }
+
+        public IdentityEmailDeliveryResult DeliverMagicLink(
+            string email,
+            string displayName,
+            string ticketId,
+            string? nextPath,
+            DateTimeOffset expiresAtUtc)
+        {
+            CallCount++;
+            return new IdentityEmailDeliveryResult(
+                DeliveryMode: "test_delivery",
+                PreviewNote: "test",
+                Delivered: false);
+        }
 
         public IdentityEmailWebhookAckResponse RecordEmailitWebhook(System.Text.Json.JsonElement payload) =>
             new(

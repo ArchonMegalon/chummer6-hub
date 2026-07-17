@@ -5,14 +5,16 @@ const baseUrl = (process.env.CHUMMER_HUB_BASE_URL ?? 'http://127.0.0.1:8091').re
 const routeExpectations: Array<{ route: string; finalPath: string }> = [
   { route: '/mobile', finalPath: '/mobile' },
   { route: '/pwa', finalPath: '/mobile' },
-  { route: '/play', finalPath: '/play' },
-  { route: '/player', finalPath: '/play?role=player' },
-  { route: '/gm', finalPath: '/play?role=gm' },
-  { route: '/observer', finalPath: '/play?role=observer' },
-  { route: '/session', finalPath: '/play' }
+  { route: '/play', finalPath: '/mobile/player' },
+  { route: '/player', finalPath: '/mobile/player' },
+  { route: '/jammer', finalPath: '/mobile/player' },
+  { route: '/gm', finalPath: '/mobile/gm' },
+  { route: '/observer', finalPath: '/mobile/observer' },
+  { route: '/session', finalPath: '/mobile/player' }
 ];
 
 test('mobile and PWA public routes keep installability and role entry explicit', async ({ page, request, context }) => {
+  test.setTimeout(90000);
   await context.grantPermissions(['notifications'], { origin: baseUrl });
 
   for (const expectation of routeExpectations) {
@@ -29,13 +31,17 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   expect(manifestResponse.ok()).toBeTruthy();
   const manifest = await manifestResponse.json();
   expect(manifest.id).toBe('/mobile');
-  expect(manifest.start_url).toBe('/mobile');
+  expect(manifest.name).toBe('Chummer Turn Companion');
+  expect(manifest.short_name).toBe('Chummer Play');
+  expect(manifest.start_url).toBe('/mobile/player');
+  expect(manifest.scope).toBe('/mobile/');
   expect(Array.isArray(manifest.display_override) && manifest.display_override.length > 0).toBeTruthy();
   expect(Array.isArray(manifest.screenshots) && manifest.screenshots.length).toBeGreaterThanOrEqual(2);
   const shortcutUrls = new Set((manifest.shortcuts ?? []).map((shortcut: { url?: string }) => shortcut.url));
-  expect(shortcutUrls.has('/mobile')).toBeTruthy();
-  expect(shortcutUrls.has('/play')).toBeTruthy();
-  expect(shortcutUrls.has('/play/continuity')).toBeTruthy();
+  expect(shortcutUrls.has('/mobile/player')).toBeTruthy();
+  expect(shortcutUrls.has('/mobile/gm')).toBeTruthy();
+  expect([...shortcutUrls].every((url) => typeof url !== 'string' || !url.includes('?'))).toBeTruthy();
+  expect(shortcutUrls.has('/app?command=character_roster')).toBeFalsy();
 
   const pwaLedgerResponse = await request.get(`${baseUrl}/mobile/pwa/ledger.json`);
   expect(pwaLedgerResponse.ok()).toBeTruthy();
@@ -55,6 +61,7 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   } else if (ledgerPayload.status === "world_not_followed") {
     expect(ledgerPayload.world).toBeTruthy();
     expect(ledgerPayload.world?.turn_headline).toBe("Follow this world to reveal the live turn headline.");
+    expect(ledgerPayload.world?.world_turn).toBeNull();
     expect(Array.isArray(ledgerPayload.top_districts)).toBeTruthy();
     expect(ledgerPayload.top_districts).toHaveLength(0);
     expect(ledgerPayload.hot_district).toBeNull();
@@ -67,38 +74,39 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   }
 
   await page.goto(`${baseUrl}/mobile`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Mobile and PWA entry' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Black Ledger live tracker' })).toBeVisible();
-  await expect(page.locator('[data-pwa-ledger-status]')).toBeVisible();
-  await expect(page.locator('[data-pwa-ledger-summary]')).toBeVisible();
-  await expect(page.locator('[data-pwa-ledger-follow-state]')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Install this app' })).toBeVisible();
+  await expect(page.locator('main[data-play-surface="install-only"]')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Keep your runner ready at the table.' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Install app' })).toBeVisible();
+  await expect(page.locator('[data-mobile-app-inline-qr]')).toBeVisible();
+  await expect(page.locator('[data-pwa-ledger-status]')).toHaveCount(0);
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', /manifest\.(json|webmanifest)/);
 
-  const swUrl = await page.evaluate(async () => {
+  const readRegisteredWorkerUrl = async () => page.evaluate(async () => {
     if (!('serviceWorker' in navigator)) {
-      return null;
+      return '';
     }
 
     const registration = await navigator.serviceWorker.getRegistration('/');
     if (!registration) {
-      return null;
+      return '';
     }
 
     const worker = registration.active ?? registration.waiting ?? registration.installing;
-    return worker?.scriptURL ?? null;
+    return worker?.scriptURL ?? '';
   });
-  expect(swUrl).toContain('/service-worker.js');
+  await expect.poll(readRegisteredWorkerUrl, { timeout: 15000 }).toContain('/service-worker.js');
+  const swUrl = await readRegisteredWorkerUrl();
 
-  const readyWorkerUrl = await page.evaluate(async () => {
+  const readReadyWorkerUrl = async () => page.evaluate(async () => {
     if (!('serviceWorker' in navigator)) {
-      return null;
+      return '';
     }
 
     const registration = await navigator.serviceWorker.ready;
-    return registration.active?.scriptURL ?? null;
+    return registration.active?.scriptURL ?? '';
   });
-  expect(readyWorkerUrl).toContain('/service-worker.js');
+  await expect.poll(readReadyWorkerUrl, { timeout: 15000 }).toContain('/service-worker.js');
+  const readyWorkerUrl = await readReadyWorkerUrl();
 
   const controllerWorkerUrl = await page.evaluate(async () => {
     if (!('serviceWorker' in navigator)) {
@@ -128,115 +136,67 @@ test('mobile and PWA public routes keep installability and role entry explicit',
     await page.reload({ waitUntil: 'domcontentloaded' });
   }
 
-  const controlledWorkerUrl = controllerWorkerUrl ?? await page.evaluate(() => {
+  const readControlledWorkerUrl = async () => page.evaluate(() => {
     if (!('serviceWorker' in navigator)) {
-      return null;
+      return '';
     }
 
-    return navigator.serviceWorker.controller?.scriptURL ?? null;
+    return navigator.serviceWorker.controller?.scriptURL ?? '';
   });
+  if (!controllerWorkerUrl) {
+    await expect.poll(readControlledWorkerUrl, { timeout: 10000 }).toContain('/service-worker.js');
+  }
+  const controlledWorkerUrl = controllerWorkerUrl || await readControlledWorkerUrl();
   expect(controlledWorkerUrl).toContain('/service-worker.js');
 });
 
-test('mobile ledger stream clears stale live detail links on followed-world fallback', async ({ page }) => {
-  let ledgerCalls = 0;
-  await page.route('**/api/v1/accounts/me/preferences', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        blackLedgerNewsEmail: true,
-        blackLedgerWorldsFollowed: ['other-world']
-      })
-    });
-  });
-  await page.route('**/mobile/pwa/ledger.json', async (route) => {
-    ledgerCalls += 1;
-    const livePayload = {
-      mode: 'mobile_pwa_living_world',
-      status: 'live',
-      status_label: 'Live board snapshot',
-      world: {
-        world_id: 'seattle-live',
-        world_name: 'Seattle Live',
-        world_turn: 42,
-        turn_headline: 'Heat rises in Redmond'
-      },
-      summary: {
-        hot_district: 'Redmond is currently the hottest district with heat 82.',
-        hot_shift: 'Downtown moved this turn by +7.',
-        follow_hint: null
-      },
-      followed_worlds: [],
-      top_districts: [{ name: 'Redmond', heat: 82, delta: 7, influence: 3, trend: 'rising' }],
-      hot_district: { name: 'Redmond', heat: 82, delta: 7 },
-      move_district: { name: 'Downtown', delta: 7 },
-      tracker: {
-        update_interval_seconds: 30,
-        turn_map_route: '/ledger/map',
-        turn_route: '/ledger/turns/42',
-        newsreel_route: '/ledger/turns/42/newsreel.json',
-        world_status: 'live'
-      },
-      continuity: {
-        turn: 42,
-        turn_summary: 'The board moved.',
-        turn_route: '/ledger/turns/42',
-        events: []
-      },
-      updates_route: '/mobile/pwa/ledger.json',
-      generated_at_utc: '2026-06-29T12:00:00Z'
-    };
-    const gatedPayload = {
-      mode: 'mobile_pwa_living_world',
-      status: 'world_not_followed',
-      status_label: 'Followed world not active',
-      world: {
-        world_id: 'seattle-live',
-        world_name: 'Seattle Live',
-        world_turn: 42,
-        turn_headline: 'Follow this world to reveal the live turn headline.'
-      },
-      summary: {
-        hot_district: 'Follow this world to reveal live heat tracking.',
-        hot_shift: 'Follow this world to reveal live movement changes.',
-        follow_hint: 'Enable or select this world in Black Ledger preferences.'
-      },
-      followed_worlds: ['other-world'],
-      top_districts: [],
-      hot_district: null,
-      move_district: null,
-      tracker: {
-        update_interval_seconds: 30,
-        turn_map_route: '/ledger/map',
-        turn_route: null,
-        newsreel_route: null,
-        world_status: 'live'
-      },
-      continuity: null,
-      updates_route: '/mobile/pwa/ledger.json',
-      generated_at_utc: '2026-06-29T12:00:30Z'
-    };
+test('public role aliases discard query and fragment state for GET and HEAD', async ({ page, request }) => {
+  const aliases = [
+    { route: '/player', target: '/mobile/player' },
+    { route: '/jammer', target: '/mobile/player' },
+    { route: '/gm', target: '/mobile/gm' },
+    { route: '/observer', target: '/mobile/observer' },
+  ];
 
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(ledgerCalls === 1 ? livePayload : gatedPayload)
-    });
-  });
+  for (const alias of aliases) {
+    const head = await request.fetch(
+      `${baseUrl}${alias.route}?sessionId=synthetic-alias-proof&deviceId=synthetic-alias-proof`,
+      { method: 'HEAD', maxRedirects: 0 },
+    );
+    expect(head.status(), `${alias.route} HEAD should redirect before routing`).toBe(302);
+    expect(head.headers()['location'], `${alias.route} HEAD should emit a clean canonical target`).toBe(`${alias.target}#`);
+    const cacheControl = head.headers()['cache-control'] ?? '';
+    for (const token of ['private', 'no-store', 'no-cache', 'max-age=0']) {
+      expect(cacheControl.toLowerCase(), `${alias.route} HEAD should include ${token}`).toContain(token);
+    }
+    expect(head.headers()['pragma']).toBe('no-cache');
+    expect(head.headers()['expires']).toBe('0');
+    expect(head.headers()['referrer-policy']).toBe('no-referrer');
+  }
 
+  await page.goto(
+    `${baseUrl}/jammer?sessionId=synthetic-alias-proof&deviceId=synthetic-alias-proof#private-fragment-proof`,
+    { waitUntil: 'domcontentloaded' },
+  );
+  const finalUrl = new URL(page.url());
+  expect(finalUrl.pathname).toBe('/mobile/player');
+  expect(finalUrl.search).toBe('');
+  expect(finalUrl.hash).toBe('');
+  await expect(page.locator('main[data-play-surface="install-only"]')).toBeVisible();
+});
+
+test('public install shell does not request private ledger data', async ({ page }) => {
+  let ledgerRequests = 0;
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/mobile/pwa/ledger.json') {
+      ledgerRequests += 1;
+    }
+  });
   await page.goto(`${baseUrl}/mobile`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(750);
 
-  const turnRoute = page.locator('[data-pwa-ledger-turn-route]');
-  const newsreelRoute = page.locator('[data-pwa-ledger-newsreel-route]');
-  await expect(turnRoute).toHaveAttribute('href', '/ledger/turns/42');
-  await expect(newsreelRoute).toHaveAttribute('href', '/ledger/turns/42/newsreel.json');
-
-  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-
-  await expect.poll(async () => await turnRoute.getAttribute('href')).toBeNull();
-  await expect.poll(async () => await newsreelRoute.getAttribute('href')).toBeNull();
-  await expect(turnRoute).toHaveText('Follow this world to open live turn detail');
-  await expect(newsreelRoute).toHaveText('Follow this world to open live newsreel');
-  await expect(page.locator('[data-pwa-ledger-heat-score]')).toHaveText('Follow required');
+  expect(ledgerRequests).toBe(0);
+  await expect(page.locator('main[data-play-surface="install-only"]')).toBeVisible();
+  await expect(page.locator('[data-pwa-ledger-status]')).toHaveCount(0);
+  await expect(page.locator('[data-pwa-ledger-turn-route]')).toHaveCount(0);
 });

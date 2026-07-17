@@ -1,5 +1,6 @@
 <Project>
   <PropertyGroup>
     <RestorePackagesPath Condition="'$(RestorePackagesPath)' == ''">$(MSBuildThisFileDirectory).tmp/nuget/packages</RestorePackagesPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildThisFileDirectory).state/**</DefaultItemExcludes>
   </PropertyGroup>
 </Project>

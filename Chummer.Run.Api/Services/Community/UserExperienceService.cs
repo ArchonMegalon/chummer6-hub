@@ -91,8 +91,8 @@ public sealed class UserExperienceService
             var blackLedgerWorldsFollowed = request.BlackLedgerWorldsFollowed is null
                 ? (existing.BlackLedgerWorldsFollowed ?? Array.Empty<string>())
                 : request.BlackLedgerWorldsFollowed
-                    .Where(static lane => !string.IsNullOrWhiteSpace(lane))
-                    .Select(static lane => lane.Trim())
+                    .Select(NormalizeBlackLedgerWorldKey)
+                    .Where(static worldId => !string.IsNullOrWhiteSpace(worldId))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToArray();
             var updated = existing with
@@ -117,6 +117,11 @@ public sealed class UserExperienceService
             return updated;
         }
     }
+
+    private static string NormalizeBlackLedgerWorldKey(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Trim().Replace("_", "-", StringComparison.Ordinal).ToLowerInvariant();
 
     public HubUserExperienceDto RecordWorkspacePrepLibrarySearch(string subjectId, string workspaceId, string queryText)
     {

@@ -54,12 +54,14 @@ def test_restart_plan_waits_for_explicit_approval_without_deploying(tmp_path: Pa
     assert result["deploymentPerformed"] is False
     assert result["approvalGate"] == "explicit_user_deploy_or_restart_approval_required"
     assert "docker compose -f docker-compose.public-edge.yml up -d --no-deps --force-recreate chummer-portal" in result["restartCommands"]
+    assert any("verify_downloads_version_marker.py --base-url http://127.0.0.1:8091 --output " in command for command in result["restartCommands"])
+    assert "local_public_edge_downloads_version_marker_status_pass" in result["postRestartRequiredEvidence"]
     assert "materialize_origin_dossier_deployed_browser_probe.py" in serialized
     assert result["privacy"]["rawCredentialExposed"] is False
     assert result["privacy"]["rawEnvValueExposed"] is False
 
 
-def test_restart_plan_blocks_without_preflight_restart_requirement(tmp_path: Path) -> None:
+def test_restart_plan_is_not_required_when_preflight_already_passes(tmp_path: Path) -> None:
     module = load_module()
     branch = Path("origin.chummer.run/Varga/Mira/Kestrel")
     preflight = tmp_path / branch / "portal-publication-index-preflight.receipt.json"
@@ -80,7 +82,11 @@ def test_restart_plan_blocks_without_preflight_restart_requirement(tmp_path: Pat
         compose_file=compose,
     )
 
-    assert result["status"] == "blocked"
+    assert result["status"] == "not_required"
     assert result["safeToExecuteAfterApproval"] is False
-    assert "portal_preflight_restart_required_not_true" in result["blockers"]
+    assert result["postRestartVerificationRequired"] is False
+    assert result["approvalGate"] == ""
+    assert result["blockers"] == []
+    assert result["blocking_reason"] == ""
     assert result["deploymentPerformed"] is False
+    assert "local_public_edge_downloads_version_marker_status_pass" in result["postRestartRequiredEvidence"]

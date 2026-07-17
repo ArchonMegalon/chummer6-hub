@@ -23,7 +23,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/feedback/operations", doc, StringComparison.Ordinal);
         Assert.Contains("milestone-backed public direction", doc, StringComparison.Ordinal);
         Assert.Contains("public signal, projected movement, and shipped updates", doc, StringComparison.Ordinal);
-        Assert.Contains("compatibility maintenance alias", doc, StringComparison.Ordinal);
+        Assert.Contains("quieter working-lanes summary", doc, StringComparison.Ordinal);
         Assert.DoesNotContain("/horizons for the deeper readiness shelf", doc, StringComparison.Ordinal);
         Assert.DoesNotContain("horizons stay the deeper readiness view", doc, StringComparison.Ordinal);
     }
@@ -78,6 +78,8 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/login?next=...", doc, StringComparison.Ordinal);
         Assert.Contains("/auth/google/start?next=%2Fparticipate%2Fcodex", manifest, StringComparison.Ordinal);
         Assert.Contains("/progress", manifest, StringComparison.Ordinal);
+        Assert.Contains("- path: /downloads", manifest, StringComparison.Ordinal);
+        Assert.Contains("- Version", manifest, StringComparison.Ordinal);
         Assert.Contains("/docs", manifest, StringComparison.Ordinal);
         Assert.Contains("/docs/chummer6-quickstart", manifest, StringComparison.Ordinal);
         Assert.Contains("/docs/{slug}/receipts/publication.json", manifest, StringComparison.Ordinal);
@@ -86,6 +88,26 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/docs/category/{category}", manifest, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations", manifest, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations/lookup", manifest, StringComparison.Ordinal);
+        Assert.Contains("/ready/packet/{role}.md", manifest, StringComparison.Ordinal);
+        Assert.Contains("/ready/packet/{role}.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/ready/loadout/{kitId}.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/ready/handoff/mobile.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("purpose: ready_mobile_handoff", manifest, StringComparison.Ordinal);
+        Assert.Contains("- /mobile/player", manifest, StringComparison.Ordinal);
+        Assert.Contains("- /mobile/gm", manifest, StringComparison.Ordinal);
+        Assert.Contains("- /manifest.player.webmanifest", manifest, StringComparison.Ordinal);
+        Assert.Contains("- /manifest.gm.webmanifest", manifest, StringComparison.Ordinal);
+        Assert.Contains("- playtime_tools", manifest, StringComparison.Ordinal);
+        Assert.Contains("- role_routes", manifest, StringComparison.Ordinal);
+        Assert.Contains("- quick_rolls", manifest, StringComparison.Ordinal);
+        Assert.Contains("- living_world", manifest, StringComparison.Ordinal);
+        Assert.Contains("- account opt-in", manifest, StringComparison.Ordinal);
+        Assert.Contains("- followed-world selection", manifest, StringComparison.Ordinal);
+        Assert.Contains("- path: /horizons", manifest, StringComparison.Ordinal);
+        Assert.Contains("purpose: working_horizons_summary", manifest, StringComparison.Ordinal);
+        Assert.Contains("required_texts:", manifest, StringComparison.Ordinal);
+        Assert.Contains("- Not the front door", manifest, StringComparison.Ordinal);
+        Assert.Contains("- Working lanes", manifest, StringComparison.Ordinal);
         Assert.Contains("/alice", manifest, StringComparison.Ordinal);
         Assert.Contains("/build", manifest, StringComparison.Ordinal);
         Assert.Contains("/alice/receipts/build-ghost.json", manifest, StringComparison.Ordinal);
@@ -118,8 +140,112 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/participate/karma-forge/submitted/{submissionId}", manifest, StringComparison.Ordinal);
         Assert.Contains("verification_mode: controller_contract", manifest, StringComparison.Ordinal);
         Assert.Contains("verify_public_routes_from_manifest.py", runbook, StringComparison.Ordinal);
+        Assert.Contains("check_public_edge_deploy_preflight.py", runbook, StringComparison.Ordinal);
+        Assert.Contains("verify_public_edge_postdeploy_gate.py", runbook, StringComparison.Ordinal);
+        Assert.Contains("verify_downloads_version_marker.py", runbook, StringComparison.Ordinal);
+        Assert.Contains("verify_public_pwa_static_assets.py", runbook, StringComparison.Ordinal);
+        Assert.Contains("verify_participate_iframe_shell.py", runbook, StringComparison.Ordinal);
         Assert.Contains(".codex-design/product/PUBLIC_LANDING_MANIFEST.yaml", runbook, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PUBLIC_ROUTE_PROOF.generated.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-deploy-preflight.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-postdeploy-local.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-postdeploy-canonical.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("--require-downloads-status-playwright", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-postdeploy-local-browser.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-postdeploy-canonical-browser.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-postdeploy-local-pwa-viewport.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-postdeploy-canonical-pwa-viewport.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("--require-mobile-pwa-viewport-playwright", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-postdeploy-local-frontdoor-navigation.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-postdeploy-canonical-frontdoor-navigation.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("--require-frontdoor-navigation-playwright", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-postdeploy-local-full-browser.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-public-edge-postdeploy-canonical-full-browser.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("Release-ready, final-gold, and dashboard materializers use the full browser-backed postdeploy receipt", runbook, StringComparison.Ordinal);
+        Assert.Contains("--skip-preflight", runbook, StringComparison.Ordinal);
+        Assert.Contains("Do not use `--skip-preflight` for local public-edge deploy proof", runbook, StringComparison.Ordinal);
+        Assert.Contains("post-fact canonical `https://chummer.run` checks", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-downloads-version-source.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-downloads-version-local.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-downloads-version-canonical.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("preflightStatus=pass", runbook, StringComparison.Ordinal);
+        Assert.Contains("preflightBlockingLockCount=0", runbook, StringComparison.Ordinal);
+        Assert.Contains("preflightStaleForeignLocksIgnored=true", runbook, StringComparison.Ordinal);
+        Assert.Contains("preflightStaleForeignLockCount", runbook, StringComparison.Ordinal);
+        Assert.Contains("downloads_marker=true", runbook, StringComparison.Ordinal);
+        Assert.Contains("status_redirect_marker=true", runbook, StringComparison.Ordinal);
+        Assert.Contains("source-only pass is not deployment proof", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-pwa-static-assets-canonical.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-pwa-static-assets-source.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("mode=source", runbook, StringComparison.Ordinal);
+        Assert.Contains("It is not deployment proof", runbook, StringComparison.Ordinal);
+        Assert.Contains("/mobile/pwa/ledger.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("privacy boundary", runbook, StringComparison.Ordinal);
+        Assert.Contains("NON_CACHEABLE_PATHS", runbook, StringComparison.Ordinal);
+        Assert.Contains("PRECACHE_URLS", runbook, StringComparison.Ordinal);
+        Assert.Contains("Mobile PWA ledger boundary proof", runbook, StringComparison.Ordinal);
+        Assert.Contains("verify_mobile_pwa_ledger_boundary.py", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-mobile-pwa-ledger-boundary-source.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-mobile-pwa-ledger-boundary-local.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-mobile-pwa-ledger-boundary-canonical.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("payload_status", runbook, StringComparison.Ordinal);
+        Assert.Contains("cache_control", runbook, StringComparison.Ordinal);
+        Assert.Contains("world_not_followed", runbook, StringComparison.Ordinal);
+        Assert.Contains("turn_route", runbook, StringComparison.Ordinal);
+        Assert.Contains("newsreel_route", runbook, StringComparison.Ordinal);
+        Assert.Contains("Ready mobile handoff proof", runbook, StringComparison.Ordinal);
+        Assert.Contains("verify_ready_mobile_handoff_contract.py", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-ready-mobile-handoff-source.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-ready-mobile-handoff-local.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-ready-mobile-handoff-canonical.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("tool_ids", runbook, StringComparison.Ordinal);
+        Assert.Contains("quick_rolls", runbook, StringComparison.Ordinal);
+        Assert.Contains("living_world", runbook, StringComparison.Ordinal);
+        Assert.Contains("pwa_route=/mobile", runbook, StringComparison.Ordinal);
+        Assert.Contains("continuity_route=/play/continuity", runbook, StringComparison.Ordinal);
+        Assert.Contains("Mobile PWA viewport proof", runbook, StringComparison.Ordinal);
+        Assert.Contains("mobile-pwa-viewport-smoke.spec.ts", runbook, StringComparison.Ordinal);
+        Assert.Contains("MOBILE_PWA_VIEWPORT_SMOKE.generated.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("route_count=3", runbook, StringComparison.Ordinal);
+        Assert.Contains("viewport_count=3", runbook, StringComparison.Ordinal);
+        Assert.Contains("phone-390", runbook, StringComparison.Ordinal);
+        Assert.Contains("desktop-1366", runbook, StringComparison.Ordinal);
+        Assert.Contains("Front-door navigation proof", runbook, StringComparison.Ordinal);
+        Assert.Contains("frontdoor-mobile-launch.spec.ts", runbook, StringComparison.Ordinal);
+        Assert.Contains("black-ledger-frontdoor.spec.ts", runbook, StringComparison.Ordinal);
+        Assert.Contains("FRONTDOOR_MOBILE_LAUNCH.generated.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("BLACK_LEDGER_GLOBE_FRONTDOOR.generated.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("ledger_primary=false", runbook, StringComparison.Ordinal);
+        Assert.Contains("ledger_stream_non_cacheable=true", runbook, StringComparison.Ordinal);
+        Assert.Contains("ledger_stream_precached=false", runbook, StringComparison.Ordinal);
+        Assert.Contains("Participate iframe shell proof", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-participate-iframe-shell-source.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-participate-iframe-shell-local.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("/tmp/chummer-participate-iframe-shell-canonical.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("participateIframeShellStatus=pass", runbook, StringComparison.Ordinal);
+        Assert.Contains("iframe_route_count", runbook, StringComparison.Ordinal);
+        Assert.Contains("offline_fallback_route_count", runbook, StringComparison.Ordinal);
+        Assert.Contains("PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("status=pass", runbook, StringComparison.Ordinal);
+        Assert.Contains("preflightStatus", runbook, StringComparison.Ordinal);
+        Assert.Contains("preflightBlockingLockCount", runbook, StringComparison.Ordinal);
+        Assert.Contains("preflightStaleForeignLockCount", runbook, StringComparison.Ordinal);
+        Assert.Contains("preflightStaleForeignLocksIgnored", runbook, StringComparison.Ordinal);
+        Assert.Contains("downloadsStatus", runbook, StringComparison.Ordinal);
+        Assert.Contains("downloadsHasMarker", runbook, StringComparison.Ordinal);
+        Assert.Contains("statusRedirectHasMarker", runbook, StringComparison.Ordinal);
+        Assert.Contains("pwaStaticStatus", runbook, StringComparison.Ordinal);
+        Assert.Contains("mobileLedgerStatus", runbook, StringComparison.Ordinal);
+        Assert.Contains("readyMobileHandoffStatus", runbook, StringComparison.Ordinal);
+        Assert.Contains("downloadsStatusBrowserStatus", runbook, StringComparison.Ordinal);
+        Assert.Contains("mobilePwaViewportStatus", runbook, StringComparison.Ordinal);
+        Assert.Contains("mobilePwaViewportRouteCount", runbook, StringComparison.Ordinal);
+        Assert.Contains("mobilePwaViewportViewportCount", runbook, StringComparison.Ordinal);
+        Assert.Contains("participateIframeRouteCount", runbook, StringComparison.Ordinal);
+        Assert.Contains("frontdoorNavigationStatus", runbook, StringComparison.Ordinal);
+        Assert.Contains("frontdoorNavigationGatedTargets", runbook, StringComparison.Ordinal);
+        Assert.Contains("frontdoorNavigationLedgerPrimary", runbook, StringComparison.Ordinal);
+        Assert.Contains("missing postdeploy fields", runbook, StringComparison.Ordinal);
         Assert.Contains("https://chummer.run", runbook, StringComparison.Ordinal);
         Assert.DoesNotContain("https://chummer6.run", runbook, StringComparison.Ordinal);
         Assert.DoesNotContain("CHUMMER_PUBLIC_ROUTE_PROOF_CHUMMER6_ALIAS.generated.json", runbook, StringComparison.Ordinal);
@@ -154,6 +280,26 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.DoesNotContain("Lunacal", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Product Governor", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", combined, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicLandingCopyAvoidsInternalStatusAndDataLabels()
+    {
+        string[] publicFiles =
+        {
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeedbackOperationsDetail.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionPromo.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerNotifications.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerWorldTickValidation.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "PublicCreatorPublication.cshtml"),
+        };
+
+        string combined = string.Join("\n", publicFiles.Select(static path => File.ReadAllText(path)));
+
+        Assert.DoesNotContain("Open conversation data", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("Status:", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("status:", combined, StringComparison.Ordinal);
     }
 
     [Fact]

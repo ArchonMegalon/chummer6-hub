@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -22,9 +23,15 @@ import yaml
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = RUN_SERVICES_ROOT.parent
 CHUMMER6_ROOT = WORKSPACE_ROOT / "Chummer6"
+CHUMMER_PLAY_ROOT = WORKSPACE_ROOT / "chummer-play"
 DEFAULT_COMPLETION_ROOT = WORKSPACE_ROOT / "_completion" / "chummer6_absolute_completion"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_COMPLETION_BASE_URL", "http://127.0.0.1:5099").rstrip("/")
 REQUEST_TIMEOUT_SECONDS = 30
+LOCAL_HUB_READY_TIMEOUT_SECONDS = 90
+_LOCAL_HUB_BUILD_LOCK = threading.Lock()
+_LOCAL_HUB_BUILD_READY = False
+_LOCAL_PLAY_BUILD_LOCK = threading.Lock()
+_LOCAL_PLAY_BUILD_READY = False
 
 
 def now_iso() -> str:
@@ -122,6 +129,77 @@ def extract_first_select_option(html: str, select_name: str) -> str:
 def slugify_route(route: str) -> str:
     cleaned = route.strip("/") or "index"
     return re.sub(r"[^a-z0-9]+", "-", cleaned.lower()).strip("-") or "index"
+
+
+def tail_text_file(path: Path, *, max_lines: int = 120) -> str:
+    if not path.exists():
+        return ""
+
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+
+    if len(lines) > max_lines:
+        lines = lines[-max_lines:]
+
+    return "\n".join(lines).strip()
+
+
+def ensure_local_hub_build() -> None:
+    global _LOCAL_HUB_BUILD_READY
+
+    if _LOCAL_HUB_BUILD_READY:
+        return
+
+    with _LOCAL_HUB_BUILD_LOCK:
+        if _LOCAL_HUB_BUILD_READY:
+            return
+
+        result = subprocess.run(
+            ["dotnet", "build", "Chummer.Run.Api/Chummer.Run.Api.csproj", "-nologo"],
+            cwd=RUN_SERVICES_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        if result.returncode != 0:
+            build_output = (result.stdout or "").strip()
+            excerpt = "\n".join(build_output.splitlines()[-120:])
+            message = "local hub prebuild failed"
+            if excerpt:
+                message = f"{message}\n{excerpt}"
+            raise RuntimeError(message)
+
+        _LOCAL_HUB_BUILD_READY = True
+
+
+def ensure_local_play_build() -> None:
+    global _LOCAL_PLAY_BUILD_READY
+
+    if _LOCAL_PLAY_BUILD_READY:
+        return
+
+    with _LOCAL_PLAY_BUILD_LOCK:
+        if _LOCAL_PLAY_BUILD_READY:
+            return
+
+        result = subprocess.run(
+            ["bash", "scripts/ai/with-package-plane.sh", "build", "src/Chummer.Play.Web/Chummer.Play.Web.csproj", "-nologo"],
+            cwd=CHUMMER_PLAY_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        if result.returncode != 0:
+            build_output = (result.stdout or "").strip()
+            excerpt = "\n".join(build_output.splitlines()[-120:])
+            message = "local play prebuild failed"
+            if excerpt:
+                message = f"{message}\n{excerpt}"
+            raise RuntimeError(message)
+
+        _LOCAL_PLAY_BUILD_READY = True
 
 
 class TokenIdentityStub(AbstractContextManager["TokenIdentityStub"]):
@@ -268,16 +346,19 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
         self.port = pick_free_port()
         self.base_url = f"http://127.0.0.1:{self.port}"
         self._process: subprocess.Popen[str] | None = None
-        self._temp_root: tempfile.TemporaryDirectory[str] | None = None
+        self._temp_root: Path | None = None
         self._log_path: Path | None = None
+        self._log_handle: Any | None = None
 
     @property
     def log_path(self) -> Path | None:
         return self._log_path
 
     def __enter__(self) -> "LocalHubApp":
-        self._temp_root = tempfile.TemporaryDirectory(prefix="chummer-local-hub-")
-        temp_root = Path(self._temp_root.name)
+        ensure_local_hub_build()
+
+        temp_root = Path(tempfile.mkdtemp(prefix="chummer-local-hub-"))
+        self._temp_root = temp_root
         self._log_path = temp_root / "hub.log"
 
         env = os.environ.copy()
@@ -296,26 +377,148 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
             "Chummer.Run.Api/Chummer.Run.Api.csproj",
             "-nologo",
             "--no-launch-profile",
+            "--no-build",
+            "--no-restore",
         ]
-        log_handle = self._log_path.open("w", encoding="utf-8")
+        self._log_handle = self._log_path.open("w", encoding="utf-8")
         self._process = subprocess.Popen(
             command,
             cwd=RUN_SERVICES_ROOT,
             env=env,
-            stdout=log_handle,
+            stdout=self._log_handle,
             stderr=subprocess.STDOUT,
             text=True,
         )
-        wait_for_http(self.base_url, "/login", accepted=(200,), timeout_seconds=90)
+
+        try:
+            wait_for_http(
+                self.base_url,
+                "/login",
+                accepted=(200,),
+                timeout_seconds=LOCAL_HUB_READY_TIMEOUT_SECONDS,
+            )
+        except Exception as exc:
+            self._stop_process()
+            log_excerpt = tail_text_file(self._log_path) if self._log_path is not None else ""
+            self._cleanup_temp_root()
+            message = str(exc)
+            if log_excerpt:
+                message = f"{message}\nstartup log:\n{log_excerpt}"
+            raise RuntimeError(message) from exc
+
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def _stop_process(self) -> None:
         if self._process is not None:
-            self._process.terminate()
-            try:
-                self._process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                self._process.kill()
-                self._process.wait(timeout=10)
+            if self._process.poll() is None:
+                self._process.terminate()
+                try:
+                    self._process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    self._process.kill()
+                    self._process.wait(timeout=10)
+            self._process = None
+
+        if self._log_handle is not None:
+            self._log_handle.close()
+            self._log_handle = None
+
+    def _cleanup_temp_root(self) -> None:
         if self._temp_root is not None:
-            self._temp_root.cleanup()
+            shutil.rmtree(self._temp_root, ignore_errors=True)
+            self._temp_root = None
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._stop_process()
+        self._cleanup_temp_root()
+
+
+class LocalPlayApp(AbstractContextManager["LocalPlayApp"]):
+    def __init__(self, *, extra_env: dict[str, str] | None = None) -> None:
+        self.extra_env = dict(extra_env or {})
+        self.port = pick_free_port()
+        self.base_url = f"http://127.0.0.1:{self.port}"
+        self._process: subprocess.Popen[str] | None = None
+        self._temp_root: Path | None = None
+        self._log_path: Path | None = None
+        self._log_handle: Any | None = None
+
+    @property
+    def log_path(self) -> Path | None:
+        return self._log_path
+
+    def __enter__(self) -> "LocalPlayApp":
+        ensure_local_play_build()
+
+        temp_root = Path(tempfile.mkdtemp(prefix="chummer-local-play-"))
+        self._temp_root = temp_root
+        self._log_path = temp_root / "play.log"
+
+        env = os.environ.copy()
+        env["ASPNETCORE_ENVIRONMENT"] = "Development"
+        env["ASPNETCORE_URLS"] = self.base_url
+        env["TMPDIR"] = str(temp_root)
+        env["CHUMMER_PLAY_BROWSER_STATE_DIR"] = str(temp_root / "browser-state")
+        env["CHUMMER_PLAY_BROWSER_STATE_ISOLATE_PER_APP"] = "true"
+        env.update(self.extra_env)
+
+        command = [
+            "dotnet",
+            "run",
+            "--project",
+            "src/Chummer.Play.Web/Chummer.Play.Web.csproj",
+            "-nologo",
+            "--no-launch-profile",
+            "--no-build",
+        ]
+        self._log_handle = self._log_path.open("w", encoding="utf-8")
+        self._process = subprocess.Popen(
+            command,
+            cwd=CHUMMER_PLAY_ROOT,
+            env=env,
+            stdout=self._log_handle,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+
+        try:
+            wait_for_http(
+                self.base_url,
+                "/health",
+                accepted=(200,),
+                timeout_seconds=LOCAL_HUB_READY_TIMEOUT_SECONDS,
+            )
+        except Exception as exc:
+            self._stop_process()
+            log_excerpt = tail_text_file(self._log_path) if self._log_path is not None else ""
+            self._cleanup_temp_root()
+            message = str(exc)
+            if log_excerpt:
+                message = f"{message}\nstartup log:\n{log_excerpt}"
+            raise RuntimeError(message) from exc
+
+        return self
+
+    def _stop_process(self) -> None:
+        if self._process is not None:
+            if self._process.poll() is None:
+                self._process.terminate()
+                try:
+                    self._process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    self._process.kill()
+                    self._process.wait(timeout=10)
+            self._process = None
+
+        if self._log_handle is not None:
+            self._log_handle.close()
+            self._log_handle = None
+
+    def _cleanup_temp_root(self) -> None:
+        if self._temp_root is not None:
+            shutil.rmtree(self._temp_root, ignore_errors=True)
+            self._temp_root = None
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self._stop_process()
+        self._cleanup_temp_root()

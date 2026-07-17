@@ -69,7 +69,7 @@ public sealed class TeableImportantWorkService
         new("User Id", "singleLineText", Description: "Optional Chummer user id."),
         new("Subject Id", "singleLineText", Description: "Optional identity subject id."),
         new("Source", "singleLineText", Description: "Where this item came from."),
-        new("Link", "url", Description: "Optional first-party link."),
+        new("Link", "singleLineText", Description: "Optional first-party link."),
         new("Tags", "longText", Description: "One tag per line."),
         new("Created At UTC", "singleLineText", Description: "Creation timestamp."),
         new("Updated At UTC", "singleLineText", Description: "Last Chummer-side update timestamp."),

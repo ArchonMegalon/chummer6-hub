@@ -67,6 +67,27 @@ public sealed class UserExperienceServiceTests
         }
     }
 
+    [Fact]
+    public void Upsert_normalizes_black_ledger_followed_worlds_for_mobile_stream_consent()
+    {
+        using Fixture fixture = new();
+        fixture.Accounts.EnsureUser("subject.demo", "Runner Demo", "runner@example.invalid");
+
+        HubUserExperienceDto experience = fixture.Experience.Upsert(new UpsertHubUserExperienceRequest(
+            SubjectId: "subject.demo",
+            BlackLedgerNewsEmail: true,
+            BlackLedgerWorldsFollowed:
+            [
+                " Emerald_Sprawl_Prelude ",
+                "emerald-sprawl-prelude",
+                "",
+                "  "
+            ]));
+
+        Assert.True(experience.BlackLedgerNewsEmail);
+        Assert.Equal(["emerald-sprawl-prelude"], experience.BlackLedgerWorldsFollowed);
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), $"chummer-tests-user-experience-{Guid.NewGuid():N}");

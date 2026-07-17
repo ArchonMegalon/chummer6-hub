@@ -28,6 +28,10 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
     UPSTREAM_ERROR = False
     PARTICIPATE_UNAVAILABLE = False
     CONFIGURED_BILLING_HANDOFF = False
+    EMAIL_ENTRY_ENABLED = True
+    STALE_EMAIL_DISABLED_COPY = False
+    STATUS_REDIRECTS = False
+    STALE_STATUS_HEADING = False
 
     def do_GET(self) -> None:  # noqa: N802
         path = self.path
@@ -49,11 +53,11 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                         <meta name="twitter:url" content="/participate" />
                       </head>
                       <body>
-                        <h1>Participate</h1>
-                        <p>Public requests, clear bugs, useful ideas.</p>
-                        <p>Board offline right now.</p>
-                        <p>Use Contact for the Chummer5 Discord server.</p>
-                        <a href="/contact">Contact</a>
+                        <h1 class="sr-only">Participate</h1>
+                        <article class="participate-board-fallback" role="status" aria-live="polite">
+                          <p>Board offline right now. Use Contact for the Chummer5 Discord server.</p>
+                          <a href="/contact">Contact</a>
+                        </article>
                       </body>
                     </html>
                     """,
@@ -71,9 +75,7 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                     <meta name="twitter:url" content="/participate" />
                   </head>
                   <body>
-                    <h1>Participate</h1>
-                    <p>Public requests, clear bugs, useful ideas.</p>
-                    <h2>Current requests</h2>
+                    <h1 class="sr-only">Participate</h1>
                     <iframe src="/participate/board?embed=1" data-chummer-participate-frame></iframe>
                   </body>
                 </html>
@@ -109,6 +111,23 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
         if path.startswith("/login"):
             og_value = "" if type(self).EMPTY_LOGIN_META else path
             billing_login = "next=%2Faccount%2Fbilling" in self.path or "next=/account/billing" in self.path
+            if type(self).EMAIL_ENTRY_ENABLED or type(self).STALE_EMAIL_DISABLED_COPY:
+                support_line = (
+                    "Email first. Billing stays attached after this step."
+                    if billing_login
+                    else "Email first. Google if you prefer."
+                )
+            else:
+                support_line = (
+                    "Google first. Billing stays attached after that step."
+                    if billing_login
+                    else "Email sign-in is unavailable on this host right now. Continue with Google instead."
+                )
+            email_action = (
+                '<a href="/auth/email/start">Continue with email</a>'
+                if type(self).EMAIL_ENTRY_ENABLED
+                else ""
+            )
             self._send_html(
                 200,
                 f"""
@@ -119,9 +138,9 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
                   </head>
                   <body>
                     <h1>{"Supporter" if billing_login else "Open Chummer"}</h1>
-                    <p>{"Email first. Billing stays attached after this step." if billing_login else "Email first. Google if you prefer."}</p>
+                    <p>{support_line}</p>
                     <p>{"After this step, Chummer returns to billing." if billing_login else "After this step, Chummer returns to the signed-in product."}</p>
-                    <a href="/auth/email/start">Continue with email</a>
+                    {email_action}
                     <a href="/auth/google/start">Continue with Google</a>
                   </body>
                 </html>
@@ -171,9 +190,33 @@ class _PublicShellMinimalTruthHandler(BaseHTTPRequestHandler):
             )
             return
         if path == "/status":
-            self.send_response(302)
-            self.send_header("Location", "/downloads")
-            self.end_headers()
+            if type(self).STATUS_REDIRECTS:
+                self.send_response(302)
+                self.send_header("Location", "/downloads")
+                self.end_headers()
+                return
+
+            heading = "Updated" if type(self).STALE_STATUS_HEADING else "Preview downloads"
+            self._send_html(
+                200,
+                f"""
+                <html>
+                  <head>
+                    <meta property="og:url" content="/status" />
+                    <meta name="twitter:url" content="/status" />
+                  </head>
+                  <body>
+                    <section class="minimal-page-hero minimal-status-pill">
+                      <p>Now</p>
+                      <h1>{heading}</h1>
+                      <p>Windows download is live. Stable is still unavailable.</p>
+                      <a href="/downloads" data-analytics-surface="status_decision">Downloads</a>
+                      <a href="/help" data-analytics-surface="status_decision">Help</a>
+                    </section>
+                  </body>
+                </html>
+                """,
+            )
             return
 
         self._send_html(404, "<html><body>missing</body></html>")
@@ -197,6 +240,10 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         _PublicShellMinimalTruthHandler.UPSTREAM_ERROR = False
         _PublicShellMinimalTruthHandler.PARTICIPATE_UNAVAILABLE = False
         _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = False
+        _PublicShellMinimalTruthHandler.EMAIL_ENTRY_ENABLED = True
+        _PublicShellMinimalTruthHandler.STALE_EMAIL_DISABLED_COPY = False
+        _PublicShellMinimalTruthHandler.STATUS_REDIRECTS = False
+        _PublicShellMinimalTruthHandler.STALE_STATUS_HEADING = False
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _PublicShellMinimalTruthHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -225,6 +272,27 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
         self.assertTrue(payload["require_brilliant_directories_checkout"])
         billing = next(item for item in payload["routes"] if item["route"] == "/account/billing")
         self.assertEqual("/login", billing["finalPath"])
+
+    def test_gate_passes_when_email_entry_is_disabled_and_google_is_named(self) -> None:
+        _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = True
+        _PublicShellMinimalTruthHandler.EMAIL_ENTRY_ENABLED = False
+
+        payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
+
+        self.assertEqual(payload["status"], "pass")
+        self.assertEqual(payload["failure_count"], 0)
+
+    def test_gate_rejects_email_disabled_surface_with_stale_email_first_copy(self) -> None:
+        _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = True
+        _PublicShellMinimalTruthHandler.EMAIL_ENTRY_ENABLED = False
+        _PublicShellMinimalTruthHandler.STALE_EMAIL_DISABLED_COPY = True
+
+        payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
+
+        self.assertEqual(payload["status"], "fail")
+        self.assertTrue(
+            any("does not match any coherent required state" in failure for failure in payload["failures"])
+        )
 
     def test_gate_fails_when_live_billing_stays_on_placeholder_surface(self) -> None:
         with mock.patch.dict(os.environ, {"CHUMMER_REQUIRE_BRILLIANT_DIRECTORIES_CHECKOUT": "1"}, clear=False):
@@ -276,6 +344,26 @@ class PublicShellMinimalTruthGateTests(unittest.TestCase):
 
         self.assertEqual(payload["status"], "fail")
         self.assertTrue(any("Something went wrong on our side. Could not load posts." in failure for failure in payload["failures"]))
+
+    def test_gate_fails_when_status_route_redirects_to_downloads(self) -> None:
+        _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = True
+        _PublicShellMinimalTruthHandler.STATUS_REDIRECTS = True
+
+        payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
+
+        self.assertEqual(payload["status"], "fail")
+        self.assertTrue(any("/status:" in failure for failure in payload["failures"]))
+        self.assertTrue(any("instead of /status" in failure for failure in payload["failures"]))
+
+    def test_gate_fails_when_status_page_uses_stale_updated_heading(self) -> None:
+        _PublicShellMinimalTruthHandler.CONFIGURED_BILLING_HANDOFF = True
+        _PublicShellMinimalTruthHandler.STALE_STATUS_HEADING = True
+
+        payload = MODULE.evaluate(base_url=self.base_url, timeout=5.0)
+
+        self.assertEqual(payload["status"], "fail")
+        self.assertTrue(any("/status:" in failure for failure in payload["failures"]))
+        self.assertTrue(any("Updated" in failure or "Preview downloads" in failure for failure in payload["failures"]))
 
     def test_gate_can_allow_local_participate_unavailable_fallback_explicitly(self) -> None:
         _PublicShellMinimalTruthHandler.PARTICIPATE_UNAVAILABLE = True

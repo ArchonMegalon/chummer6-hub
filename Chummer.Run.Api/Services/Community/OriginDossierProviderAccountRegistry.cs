@@ -387,8 +387,8 @@ internal static class OriginDossierProviderAccountRegistry
 
         return registryRole.ToLowerInvariant() switch
         {
-            "manuscript" => tokens.Overlaps(["manuscript", "authoring", "premium_authoring", "premium_guided_authoring", "scale_drafting", "drafting", "finishing", "narrative_editions", "origin", "chummer_origin", "runner_memoir"]),
-            "audio" => tokens.Overlaps(["audio", "audiobook", "narration", "premium_narration", "finishing", "origin", "chummer_origin"]),
+            "manuscript" => tokens.Overlaps(["manuscript", "authoring", "premium_authoring", "premium_guided_authoring", "scale_drafting", "drafting", "finishing", "narrative_editions", "runner_memoir"]),
+            "audio" => tokens.Overlaps(["audio", "audiobook", "narration", "premium_narration", "audio_finishing", "origin_audio", "origin_audiobook"]),
             "visual" => tokens.Overlaps(["visual", "scene_render", "scene-render", "video_render", "video-render", "visuals", "magicfit", "origin_visual", "origin_visuals"]),
             "packaging" => tokens.Overlaps(["packaging", "package", "book_artifact", "book-artifact", "book_export", "book-export", "ebook", "epub", "pdf", "fliplink", "runbook_press", "runbook-press", "origin_packaging", "origin_package"]),
             "audiobookshelf" => tokens.Overlaps(["audiobookshelf", "ebook_shelf", "audiobook_shelf", "book_share", "share_host"]),

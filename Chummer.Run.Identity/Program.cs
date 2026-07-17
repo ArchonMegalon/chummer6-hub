@@ -26,6 +26,13 @@ else if (enableHttpsRedirection)
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapMethods("/health", [HttpMethods.Get, HttpMethods.Head], () => Results.Ok(new
+{
+    ok = true,
+    service = "chummer.run.identity",
+    status = "ready",
+    generatedAt = DateTimeOffset.UtcNow
+}));
 
 app.Run();
 

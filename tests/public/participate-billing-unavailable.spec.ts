@@ -25,7 +25,8 @@ test('participate suppresses supporter links when billing is unavailable', async
   const page = await context.newPage();
   await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Participate' })).toBeVisible();
-  await expect(page.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
+  await expect(page.locator('body')).not.toContainText('Public requests, clear bugs, useful ideas.');
+  await expect(page.locator('.participate-hosted__header')).toHaveCount(0);
   await expect(page.locator('[data-chummer-participate-frame], .participate-board-fallback')).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText('ProductLift');
   await expect(page.locator('a[href="/account/billing"]')).toHaveCount(0);

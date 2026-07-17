@@ -9,6 +9,7 @@ fi
 ROOT_DIR="$(cd "$script_dir/../.." && pwd)"
 cd "$ROOT_DIR"
 export PYTHONPATH="$ROOT_DIR:$ROOT_DIR/scripts${PYTHONPATH:+:$PYTHONPATH}"
+AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG="${CHUMMER_AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG:-$ROOT_DIR/.state/auth_signin_automation_paused.flag}"
 
 resolve_writable_tmp_root() {
   local candidate
@@ -170,6 +171,9 @@ run_slice_safe_dotnet_test() {
 }
 
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_routes.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_run_services_restore_drill_fail_closed.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_edge_compose_operability.py' >/dev/null
+python3 "$ROOT_DIR/scripts/verify_public_edge_compose_operability.py" >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_surface.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_analytics_hooks.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_codex_guest_fallback.py' >/dev/null
@@ -202,13 +206,33 @@ python3 "$ROOT_DIR/scripts/public_shell_minimal_truth_gate.py" --base-url "${CHU
 python3 "$ROOT_DIR/scripts/verify_live_public_web_recrawl.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/public_download_shelf_truth_gate.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_black_ledger_live_media_proof.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
+python3 "$ROOT_DIR/scripts/materialize_windows_installer_visual_audit_intake_request.py" --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json >/dev/null
+python3 "$ROOT_DIR/scripts/verify_windows_installer_visual_audit_intake_request.py" >/dev/null
+python3 "$ROOT_DIR/scripts/auto_import_windows_installer_gold_proof.py" --intake-request .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json --output .codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json --wait-seconds 0 >/dev/null
+if [[ -f "$AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG" ]]; then
+  echo "skipping google oauth auth automation in verify.sh: auth/sign-in automation is paused at $AUTH_SIGNIN_AUTOMATION_PAUSE_FLAG" >&2
+else
+  python3 "$ROOT_DIR/scripts/materialize_google_oauth_linking_operator_evidence_request.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null
+  python3 "$ROOT_DIR/scripts/verify_google_oauth_linking_operator_evidence_request.py" >/dev/null
+  python3 "$ROOT_DIR/scripts/auto_import_google_oauth_linking_operator_evidence.py" --intake-request .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_REQUEST.generated.json --output .codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE_AUTO_IMPORT.generated.json --wait-seconds 0 >/dev/null
+  python3 "$ROOT_DIR/scripts/materialize_google_oauth_linking_proof.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null
+  python3 "$ROOT_DIR/scripts/verify_google_oauth_linking_proof.py" >/dev/null
+fi
 CHUMMER_PORTAL_BASE_URL="${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" \
 CHUMMER_PORTAL_PUBLIC_HOST= \
 CHUMMER_PORTAL_FORWARDED_PROTO= \
-CHUMMER_PORTAL_REQUIRE_BLAZOR="${CHUMMER_HUB_PUBLIC_REQUIRE_BLAZOR:-0}" \
+CHUMMER_PORTAL_REQUIRE_BLAZOR="${CHUMMER_HUB_PUBLIC_REQUIRE_BLAZOR:-1}" \
 node "$ROOT_DIR/scripts/e2e-portal.cjs" >/dev/null
 node "$ROOT_DIR/scripts/verify_partizipate_runtime_fallback.cjs" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run}" >/dev/null
+release_ready_materializer_active="$(printf '%s' "${CHUMMER_RELEASE_READY_MATERIALIZER_ACTIVE:-}" | tr '[:upper:]' '[:lower:]')"
+if [[ "$release_ready_materializer_active" == "1" || "$release_ready_materializer_active" == "true" || "$release_ready_materializer_active" == "yes" || "$release_ready_materializer_active" == "on" ]]; then
+  echo "skipping release-ready materializer recursion in verify.sh: outer materializer is active" >&2
+else
+  python3 "$ROOT_DIR/scripts/materialize_release_ready_receipt.py" --force-global-verifier >/dev/null
+fi
 run_slice_safe_dotnet_test "FullyQualifiedName~HubPageChromeServiceTests"
+run_slice_safe_dotnet_test "FullyQualifiedName~AiMutationAuthorizationMiddlewareTests"
+run_slice_safe_dotnet_test "FullyQualifiedName~AiPublicEndpointIntegrationTests"
 
 sync_workflow_evidence_timestamps_from_nested_receipts() {
   python3 - "$UI_WORKFLOW_GATE_RECEIPT" <<'PY'

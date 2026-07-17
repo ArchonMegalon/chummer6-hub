@@ -279,7 +279,10 @@ async Task VerifySupportCrashWorkflowAsync()
             .Build();
 
         using ILoggerFactory loggerFactory = LoggerFactory.Create(static builder => { });
-        InstallLinkingStore installLinkingStore = new(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
+        InstallLinkingStore installLinkingStore = new(
+            configuration,
+            DataProtectionProvider.Create(Path.Combine(tempRoot, "install-linking-keys")),
+            loggerFactory.CreateLogger<InstallLinkingStore>());
         InstallLinkingService installLinking = new(installLinkingStore, configuration);
         CommunityStore communityStore = new(configuration, loggerFactory.CreateLogger<CommunityStore>());
         RewardService rewards = new(communityStore);
@@ -525,6 +528,38 @@ void VerifyIdentityEmailDeliveryProviders()
         Assert(deliveryStatus.RecentDeliveries.Any(static item => item.TransportKey == "emailit_api" && item.ProviderMessageId == "email_123" && item.Status == "accepted"), "Email delivery status should record accepted Emailit sends.");
         Assert(deliveryStatus.Recipients.Any(static item => item.Email == "runner@example.invalid" && item.Provider == "emailit_api"), "Email delivery status should project recipient state.");
 
+        HttpRequestMessage? blankOrderRequest = null;
+        var blankProviderOrderConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["IDENTITY_PUBLIC_BASE_URL"] = "https://chummer.run",
+                ["IDENTITY_EMAIL_PROVIDER_ORDER"] = "",
+                ["IDENTITY_EMAILIT_API_KEY"] = "secret-emailit-key",
+                ["IDENTITY_EMAILIT_FROM_EMAIL"] = "concierge@chummer.run",
+                ["IDENTITY_EMAILIT_FROM_NAME"] = "Chummer Concierge",
+                ["CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH"] = Path.Combine(tempRoot, "identity-email-delivery-blank-order.json")
+            })
+            .Build();
+        var blankProviderOrderService = new IdentityEmailDeliveryService(
+            blankProviderOrderConfig,
+            loggerFactory.CreateLogger<IdentityEmailDeliveryService>(),
+            new HttpClient(new StubHttpMessageHandler(request =>
+            {
+                blankOrderRequest = request;
+                return JsonResponse(new { data = new { id = "email_blank_order_123" } }, HttpStatusCode.Accepted);
+            })));
+
+        var blankOrderDelivered = blankProviderOrderService.DeliverMagicLink(
+            email: "runner@example.invalid",
+            displayName: "Runner Demo",
+            ticketId: "ticket-emailit-blank-order",
+            nextPath: "/home",
+            expiresAtUtc: DateTimeOffset.Parse("2026-03-20T10:00:00Z"));
+
+        Assert(!blankOrderDelivered.Delivered, "Blank email provider order should fail closed instead of implicitly enabling transactional email.");
+        Assert(blankOrderDelivered.DeliveryMode == "email_delivery_unavailable", "Blank email provider order should report unavailable delivery when no provider order is explicitly enabled.");
+        Assert(blankOrderRequest is null, "Blank email provider order should not issue an external provider request.");
+
         var webhookAck = emailitService.RecordEmailitWebhook(JsonDocument.Parse("""
         {
           "type": "email.delivered",
@@ -701,7 +736,10 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         .Build();
     using var loggerFactory = LoggerFactory.Create(static builder => builder.SetMinimumLevel(LogLevel.None));
     var store = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
-    var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
+    var installLinkingStore = new InstallLinkingStore(
+        configuration,
+        DataProtectionProvider.Create(Path.Combine(tempRoot, "install-linking-keys")),
+        loggerFactory.CreateLogger<InstallLinkingStore>());
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var supportAttachments = new SupportAttachmentStorageService(configuration);
     var installLinking = new InstallLinkingService(installLinkingStore, configuration);
@@ -2072,9 +2110,21 @@ async Task VerifyPublicLandingProjectionAsync()
     var storePath = Path.Combine(tempRoot, "community-store.json");
     var downloadsRoot = Path.Combine(tempRoot, "downloads");
     var downloadsFilesRoot = Path.Combine(downloadsRoot, "files");
+    var releaseEvidenceRoot = Path.Combine(downloadsRoot, "release-evidence", "browser-lane");
     Directory.CreateDirectory(downloadsFilesRoot);
+    Directory.CreateDirectory(releaseEvidenceRoot);
     File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-linux-x64.zip"), "smoke");
     File.WriteAllText(Path.Combine(downloadsFilesRoot, "smoke-poc-osx-arm64-installer.dmg"), "smoke-mac");
+    File.WriteAllText(
+        Path.Combine(releaseEvidenceRoot, "BLAZOR_PWA_PUBLIC_EDGE_PROOF.generated.json"),
+        JsonSerializer.Serialize(
+            new
+            {
+                contract_name = "chummer6-ui.blazor_pwa_public_edge_proof",
+                status = "passed",
+                public_entry_url = "https://chummer.run/app"
+            },
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)));
     File.WriteAllText(
         Path.Combine(downloadsRoot, "RELEASE_CHANNEL.generated.json"),
         JsonSerializer.Serialize(
@@ -2210,7 +2260,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var weeklyPulseArtifact = new WeeklyProductPulseArtifactService(configuration, loggerFactory.CreateLogger<WeeklyProductPulseArtifactService>());
     var progress = new PublicProgressService(configuration, weeklyPulseArtifact, loggerFactory.CreateLogger<PublicProgressService>());
     var trustContent = new PublicTrustContentService(canon, routes);
-    var installLinkingStore = new InstallLinkingStore(configuration, loggerFactory.CreateLogger<InstallLinkingStore>());
+    var installLinkingStore = new InstallLinkingStore(
+        configuration,
+        DataProtectionProvider.Create(Path.Combine(tempRoot, "install-linking-keys")),
+        loggerFactory.CreateLogger<InstallLinkingStore>());
     var supportStore = new SupportStore(configuration, loggerFactory.CreateLogger<SupportStore>());
     var supportAttachments = new SupportAttachmentStorageService(configuration);
     var installLinking = new InstallLinkingService(installLinkingStore, configuration);
@@ -2309,6 +2362,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(programSource.Contains("OAuth and sign-in callback state can break after container churn.", StringComparison.Ordinal), "startup should warn when Google callback state is backed only by a temporary key ring.");
     Assert(programSource.Contains("MapPost(\"/api/desktop-analytics/track\"", StringComparison.Ordinal), "startup should expose the bounded desktop analytics ingest endpoint.");
     Assert(programSource.Contains("DesktopAnalyticsBridgeService", StringComparison.Ordinal), "startup should route desktop analytics through the bounded bridge service.");
+    Assert(programSource.Contains("MapGet(\"/downloads/release-evidence/{**path}\"", StringComparison.Ordinal), "startup should expose browser-lane release evidence under the public downloads shelf.");
     var authEntrySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Auth", "Entry.cshtml"));
     Assert(!authEntrySource.Contains("auth-panel__support", StringComparison.Ordinal), "auth entry should keep one quiet support row instead of duplicating support chrome inside the panel.");
     var landingSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml"));
@@ -2844,12 +2898,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!trustCanonSource.Contains("signed-in shell", StringComparison.Ordinal), "public trust canon should not leak signed-in-shell language into customer copy.");
     Assert(!trustCanonSource.Contains("stays canonical", StringComparison.Ordinal), "public trust canon should not use canonical jargon on public trust surfaces.");
     Assert(trustCanonSource.Contains("The published package stays the same for everyone", StringComparison.Ordinal), "public trust canon should explain the package relationship in customer language.");
-    Assert(publicControllerSource.Contains("BuildFirstPartyParticipateBoardAsync", StringComparison.Ordinal), "participate should render a first-party public summary instead of dropping users into a vendor shell.");
+    Assert(publicControllerSource.Contains("BuildFirstPartyParticipateBoardAsync", StringComparison.Ordinal), "participate should render a first-party iframe shell instead of dropping users into a vendor shell.");
     Assert(publicControllerSource.Contains("return await ParticipateBoardProxyCore(", StringComparison.Ordinal), "participate should resolve the canonical route straight into the first-party ProductLift proxy.");
     Assert(publicControllerSource.Contains("BuildParticipateBoardRouteHref(normalizedBoardPath)", StringComparison.Ordinal), "participate should keep a deliberate board route for the full ProductLift queue.");
     Assert(publicControllerSource.Contains("public IActionResult ParticipateBoardFrame(string? boardPath)", StringComparison.Ordinal), "participate should keep the live board behind a first-party wrapper and frame handoff.");
     Assert(publicControllerSource.Contains("Heading: \"Participate\"", StringComparison.Ordinal), "participate should keep the public heading explicit and first-party.");
-    Assert(publicControllerSource.Contains("Summary: \"Public requests, clear bugs, useful ideas.\"", StringComparison.Ordinal), "participate should keep the public summary in restrained product language.");
+    Assert(publicControllerSource.Contains("Summary: \"Participate\"", StringComparison.Ordinal), "participate should keep the public summary minimal for the iframe-only shell.");
+    Assert(!publicControllerSource.Contains("Summary: \"Public requests, clear bugs, useful ideas.\"", StringComparison.Ordinal), "participate should not restore the removed visible board wrapper summary.");
     var surface = landing.LoadSurface();
     Assert(string.Equals(surface.Surface, "chummer.run", StringComparison.Ordinal), "landing surface should target chummer.run");
     Assert(surface.PublicRoutes.Any(static route => string.Equals(route.Path, "/", StringComparison.Ordinal)), "landing surface should expose the root route");
@@ -2902,9 +2957,12 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(shelfSource.Contains("ArtifactViewHref", StringComparison.Ordinal) && shelfSource.Contains("new[] { \"all\", \"personal\", \"campaign\", \"creator\", \"public\" }", StringComparison.Ordinal), "artifacts shelf should expose first-class personal, campaign, creator, and public view filters instead of one blended signed-in overlay.");
     Assert(!publicLandingControllerSource.Contains("Redirect(\"/now\")", StringComparison.Ordinal), "status should be a first-class public surface instead of redirecting to the current-release page.");
     Assert(statusSource.Contains("Status", StringComparison.Ordinal), "status should keep the compact status eyebrow inside the one public decision surface.");
-    Assert(statusSource.Contains("<h1>Updated</h1>", StringComparison.Ordinal), "status should keep the short updated headline inside the one public decision surface.");
+    Assert(statusSource.Contains("Preview downloads", StringComparison.Ordinal), "status should keep an explicit preview heading when the public lane is not stable.");
+    Assert(statusSource.Contains("Stable downloads", StringComparison.Ordinal), "status should keep an explicit stable heading when the public lane is stable.");
+    Assert(statusSource.Contains("Downloads paused", StringComparison.Ordinal), "status should keep an explicit paused heading when no public download is available.");
     Assert(statusSource.Contains(">Downloads</a>", StringComparison.Ordinal), "status should keep the primary release path inside the one public decision surface.");
     Assert(statusSource.Contains(">Help</a>", StringComparison.Ordinal), "status should keep setup help beside the primary release path.");
+    Assert(statusSource.Contains("Replace(\"Open help\", \"Use Help\", StringComparison.OrdinalIgnoreCase)", StringComparison.Ordinal), "status should sanitize Open help copy inside the status body text.");
     Assert(!statusSource.Contains("<h2>Platforms</h2>", StringComparison.Ordinal), "status should not carry a platform shelf after the minimal release decision.");
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
     Assert(!featureDetailSource.Contains("Get help with this surface", StringComparison.Ordinal), "detail-family pages should keep next-step help inside the family-specific route blocks.");
@@ -3262,7 +3320,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var participateModel = participateView?.Model as FirstPartyParticipateBoardViewModel;
     Assert(participateModel is not null, "participate page should render the Chummer-owned board shell.");
     Assert(string.Equals(participateModel!.Heading, "Participate", StringComparison.Ordinal), "participate page should keep the first-party heading.");
-    Assert(string.Equals(participateModel.Summary, "Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate page should keep the public board summary.");
+    Assert(string.Equals(participateModel.Summary, "Participate", StringComparison.Ordinal), "participate page should keep the public board summary minimal.");
     Assert(participateModel.EmbeddedBoardEnabled && string.Equals(participateModel.EmbeddedBoardHref, "/participate/board?embed=1", StringComparison.Ordinal), "participate page should host the same-origin ProductLift board frame.");
     var authenticatedParticipateView = await authenticatedLandingController.ParticipatePage(CancellationToken.None) as ViewResult;
     var authenticatedParticipateModel = authenticatedParticipateView?.Model as FirstPartyParticipateBoardViewModel;
@@ -3365,6 +3423,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var authenticatedDownloadResult = await downloadsController.DownloadArtifact("smoke-poc-linux-x64", CancellationToken.None);
     var authenticatedRedirect = authenticatedDownloadResult as RedirectResult;
     Assert(authenticatedRedirect is not null && string.Equals(authenticatedRedirect.Url, "/downloads/install/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in compatibility downloads should route through the install handoff.");
+    string? releaseEvidencePath = releases.ResolveReleaseEvidenceFilePath("browser-lane/BLAZOR_PWA_PUBLIC_EDGE_PROOF.generated.json");
+    Assert(!string.IsNullOrWhiteSpace(releaseEvidencePath) && File.Exists(releaseEvidencePath), "release evidence resolver should expose browser-lane JSON receipts.");
+    Assert(releases.ResolveReleaseEvidenceFilePath("../RELEASE_CHANNEL.generated.json") is null, "release evidence resolver should reject traversal.");
+    Assert(releases.ResolveReleaseEvidenceFilePath("browser-lane/not-json.txt") is null, "release evidence resolver should reject non-JSON files.");
     var blockedMacFile = await downloadsController.DownloadFile("smoke-poc-osx-arm64-installer.dmg", CancellationToken.None);
     Assert(blockedMacFile is NotFoundResult, "direct file routes should not serve macOS artifacts that were withheld from the public shelf.");
     var dispatchView = await authenticatedLandingController.DownloadDispatchPage("smoke-poc-linux-x64", CancellationToken.None) as ViewResult;
@@ -5748,10 +5810,24 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHorizonsModel?.TrustPulse is not null, "authenticated horizons page should keep the weekly public trust pulse visible.");
     Assert(authenticatedHorizonsModel?.SignedInStatus is not null, "authenticated horizons page should project the shared signed-in trust status.");
 
-    var participateHtml = participateContent?.Content ?? string.Empty;
-    Assert(participateHtml.Contains("Participate", StringComparison.Ordinal), "participate page should keep the first-party heading.");
-    Assert(participateHtml.Contains("Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate page should keep the public summary.");
-    Assert(!participateHtml.Contains("worker host", StringComparison.OrdinalIgnoreCase), "public participate copy should not leak worker-host jargon");
+    Assert(string.Equals(participateModel?.Heading, "Participate", StringComparison.Ordinal), "participate page should keep the first-party heading.");
+    Assert(
+        participateModel?.EmbeddedBoardEnabled == true
+        || string.Equals(participateModel?.SyncedLabel, "Board offline right now", StringComparison.Ordinal),
+        "participate page should show the iframe shell or the existing offline fallback.");
+    Assert(!string.Equals(participateModel?.Summary, "Public requests, clear bugs, useful ideas.", StringComparison.Ordinal), "participate page should not restore the removed visible summary.");
+    string participateSurfaceCopy = string.Join(
+        " ",
+        new[]
+        {
+            participateModel?.Heading,
+            participateModel?.Summary,
+            participateModel?.StatusLabel,
+            participateModel?.SyncedLabel,
+            participateModel?.EntryLabel,
+            participateModel?.EntrySummary
+        }.Where(static value => !string.IsNullOrWhiteSpace(value)));
+    Assert(!participateSurfaceCopy.Contains("worker host", StringComparison.OrdinalIgnoreCase), "public participate copy should not leak worker-host jargon");
 
     var homeResult = await controller.HomePage(null, CancellationToken.None);
     var homeRedirect = homeResult as RedirectResult;
@@ -5936,6 +6012,44 @@ async Task VerifyPublicLandingProjectionAsync()
     var unavailableGoogleModel = (unavailableGoogleResult as ViewResult)?.Model as AuthMessagePageViewModel;
     Assert(string.Equals(unavailableGoogleModel?.Heading, "Google sign-in failed", StringComparison.Ordinal), "google callback should render a stable failure message when upstream token exchange fails.");
     Assert(!(unavailableGoogleModel?.SupportLine?.Contains("provider-secret-raw-detail", StringComparison.OrdinalIgnoreCase) ?? false), "google callback should not leak raw provider failure details.");
+
+    var malformedCodeGoogle = new HubGoogleAuthService(
+        new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("{\"error\":\"invalid_grant\",\"error_description\":\"Malformed auth code.\"}", Encoding.UTF8, "application/json")
+        })),
+        googleFailureConfiguration,
+        authService,
+        identityLinks,
+        accounts,
+        DataProtectionProvider.Create(Path.Combine(tempRoot, "google-malformed-code")),
+        loggerFactory.CreateLogger<HubGoogleAuthService>(),
+        new SmokeWebHostEnvironment
+        {
+            EnvironmentName = "Development",
+            ApplicationName = "RunServicesSmoke",
+            ContentRootPath = tempRoot,
+            WebRootPath = Path.Combine(tempRoot, "wwwroot")
+        });
+    var malformedCodeContext = new DefaultHttpContext();
+    malformedCodeContext.Request.Scheme = "https";
+    malformedCodeContext.Request.Host = new HostString("hub.example.test");
+    var malformedCodeChallenge = malformedCodeGoogle.CreateChallenge(malformedCodeContext.Request, "/home");
+    var malformedCodeState = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(malformedCodeChallenge.RedirectUrl).Query)["state"].ToString();
+    malformedCodeContext.Request.Headers.Cookie = $"{HubGoogleAuthConstants.StateCookieName}={malformedCodeChallenge.StateCookieValue}";
+    malformedCodeContext.Request.QueryString = new QueryString($"?state={Uri.EscapeDataString(malformedCodeState)}&code=fake-auth-code");
+    var malformedCodeAuthController = new AuthController(authService, identityClient, landing, releases, releaseSelection, chrome, malformedCodeGoogle, accounts, participationNotifications, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
+    {
+        ControllerContext = new ControllerContext
+        {
+            HttpContext = malformedCodeContext
+        }
+    };
+    var malformedCodeResult = await malformedCodeAuthController.GoogleCallback(CancellationToken.None);
+    var malformedCodeModel = (malformedCodeResult as ViewResult)?.Model as AuthMessagePageViewModel;
+    Assert(string.Equals(malformedCodeModel?.Heading, "Google sign-in code was malformed", StringComparison.Ordinal), "google callback should render the specific malformed-code heading when Google rejects a broken authorization code.");
+    Assert(string.Equals(malformedCodeModel?.SupportLine, "Google returned a malformed authorization code. Start the Google sign-in flow again.", StringComparison.Ordinal), "google callback should keep the specific malformed-code guidance instead of regressing to the stale generic handshake copy.");
+    Assert(!(malformedCodeModel?.SupportLine?.Contains("could not complete your Google sign-in right now", StringComparison.OrdinalIgnoreCase) ?? false), "google callback malformed-code guidance should not fall back to the generic Google sign-in failure copy.");
 }
 
 void VerifyRegistryWorkflow()
@@ -8151,7 +8265,7 @@ async Task VerifyHostedBoundedContextCoverageWorkflowAsync()
             boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "community_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work#community-ops", StringComparison.Ordinal)),
             "hub bounded-context coverage should keep community context proof on the signed-in community rail.");
         Assert(
-            boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "campaign_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work/workspaces/workspace-demo-135", StringComparison.Ordinal)),
+            boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "campaign_context", StringComparison.Ordinal) && string.Equals(item.Route, "/account/campaigns/workspace-demo-135", StringComparison.Ordinal)),
             "hub bounded-context coverage should keep campaign context proof on the workspace continuity rail.");
         Assert(
             boundedContextCoverage.Projections.Any(item => string.Equals(item.SurfaceId, "support_context", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal)),

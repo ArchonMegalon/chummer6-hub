@@ -36,6 +36,21 @@ public sealed class PublicFacingCopyHumanizerTests
         Assert.DoesNotContain("publication lane", cleaned, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Clean_RemovesLocalReviewPathsAndInternalCoverageKeys()
+    {
+        const string source = "Desktop polish still needs closure: google oauth operator evidence is still missing: /docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json. missing coverage: desktop_client. Windows installer visual audit source digest does not match promoted installer.";
+
+        string cleaned = PublicFacingCopyHumanizer.Clean(source);
+
+        Assert.Contains("Google sign-in review is still missing", cleaned, StringComparison.Ordinal);
+        Assert.Contains("desktop app coverage is still missing", cleaned, StringComparison.Ordinal);
+        Assert.Contains("Windows desktop visual review still needs a current promoted build capture", cleaned, StringComparison.Ordinal);
+        Assert.DoesNotContain("/docker/chummercomplete", cleaned, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("GOOGLE_OAUTH_LINKING_OPERATOR_EVIDENCE.generated.json", cleaned, StringComparison.Ordinal);
+        Assert.DoesNotContain("desktop_client", cleaned, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData("provider proof ready", "service status ready")]
     [InlineData("artifact receipt attached", "file record attached")]

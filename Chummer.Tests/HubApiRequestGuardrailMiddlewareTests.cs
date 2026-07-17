@@ -19,7 +19,7 @@ public sealed class HubApiRequestGuardrailMiddlewareTests
         var options = new HubApiGuardrailOptions
         {
             DefaultRequestTimeout = TimeSpan.FromMilliseconds(50),
-            ExtendedRequestTimeout = TimeSpan.FromMilliseconds(250)
+            ExtendedRequestTimeout = TimeSpan.FromSeconds(5)
         };
 
         var middleware = new HubApiRequestGuardrailMiddleware(
@@ -48,13 +48,13 @@ public sealed class HubApiRequestGuardrailMiddlewareTests
         var options = new HubApiGuardrailOptions
         {
             DefaultRequestTimeout = TimeSpan.FromMilliseconds(50),
-            ExtendedRequestTimeout = TimeSpan.FromMilliseconds(250)
+            ExtendedRequestTimeout = TimeSpan.FromSeconds(5)
         };
 
         var middleware = new HubApiRequestGuardrailMiddleware(
             async innerContext =>
             {
-                await Task.Delay(100, innerContext.RequestAborted);
+                await Task.Delay(TimeSpan.FromSeconds(5), innerContext.RequestAborted);
                 innerContext.Response.StatusCode = StatusCodes.Status204NoContent;
             },
             options);

@@ -125,6 +125,10 @@ def test_origin_packet_hashes_canon_and_mechanics_snapshot(tmp_path: Path) -> No
             mechanics_snapshot_path=str(mechanics_doc),
             public_projection="player_safe",
             gm_secret_included=False,
+            accepted_story_link=[
+                "story-link:runner-switchback|runner:switchback|Switchback|They survived the same botched clinic extraction and owe the same fixer.|origin-story-link-consent:runner-switchback"
+            ],
+            shared_history_gm_review_required=True,
             source_head=["chummer_core=sha-core"],
             source=[f"{source_doc}|origin-canon|public"],
             allowed_claim=[
@@ -151,6 +155,17 @@ def test_origin_packet_hashes_canon_and_mechanics_snapshot(tmp_path: Path) -> No
     assert packet["origin_dossier"]["campaign_ref"] == "campaign:redmond"
     assert len(packet["origin_dossier"]["origin_canon_sha256"]) == 64
     assert len(packet["origin_dossier"]["mechanics_snapshot_sha256"]) == 64
+    assert packet["origin_dossier"]["accepted_runner_story_link_ids"] == ["story-link:runner-switchback"]
+    assert packet["origin_dossier"]["shared_history_policy"] == {
+        "requires_player_consent": True,
+        "requires_gm_review": True,
+        "provider_may_access_linked_runner_artifacts": False,
+        "integration_scope": "origin_story_context_only",
+    }
+    story_link = packet["origin_dossier"]["shared_history_links"][0]
+    assert story_link["linked_runner_ref"] == "runner:switchback"
+    assert story_link["linked_runner_alias"] == "Switchback"
+    assert story_link["consent_receipt_ref"] == "origin-story-link-consent:runner-switchback"
 
 
 def test_subscribr_verifier_blocks_forbidden_claim(tmp_path: Path) -> None:

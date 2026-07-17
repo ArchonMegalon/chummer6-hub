@@ -41,6 +41,22 @@ DEFAULT_REQUEST_TIMEOUT_SECONDS = float(os.environ.get("CHUMMER_PUBLIC_ROUTE_PRO
 DEFAULT_MAX_RETRIES = int(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_MAX_RETRIES", "1"))
 DEFAULT_RETRY_DELAY_SECONDS = float(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_RETRY_DELAY_SECONDS", "0.5"))
 DEFAULT_MAX_WORKERS = int(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_MAX_WORKERS", "12"))
+LOCAL_BASE_HOSTS = {"127.0.0.1", "localhost", "::1"}
+CANONICAL_PUBLIC_ROUTE_PROOF_HOSTS = {"chummer.run", "www.chummer.run"}
+LOCAL_BASE_MAX_WORKERS = int(os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_LOCAL_MAX_WORKERS", "1"))
+LOCAL_BASE_REQUEST_TIMEOUT_SECONDS = float(
+    os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_LOCAL_REQUEST_TIMEOUT_SECONDS", "12")
+)
+# The public edge will intermittently time out when we fan out too many live probes
+# against chummer.run at once. Keep canonical-host verification tightly bounded by
+# default so gold/materializer receipts measure the surface instead of probe pressure,
+# while still allowing enough concurrency to keep the janitor loop practical.
+CANONICAL_PUBLIC_ROUTE_PROOF_MAX_WORKERS = int(
+    os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_CANONICAL_MAX_WORKERS", "1")
+)
+CANONICAL_PUBLIC_ROUTE_PROOF_REQUEST_TIMEOUT_SECONDS = float(
+    os.environ.get("CHUMMER_PUBLIC_ROUTE_PROOF_CANONICAL_REQUEST_TIMEOUT_SECONDS", "20")
+)
 
 
 @dataclass
@@ -134,6 +150,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=DEFAULT_MAX_WORKERS,
         help="Maximum worker count for parallel live route verification.")
+    parser.add_argument(
+        "--path",
+        action="append",
+        default=[],
+        help="Optional exact manifest route path to verify. Repeat to verify multiple changed routes only.")
     return parser.parse_args(argv)
 
 
@@ -160,6 +181,42 @@ def normalize_target(target: str | None) -> tuple[str, tuple[tuple[str, str], ..
     return path, query_items, fragment
 
 
+def base_url_is_local(base_url: str) -> bool:
+    parsed = urlparse(base_url)
+    host = (parsed.hostname or "").strip().lower()
+    return host in LOCAL_BASE_HOSTS
+
+
+def base_url_is_canonical_public_host(base_url: str) -> bool:
+    parsed = urlparse(base_url)
+    host = (parsed.hostname or "").strip().lower()
+    return host in CANONICAL_PUBLIC_ROUTE_PROOF_HOSTS
+
+
+def resolve_effective_max_workers(base_url: str, requested_max_workers: int) -> int:
+    if requested_max_workers <= 0:
+        raise SystemExit("--max-workers must be positive")
+
+    if base_url_is_local(base_url):
+        return max(1, min(requested_max_workers, LOCAL_BASE_MAX_WORKERS))
+    if base_url_is_canonical_public_host(base_url):
+        return max(1, min(requested_max_workers, CANONICAL_PUBLIC_ROUTE_PROOF_MAX_WORKERS))
+
+    return requested_max_workers
+
+
+def resolve_effective_request_timeout_seconds(base_url: str, requested_timeout_seconds: float) -> float:
+    if requested_timeout_seconds <= 0:
+        raise SystemExit("--request-timeout-seconds must be positive")
+
+    if base_url_is_local(base_url):
+        return max(requested_timeout_seconds, LOCAL_BASE_REQUEST_TIMEOUT_SECONDS)
+    if base_url_is_canonical_public_host(base_url):
+        return max(requested_timeout_seconds, CANONICAL_PUBLIC_ROUTE_PROOF_REQUEST_TIMEOUT_SECONDS)
+
+    return requested_timeout_seconds
+
+
 def _normalize_placeholder_token(token: str) -> str:
     return "".join(ch for ch in token.lower() if ch.isalnum())
 
@@ -184,6 +241,54 @@ def route_path_contains_placeholders(route_path: str) -> bool:
     return "{" in route_path and "}" in route_path
 
 
+def _origin_tuple(value: str) -> tuple[str, str, int | None] | None:
+    try:
+        parsed = urlparse(value)
+        port = parsed.port
+    except ValueError:
+        return None
+    scheme = parsed.scheme.lower()
+    host = (parsed.hostname or "").lower()
+    if scheme not in {"http", "https"} or not host:
+        return None
+    if port is None:
+        port = 443 if scheme == "https" else 80
+    return scheme, host, port
+
+
+def redirect_location_matches_exact_alias_contract(
+    base_url: str,
+    location: str | None,
+    expected_path: str,
+) -> bool:
+    location_text = str(location or "").strip()
+    if not location_text or not expected_path.startswith("/"):
+        return False
+    try:
+        parsed = urlparse(location_text)
+    except ValueError:
+        return False
+    if parsed.username is not None or parsed.password is not None:
+        return False
+    if parsed.path != expected_path:
+        return False
+    # A query delimiter is forbidden even when its value is empty.
+    if "?" in location_text.split("#", 1)[0] or parsed.query:
+        return False
+    # The explicit empty fragment prevents user agents from inheriting a private
+    # fragment from the alias request. Missing or non-empty fragments are unsafe.
+    if "#" not in location_text or parsed.fragment:
+        return False
+
+    if parsed.scheme or parsed.netloc:
+        if not parsed.scheme or not parsed.netloc:
+            return False
+        return _origin_tuple(base_url) == _origin_tuple(location_text)
+
+    # Only a canonical root-relative reference is accepted for a relative target.
+    return location_text.startswith("/") and not location_text.startswith("//")
+
+
 def read_manifest(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
@@ -206,6 +311,22 @@ def read_manifest(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         raise AssertionError(f"{path} did not contain any route lists in {ROUTE_LIST_KEYS}")
 
     return payload, normalized
+
+
+def filter_manifest_routes(routes: list[dict[str, Any]], path_filters: list[str]) -> list[dict[str, Any]]:
+    normalized_filters = [item.strip() for item in path_filters if item.strip()]
+    if not normalized_filters:
+        return routes
+
+    allowed = set(normalized_filters)
+    filtered = [route for route in routes if str(route.get("path") or "").strip() in allowed]
+    if filtered:
+        return filtered
+
+    raise SystemExit(
+        "--path did not match any manifest route: "
+        + ", ".join(sorted(allowed))
+    )
 
 
 def resolve_repo_path(path_value: str) -> Path:
@@ -263,6 +384,7 @@ def verify_route(
         if str(item).strip()
     )
     required_final_url_prefix = str(route.get("required_final_url_prefix") or "").strip()
+    required_redirect_location_prefix = str(route.get("required_redirect_location_prefix") or "").strip()
     verification_mode = str(route.get("verification_mode") or "").strip()
     receipt_seed_required = verification_mode == "controller_contract" and route_path_contains_placeholders(request_path)
 
@@ -525,28 +647,49 @@ def verify_route(
                 detail=f"request failed: {exc}")
 
     mode = "public_route"
-    expectation = "public route resolves successfully"
+    expectation = (
+        f"public route redirects to {required_redirect_location_prefix}"
+        if required_redirect_location_prefix
+        else "public route resolves successfully"
+    )
     try:
         status, body_text, headers, final_url = fetch(
             base_url,
             resolved_request_path,
             public_host=public_host or None,
             forwarded_proto=forwarded_proto or None,
-            follow_redirects=True,
+            follow_redirects=not required_redirect_location_prefix,
             request_timeout_seconds=request_timeout_seconds,
             max_retries=max_retries,
             retry_delay_seconds=retry_delay_seconds)
         redirect_location = headers.get("location")
-        missing_texts = [snippet for snippet in required_texts if snippet not in body]
-        final_url_ok = (
-            not required_final_url_prefix
-            or final_url.startswith(f"{base_url.rstrip('/')}{required_final_url_prefix}")
-            or final_url.startswith(required_final_url_prefix)
-        )
-        success = status == 200 and not missing_texts and final_url_ok
-        detail_parts = [f"expected 200 from public route, got {status}"]
+        missing_texts = [snippet for snippet in required_texts if snippet not in body_text]
+        final_url_ok = True
+        redirect_location_ok = True
+        if required_redirect_location_prefix:
+            redirect_location_ok = redirect_location_matches_exact_alias_contract(
+                base_url,
+                redirect_location,
+                required_redirect_location_prefix,
+            )
+            success = status == 302 and not missing_texts and redirect_location_ok
+            detail_parts = [
+                f"expected exact HTTP 302 same-origin redirect to {required_redirect_location_prefix}# with an explicit empty fragment, got {redirect_location or '<none>'} (status {status})"
+            ]
+        else:
+            final_url_ok = (
+                not required_final_url_prefix
+                or final_url.startswith(f"{base_url.rstrip('/')}{required_final_url_prefix}")
+                or final_url.startswith(required_final_url_prefix)
+            )
+            success = status == 200 and not missing_texts and final_url_ok
+            detail_parts = [f"expected 200 from public route, got {status}"]
         if missing_texts:
             detail_parts.append("missing required text: " + ", ".join(missing_texts))
+        if not redirect_location_ok:
+            detail_parts.append(
+                f"redirect location {redirect_location!r} does not satisfy exact alias target {required_redirect_location_prefix!r} with an explicit empty fragment"
+            )
         if not final_url_ok:
             detail_parts.append(
                 f"final URL {final_url!r} does not match required prefix {required_final_url_prefix!r}"
@@ -673,8 +816,13 @@ def build_report(
         "base_url": args.base_url,
         "public_host": args.public_host or None,
         "forwarded_proto": args.forwarded_proto or None,
+        "request_timeout_seconds": args.request_timeout_seconds,
+        "effective_request_timeout_seconds": getattr(args, "effective_request_timeout_seconds", args.request_timeout_seconds),
+        "requested_max_workers": args.max_workers,
+        "effective_max_workers": getattr(args, "effective_max_workers", args.max_workers),
         "strict_positive": bool(args.strict_positive),
         "seed_receipts": bool(args.seed_receipts),
+        "path_filter": list(args.path or []),
         "manifest_path": manifest_path_label(manifest_path),
         "manifest_surface": manifest.get("surface"),
         "manifest_version": manifest.get("version"),
@@ -701,12 +849,21 @@ def build_report(
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    if args.max_workers <= 0:
-        raise SystemExit("--max-workers must be positive")
+    effective_max_workers = resolve_effective_max_workers(args.base_url, args.max_workers)
+    effective_request_timeout_seconds = resolve_effective_request_timeout_seconds(
+        args.base_url,
+        args.request_timeout_seconds,
+    )
+    args.effective_max_workers = effective_max_workers
+    args.effective_request_timeout_seconds = effective_request_timeout_seconds
     manifest_path = Path(args.manifest).resolve()
     manifest, manifest_routes = read_manifest(manifest_path)
     hub_live_audit = load_hub_live_audit_module()
-    active_routes = [route for route in manifest_routes if bool(route.get("must_exist", True))]
+    active_routes = [
+        route
+        for route in filter_manifest_routes(manifest_routes, list(args.path or []))
+        if bool(route.get("must_exist", True))
+    ]
 
     def route_task(route: dict[str, Any]) -> RouteResult:
         return verify_route(
@@ -717,7 +874,7 @@ def main(argv: list[str] | None = None) -> int:
             forwarded_proto=args.forwarded_proto,
             strict_positive=bool(args.strict_positive),
             seed_receipts=bool(args.seed_receipts),
-            request_timeout_seconds=args.request_timeout_seconds,
+            request_timeout_seconds=effective_request_timeout_seconds,
             max_retries=args.max_retries,
             retry_delay_seconds=args.retry_delay_seconds,
         )
@@ -729,19 +886,20 @@ def main(argv: list[str] | None = None) -> int:
             route,
             public_host=args.public_host,
             forwarded_proto=args.forwarded_proto,
-            request_timeout_seconds=args.request_timeout_seconds,
+            request_timeout_seconds=effective_request_timeout_seconds,
             max_retries=args.max_retries,
             retry_delay_seconds=args.retry_delay_seconds,
         )
 
-    if args.max_workers == 1:
+    if effective_max_workers == 1:
         results = [route_task(route) for route in active_routes]
         negative_paths = [negative for negative in (negative_task(route) for route in active_routes) if negative is not None]
     else:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_workers) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=effective_max_workers) as executor:
             route_futures = [executor.submit(route_task, route) for route in active_routes]
-            negative_futures = [executor.submit(negative_task, route) for route in active_routes]
             results = [future.result() for future in route_futures]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=effective_max_workers) as executor:
+            negative_futures = [executor.submit(negative_task, route) for route in active_routes]
             negative_paths = [negative for negative in (future.result() for future in negative_futures) if negative is not None]
 
     report = build_report(manifest, manifest_path, args, results, negative_paths)

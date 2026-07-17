@@ -55,13 +55,96 @@ public sealed class InstallBootstrapTicketServiceTests
             "user-archon",
             "subject-archon");
 
-        bool validAllowed = fixture.Service.TryValidateForArtifact(issued.Ticket, "blazor-desktop-osx-arm64-installer", out InstallBootstrapTicketClaims? allowedClaims);
-        bool validDenied = fixture.Service.TryValidateForArtifact(issued.Ticket, "avalonia-win-x64-installer", out InstallBootstrapTicketClaims? deniedClaims);
+        bool validAllowed = fixture.Service.TryValidateForArtifact(
+            issued.Ticket,
+            "blazor-desktop-osx-arm64-installer",
+            generationId: null,
+            artifactSha256: null,
+            allowLegacyUnbound: true,
+            out InstallBootstrapTicketClaims? allowedClaims);
+        bool validDenied = fixture.Service.TryValidateForArtifact(
+            issued.Ticket,
+            "avalonia-win-x64-installer",
+            generationId: null,
+            artifactSha256: null,
+            allowLegacyUnbound: true,
+            out InstallBootstrapTicketClaims? deniedClaims);
 
         Assert.True(validAllowed);
         Assert.NotNull(allowedClaims);
         Assert.False(validDenied);
         Assert.Null(deniedClaims);
+    }
+
+    [Fact]
+    public void BoundTicketRequiresExactGenerationAndArtifactDigest()
+    {
+        using TicketFixture fixture = new();
+        string artifactId = "avalonia-osx-arm64-installer";
+        string generationASha256 = new('a', 64);
+        InstallBootstrapTicketIssueResult issued = fixture.Service.IssueBound(
+            artifactId,
+            [new InstallBootstrapArtifactBinding(artifactId, generationASha256)],
+            "generation-a",
+            "user-archon",
+            "subject-archon");
+
+        bool validForA = fixture.Service.TryValidateForArtifact(
+            issued.Ticket,
+            artifactId,
+            "generation-a",
+            generationASha256,
+            allowLegacyUnbound: false,
+            out InstallBootstrapTicketClaims? generationAClaims);
+        bool validForB = fixture.Service.TryValidateForArtifact(
+            issued.Ticket,
+            artifactId,
+            "generation-b",
+            new string('b', 64),
+            allowLegacyUnbound: false,
+            out InstallBootstrapTicketClaims? generationBClaims);
+        bool validForChangedBytes = fixture.Service.TryValidateForArtifact(
+            issued.Ticket,
+            artifactId,
+            "generation-a",
+            new string('c', 64),
+            allowLegacyUnbound: false,
+            out _);
+
+        Assert.True(validForA);
+        Assert.Equal("generation-a", generationAClaims?.GenerationId);
+        Assert.Equal(generationASha256, Assert.Single(generationAClaims!.ArtifactBindings!).Sha256);
+        Assert.False(validForB);
+        Assert.Null(generationBClaims);
+        Assert.False(validForChangedBytes);
+    }
+
+    [Fact]
+    public void LegacyUnboundTicketFailsClosedForActiveGeneration()
+    {
+        using TicketFixture fixture = new();
+        InstallBootstrapTicketIssueResult issued = fixture.Service.Issue(
+            "avalonia-osx-arm64-installer",
+            "user-archon",
+            "subject-archon");
+
+        bool validForLegacy = fixture.Service.TryValidateForArtifact(
+            issued.Ticket,
+            "avalonia-osx-arm64-installer",
+            generationId: null,
+            artifactSha256: null,
+            allowLegacyUnbound: true,
+            out _);
+        bool validForGeneration = fixture.Service.TryValidateForArtifact(
+            issued.Ticket,
+            "avalonia-osx-arm64-installer",
+            "generation-a",
+            new string('a', 64),
+            allowLegacyUnbound: false,
+            out _);
+
+        Assert.True(validForLegacy);
+        Assert.False(validForGeneration);
     }
 
     private sealed class TicketFixture : IDisposable

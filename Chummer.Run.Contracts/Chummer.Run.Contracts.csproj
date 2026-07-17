@@ -13,9 +13,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\chummer-core-engine\Chummer.Contracts\Chummer.Contracts.csproj" />
-    <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
-    <ProjectReference Include="..\Chummer.Play.Contracts\Chummer.Play.Contracts.csproj" />
+    <ProjectReference Include="$(MSBuildProjectDirectory)/../../chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj" />
+    <ProjectReference Include="$(MSBuildProjectDirectory)/../../chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj" />
+    <ProjectReference Include="$(MSBuildProjectDirectory)/../Chummer.Play.Contracts/Chummer.Play.Contracts.csproj" />
     <ProjectReference Include="$(ChummerMediaContractsProject)" Condition="'$(ChummerMediaContractsProject)' != ''" />
     <Reference Include="Chummer.Media.Contracts" Condition="'$(ChummerMediaContractsProject)' == '' and '$(ChummerMediaContractsAssembly)' != ''">
       <HintPath>$(ChummerMediaContractsAssembly)</HintPath>

@@ -1,788 +1,89 @@
-@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @model MobileProjectionPageViewModel
+@inject Chummer.Run.Api.Services.PublicCanonicalOriginPolicy PublicOrigin
 @{
-    static string PublicMobileText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
-
-    var antiForgery = Antiforgery.GetAndStoreTokens(Context);
-    ViewData["Title"] = PublicMobileText(Model.Heading);
-    ViewData["Chrome"] = Model.Chrome;
-    ViewData["SurfaceClass"] = "surface-mobile-projection";
+    Layout = "~/Views/Shared/_MobileInstallLayout.cshtml";
+    var roleProfile = Model.RoleProfile;
+    ViewData["Title"] = Model.DocumentTitle;
+    ViewData["MobileManifestHref"] = Model.ManifestHref;
+    ViewData["MobileAppleAppTitle"] = Model.AppleAppTitle;
 }
 
-<input type="hidden" name="__RequestVerificationToken" value="@antiForgery.RequestToken" />
-
-<section class="minimal-page-hero pwa-minimal-hero">
-    <div>
-        <p class="eyebrow">@PublicMobileText(Model.Eyebrow)</p>
-        <h1 class="page-title">@PublicMobileText(Model.Heading)</h1>
-        <p class="page-copy">@PublicMobileText(Model.Intro)</p>
-        <div class="trust-claim__details">
-            <span>@PublicMobileText(Model.CurrentRoleLabel)</span>
-            <span>Installable app shell live</span>
-            <span>Offline and reconnect lane cached</span>
+<main class="turn-shell install-only-shell"
+      data-play-surface="install-only"
+      data-live-session="unavailable"
+      data-authority="none"
+      data-install-role="@roleProfile.RoleKey"
+      data-mobile-app-inline-handoff
+      data-mobile-app-path="@roleProfile.InstallTargetPath"
+      data-mobile-app-origin="@PublicOrigin.Origin">
+    <section class="turn-card hero install-hero">
+        <div>
+            <p class="eyebrow">Chummer @Model.CurrentRoleLabel · install shell</p>
+            <h1>@roleProfile.PurposeHeading</h1>
+            <p class="lede">@roleProfile.PurposeSummary</p>
         </div>
-    </div>
-    <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@PublicMobileText(Model.PrimaryAction.Label)</a>
-        <button class="button-like button-like--secondary" type="button" data-install-prompt-button aria-disabled="true">Install this app</button>
-        <a class="button-like button-like--ghost" href="/play/continuity">Open continuity</a>
-    </div>
-</section>
 
-<section class="minimal-section minimal-section--tight" id="pwa-ledger-stream">
-    <div class="minimal-section__lead">
-        <p class="eyebrow">Living world</p>
-        <h2>Black Ledger live tracker</h2>
-        <p>Heat, movement, turn state, and reconnect status stay in one compact mobile view.</p>
-    </div>
-    <div class="minimal-facts">
-        <article>
-            <p class="eyebrow">Install</p>
-            <h3><span data-pwa-online-state>Checking</span></h3>
-            <p data-pwa-install-state>@PublicMobileText(Model.InstallabilitySummary) The offline return path stays ready.</p>
-            <div class="stacked-actions">
-                <a class="editorial-strip__action" href="/mobile">Open mobile view</a>
-                <a class="editorial-strip__action" href="/downloads">Desktop downloads</a>
-                <a class="editorial-strip__action" href="/help">Open setup help</a>
-            </div>
-        </article>
-        <article>
-            <p class="eyebrow">Ledger</p>
-            <h3><span data-pwa-ledger-status>Checking</span></h3>
-            <p data-pwa-ledger-summary>Waiting for live board stream data.</p>
-            <p class="muted-copy">
-                <span>World:</span>
-                <span data-pwa-ledger-world>Not yet available</span>
-            </p>
-            <p class="muted-copy">
-                <span>Turn:</span>
-                <span data-pwa-ledger-turn>—</span>
-            </p>
-            <p class="muted-copy">
-                <span>Hot district:</span>
-                <span data-pwa-ledger-hot-district>—</span>
-            </p>
-            <p class="muted-copy">
-                <span>Heat meter:</span>
-                <span data-pwa-ledger-heat-score>—</span>
-            </p>
-            <meter min="0" max="100" low="35" high="70" optimum="0" value="0" data-pwa-ledger-heat-meter aria-label="Current hottest district heat"></meter>
-            <p class="muted-copy">
-                <span>Top movement:</span>
-                <span data-pwa-ledger-top-movement>—</span>
-            </p>
-            <div class="stacked-actions">
-                <a class="editorial-strip__action" data-pwa-ledger-map-route href="/ledger/map">Open ledger map</a>
-                <a class="editorial-strip__action" data-pwa-ledger-opt-in-route href="/account">Enable updates</a>
-                <button class="button-like button-like--secondary" type="button" data-pwa-ledger-follow-button hidden></button>
-            </div>
-            <div class="muted-copy" data-pwa-ledger-follow-state>Sign in to opt in and follow a living world.</div>
-            <div class="muted-copy" data-pwa-ledger-follow-hint></div>
-        </article>
-        <article>
-            <p class="eyebrow">Continuity</p>
-            <h3>Turn and heat</h3>
-            <p class="muted-copy">
-                <span>Continuity turn:</span>
-                <span data-pwa-continuity-turn>—</span>
-            </p>
-            <p class="muted-copy" data-pwa-continuity-summary>No continuity snapshot loaded yet.</p>
-            <ul class="gateway-card__list" data-pwa-continuity-events>
-                <li>No continuity events yet.</li>
-            </ul>
-            <p class="muted-copy">Current heat top list:</p>
-            <ul class="gateway-card__list" data-pwa-ledger-top-districts>
-                <li>No live district data yet.</li>
-            </ul>
-        </article>
-        <article>
-            <p class="eyebrow">Links</p>
-            <h3>Details</h3>
-            <p class="muted-copy">
-                <span>Route:</span>
-                <span>/mobile/pwa/ledger.json</span>
-            </p>
-            <p class="muted-copy">
-                <span>Turn detail:</span>
-                <a class="editorial-strip__action" data-pwa-ledger-turn-route href="/ledger/turns/1">Open live turn</a>
-            </p>
-            <p class="muted-copy">
-                <span>Turn newsreel:</span>
-                <a class="editorial-strip__action" data-pwa-ledger-newsreel-route href="/ledger/turns/1/newsreel.json">Open live newsreel</a>
-            </p>
-            <p class="muted-copy">
-                <span>Last update:</span>
-                <span data-pwa-ledger-updated>never</span>
-            </p>
-        </article>
-    </div>
-</section>
+        <div class="trust-strip" aria-label="Public install boundary">
+            <span class="status-pill status-pill--cool">Public shell only</span>
+            <span class="status-pill">No table data loaded</span>
+            <span class="status-pill">No role granted</span>
+        </div>
 
-<section class="minimal-section minimal-section--tight">
-    <div class="minimal-section__lead">
-        <p class="eyebrow">Roles</p>
-        <h2>Open the right shell.</h2>
-        <p>Player, GM, and observer entry points meet in one shell.</p>
-    </div>
-    <div class="minimal-actions" aria-label="Role entry">
-        @foreach (var role in Model.Roles)
+        <div class="install-surface install-actions">
+            <button id="turn-install-button" type="button" class="primary-button">Install app</button>
+            <a class="secondary-button"
+               href="@roleProfile.InstallTargetPath"
+               data-mobile-app-inline-open>@roleProfile.OpenTargetLabel</a>
+            <a class="secondary-button" href="/participate">How to join</a>
+        </div>
+        <div class="mobile-app-handoff__qr-card">
+            <svg class="mobile-app-handoff__qr"
+                 width="224"
+                 height="224"
+                 data-mobile-app-inline-qr
+                 role="img"
+                 aria-label="@roleProfile.QrAriaLabel"
+                 focusable="false"></svg>
+            <p class="support-copy" data-mobile-app-inline-qr-status hidden>
+                The QR code is unavailable. Use the clean role link instead.
+            </p>
+        </div>
+        <p id="turn-install-status" class="support-copy" role="status" aria-live="polite">
+            Use your browser menu to install this app. A direct install button appears when your browser supports it.
+        </p>
+        <div id="turn-manual-install-help" class="support-copy manual-install-help" tabindex="-1">
+            <p><strong>iPhone or iPad:</strong> in Safari, choose Share, then Add to Home Screen.</p>
+            <p><strong>Android:</strong> open the browser menu, then choose Install app or Add to Home screen.</p>
+            <p>If your browser offers neither command, keep using this public install shell in the browser.</p>
+        </div>
+    </section>
+
+    <section class="install-boundary-grid"
+             aria-label="@Model.CurrentRoleLabel install capabilities"
+             data-role-capabilities="@roleProfile.RoleKey">
+        @foreach (var capability in roleProfile.Capabilities)
         {
-            <a class="button-like @(role.Current ? "button-like--primary" : "button-like--secondary")" href="@role.Href">Open @PublicMobileText(role.Label)</a>
+            <article class="turn-card" data-role-capability>
+                <p class="eyebrow">@Model.CurrentRoleLabel capability</p>
+                <h2>@capability.Label</h2>
+                <p class="support-copy">@capability.Summary</p>
+            </article>
         }
-    </div>
-</section>
-
-@if (Model.SignedInStatus is not null)
-{
-    <section class="workflow-band workflow-band--compact">
-        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
     </section>
-}
 
-@if (Model.TrustPulse is not null)
-{
-    <section class="workflow-band workflow-band--compact">
-        @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+    <section class="turn-card role-warning"
+             role="note"
+             data-role-privacy-warning="@roleProfile.RoleKey">
+        <p class="eyebrow">@Model.CurrentRoleLabel privacy boundary</p>
+        <h2>@roleProfile.PrivacyHeading</h2>
+        <p class="support-copy">@roleProfile.PrivacySummary</p>
     </section>
-}
 
-@section Scripts
-{
-    <script>
-        (function () {
-            var installButton = document.querySelector("[data-install-prompt-button]");
-            var installState = document.querySelector("[data-pwa-install-state]");
-            var onlineState = document.querySelector("[data-pwa-online-state]");
-            var deferredPrompt = null;
-            var ui = window.ChummerUi;
-            var ledgerStatus = document.querySelector("[data-pwa-ledger-status]");
-            var ledgerSummary = document.querySelector("[data-pwa-ledger-summary]");
-            var ledgerWorld = document.querySelector("[data-pwa-ledger-world]");
-            var ledgerTurn = document.querySelector("[data-pwa-ledger-turn]");
-            var ledgerHotDistrict = document.querySelector("[data-pwa-ledger-hot-district]");
-            var ledgerHeatScore = document.querySelector("[data-pwa-ledger-heat-score]");
-            var ledgerHeatMeter = document.querySelector("[data-pwa-ledger-heat-meter]");
-            var ledgerTopMovement = document.querySelector("[data-pwa-ledger-top-movement]");
-            var ledgerTopDistricts = document.querySelector("[data-pwa-ledger-top-districts]");
-            var ledgerFollowHint = document.querySelector("[data-pwa-ledger-follow-hint]");
-            var ledgerFollowState = document.querySelector("[data-pwa-ledger-follow-state]");
-            var ledgerFollowButton = document.querySelector("[data-pwa-ledger-follow-button]");
-            var ledgerMapRoute = document.querySelector("[data-pwa-ledger-map-route]");
-            var ledgerOptInRoute = document.querySelector("[data-pwa-ledger-opt-in-route]");
-            var ledgerUpdated = document.querySelector("[data-pwa-ledger-updated]");
-            var ledgerTurnRoute = document.querySelector("[data-pwa-ledger-turn-route]");
-            var ledgerNewsreelRoute = document.querySelector("[data-pwa-ledger-newsreel-route]");
-            var ledgerContinuityTurn = document.querySelector("[data-pwa-continuity-turn]");
-            var ledgerContinuitySummary = document.querySelector("[data-pwa-continuity-summary]");
-            var ledgerContinuityEvents = document.querySelector("[data-pwa-continuity-events]");
-            var currentLedgerPayload = null;
-            var ledgerRefreshTimer = 0;
-            var ledgerRefreshInFlight = false;
-            var defaultLedgerRefreshIntervalMs = 30000;
-            var ledgerTurnRouteLabel = ledgerTurnRoute ? ledgerTurnRoute.textContent : "Open live turn";
-            var ledgerNewsreelRouteLabel = ledgerNewsreelRoute ? ledgerNewsreelRoute.textContent : "Open live newsreel";
-            var preferenceState = {
-                loaded: false,
-                authenticated: false,
-                optedIn: false,
-                followedWorlds: []
-            };
-
-            function setOnlineState() {
-                if (!onlineState) {
-                    return;
-                }
-
-                onlineState.textContent = navigator.onLine ? "Online" : "Offline";
-            }
-
-            function setInstallAvailability(ready) {
-                if (!installButton || !installState) {
-                    return;
-                }
-
-                if (ready) {
-                    installButton.removeAttribute("aria-disabled");
-                    installState.textContent = "This browser exposed a direct install prompt. Use it when you want the shell pinned like an app.";
-                    return;
-                }
-
-                installButton.setAttribute("aria-disabled", "true");
-                installState.textContent = "If this browser does not expose a direct install prompt, use its Add to Home Screen or Install App menu. The shell still keeps the same continuity path.";
-            }
-
-            setOnlineState();
-            setInstallAvailability(false);
-            window.addEventListener("online", setOnlineState);
-            window.addEventListener("offline", setOnlineState);
-
-            window.addEventListener("beforeinstallprompt", function (event) {
-                event.preventDefault();
-                deferredPrompt = event;
-                setInstallAvailability(true);
-            });
-
-            if (installButton) {
-                installButton.addEventListener("click", async function () {
-                    if (!deferredPrompt) {
-                        return;
-                    }
-
-                    deferredPrompt.prompt();
-                    try {
-                        await deferredPrompt.userChoice;
-                    } finally {
-                        deferredPrompt = null;
-                        setInstallAvailability(false);
-                    }
-                });
-            }
-
-            window.addEventListener("appinstalled", function () {
-                deferredPrompt = null;
-                if (installState) {
-                    installState.textContent = "Installed. Re-open the shell from your app drawer or home screen to keep return and role entry on the same path.";
-                }
-                setInstallAvailability(false);
-            });
-
-            function safeText(node, value) {
-                if (node) {
-                    node.textContent = value;
-                }
-            }
-
-            function formatTimestamp(value, fallback) {
-                if (!value) {
-                    return fallback || "not yet";
-                }
-
-                var timestamp = new Date(value);
-                return Number.isNaN(timestamp.getTime())
-                    ? String(value)
-                    : timestamp.toLocaleString();
-            }
-
-            function setActionLink(node, href, enabledLabel, disabledLabel) {
-                if (!node) {
-                    return;
-                }
-
-                safeText(node, href ? enabledLabel : disabledLabel);
-
-                if (href) {
-                    node.setAttribute("href", href);
-                    node.removeAttribute("aria-disabled");
-                    node.removeAttribute("tabindex");
-                    return;
-                }
-
-                node.removeAttribute("href");
-                node.setAttribute("aria-disabled", "true");
-                node.setAttribute("tabindex", "-1");
-            }
-
-            function clearLedgerDetailRoutes(turnReason, newsreelReason) {
-                setActionLink(ledgerTurnRoute, null, ledgerTurnRouteLabel, turnReason || "Turn detail unavailable");
-                setActionLink(ledgerNewsreelRoute, null, ledgerNewsreelRouteLabel, newsreelReason || "Newsreel unavailable");
-            }
-
-            function resolveLedgerRefreshIntervalMs(payload) {
-                var seconds = payload
-                    && payload.tracker
-                    && typeof payload.tracker.update_interval_seconds === "number"
-                    ? payload.tracker.update_interval_seconds
-                    : 30;
-                return Math.max(15000, Math.min(120000, seconds * 1000));
-            }
-
-            function clearLedgerRefreshTimer() {
-                if (ledgerRefreshTimer) {
-                    window.clearTimeout(ledgerRefreshTimer);
-                    ledgerRefreshTimer = 0;
-                }
-            }
-
-            function scheduleLedgerRefresh(delayMs) {
-                clearLedgerRefreshTimer();
-                ledgerRefreshTimer = window.setTimeout(function () {
-                    if (document.hidden) {
-                        scheduleLedgerRefresh(delayMs);
-                        return;
-                    }
-
-                    refreshLedgerPayload();
-                }, Math.max(15000, delayMs || defaultLedgerRefreshIntervalMs));
-            }
-
-            function updateLedgerStatus(status, label) {
-                safeText(ledgerStatus, label || status || "Unknown");
-            }
-
-            function normalizeWorldId(value) {
-                return typeof value === "string"
-                    ? value.trim().toLowerCase().replace(/_/g, "-")
-                    : "";
-            }
-
-            function getCurrentWorldId(payload) {
-                return payload && payload.world
-                    ? normalizeWorldId(payload.world.world_id)
-                    : "";
-            }
-
-            function getCurrentWorldName(payload) {
-                return payload && payload.world && payload.world.world_name
-                    ? payload.world.world_name
-                    : "this world";
-            }
-
-            function isCurrentWorldFollowed(payload, followedWorlds) {
-                var worldId = getCurrentWorldId(payload);
-                if (!worldId) {
-                    return false;
-                }
-
-                if (!followedWorlds || followedWorlds.length === 0) {
-                    return true;
-                }
-
-                for (var i = 0; i < followedWorlds.length; i += 1) {
-                    if (normalizeWorldId(followedWorlds[i]) === worldId) {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            function setFollowButton(label, action, tone) {
-                if (!ledgerFollowButton) {
-                    return;
-                }
-
-                ledgerFollowButton.hidden = false;
-                ledgerFollowButton.dataset.action = action || "";
-                ledgerFollowButton.className = "button-like button-like--" + (tone || "secondary");
-                ledgerFollowButton.textContent = label;
-                ledgerFollowButton.disabled = false;
-            }
-
-            function hideFollowButton() {
-                if (!ledgerFollowButton) {
-                    return;
-                }
-
-                ledgerFollowButton.hidden = true;
-                ledgerFollowButton.dataset.action = "";
-                ledgerFollowButton.disabled = false;
-            }
-
-            async function loadPreferenceState() {
-                if (!ui || preferenceState.loaded) {
-                    return preferenceState;
-                }
-
-                try {
-                    var payload = await ui.requestJson("/api/v1/accounts/me/preferences");
-                    preferenceState = {
-                        loaded: true,
-                        authenticated: true,
-                        optedIn: !!payload.blackLedgerNewsEmail,
-                        followedWorlds: Array.isArray(payload.blackLedgerWorldsFollowed) ? payload.blackLedgerWorldsFollowed : []
-                    };
-                } catch (error) {
-                    var statusCode = error && error.payload && typeof error.payload.status === "number"
-                        ? error.payload.status
-                        : 0;
-                    if (statusCode === 401 || statusCode === 403) {
-                        preferenceState = {
-                            loaded: true,
-                            authenticated: false,
-                            optedIn: false,
-                            followedWorlds: []
-                        };
-                    } else {
-                        preferenceState = {
-                            loaded: true,
-                            authenticated: false,
-                            optedIn: false,
-                            followedWorlds: []
-                        };
-                    }
-                }
-
-                return preferenceState;
-            }
-
-            function renderFollowState(payload) {
-                if (!ledgerFollowState) {
-                    return;
-                }
-
-                if (!payload || !payload.world) {
-                    safeText(ledgerFollowState, "No active living world is available yet.");
-                    hideFollowButton();
-                    return;
-                }
-
-                var worldName = getCurrentWorldName(payload);
-                var followedWorlds = Array.isArray(preferenceState.followedWorlds) ? preferenceState.followedWorlds : [];
-                var currentWorldFollowed = isCurrentWorldFollowed(payload, followedWorlds);
-
-                if (!preferenceState.authenticated) {
-                    safeText(ledgerFollowState, "Sign in to opt in and decide whether " + worldName + " can send mobile heat updates.");
-                    hideFollowButton();
-                    return;
-                }
-
-                if (!preferenceState.optedIn) {
-                    safeText(ledgerFollowState, "Enable the stream to receive live heat and continuity for " + worldName + ".");
-                    setFollowButton("Enable stream and follow this world", "enable_and_follow", "primary");
-                    return;
-                }
-
-                if (followedWorlds.length === 0) {
-                    safeText(ledgerFollowState, worldName + " is live because this account currently accepts available Black Ledger worlds.");
-                    setFollowButton("Limit stream to this world", "pin_current_world", "secondary");
-                    return;
-                }
-
-                if (!currentWorldFollowed || payload.status === "world_not_followed") {
-                    safeText(ledgerFollowState, "This account is opted in, but " + worldName + " is not on the followed-world list yet.");
-                    setFollowButton("Follow current world", "follow_current_world", "primary");
-                    return;
-                }
-
-                safeText(ledgerFollowState, "Following " + worldName + " for live heat and continuity updates.");
-                hideFollowButton();
-            }
-
-            function updateHeatMeter(district, status) {
-                if (ledgerHeatMeter) {
-                    ledgerHeatMeter.value = 0;
-                }
-
-                if (!district || typeof district.heat !== "number") {
-                    safeText(ledgerHeatScore, status === "world_not_followed" ? "Follow required" : "—");
-                    return;
-                }
-
-                var heatValue = Math.max(0, Math.min(100, district.heat));
-                if (ledgerHeatMeter) {
-                    ledgerHeatMeter.value = heatValue;
-                }
-
-                safeText(ledgerHeatScore, heatValue + " / 100");
-            }
-
-            function updateLedgerTopDistricts(items) {
-                if (!ledgerTopDistricts) {
-                    return;
-                }
-
-                if (!items || items.length === 0) {
-                    ledgerTopDistricts.innerHTML = "<li>No live district data yet.</li>";
-                    return;
-                }
-
-                ledgerTopDistricts.innerHTML = "";
-                for (var i = 0; i < items.length; i += 1) {
-                    var district = items[i];
-                    var delta = typeof district.delta === "number" ? district.delta : 0;
-                    var formattedDelta = delta >= 0 ? "+" + delta : String(delta);
-                    var trend = district.trend || "";
-                    var listItem = document.createElement("li");
-                    listItem.textContent = district.name + " — heat " + district.heat + ", Δ " + formattedDelta + (trend ? " (" + trend + ")" : "");
-                    ledgerTopDistricts.appendChild(listItem);
-                }
-            }
-
-            function updateContinuityEvents(events) {
-                if (!ledgerContinuityEvents) {
-                    return;
-                }
-
-                if (!events || events.length === 0) {
-                    ledgerContinuityEvents.innerHTML = "<li>No continuity events yet.</li>";
-                    return;
-                }
-
-                ledgerContinuityEvents.innerHTML = "";
-                for (var i = 0; i < events.length; i += 1) {
-                    var eventItem = events[i];
-                    var delta = typeof eventItem.delta === "number" ? eventItem.delta : 0;
-                    var formattedDelta = delta >= 0 ? "+" + delta : String(delta);
-                    var target = eventItem.target || "Unknown zone";
-                    var metric = eventItem.metric || "impact";
-                    var reason = eventItem.reason || "";
-                    var listItem = document.createElement("li");
-                    listItem.textContent = target + ": " + metric + " " + formattedDelta + (reason ? " — " + reason : "");
-                    ledgerContinuityEvents.appendChild(listItem);
-                }
-            }
-
-            function renderLedgerUnavailable(statusLabel, summaryText) {
-                currentLedgerPayload = null;
-                updateLedgerStatus("error", statusLabel || "Stream unavailable");
-                safeText(ledgerSummary, summaryText || "The board stream did not return a valid payload.");
-                safeText(ledgerWorld, "Unavailable");
-                safeText(ledgerTurn, "—");
-                safeText(ledgerHotDistrict, "Unavailable");
-                safeText(ledgerHeatScore, "Unavailable");
-                safeText(ledgerTopMovement, "Unavailable");
-                safeText(ledgerUpdated, "Unavailable");
-                safeText(ledgerFollowHint, "");
-                safeText(ledgerContinuityTurn, "Unavailable");
-                safeText(ledgerContinuitySummary, "Continuity snapshot is not available in this lane.");
-                updateHeatMeter(null, "error");
-                updateLedgerTopDistricts([]);
-                updateContinuityEvents([]);
-                clearLedgerDetailRoutes("Turn detail unavailable in this lane", "Newsreel unavailable in this lane");
-                renderFollowState(null);
-            }
-
-            function renderLedgerPayload(payload) {
-                if (!payload || typeof payload !== "object") {
-                    renderLedgerUnavailable("Stream unavailable", "The board stream did not return a valid payload.");
-                    return;
-                }
-
-                currentLedgerPayload = payload;
-                updateLedgerStatus(payload.status, payload.status_label);
-                var summaryText = typeof payload.summary === "string"
-                    ? payload.summary
-                    : (payload.summary && payload.summary.hot_district)
-                        ? payload.summary.hot_district
-                        : "No summary available.";
-                safeText(ledgerSummary, summaryText);
-                safeText(ledgerUpdated, formatTimestamp(payload.generated_at_utc, "not yet"));
-                clearLedgerDetailRoutes(
-                    payload.status === "world_not_followed"
-                        ? "Follow this world to open live turn detail"
-                        : "Turn detail unavailable right now",
-                    payload.status === "world_not_followed"
-                        ? "Follow this world to open live newsreel"
-                        : "Newsreel unavailable right now");
-
-                if (payload.world) {
-                    safeText(ledgerWorld, payload.world.world_name || payload.world.world_id || "No world loaded");
-                    safeText(ledgerTurn, "Turn " + (payload.world.world_turn || 0));
-                }
-                else {
-                    safeText(ledgerWorld, "No world loaded");
-                    safeText(ledgerTurn, "—");
-                }
-
-                if (payload.hot_district) {
-                    safeText(
-                        ledgerHotDistrict,
-                        payload.hot_district.name
-                            ? payload.hot_district.name + " (" + payload.hot_district.heat + ")"
-                            : String(payload.hot_district.heat || 0));
-                    updateHeatMeter(payload.hot_district, payload.status);
-                }
-                else if (payload.summary && payload.summary.hot_district) {
-                    safeText(ledgerHotDistrict, payload.summary.hot_district);
-                    updateHeatMeter(null, payload.status);
-                }
-                else {
-                    safeText(ledgerHotDistrict, payload.status === "world_not_followed" ? "Follow required" : "No hot district yet");
-                    updateHeatMeter(null, payload.status);
-                }
-
-                if (payload.move_district) {
-                    var moveDelta = typeof payload.move_district.delta === "number" ? payload.move_district.delta : 0;
-                    safeText(
-                        ledgerTopMovement,
-                        payload.move_district.name
-                            ? payload.move_district.name + " (" + (moveDelta >= 0 ? "+" + moveDelta : moveDelta) + ")"
-                            : "No movement data");
-                }
-                else if (payload.summary && payload.summary.hot_shift) {
-                    safeText(ledgerTopMovement, payload.summary.hot_shift);
-                }
-                else {
-                    safeText(ledgerTopMovement, payload.status === "world_not_followed" ? "Follow required" : "No movement data yet");
-                }
-
-                if (ledgerMapRoute && payload.tracker && payload.tracker.turn_map_route) {
-                    ledgerMapRoute.setAttribute("href", payload.tracker.turn_map_route);
-                }
-
-                if (ledgerOptInRoute && payload.opt_in_route) {
-                    ledgerOptInRoute.href = payload.opt_in_route;
-                }
-
-                if (ledgerTurnRoute && payload.tracker && payload.tracker.turn_route) {
-                    setActionLink(ledgerTurnRoute, payload.tracker.turn_route, ledgerTurnRouteLabel, "Turn detail unavailable");
-                }
-
-                if (ledgerNewsreelRoute && payload.tracker && payload.tracker.newsreel_route) {
-                    setActionLink(ledgerNewsreelRoute, payload.tracker.newsreel_route, ledgerNewsreelRouteLabel, "Newsreel unavailable");
-                }
-
-                if (payload.continuity) {
-                    safeText(
-                        ledgerContinuityTurn,
-                        typeof payload.continuity.turn === "number"
-                            ? "Turn " + payload.continuity.turn
-                            : "No live turn yet");
-                    safeText(
-                        ledgerContinuitySummary,
-                        payload.continuity.turn_summary || "No continuity summary available.");
-                    updateContinuityEvents(payload.continuity.events);
-                    if (ledgerTurnRoute && payload.continuity.turn_route) {
-                        setActionLink(ledgerTurnRoute, payload.continuity.turn_route, ledgerTurnRouteLabel, "Turn detail unavailable");
-                    }
-                    if (ledgerNewsreelRoute && payload.continuity.turn_route) {
-                        var newsreelRoute = (payload.tracker && payload.tracker.newsreel_route) || (typeof payload.continuity.turn === "number"
-                            ? "/ledger/turns/" + payload.continuity.turn + "/newsreel.json"
-                            : null);
-                        if (newsreelRoute) {
-                            setActionLink(ledgerNewsreelRoute, newsreelRoute, ledgerNewsreelRouteLabel, "Newsreel unavailable");
-                        }
-                    }
-                }
-                else {
-                    safeText(ledgerContinuityTurn, payload.status === "world_not_followed" ? "Follow required" : "Unavailable");
-                    safeText(
-                        ledgerContinuitySummary,
-                        payload.status === "world_not_followed"
-                            ? ((payload.summary && payload.summary.follow_hint) || "Follow this world to unlock live continuity.")
-                            : "Continuity snapshot is not available in this lane.");
-                    updateContinuityEvents([]);
-                }
-
-                safeText(ledgerFollowHint, payload.summary && payload.summary.follow_hint ? payload.summary.follow_hint : "");
-                updateLedgerTopDistricts(payload.top_districts || []);
-                renderFollowState(payload);
-            }
-
-            async function refreshLedgerPayload() {
-                if (!ledgerStatus || !ledgerSummary) {
-                    return;
-                }
-
-                if (ledgerRefreshInFlight) {
-                    return;
-                }
-
-                if (document.hidden) {
-                    scheduleLedgerRefresh(defaultLedgerRefreshIntervalMs);
-                    return;
-                }
-
-                ledgerRefreshInFlight = true;
-                var nextRefreshDelay = defaultLedgerRefreshIntervalMs;
-                try {
-                    var response = await fetch("/mobile/pwa/ledger.json", { cache: "no-store", method: "GET" });
-                    if (!response.ok) {
-                        renderLedgerUnavailable("Stream offline", "The stream endpoint returned " + response.status + ".");
-                        return;
-                    }
-
-                    var payload = await response.json();
-                    renderLedgerPayload(payload);
-                    nextRefreshDelay = resolveLedgerRefreshIntervalMs(payload);
-                } catch (error) {
-                    renderLedgerUnavailable("Stream offline", "Could not reach /mobile/pwa/ledger.json while checking for updates.");
-                } finally {
-                    ledgerRefreshInFlight = false;
-                    scheduleLedgerRefresh(nextRefreshDelay);
-                }
-            }
-
-            async function saveFollowPreference(action) {
-                if (!ui || !currentLedgerPayload || !currentLedgerPayload.world) {
-                    return;
-                }
-
-                var worldId = currentLedgerPayload.world.world_id;
-                if (!worldId) {
-                    return;
-                }
-
-                var followedWorlds = Array.isArray(preferenceState.followedWorlds)
-                    ? preferenceState.followedWorlds.slice()
-                    : [];
-                var normalizedWorldId = normalizeWorldId(worldId);
-                var nextOptIn = preferenceState.optedIn;
-                var nextFollowedWorlds;
-
-                if (action === "enable_and_follow") {
-                    nextOptIn = true;
-                    nextFollowedWorlds = followedWorlds.filter(function (value) { return normalizeWorldId(value) !== normalizedWorldId; });
-                    nextFollowedWorlds.push(worldId);
-                } else if (action === "pin_current_world") {
-                    nextOptIn = true;
-                    nextFollowedWorlds = [worldId];
-                } else if (action === "follow_current_world") {
-                    nextOptIn = true;
-                    nextFollowedWorlds = followedWorlds.slice();
-                    if (!nextFollowedWorlds.some(function (value) { return normalizeWorldId(value) === normalizedWorldId; })) {
-                        nextFollowedWorlds.push(worldId);
-                    }
-                } else {
-                    return;
-                }
-
-                if (!ledgerFollowButton) {
-                    return;
-                }
-
-                try {
-                    if (ledgerFollowState) {
-                        safeText(ledgerFollowState, "Updating Black Ledger mobile preferences...");
-                    }
-
-                    if (typeof ui.setButtonBusy === "function") {
-                        ui.setButtonBusy(ledgerFollowButton, true, "Saving...");
-                    }
-
-                    var updated = await ui.requestJson("/api/v1/accounts/me/preferences", {
-                        method: "POST",
-                        json: {
-                            blackLedgerNewsEmail: nextOptIn,
-                            blackLedgerWorldsFollowed: nextFollowedWorlds
-                        }
-                    });
-
-                    preferenceState = {
-                        loaded: true,
-                        authenticated: true,
-                        optedIn: !!updated.blackLedgerNewsEmail,
-                        followedWorlds: Array.isArray(updated.blackLedgerWorldsFollowed) ? updated.blackLedgerWorldsFollowed : []
-                    };
-                    renderFollowState(currentLedgerPayload);
-                    await refreshLedgerPayload();
-                } catch (error) {
-                    safeText(
-                        ledgerFollowState,
-                        ui.describeError(error, "Black Ledger preferences could not be updated right now."));
-                } finally {
-                    if (typeof ui.setButtonBusy === "function") {
-                        ui.setButtonBusy(ledgerFollowButton, false, "Saving...");
-                    }
-                }
-            }
-
-            safeText(ledgerSummary, "Loading live board stream...");
-            loadPreferenceState().then(function () {
-                renderFollowState(currentLedgerPayload);
-            });
-            if (ledgerFollowButton) {
-                ledgerFollowButton.addEventListener("click", function () {
-                    saveFollowPreference(ledgerFollowButton.dataset.action || "");
-                });
-            }
-            refreshLedgerPayload();
-            document.addEventListener("visibilitychange", function () {
-                if (!document.hidden) {
-                    refreshLedgerPayload();
-                }
-            });
-            window.addEventListener("pagehide", clearLedgerRefreshTimer);
-        })();
-    </script>
-}
+    <section class="turn-card role-warning"
+             role="note"
+             data-role-authority-warning="@roleProfile.RoleKey">
+        <p class="eyebrow">@Model.CurrentRoleLabel authority boundary</p>
+        <h2>@roleProfile.AuthorityHeading</h2>
+        <p class="support-copy">@roleProfile.AuthoritySummary</p>
+    </section>
+</main>

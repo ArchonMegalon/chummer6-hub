@@ -59,7 +59,7 @@ class BlackLedgerNewsroomRouteTests(unittest.TestCase):
         self.assertIn("/ledger/viewers/fly-through", ledger_view)
         self.assertIn("/ledger/viewers/3d-tour", ledger_view)
         self.assertIn("/ledger/viewers/alternate-3d-tour", ledger_view)
-        self.assertIn("Viewer receipt", ledger_view)
+        self.assertIn("Viewer details", ledger_view)
         self.assertIn("Optional viewer exports.", ledger_view)
         self.assertNotIn("Matterport", ledger_view)
         self.assertNotIn("3DVista", ledger_view)

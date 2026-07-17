@@ -181,6 +181,22 @@
 - required_boundary: `governed video script pre-production only; Chummer-owned source packets remain canonical and Subscribr may not own rules truth, release truth, private campaign data, entitlement truth, or publication approval`
 - mirrors_default: `false`
 
+### sendr
+
+- tier: `License Tier 4`
+- license_count: `1 lifetime license`
+- credential_source: local `.env`
+- env_email_key: `CHUMMER_EA_SENDR_EMAIL`
+- env_password_key: `CHUMMER_EA_SENDR_PASSWORD`
+- env_api_key: `CHUMMER_EA_SENDR_API_KEY`
+- env_api_alias_keys: `SENDR_API_KEY`, `SENDR_API_TOKEN`
+- env_webhook_secret_key: `SENDR_WEBHOOK_SECRET`
+- status: `owned_activated_draft_operator_lane`
+- runtime_ready: `false`
+- integration_lane: `Black Ledger outbound-growth lane`
+- required_boundary: `governed Black Ledger and Chummer outbound growth only: sponsor outreach, guest/interview invitations, creator/community collaboration, episode launch outreach, personalized Black Ledger campaign pages, and personalized video/audio introductions. Sendr may enrich and sequence approved business outreach only; it must not own Chummer rules truth, Black Ledger editorial truth, sourcebook interpretation, release truth, support truth, private campaign data, memorial data, sponsor contract truth, or publication approval. Direct send, WhatsApp, auto-reply, and high-volume enrollment remain disabled until recipient-basis, suppression, platform-policy, message-copy, and human-approval receipts pass.`
+- mirrors_default: `true`
+
 ### rafter
 
 - tier: `qa`

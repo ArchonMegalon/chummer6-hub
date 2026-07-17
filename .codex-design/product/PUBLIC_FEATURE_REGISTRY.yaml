@@ -227,7 +227,7 @@ cards:
   - id: horizon_origin_dossier
     bucket: coming_next
     title: ORIGIN DOSSIER
-    summary: Turn an approved origin into contacts, debts, scars, secrets, media, and later build-help context.
+    summary: Turn an approved runner origin into a private full-story ebook with fitted cover art, shared-history link codes, portrait choice, optional audiobook, and one cinematic scene.
     href: https://chummer.run/media/horizons/origin-dossier-90s-deepdive.mp4
     badge: Shipped MVP
     audience: public
@@ -239,10 +239,10 @@ cards:
     fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/origin-dossier.md
     fallback_label: Read the horizon brief
     external_ok: true
-    pain: A runner can be legal and still feel unfinished.
-    payoff: The table gets approved identity canon without letting story prose rewrite the sheet.
-    status_note: "Origin Dossier keeps reviewed story and media separate from character mechanics."
-    status_chips: Accepted story|Media bundle|No silent mechanics
+    pain: A runner can be legal and still feel like math instead of a person.
+    payoff: The player gets a real origin edition while Chummer keeps story, media, and mechanics truth separated.
+    status_note: "Origin Dossier is ebook-first: full approved story, fitted cover, runner link codes, three portraits, chosen voice request, and one character-visible cinematic scene."
+    status_chips: Full story ebook|Runner links|Scoped audio and cinema
   - id: horizon_table_pulse
     bucket: coming_next
     title: TABLE PULSE

@@ -34,6 +34,14 @@ class _RouteFixtureHandler(BaseHTTPRequestHandler):
         if self.path == "/public":
             self._send_text(200, "public")
             return
+        if self.path == "/player":
+            self.send_response(302)
+            self.send_header("Location", "/mobile/player#")
+            self.end_headers()
+            return
+        if self.path == "/mobile/player":
+            self._send_text(200, "player")
+            return
         if self.path == "/contact/submitted/sample-case-id":
             self._send_text(200, "sample support receipt")
             return
@@ -128,6 +136,7 @@ class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
                     "requires_auth": False,
                     "guest_fallback": "/public",
                     "must_exist": True,
+                    "required_texts": ["public"],
                 },
                 {
                     "path": "/private",
@@ -252,6 +261,111 @@ class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
             ["controller_contract", "controller_contract"],
         )
 
+    def test_verifier_supports_public_redirect_alias_routes(self) -> None:
+        manifest = {
+            "surface": "chummer.run",
+            "version": 1,
+            "public_routes": [
+                {
+                    "path": "/player",
+                    "audience": "public",
+                    "purpose": "play_projection",
+                    "requires_auth": False,
+                    "guest_fallback": "/player",
+                    "must_exist": True,
+                    "required_redirect_location_prefix": "/mobile/player",
+                }
+            ],
+        }
+
+        completed, report = self.run_script(manifest)
+
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["summary"]["failed_count"], 0)
+        self.assertEqual(302, report["routes"][0]["status_code"])
+        self.assertEqual("/mobile/player#", report["routes"][0]["redirect_location"])
+
+    def test_alias_redirect_contract_is_exact_same_origin_and_fragment_clearing(self) -> None:
+        module = load_module()
+        base_url = "https://chummer.run"
+
+        self.assertTrue(module.redirect_location_matches_exact_alias_contract(
+            base_url, "/mobile/player#", "/mobile/player"))
+        self.assertTrue(module.redirect_location_matches_exact_alias_contract(
+            base_url, "https://chummer.run/mobile/player#", "/mobile/player"))
+
+        rejected = [
+            "/mobile/player",
+            "/mobile/player#private",
+            "/mobile/player?sessionId=private#",
+            "/mobile/player?#",
+            "/mobile/player/extra#",
+            "/mobile/player-extended#",
+            "/mobile/role/../player#",
+            "mobile/player#",
+            "//chummer.run/mobile/player#",
+            "https://attacker.example/mobile/player#",
+            "https://chummer.run.attacker.example/mobile/player#",
+            "http://chummer.run/mobile/player#",
+            "https://chummer.run:444/mobile/player#",
+            "https://user:secret@chummer.run/mobile/player#",
+        ]
+        for location in rejected:
+            with self.subTest(location=location):
+                self.assertFalse(module.redirect_location_matches_exact_alias_contract(
+                    base_url, location, "/mobile/player"))
+
+    def test_public_route_verification_fails_closed_for_malicious_alias_locations(self) -> None:
+        module = load_module()
+        route = {
+            "path": "/jammer",
+            "audience": "public",
+            "purpose": "play_projection",
+            "requires_auth": False,
+            "guest_fallback": "/jammer",
+            "must_exist": True,
+            "required_redirect_location_prefix": "/mobile/player",
+        }
+        malicious_responses = [
+            (301, "/mobile/player#"),
+            (303, "/mobile/player#"),
+            (307, "/mobile/player#"),
+            (308, "/mobile/player#"),
+            (302, "/Mobile/player#"),
+            (302, "/mobile/player/extra#"),
+            (302, "/mobile/player?sessionId=private#"),
+            (302, "https://attacker.example/mobile/player#"),
+            (302, "https://chummer.run.attacker.example/mobile/player#"),
+            (302, "https://user:secret@chummer.run/mobile/player#"),
+            (302, "/mobile/player"),
+        ]
+
+        for status, location in malicious_responses:
+            with self.subTest(status=status, location=location):
+                def fake_fetch(base_url, path, **kwargs):  # noqa: ANN001, ARG001
+                    return status, "", {"location": location}, f"{base_url}{path}"
+
+                result = module.verify_route(
+                    fake_fetch,
+                    "https://chummer.run",
+                    route,
+                    public_host=None,
+                    forwarded_proto=None,
+                    strict_positive=False,
+                    seed_receipts=False,
+                    request_timeout_seconds=2,
+                    max_retries=0,
+                    retry_delay_seconds=0,
+                )
+
+                self.assertFalse(result.success)
+                self.assertFalse(result.positive_proof)
+                if status != 302:
+                    self.assertIn("expected exact HTTP 302", result.detail or "")
+                else:
+                    self.assertIn("does not satisfy exact alias target", result.detail or "")
+
     def test_verifier_passes_bounded_fetch_settings_to_shared_fetch_helper(self) -> None:
         module = load_module()
         captured: dict[str, object] = {}
@@ -299,12 +413,69 @@ class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
             "--request-timeout-seconds", "3",
             "--max-retries", "0",
             "--retry-delay-seconds", "0.1",
+            "--path", "/public",
+            "--path", "/private",
         ])
 
         self.assertEqual(4, args.max_workers)
         self.assertEqual(3.0, args.request_timeout_seconds)
         self.assertEqual(0, args.max_retries)
         self.assertEqual(0.1, args.retry_delay_seconds)
+        self.assertEqual(["/public", "/private"], args.path)
+
+    def test_verifier_can_filter_to_specific_manifest_paths(self) -> None:
+        manifest = {
+            "surface": "chummer.run",
+            "version": 1,
+            "public_routes": [
+                {
+                    "path": "/public",
+                    "audience": "public",
+                    "purpose": "proof_shelf",
+                    "requires_auth": False,
+                    "guest_fallback": "/public",
+                    "must_exist": True,
+                    "required_texts": ["public"],
+                },
+                {
+                    "path": "/private",
+                    "audience": "registered",
+                    "purpose": "signed_in_dashboard",
+                    "requires_auth": True,
+                    "guest_fallback": "/login?next=/private",
+                    "must_exist": True,
+                },
+            ],
+        }
+
+        completed, report = self.run_script(manifest, ["--path", "/private"])
+
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["summary"]["route_count"], 1)
+        self.assertEqual(report["summary"]["registered_route_count"], 1)
+        self.assertEqual(report["summary"]["failed_count"], 0)
+        self.assertEqual(["/private"], report["path_filter"])
+        self.assertEqual("/private", report["routes"][0]["path"])
+
+    def test_local_base_urls_clamp_effective_worker_count(self) -> None:
+        module = load_module()
+
+        self.assertEqual(1, module.resolve_effective_max_workers("http://127.0.0.1:8091", 12))
+        self.assertEqual(1, module.resolve_effective_max_workers("http://localhost:8091", 1))
+        self.assertEqual(1, module.resolve_effective_max_workers("https://chummer.run", 12))
+        self.assertEqual(1, module.resolve_effective_max_workers("https://chummer.run", 2))
+        self.assertEqual(12, module.resolve_effective_max_workers("https://example.invalid", 12))
+
+    def test_local_base_urls_floor_effective_request_timeout(self) -> None:
+        module = load_module()
+
+        self.assertEqual(12.0, module.resolve_effective_request_timeout_seconds("http://127.0.0.1:8091", 3.0))
+        self.assertEqual(12.0, module.resolve_effective_request_timeout_seconds("http://localhost:8091", 12.0))
+        self.assertEqual(15.0, module.resolve_effective_request_timeout_seconds("http://127.0.0.1:8091", 15.0))
+        self.assertEqual(20.0, module.resolve_effective_request_timeout_seconds("https://chummer.run", 3.0))
+        self.assertEqual(20.0, module.resolve_effective_request_timeout_seconds("https://chummer.run", 15.0))
+        self.assertEqual(3.0, module.resolve_effective_request_timeout_seconds("https://example.invalid", 3.0))
 
     def test_verifier_requires_seed_receipts_for_strict_positive_parameterized_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

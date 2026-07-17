@@ -96,28 +96,28 @@ test('billing surfaces stay honest and origin dossier has a first-party story ro
   expect(originBookStudioPayload.receipt.embedRoute).toBe('/docs/embed/origin-book-studio');
   expect(originBookStudioPayload.viewerPosture).toBe('operator_managed_viewer_optional');
   const originBookStudioSourceText = await originBookStudioSource.text();
-  expect(originBookStudioSourceText).toContain('OriginBookEngine');
+  expect(originBookStudioSourceText).toContain('SubscribrManuscriptLane');
   expect(originBookStudioSourceText).toContain('Narrative Origin');
 
   const dossierPage = await openPublicPage(browser, '/origin-dossier');
   await expect(dossierPage.getByRole('heading', { name: 'Origin Dossier' })).toBeVisible();
-  await expect(dossierPage.locator('body')).toContainText('story packet');
+  await expect(dossierPage.locator('body')).toContainText('full private story edition');
   await expect(dossierPage.locator('body')).toContainText('The sheet stays authoritative');
-  await expect(dossierPage.getByRole('link', { name: 'Open the story booklet' })).toBeVisible();
+  await expect(dossierPage.getByRole('link', { name: 'Open the story edition sample' })).toBeVisible();
   await expect(dossierPage.getByRole('link', { name: 'Read the book-studio design' })).toBeVisible();
-  await expect(dossierPage.getByRole('link', { name: 'Watch the narrated overview' })).toHaveAttribute('href', '/origin-dossier/media');
+  await expect(dossierPage.getByRole('link', { name: 'Watch the story-to-cinema path' })).toHaveAttribute('href', '/origin-dossier/media');
   await dossierPage.close();
 
   const storyPage = await openPublicPage(browser, '/docs/origin-dossier-the-name-she-chose');
   await expect(storyPage.getByRole('heading', { name: 'Origin Dossier: The Name She Chose' })).toBeVisible();
-  await expect(storyPage.locator('body')).toContainText('approved story packet');
+  await expect(storyPage.locator('body')).toContainText('approved story edition');
   await expect(storyPage.locator('body')).toContainText('Fallback PDF is current');
   await expect(storyPage.getByRole('link', { name: 'Download PDF' })).toBeVisible();
   await storyPage.close();
 
   const storyEmbedPage = await openPublicPage(browser, '/docs/embed/origin-dossier-the-name-she-chose');
   await expect(storyEmbedPage.getByRole('heading', { name: 'Origin Dossier: The Name She Chose reader view' })).toBeVisible();
-  await expect(storyEmbedPage.locator('body')).toContainText('approved story packet');
+  await expect(storyEmbedPage.locator('body')).toContainText('approved story edition');
   await expect(storyEmbedPage.getByRole('link', { name: 'Back to Origin Dossier: The Name She Chose' })).toBeVisible();
   const embedSections = storyEmbedPage.locator('.trust-page-section');
   await expect(embedSections).toHaveCount(2);

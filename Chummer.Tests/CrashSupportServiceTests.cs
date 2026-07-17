@@ -7,6 +7,7 @@ using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc;
@@ -71,7 +72,10 @@ public sealed class CrashSupportServiceTests
                 })
                 .Build();
 
-            InstallLinkingStore installLinkingStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
+            InstallLinkingStore installLinkingStore = new(
+                configuration,
+                DataProtectionProvider.Create(Path.Combine(_root, "install-linking-keys")),
+                NullLogger<InstallLinkingStore>.Instance);
             InstallLinkingService installLinking = new(installLinkingStore, configuration);
             CommunityStore communityStore = new(configuration, NullLogger<CommunityStore>.Instance);
             RewardService rewards = new(communityStore);

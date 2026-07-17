@@ -83,7 +83,7 @@ Package routes are intentionally split across public browsing, account tracking,
 Discoverable publication pages may still open creator or review follow-up pages without turning publication pages, testimonials, or media pages into support or install pages.
 Guest access to `/participate/codex` should fall back to `/login?next=...` so the public manifest keeps one signed-in entry rail and leaves provider selection behind the login surface.
 `/ledger` and `/black-ledger` are intentionally direct-access lab routes until Black Ledger clears the normal-user visual and behavior bar.
-`/roadmap` is the public planning surface. `/horizons` remains only as a compatibility maintenance alias for older links and should not be promoted, indexed, or presented as a normal product category.
+`/roadmap` is the public planning surface. `/horizons` is the quieter working-lanes summary for direct or older links: useful for stabilization, table-play, and living-world direction, but still not a normal front-door product category.
 `/feedback`, `/roadmap`, and `/changelog` are also intentionally separate so public signal, projected movement, and shipped updates do not collapse into one vague route family.
 
 ## Route Families

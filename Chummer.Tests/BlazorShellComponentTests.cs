@@ -8,11 +8,16 @@ public sealed class BlazorShellComponentTests
     public void SignedInTrustPanelPartialExists()
     {
         string partialPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_SignedInTrustStatusPanel.cshtml");
+        string partial = File.ReadAllText(partialPath);
 
         Assert.True(File.Exists(partialPath));
         Assert.Contains(
             "@model SignedInTrustStatusPanelViewModel",
-            File.ReadAllText(partialPath),
+            partial,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "@PublicSignedInTrustText(row.Value)",
+            partial,
             StringComparison.Ordinal);
     }
 

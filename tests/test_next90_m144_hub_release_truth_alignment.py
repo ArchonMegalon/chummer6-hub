@@ -11,7 +11,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_next90_m144_hub_release_truth_alignment.py"
-SOURCE_FILES = [
+STATIC_SOURCE_FILES = [
     "Chummer.Run.Api/Services/PublicReleaseManifestService.cs",
     "Chummer.Run.Api/Services/SignedInTrustStatusService.cs",
     "tests/RunServicesSmoke/Program.cs",
@@ -19,10 +19,15 @@ SOURCE_FILES = [
     ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
     "Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json",
     "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
-    "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-linux-x64.receipt.json",
-    "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-osx-arm64.receipt.json",
-    "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
 ]
+
+
+def source_files() -> list[str]:
+    files = list(STATIC_SOURCE_FILES)
+    startup_smoke_root = REPO_ROOT / "Chummer.Portal/downloads/startup-smoke"
+    for receipt_path in sorted(startup_smoke_root.glob("startup-smoke-*.receipt.json")):
+        files.append(str(receipt_path.relative_to(REPO_ROOT)))
+    return files
 
 
 class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
@@ -149,8 +154,24 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
         self.assertIn("must stay review_required", result.stderr)
         self.assertIn("must stay coverage_incomplete", result.stderr)
 
+    def test_verifier_fails_when_public_trust_summary_drifted_from_route_truth(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="next90-m144-public-trust-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            release_channel_path = temp_root / "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
+            payload = json.loads(release_channel_path.read_text(encoding="utf-8"))
+            payload["publicTrustMetrics"]["releaseChannel"]["summary"] = (
+                "Channel preview is preview with 2 recommended primary routes, 1 promoted fallback recovery routes, 0 blocked routes, and 0 active revocations."
+            )
+            release_channel_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+            result = self.run_verifier(temp_root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("publicTrustMetrics.releaseChannel summary is missing '0 promoted fallback recovery routes'", result.stderr)
+
     def copy_sources(self, temp_root: Path) -> None:
-        for relative_path in SOURCE_FILES:
+        for relative_path in source_files():
             source = REPO_ROOT / relative_path
             target = temp_root / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)

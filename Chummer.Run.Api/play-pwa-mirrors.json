@@ -1,0 +1,173 @@
+{
+  "contract": "play-install-mirror-v5",
+  "inventoryContract": "play-install-mirror-required-inventory-v2",
+  "policyId": "chummer.public-play-pwa-mirror.v1",
+  "assetPolicyCount": 12,
+  "dependencyPolicyCount": 4,
+  "inventoryPath": "Chummer.Run.Api/play-pwa-required-inventory.json",
+  "inventorySha256": "cdf7a49e98e7926cae82ea8bff0e219ce9a5a5133b3ef222954046c9d4a51f2a",
+  "sourceRepository": "../chummer-play",
+  "executableTransforms": [
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/service-worker.js",
+      "projection": "wwwroot/service-worker.js",
+      "kind": "transform",
+      "role": "root_worker",
+      "contentType": "application/javascript",
+      "cacheControl": "no-cache, no-store, must-revalidate",
+      "contract": "play-root-worker-public-edge-projection-v2",
+      "sourceSha256": "f3cef86bbf454b1a93c8ff9ccfe84f4c83dc7b505901471d702493a37960b83c",
+      "projectionSha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
+      "transformation": {
+        "cacheContract": "play-source-v2 -> run-api-projection-v2",
+        "baseManifest": "/manifest.webmanifest -> /manifest.play.webmanifest",
+        "privateCompanionScript": "removed from the public-edge runtime allowlist",
+        "activation": "passive; neither worker calls skipWaiting() or clients.claim()"
+      },
+      "generatorConfig": "Chummer.Run.Api/play-worker-projection.json"
+    }
+  ],
+  "assets": [
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/mobile-install-shell.js",
+      "projection": "wwwroot/mobile-install-shell.js",
+      "kind": "exact",
+      "role": "install_shell",
+      "contentType": "application/javascript",
+      "cacheControl": "public, max-age=300, must-revalidate",
+      "sha256": "bd691178430f3feb36113686a8c665e356ede6cce39194918f52cef8fe6b2cdb"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/mobile.css",
+      "projection": "wwwroot/mobile.css",
+      "kind": "exact",
+      "role": "install_styles",
+      "contentType": "text/css",
+      "cacheControl": "public, max-age=300, must-revalidate",
+      "sha256": "5ebc665a90355e837a5b0bea28470ef32937c76146250df350d88022ed798082"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/manifest.webmanifest",
+      "projection": "wwwroot/manifest.play.webmanifest",
+      "kind": "exact",
+      "role": "base_manifest",
+      "contentType": "application/manifest+json",
+      "cacheControl": "public, max-age=300, must-revalidate",
+      "sha256": "7411b100fa3cd6ddb905d5e0beac2ad2977aa495de65c8031a70cdb5e1bcf797"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/manifest.player.webmanifest",
+      "projection": "wwwroot/manifest.player.webmanifest",
+      "kind": "exact",
+      "role": "player_manifest",
+      "contentType": "application/manifest+json",
+      "cacheControl": "public, max-age=300, must-revalidate",
+      "sha256": "8da984961dd2d50bdcfb92b1be0af8228f9bd9d6dcdad38889e7916e69843b40"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/manifest.gm.webmanifest",
+      "projection": "wwwroot/manifest.gm.webmanifest",
+      "kind": "exact",
+      "role": "gm_manifest",
+      "contentType": "application/manifest+json",
+      "cacheControl": "public, max-age=300, must-revalidate",
+      "sha256": "eda6bf766e595e4dd490494d8da3ade15d469641b6a08dee1619ad93871c2b26"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/manifest.observer.webmanifest",
+      "projection": "wwwroot/manifest.observer.webmanifest",
+      "kind": "exact",
+      "role": "observer_manifest",
+      "contentType": "application/manifest+json",
+      "cacheControl": "public, max-age=300, must-revalidate",
+      "sha256": "d1006f14a0d159e0eb40c18675b518638c8f07fa6017a4a019d7e34cb0d72d7d"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/icons/icon-192.png",
+      "projection": "wwwroot/icons/icon-192.png",
+      "kind": "exact",
+      "role": "icon_192_png",
+      "contentType": "image/png",
+      "cacheControl": "public, max-age=300, must-revalidate",
+      "sha256": "af68b4d5060e42efe982ebc404bf15d2e16042dacd3388f4cfafc39298aa14b0"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/icons/icon-512.png",
+      "projection": "wwwroot/icons/icon-512.png",
+      "kind": "exact",
+      "role": "icon_512_png",
+      "contentType": "image/png",
+      "cacheControl": "public, max-age=300, must-revalidate",
+      "sha256": "b0ac06bc1c869084c8c445dadbf465c28a1a1877fe8fd905154a6e14c95516c6"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/icons/icon-192.svg",
+      "projection": "wwwroot/icons/icon-192.svg",
+      "kind": "exact",
+      "role": "icon_192_svg",
+      "contentType": "image/svg+xml",
+      "cacheControl": "public, max-age=300, must-revalidate",
+      "sha256": "0d7b9fe1d527ceca3291e5025e6de00988a4f077d26570b9eb794f9a942f810e"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/icons/icon-512.svg",
+      "projection": "wwwroot/icons/icon-512.svg",
+      "kind": "exact",
+      "role": "icon_512_svg",
+      "contentType": "image/svg+xml",
+      "cacheControl": "public, max-age=300, must-revalidate",
+      "sha256": "1e0134a8c2dcc849934c62c856fa65c63acf8e7f43e07e82be85fc42296c6dde"
+    },
+    {
+      "source": "src/Chummer.Play.Web/wwwroot/mobile/service-worker.js",
+      "projection": "wwwroot/mobile/service-worker.js",
+      "kind": "exact",
+      "role": "scoped_worker",
+      "contentType": "application/javascript",
+      "cacheControl": "no-cache, no-store, must-revalidate",
+      "sha256": "79581bcacc231b8d8c211a8cef14cbc7354991c6449448b02847fc07b6c204fe"
+    }
+  ],
+  "generator": {
+    "contract": "play-root-worker-projection-generator-v1",
+    "command": "python3 scripts/generate_public_play_worker_projection.py",
+    "script": "scripts/generate_public_play_worker_projection.py",
+    "scriptSha256": "d05c3610bd44546af5dd5cb4703012395eaccb6cae0ffae8768d4ce9518dbf17",
+    "config": "Chummer.Run.Api/play-worker-projection.json",
+    "configSha256": "ce3255c0aa661105d6139c21decc618e7bd3d5c6c90478a2d5d32e381387ca19",
+    "template": "Chummer.Run.Api/service-worker.public-edge.template.js",
+    "templateSha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13",
+    "inventory": "Chummer.Run.Api/play-pwa-required-inventory.json",
+    "inventorySha256": "cdf7a49e98e7926cae82ea8bff0e219ce9a5a5133b3ef222954046c9d4a51f2a",
+    "dependencies": [
+      {
+        "path": "scripts/generate_public_play_worker_projection.py",
+        "kind": "python",
+        "role": "generator_script",
+        "contentType": "text/x-python",
+        "sha256": "d05c3610bd44546af5dd5cb4703012395eaccb6cae0ffae8768d4ce9518dbf17"
+      },
+      {
+        "path": "Chummer.Run.Api/play-worker-projection.json",
+        "kind": "json",
+        "role": "projection_config",
+        "contentType": "application/json",
+        "sha256": "ce3255c0aa661105d6139c21decc618e7bd3d5c6c90478a2d5d32e381387ca19"
+      },
+      {
+        "path": "Chummer.Run.Api/service-worker.public-edge.template.js",
+        "kind": "template",
+        "role": "projection_template",
+        "contentType": "application/javascript",
+        "sha256": "986140b478903a84c617e4fcaf2b4c3e4f8c63ac50aa22af89e53be490fa7b13"
+      },
+      {
+        "path": "Chummer.Run.Api/play-pwa-required-inventory.json",
+        "kind": "json",
+        "role": "required_inventory",
+        "contentType": "application/json",
+        "sha256": "cdf7a49e98e7926cae82ea8bff0e219ce9a5a5133b3ef222954046c9d4a51f2a"
+      }
+    ]
+  }
+}

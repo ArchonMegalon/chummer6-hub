@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
-# Release-upload bootstrap defaults to GitHub main for the active repos; callers can still override refs or pin explicit commits via env.
-export CHUMMER_UI_REF='main'
-export CHUMMER_CORE_REF='main'
-export CHUMMER_HUB_REF='main'
-export CHUMMER_UI_KIT_REF='main'
-export CHUMMER_HUB_REGISTRY_REF='main'
-export CHUMMER_MEDIA_FACTORY_REF='main'
-export CHUMMER_LEGACY_REF='Docker'
+set +x
+# Release-upload bootstrap defaults to the active refs while preserving caller-supplied reviewed refs and commit pins.
+export CHUMMER_UI_REF="${CHUMMER_UI_REF:-main}"
+export CHUMMER_CORE_REF="${CHUMMER_CORE_REF:-main}"
+export CHUMMER_HUB_REF="${CHUMMER_HUB_REF:-main}"
+export CHUMMER_UI_KIT_REF="${CHUMMER_UI_KIT_REF:-main}"
+export CHUMMER_HUB_REGISTRY_REF="${CHUMMER_HUB_REGISTRY_REF:-main}"
+export CHUMMER_MEDIA_FACTORY_REF="${CHUMMER_MEDIA_FACTORY_REF:-main}"
+export CHUMMER_LEGACY_REF="${CHUMMER_LEGACY_REF:-Docker}"
 set -euo pipefail
 umask 077
+
+bootstrap_tmp_paths=()
+BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=0
+BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH=""
 
 log() {
   printf '[chummer-mac-release] %s\n' "$*"
@@ -21,6 +26,100 @@ die() {
 
 to_lower_ascii() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+array_count() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || {
+    printf '0\n'
+    return 0
+  }
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  eval "set -- \"\${${array_name}[@]}\""
+  local count="$#"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  printf '%s\n' "$count"
+}
+
+array_values_nul() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || return 0
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  eval "printf '%s\\0' \"\${${array_name}[@]}\""
+  local status="$?"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  return "$status"
+}
+
+cleanup_bootstrap_tmp_paths() {
+  local status="$?"
+  local path
+  if (( $(array_count bootstrap_tmp_paths) > 0 )); then
+    while IFS= read -r -d '' path; do
+      [[ -f "$path" ]] && rm -f "$path"
+    done < <(array_values_nul bootstrap_tmp_paths)
+  fi
+
+  if [[ "${BOOTSTRAP_KEEP_UPLOAD_RESPONSE:-0}" != "1" ]] \
+    && [[ -n "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH:-}" ]] \
+    && [[ -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" ]]; then
+    chmod 600 "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" 2>/dev/null || true
+    rm -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}"
+  fi
+
+  if (( status != 0 )) && [[ "${BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED:-0}" == "1" ]]; then
+    printf '[chummer-mac-release] ERROR: Release completion was accepted before a later check failed; the release may already be public. Do not create or publish another session. Inspect %s and reconcile the recorded session.\n' \
+      "${BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-the durable upload handoff}" >&2
+  fi
+  return "$status"
+}
+
+require_all_reviewed_commit_pins() {
+  local setting=""
+  local value=""
+  local normalized=""
+  local -a settings=(
+    CHUMMER_UI_EXPECTED_COMMIT
+    CHUMMER_CORE_EXPECTED_COMMIT
+    CHUMMER_HUB_EXPECTED_COMMIT
+    CHUMMER_UI_KIT_EXPECTED_COMMIT
+    CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT
+    CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT
+    CHUMMER_LEGACY_EXPECTED_COMMIT
+  )
+
+  for setting in "${settings[@]}"; do
+    value="${!setting:-}"
+    [[ "$value" =~ ^[0-9a-fA-F]{40}$ ]] \
+      || die "$setting must be set to a reviewed full 40-character hexadecimal commit SHA before release work begins"
+    normalized="$(to_lower_ascii "$value")"
+    printf -v "$setting" '%s' "$normalized"
+    export "$setting"
+  done
 }
 
 require_cmd() {
@@ -41,8 +140,29 @@ print(hashlib.sha256(path.read_bytes()).hexdigest())
 PY
 }
 
-log_bootstrap_identity() {
+resolve_executed_bootstrap_path() {
   local source_path="${BASH_SOURCE[0]:-}"
+  [[ -n "$source_path" ]] || return 1
+  python3 - "$source_path" <<'PY'
+from __future__ import annotations
+
+import stat
+import sys
+from pathlib import Path
+
+try:
+    path = Path(sys.argv[1]).expanduser().resolve(strict=True)
+    mode = path.stat().st_mode
+except OSError as exc:
+    raise SystemExit(f"executed bootstrap path is unavailable: {type(exc).__name__}") from exc
+if not stat.S_ISREG(mode):
+    raise SystemExit("executed bootstrap path is not a regular file")
+print(path)
+PY
+}
+
+log_bootstrap_identity() {
+  local source_path="${1:-${BASH_SOURCE[0]:-}}"
   [[ -n "$source_path" ]] || return 0
 
   local digest=""
@@ -58,8 +178,8 @@ log_bootstrap_identity() {
 }
 
 verify_bootstrap_integrity() {
+  local source_path="${1:-${BASH_SOURCE[0]:-}}"
   local expected_sha256="${CHUMMER_BOOTSTRAP_EXPECTED_SHA256:-}"
-  local source_path="${BASH_SOURCE[0]:-}"
   [[ -n "$expected_sha256" ]] || return 0
   [[ -n "$source_path" && -r "$source_path" ]] || die "bootstrap integrity check requested but bootstrap source is unreadable"
 
@@ -336,6 +456,21 @@ append_unique_value() {
   return 1
 }
 
+array_contains_value() {
+  local array_name="${1:-}"
+  local needle="${2:-}"
+  local existing=""
+  [[ -n "$array_name" ]] || return 1
+
+  while IFS= read -r -d '' existing; do
+    if [[ "$existing" == "$needle" ]]; then
+      return 0
+    fi
+  done < <(array_values_nul "$array_name")
+
+  return 1
+}
+
 ensure_link_target() {
   local source="$1"
   local link_path="$2"
@@ -386,6 +521,12 @@ create_minimal_promotion_bundle() {
   if [[ -d "$source_root/startup-smoke" ]]; then
     cp -aL "$source_root/startup-smoke/." "$bundle_root/startup-smoke/"
   fi
+
+  local governed_provenance_root="$source_root/proof/build-provenance/v1"
+  if [[ -d "$governed_provenance_root" ]]; then
+    mkdir -p "$bundle_root/proof/build-provenance/v1"
+    cp -a "$governed_provenance_root/." "$bundle_root/proof/build-provenance/v1/"
+  fi
 }
 
 sync_startup_smoke_receipts_for_local_verifier() {
@@ -414,6 +555,239 @@ sync_startup_smoke_receipts_for_local_verifier() {
     [[ -f "$receipt_path" ]] || continue
     cp "$receipt_path" "$target_dir/"
   done < <(find "$source_dir" -maxdepth 1 -type f -name 'startup-smoke-*.receipt.json' | sort)
+}
+
+verify_live_canonical_supportability_preflight() {
+  local canonical_url="$1"
+  local timeout_seconds="${CHUMMER_LIVE_CANONICAL_PREFLIGHT_TIMEOUT_SECONDS:-30}"
+  local live_canonical_path
+  live_canonical_path="$(mktemp)" \
+    || die "could not reserve a temporary file for the live canonical manifest preflight"
+
+  local http_code=""
+  local curl_status=0
+  http_code="$(curl \
+    -sS \
+    -L \
+    --connect-timeout "$timeout_seconds" \
+    --max-time "$timeout_seconds" \
+    -o "$live_canonical_path" \
+    -w '%{http_code}' \
+    "$canonical_url")" || curl_status=$?
+
+  if (( curl_status != 0 )); then
+    rm -f "$live_canonical_path"
+    die "live canonical manifest preflight could not reach $canonical_url (curl exit ${curl_status}, HTTP ${http_code:-000}). No release build or upload was started. Operator/deployment handoff required: restore public canonical-manifest access and verify the active public-edge projection before rerunning."
+  fi
+
+  case "$http_code" in
+    2??)
+      ;;
+    403)
+      rm -f "$live_canonical_path"
+      die "live canonical manifest preflight received HTTP 403 from $canonical_url. No release build or upload was started. Operator/deployment handoff required: restore public canonical-manifest access and deploy/activate the corrected public-edge projection before rerunning."
+      ;;
+    *)
+      rm -f "$live_canonical_path"
+      die "live canonical manifest preflight received HTTP ${http_code:-000} from $canonical_url. No release build or upload was started. Operator/deployment handoff required: restore a readable canonical manifest and verify the active public-edge projection before rerunning."
+      ;;
+  esac
+
+  local validation_message=""
+  if ! validation_message="$(python3 - "$live_canonical_path" "$canonical_url" 2>&1 <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+
+manifest_path = Path(sys.argv[1])
+canonical_url = sys.argv[2]
+
+try:
+    payload: Any = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+    raise SystemExit(
+        f"live canonical manifest preflight could not parse {canonical_url}: {type(exc).__name__}. "
+        "No release build or upload was started. Operator/deployment handoff required: "
+        "restore a valid public canonical manifest and verify the active public-edge projection."
+    ) from exc
+
+if not isinstance(payload, dict):
+    raise SystemExit(
+        f"live canonical manifest preflight expected a JSON object at {canonical_url}. "
+        "No release build or upload was started. Operator/deployment handoff required: "
+        "restore a valid public canonical manifest and verify the active public-edge projection."
+    )
+
+public_trust = payload.get("publicTrustMetrics")
+proof_freshness = public_trust.get("proofFreshness") if isinstance(public_trust, dict) else None
+raw_proof_status = proof_freshness.get("status") if isinstance(proof_freshness, dict) else None
+proof_status = str(raw_proof_status or "").strip().lower()
+
+if not proof_status:
+    raise SystemExit(
+        f"live canonical manifest preflight could not determine "
+        f"publicTrustMetrics.proofFreshness.status at {canonical_url}. "
+        "No release build or upload was started. Operator/deployment handoff required: "
+        "restore complete proof-freshness truth in the public canonical manifest and verify the "
+        "active public-edge projection."
+    )
+
+if proof_status == "fresh":
+    print(f"live canonical supportability preflight passed: proofFreshness.status={proof_status}")
+    raise SystemExit(0)
+
+if proof_status not in {"stale", "missing"}:
+    raise SystemExit(
+        f"live canonical manifest preflight found unrecognized "
+        f"publicTrustMetrics.proofFreshness.status={proof_status!r} at {canonical_url}. "
+        "No release build or upload was started. Operator/deployment handoff required: "
+        "restore a recognized fresh, stale, or missing proof-freshness status in the public "
+        "canonical manifest and verify the active public-edge projection."
+    )
+
+registry_boundary = payload.get("registryBoundaryCoverage")
+public_release_channel = public_trust.get("releaseChannel") if isinstance(public_trust, dict) else None
+registry_release_channel = (
+    registry_boundary.get("releaseChannel") if isinstance(registry_boundary, dict) else None
+)
+
+supportability_fields = (
+    ("supportabilityState", payload.get("supportabilityState")),
+    (
+        "publicTrustMetrics.releaseChannel.supportabilityState",
+        public_release_channel.get("supportabilityState")
+        if isinstance(public_release_channel, dict)
+        else None,
+    ),
+    (
+        "registryBoundaryCoverage.releaseChannel.supportabilityState",
+        registry_release_channel.get("supportabilityState")
+        if isinstance(registry_release_channel, dict)
+        else None,
+    ),
+)
+invalid_fields = [
+    f"{field}={value!r}"
+    for field, value in supportability_fields
+    if value != "review_required"
+]
+public_trust_posture_fields = (
+    (
+        "publicTrustMetrics.releaseChannel.posture",
+        public_release_channel.get("posture")
+        if isinstance(public_release_channel, dict)
+        else None,
+    ),
+    (
+        "registryBoundaryCoverage.releaseChannel.publicTrustPosture",
+        registry_release_channel.get("publicTrustPosture")
+        if isinstance(registry_release_channel, dict)
+        else None,
+    ),
+)
+invalid_posture_fields = [
+    f"{field}={value!r}"
+    for field, value in public_trust_posture_fields
+    if value != "blocked"
+]
+if invalid_fields or invalid_posture_fields:
+    raise SystemExit(
+        f"{canonical_url} must set supportabilityState='review_required' at all three canonical "
+        f"supportability paths and public trust posture='blocked' at both release-channel paths "
+        f"when proofFreshness.status={proof_status!r}; invalid: "
+        + ", ".join(invalid_fields + invalid_posture_fields)
+        + ". No release build or upload was started. Operator/deployment handoff required: "
+        "deploy/activate the corrected canonicalization or live projection, verify the served bytes, "
+        "then rerun the macOS release bootstrap."
+    )
+
+print(
+    "live canonical supportability preflight passed: "
+    f"proofFreshness.status={proof_status}; all supportability paths are review_required and "
+    "all public trust posture paths are blocked"
+)
+PY
+  )"; then
+    rm -f "$live_canonical_path"
+    if [[ -z "$validation_message" ]]; then
+      validation_message="live canonical manifest preflight failed without a validator diagnostic at $canonical_url. No release build or upload was started. Operator/deployment handoff required: verify the served canonical bytes and the active public-edge projection before rerunning."
+    fi
+    die "$validation_message"
+  fi
+
+  rm -f "$live_canonical_path"
+  [[ -n "$validation_message" ]] && log "$validation_message"
+}
+
+validate_release_response_probe_url() {
+  local candidate="$1"
+  local canonical_manifest_url="$2"
+  local route_role="$3"
+  python3 - "$candidate" "$canonical_manifest_url" "$route_role" <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+from urllib.parse import unquote, urlsplit
+
+candidate_text, canonical_text, role = (str(value).strip() for value in sys.argv[1:4])
+candidate = urlsplit(candidate_text)
+canonical = urlsplit(canonical_text)
+try:
+    candidate_authority = (candidate.scheme.lower(), (candidate.hostname or "").lower(), candidate.port)
+    canonical_authority = (canonical.scheme.lower(), (canonical.hostname or "").lower(), canonical.port)
+except ValueError:
+    raise SystemExit(1)
+
+decoded_path = unquote(candidate.path)
+segments = decoded_path.replace("\\", "/").split("/")
+if (
+    candidate.scheme not in {"http", "https"}
+    or not candidate.hostname
+    or canonical.scheme not in {"http", "https"}
+    or not canonical.hostname
+    or candidate.username is not None
+    or candidate.password is not None
+    or canonical.username is not None
+    or canonical.password is not None
+    or candidate.query
+    or candidate.fragment
+    or candidate_authority != canonical_authority
+    or decoded_path != candidate.path
+    or "\\" in candidate.path
+    or any(segment in {".", ".."} for segment in segments)
+):
+    raise SystemExit(1)
+
+safe_id = r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}"
+safe_file = r"[A-Za-z0-9][A-Za-z0-9._-]{0,255}"
+current_install = re.fullmatch(rf"/downloads/install/{safe_id}", decoded_path) is not None
+generation_install = re.fullmatch(
+    rf"/downloads/g/{safe_id}/install/{safe_id}(?:/(?:payload|metadata))?",
+    decoded_path,
+) is not None
+current_file = re.fullmatch(rf"/downloads/files/{safe_file}", decoded_path) is not None
+generation_file = re.fullmatch(
+    rf"/downloads/g/{safe_id}/files/{safe_file}",
+    decoded_path,
+) is not None
+
+if role == "install":
+    allowed = current_install or (
+        generation_install and not decoded_path.endswith(("/payload", "/metadata"))
+    )
+elif role == "direct":
+    allowed = current_file or generation_file or generation_install
+else:
+    allowed = False
+if not allowed:
+    raise SystemExit(1)
+print(candidate.geturl())
+PY
 }
 
 verify_live_release_projection() {
@@ -488,6 +862,42 @@ if missing_compat:
     if require_compatibility:
         raise SystemExit(message)
     print(message)
+
+def nested_value(payload, *path):
+    current = payload
+    for segment in path:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(segment)
+    return current
+
+truth_paths = (
+    ("version",),
+    ("publishedAt",),
+    ("channel",),
+    ("channelId",),
+    ("status",),
+    ("rolloutState",),
+    ("rolloutReason",),
+    ("supportabilityState",),
+    ("publicTrustMetrics", "proofFreshness", "status"),
+    ("publicTrustMetrics", "releaseChannel", "posture"),
+    ("publicTrustMetrics", "releaseChannel", "rolloutState"),
+    ("publicTrustMetrics", "releaseChannel", "supportabilityState"),
+    ("registryBoundaryCoverage", "releaseChannel", "publicTrustPosture"),
+    ("registryBoundaryCoverage", "releaseChannel", "rolloutState"),
+    ("registryBoundaryCoverage", "releaseChannel", "supportabilityState"),
+)
+truth_mismatches = [
+    ".".join(path)
+    for path in truth_paths
+    if nested_value(local_canonical, *path) != nested_value(live_canonical, *path)
+]
+if truth_mismatches:
+    raise SystemExit(
+        "canonical release projection changed uploaded release truth after promotion; mismatched fields: "
+        + ", ".join(truth_mismatches)
+    )
 PY
   )"; then
     rm -f "$live_compat_path" "$live_canonical_path"
@@ -513,19 +923,27 @@ PY
     done < <(jq -r '.directFileUrls[]? // empty' "$response_path")
 
     local url http_code
-    for url in "${install_urls[@]}"; do
-      http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url")"
-      if [[ "$http_code" == "404" ]]; then
-        die "install dispatch returned 404 after promotion: $url"
-      fi
-    done
+    if (( $(array_count install_urls) > 0 )); then
+      while IFS= read -r -d '' url; do
+        url="$(validate_release_response_probe_url "$url" "$canonical_url" install)" \
+          || die "release upload response contained an unsafe install handoff URL; do not retry the published session until it is reconciled"
+        http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url")"
+        if [[ "$http_code" == "404" ]]; then
+          die "install dispatch returned 404 after promotion; do not retry the published session until it is reconciled"
+        fi
+      done < <(array_values_nul install_urls)
+    fi
 
-    for url in "${direct_urls[@]}"; do
-      http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url")"
-      if [[ "$http_code" == "404" ]]; then
-        die "direct artifact returned 404 after promotion: $url"
-      fi
-    done
+    if (( $(array_count direct_urls) > 0 )); then
+      while IFS= read -r -d '' url; do
+        url="$(validate_release_response_probe_url "$url" "$canonical_url" direct)" \
+          || die "release upload response contained an unsafe direct-file URL; do not retry the published session until it is reconciled"
+        http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url")"
+        if [[ "$http_code" == "404" ]]; then
+          die "direct artifact returned 404 after promotion; do not retry the published session until it is reconciled"
+        fi
+      done < <(array_values_nul direct_urls)
+    fi
   fi
 
   rm -f "$live_compat_path" "$live_canonical_path"
@@ -565,6 +983,94 @@ resolve_head_build_metadata() {
   esac
 }
 
+resolve_head_provenance_target_id() {
+  case "$1" in
+    avalonia) printf '%s\n' "desktop-avalonia" ;;
+    blazor-desktop) printf '%s\n' "desktop-blazor" ;;
+    *) return 1 ;;
+  esac
+}
+
+require_safe_provenance_invocation_id() {
+  python3 - "$1" <<'PY'
+import re
+import sys
+
+value = sys.argv[1]
+if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,159}", value) is None:
+    raise SystemExit(f"unsafe build provenance invocation id: {value!r}")
+PY
+}
+
+begin_mac_file_build_provenance() {
+  local generator_path="$1"
+  local support_path="$2"
+  local ui_repo="$3"
+  local core_repo="$4"
+  local hub_repo="$5"
+  local ui_kit_repo="$6"
+  local registry_repo="$7"
+  local media_repo="$8"
+  local legacy_repo="$9"
+  local project_path="${10}"
+  local target_id="${11}"
+  local artifact_id="${12}"
+  local artifact_name="${13}"
+  local artifact_path="${14}"
+  local invocation_id="${15}"
+  local state_path="${16}"
+  local receipt_path="${17}"
+  local sbom_path="${18}"
+  local executed_bootstrap_path="${19}"
+
+  [[ -f "$generator_path" ]] || die "portable build provenance generator is missing: $generator_path"
+  [[ -f "$support_path" ]] || die "portable build provenance support is missing: $support_path"
+  [[ -f "$executed_bootstrap_path" && ! -L "$executed_bootstrap_path" ]] \
+    || die "executed hosted bootstrap is unavailable or not a regular file: $executed_bootstrap_path"
+  require_safe_provenance_invocation_id "$invocation_id"
+  python3 "$generator_path" begin \
+    --state "$state_path" \
+    --output "$receipt_path" \
+    --builder-id "chummer-mac-hosted-bootstrap" \
+    --build-type "macos-desktop-release" \
+    --invocation-id "$invocation_id" \
+    --support-script "$support_path" \
+    --source-repository "chummer-presentation" \
+    --source-repo-root "$ui_repo" \
+    --source-material "chummer-core-engine=$core_repo" \
+    --source-material "chummer.run-services=$hub_repo" \
+    --source-material "chummer-ui-kit=$ui_kit_repo" \
+    --source-material "chummer-hub-registry=$registry_repo" \
+    --source-material "chummer-media-factory=$media_repo" \
+    --source-material "chummer5a=$legacy_repo" \
+    --build-root "$ui_repo" \
+    --target-id "$target_id" \
+    --project-path "$project_path" \
+    --artifact-id "$artifact_id" \
+    --artifact-kind "desktop_download" \
+    --artifact-name "$artifact_name" \
+    --artifact-path "$artifact_path" \
+    --sbom-path "$sbom_path" \
+    --build-input "hosted-bootstrap=$executed_bootstrap_path" \
+    --build-input "desktop-project=$ui_repo/$project_path" \
+    --build-input "desktop-installer-recipe=$ui_repo/scripts/build-desktop-installer.sh" \
+    --build-input "dotnet-sdk-selection=$ui_repo/global.json"
+}
+
+finalize_mac_file_build_provenance() {
+  local generator_path="$1"
+  local invocation_id="$2"
+  local state_path="$3"
+  local receipt_path="$4"
+
+  python3 "$generator_path" finalize \
+    --state "$state_path" \
+    --output "$receipt_path" \
+    --builder-id "chummer-mac-hosted-bootstrap" \
+    --build-type "macos-desktop-release" \
+    --invocation-id "$invocation_id"
+}
+
 json_contract_name() {
   local path="$1"
   python3 - "$path" <<'PY'
@@ -596,6 +1102,7 @@ resolve_hub_local_release_proof_path() {
   local contract_name=""
   local requested_path=""
   local allow_remote_requested="0"
+  local remote_expected_sha256="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_EXPECTED_SHA256:-}"
 
   if allow_remote_release_proof_input_for_candidate "${requested:-}"; then
     allow_remote_requested="1"
@@ -604,7 +1111,11 @@ resolve_hub_local_release_proof_path() {
   if resolve_candidate_is_http_url "${requested:-}" && [[ "$allow_remote_requested" != "1" ]]; then
     echo "Ignoring remote requested release proof because remote proof inputs are disabled by default: $requested" >&2
   fi
-  requested_path="$(resolve_local_file_path "$requested" "$allow_remote_requested")"
+  requested_path="$(resolve_local_file_path \
+    "$requested" \
+    "$allow_remote_requested" \
+    "$remote_expected_sha256" \
+    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_EXPECTED_SHA256")"
   if [[ -n "$requested_path" && -f "$requested_path" ]]; then
     contract_name="$(json_contract_name "$requested_path")"
     if [[ "$contract_name" == "chummer6-hub.local_release_proof" ]]; then
@@ -622,7 +1133,11 @@ resolve_hub_local_release_proof_path() {
     if resolve_candidate_is_http_url "${candidate:-}" && [[ "$allow_remote_candidate" != "1" ]]; then
       continue
     fi
-    resolved="$(resolve_local_file_path "$candidate" "$allow_remote_candidate")"
+    resolved="$(resolve_local_file_path \
+      "$candidate" \
+      "$allow_remote_candidate" \
+      "$remote_expected_sha256" \
+      "CHUMMER_HUB_LOCAL_RELEASE_PROOF_EXPECTED_SHA256")"
     [[ -n "$resolved" && -f "$resolved" ]] || continue
     contract_name="$(json_contract_name "$resolved")"
     if [[ "$contract_name" == "chummer6-hub.local_release_proof" ]]; then
@@ -641,6 +1156,7 @@ resolve_first_existing_file_path() {
   local resolved=""
   local requested_path=""
   local allow_remote_requested="0"
+  local remote_expected_sha256="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_EXPECTED_SHA256:-}"
 
   if allow_remote_release_proof_input_for_candidate "${requested:-}"; then
     allow_remote_requested="1"
@@ -649,7 +1165,11 @@ resolve_first_existing_file_path() {
   if resolve_candidate_is_http_url "${requested:-}" && [[ "$allow_remote_requested" != "1" ]]; then
     echo "Ignoring remote requested release gate because remote proof inputs are disabled by default: $requested" >&2
   fi
-  requested_path="$(resolve_local_file_path "$requested" "$allow_remote_requested")"
+  requested_path="$(resolve_local_file_path \
+    "$requested" \
+    "$allow_remote_requested" \
+    "$remote_expected_sha256" \
+    "CHUMMER_UI_LOCALIZATION_RELEASE_GATE_EXPECTED_SHA256")"
   if [[ -n "$requested_path" && -f "$requested_path" ]]; then
     printf '%s\n' "$requested_path"
     return 0
@@ -663,7 +1183,11 @@ resolve_first_existing_file_path() {
     if resolve_candidate_is_http_url "${candidate:-}" && [[ "$allow_remote_candidate" != "1" ]]; then
       continue
     fi
-    resolved="$(resolve_local_file_path "$candidate" "$allow_remote_candidate")"
+    resolved="$(resolve_local_file_path \
+      "$candidate" \
+      "$allow_remote_candidate" \
+      "$remote_expected_sha256" \
+      "CHUMMER_UI_LOCALIZATION_RELEASE_GATE_EXPECTED_SHA256")"
     if [[ -n "$resolved" && -f "$resolved" ]]; then
       printf '%s\n' "$resolved"
       return 0
@@ -690,26 +1214,32 @@ resolve_ui_localization_release_gate_repo() {
     "/docker/chummercomplete/chummer-presentation-clean" \
     "/docker/chummercomplete/chummer-presentation"; do
     [[ -n "$candidate" ]] || continue
-    if [[ "${#candidates[@]}" -eq 0 ]]; then
+    if (( $(array_count candidates) == 0 )); then
       candidates+=("$candidate")
     elif append_unique_value "$candidate" "${candidates[@]}"; then
       candidates+=("$candidate")
     fi
   done
 
-  for candidate in "${candidates[@]}"; do
-    if [[ -f "$candidate/$script_relative_path" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
+  local candidate_count
+  candidate_count="$(array_count candidates)"
+  if (( candidate_count > 0 )); then
+    for candidate in "${candidates[@]}"; do
+      if [[ -f "$candidate/$script_relative_path" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done
+  fi
 
-  for candidate in "${candidates[@]}"; do
-    if [[ -f "$candidate/$output_relative_path" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
+  if (( candidate_count > 0 )); then
+    for candidate in "${candidates[@]}"; do
+      if [[ -f "$candidate/$output_relative_path" ]]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+    done
+  fi
 
   if [[ -n "$primary_ui_repo" ]]; then
     printf '%s\n' "$primary_ui_repo"
@@ -750,7 +1280,10 @@ allow_remote_release_proof_input_for_candidate() {
 resolve_local_file_path() {
   local candidate="${1:-}"
   local allow_remote="${2:-1}"
+  local expected_sha256="${3:-}"
+  local expected_sha256_setting="${4:-CHUMMER_REMOTE_RELEASE_PROOF_EXPECTED_SHA256}"
   local downloaded_path=""
+  local actual_sha256=""
   if [[ -z "$candidate" ]]; then
     printf '%s\n' ""
     return 0
@@ -761,8 +1294,18 @@ resolve_local_file_path() {
       printf '%s\n' ""
       return 0
     fi
+    [[ -n "$expected_sha256" ]] \
+      || die "$expected_sha256_setting must be set when its remote proof URL is enabled"
+    [[ "$expected_sha256" =~ ^[[:xdigit:]]{64}$ ]] \
+      || die "$expected_sha256_setting must be an exact 64-character SHA-256"
+    expected_sha256="$(to_lower_ascii "$expected_sha256")"
     downloaded_path="$(mktemp)"
     if curl -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' -fsSL "$candidate" -o "$downloaded_path"; then
+      actual_sha256="$(file_sha256 "$downloaded_path")"
+      if [[ "$actual_sha256" != "$expected_sha256" ]]; then
+        rm -f "$downloaded_path"
+        die "downloaded remote proof SHA-256 does not match $expected_sha256_setting"
+      fi
       bootstrap_tmp_paths+=("$downloaded_path")
       printf '%s\n' "$downloaded_path"
       return 0
@@ -1101,6 +1644,32 @@ if "/account/access" not in normalized_routes or "/account/work" not in normaliz
 PY
 }
 
+validate_hub_local_release_proof_with_registry() {
+  local materializer_path="$1"
+  local proof_path="$2"
+
+  python3 - "$materializer_path" "$proof_path" <<'PY'
+from __future__ import annotations
+
+import importlib.util
+import pathlib
+import sys
+
+
+materializer_path = pathlib.Path(sys.argv[1])
+proof_path = pathlib.Path(sys.argv[2])
+if not materializer_path.is_file():
+    raise SystemExit(f"Registry release-proof validator is missing: {materializer_path}")
+
+spec = importlib.util.spec_from_file_location("registry_release_materializer", materializer_path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)  # type: ignore[union-attr]
+proof = module.load_release_proof(proof_path)
+if not isinstance(proof, dict):
+    raise SystemExit("Registry release-proof validator returned no proof object")
+PY
+}
+
 write_bootstrap_fallback_hub_local_release_proof() {
   die "bootstrap synthetic hub local release-proof fallback is disabled; fix the checked-out generator or set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH"
 }
@@ -1144,7 +1713,9 @@ generate_validated_hub_local_release_proof() {
   local output_path="$3"
   local max_age_seconds="$4"
   local max_future_skew_seconds="$5"
+  local materializer_path="$6"
   local release_proof_health=""
+  local registry_validation_output=""
 
   generate_hub_local_release_proof "$hub_alias" "$hub_repo" "$output_path"
   if ! release_proof_health="$(json_generated_at_health \
@@ -1153,6 +1724,11 @@ generate_validated_hub_local_release_proof() {
     "$max_age_seconds" \
     "$max_future_skew_seconds" 2>&1)"; then
     die "hub local release proof generation produced an unusable receipt: $release_proof_health"
+  fi
+  if ! registry_validation_output="$(validate_hub_local_release_proof_with_registry \
+    "$materializer_path" \
+    "$output_path" 2>&1)"; then
+    die "hub local release proof generation produced a Registry-incompatible receipt: $registry_validation_output"
   fi
 }
 
@@ -1164,23 +1740,68 @@ generate_ui_localization_release_gate() {
   fi
   local script_path="$ui_repo/scripts/ai/milestones/b15-localization-release-gate.sh"
   local output_path="$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
+  local captured_path=""
+  local snapshot_path=""
+  local had_original=0
 
   if [[ "$ui_repo" != "$1" ]]; then
-    log "ui localization release gate generator is using fallback repo at $ui_repo"
+    log "ui localization release gate generator is using fallback repo at $ui_repo" >&2
   fi
 
-  if [[ -f "$script_path" ]]; then
-    if (
-      cd "$ui_repo"
-      bash "$script_path" >/dev/null
-    ); then
-      return 0
+  [[ -f "$script_path" ]] \
+    || die "ui localization release gate generator is missing at $script_path; set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH or restore the gate script"
+  captured_path="$(mktemp "${TMPDIR:-/tmp}/chummer-ui-localization-gate.XXXXXX.json")" \
+    || die "could not reserve a temporary ui localization gate receipt"
+  snapshot_path="$(mktemp "${TMPDIR:-/tmp}/chummer-ui-localization-gate-snapshot.XXXXXX.json")" \
+    || {
+      rm -f "$captured_path"
+      die "could not reserve a temporary ui localization gate snapshot"
+    }
+
+  if [[ -e "$output_path" ]]; then
+    if [[ ! -f "$output_path" || -L "$output_path" ]]; then
+      rm -f "$captured_path" "$snapshot_path"
+      die "checked-out ui localization gate must be a regular non-symlink file: $output_path"
     fi
-
-    die "ui localization release gate generator failed at $script_path; fix the gate or set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH"
+    cp -p "$output_path" "$snapshot_path" || {
+      rm -f "$captured_path" "$snapshot_path"
+      die "could not snapshot the checked-out ui localization gate: $output_path"
+    }
+    had_original=1
   fi
 
-  die "ui localization release gate generator is missing at $script_path; set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH or restore the gate script"
+  if (
+      restore_checked_out_gate() {
+        if [[ "$had_original" == "1" ]]; then
+          local restore_path=""
+          restore_path="$(mktemp "${output_path}.restore.XXXXXX")" || return 1
+          cp -p "$snapshot_path" "$restore_path" || {
+            rm -f "$restore_path"
+            return 1
+          }
+          mv -f "$restore_path" "$output_path" || {
+            rm -f "$restore_path"
+            return 1
+          }
+        else
+          rm -f "$output_path"
+        fi
+      }
+      trap 'restore_checked_out_gate' EXIT
+      cd "$ui_repo" || exit 1
+      bash "$script_path" >/dev/null || exit $?
+      [[ -f "$output_path" && ! -L "$output_path" ]] || exit 1
+      cp "$output_path" "$captured_path" || exit 1
+      restore_checked_out_gate || exit 1
+      trap - EXIT
+    ); then
+    rm -f "$snapshot_path"
+    printf '%s\n' "$captured_path"
+    return 0
+  fi
+
+  rm -f "$captured_path" "$snapshot_path"
+  die "ui localization release gate generator failed at $script_path; fix the gate or set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH. The checked-out gate may also have failed restoration."
 }
 
 generate_validated_ui_localization_release_gate() {
@@ -1192,15 +1813,16 @@ generate_validated_ui_localization_release_gate() {
   if [[ -z "$ui_repo" || "$ui_repo" == "/" ]]; then
     die "ui localization release gate validation could not resolve a repo root; set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH or run from a checkout with the gate script"
   fi
-  local output_path="$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
+  local output_path=""
   local ui_localization_release_gate_health=""
 
-  generate_ui_localization_release_gate "$ui_repo" "$@"
+  output_path="$(generate_ui_localization_release_gate "$ui_repo" "$@")"
   if ! ui_localization_release_gate_health="$(json_generated_at_health \
     "$output_path" \
     "ui localization release gate" \
     "$max_age_seconds" \
     "$max_future_skew_seconds" 2>&1)"; then
+    rm -f "$output_path"
     die "ui localization release gate generation produced an unusable receipt: $ui_localization_release_gate_health"
   fi
 
@@ -1912,12 +2534,13 @@ verify_checkout_expected_commit() {
 }
 
 infer_publish_mode() {
+  local has_release_upload_auth="${1:-0}"
   if [[ -n "${CHUMMER_RELEASE_PUBLISH_MODE:-}" ]]; then
     printf '%s' "$CHUMMER_RELEASE_PUBLISH_MODE"
     return
   fi
 
-  if [[ -n "${CHUMMER_RELEASE_UPLOAD_URL:-}" || -n "$(release_upload_token_value)" ]]; then
+  if [[ -n "${CHUMMER_RELEASE_UPLOAD_SESSIONS_URL:-}" || "$has_release_upload_auth" == "1" ]]; then
     printf 'http'
     return
   fi
@@ -1935,64 +2558,95 @@ infer_publish_mode() {
   printf 'http'
 }
 
-release_upload_token_value() {
+capture_release_upload_auth_value() {
+  local output_value_variable="${1:-}"
+  local output_source_variable="${2:-}"
+  local captured_value=""
+  local captured_source=""
+  export -n captured_value captured_source 2>/dev/null || true
+  [[ -n "$output_value_variable" && -n "$output_source_variable" ]] || return 1
+
   if [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN:-}" ]]; then
-    printf '%s' "${CHUMMER_RELEASE_UPLOAD_TOKEN}"
-    return
+    captured_value="$CHUMMER_RELEASE_UPLOAD_TOKEN"
+    captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN"
+  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]; then
+    captured_value="$CHUMMER_RELEASE_UPLOAD_TICKET"
+    captured_source="CHUMMER_RELEASE_UPLOAD_TICKET"
+  elif [[ -n "${FLEET_INTERNAL_API_TOKEN:-}" ]]; then
+    captured_value="$FLEET_INTERNAL_API_TOKEN"
+    captured_source="FLEET_INTERNAL_API_TOKEN"
+  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN_FILE:-}" ]]; then
+    captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN_FILE"
+  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN_PATH:-}" ]]; then
+    captured_source="CHUMMER_RELEASE_UPLOAD_TOKEN_PATH"
+  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET_FILE:-}" ]]; then
+    captured_source="CHUMMER_RELEASE_UPLOAD_TICKET_FILE"
+  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET_PATH:-}" ]]; then
+    captured_source="CHUMMER_RELEASE_UPLOAD_TICKET_PATH"
   fi
-  if [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]; then
-    printf '%s' "${CHUMMER_RELEASE_UPLOAD_TICKET}"
-    return
-  fi
-  if [[ -n "${FLEET_INTERNAL_API_TOKEN:-}" ]]; then
-    printf '%s' "${FLEET_INTERNAL_API_TOKEN}"
-    return
-  fi
-  printf '%s' ""
+
+  printf -v "$output_value_variable" '%s' "$captured_value"
+  printf -v "$output_source_variable" '%s' "$captured_source"
+  export -n "$output_value_variable" "$output_source_variable" 2>/dev/null || true
+  unset \
+    CHUMMER_RELEASE_UPLOAD_TOKEN \
+    CHUMMER_RELEASE_UPLOAD_TICKET \
+    CHUMMER_RELEASE_UPLOAD_TOKEN_FILE \
+    CHUMMER_RELEASE_UPLOAD_TOKEN_PATH \
+    CHUMMER_RELEASE_UPLOAD_TICKET_FILE \
+    CHUMMER_RELEASE_UPLOAD_TICKET_PATH \
+    FLEET_INTERNAL_API_TOKEN
 }
 
 prompt_for_release_upload_ticket() {
+  local output_variable="${1:-}"
+  local prompted_value=""
+  [[ -n "$output_variable" ]] || return 1
   if [[ ! -t 0 ]]; then
     return 1
   fi
 
   printf 'Paste the signed-in release upload handoff code (input hidden): ' >&2
-  IFS= read -r -s CHUMMER_RELEASE_UPLOAD_TICKET || return 1
+  IFS= read -r -s prompted_value || return 1
   printf '\n' >&2
-  export CHUMMER_RELEASE_UPLOAD_TICKET
-  [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]
+  [[ -n "$prompted_value" ]] || return 1
+  printf -v "$output_variable" '%s' "$prompted_value"
+  export -n "$output_variable" 2>/dev/null || true
 }
 
 ensure_release_upload_token() {
-  [[ -n "$(release_upload_token_value)" ]] && return 0
-  prompt_for_release_upload_ticket && [[ -n "$(release_upload_token_value)" ]] && return 0
-  die "set CHUMMER_RELEASE_UPLOAD_TICKET or CHUMMER_RELEASE_UPLOAD_TOKEN for HTTP release promotion"
+  local auth_value="${1:-}"
+  export -n auth_value 2>/dev/null || true
+  [[ -n "$auth_value" ]] \
+    || die "set CHUMMER_RELEASE_UPLOAD_TICKET or CHUMMER_RELEASE_UPLOAD_TOKEN for HTTP release promotion"
+  (( ${#auth_value} <= 8192 )) && [[ "$auth_value" != *$'\n'* && "$auth_value" != *$'\r'* ]] \
+    || die "release upload authorization must be a single value of at most 8192 bytes"
 }
 
 write_release_upload_curl_config() {
-  local config_path="$1"
-  ensure_release_upload_token
-  chmod 600 "$config_path"
-  if [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN:-}" ]]; then
-    printf '%s' "${CHUMMER_RELEASE_UPLOAD_TOKEN}"
-  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]; then
-    printf '%s' "${CHUMMER_RELEASE_UPLOAD_TICKET}"
-  elif [[ -n "${FLEET_INTERNAL_API_TOKEN:-}" ]]; then
-    printf '%s' "${FLEET_INTERNAL_API_TOKEN}"
-  else
-    die "release upload token could not be resolved after prompting"
-  fi | python3 -c 'from pathlib import Path; import sys; config_path = Path(sys.argv[1]); token = sys.stdin.read(); escaped = token.replace("\\\\", "\\\\\\\\").replace("\"", "\\\\\""); config_path.write_text(f"header = \"Authorization: Bearer {escaped}\"\n", encoding="utf-8")' "$config_path"
-  unset CHUMMER_RELEASE_UPLOAD_TICKET CHUMMER_RELEASE_UPLOAD_TOKEN FLEET_INTERNAL_API_TOKEN
+  local auth_value="${1:-}"
+  export -n auth_value 2>/dev/null || true
+  ensure_release_upload_token "$auth_value"
+  printf '%s' "$auth_value" \
+    | python3 -c 'import sys; token = sys.stdin.read(); escaped = token.replace("\\\\", "\\\\\\\\").replace("\"", "\\\\\""); sys.stdout.write(f"header = \"Authorization: Bearer {escaped}\"\n")'
 }
 
 validate_publish_mode() {
   local publish_mode="$1"
-  local upload_url="$2"
+  local sessions_url="$2"
+  local release_upload_auth_value="${3:-}"
+  export -n release_upload_auth_value 2>/dev/null || true
 
   case "$publish_mode" in
     http)
-      ensure_release_upload_token
-      [[ -n "$upload_url" ]] || die "set CHUMMER_RELEASE_UPLOAD_URL for HTTP release promotion"
+      ensure_release_upload_token "$release_upload_auth_value"
+      [[ -n "$sessions_url" ]] || die "set CHUMMER_RELEASE_UPLOAD_SESSIONS_URL for HTTP release promotion"
+      [[ -z "${CHUMMER_RELEASE_UPLOAD_URL:-}" ]] \
+        || die "CHUMMER_RELEASE_UPLOAD_URL is retired; use CHUMMER_RELEASE_UPLOAD_SESSIONS_URL"
+      ! is_true "${CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-0}" \
+        || die "direct release upload fallback is permanently disabled"
+      ! is_true "${CHUMMER_RELEASE_PRINT_SIGNED_INSTALL_CLAIMS:-0}" \
+        || die "printing signed install claim credentials is permanently disabled"
       ;;
     filesystem)
       require_cmd ssh
@@ -2014,6 +2668,131 @@ is_true() {
   local value
   value="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
+}
+
+MAC_RELEASE_STAGE_ONLY=0
+MAC_RELEASE_STAGE_OUTPUT_DIR=""
+
+parse_mac_release_stage_only_args() {
+  local env_mode="${CHUMMER_MAC_RELEASE_STAGE_ONLY:-}"
+  local env_output="${CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR:-}"
+  local flag_mode=0
+  local flag_output=""
+  local value=""
+
+  if [[ -n "$env_mode" ]]; then
+    value="$(to_lower_ascii "$env_mode")"
+    case "$value" in
+      1|true|yes|on) MAC_RELEASE_STAGE_ONLY=1 ;;
+      0|false|no|off) MAC_RELEASE_STAGE_ONLY=0 ;;
+      *) die "CHUMMER_MAC_RELEASE_STAGE_ONLY must be a boolean value" ;;
+    esac
+  else
+    MAC_RELEASE_STAGE_ONLY=0
+  fi
+
+  while (( $# > 0 )); do
+    case "$1" in
+      --stage-only)
+        flag_mode=1
+        shift
+        ;;
+      --stage-output-dir)
+        (( $# >= 2 )) || die "--stage-output-dir requires a path"
+        [[ -z "$flag_output" ]] || die "--stage-output-dir may be supplied only once"
+        flag_output="$2"
+        shift 2
+        ;;
+      --stage-output-dir=*)
+        [[ -z "$flag_output" ]] || die "--stage-output-dir may be supplied only once"
+        flag_output="${1#--stage-output-dir=}"
+        shift
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  if (( flag_mode == 1 )); then
+    if [[ -n "$env_mode" ]] && ! is_true "$env_mode"; then
+      die "--stage-only conflicts with CHUMMER_MAC_RELEASE_STAGE_ONLY=$env_mode"
+    fi
+    MAC_RELEASE_STAGE_ONLY=1
+  fi
+  if [[ -n "$flag_output" && -n "$env_output" && "$flag_output" != "$env_output" ]]; then
+    die "--stage-output-dir conflicts with CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR"
+  fi
+  MAC_RELEASE_STAGE_OUTPUT_DIR="${flag_output:-$env_output}"
+
+  if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
+    [[ -z "$MAC_RELEASE_STAGE_OUTPUT_DIR" ]] \
+      || die "CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR/--stage-output-dir requires stage-only mode"
+    return 0
+  fi
+
+  [[ -n "$MAC_RELEASE_STAGE_OUTPUT_DIR" ]] \
+    || die "stage-only mode requires CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR or --stage-output-dir"
+
+  local incompatible_setting=""
+  for incompatible_setting in \
+    CHUMMER_RELEASE_PUBLISH_MODE \
+    CHUMMER_RELEASE_UPLOAD_URL \
+    CHUMMER_RELEASE_UPLOAD_SESSIONS_URL \
+    CHUMMER_RELEASE_UPLOAD_TOKEN \
+    CHUMMER_RELEASE_UPLOAD_TICKET \
+    CHUMMER_RELEASE_UPLOAD_TOKEN_FILE \
+    CHUMMER_RELEASE_UPLOAD_TOKEN_PATH \
+    CHUMMER_RELEASE_UPLOAD_TICKET_FILE \
+    CHUMMER_RELEASE_UPLOAD_TICKET_PATH \
+    CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK \
+    CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS \
+    CHUMMER_RELEASE_UPLOAD_RETRY_SLEEP_SECONDS \
+    CHUMMER_RELEASE_UPLOAD_DIRECT_LIMIT_BYTES \
+    CHUMMER_RELEASE_UPLOAD_CHUNK_BYTES \
+    CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE \
+    CHUMMER_RELEASE_PRINT_SIGNED_INSTALL_CLAIMS \
+    CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION \
+    CHUMMER_RELEASE_SKIP_STRICT_MANIFEST_VERIFY \
+    FLEET_INTERNAL_API_TOKEN \
+    CHUMMER_RELEASE_SSH_TARGET \
+    CHUMMER_REMOTE_STAGING_DIR \
+    CHUMMER_REMOTE_UI_REPO_DIR \
+    CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR \
+    CHUMMER_PORTAL_DOWNLOADS_S3_URI \
+    CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL \
+    CHUMMER_APP_SIGN_IDENTITY \
+    CHUMMER_NOTARY_PROFILE; do
+    value=""
+    eval "value=\"\${${incompatible_setting}:-}\""
+    [[ -z "$value" ]] \
+      || die "stage-only mode rejects publish-only setting $incompatible_setting"
+  done
+}
+
+resolve_mac_release_stage_output_path() {
+  python3 - "$1" <<'PY'
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+raw = sys.argv[1]
+candidate = Path(raw).expanduser()
+if not candidate.is_absolute():
+    raise SystemExit("stage-only output path must be absolute")
+if candidate.exists() or candidate.is_symlink():
+    raise SystemExit("stage-only output path must not already exist or be a symlink")
+try:
+    parent = candidate.parent.resolve(strict=True)
+except OSError as exc:
+    raise SystemExit(f"stage-only output parent is unavailable: {type(exc).__name__}") from exc
+if not parent.is_dir():
+    raise SystemExit("stage-only output parent must be a directory")
+if candidate.name in {"", ".", ".."}:
+    raise SystemExit("stage-only output path must name a new directory")
+print(parent / candidate.name)
+PY
 }
 
 write_release_manifests() {
@@ -3116,88 +3895,264 @@ with output_path.open("w", encoding="utf-8") as handle:
 PY
 }
 
+sanitize_release_upload_response_stream() {
+  local output_path="$1"
+  local max_bytes="$2"
+  python3 -c '
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+import tempfile
+from pathlib import Path
+from urllib.parse import urlsplit
+
+output_path = Path(sys.argv[1])
+max_bytes = int(sys.argv[2])
+raw = bytearray()
+tail = bytearray()
+total_bytes = 0
+while True:
+    chunk = sys.stdin.buffer.read(65536)
+    if not chunk:
+        break
+    total_bytes += len(chunk)
+    tail = (tail + chunk)[-128:]
+    remaining = max(0, max_bytes + 129 - len(raw))
+    if remaining:
+        raw.extend(chunk[:remaining])
+
+status_match = re.search(rb"\nCHUMMER_HTTP_STATUS:([0-9]{3})\Z", bytes(tail))
+status_code = status_match.group(1).decode("ascii") if status_match else "000"
+stream_overflow = total_bytes > max_bytes + 128
+body = b""
+if status_match and not stream_overflow:
+    trailer_size = len(status_match.group(0))
+    body = bytes(raw[:-trailer_size])
+overflow = stream_overflow or len(body) > max_bytes
+
+safe_scalar = re.compile(r"^[A-Za-z0-9._:/+ -]{1,2048}$")
+safe_identifier = re.compile(r"^[A-Za-z0-9._:+-]{1,200}$")
+endpoint_fields = {
+    "filesUrl", "FilesUrl", "files_url", "files",
+    "chunksUrl", "ChunksUrl", "chunks_url", "chunks",
+    "completeUrl", "CompleteUrl", "complete_url", "complete",
+}
+scalar_fields = (
+    "contractName", "sessionId", "SessionId", "session_id", "id",
+    "expiresAtUtc", "ExpiresAtUtc", "expires_at_utc", "expiresAt",
+    *sorted(endpoint_fields), "status", "state", "version", "channel",
+    "publishedAt", "supportabilityState", "compatibilityState",
+    "traceId", "requestId", "success", "fileCount", "totalBytes",
+)
+
+def safe_url(value: object, *, allow_relative: bool) -> str | None:
+    if not isinstance(value, str) or not (1 <= len(value) <= 2048):
+        return None
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        return None
+    parsed = urlsplit(value)
+    if parsed.query or parsed.fragment or parsed.username is not None or parsed.password is not None:
+        return None
+    if parsed.scheme or parsed.netloc:
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return None
+    elif not allow_relative or not value.startswith("/"):
+        return None
+    return value
+
+summary: dict[str, object] = {"responseSanitized": True}
+payload: object = None
+if not status_match:
+    summary["responseSuppressed"] = "missing_http_status"
+elif overflow:
+    summary["responseSuppressed"] = "size_limit"
+else:
+    try:
+        payload = json.loads(body.decode("utf-8")) if body else {}
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
+        summary["responseSuppressed"] = "non_json"
+
+if isinstance(payload, dict):
+    for field_name in scalar_fields:
+        value = payload.get(field_name)
+        if isinstance(value, bool) or isinstance(value, int):
+            summary[field_name] = value
+        elif field_name in endpoint_fields:
+            safe_value = safe_url(value, allow_relative=True)
+            if safe_value is not None:
+                summary[field_name] = safe_value
+        elif isinstance(value, str) and safe_scalar.fullmatch(value):
+            summary[field_name] = value
+    for field_name in ("installDispatchUrls", "directFileUrls"):
+        values = payload.get(field_name)
+        if isinstance(values, list):
+            summary[field_name] = [
+                safe for item in values[:256]
+                if (safe := safe_url(item, allow_relative=False)) is not None
+            ]
+    promoted_ids = payload.get("promotedArtifactIds")
+    if isinstance(promoted_ids, list):
+        summary["promotedArtifactIds"] = [
+            item for item in promoted_ids[:512]
+            if isinstance(item, str) and safe_identifier.fullmatch(item)
+        ]
+    summary["suppressedFieldCount"] = max(0, len(payload) - len(summary) + 2)
+elif isinstance(payload, list):
+    summary["itemCount"] = len(payload)
+
+output_path.parent.mkdir(parents=True, exist_ok=True)
+fd, temporary_name = tempfile.mkstemp(prefix=f".{output_path.name}.", dir=output_path.parent)
+temporary_path = Path(temporary_name)
+try:
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(summary, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary_path, output_path)
+    directory_fd = os.open(output_path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+finally:
+    try:
+        temporary_path.unlink()
+    except FileNotFoundError:
+        pass
+print(status_code)
+if not status_match:
+    raise SystemExit(65)
+' "$output_path" "$max_bytes"
+}
+
 upload_release_bundle_http() {
   local bundle_dir="$1"
-  local upload_url="$2"
-  local curl_auth_config="$3"
+  local sessions_url="$2"
+  local release_upload_auth_value="$3"
   local response_path="$4"
+  local attempt_receipt_helper="$5"
+  export -n release_upload_auth_value 2>/dev/null || true
+  ensure_release_upload_token "$release_upload_auth_value"
 
-  local fallback_mode="${CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-0}"
   local retry_attempts="${CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS:-4}"
   local retry_sleep="${CHUMMER_RELEASE_UPLOAD_RETRY_SLEEP_SECONDS:-5}"
   local direct_limit_bytes="${CHUMMER_RELEASE_UPLOAD_DIRECT_LIMIT_BYTES:-94371840}"
   local chunk_bytes="${CHUMMER_RELEASE_UPLOAD_CHUNK_BYTES:-33554432}"
-  local sessions_url="${CHUMMER_RELEASE_UPLOAD_SESSIONS_URL:-${upload_url%/bundles}/upload-sessions}"
+  local max_response_bytes="${CHUMMER_RELEASE_UPLOAD_MAX_RESPONSE_BYTES:-1048576}"
+  [[ "$max_response_bytes" =~ ^[0-9]+$ ]] \
+    && (( max_response_bytes >= 1024 && max_response_bytes <= 16777216 )) \
+    || die "CHUMMER_RELEASE_UPLOAD_MAX_RESPONSE_BYTES must be an integer from 1024 through 16777216"
+  [[ -n "$sessions_url" ]] || die "release upload sessions URL is required"
+  [[ -f "$attempt_receipt_helper" && ! -L "$attempt_receipt_helper" ]] \
+    || die "durable upload-attempt receipt helper is missing or unsafe: $attempt_receipt_helper"
+  [[ -z "${CHUMMER_RELEASE_UPLOAD_URL:-}" ]] \
+    || die "CHUMMER_RELEASE_UPLOAD_URL is retired; use CHUMMER_RELEASE_UPLOAD_SESSIONS_URL"
+  ! is_true "${CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-0}" \
+    || die "direct release upload fallback is permanently disabled"
 
-  local use_fallback=0
+  local upload_failed=0
+  local completion_attempted=0
   local last_request_status=""
   local session_json session_id files_url chunks_url complete_url
   local file_path relative_path file_size
-  local -a request_common=(
-    "--config"
-    "$curl_auth_config"
-  )
+  local -a request_common=()
+  local attempt_receipt_path="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-$(dirname "$response_path")/release-upload-handoff.json}"
+  local candidate_summary=""
+  BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH="$attempt_receipt_path"
+  python3 "$attempt_receipt_helper" preflight --receipt "$attempt_receipt_path"
 
-  curl_status_from_headers() {
-    awk 'BEGIN {status=""} /^HTTP\/[0-9.]+ / {status=$2} END {print status}' "$1"
+  render_sanitized_release_upload_response() {
+    local body_file="$1"
+    python3 - "$body_file" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+max_response_bytes = 1024 * 1024
+try:
+    response_size = path.stat().st_size
+    if response_size > max_response_bytes:
+        print(f"(response display suppressed; {response_size} bytes exceeds {max_response_bytes}-byte limit)")
+        raise SystemExit(0)
+    raw = path.read_bytes()
+except OSError:
+    print("(response unavailable)")
+    raise SystemExit(0)
+
+if not raw:
+    print("(empty response body)")
+    raise SystemExit(0)
+
+try:
+    payload = json.loads(raw.decode("utf-8"))
+except (UnicodeDecodeError, json.JSONDecodeError, RecursionError, MemoryError, ValueError):
+    print(f"(non-JSON response suppressed; {len(raw)} bytes)")
+    raise SystemExit(0)
+
+try:
+    allowed_scalars = (
+        "status",
+        "state",
+        "version",
+        "releaseVersion",
+        "channel",
+        "generationId",
+        "publishedAt",
+        "type",
+        "traceId",
+        "requestId",
+        "itemCount",
+    )
+    allowed_collections = (
+        "installDispatchUrls",
+        "directFileUrls",
+        "signedInInstallClaims",
+        "artifacts",
+        "errors",
+    )
+    safe_characters = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._:/+-TZ")
+    summary = {"responseType": "json"}
+    if isinstance(payload, dict):
+        for field in allowed_scalars:
+            value = payload.get(field)
+            if isinstance(value, bool):
+                summary[field] = value
+            elif isinstance(value, int) and -(2**63) <= value < 2**63:
+                summary[field] = value
+            elif isinstance(value, str) and 0 < len(value) <= 160 and all(character in safe_characters for character in value):
+                summary[field] = value
+        for field in allowed_collections:
+            value = payload.get(field)
+            if isinstance(value, (dict, list)):
+                summary[f"{field}Count"] = len(value)
+        summary["suppressedFieldCount"] = max(0, len(payload) - len(summary) + 1)
+    elif isinstance(payload, list):
+        summary["itemCount"] = len(payload)
+    else:
+        summary["valueSuppressed"] = True
+    rendered = json.dumps(summary, indent=2, sort_keys=True)
+except (RecursionError, MemoryError, TypeError, ValueError):
+    print(f"(JSON response display suppressed; {len(raw)} bytes could not be safely summarized)")
+    raise SystemExit(0)
+print(rendered)
+PY
   }
 
   log_http_body() {
     local body_file="$1"
     local line
     [[ -f "$body_file" ]] || return 0
-    if [[ ! -s "$body_file" ]]; then
-      log "  (empty response body)"
-      return 0
-    fi
     while IFS= read -r line; do
       log "  ${line}"
-    done < "$body_file"
-  }
-
-  log_problem_details() {
-    local body_file="$1"
-    [[ -f "$body_file" ]] || return 0
-    if ! jq -e . "$body_file" >/dev/null 2>&1; then
-      return 0
-    fi
-
-    local status title detail type instance
-    local -a validation_errors
-
-    status="$(jq -r '.status // empty' "$body_file" 2>/dev/null || true)"
-    title="$(jq -r '.title // empty' "$body_file" 2>/dev/null || true)"
-    detail="$(jq -r '.detail // empty' "$body_file" 2>/dev/null || true)"
-    type="$(jq -r '.type // empty' "$body_file" 2>/dev/null || true)"
-    instance="$(jq -r '.instance // empty' "$body_file" 2>/dev/null || true)"
-
-    validation_errors=()
-    while IFS= read -r validation_error; do
-      [[ -n "$validation_error" ]] || continue
-      validation_errors+=("$validation_error")
-    done < <(jq -r '.errors? | to_entries? | map("\(.key): \(.value | join(\", \"))")[]?' "$body_file" 2>/dev/null || true)
-
-    if [[ -n "$status" ]]; then
-      log "  error status: ${status}"
-    fi
-    if [[ -n "$type" ]]; then
-      log "  problem type: ${type}"
-    fi
-    if [[ -n "$title" ]]; then
-      log "  title: ${title}"
-    fi
-    if [[ -n "$detail" ]]; then
-      log "  detail: ${detail}"
-    fi
-    if [[ -n "$instance" ]]; then
-      log "  instance: ${instance}"
-    fi
-    if (( ${#validation_errors[@]} > 0 )); then
-      log "  validation errors:"
-      for line in "${validation_errors[@]}"; do
-        [[ -n "$line" ]] && log "    ${line}"
-      done
-    fi
+    done < <(render_sanitized_release_upload_response "$body_file")
   }
 
   log_status_guidance() {
@@ -3224,32 +4179,50 @@ upload_release_bundle_http() {
     local candidate="$1"
     local base="$2"
     [[ -n "$candidate" && "$candidate" != "null" ]] || return 1
-    if [[ "$candidate" == "http://"* || "$candidate" == "https://"* ]]; then
-      printf '%s' "$candidate"
-      return 0
-    fi
-    if [[ "$candidate" == /* ]]; then
-      local origin
-      if [[ "$base" == "http://"* ]]; then
-        origin="${base#http://}"
-        origin="${origin%%/*}"
-        origin="http://$origin"
-      elif [[ "$base" == "https://"* ]]; then
-        origin="${base#https://}"
-        origin="${origin%%/*}"
-        origin="https://$origin"
-      else
-        printf '%s%s' "${base%/}" "$candidate"
-        return 0
-      fi
-      printf '%s%s' "$origin" "$candidate"
-      return 0
-    fi
+    python3 - "$base" "$candidate" <<'PY'
+from __future__ import annotations
 
-    local normalized_base="${base%/}"
-    normalized_base="${normalized_base%/bundles}"
-    printf '%s/%s' "${normalized_base%/}" "$candidate"
-    return 0
+import sys
+from urllib.parse import unquote, urljoin, urlsplit
+
+base_text = str(sys.argv[1]).strip()
+candidate_text = str(sys.argv[2]).strip()
+base = urlsplit(base_text)
+if (
+    base.scheme not in {"http", "https"}
+    or not base.hostname
+    or base.username is not None
+    or base.password is not None
+    or base.query
+    or base.fragment
+    or not base.path.rstrip("/").endswith("/upload-sessions")
+):
+    raise SystemExit(1)
+
+resolved = urlsplit(urljoin(base_text.rstrip("/") + "/", candidate_text))
+try:
+    base_authority = (base.scheme.lower(), base.hostname.lower(), base.port)
+    resolved_authority = (resolved.scheme.lower(), (resolved.hostname or "").lower(), resolved.port)
+except ValueError:
+    raise SystemExit(1)
+
+decoded_path = unquote(resolved.path)
+segments = decoded_path.replace("\\", "/").split("/")
+required_prefix = base.path.rstrip("/") + "/"
+if (
+    resolved_authority != base_authority
+    or resolved.username is not None
+    or resolved.password is not None
+    or resolved.query
+    or resolved.fragment
+    or "\\" in resolved.path
+    or any(segment in {".", ".."} for segment in segments)
+    or not decoded_path.startswith(required_prefix)
+):
+    raise SystemExit(1)
+
+print(resolved.geturl())
+PY
   }
 
   resolve_json_field() {
@@ -3267,34 +4240,14 @@ upload_release_bundle_http() {
     return 1
   }
 
-  log_json_or_text() {
-    local payload_path="$1"
-    if ! jq -e . "$payload_path" >/dev/null 2>&1; then
-      cat "$payload_path"
-      return 0
-    fi
-    jq . "$payload_path"
-  }
-
   log_release_upload_response() {
     local payload_path="$1"
-    if ! jq -e . "$payload_path" >/dev/null 2>&1; then
-      cat "$payload_path"
-      return 0
-    fi
-    jq '
-      if (.signedInInstallClaims? | type) == "array" then
-        .signedInInstallClaims |= map(
-          if type == "object" and has("claimCode") then
-            .claimCode = "[redacted]"
-          else
-            .
-          end
-        )
-      else
-        .
-      end
-    ' "$payload_path"
+    render_sanitized_release_upload_response "$payload_path"
+  }
+
+  release_upload_curl() {
+    write_release_upload_curl_config "$release_upload_auth_value" \
+      | curl -q --config - "$@"
   }
 
   post_form_request() {
@@ -3303,28 +4256,39 @@ upload_release_bundle_http() {
     local request_url="$3"
     shift 3
 
+    local allow_retry=1
+    if [[ "${1:-}" == "--no-retry" ]]; then
+      allow_retry=0
+      shift
+    fi
+
     last_request_status=""
     local attempt=1
     local request_id=""
     while true; do
-      local headers_file body_file
-      headers_file="$(mktemp)"
+      local body_file http_status request_ok
       body_file="$(mktemp)"
-      if curl --fail-with-body -sS -D "$headers_file" -o "$body_file" -X POST "$@" "$request_url"; then
+      http_status=""
+      request_ok=0
+      if http_status="$(release_upload_curl --fail-with-body -sS --max-filesize "$max_response_bytes" \
+          --write-out $'\nCHUMMER_HTTP_STATUS:%{http_code}' -X POST "$@" "$request_url" \
+          | sanitize_release_upload_response_stream "$body_file" "$max_response_bytes")"; then
+        [[ "$http_status" =~ ^2 ]] && request_ok=1
+      fi
+      if (( request_ok == 1 )); then
         if [[ -n "$output_path" ]]; then
           mv "$body_file" "$output_path"
           chmod 600 "$output_path" 2>/dev/null || true
         else
           rm -f "$body_file"
         fi
-        rm -f "$headers_file"
         return 0
       fi
 
       local status
-      status="$(curl_status_from_headers "$headers_file")"
+      status="$http_status"
       last_request_status="$status"
-      request_id="$(awk 'BEGIN {IGNORECASE=1} /^x-request-id:/ {sub(/\r/, "", $0); print substr($0, index($0, ":") + 1); exit}' "$headers_file" | sed 's/^ *//' | sed 's/ *$//')"
+      request_id="$(jq -r '.requestId // .traceId // empty' "$body_file" 2>/dev/null || true)"
       log "release upload request failed: ${label} (attempt ${attempt}/${retry_attempts}, status ${status:-unknown})"
       log "  url: ${request_url}"
       if [[ -n "$request_id" ]]; then
@@ -3332,7 +4296,6 @@ upload_release_bundle_http() {
       fi
       log "  response body:"
       log_http_body "$body_file"
-      log_problem_details "$body_file"
       log_status_guidance "${status}"
       if [[ "$status" == "400" || "$status" == "401" || "$status" == "403" ]]; then
         if [[ -n "$output_path" ]]; then
@@ -3341,7 +4304,15 @@ upload_release_bundle_http() {
         else
           rm -f "$body_file"
         fi
-        rm -f "$headers_file"
+        return 22
+      fi
+      if (( allow_retry == 0 )); then
+        if [[ -n "$output_path" ]]; then
+          mv "$body_file" "$output_path"
+          chmod 600 "$output_path" 2>/dev/null || true
+        else
+          rm -f "$body_file"
+        fi
         return 22
       fi
       if (( attempt >= retry_attempts )); then
@@ -3351,11 +4322,10 @@ upload_release_bundle_http() {
         else
           rm -f "$body_file"
         fi
-        rm -f "$headers_file"
         return 22
       fi
 
-      rm -f "$headers_file" "$body_file"
+      rm -f "$body_file"
 
       attempt=$((attempt + 1))
       log "  retrying in ${retry_sleep}s"
@@ -3363,61 +4333,48 @@ upload_release_bundle_http() {
     done
   }
 
-create_release_bundle_archive() {
-  local source_dir="$1"
-  local archive_path="$2"
-    python3 - "$source_dir" "$archive_path" <<'PY'
-from __future__ import annotations
-
-import sys
-import zipfile
-import os
-from pathlib import Path
-
-source_dir = Path(sys.argv[1])
-archive_path = Path(sys.argv[2])
-archive_path.parent.mkdir(parents=True, exist_ok=True)
-
-with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as handle:
-    for current_root, _dirs, filenames in os.walk(source_dir, followlinks=True):
-        for filename in sorted(filenames):
-            path = Path(current_root) / filename
-            if not path.is_file():
-                continue
-            handle.write(path, arcname=str(path.relative_to(source_dir)))
-PY
-  }
-
-  create_temp_zip_path() {
-    local temp_root="${TMPDIR:-/tmp}"
-    local temp_path
-    temp_path="$(mktemp "${temp_root%/}/chummer-release-upload.XXXXXX")"
-    rm -f "$temp_path"
-    printf '%s.zip\n' "$temp_path"
-  }
-
-  upload_release_bundle_direct() {
-    local direct_bundle="$1"
-    local direct_response="$2"
-
-    log "uploading release bundle via direct multipart fallback"
-    create_release_bundle_archive "$bundle_dir" "$direct_bundle"
-    if ! post_form_request \
-      "$direct_response" \
-      "direct release bundle upload" \
-      "$upload_url" \
-      "${request_common[@]}" \
-      -F "bundle=@${direct_bundle};type=application/zip"; then
-      rm -f "$direct_bundle"
-      return 22
+  collect_upload_files() {
+    local bundle_root="$1"
+    [[ -f "$bundle_root/releases.json" ]] && printf '%s\n' "$bundle_root/releases.json"
+    [[ -f "$bundle_root/RELEASE_CHANNEL.generated.json" ]] && printf '%s\n' "$bundle_root/RELEASE_CHANNEL.generated.json"
+    [[ -f "$bundle_root/release-evidence/public-promotion.json" ]] && printf '%s\n' "$bundle_root/release-evidence/public-promotion.json"
+    if [[ -d "$bundle_root/files" ]]; then
+      find "$bundle_root/files" -type f | sort
     fi
-
-    log_release_upload_response "$direct_response"
-    rm -f "$direct_bundle"
-    return 0
+    if [[ -d "$bundle_root/startup-smoke" ]]; then
+      find "$bundle_root/startup-smoke" -type f | sort
+    fi
+    if [[ -d "$bundle_root/proof/build-provenance/v1" ]]; then
+      find "$bundle_root/proof/build-provenance/v1" -type f | sort
+    fi
   }
+
+  local -a upload_files=()
+  while IFS= read -r file_path; do
+    [[ -n "$file_path" ]] || continue
+    upload_files+=("$file_path")
+  done < <(collect_upload_files "$bundle_dir")
+  local upload_file_count
+  upload_file_count="$(array_count upload_files)"
+  if (( upload_file_count == 0 )); then
+    die "release upload payload has no files."
+  fi
+
+  candidate_summary="$(mktemp)"
+  bootstrap_tmp_paths+=("$candidate_summary")
+  local -a candidate_summary_command=(
+    python3 "$attempt_receipt_helper" summarize
+    --bundle-root "$bundle_dir"
+    --canonical-manifest "$bundle_dir/RELEASE_CHANNEL.generated.json"
+    --output "$candidate_summary"
+  )
+  while IFS= read -r -d '' file_path; do
+    candidate_summary_command+=(--file "$file_path")
+  done < <(array_values_nul upload_files)
+  "${candidate_summary_command[@]}"
 
   session_json="$(mktemp)"
+  bootstrap_tmp_paths+=("$session_json")
   if ! post_form_request \
     "$session_json" \
     "create upload session" \
@@ -3429,35 +4386,65 @@ PY
         die "release upload session was rejected with HTTP ${last_request_status}; inspect the staged bundle contract before retrying."
         ;;
     esac
-    if is_true "$fallback_mode"; then
-      local direct_bundle
-      direct_bundle="$(create_temp_zip_path)"
-      if ! upload_release_bundle_direct "$direct_bundle" "$response_path"; then
-        rm -f "$direct_bundle"
-        die "staged and direct upload both failed while creating upload session."
-      fi
-      rm -f "$direct_bundle"
-      return 0
-    fi
     die "release upload session creation failed."
   fi
 
   session_id="$(resolve_json_field "$session_json" "sessionId" "SessionId" "session_id" "id" "session")" || die "upload session response missing sessionId"
-  [[ -n "$session_id" ]] || die "upload session response missing sessionId"
+  [[ "$session_id" =~ ^[0-9a-f]{32}$ ]] \
+    || die "upload session response contains an unsafe sessionId"
 
   files_url="$(resolve_json_field "$session_json" "filesUrl" "files_url" "FilesUrl" "files" || true)"
   chunks_url="$(resolve_json_field "$session_json" "chunksUrl" "chunks_url" "ChunksUrl" "chunks" || true)"
   complete_url="$(resolve_json_field "$session_json" "completeUrl" "complete_url" "CompleteUrl" "complete" || true)"
+  local expires_at
+  expires_at="$(resolve_json_field "$session_json" "expiresAtUtc" "ExpiresAtUtc" "expires_at_utc" "expiresAt" || true)"
 
-  if ! files_url="$(normalize_upload_url "$files_url" "$sessions_url")"; then
-    files_url="${sessions_url}/${session_id}/files"
+  record_upload_attempt_state() {
+    local state="$1"
+    shift
+    python3 "$attempt_receipt_helper" transition \
+      --receipt "$attempt_receipt_path" \
+      --summary "$candidate_summary" \
+      --sessions-url "$sessions_url" \
+      --session-id "$session_id" \
+      --expires-at "$expires_at" \
+      --state "$state" \
+      "$@"
+  }
+
+  if ! record_upload_attempt_state created; then
+    die "upload session $session_id was created, but its durable recovery handoff could not be written; no files were uploaded"
   fi
-  if ! chunks_url="$(normalize_upload_url "$chunks_url" "$sessions_url")"; then
-    chunks_url="${sessions_url}/${session_id}/chunks"
+
+  local expected_files_url expected_chunks_url expected_complete_url
+  expected_files_url="$(normalize_upload_url "${session_id}/files" "$sessions_url")" \
+    || die "upload sessions base URL is invalid"
+  expected_chunks_url="$(normalize_upload_url "${session_id}/chunks" "$sessions_url")" \
+    || die "upload sessions base URL is invalid"
+  expected_complete_url="$(normalize_upload_url "${session_id}/complete" "$sessions_url")" \
+    || die "upload sessions base URL is invalid"
+  if [[ -n "$files_url" ]]; then
+    files_url="$(normalize_upload_url "$files_url" "$sessions_url")" \
+      || die "upload session files URL escaped its same-origin session root"
+  else
+    files_url="$expected_files_url"
   fi
-  if ! complete_url="$(normalize_upload_url "$complete_url" "$sessions_url")"; then
-    complete_url="${sessions_url}/${session_id}/complete"
+  if [[ -n "$chunks_url" ]]; then
+    chunks_url="$(normalize_upload_url "$chunks_url" "$sessions_url")" \
+      || die "upload session chunks URL escaped its same-origin session root"
+  else
+    chunks_url="$expected_chunks_url"
   fi
+  if [[ -n "$complete_url" ]]; then
+    complete_url="$(normalize_upload_url "$complete_url" "$sessions_url")" \
+      || die "upload session completion URL escaped its same-origin session root"
+  else
+    complete_url="$expected_complete_url"
+  fi
+  [[ "$files_url" == "$expected_files_url" \
+      && "$chunks_url" == "$expected_chunks_url" \
+      && "$complete_url" == "$expected_complete_url" ]] \
+    || die "upload session response endpoints do not match the created session"
 
   upload_file() {
     local file_path="$1"
@@ -3474,7 +4461,7 @@ PY
           die "release upload rejected while staging ${relative_path} with HTTP ${last_request_status}; inspect the bundle contract instead of retrying the same payload."
           ;;
         *)
-          use_fallback=1
+          upload_failed=1
           ;;
       esac
     fi
@@ -3495,9 +4482,13 @@ PY
       [[ -n "$chunk_path" ]] || continue
       chunks+=("$chunk_path")
     done < <(find "$chunk_dir" -maxdepth 1 -type f | sort)
-    total="${#chunks[@]}"
+    total="$(array_count chunks)"
+    if (( total == 0 )); then
+      rm -rf "$chunk_dir"
+      die "chunking produced no files for ${relative_path}"
+    fi
     idx=0
-    for chunk_path in "${chunks[@]}"; do
+    while IFS= read -r -d '' chunk_path; do
       if ! post_form_request \
         "" \
         "upload chunk ${idx}/${total} for ${relative_path}" \
@@ -3513,115 +4504,243 @@ PY
             die "release upload rejected while staging ${relative_path} chunk ${idx}/${total} with HTTP ${last_request_status}; inspect the bundle contract instead of retrying the same payload."
             ;;
           *)
-            use_fallback=1
+            upload_failed=1
             ;;
         esac
         break
       fi
       idx=$((idx + 1))
-    done
+    done < <(array_values_nul chunks)
     rm -rf "$chunk_dir"
   }
 
-  collect_upload_files() {
-    local bundle_root="$1"
-    [[ -f "$bundle_root/releases.json" ]] && printf '%s\n' "$bundle_root/releases.json"
-    [[ -f "$bundle_root/RELEASE_CHANNEL.generated.json" ]] && printf '%s\n' "$bundle_root/RELEASE_CHANNEL.generated.json"
-    [[ -f "$bundle_root/release-evidence/public-promotion.json" ]] && printf '%s\n' "$bundle_root/release-evidence/public-promotion.json"
-    if [[ -d "$bundle_root/files" ]]; then
-      find "$bundle_root/files" -type f | sort
-    fi
-    if [[ -d "$bundle_root/startup-smoke" ]]; then
-      find "$bundle_root/startup-smoke" -type f | sort
-    fi
+  file_size_bytes() {
+    wc -c < "$1" | tr -d '[:space:]'
   }
-
-  local -a upload_files=()
-  while IFS= read -r file_path; do
-    [[ -n "$file_path" ]] || continue
-    upload_files+=("$file_path")
-  done < <(collect_upload_files "$bundle_dir")
-  if (( ${#upload_files[@]} == 0 )); then
-    rm -f "$session_json"
-    die "release upload payload has no files."
-  fi
 
   log "staged upload endpoint: ${sessions_url}"
   local file_size_total=0
-  for file_path in "${upload_files[@]}"; do
+  while IFS= read -r -d '' file_path; do
     [[ -n "$file_path" ]] || continue
-    file_size="$(stat -f '%z' "$file_path" 2>/dev/null || stat -c '%s' "$file_path" 2>/dev/null || echo 0)"
+    file_size="$(file_size_bytes "$file_path")"
     if [[ "$file_size" =~ ^[0-9]+$ ]]; then
       file_size_total=$(( file_size_total + file_size ))
     fi
-  done
-  log "staged upload payload: ${#upload_files[@]} files, ${file_size_total} bytes total"
-  for file_path in "${upload_files[@]:0:8}"; do
-    file_size="$(stat -f '%z' "$file_path" 2>/dev/null || stat -c '%s' "$file_path" 2>/dev/null || echo 0)"
+  done < <(array_values_nul upload_files)
+  log "staged upload payload: ${upload_file_count} files, ${file_size_total} bytes total"
+  local preview_index=0
+  while IFS= read -r -d '' file_path; do
+    (( preview_index < 8 )) || break
+    file_size="$(file_size_bytes "$file_path")"
     log "  file: ${file_path#$bundle_dir/} (${file_size} bytes)"
-  done
-  if (( ${#upload_files[@]} > 8 )); then
-    log "  ... and $((${#upload_files[@]} - 8)) additional files"
+    preview_index=$((preview_index + 1))
+  done < <(array_values_nul upload_files)
+  if (( upload_file_count > 8 )); then
+    log "  ... and $((upload_file_count - 8)) additional files"
   fi
 
-  for file_path in "${upload_files[@]}"; do
+  while IFS= read -r -d '' file_path; do
     [[ -n "$file_path" ]] || continue
     relative_path="${file_path#$bundle_dir/}"
-    file_size="$(stat -f '%z' "$file_path" 2>/dev/null || stat -c '%s' "$file_path" 2>/dev/null || echo 0)"
+    file_size="$(file_size_bytes "$file_path")"
     if (( file_size <= direct_limit_bytes )); then
       upload_file "$file_path" "$relative_path"
     else
       upload_chunked_file "$file_path" "$relative_path"
     fi
-  done
+  done < <(array_values_nul upload_files)
 
-  if (( use_fallback == 0 )); then
+  if (( upload_failed == 0 )); then
+    record_upload_attempt_state uploaded
+    record_upload_attempt_state request_started
+    completion_attempted=1
     if ! post_form_request \
       "$response_path" \
       "complete staged upload" \
       "$complete_url" \
+      --no-retry \
       "${request_common[@]}"; then
       case "$last_request_status" in
         400|401|403)
-          die "release upload completion was rejected with HTTP ${last_request_status}; inspect the bundle contract instead of retrying the same payload."
+          die "release upload completion returned HTTP ${last_request_status}; its durable state remains request_started. Do not create another session. Reconcile the recorded handoff at $attempt_receipt_path."
           ;;
         *)
-          use_fallback=1
+          upload_failed=1
           ;;
       esac
     fi
-  fi
-
-  if (( use_fallback == 1 )); then
-    log "upload staged flow failed; using direct multipart fallback."
-    if ! is_true "$fallback_mode"; then
-      rm -f "$session_json"
-      if [[ -f "$response_path" ]]; then
-        die "release upload failed. inspect release upload response at: $response_path"
+    if (( upload_failed == 0 )); then
+      BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED=1
+      python3 "$attempt_receipt_helper" fsync-file --path "$response_path"
+      if ! record_upload_attempt_state completed; then
+        die "release completion returned success, but the durable handoff could not be acknowledged; reconcile session $session_id instead of creating another release"
       fi
-      die "release upload failed. set CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK=1 to try direct upload fallback."
     fi
-    rm -f "$session_json"
-    local direct_bundle
-    direct_bundle="$(create_temp_zip_path)"
-    if ! upload_release_bundle_direct "$direct_bundle" "$response_path"; then
-      rm -f "$direct_bundle"
-      die "both staged and direct upload paths failed."
-    fi
-    rm -f "$direct_bundle"
-    return 0
   fi
 
-  log_release_upload_response "$response_path"
+  if (( upload_failed == 1 )); then
+    rm -f "$session_json"
+    if (( completion_attempted == 1 )); then
+      die "release completion outcome is unknown. Do not create another session. Reconcile the request_started handoff at $attempt_receipt_path."
+    fi
+    if [[ -f "$response_path" ]]; then
+      die "staged release upload failed before completion. inspect the sanitized diagnostic response at: $response_path"
+    fi
+    die "staged release upload failed; reconcile the existing upload session before retrying."
+  fi
+
+  log_release_upload_response "$response_path" || log "release response display was suppressed"
   rm -f "$session_json"
 }
 
+stage_local_release_bundle() {
+  local source_bundle="$1"
+  local output_path="$2"
+  local provenance_verifier="$3"
+  local release_version="$4"
+  local release_channel="$5"
+  local rid="$6"
+  local apps_raw="$7"
+
+  [[ -d "$source_bundle" && ! -L "$source_bundle" ]] \
+    || die "stage-only source bundle must be a real directory: $source_bundle"
+  [[ -f "$provenance_verifier" ]] \
+    || die "stage-only provenance verifier is missing: $provenance_verifier"
+
+  local output_parent output_name staging_dir
+  output_parent="$(dirname "$output_path")"
+  output_name="$(basename "$output_path")"
+  staging_dir="$(mktemp -d "$output_parent/.${output_name}.stage.XXXXXX")" \
+    || die "could not reserve a stage-only output directory beside $output_path"
+
+  if ! (
+    trap 'rm -rf "$staging_dir"' EXIT
+    cp -a "$source_bundle/." "$staging_dir/"
+    mkdir -p "$staging_dir/release-evidence"
+    python3 - \
+      "$staging_dir/release-evidence/mac-stage-only.json" \
+      "$output_path" \
+      "$release_version" \
+      "$release_channel" \
+      "$rid" \
+      "$apps_raw" <<'PY'
+from __future__ import annotations
+
+import datetime as dt
+import json
+import sys
+from pathlib import Path
+
+receipt_path = Path(sys.argv[1])
+payload = {
+    "contractName": "chummer.run.mac_release_stage_only",
+    "status": "pass",
+    "mode": "stage_only",
+    "generatedAt": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+    "outputPath": sys.argv[2],
+    "releaseVersion": sys.argv[3],
+    "releaseChannel": sys.argv[4],
+    "rid": sys.argv[5],
+    "appHeads": [item.strip() for item in sys.argv[6].replace(" ", ",").split(",") if item.strip()],
+    "uploadAttempted": False,
+    "publicationAttempted": False,
+    "publicActivationAttempted": False,
+    "countsAsPublicationEvidence": False,
+}
+receipt_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+    python3 "$provenance_verifier" "$staging_dir"
+    validate_bundle_directory_integrity "$staging_dir"
+    python3 - "$staging_dir" "$output_path" <<'PY'
+from __future__ import annotations
+
+import ctypes
+import errno
+import os
+import sys
+
+source = os.fsencode(sys.argv[1])
+target = os.fsencode(sys.argv[2])
+libc = ctypes.CDLL(None, use_errno=True)
+
+if sys.platform == "darwin":
+    rename_exclusive = getattr(libc, "renamex_np", None)
+    if rename_exclusive is None:
+        raise SystemExit("exclusive atomic rename is unavailable on this macOS host")
+    result = rename_exclusive(source, target, ctypes.c_uint(0x00000004))  # RENAME_EXCL
+elif sys.platform.startswith("linux"):
+    rename_exclusive = getattr(libc, "renameat2", None)
+    if rename_exclusive is None:
+        raise SystemExit("exclusive atomic rename is unavailable on this Linux test host")
+    result = rename_exclusive(-100, source, -100, target, ctypes.c_uint(1))  # RENAME_NOREPLACE
+else:
+    raise SystemExit(f"exclusive atomic rename is unsupported on {sys.platform}")
+
+if result != 0:
+    error = ctypes.get_errno()
+    if error in {errno.EEXIST, errno.ENOTEMPTY}:
+        raise SystemExit("stage-only output path appeared before atomic rename")
+    raise SystemExit(f"stage-only atomic rename failed: {os.strerror(error)}")
+PY
+    trap - EXIT
+  ); then
+    die "stage-only bundle validation or atomic placement failed; no output was published"
+  fi
+
+  log "stage-only local bundle complete; upload/publication/live verification were not attempted"
+  printf 'release_stage_only_path=%s\n' "$output_path"
+}
+
 main() {
+  bootstrap_tmp_paths=()
+  trap cleanup_bootstrap_tmp_paths EXIT
+
+  # Capture the one HTTP-promotion credential before any preflight/build child
+  # can inherit it, then scrub every inbound bearer variable. The private local
+  # remains de-exported and is streamed to curl only when upload actually starts.
+  local release_upload_auth_value=""
+  local release_upload_auth_source=""
+  capture_release_upload_auth_value release_upload_auth_value release_upload_auth_source
+
+  parse_mac_release_stage_only_args "$@"
+  if (( MAC_RELEASE_STAGE_ONLY == 1 )) && [[ -n "$release_upload_auth_source" ]]; then
+    die "stage-only mode rejects publish-only setting $release_upload_auth_source"
+  fi
+
+  local publish_mode
+  if (( MAC_RELEASE_STAGE_ONLY == 1 )); then
+    publish_mode="stage-only"
+    release_upload_auth_value=""
+  else
+    local has_release_upload_auth=0
+    [[ -n "$release_upload_auth_value" ]] && has_release_upload_auth=1
+    publish_mode="$(infer_publish_mode "$has_release_upload_auth")"
+    if [[ "$publish_mode" == "http" && -z "$release_upload_auth_value" ]]; then
+      prompt_for_release_upload_ticket release_upload_auth_value \
+        || die "set CHUMMER_RELEASE_UPLOAD_TICKET or CHUMMER_RELEASE_UPLOAD_TOKEN for HTTP release promotion"
+    fi
+    if [[ "$publish_mode" == "http" ]]; then
+      ensure_release_upload_token "$release_upload_auth_value"
+    else
+      release_upload_auth_value=""
+    fi
+  fi
+
+  require_all_reviewed_commit_pins
+  require_cmd python3
+  local stage_output_path=""
+  if (( MAC_RELEASE_STAGE_ONLY == 1 )); then
+    stage_output_path="$(resolve_mac_release_stage_output_path "$MAC_RELEASE_STAGE_OUTPUT_DIR")" \
+      || die "invalid stage-only output path: $MAC_RELEASE_STAGE_OUTPUT_DIR"
+    log "stage-only mode enabled; local output will be placed at $stage_output_path"
+  fi
+  local executed_bootstrap_path
+  executed_bootstrap_path="$(resolve_executed_bootstrap_path)" \
+    || die "executed bootstrap must be available as a regular file before release work begins"
   require_cmd git
   ensure_dotnet_resolver
-  require_cmd python3
-  log_bootstrap_identity
-  verify_bootstrap_integrity
+  log_bootstrap_identity "$executed_bootstrap_path"
+  verify_bootstrap_integrity "$executed_bootstrap_path"
   require_cmd jq
   require_cmd curl
   require_cmd hdiutil
@@ -3650,11 +4769,9 @@ main() {
   local minimum_free_gib="${CHUMMER_MAC_RELEASE_MIN_FREE_GIB:-20}"
   local packaging_minimum_free_gib="${CHUMMER_MAC_RELEASE_PACKAGING_MIN_FREE_GIB:-8}"
   local temp_root="${CHUMMER_MAC_RELEASE_TMPDIR:-$work_root/tmp}"
-  local publish_mode
-  publish_mode="$(infer_publish_mode)"
   local verify_url="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-https://chummer.run/downloads/RELEASE_CHANNEL.generated.json}"
   local require_compatibility_projection="${CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION:-0}"
-  local upload_url="${CHUMMER_RELEASE_UPLOAD_URL:-https://chummer.run/api/internal/releases/bundles}"
+  local sessions_url="${CHUMMER_RELEASE_UPLOAD_SESSIONS_URL:-https://chummer.run/api/internal/releases/upload-sessions}"
   local materializer_skip_startup_smoke_filter="${CHUMMER_MATERIALIZE_SKIP_STARTUP_SMOKE_FILTER:-0}"
   local materializer_retry_without_filter="${CHUMMER_MATERIALIZE_RETRY_WITHOUT_STARTUP_SMOKE_FILTER_ON_ZERO:-}"
   if [[ -z "$materializer_retry_without_filter" ]]; then
@@ -3670,21 +4787,24 @@ main() {
   if is_true "$materializer_retry_without_filter"; then
     log "manifest retry without startup-smoke filter is enabled on zero-manifest projection"
   fi
-  validate_publish_mode "$publish_mode" "$upload_url"
-  local compatibility_verify_url canonical_verify_url
-  IFS='|' read -r compatibility_verify_url canonical_verify_url < <(resolve_live_release_verify_urls "$verify_url")
-  local release_upload_curl_config=""
-  if [[ "$publish_mode" == "http" ]]; then
-    release_upload_curl_config="$(mktemp)"
-    chmod 600 "$release_upload_curl_config"
-    bootstrap_tmp_paths+=("$release_upload_curl_config")
-    write_release_upload_curl_config "$release_upload_curl_config"
+  local compatibility_verify_url=""
+  local canonical_verify_url=""
+  if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
+    validate_publish_mode "$publish_mode" "$sessions_url" "$release_upload_auth_value"
+    IFS='|' read -r compatibility_verify_url canonical_verify_url < <(resolve_live_release_verify_urls "$verify_url")
+    log "preflighting live canonical supportability contract at $canonical_verify_url"
+    verify_live_canonical_supportability_preflight "$canonical_verify_url"
   fi
 
   local sign_identity="${CHUMMER_APP_SIGN_IDENTITY:-}"
   local notary_profile="${CHUMMER_NOTARY_PROFILE:-}"
   local require_signed_release=1
-  if [[ -z "$sign_identity" || -z "$notary_profile" ]]; then
+  if (( MAC_RELEASE_STAGE_ONLY == 1 )); then
+    [[ "$release_channel" == "preview" ]] \
+      || die "stage-only mode is limited to the unsigned preview channel"
+    require_signed_release=0
+    log "stage-only preview will not sign, notarize, upload, publish, or verify live surfaces"
+  elif [[ -z "$sign_identity" || -z "$notary_profile" ]]; then
     if is_true "$allow_unsigned_preview" && [[ "$release_channel" == "preview" ]]; then
       require_signed_release=0
       log "Apple release credentials missing; continuing with unsigned preview upload."
@@ -3750,22 +4870,6 @@ main() {
   ensure_link_target "$registry_alias" "$complete_alias_root/chummer-hub-registry"
   ensure_link_target "$ui_repo" "$complete_alias_root/chummer6-ui"
 
-  local -a bootstrap_tmp_paths=()
-  cleanup_bootstrap_tmp_paths() {
-    local path
-    for path in "${bootstrap_tmp_paths[@]}"; do
-      [[ -f "$path" ]] && rm -f "$path"
-    done
-
-    if [[ "${BOOTSTRAP_KEEP_UPLOAD_RESPONSE:-0}" != "1" ]] \
-      && [[ -n "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH:-}" ]] \
-      && [[ -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" ]]; then
-      chmod 600 "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" 2>/dev/null || true
-      rm -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}"
-    fi
-  }
-  trap cleanup_bootstrap_tmp_paths EXIT
-
   local requested_release_proof="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}}}"
   local requested_ui_localization_release_gate="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_FILE:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}}}"
   local fallback_release_proof_url="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}"
@@ -3805,7 +4909,8 @@ main() {
       "$hub_repo" \
       "$release_proof_path" \
       "$release_proof_max_age_seconds" \
-      "$release_proof_max_future_skew_seconds"
+      "$release_proof_max_future_skew_seconds" \
+      "${registry_alias}/scripts/materialize_public_release_channel.py"
     log "generated fresh hub local release proof at $release_proof_path"
   fi
 
@@ -3830,6 +4935,7 @@ main() {
       "$localization_gate_max_age_seconds" \
       "$localization_gate_max_future_skew_seconds" \
       "$complete_alias_root/chummer6-ui")"
+    bootstrap_tmp_paths+=("$ui_localization_release_gate_path")
     log "generated fresh ui localization release gate at $ui_localization_release_gate_path"
   fi
 
@@ -3861,7 +4967,8 @@ main() {
       "$hub_repo" \
       "$regenerated_release_proof_path" \
       "$release_proof_max_age_seconds" \
-      "$release_proof_max_future_skew_seconds"
+      "$release_proof_max_future_skew_seconds" \
+      "$materializer_path"
     sanitize_release_proof_payload "$regenerated_release_proof_path" "$sanitized_release_proof_path"
     release_proof_path="$sanitized_release_proof_path"
 
@@ -3875,6 +4982,7 @@ main() {
         "$localization_gate_max_age_seconds" \
         "$localization_gate_max_future_skew_seconds" \
         "$complete_alias_root/chummer6-ui")"
+      bootstrap_tmp_paths+=("$ui_localization_release_gate_path")
       sanitize_ui_localization_release_gate_payload "$ui_localization_release_gate_path" "$sanitized_ui_localization_release_gate_path"
       ui_localization_release_gate_path="$sanitized_ui_localization_release_gate_path"
 
@@ -3903,19 +5011,19 @@ main() {
   local -a app_heads=()
   local raw_head
   IFS=',' read -r -a raw_heads <<< "$normalized_apps_csv"
-  for raw_head in "${raw_heads[@]}"; do
+  while IFS= read -r -d '' raw_head; do
     [[ -n "$raw_head" ]] || continue
     case "$raw_head" in
       all)
-        if [[ "${#app_heads[@]}" -eq 0 ]] || ! append_unique_value "avalonia" "${app_heads[@]}"; then
+        if ! array_contains_value app_heads "avalonia"; then
           app_heads+=("avalonia")
         fi
-        if [[ "${#app_heads[@]}" -eq 0 ]] || ! append_unique_value "blazor-desktop" "${app_heads[@]}"; then
+        if ! array_contains_value app_heads "blazor-desktop"; then
           app_heads+=("blazor-desktop")
         fi
         ;;
       avalonia|blazor-desktop)
-        if [[ "${#app_heads[@]}" -eq 0 ]] || ! append_unique_value "$raw_head" "${app_heads[@]}"; then
+        if ! array_contains_value app_heads "$raw_head"; then
           app_heads+=("$raw_head")
         fi
         ;;
@@ -3923,9 +5031,9 @@ main() {
         die "unsupported app head: $raw_head"
         ;;
     esac
-  done
+  done < <(array_values_nul raw_heads)
 
-  [[ "${#app_heads[@]}" -gt 0 ]] || die "no app heads requested"
+  (( $(array_count app_heads) > 0 )) || die "no app heads requested"
 
   export CHUMMER_LOCAL_CONTRACTS_PROJECT="$core_alias/Chummer.Contracts/Chummer.Contracts.csproj"
   export CHUMMER_LOCAL_CAMPAIGN_CONTRACTS_PROJECT="$hub_alias/Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj"
@@ -3945,9 +5053,26 @@ main() {
   BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH="$response_path"
   BOOTSTRAP_KEEP_UPLOAD_RESPONSE="$keep_upload_response"
   rm -rf "$out_root" "$dist_dir"
-  mkdir -p "$smoke_dir" "$dist_dir/files" "$release_evidence_dir"
+  mkdir -p \
+    "$smoke_dir" \
+    "$dist_dir/files" \
+    "$release_evidence_dir" \
+    "$dist_dir/proof/build-provenance/v1/invocations" \
+    "$dist_dir/proof/build-provenance/v1/sbom" \
+    "$dist_dir/.build-provenance-state"
 
-  local head project launch_target artifact_kind out_dir dmg_path tar_path
+  local provenance_generator="$hub_alias/scripts/release/materialize_build_provenance.py"
+  local provenance_support="$hub_alias/scripts/release/build_provenance_support.py"
+  local provenance_invocation_dir="$ui_repo/$dist_dir/proof/build-provenance/v1/invocations"
+  local provenance_sbom_dir="$ui_repo/$dist_dir/proof/build-provenance/v1/sbom"
+  local provenance_state_dir="$ui_repo/$dist_dir/.build-provenance-state"
+  [[ -f "$provenance_generator" ]] || die "portable build provenance generator is missing: $provenance_generator"
+  [[ -f "$provenance_support" ]] || die "portable build provenance support is missing: $provenance_support"
+
+  local head project launch_target artifact_kind out_dir dmg_path tar_path promoted_tar_path
+  local provenance_target_id installer_artifact_id archive_artifact_id
+  local installer_invocation_id archive_invocation_id
+  local installer_state_path archive_state_path installer_receipt_path archive_receipt_path sbom_path
   local published_at
   published_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   log "building heads: ${app_heads[*]}"
@@ -3967,6 +5092,60 @@ main() {
       -p:ChummerLocalRunContractsProject="$CHUMMER_LOCAL_RUN_CONTRACTS_PROJECT" \
       -p:ChummerLocalHubRegistryContractsProject="$CHUMMER_LOCAL_HUB_REGISTRY_CONTRACTS_PROJECT" \
       -p:ChummerLocalUiKitProject="$CHUMMER_LOCAL_UI_KIT_PROJECT"
+
+    provenance_target_id="$(resolve_head_provenance_target_id "$head")" \
+      || die "unsupported provenance target for app head: $head"
+    installer_artifact_id="$head-$rid-installer"
+    archive_artifact_id="$head-$rid-archive"
+    installer_invocation_id="$release_version.$head.$rid.installer"
+    archive_invocation_id="$release_version.$head.$rid.archive"
+    installer_state_path="$provenance_state_dir/$installer_invocation_id.state.json"
+    archive_state_path="$provenance_state_dir/$archive_invocation_id.state.json"
+    installer_receipt_path="$provenance_invocation_dir/$installer_invocation_id.json"
+    archive_receipt_path="$provenance_invocation_dir/$archive_invocation_id.json"
+    sbom_path="$provenance_sbom_dir/$provenance_target_id.cdx.json"
+
+    log "declaring build provenance subjects before publish for $head"
+    begin_mac_file_build_provenance \
+      "$provenance_generator" \
+      "$provenance_support" \
+      "$ui_repo" \
+      "$core_alias" \
+      "$hub_alias" \
+      "$ui_kit_alias" \
+      "$registry_alias" \
+      "$media_repo" \
+      "$legacy_alias" \
+      "$project" \
+      "$provenance_target_id" \
+      "$installer_artifact_id" \
+      "chummer-$head-$rid-installer.dmg" \
+      "$ui_repo/$dist_dir/files/chummer-$head-$rid-installer.dmg" \
+      "$installer_invocation_id" \
+      "$installer_state_path" \
+      "$installer_receipt_path" \
+      "$sbom_path" \
+      "$executed_bootstrap_path"
+    begin_mac_file_build_provenance \
+      "$provenance_generator" \
+      "$provenance_support" \
+      "$ui_repo" \
+      "$core_alias" \
+      "$hub_alias" \
+      "$ui_kit_alias" \
+      "$registry_alias" \
+      "$media_repo" \
+      "$legacy_alias" \
+      "$project" \
+      "$provenance_target_id" \
+      "$archive_artifact_id" \
+      "chummer-$head-$rid.tar.gz" \
+      "$ui_repo/$dist_dir/files/chummer-$head-$rid.tar.gz" \
+      "$archive_invocation_id" \
+      "$archive_state_path" \
+      "$archive_receipt_path" \
+      "$sbom_path" \
+      "$executed_bootstrap_path"
 
     log "publishing $project"
     dotnet publish "$project" \
@@ -4004,11 +5183,9 @@ main() {
     dmg_path="$dist_dir/chummer-$head-$rid-installer.dmg"
     [[ -f "$dmg_path" ]] || die "dmg not produced: $dmg_path"
     tar_path="$dist_dir/chummer-$head-$rid.tar.gz"
-    if [[ -f "$tar_path" ]]; then
-      mv "$tar_path" "$dist_dir/files/"
-    else
-      log "warning: tar archive not produced for $head: $tar_path"
-    fi
+    [[ -f "$tar_path" ]] || die "tar archive not produced for $head: $tar_path"
+    promoted_tar_path="$dist_dir/files/$(basename "$tar_path")"
+    mv "$tar_path" "$promoted_tar_path"
 
     if [[ "$artifact_kind" != "dmg" ]]; then
       die "unsupported artifact kind for mac bootstrap: $artifact_kind"
@@ -4082,6 +5259,20 @@ main() {
       "$promoted_dmg_path" \
       "$head" \
       "$rid"
+
+    [[ -f "$promoted_dmg_path" ]] || die "final dmg bytes are missing before provenance finalization: $promoted_dmg_path"
+    [[ -f "$promoted_tar_path" ]] || die "final archive bytes are missing before provenance finalization: $promoted_tar_path"
+    log "finalizing build provenance against final dist/files bytes for $head"
+    finalize_mac_file_build_provenance \
+      "$provenance_generator" \
+      "$installer_invocation_id" \
+      "$installer_state_path" \
+      "$installer_receipt_path"
+    finalize_mac_file_build_provenance \
+      "$provenance_generator" \
+      "$archive_invocation_id" \
+      "$archive_state_path" \
+      "$archive_receipt_path"
   done
 
   log "generating release manifests"
@@ -4240,6 +5431,8 @@ main() {
     fi
   fi
 
+  log "validating governed build provenance against final release bytes"
+  python3 "$hub_alias/scripts/release/verify_release_build_provenance_bundle.py" "$ui_repo/$dist_dir"
   validate_bundle_directory_integrity "$dist_dir"
   ensure_publish_bundle_startup_smoke_receipts "$dist_dir" "$publish_bundle_dir"
   write_release_upload_payload_summary "$dist_dir"
@@ -4247,16 +5440,30 @@ main() {
   log_bundle_manifest_summary "$dist_dir"
 
   create_minimal_promotion_bundle "$dist_dir" "$publish_bundle_dir"
+  python3 "$hub_alias/scripts/release/verify_release_build_provenance_bundle.py" "$ui_repo/$publish_bundle_dir"
   validate_bundle_directory_integrity "$publish_bundle_dir"
+
+  if (( MAC_RELEASE_STAGE_ONLY == 1 )); then
+    stage_local_release_bundle \
+      "$ui_repo/$publish_bundle_dir" \
+      "$stage_output_path" \
+      "$hub_alias/scripts/release/verify_release_build_provenance_bundle.py" \
+      "$release_version" \
+      "$release_channel" \
+      "$rid" \
+      "$apps_raw"
+    return 0
+  fi
 
   case "$publish_mode" in
     http)
       log "uploading release bundle via staged HTTP session"
       upload_release_bundle_http \
         "$publish_bundle_dir" \
-        "$upload_url" \
-        "$release_upload_curl_config" \
-        "$response_path"
+        "$sessions_url" \
+        "$release_upload_auth_value" \
+        "$response_path" \
+        "$hub_alias/scripts/release/release_upload_attempt_receipt.py"
       ;;
     filesystem)
       local remote_stage="${CHUMMER_REMOTE_STAGING_DIR:-/tmp/chummer-mac-release-bundle}"
@@ -4289,27 +5496,19 @@ main() {
 
   if [[ -f "$response_path" ]]; then
     chmod 600 "$response_path" 2>/dev/null || true
-    log "public downloads url: $(jq -r '.downloadsUrl // empty' "$response_path")"
-    jq -r '.installDispatchUrls[]? | "install handoff: " + .' "$response_path"
-    jq -r '.directFileUrls[]? | "direct file: " + .' "$response_path"
-    if is_true "${CHUMMER_RELEASE_PRINT_SIGNED_INSTALL_CLAIMS:-0}"; then
-      jq -r '.signedInInstallClaims[]? | "claim code: " + .artifactId + " -> " + .claimCode + " (dispatch: " + .installDispatchUrl + ")"' "$response_path"
-    else
-      jq -r '.signedInInstallClaims[]? | "signed-in install claim recorded for " + .artifactId + " (dispatch: " + .installDispatchUrl + ")"' "$response_path"
-      if jq -e '.signedInInstallClaims | length > 0' "$response_path" >/dev/null 2>&1; then
-        log "claim codes are stored in $response_path; rerun with CHUMMER_RELEASE_PRINT_SIGNED_INSTALL_CLAIMS=1 to print them."
-      fi
-    fi
+    log "sanitized release upload response summary accepted; credential-bearing fields were discarded before persistence"
     if is_true "$keep_upload_response"; then
-      log "sensitive release upload response retained at $response_path"
+      log "sanitized release upload response summary retained at $response_path"
     else
       rm -f "$response_path"
       BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH=""
-      log "removed sensitive release upload response file; set CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE=1 to retain it."
+      log "removed sanitized release upload response summary; set CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE=1 to retain it."
     fi
   fi
 
   log "done"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

@@ -233,6 +233,9 @@ public sealed class ParticipationOperatorNotificationService
         string normalizedIntentKind = AccountService.NormalizeRequired(intentKind, nameof(intentKind)).Trim().ToLowerInvariant();
         string normalizedEmail = AccountService.NormalizeOptional(email) ?? AccountService.NormalizeOptional(user.Email) ?? string.Empty;
         DateTimeOffset now = DateTimeOffset.UtcNow;
+        string notifyChannel = ResolveOperatorNotifyChannel();
+        string recipient = ResolveOperatorRecipient(notifyChannel);
+        (string Status, string Summary, string FailureReason)? suppressedOutcome = ResolveSuppressedOutcome(notifyChannel, recipient);
         ParticipationOperatorNotificationReceipt pendingReceipt;
 
         lock (_store.Gate)
@@ -244,6 +247,40 @@ public sealed class ParticipationOperatorNotificationService
                 if (!CanRetryExistingReceipt(existing))
                 {
                     return existing;
+                }
+
+                if (suppressedOutcome is { } existingSuppressedOutcome)
+                {
+                    if (string.Equals(existing.Status, existingSuppressedOutcome.Status, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(existing.FailureReason, existingSuppressedOutcome.FailureReason, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return existing;
+                    }
+
+                    var suppressedRetry = existing with
+                    {
+                        Status = existingSuppressedOutcome.Status,
+                        DeliveryRef = null,
+                        Summary = existingSuppressedOutcome.Summary,
+                        FailureReason = existingSuppressedOutcome.FailureReason,
+                        AttemptedAtUtc = now,
+                        Envelope = ReceiptEnvelopeFactory.Runtime(
+                            receiptKind: "participation_operator_notification",
+                            ownerScope: "community.participation",
+                            exposureClass: ReceiptExposureClasses.Internal,
+                            evidenceRef: existing.EventKey,
+                            reviewState: existingSuppressedOutcome.Status),
+                    };
+
+                    int suppressedIndex = _store.ParticipationNotificationReceipts.FindIndex(item =>
+                        string.Equals(item.ReceiptId, existing.ReceiptId, StringComparison.OrdinalIgnoreCase));
+                    if (suppressedIndex >= 0)
+                    {
+                        _store.ParticipationNotificationReceipts[suppressedIndex] = suppressedRetry;
+                        _store.PersistLocked();
+                    }
+
+                    return suppressedRetry;
                 }
 
                 pendingReceipt = existing with
@@ -298,6 +335,29 @@ public sealed class ParticipationOperatorNotificationService
                 return limitedReceipt;
             }
 
+            if (suppressedOutcome is { } initialSuppressedOutcome)
+            {
+                var suppressedReceipt = BuildReceipt(
+                    user,
+                    normalizedEmail,
+                    eventType,
+                    eventKey,
+                    normalizedIntentKind,
+                    normalizedEntryRoute,
+                    normalizedAuthProvider,
+                    status: initialSuppressedOutcome.Status,
+                    isFirstParticipationEvent,
+                    occurredAtUtc: now,
+                    attemptedAtUtc: now,
+                    deliveryRef: null,
+                    summary: initialSuppressedOutcome.Summary,
+                    failureReason: initialSuppressedOutcome.FailureReason,
+                    rateLimitBucket);
+                _store.ParticipationNotificationReceipts.Add(suppressedReceipt);
+                _store.PersistLocked();
+                return suppressedReceipt;
+            }
+
             pendingReceipt = BuildReceipt(
                 user,
                 normalizedEmail,
@@ -321,33 +381,6 @@ public sealed class ParticipationOperatorNotificationService
 DispatchPendingReceipt:
         try
         {
-            if (!NotificationsEnabled())
-            {
-                return FinalizeReceipt(pendingReceipt, "suppressed_disabled", null, "Operator participation notifications are disabled on this runtime.", "notifications_disabled");
-            }
-
-            string notifyChannel = ResolveOperatorNotifyChannel();
-            string recipient = ResolveOperatorRecipient(notifyChannel);
-            if (string.IsNullOrWhiteSpace(recipient))
-            {
-                return FinalizeReceipt(pendingReceipt, "suppressed_recipient_missing", null, "No operator recipient is configured for participant notifications on this runtime.", "recipient_missing");
-            }
-
-            if (!EaDispatchConfigured(notifyChannel))
-            {
-                return FinalizeReceipt(pendingReceipt, "suppressed_adapter_unconfigured", null, "The EA dispatch adapter is not configured on this runtime, so the participant event stayed as a first-party receipt only.", "ea_dispatch_unconfigured");
-            }
-
-            if (!IsSupportedNotifyChannel(notifyChannel))
-            {
-                return FinalizeReceipt(
-                    pendingReceipt,
-                    "suppressed_adapter_unconfigured",
-                    null,
-                    $"Operator notification channel '{notifyChannel}' is not supported.",
-                    "unsupported_notify_channel");
-            }
-
             string deliveryRef = await SendToEaAsync(pendingReceipt, recipient, notifyChannel, cancellationToken);
             return FinalizeReceipt(pendingReceipt, "sent", deliveryRef, "The participant event was queued to the internal EA delivery bridge.", null);
         }
@@ -396,6 +429,43 @@ DispatchPendingReceipt:
         }
 
         return finalized;
+    }
+
+    private (string Status, string Summary, string FailureReason)? ResolveSuppressedOutcome(string notifyChannel, string recipient)
+    {
+        if (!NotificationsEnabled())
+        {
+            return (
+                "suppressed_disabled",
+                "Operator participation notifications are disabled on this runtime.",
+                "notifications_disabled");
+        }
+
+        if (string.IsNullOrWhiteSpace(recipient))
+        {
+            return (
+                "suppressed_recipient_missing",
+                "No operator recipient is configured for participant notifications on this runtime.",
+                "recipient_missing");
+        }
+
+        if (!EaDispatchConfigured(notifyChannel))
+        {
+            return (
+                "suppressed_adapter_unconfigured",
+                "The EA dispatch adapter is not configured on this runtime, so the participant event stayed as a first-party receipt only.",
+                "ea_dispatch_unconfigured");
+        }
+
+        if (!IsSupportedNotifyChannel(notifyChannel))
+        {
+            return (
+                "suppressed_adapter_unconfigured",
+                $"Operator notification channel '{notifyChannel}' is not supported.",
+                "unsupported_notify_channel");
+        }
+
+        return null;
     }
 
     private ParticipationOperatorNotificationReceipt BuildReceipt(

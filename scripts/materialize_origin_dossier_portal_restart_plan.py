@@ -64,20 +64,25 @@ def materialize(
     preflight_restart_required = preflight_payload.get("restartRequiredForExistingContainer") is True
     preflight_status = str(preflight_payload.get("status") or "")
     compose_configured = compose_has_index(compose_file, expected_index)
+    restart_not_required = preflight_path.is_file() and preflight_status == "pass" and not preflight_restart_required
     safe_to_prepare = preflight_restart_required and compose_configured
     blockers: list[str] = []
-    if not preflight_path.is_file():
-        blockers.append("portal_publication_index_preflight_missing")
-    if preflight_status != "blocked":
-        blockers.append("portal_preflight_not_in_restart_required_blocked_state")
-    if not preflight_restart_required:
-        blockers.append("portal_preflight_restart_required_not_true")
-    if not compose_configured:
-        blockers.append("compose_publication_index_env_missing")
+    if not restart_not_required:
+        if not preflight_path.is_file():
+            blockers.append("portal_publication_index_preflight_missing")
+        if preflight_status != "blocked":
+            blockers.append("portal_preflight_not_in_restart_required_blocked_state")
+        if not preflight_restart_required:
+            blockers.append("portal_preflight_restart_required_not_true")
+        if not compose_configured:
+            blockers.append("compose_publication_index_env_missing")
 
     approval_gate = "explicit_user_deploy_or_restart_approval_required"
+    local_status_receipt = branch_path / "public-edge-downloads-version-marker.receipt.json"
     restart_commands = [
         "docker compose -f docker-compose.public-edge.yml up -d --no-deps --force-recreate chummer-portal",
+        "python3 scripts/verify_downloads_version_marker.py --base-url http://127.0.0.1:8091 --output "
+        f"{local_status_receipt.as_posix()}",
         "python3 scripts/materialize_origin_dossier_portal_publication_index_preflight.py --output "
         f"{(branch_path / 'portal-publication-index-preflight.receipt.json').as_posix()} "
         "--host-state-root /var/lib/docker/volumes/chummer6-hub_chummer-run-api-state/_data",
@@ -91,10 +96,10 @@ def materialize(
         "contractName": CONTRACT_NAME,
         "generatedAtUtc": now_iso(),
         "updated_at": now_iso(),
-        "status": "awaiting_explicit_restart_approval" if safe_to_prepare else "blocked",
+        "status": "not_required" if restart_not_required else "awaiting_explicit_restart_approval" if safe_to_prepare else "blocked",
         "goalCompletionClaimAllowed": False,
         "deploymentPerformed": False,
-        "approvalGate": approval_gate,
+        "approvalGate": "" if restart_not_required else approval_gate,
         "safeToExecuteAfterApproval": safe_to_prepare,
         "expectedContainerPublicationIndex": expected_index,
         "preflight": {
@@ -110,19 +115,22 @@ def materialize(
             "publicationIndexConfigured": compose_configured,
         },
         "restartCommands": restart_commands,
-        "postRestartVerificationRequired": True,
+        "postRestartVerificationRequired": not restart_not_required,
         "postRestartRequiredEvidence": [
+            "local_public_edge_downloads_version_marker_status_pass",
             "portal_publication_index_preflight_status_pass",
             "deployed_browser_probe_status_pass",
             "origin_gold_proof_chain_status_pass",
             "final_verdict_gold_ready",
         ],
         "next_action": (
-            "Await explicit deploy/restart approval, then run restartCommands exactly once and rerun strict Gold verification."
+            "Restart not required; portal publication index is already active in the running container."
+            if restart_not_required
+            else "Await explicit deploy/restart approval, then run restartCommands exactly once and rerun strict Gold verification."
             if safe_to_prepare
             else "Resolve restart-plan blockers before requesting restart approval."
         ),
-        "blocking_reason": "" if safe_to_prepare else ",".join(blockers),
+        "blocking_reason": "" if restart_not_required or safe_to_prepare else ",".join(blockers),
         "blockers": blockers,
         "privacy": {
             "rawCredentialExposed": False,

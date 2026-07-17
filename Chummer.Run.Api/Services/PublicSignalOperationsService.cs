@@ -2608,9 +2608,39 @@ public sealed class PublicSignalOperationsService
                 return;
             }
 
-            string snapshotJson = File.ReadAllText(_storagePath);
-            ProductLiftWebhookReceiptSnapshot snapshot = JsonSerializer.Deserialize<ProductLiftWebhookReceiptSnapshot>(snapshotJson, JsonOptions)
-                ?? throw new InvalidOperationException($"Unable to deserialize ProductLift webhook receipt snapshot: {_storagePath}");
+            string snapshotJson;
+            try
+            {
+                snapshotJson = File.ReadAllText(_storagePath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogError(ex, "PublicSignalOperationsService could not read the stored ProductLift webhook receipts at {StoragePath}; starting with an empty receipt set.", _storagePath);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(snapshotJson))
+            {
+                _logger.LogWarning("PublicSignalOperationsService found an empty ProductLift webhook receipt snapshot at {StoragePath}; starting with an empty receipt set.", _storagePath);
+                return;
+            }
+
+            ProductLiftWebhookReceiptSnapshot? snapshot;
+            try
+            {
+                snapshot = JsonSerializer.Deserialize<ProductLiftWebhookReceiptSnapshot>(snapshotJson, JsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "PublicSignalOperationsService found an invalid ProductLift webhook receipt snapshot at {StoragePath}; starting with an empty receipt set.", _storagePath);
+                return;
+            }
+
+            if (snapshot is null)
+            {
+                _logger.LogWarning("PublicSignalOperationsService found a null ProductLift webhook receipt snapshot at {StoragePath}; starting with an empty receipt set.", _storagePath);
+                return;
+            }
 
             ApplySnapshotLocked(snapshot);
             _logger.LogInformation(

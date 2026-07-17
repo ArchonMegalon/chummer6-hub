@@ -1,0 +1,52 @@
+{
+  "id": "/mobile/player",
+  "name": "Chummer Player Companion",
+  "short_name": "Chummer Player",
+  "description": "Installable public player shell. Live table access requires a signed-in identity and trusted invitation.",
+  "start_url": "/mobile/player",
+  "scope": "/mobile/",
+  "display": "standalone",
+  "background_color": "#0f1b26",
+  "theme_color": "#0f1b26",
+  "orientation": "any",
+  "shortcuts": [
+    {
+      "name": "Open Player Companion",
+      "short_name": "Player",
+      "description": "Open the public player install shell.",
+      "url": "/mobile/player"
+    },
+    {
+      "name": "Switch to GM Companion",
+      "short_name": "GM",
+      "description": "Open the public GM install shell. This shortcut grants no GM authority.",
+      "url": "/mobile/gm"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

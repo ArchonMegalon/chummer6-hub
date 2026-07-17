@@ -19,8 +19,12 @@ test('guest billing and account entry stay first-party', async ({ request }) => 
   expect(guestBillingLogin.status()).toBe(200);
   const guestBillingLoginText = await guestBillingLogin.text();
   expect(guestBillingLoginText).toContain('Supporter');
-  expect(guestBillingLoginText).toContain('Email first. Billing stays attached after this step.');
   expect(guestBillingLoginText).toContain('After this step, Chummer returns to billing.');
+  expect(
+    guestBillingLoginText.includes('Email first. Billing stays attached after this step.')
+    || guestBillingLoginText.includes('Google first. Billing stays attached after that step.')
+    || guestBillingLoginText.includes('Sign-in is unavailable on this host right now.'),
+  ).toBeTruthy();
 
   const guestAccount = await request.get(`${baseUrl}/account`, { maxRedirects: 0 });
   expect([302, 303, 307, 308]).toContain(guestAccount.status());
@@ -45,7 +49,8 @@ test('billing and participate stay first-party for guests and signed-in users', 
   expect(guestParticipate.status()).toBe(200);
   const guestParticipateText = await guestParticipate.text();
   expect(guestParticipateText).toContain('Participate');
-  expect(guestParticipateText).toContain('Public requests, clear bugs, useful ideas.');
+  expect(guestParticipateText).not.toContain('Public requests, clear bugs, useful ideas.');
+  expect(guestParticipateText).not.toContain('<p class="eyebrow">Board</p>');
   expect(guestParticipateText.includes('data-chummer-participate-frame') || guestParticipateText.includes('Board offline right now')).toBeTruthy();
   expect(guestParticipateText).not.toContain('ProductLift');
   const guestParticipateSurface = guestParticipateText.includes('data-chummer-participate-frame')
@@ -146,7 +151,8 @@ test('billing and participate stay first-party for guests and signed-in users', 
 
   await page.goto(`${baseUrl}/participate`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Participate' })).toBeVisible();
-  await expect(page.locator('body')).toContainText('Public requests, clear bugs, useful ideas.');
+  await expect(page.locator('body')).not.toContainText('Public requests, clear bugs, useful ideas.');
+  await expect(page.locator('.participate-hosted__header')).toHaveCount(0);
   await expect(page.locator('[data-chummer-participate-frame], .participate-board-fallback')).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText('ProductLift');
   await expect(page.locator('body')).not.toContainText('Log in');

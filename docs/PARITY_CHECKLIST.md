@@ -17,9 +17,9 @@ Generated automatically from the parity oracle and current contracts catalogs.
 
 | Surface | Legacy IDs | Covered | Missing In Catalog | Catalog Only |
 | --- | ---: | ---: | ---: | ---: |
-| Tabs | 17 | 17 | 0 | 2 |
-| Workspace Actions | 47 | 47 | 0 | 2 |
-| Desktop Controls | 29 | 29 | 0 | 44 |
+| Tabs | 17 | 17 | 0 | 5 |
+| Workspace Actions | 47 | 47 | 0 | 9 |
+| Desktop Controls | 29 | 29 | 0 | 57 |
 
 ## Tabs Coverage
 
@@ -43,7 +43,10 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `tab-technomancer` | covered |
 | `tab-vehicles` | covered |
 | `tab-create` | catalog_only_acknowledged |
+| `tab-karma` | catalog_only_acknowledged |
+| `tab-relationships` | catalog_only_acknowledged |
 | `tab-rules` | catalog_only_acknowledged |
+| `tab-streetgear` | catalog_only_acknowledged |
 
 ## Workspace Actions Coverage
 
@@ -97,7 +100,14 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `weaponlocations` | covered |
 | `weapons` | covered |
 | `build-lab` | catalog_only_acknowledged |
+| `conditionmonitor` | catalog_only_acknowledged |
 | `data_exporter` | catalog_only_acknowledged |
+| `enemies` | catalog_only_acknowledged |
+| `karmasummary` | catalog_only_acknowledged |
+| `pets` | catalog_only_acknowledged |
+| `relationships` | catalog_only_acknowledged |
+| `spelldefense` | catalog_only_acknowledged |
+| `sprites` | catalog_only_acknowledged |
 
 ## Desktop Controls Coverage
 
@@ -151,12 +161,19 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `export_character` | present_in_dialog_factory_acknowledged |
 | `global_settings` | present_in_dialog_factory_acknowledged |
 | `hero_lab_importer` | present_in_dialog_factory_acknowledged |
+| `identity_license_add` | present_in_dialog_factory_acknowledged |
+| `identity_license_delete` | present_in_dialog_factory_acknowledged |
+| `identity_license_edit` | present_in_dialog_factory_acknowledged |
 | `initiation_add` | present_in_dialog_factory_acknowledged |
 | `master_index` | present_in_dialog_factory_acknowledged |
 | `matrix_program_add` | present_in_dialog_factory_acknowledged |
 | `new_character` | present_in_dialog_factory_acknowledged |
 | `new_character_origin` | present_in_dialog_factory_acknowledged |
 | `new_window` | present_in_dialog_factory_acknowledged |
+| `open_custom_data` | present_in_dialog_factory_acknowledged |
+| `open_data_folder` | present_in_dialog_factory_acknowledged |
+| `open_errata` | present_in_dialog_factory_acknowledged |
+| `open_sourcebooks` | present_in_dialog_factory_acknowledged |
 | `print_character` | present_in_dialog_factory_acknowledged |
 | `print_multiple` | present_in_dialog_factory_acknowledged |
 | `print_setup` | present_in_dialog_factory_acknowledged |
@@ -164,12 +181,18 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `quality_delete` | present_in_dialog_factory_acknowledged |
 | `report_bug` | present_in_dialog_factory_acknowledged |
 | `revision_history` | present_in_dialog_factory_acknowledged |
+| `runner_benchmark` | present_in_dialog_factory_acknowledged |
+| `runner_cohort_privacy` | present_in_dialog_factory_acknowledged |
+| `runner_what_if` | present_in_dialog_factory_acknowledged |
 | `show_login_video` | present_in_dialog_factory_acknowledged |
 | `spell_add` | present_in_dialog_factory_acknowledged |
 | `spirit_add` | present_in_dialog_factory_acknowledged |
+| `sprite_add` | present_in_dialog_factory_acknowledged |
 | `switch_ruleset` | present_in_dialog_factory_acknowledged |
 | `translator` | present_in_dialog_factory_acknowledged |
 | `update` | present_in_dialog_factory_acknowledged |
+| `update_data_packs` | present_in_dialog_factory_acknowledged |
+| `validate_data_scope` | present_in_dialog_factory_acknowledged |
 | `vehicle_add` | present_in_dialog_factory_acknowledged |
 | `vehicle_delete` | present_in_dialog_factory_acknowledged |
 | `vehicle_edit` | present_in_dialog_factory_acknowledged |

@@ -1,9 +1,12 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.InstallLinking.Postgres;
 using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Services.Support;
+using Chummer.Run.Api.Services.WindowsProof;
 using Chummer.Run.Registry.Services;
+using Microsoft.Extensions.Hosting;
 
 namespace Chummer.Run.Api;
 
@@ -53,7 +56,15 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PublicProgressService>();
         services.AddSingleton<PublicTrustPulseService>();
         services.AddSingleton<CampaignOsLocalProofService>();
-        services.AddSingleton<PublicReleaseManifestService>();
+        services.AddSingleton<ReleaseShelfGenerationStore>();
+        services.AddSingleton(static provider => new PublicReleaseManifestService(
+            provider.GetRequiredService<IConfiguration>(),
+            provider.GetRequiredService<ReleaseShelfGenerationStore>()));
+        services.AddSingleton<ArtifactDeliveryPolicy>();
+        services.AddSingleton<WindowsProofManifestValidator>();
+        services.AddSingleton<WindowsProofGenerationStore>();
+        services.AddSingleton<IWindowsProofGenerationStore>(static provider =>
+            provider.GetRequiredService<WindowsProofGenerationStore>());
         services.AddSingleton<WindowsProofInstallerService>();
         services.AddSingleton<AurPackageCatalogService>();
         services.AddSingleton<ReleaseSelectionService>();
@@ -63,7 +74,13 @@ internal static class ServiceCollectionBoundedContextExtensions
 
     public static IServiceCollection AddHubAccountsAndCommunityContext(this IServiceCollection services)
     {
+        services.AddSingleton(TimeProvider.System);
         services.AddSingleton<CommunityStore>();
+        services.AddSingleton<IPlaySessionAuthorizationPersistence, CommunityStorePlaySessionAuthorizationPersistence>();
+        services.AddSingleton<PlaySessionAuthorizationService>();
+        services.AddSingleton<PlayAuthorizationIdempotencyCoordinator>();
+        services.AddSingleton<PlayAuthorizationApiPolicy>();
+        services.AddSingleton<PlayAuthorizationRequestLimiter>();
         services.AddSingleton<TeableUserProjectionService>();
         services.AddSingleton<TeableBlackLedgerWorldTickService>();
         services.AddSingleton<TeableHeyyScamChatService>();
@@ -118,6 +135,8 @@ internal static class ServiceCollectionBoundedContextExtensions
     {
         services.AddSingleton<WorkspaceLifecyclePolicyService>();
         services.AddSingleton<RunsiteOrientationRequestComposerService>();
+        services.AddSingleton<RunsiteOrientationArtifactRequestBridgeService>();
+        services.AddSingleton<PropertyquarryApartmentVideoArtifactRequestBridgeService>();
         services.AddSingleton<IHubPublicationDraftService, HubPublicationDraftService>();
         services.AddSingleton<CampaignArtifactRegistryBridge>();
         services.AddSingleton<CreatorPublicationRegistryBridge>();
@@ -164,14 +183,86 @@ internal static class ServiceCollectionBoundedContextExtensions
         return services;
     }
 
-    public static IServiceCollection AddHubInstallAndOrchestrationAdapters(this IServiceCollection services)
+    public static IServiceCollection AddHubInstallAndOrchestrationAdapters(
+        this IServiceCollection services)
     {
-        services.AddSingleton<InstallLinkingStore>();
-        services.AddSingleton<InstallLinkingService>();
+        services.AddSingleton<IInstallLinkingRollbackAuthorityReadinessProbe,
+            UnavailableInstallLinkingRollbackAuthorityReadinessProbe>();
+        return AddHubInstallAndOrchestrationAdapterCore(
+            services,
+            deferAuthorityActivation: false);
+    }
+
+    public static IServiceCollection AddHubInstallAndOrchestrationAdapters(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        IHostEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
+        if (environment.IsProduction())
+        {
+            services.AddSingleton(_ => new InstallLinkingPostgresRuntime(
+                InstallLinkingPostgresConnectionConfiguration.LoadRuntimeConnectionString(
+                    configuration,
+                    environment)));
+            services.AddSingleton(static provider =>
+                new NpgsqlInstallLinkingSnapshotAuthority(
+                    provider.GetRequiredService<InstallLinkingPostgresRuntime>().DataSource));
+            services.AddSingleton(static provider =>
+                new InstallLinkingPostgresAuthorityCoordinator(
+                    provider.GetRequiredService<NpgsqlInstallLinkingSnapshotAuthority>()));
+            services.AddSingleton<IInstallLinkingSnapshotAuthority>(static provider =>
+                provider.GetRequiredService<InstallLinkingPostgresAuthorityCoordinator>());
+            services.AddSingleton<IInstallLinkingRollbackAuthorityReadinessProbe>(static provider =>
+                provider.GetRequiredService<InstallLinkingPostgresAuthorityCoordinator>());
+        }
+        else
+        {
+            services.AddSingleton<IInstallLinkingRollbackAuthorityReadinessProbe,
+                UnavailableInstallLinkingRollbackAuthorityReadinessProbe>();
+        }
+
+        return AddHubInstallAndOrchestrationAdapterCore(
+            services,
+            deferAuthorityActivation: environment.IsProduction());
+    }
+
+    private static IServiceCollection AddHubInstallAndOrchestrationAdapterCore(
+        IServiceCollection services,
+        bool deferAuthorityActivation)
+    {
+        services.AddSingleton<InstallLinkingStoreActivation>();
+        services.AddSingleton<IInstallLinkingStoreReadinessProbe>(static provider =>
+            provider.GetRequiredService<InstallLinkingStoreActivation>());
+        if (deferAuthorityActivation)
+        {
+            services.AddSingleton<InstallLinkingStoreAccess>();
+            services.AddSingleton(static provider => new InstallLinkingService(
+                provider.GetRequiredService<InstallLinkingStoreAccess>(),
+                provider.GetRequiredService<IConfiguration>(),
+                provider.GetRequiredService<IInstallLinkingStoreReadinessProbe>()));
+            services.AddSingleton(static provider => new PersonalizedInstallScriptService(
+                provider.GetRequiredService<InstallLinkingStoreAccess>(),
+                provider.GetRequiredService<IConfiguration>(),
+                provider.GetRequiredService<IInstallLinkingStoreReadinessProbe>()));
+            services.AddSingleton(static provider => new NexusPanContinuityService(
+                provider.GetRequiredService<InstallLinkingStoreAccess>()));
+            services.AddSingleton(static provider => new CommunityCreatorHorizonsService(
+                provider.GetRequiredService<CommunityStore>(),
+                provider.GetRequiredService<InstallLinkingStoreAccess>(),
+                provider.GetRequiredService<PublicCreatorPublicationDiscoveryService>()));
+        }
+        else
+        {
+            services.AddSingleton(static provider =>
+                provider.GetRequiredService<InstallLinkingStoreActivation>().GetActivatedStoreForDependencyInjection());
+            services.AddSingleton<InstallLinkingService>();
+            services.AddSingleton<PersonalizedInstallScriptService>();
+        }
         services.AddSingleton<InstallLinkedWorkspaceSnapshotStore>();
         services.AddSingleton<InstallLinkedWorkspaceSnapshotService>();
         services.AddSingleton<AccountDesktopLaunchTicketService>();
-        services.AddSingleton<PersonalizedInstallScriptService>();
         services.AddSingleton<InstallBootstrapTicketService>();
         services.AddSingleton<ReleaseBundlePromotionService>();
         services.AddSingleton<ReleaseBundleUploadSessionService>();
@@ -183,6 +274,11 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<HubIdentitySubjectCache>();
         services.AddHttpClient<FleetBridgeService>();
         services.AddHttpClient<HubIdentityClient>();
+        services.AddTransient<IPublicPlayIdentityResolver, HubPublicPlayIdentityResolver>();
+        services.AddSingleton<IPlaySessionGrantAuthorizer, DenyAllPlaySessionGrantAuthorizer>();
+        services.AddTransient<PublicPlaySessionAccessPolicy>();
+        services.AddTransient<IPublicPlaySessionAccessPolicy>(static provider =>
+            provider.GetRequiredService<PublicPlaySessionAccessPolicy>());
         services.AddHttpClient<HubBrowserAuthService>();
         services.AddHttpClient<HubGoogleAuthService>();
         return services;

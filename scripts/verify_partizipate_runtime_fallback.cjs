@@ -71,11 +71,10 @@ async function assertBoardShell(page, path) {
   assert(response, `${path} should return a response.`);
   assert.equal(response.status(), 200, `${path} should return 200.`);
   await page.getByRole('heading', { name: 'Participate' }).waitFor({ state: 'visible', timeout: 15000 });
-  await page.getByText('Public requests, clear bugs, useful ideas.', { exact: true }).waitFor({ state: 'visible', timeout: 15000 });
 
   const text = await page.locator('body').innerText();
   assert.equal(/Participate/i.test(text), true, `${path} should render the first-party heading.`);
-  assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), true, `${path} should render the first-party summary.`);
+  assert.equal(/Public requests, clear bugs, useful ideas\./i.test(text), false, `${path} must not render the removed first-party summary.`);
   assert.equal(/Something went wrong|Could not load posts|Network error|support@productlift\.dev/i.test(text), false, `${path} must not show provider failure copy.`);
   assert.equal(/productlift\.dev/i.test(text), false, `${path} must not leak provider domains.`);
 
@@ -106,6 +105,7 @@ async function assertBoardShell(page, path) {
 
 async function main() {
   const browser = await chromium.launch({
+    channel: process.env.CHUMMER_PLAYWRIGHT_CHANNEL?.trim() || 'chromium',
     headless: true,
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
@@ -155,14 +155,14 @@ async function main() {
     await framePage.waitForFunction(
       () => {
         const text = (document.body && document.body.innerText) || '';
-        return /What do you want to see next\?|Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(text);
+        return /What do you want to see next\?|Board offline right now/i.test(text);
       },
       { timeout: 15000 },
     );
     assert.equal(/\/participate\/board\/?\?embed=1$/.test(framePage.url()), true, '/participate/frame should resolve to the embedded first-party board document.');
     assert.equal(await framePage.locator('iframe[data-chummer-participate-frame]').count(), 0, '/participate/frame should resolve directly to the embedded board document instead of nesting another frame.');
     const frameText = await framePage.locator('body').innerText();
-    assert.equal(/What do you want to see next\?|Public requests, clear bugs, useful ideas\.|Board offline right now/i.test(frameText), true, '/participate/frame should keep the request entry point visible.');
+    assert.equal(/What do you want to see next\?|Board offline right now/i.test(frameText), true, '/participate/frame should keep the request entry point visible.');
     await framePage.close();
 
     console.log(JSON.stringify({
