@@ -527,6 +527,16 @@ def desktop_client_gap_subsumed_by_launch_blockers(payload: dict[str, Any], bloc
     if norm(evidence.get("ui_flagship_release_gate_status")) not in PASS_STATES:
         return False
 
+    if "ui_user_journey_tester_audit_required" in evidence:
+        user_journey_audit_required = evidence.get("ui_user_journey_tester_audit_required")
+        if user_journey_audit_required is not True and user_journey_audit_required is not False:
+            return False
+        if user_journey_audit_required is True:
+            if norm(evidence.get("ui_user_journey_tester_audit_status")) not in PASS_STATES:
+                return False
+            if evidence.get("ui_user_journey_tester_audit_ready") is not True:
+                return False
+
     unresolved_hosts = {
         norm(item)
         for item in evidence.get("ui_external_host_proof_blockers_unresolved_hosts", [])
