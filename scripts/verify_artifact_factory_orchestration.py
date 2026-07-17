@@ -381,7 +381,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'format.Trim().Replace(\'-\', \'_\').ToLowerInvariant()',
     ],
     "Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs": [
-        "public static IServiceCollection AddHubInstallAndOrchestrationAdapters(this IServiceCollection services)",
+        "public static IServiceCollection AddHubInstallAndOrchestrationAdapters(\n"
+        "        this IServiceCollection services)",
         "services.AddSingleton<ArtifactFactoryOrchestrationService>();",
     ],
     "Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs": [
