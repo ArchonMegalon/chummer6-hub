@@ -36,7 +36,19 @@ def load_module():
     )
     module.google_oauth_receipt_validation_failures = lambda _path: []
     module._production_source_binding_failures = module.source_binding_failures
+    module._production_authoritative_release_launcher_identity = (
+        module.authoritative_release_launcher_identity
+    )
     module._production_current_git_head = module.current_git_head
+    launcher_stat = module.VERIFY_SCRIPT.stat()
+    module._test_release_launcher_identity = {
+        **module.regular_file_execution_identity(module.VERIFY_SCRIPT),
+        "uid": launcher_stat.st_uid,
+        "gid": launcher_stat.st_gid,
+    }
+    module.authoritative_release_launcher_identity = lambda *_args, **_kwargs: dict(
+        module._test_release_launcher_identity
+    )
     module._test_release_execution_environment = {
         "CHUMMER_PUBLIC_BASE_URL": "https://chummer.run",
         "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "a" * 40,
@@ -77,6 +89,11 @@ def load_module():
         module.RELEASE_READY_MATERIALIZER_ACTIVE_ENV: "1",
         "CHUMMER_SKIP_CODEX_HANDOFF_MATERIALIZER": "1",
         "CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE": "1",
+        module.RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV: json.dumps(
+            module._test_release_launcher_identity,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
         module.SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH_ENV: (
             "1"
             if kwargs.get("skip_google_oauth_runtime_refresh")
@@ -604,6 +621,10 @@ launch()
         )
         self.assertEqual("a" * 40, sanitized["CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD"])
         self.assertEqual(
+            module._test_release_launcher_identity,
+            json.loads(sanitized[module.RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV]),
+        )
+        self.assertEqual(
             sanitized["CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD"],
             module.current_release_execution_environment(sanitized)[
                 "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD"
@@ -628,8 +649,11 @@ launch()
                 ),
                 mock.patch.object(
                     module,
-                    "source_binding_failures",
-                    return_value=["shared release launcher executable dispatch is legacy-checkout-bound"],
+                    "authoritative_release_launcher_identity",
+                    side_effect=ValueError(
+                        "release controller source binding failed: shared release launcher "
+                        "executable dispatch is legacy-checkout-bound"
+                    ),
                 ),
                 mock.patch.object(module, "current_git_head") as current_head,
                 mock.patch.object(
@@ -868,6 +892,119 @@ launch()
                     [str(root)],
                     environment=module._test_release_execution_environment,
                 )
+
+    def test_execution_plan_rejects_launcher_swap_after_semantic_validation(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="release-plan-launcher-swap-") as temp_dir:
+            launcher = Path(temp_dir) / "verify_chummer6_release_ready.sh"
+            launcher.write_text(
+                module.AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE,
+                encoding="utf-8",
+            )
+            launcher.chmod(0o700)
+            early_identity = (
+                module._production_authoritative_release_launcher_identity(launcher)
+            )
+            launcher.write_text(
+                module.AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE
+                + "# semantically valid byte swap after early validation\n",
+                encoding="utf-8",
+            )
+
+            with (
+                mock.patch.object(module, "VERIFY_SCRIPT", launcher),
+                mock.patch.object(
+                    module,
+                    "authoritative_release_launcher_identity",
+                    side_effect=lambda: (
+                        module._production_authoritative_release_launcher_identity(
+                            launcher
+                        )
+                    ),
+                ),
+                self.assertRaisesRegex(
+                    ValueError,
+                    "drifted between semantic validation and plan construction",
+                ),
+            ):
+                module.build_release_execution_plan(
+                    [],
+                    [],
+                    [],
+                    environment=module._test_release_execution_environment,
+                    release_launcher_authority_identity=early_identity,
+                )
+
+    def test_execution_plan_binds_and_finally_rechecks_semantic_launcher_identity(self) -> None:
+        module = load_module()
+        source_plan = passing_verifier_evidence(module)["plan"]
+        controller_environment = module.authoritative_controller_environment()
+        launcher_identity = dict(module._test_release_launcher_identity)
+        plan = module.build_release_execution_plan(
+            [
+                [
+                    str(gate["name"]),
+                    str(gate["command"]),
+                    str(gate["cwd"]),
+                    str(gate["timeout_seconds"]),
+                    "|".join(
+                        str(identity["path"])
+                        for identity in gate["entrypoints"]
+                    ),
+                ]
+                for gate in source_plan["gates"]
+            ],
+            [
+                [str(item["name"]), str(item["identity"]["path"])]
+                for item in source_plan["interpreters"]
+            ],
+            [str(item["path"]) for item in source_plan["code_roots"]],
+            environment=module._test_release_execution_environment,
+            controller_environment=controller_environment,
+            release_launcher_authority_identity=launcher_identity,
+            run_nonce="9" * 64,
+        )
+
+        self.assertEqual(
+            launcher_identity,
+            plan["release_launcher_authority_identity"],
+        )
+        self.assertEqual(
+            [launcher_identity],
+            [
+                identity
+                for identity in plan["authority_inputs"]
+                if identity["path"] == str(module.VERIFY_SCRIPT)
+            ],
+        )
+        self.assertTrue(
+            all(
+                module.RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV
+                not in gate["environment_keys"]
+                for gate in plan["gates"]
+            )
+        )
+        module.validate_release_execution_plan(
+            plan,
+            controller_environment=controller_environment,
+        )
+
+        drifted_identity = {**launcher_identity, "sha256": "0" * 64}
+        with (
+            mock.patch.object(
+                module,
+                "authoritative_release_launcher_identity",
+                return_value=drifted_identity,
+            ),
+            self.assertRaisesRegex(
+                ValueError,
+                "release launcher authority identity drifted",
+            ),
+        ):
+            module.validate_release_execution_plan(
+                plan,
+                controller_environment=controller_environment,
+            )
 
     def test_execution_binding_rejects_entrypoint_changed_and_restored_during_gate(self) -> None:
         module = load_module()

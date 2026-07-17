@@ -212,7 +212,26 @@ RELEASE_GATE_EXECUTION_BINDING_PREFIX = "RELEASE_GATE_EXECUTION_BINDING "
 RELEASE_VERIFIER_REPLAY_MAX_AGE = timedelta(minutes=30)
 RELEASE_VERIFIER_REPLAY_FUTURE_SKEW = timedelta(minutes=5)
 RELEASE_VERIFIER_DIRECT_RECEIPT_MAX_AGE = timedelta(hours=24)
-RELEASE_EXECUTION_PLAN_CONTRACT = "chummer.release_execution_plan.v3"
+RELEASE_EXECUTION_PLAN_CONTRACT = "chummer.release_execution_plan.v4"
+RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV = (
+    "CHUMMER_RELEASE_LAUNCHER_AUTHORITY_IDENTITY"
+)
+RELEASE_LAUNCHER_AUTHORITY_IDENTITY_FIELDS = frozenset(
+    {
+        "path",
+        "sha256",
+        "device",
+        "inode",
+        "mode",
+        "uid",
+        "gid",
+        "size_bytes",
+        "mtime_ns",
+        "ctime_ns",
+        "parent",
+        "ancestors",
+    }
+)
 RELEASE_GATE_EXECUTION_PREBINDING_CONTRACT = "chummer.release_gate_execution_prebinding.v1"
 RELEASE_GATE_EXECUTION_BINDING_CONTRACT = "chummer.release_gate_execution_binding.v1"
 RELEASE_EXECUTION_PLAN_MAX_AGE = timedelta(hours=6)
@@ -275,6 +294,7 @@ RELEASE_CONTROLLER_ENV_ALLOWLIST = frozenset(
         "CHUMMER_SKIP_RELEASE_WRAPPER_REFRESH",
         "CHUMMER_SKIP_PUBLIC_GUIDE_VERIFICATION",
         "CHUMMER_RELEASE_READY_MATERIALIZER_ACTIVE",
+        RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV,
         "TEABLE_ACCESS_TOKEN",
         "TEABLE_API_TOKEN",
         "TEABLE_BASE_URL",
@@ -745,26 +765,31 @@ def _matches_authoritative_release_launcher_template(tree: ast.Module) -> bool:
 
 def _read_authoritative_release_launcher(
     path: Path,
-) -> tuple[bytes | None, str | None]:
+) -> tuple[bytes | None, dict[str, object] | None, str | None]:
     """Bind bytes, inode, ownership, and mode without following the final path."""
 
+    try:
+        normalized = absolute_nonsymlink_path(path)
+        ancestors_before = directory_ancestor_identities(normalized.parent)
+    except (OSError, ValueError):
+        return None, None, "not a readable regular nonsymlink file"
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
-        fd = os.open(path, flags)
+        fd = os.open(normalized, flags)
     except FileNotFoundError:
-        return None, "missing"
+        return None, None, "missing"
     except OSError:
-        return None, "not a readable regular nonsymlink file"
+        return None, None, "not a readable regular nonsymlink file"
     try:
         before = os.fstat(fd)
         if not stat.S_ISREG(before.st_mode):
-            return None, "not a regular nonsymlink file"
+            return None, None, "not a regular nonsymlink file"
         if before.st_uid != os.geteuid():
-            return None, "not owned by the current caller"
+            return None, None, "not owned by the current caller"
         if not before.st_mode & stat.S_IXUSR:
-            return None, "not executable by its owner"
+            return None, None, "not executable by its owner"
         if before.st_size > CONTROLLER_OUTPUT_MAX_BYTES:
-            return None, "too_large"
+            return None, None, "too_large"
 
         chunks: list[bytes] = []
         total = 0
@@ -778,9 +803,11 @@ def _read_authoritative_release_launcher(
             chunks.append(chunk)
             total += len(chunk)
             if total > CONTROLLER_OUTPUT_MAX_BYTES:
-                return None, "too_large"
+                return None, None, "too_large"
 
         after = os.fstat(fd)
+        leaf_after = os.lstat(normalized)
+        ancestors_after = directory_ancestor_identities(normalized.parent)
         stable_fields = (
             "st_dev",
             "st_ino",
@@ -795,21 +822,48 @@ def _read_authoritative_release_launcher(
             getattr(before, field) != getattr(after, field)
             for field in stable_fields
         ):
-            return None, "changed during identity-bound read"
-        return b"".join(chunks), None
+            return None, None, "changed during identity-bound read"
+        if any(
+            getattr(after, field) != getattr(leaf_after, field)
+            for field in stable_fields
+        ):
+            return None, None, "path changed during identity-bound read"
+        if ancestors_before != ancestors_after:
+            return None, None, "ancestor changed during identity-bound read"
+        raw = b"".join(chunks)
+        return (
+            raw,
+            {
+                "path": str(normalized),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "device": after.st_dev,
+                "inode": after.st_ino,
+                "mode": after.st_mode,
+                "uid": after.st_uid,
+                "gid": after.st_gid,
+                "size_bytes": after.st_size,
+                "mtime_ns": after.st_mtime_ns,
+                "ctime_ns": after.st_ctime_ns,
+                "parent": ancestors_after[0],
+                "ancestors": ancestors_after,
+            },
+            None,
+        )
     except OSError:
-        return None, "unreadable"
+        return None, None, "unreadable"
     finally:
         os.close(fd)
 
 
-def source_binding_failures(launcher_path: Path | None = None) -> list[str]:
+def _source_binding_validation(
+    launcher_path: Path | None = None,
+) -> tuple[dict[str, object] | None, list[str]]:
     """Prove the shared launcher dispatches this checkout's materializer."""
 
     path = launcher_path or VERIFY_SCRIPT
-    raw, error = _read_authoritative_release_launcher(path)
-    if error is not None or raw is None:
-        return [f"shared release launcher is {error or 'unreadable'}: {path}"]
+    raw, identity, error = _read_authoritative_release_launcher(path)
+    if error is not None or raw is None or identity is None:
+        return None, [f"shared release launcher is {error or 'unreadable'}: {path}"]
     first_line = raw.partition(b"\n")[0] + (b"\n" if b"\n" in raw else b"")
     shebang_failure = first_line != AUTHORITATIVE_RELEASE_LAUNCHER_SHEBANG
     failures: list[str] = []
@@ -821,7 +875,10 @@ def source_binding_failures(launcher_path: Path | None = None) -> list[str]:
     try:
         tree = ast.parse(raw.decode("utf-8"), filename=str(path))
     except (SyntaxError, UnicodeDecodeError) as exc:
-        return [*failures, f"shared release launcher is not valid UTF-8 Python: {exc}"]
+        return None, [
+            *failures,
+            f"shared release launcher is not valid UTF-8 Python: {exc}",
+        ]
 
     if not _matches_authoritative_release_launcher_template(tree):
         failures.append(
@@ -1017,7 +1074,24 @@ def source_binding_failures(launcher_path: Path | None = None) -> list[str]:
         failures.append(
             "shared release launcher must invoke launch() exactly once as its final statement"
         )
+    return (identity if not failures else None), failures
+
+
+def source_binding_failures(launcher_path: Path | None = None) -> list[str]:
+    _identity, failures = _source_binding_validation(launcher_path)
     return failures
+
+
+def authoritative_release_launcher_identity(
+    launcher_path: Path | None = None,
+) -> dict[str, object]:
+    identity, failures = _source_binding_validation(launcher_path)
+    if failures or identity is None:
+        raise ValueError(
+            "release controller source binding failed: "
+            + "; ".join(failures or ["validated launcher identity is missing"])
+        )
+    return identity
 
 
 def current_git_head() -> str:
@@ -4005,7 +4079,8 @@ def controller_gate_environment(
         sorted(
             (key, value)
             for key, value in environment.items()
-            if key not in RELEASE_PROVIDER_ENV_KEYS or key in provider_keys
+            if key != RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV
+            and (key not in RELEASE_PROVIDER_ENV_KEYS or key in provider_keys)
         )
     )
 
@@ -4111,11 +4186,28 @@ def authoritative_controller_environment(
             "release controller rejects inherited or user-writable PATH; "
             f"expected exactly {TRUSTED_PATH}"
         )
-    binding_failures = source_binding_failures()
-    if binding_failures:
+    launcher_identity = authoritative_release_launcher_identity()
+    incoming_launcher_identity = str(
+        ambient.get(RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV) or ""
+    )
+    if source is not None and incoming_launcher_identity:
+        try:
+            expected_launcher_identity = json.loads(incoming_launcher_identity)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "release controller launcher authority identity is invalid JSON"
+            ) from exc
+        if (
+            not isinstance(expected_launcher_identity, dict)
+            or expected_launcher_identity != launcher_identity
+        ):
+            raise ValueError(
+                "release controller launcher authority identity drifted after "
+                "semantic validation"
+            )
+    elif source is not None and RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV in ambient:
         raise ValueError(
-            "release controller source binding failed: "
-            + "; ".join(binding_failures)
+            "release controller launcher authority identity is empty"
         )
 
     controlled_defaults = {
@@ -4157,6 +4249,11 @@ def authoritative_controller_environment(
     sanitized["GIT_OPTIONAL_LOCKS"] = "0"
     sanitized["CHUMMER_RUN_SERVICES_ROOT"] = str(RUN_SERVICES_ROOT)
     sanitized["CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD"] = current_git_head()
+    sanitized[RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV] = json.dumps(
+        launcher_identity,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     if skip_google_oauth_runtime_refresh:
         sanitized[SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH_ENV] = "1"
     if skip_windows_runtime_refresh:
@@ -4623,6 +4720,24 @@ def shell_command_tokens(command: str) -> list[str]:
     return list(lexer)
 
 
+def release_launcher_identity_from_controller_environment(
+    environment: dict[str, str],
+) -> dict[str, object]:
+    raw = str(environment.get(RELEASE_LAUNCHER_AUTHORITY_IDENTITY_ENV) or "")
+    try:
+        identity = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            "release controller launcher authority identity is invalid JSON"
+        ) from exc
+    if (
+        not isinstance(identity, dict)
+        or set(identity) != RELEASE_LAUNCHER_AUTHORITY_IDENTITY_FIELDS
+    ):
+        raise ValueError("release controller launcher authority identity is missing")
+    return identity
+
+
 def build_release_execution_plan(
     gate_specs: list[list[str] | tuple[str, ...]],
     interpreter_specs: list[list[str] | tuple[str, ...]],
@@ -4634,6 +4749,7 @@ def build_release_execution_plan(
     external_write_authorized: bool = False,
     governed_repositories: tuple[Path, ...] | list[Path] = (),
     require_governed_code_snapshot: bool = False,
+    release_launcher_authority_identity: dict[str, object] | None = None,
     process_containment: dict[str, object] | None = None,
     run_nonce: str | None = None,
     now: datetime | None = None,
@@ -4654,6 +4770,18 @@ def build_release_execution_plan(
         )
     if current_release_execution_environment(bound_controller_environment) != normalized_environment:
         raise ValueError("release controller environment does not match execution controls")
+    bound_launcher_identity = dict(release_launcher_authority_identity or {})
+    if require_governed_code_snapshot and not bound_launcher_identity:
+        raise ValueError(
+            "authoritative release execution lacks the semantically validated launcher identity"
+        )
+    if bound_launcher_identity:
+        current_launcher_identity = authoritative_release_launcher_identity()
+        if current_launcher_identity != bound_launcher_identity:
+            raise ValueError(
+                "release launcher authority identity drifted between semantic validation "
+                "and plan construction"
+            )
     nonce = str(run_nonce or secrets.token_hex(32)).lower()
     if not re.fullmatch(r"[0-9a-f]{64}", nonce):
         raise ValueError("release execution run nonce is not a 64-character lowercase hex value")
@@ -4781,6 +4909,13 @@ def build_release_execution_plan(
         "procfs": "/proc",
     }:
         raise ValueError("authoritative release execution lacks enforced process containment")
+    authority_inputs = []
+    for path in authority_paths:
+        if bound_launcher_identity and path == Path(os.path.abspath(VERIFY_SCRIPT)):
+            authority_inputs.append(bound_launcher_identity)
+        else:
+            authority_inputs.append(regular_file_execution_identity(path))
+
     body: dict[str, object] = {
         "contract_name": RELEASE_EXECUTION_PLAN_CONTRACT,
         "run_nonce": nonce,
@@ -4797,12 +4932,11 @@ def build_release_execution_plan(
         "external_write_authorized": bool(external_write_authorized),
         "governed_code_snapshot_required": bool(require_governed_code_snapshot),
         "governed_code_snapshot": governed_snapshot,
+        "release_launcher_authority_identity": bound_launcher_identity,
         "process_containment": normalized_process_containment,
         "code_roots": code_root_identities,
         "interpreters": interpreters,
-        "authority_inputs": [
-            regular_file_execution_identity(path) for path in authority_paths
-        ],
+        "authority_inputs": authority_inputs,
         "gates": gates,
         "gate_count": len(gates),
     }
@@ -4834,6 +4968,7 @@ def validate_release_execution_plan(
         "external_write_authorized",
         "governed_code_snapshot_required",
         "governed_code_snapshot",
+        "release_launcher_authority_identity",
         "process_containment",
         "code_roots",
         "interpreters",
@@ -4927,6 +5062,35 @@ def validate_release_execution_plan(
             )
     elif governed_snapshot:
         raise ValueError("diagnostic release plan has an unexpected governed code snapshot")
+    launcher_identity = plan.get("release_launcher_authority_identity")
+    if not isinstance(launcher_identity, dict):
+        raise ValueError("release launcher authority identity binding is invalid")
+    if (
+        launcher_identity
+        and set(launcher_identity) != RELEASE_LAUNCHER_AUTHORITY_IDENTITY_FIELDS
+    ):
+        raise ValueError("release launcher authority identity fields are invalid")
+    if plan.get("governed_code_snapshot_required") is True:
+        if (
+            not launcher_identity
+            or launcher_identity.get("path")
+            != str(Path(os.path.abspath(VERIFY_SCRIPT)))
+        ):
+            raise ValueError("authoritative release launcher identity binding is invalid")
+    plan_authority_inputs = plan.get("authority_inputs")
+    if not isinstance(plan_authority_inputs, list):
+        raise ValueError("release execution authority input identities are invalid")
+    if launcher_identity:
+        launcher_authority_inputs = [
+            item
+            for item in plan_authority_inputs
+            if isinstance(item, dict)
+            and item.get("path") == str(Path(os.path.abspath(VERIFY_SCRIPT)))
+        ]
+        if launcher_authority_inputs != [launcher_identity]:
+            raise ValueError(
+                "release execution launcher authority input binding is invalid"
+            )
     process_containment = plan.get("process_containment")
     if not isinstance(process_containment, dict) or set(process_containment) != {
         "mode",
@@ -4977,11 +5141,25 @@ def validate_release_execution_plan(
         interpreter_map[name] = identity
     if not ({"bash_noprofile_norc", "bash_lc"} & set(interpreter_map)):
         raise ValueError("release execution plan runner interpreters are missing")
+    current_launcher_identity: dict[str, object] | None = None
+    if launcher_identity:
+        current_launcher_identity = authoritative_release_launcher_identity()
+        if current_launcher_identity != launcher_identity:
+            raise ValueError("release launcher authority identity drifted")
     for recorded_value in authority_inputs:
         if not isinstance(recorded_value, dict):
             raise ValueError("release execution authority input identity is invalid")
         recorded = dict(recorded_value)
-        if regular_file_execution_identity(Path(str(recorded.get("path") or ""))) != recorded:
+        recorded_path = Path(str(recorded.get("path") or ""))
+        if (
+            launcher_identity
+            and recorded_path == Path(os.path.abspath(VERIFY_SCRIPT))
+        ):
+            if recorded != launcher_identity or current_launcher_identity != recorded:
+                raise ValueError(
+                    "release execution launcher authority input identity drifted"
+                )
+        elif regular_file_execution_identity(recorded_path) != recorded:
             raise ValueError("release execution authority input identity drifted")
     for index, gate in enumerate(gates):
         if not isinstance(gate, dict) or gate.get("index") != index:
@@ -6059,6 +6237,9 @@ def authoritative_release_execution_plan(
         external_write_authorized=external_write_authorized,
         governed_repositories=repository_roots,
         require_governed_code_snapshot=True,
+        release_launcher_authority_identity=(
+            release_launcher_identity_from_controller_environment(environment)
+        ),
         process_containment=process_containment,
     )
 
