@@ -4,6 +4,7 @@ import importlib.util
 import hashlib
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -1055,6 +1056,7 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         "exactToolPayloadMode": True,
         "exactFinalPayloadMode": True,
         "exactCopyFromReferences": True,
+        "exactRequiredNamedContextCopies": True,
         "buildDependsOnProof": True,
         "toolFinalDependsOnBuild": True,
         "finalDependsOnBuild": True,
@@ -1098,6 +1100,7 @@ def test_public_pwa_dockerfile_has_exact_pinned_validator_stage_and_receipt_depe
         ("unknown_external_copy_source", "allowed earlier stage or named context"),
         ("numeric_copy_source", "allowed earlier stage or named context"),
         ("wrong_stage_named_context", "allowed earlier stage or named context"),
+        ("initializer_copy_moved_to_build", "exact required named-context COPY set"),
         ("receipt_moved_after_publish", "first build-stage instruction"),
         ("final_publish_edge_removed", "exact build publish artifact"),
         ("tool_publish_edge_removed", "exact tool publish artifact"),
@@ -1260,6 +1263,14 @@ def test_public_pwa_docker_contract_rejects_validator_stage_bypasses(
             + "COPY --from=run-services-source Chummer.Run.Api/Chummer.Run.Api.csproj /app/decoy.csproj\n",
             1,
         )
+    elif mutation == "initializer_copy_moved_to_build":
+        initializer_copy = (
+            "COPY --from=run-services-source --chmod=0555 "
+            "scripts/initialize-public-edge-volumes.sh "
+            "/usr/local/libexec/chummer/initialize-public-edge-volumes.sh\n"
+        )
+        mutated = original.replace(initializer_copy, "", 1)
+        mutated = mutated.replace(build_from, build_from + initializer_copy, 1)
     elif mutation == "receipt_moved_after_publish":
         mutated = original.replace(receipt_copy, "", 1)
         mutated = mutated.replace(final_from, receipt_copy + final_from, 1)
@@ -1422,6 +1433,71 @@ def test_public_pwa_compose_contract_requires_exact_named_context_bindings(
         finding["id"] == "public_edge_source_compose_context_contract_invalid"
         for finding in receipt["findings"]
     )
+
+
+@pytest.mark.parametrize(
+    "service_name",
+    (
+        "chummer-install-linking-postgres-admin",
+        "chummer-install-linking-postgres-import",
+    ),
+)
+@pytest.mark.parametrize("mutation", ("context", "dockerfile", "target", "source"))
+def test_public_pwa_compose_contract_closes_operator_build_source_bindings(
+    tmp_path: Path,
+    service_name: str,
+    mutation: str,
+) -> None:
+    module = load_module()
+    source_root = write_complete_marker_source_tree(module, tmp_path / "source")
+    compose = source_root / module.PUBLIC_EDGE_COMPOSE_RELATIVE_PATH
+    original = compose.read_text(encoding="utf-8")
+    service_start = original.index(f"  {service_name}:\n")
+    next_service = re.search(r"(?m)^  [A-Za-z0-9_.-]+:\s*$", original[service_start + 3 :])
+    service_end = (
+        service_start + 3 + next_service.start()
+        if next_service is not None
+        else len(original)
+    )
+    block = original[service_start:service_end]
+    replacements = {
+        "context": (
+            f"      context: {module.PUBLIC_EDGE_COMPOSE_BUILD_CONTEXT}",
+            "      context: /tmp/unreviewed-build-context",
+        ),
+        "dockerfile": (
+            f"      dockerfile: {module.PUBLIC_EDGE_COMPOSE_DOCKERFILE}",
+            "      dockerfile: /tmp/unreviewed.Dockerfile",
+        ),
+        "target": (
+            "      target: install-linking-postgres-tool-final",
+            "      target: final",
+        ),
+        "source": (
+            "        run-services-source: "
+            + module.PUBLIC_EDGE_COMPOSE_NAMED_CONTEXTS["run-services-source"],
+            "        run-services-source: /tmp/unreviewed-run-services",
+        ),
+    }
+    expected, replacement = replacements[mutation]
+    assert expected in block
+    mutated_block = block.replace(expected, replacement, 1)
+    compose.write_text(
+        original[:service_start] + mutated_block + original[service_end:],
+        encoding="utf-8",
+    )
+
+    receipt = module.verify(
+        [],
+        allow_stale_foreign_build_locks=False,
+        source_root=source_root,
+    )
+
+    contract = receipt["publicPwaComposeContextContract"]
+    assert receipt["status"] == "fail"
+    assert contract["status"] == "fail"
+    assert contract["serviceContracts"][service_name]["status"] == "fail"
+    assert contract["serviceContracts"]["chummer-portal"]["status"] == "pass"
 
 
 def test_public_pwa_reviewed_authority_rejects_duplicate_fields(tmp_path: Path) -> None:
@@ -2535,14 +2611,21 @@ def write_complete_marker_overlay_tree(module, overlay_root: Path, source_root: 
                         "landingMarkerStatus": "pass",
                         "landingHasTurnAnchor": True,
                         "landingHasTurnAnchorRedirect": True,
+                        "landingHasBuildPublicInstallHandoff": True,
+                        "landingHasPlayPublicInstallHandoff": True,
+                        "landingRetiredMarkersAbsent": True,
                         "landingBrowserRedirectStatus": "pass",
                         "landingBrowserRedirectEntryUrl": "http://127.0.0.1:5000/#turn-runsite-card",
                         "landingBrowserRedirectFinalUrl": "http://127.0.0.1:5000/mobile/player#turn-runsite-card",
                         "landingBrowserRedirectExpectedPath": "/mobile/player",
                         "landingBrowserRedirectExpectedHash": "#turn-runsite-card",
+                        "landingBrowserRedirectExpectedQuery": "",
+                        "landingBrowserRedirectFinalQuery": "",
+                        "landingBrowserRedirectQueryDropped": True,
                         "landingBrowserRedirectPathMatches": True,
                         "landingBrowserRedirectHashMatches": True,
                         "landingMissingMarkerCount": 0,
+                        "landingForbiddenMarkerCount": 0,
                         "sourceFingerprint": module.overlay_source_fingerprint(source_root),
                     }
                 )

@@ -2,15 +2,31 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
+import os
 import re
+import stat
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+if str(SCRIPT_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIRECTORY))
+
+from public_edge_mutation_lock import (  # noqa: E402
+    AUTH_ROOT as PUBLIC_EDGE_MUTATION_AUTH_ROOT,
+    LOCK_PATH as PUBLIC_EDGE_MUTATION_LOCK,
+    MutationLease,
+    acquire_mutation_lease,
+    release_mutation_lease,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +35,33 @@ DEFAULT_PORTAL_SERVICE = "chummer-portal"
 DEFAULT_PORTAL_CONTAINER = "chummer6-hub-chummer-portal-1"
 DEFAULT_PORTAL_IMAGE_TAG = "chummer-run-api:local"
 DEFAULT_BASE_URL = "https://chummer.run"
+CANONICAL_DOCKER = "/usr/bin/docker"
+CANONICAL_PYTHON = "/usr/bin/python3"
+CANONICAL_DOCKER_CONTEXT = "default"
+CANONICAL_DOCKER_HOST = "unix:///var/run/docker.sock"
+CANONICAL_DOCKER_CONFIG_ROOT = Path(
+    "/docker/chummercomplete/.state/public-edge-docker-cli"
+)
+CANONICAL_ENV_FILE = Path("/docker/chummercomplete/chummer.run-services/.env")
+FORBIDDEN_ROUTING_VARIABLES = {
+    "BASH_ENV",
+    "ENV",
+    "CDPATH",
+    "GLOBIGNORE",
+    "LD_PRELOAD",
+    "LD_LIBRARY_PATH",
+    "PYTHONPATH",
+    "PYTHONHOME",
+    "PYTHONSTARTUP",
+    "PYTHONINSPECT",
+    "PYTHONBREAKPOINT",
+    "PYTHONWARNINGS",
+    "PYTHONSAFEPATH",
+    "DOCKER_HOST",
+    "DOCKER_CONTEXT",
+    "DOCKER_CONFIG",
+    "BUILDKIT_HOST",
+}
 
 
 @dataclass(frozen=True)
@@ -28,6 +71,59 @@ class CommandResult:
     stdout: str
     stderr: str
     skipped: bool = False
+
+
+def acquire_public_edge_mutation_lock(*, dry_run: bool) -> MutationLease | None:
+    if dry_run:
+        return None
+    authorization_root = PUBLIC_EDGE_MUTATION_AUTH_ROOT
+    if PUBLIC_EDGE_MUTATION_LOCK != Path(
+        "/docker/chummercomplete/.state/public-edge-mutation.lock"
+    ):
+        authorization_root = (
+            PUBLIC_EDGE_MUTATION_LOCK.parent / "public-edge-lock-recovery-receipts"
+        )
+    return acquire_mutation_lease(
+        actor="restore",
+        lock_path=PUBLIC_EDGE_MUTATION_LOCK,
+        authorization_root=authorization_root,
+    )
+
+
+def release_public_edge_mutation_lock(lease: MutationLease | None) -> None:
+    if lease is not None:
+        release_mutation_lease(lease)
+
+
+def atomic_write_success_receipt(path: Path, rendered: str) -> None:
+    path = path.expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        raise RuntimeError("restore success receipt output must not be a symlink")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8", closefd=True) as handle:
+            handle.write(rendered)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        directory_descriptor = os.open(
+            path.parent,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0),
+        )
+        try:
+            os.fsync(directory_descriptor)
+        finally:
+            os.close(directory_descriptor)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def normalize_image_id(value: str) -> str:
@@ -47,7 +143,61 @@ def require_sha256_image_id(value: str) -> str:
     return normalized
 
 
+def validate_clean_launch_environment() -> None:
+    if os.environ.get("CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH") != "1":
+        raise RuntimeError(
+            "restore must be launched through the documented env -i /usr/bin/python3 -I boundary"
+        )
+    forbidden = sorted(
+        name
+        for name in os.environ
+        if name in FORBIDDEN_ROUTING_VARIABLES
+        or name.startswith("BUILDX_")
+        or name.startswith("COMPOSE_")
+        or name.startswith("DOCKER_")
+    )
+    if forbidden:
+        raise RuntimeError(
+            "restore refuses ambient execution-routing variables: " + ", ".join(forbidden)
+        )
+
+
+def _prepare_private_docker_directory(path: Path) -> None:
+    if path.is_symlink() or (
+        path.exists() and (not path.is_dir() or path.stat().st_uid != os.getuid())
+    ):
+        raise RuntimeError(f"canonical Docker state directory is unsafe: {path}")
+    path.mkdir(parents=True, mode=0o700, exist_ok=True)
+    os.chmod(path, 0o700)
+    metadata = path.lstat()
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        raise RuntimeError(f"canonical Docker state directory is not mode 0700: {path}")
+
+
+def canonical_subprocess_environment() -> dict[str, str]:
+    return {
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(CANONICAL_DOCKER_CONFIG_ROOT / "home"),
+        "DOCKER_CONFIG": str(CANONICAL_DOCKER_CONFIG_ROOT / "config"),
+        "LANG": "C",
+        "LC_ALL": "C",
+    }
+
+
+def canonical_subprocess_command(command: list[str]) -> list[str]:
+    if command and command[0] == "docker":
+        return [CANONICAL_DOCKER, "--context", CANONICAL_DOCKER_CONTEXT, *command[1:]]
+    if command and command[0] == sys.executable:
+        return [CANONICAL_PYTHON, "-I", *command[1:]]
+    return command
+
+
 def run_command(command: list[str], cwd: Path = ROOT, dry_run: bool = False) -> CommandResult:
+    command = canonical_subprocess_command(command)
     if dry_run:
         return CommandResult(command=command, returncode=0, stdout="", stderr="", skipped=True)
     completed = subprocess.run(
@@ -56,6 +206,7 @@ def run_command(command: list[str], cwd: Path = ROOT, dry_run: bool = False) -> 
         text=True,
         capture_output=True,
         check=False,
+        env=canonical_subprocess_environment(),
     )
     return CommandResult(
         command=command,
@@ -63,6 +214,60 @@ def run_command(command: list[str], cwd: Path = ROOT, dry_run: bool = False) -> 
         stdout=completed.stdout.strip(),
         stderr=completed.stderr.strip(),
     )
+
+
+def _canonical_builder_identity(payload: str) -> str:
+    records: list[dict[str, Any]] = []
+    for raw in payload.splitlines():
+        if not raw.strip():
+            continue
+        item = json.loads(raw)
+        if item.get("Name") != "default":
+            continue
+        records.append(item)
+    if len(records) != 1:
+        raise RuntimeError("canonical Buildx builder is missing or duplicated")
+    item = records[0]
+    nodes = item.get("Nodes")
+    if (
+        item.get("Current") is not True
+        or item.get("Driver") != "docker"
+        or not isinstance(nodes, list)
+        or len(nodes) != 1
+        or nodes[0].get("Name") != "default"
+        or nodes[0].get("Endpoint") != "default"
+        or nodes[0].get("Status") != "running"
+    ):
+        raise RuntimeError("canonical Buildx builder identity drifted")
+    return "default|docker|default|running"
+
+
+def attest_canonical_docker_authority() -> dict[str, str]:
+    for path in (
+        CANONICAL_DOCKER_CONFIG_ROOT,
+        CANONICAL_DOCKER_CONFIG_ROOT / "home",
+        CANONICAL_DOCKER_CONFIG_ROOT / "config",
+    ):
+        _prepare_private_docker_directory(path)
+    context = run_checked(
+        [
+            "docker",
+            "context",
+            "inspect",
+            CANONICAL_DOCKER_CONTEXT,
+            "--format",
+            "{{.Name}}|{{.Endpoints.docker.Host}}|{{.Endpoints.docker.SkipTLSVerify}}",
+        ]
+    ).stdout
+    expected_context = (
+        f"{CANONICAL_DOCKER_CONTEXT}|{CANONICAL_DOCKER_HOST}|false"
+    )
+    if context != expected_context:
+        raise RuntimeError("restore refuses a non-canonical Docker daemon context")
+    builder = _canonical_builder_identity(
+        run_checked(["docker", "buildx", "ls", "--format", "json"]).stdout
+    )
+    return {"context": context, "builder": builder}
 
 
 def run_checked(command: list[str], cwd: Path = ROOT, dry_run: bool = False) -> CommandResult:
@@ -704,7 +909,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-postdeploy", action="store_true")
     parser.add_argument("--force-recreate", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--output", help="Optional JSON receipt path for this restore action.")
+    parser.add_argument("--output", required=True, help="JSON receipt path for this restore action.")
     return parser
 
 
@@ -712,15 +917,39 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    try:
+        validate_clean_launch_environment()
+    except RuntimeError as error:
+        parser.error(str(error))
+
     repo_root = ROOT
     compose_file = Path(args.compose_file).expanduser()
     if not compose_file.is_absolute():
         compose_file = repo_root / compose_file
     if not compose_file.is_file():
         parser.error(f"compose file not found: {compose_file}")
-
     try:
+        if compose_file.resolve() != (ROOT / "docker-compose.public-edge.yml").resolve():
+            raise RuntimeError("restore refuses a non-canonical Compose file")
+        docker_authority = attest_canonical_docker_authority()
+    except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as error:
+        parser.error(str(error))
+
+    mutation_lock: MutationLease | None = None
+    try:
+        mutation_lock = acquire_public_edge_mutation_lock(dry_run=args.dry_run)
+        if mutation_lock is not None:
+            atexit.register(release_public_edge_mutation_lock, mutation_lock)
         env_file = resolve_env_file(args.env_file, repo_root)
+        if env_file is None or env_file.resolve() != CANONICAL_ENV_FILE.resolve(strict=True):
+            raise RuntimeError("restore refuses a non-canonical Compose environment file")
+        if (
+            args.project_name != DEFAULT_PROJECT_NAME
+            or args.service != DEFAULT_PORTAL_SERVICE
+            or args.portal_container != DEFAULT_PORTAL_CONTAINER
+            or args.base_url != DEFAULT_BASE_URL
+        ):
+            raise RuntimeError("restore runtime authority inputs are not canonical")
         expected = require_sha256_image_id(args.expected_portal_image_id)
         browser_proofs: list[str] = []
         if args.require_all_browser_proofs or args.require_downloads_status_playwright:
@@ -782,35 +1011,49 @@ def main(argv: list[str] | None = None) -> int:
                 Path(args.playwright_artifact_dir).expanduser() if args.playwright_artifact_dir else None,
                 args.dry_run,
             )
+        receipt = {
+            "contractName": "chummer.public_edge_portal_image_restore.v1",
+            "status": "pass",
+            "generatedAtUtc": datetime.now(UTC).isoformat(),
+            "restore": restore_receipt,
+            "stability": stability_receipt,
+            "postdeploy": postdeploy_receipt,
+            "browserProofRequirements": browser_proofs,
+            "dockerAuthority": docker_authority,
+            "imageTagDiscovery": {
+                "containerImageIdBeforeDiscovery": container_image_id_before_discovery,
+                "explicitImageTags": args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
+                "includeImageTagsMatching": args.include_image_tags_matching,
+                "runtimeAliasTagsMatchingContainerImage": discover_runtime_alias_tags(
+                    args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
+                    container_image_id_before_discovery,
+                    dry_run=args.dry_run,
+                ),
+                "resolvedImageTags": image_tags,
+            },
+        }
+        rendered = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+        atomic_write_success_receipt(Path(args.output), rendered)
     except Exception as error:
+        if mutation_lock is not None:
+            try:
+                release_public_edge_mutation_lock(mutation_lock)
+            except (OSError, RuntimeError) as release_error:
+                error = RuntimeError(f"{error}; failed to release public-edge mutation lock: {release_error}")
+            finally:
+                atexit.unregister(release_public_edge_mutation_lock)
         print(str(error), file=sys.stderr)
         return 1
 
-    receipt = {
-        "contractName": "chummer.public_edge_portal_image_restore.v1",
-        "status": "pass",
-        "generatedAtUtc": datetime.now(UTC).isoformat(),
-        "restore": restore_receipt,
-        "stability": stability_receipt,
-        "postdeploy": postdeploy_receipt,
-        "browserProofRequirements": browser_proofs,
-        "imageTagDiscovery": {
-            "containerImageIdBeforeDiscovery": container_image_id_before_discovery,
-            "explicitImageTags": args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
-            "includeImageTagsMatching": args.include_image_tags_matching,
-            "runtimeAliasTagsMatchingContainerImage": discover_runtime_alias_tags(
-                args.image_tag or [DEFAULT_PORTAL_IMAGE_TAG],
-                container_image_id_before_discovery,
-                dry_run=args.dry_run,
-            ),
-            "resolvedImageTags": image_tags,
-        },
-    }
-    rendered = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
-    if args.output:
-        output_path = Path(args.output).expanduser()
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(rendered, encoding="utf-8")
+    if mutation_lock is not None:
+        try:
+            release_public_edge_mutation_lock(mutation_lock)
+        except (OSError, RuntimeError) as error:
+            print(f"failed to release public-edge mutation lock: {error}", file=sys.stderr)
+            return 1
+        finally:
+            atexit.unregister(release_public_edge_mutation_lock)
+
     print(rendered, end="")
     return 0
 

@@ -76,6 +76,8 @@ PUBLISH_TIMEOUT_EXIT_CODE = 124
 PUBLISH_TIMEOUT_TERMINATION_GRACE_SECONDS = 10.0
 MAX_RELEASE_CHANNEL_RECEIPT_BYTES = 16 * 1024 * 1024
 DEFAULT_PUBLISH_LOCK_FILE = "public-edge-portal-overlay.publish.lock"
+PUBLIC_EDGE_MUTATION_LOCK = Path("/docker/chummercomplete/.state/public-edge-mutation.lock")
+PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE = "owner-token"
 CONTRACT_NAME = "chummer.public_edge_portal_overlay_publish.v1"
 SOURCE_FINGERPRINT_ALGORITHM = "sha256-canonical-path-content-size-v1"
 STAGED_PAYLOAD_FINGERPRINT_ALGORITHM = (
@@ -334,6 +336,10 @@ CRITICAL_SOURCE_FINGERPRINT_FILES = {
     "siteViewModels": Path("Chummer.Run.Api") / "ViewModels" / "SiteViewModels.cs",
 }
 class OverlayPublishLockUnavailable(RuntimeError):
+    pass
+
+
+class PublicEdgeMutationLockUnavailable(RuntimeError):
     pass
 
 
@@ -2156,6 +2162,211 @@ def publish_lock_path(source_root: Path, active_root: Path | None = None) -> Pat
     if active_root is not None:
         return normalized_absolute_path(active_root).parent / DEFAULT_PUBLISH_LOCK_FILE
     return normalized_absolute_path(source_root) / ".state" / DEFAULT_PUBLISH_LOCK_FILE
+
+
+def _validate_mutation_lock_root(lock_root: Path) -> None:
+    try:
+        lock_root.mkdir(mode=0o700)
+    except FileExistsError:
+        pass
+    except OSError as exc:
+        raise PublicEdgeMutationLockUnavailable(
+            "public-edge mutation lock root cannot be created"
+        ) from exc
+    else:
+        os.chmod(lock_root, 0o700)
+    metadata = lock_root.lstat()
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        raise PublicEdgeMutationLockUnavailable(
+            "public-edge mutation lock root is not a caller-owned mode-0700 real directory"
+        )
+
+
+def _mutation_lock_directory_identity(lock_path: Path, *, inherited: bool) -> os.stat_result:
+    try:
+        metadata = lock_path.lstat()
+    except OSError as exc:
+        qualifier = "inherited " if inherited else ""
+        raise PublicEdgeMutationLockUnavailable(
+            f"{qualifier}public-edge mutation lock is unavailable"
+        ) from exc
+    if (
+        not stat.S_ISDIR(metadata.st_mode)
+        or stat.S_ISLNK(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or stat.S_IMODE(metadata.st_mode) != 0o700
+    ):
+        qualifier = "inherited " if inherited else ""
+        raise PublicEdgeMutationLockUnavailable(
+            f"{qualifier}public-edge mutation lock has unsafe identity"
+        )
+    return metadata
+
+
+def _read_mutation_lock_token(lock_path: Path) -> str:
+    token_path = lock_path / PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(token_path, flags)
+    except OSError as exc:
+        raise PublicEdgeMutationLockUnavailable(
+            "shared public-edge mutation lock has no readable owner token"
+        ) from exc
+    try:
+        metadata = os.fstat(descriptor)
+        path_metadata = token_path.lstat()
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or metadata.st_uid != os.getuid()
+            or stat.S_IMODE(metadata.st_mode) != 0o600
+            or (metadata.st_dev, metadata.st_ino)
+            != (path_metadata.st_dev, path_metadata.st_ino)
+        ):
+            raise PublicEdgeMutationLockUnavailable(
+                "shared public-edge mutation owner token has unsafe identity"
+            )
+        payload = os.read(descriptor, 129)
+        if len(payload) > 128:
+            raise PublicEdgeMutationLockUnavailable(
+                "shared public-edge mutation owner token is oversized"
+            )
+        token = payload.decode("ascii", errors="strict").strip()
+    except (OSError, UnicodeError) as exc:
+        raise PublicEdgeMutationLockUnavailable(
+            "shared public-edge mutation owner token is invalid"
+        ) from exc
+    finally:
+        os.close(descriptor)
+    if re.fullmatch(r"[0-9a-f]{64}", token) is None:
+        raise PublicEdgeMutationLockUnavailable(
+            "shared public-edge mutation owner token is malformed"
+        )
+    return token
+
+
+@contextmanager
+def public_edge_mutation_lock(*, activate: bool, inherited_token: str = ""):
+    """Acquire the fixed host mutation authority before the overlay publish lock."""
+    if not activate:
+        yield None
+        return
+    lock_path = PUBLIC_EDGE_MUTATION_LOCK
+    lock_root = lock_path.parent
+    _validate_mutation_lock_root(lock_root)
+    normalized_inherited_token = str(inherited_token or "").strip()
+    if normalized_inherited_token:
+        if re.fullmatch(r"[0-9a-f]{64}", normalized_inherited_token) is None:
+            raise PublicEdgeMutationLockUnavailable(
+                "inherited public-edge mutation token is malformed"
+            )
+        _mutation_lock_directory_identity(lock_path, inherited=True)
+        actual_token = _read_mutation_lock_token(lock_path)
+        if not secrets.compare_digest(actual_token, normalized_inherited_token):
+            raise PublicEdgeMutationLockUnavailable(
+                "inherited public-edge mutation token does not own the active lock"
+            )
+        yield lock_path
+        return
+
+    try:
+        lock_path.mkdir(mode=0o700)
+    except FileExistsError as exc:
+        raise PublicEdgeMutationLockUnavailable(
+            "another public-edge mutation owns the shared deployment authority"
+        ) from exc
+    except OSError as exc:
+        raise PublicEdgeMutationLockUnavailable(
+            "public-edge mutation lock cannot be created"
+        ) from exc
+    os.chmod(lock_path, 0o700)
+    token_path = lock_path / PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+    token = secrets.token_hex(32)
+    descriptor = -1
+    lock_metadata = _mutation_lock_directory_identity(lock_path, inherited=False)
+    token_metadata: os.stat_result | None = None
+    try:
+        flags = (
+            os.O_WRONLY
+            | os.O_CREAT
+            | os.O_EXCL
+            | getattr(os, "O_CLOEXEC", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+        )
+        descriptor = os.open(token_path, flags, 0o600)
+        os.fchmod(descriptor, 0o600)
+        os.write(descriptor, (token + "\n").encode("ascii"))
+        os.fsync(descriptor)
+        token_metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(token_metadata.st_mode)
+            or token_metadata.st_nlink != 1
+            or token_metadata.st_uid != os.getuid()
+            or stat.S_IMODE(token_metadata.st_mode) != 0o600
+        ):
+            raise PublicEdgeMutationLockUnavailable(
+                "created public-edge mutation owner token has unsafe identity"
+            )
+        os.close(descriptor)
+        descriptor = -1
+        yield lock_path
+    finally:
+        active_exception = sys.exc_info()[1]
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            current_lock_metadata = _mutation_lock_directory_identity(
+                lock_path,
+                inherited=False,
+            )
+            if (current_lock_metadata.st_dev, current_lock_metadata.st_ino) != (
+                lock_metadata.st_dev,
+                lock_metadata.st_ino,
+            ):
+                raise PublicEdgeMutationLockUnavailable(
+                    "public-edge mutation lock changed identity before cleanup"
+                )
+            if token_metadata is None:
+                try:
+                    token_path.lstat()
+                except FileNotFoundError:
+                    pass
+                else:
+                    raise PublicEdgeMutationLockUnavailable(
+                        "unowned public-edge mutation token appeared before cleanup"
+                    )
+            else:
+                current_token_metadata = token_path.lstat()
+                if (
+                    not stat.S_ISREG(current_token_metadata.st_mode)
+                    or current_token_metadata.st_nlink != 1
+                    or current_token_metadata.st_uid != os.getuid()
+                    or stat.S_IMODE(current_token_metadata.st_mode) != 0o600
+                    or (current_token_metadata.st_dev, current_token_metadata.st_ino)
+                    != (token_metadata.st_dev, token_metadata.st_ino)
+                ):
+                    raise PublicEdgeMutationLockUnavailable(
+                        "public-edge mutation owner token changed identity before cleanup"
+                    )
+                token_path.unlink()
+            lock_path.rmdir()
+        except (OSError, PublicEdgeMutationLockUnavailable) as cleanup_exc:
+            wrapped = (
+                cleanup_exc
+                if isinstance(cleanup_exc, PublicEdgeMutationLockUnavailable)
+                else PublicEdgeMutationLockUnavailable(
+                    f"unable to safely release public-edge mutation lock: {cleanup_exc}"
+                )
+            )
+            if active_exception is not None:
+                active_exception.add_note(str(wrapped))
+            else:
+                raise wrapped
 
 
 @contextmanager
@@ -5352,6 +5563,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--activate", action="store_true")
+    parser.add_argument(
+        "--shared-mutation-lock-token",
+        default="",
+        help=(
+            "Owner token for an already-held fixed public-edge mutation lock. "
+            "Only the guarded cutover lane should supply this."
+        ),
+    )
     parser.add_argument("--reuse-staging", action="store_true")
     parser.add_argument("--skip-backup-on-activate", action="store_true")
     parser.add_argument("--activation-mode", choices=("copy",), default="copy")
@@ -5432,44 +5651,66 @@ def main() -> int:
             build_root=args.build_root,
             activation_mode=args.activation_mode,
         )
-        with overlay_publish_lock(
-            path_plan["sourceRoot"],
-            path_plan["activeRoot"],
-        ):
-            capacity_check = require_disk_capacity(
-                staging_root=path_plan["stagingRoot"],
-                build_root=path_plan["buildRoot"],
-                minimum_free_bytes=minimum_free_disk_bytes,
-                allow_low_disk_capacity=allow_low_disk_capacity,
-            )
-            invalidate_prior_publisher_outputs(path_plan)
-            payload = materialize(
-                path_plan["output"],
-                release_channel_receipt=path_plan["releaseChannelReceipt"],
-                release_channel_receipt_sha256=args.release_channel_receipt_sha256,
-                source_root=path_plan["sourceRoot"],
-                staging_root=path_plan["stagingRoot"],
-                active_root=path_plan["activeRoot"],
-                backup_root=path_plan["backupRoot"],
-                build_root=path_plan["buildRoot"],
-                configuration=args.configuration,
-                activate=args.activate,
-                reuse_staging=args.reuse_staging,
-                skip_backup_on_activate=args.skip_backup_on_activate,
-                activation_mode=args.activation_mode,
-                verify_timeout_seconds=verify_timeout_seconds,
-                verification_deadline_seconds=verification_deadline_seconds,
-                publish_timeout_seconds=publish_timeout_seconds,
-                minimum_free_disk_bytes=minimum_free_disk_bytes,
-                allow_low_disk_capacity=allow_low_disk_capacity,
-                _preflight_disk_capacity_check=capacity_check,
-            )
+        with public_edge_mutation_lock(
+            activate=bool(args.activate),
+            inherited_token=str(
+                getattr(args, "shared_mutation_lock_token", "") or ""
+            ),
+        ) as mutation_lock_path:
+            with overlay_publish_lock(
+                path_plan["sourceRoot"],
+                path_plan["activeRoot"],
+            ):
+                capacity_check = require_disk_capacity(
+                    staging_root=path_plan["stagingRoot"],
+                    build_root=path_plan["buildRoot"],
+                    minimum_free_bytes=minimum_free_disk_bytes,
+                    allow_low_disk_capacity=allow_low_disk_capacity,
+                )
+                invalidate_prior_publisher_outputs(path_plan)
+                payload = materialize(
+                    path_plan["output"],
+                    release_channel_receipt=path_plan["releaseChannelReceipt"],
+                    release_channel_receipt_sha256=args.release_channel_receipt_sha256,
+                    source_root=path_plan["sourceRoot"],
+                    staging_root=path_plan["stagingRoot"],
+                    active_root=path_plan["activeRoot"],
+                    backup_root=path_plan["backupRoot"],
+                    build_root=path_plan["buildRoot"],
+                    configuration=args.configuration,
+                    activate=args.activate,
+                    reuse_staging=args.reuse_staging,
+                    skip_backup_on_activate=args.skip_backup_on_activate,
+                    activation_mode=args.activation_mode,
+                    verify_timeout_seconds=verify_timeout_seconds,
+                    verification_deadline_seconds=verification_deadline_seconds,
+                    publish_timeout_seconds=publish_timeout_seconds,
+                    minimum_free_disk_bytes=minimum_free_disk_bytes,
+                    allow_low_disk_capacity=allow_low_disk_capacity,
+                    _preflight_disk_capacity_check=capacity_check,
+                )
+                payload["sharedMutationLock"] = {
+                    "required": bool(args.activate),
+                    "status": "held" if mutation_lock_path is not None else "not_required",
+                    "path": str(mutation_lock_path or ""),
+                    "inherited": bool(
+                        getattr(args, "shared_mutation_lock_token", "")
+                    ),
+                    "acquiredBeforeOverlayPublishLock": True,
+                }
+                # Materialize writes the base receipt before returning. Persist the lock
+                # authority while both locks are still held so the durable receipt matches stdout.
+                atomic_write_json(path_plan["output"], payload)
     except Exception as exc:
+        mutation_lock_unavailable = isinstance(exc, PublicEdgeMutationLockUnavailable)
         lock_unavailable = isinstance(exc, OverlayPublishLockUnavailable)
         activation_error = isinstance(exc, OverlayActivationError)
         if isinstance(exc, OverlayDiskCapacityError):
             capacity_check = exc.check
         failure_reason = (
+            "public_edge_mutation_lock_unavailable"
+            if mutation_lock_unavailable
+            else
             "overlay_publish_lock_unavailable"
             if lock_unavailable
             else exc.reason
@@ -5477,7 +5718,9 @@ def main() -> int:
             else "overlay_publish_preflight_failed"
         )
         activation_status = (
-            "blocked_by_active_publisher"
+            "blocked_by_active_mutation"
+            if mutation_lock_unavailable
+            else "blocked_by_active_publisher"
             if lock_unavailable
             else "activation_failure_recovery_required"
             if activation_error and exc.rollback_status == "recovery_required"
@@ -5569,7 +5812,9 @@ def main() -> int:
             "stagingBuildInfoPath": "",
             "activeBuildInfoPath": "",
             "nextAction": (
-                "Wait for the active overlay publisher to finish and rerun this publish lane."
+                "Wait for the active public-edge mutation to finish and rerun this publish lane."
+                if mutation_lock_unavailable
+                else "Wait for the active overlay publisher to finish and rerun this publish lane."
                 if lock_unavailable
                 else "Resolve the recorded preflight or recovery condition before rerunning this publish lane."
             ),
@@ -5579,6 +5824,15 @@ def main() -> int:
                 if path_plan is not None
                 else publish_lock_path(resolved_source_root, normalized_active_root)
             ),
+            "sharedMutationLock": {
+                "required": bool(args.activate),
+                "status": "unavailable" if mutation_lock_unavailable else "not_acquired",
+                "path": str(PUBLIC_EDGE_MUTATION_LOCK),
+                "inherited": bool(
+                    getattr(args, "shared_mutation_lock_token", "")
+                ),
+                "acquiredBeforeOverlayPublishLock": True,
+            },
             "failureReceiptWritten": False,
         }
     print(json.dumps(payload, sort_keys=True, allow_nan=False))

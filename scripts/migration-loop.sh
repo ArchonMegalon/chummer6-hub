@@ -9,9 +9,15 @@ HUB_EDGE_PROJECT_NAME="${CHUMMER_HUB_EDGE_PROJECT_NAME:-chummer6-hub}"
 PORTAL_E2E="${CHUMMER_PORTAL_E2E:-1}"
 HUB_E2E="${CHUMMER_HUB_E2E:-1}"
 PUBLIC_EDGE_DEPLOY_SOURCE_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE:-1}"
+PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE:-1}"
 PUBLIC_EDGE_EXPECTED_HEAD="${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}"
 PUBLIC_EDGE_DEPLOY_REPO_ROOT="${CHUMMER_PUBLIC_EDGE_DEPLOY_REPO_ROOT:-${CHUMMER_RUN_SERVICES_SOURCE:-$ROOT_DIR}}"
 FAILED=0
+
+PUBLIC_EDGE_DEPLOY_REPO_ROOT="$(cd "$PUBLIC_EDGE_DEPLOY_REPO_ROOT" && pwd)"
+export CHUMMER_RUN_SERVICES_SOURCE="$PUBLIC_EDGE_DEPLOY_REPO_ROOT"
+export CHUMMER_RUN_SERVICES_CONTEXT_DIR="$PUBLIC_EDGE_DEPLOY_REPO_ROOT"
+export CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT="${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}"
 
 cd "$ROOT_DIR"
 
@@ -29,7 +35,7 @@ verify_public_edge_deploy_source() {
   if [[ -n "$PUBLIC_EDGE_EXPECTED_HEAD" ]]; then
     gate_args+=(--expected-head "$PUBLIC_EDGE_EXPECTED_HEAD")
   fi
-  python3 scripts/verify_public_edge_deploy_source.py "${gate_args[@]}"
+  python3 "$PUBLIC_EDGE_DEPLOY_REPO_ROOT/scripts/verify_public_edge_deploy_source.py" "${gate_args[@]}"
 }
 
 verify_public_edge_deploy_preflight() {
@@ -37,15 +43,25 @@ verify_public_edge_deploy_preflight() {
     return 0
   fi
 
-  python3 scripts/check_public_edge_deploy_preflight.py
+  python3 "$PUBLIC_EDGE_DEPLOY_REPO_ROOT/scripts/check_public_edge_deploy_preflight.py" \
+      --source-root "$PUBLIC_EDGE_DEPLOY_REPO_ROOT"
+}
+
+deploy_public_edge_portal() {
+  CHUMMER_PUBLIC_EDGE_COMPOSE_FILE="$HUB_EDGE_COMPOSE_FILE" \
+  CHUMMER_PUBLIC_EDGE_PROJECT_NAME="$HUB_EDGE_PROJECT_NAME" \
+    bash "$PUBLIC_EDGE_DEPLOY_REPO_ROOT/scripts/deploy_public_edge_portal.sh"
 }
 
 for ((iter = 1; iter <= MAX_ITERS; iter++)); do
   echo "===== migration slice iteration ${iter}/${MAX_ITERS} ====="
 
-  if verify_public_edge_deploy_source chummer-run-identity \
+  if verify_public_edge_deploy_preflight \
+    && verify_public_edge_deploy_source chummer-run-identity \
     && verify_public_edge_deploy_source chummer-portal \
-    && docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal \
+    && docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" \
+      up -d --build chummer-run-identity \
+    && deploy_public_edge_portal \
     && bash scripts/audit-compliance.sh \
     && if [[ "$PORTAL_E2E" == "1" ]]; then CHUMMER_PORTAL_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-portal.sh; else true; fi \
     && if [[ "$HUB_E2E" == "1" ]]; then CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh; else true; fi; then

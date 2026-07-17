@@ -702,6 +702,151 @@ def test_overlay_publish_lock_rejects_competing_publisher(tmp_path: Path) -> Non
         holder.communicate(timeout=10)
 
 
+def test_direct_activation_owns_shared_mutation_lock_and_cleans_it(tmp_path: Path) -> None:
+    module = load_module()
+    lock_path = tmp_path / ".state" / "public-edge-mutation.lock"
+    module.PUBLIC_EDGE_MUTATION_LOCK = lock_path
+
+    with module.public_edge_mutation_lock(activate=True) as acquired:
+        assert acquired == lock_path
+        token_path = lock_path / module.PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+        assert token_path.is_file()
+        assert token_path.stat().st_mode & 0o777 == 0o600
+        assert lock_path.stat().st_mode & 0o777 == 0o700
+        with pytest.raises(
+            module.PublicEdgeMutationLockUnavailable,
+            match="another public-edge mutation",
+        ):
+            with module.public_edge_mutation_lock(activate=True):
+                pass
+
+    assert not lock_path.exists()
+
+
+def test_inherited_shared_mutation_lock_requires_exact_safe_owner_token(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock_path = tmp_path / ".state" / "public-edge-mutation.lock"
+    lock_path.parent.mkdir(mode=0o700)
+    lock_path.mkdir(mode=0o700)
+    token_path = lock_path / module.PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+    token = "a" * 64
+    token_path.write_text(token + "\n", encoding="ascii")
+    token_path.chmod(0o600)
+    module.PUBLIC_EDGE_MUTATION_LOCK = lock_path
+
+    with module.public_edge_mutation_lock(activate=True, inherited_token=token) as acquired:
+        assert acquired == lock_path
+    assert lock_path.is_dir()
+    assert token_path.is_file()
+
+    with pytest.raises(module.PublicEdgeMutationLockUnavailable, match="does not own"):
+        with module.public_edge_mutation_lock(
+            activate=True,
+            inherited_token="b" * 64,
+        ):
+            pass
+    token_path.chmod(0o644)
+    with pytest.raises(module.PublicEdgeMutationLockUnavailable, match="unsafe identity"):
+        with module.public_edge_mutation_lock(activate=True, inherited_token=token):
+            pass
+
+
+def test_shared_mutation_lock_rejects_unsafe_root_without_repairing_it(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock_root = tmp_path / ".state"
+    lock_root.mkdir(mode=0o755)
+    lock_root.chmod(0o755)
+    module.PUBLIC_EDGE_MUTATION_LOCK = lock_root / "public-edge-mutation.lock"
+
+    with pytest.raises(
+        module.PublicEdgeMutationLockUnavailable,
+        match="mode-0700",
+    ):
+        with module.public_edge_mutation_lock(activate=True):
+            pass
+
+    assert lock_root.stat().st_mode & 0o777 == 0o755
+    assert not module.PUBLIC_EDGE_MUTATION_LOCK.exists()
+
+
+def test_shared_mutation_lock_cleanup_never_unlinks_replaced_token_target(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    lock_path = tmp_path / ".state" / "public-edge-mutation.lock"
+    module.PUBLIC_EDGE_MUTATION_LOCK = lock_path
+    victim = tmp_path / "victim"
+    victim.write_text("preserve\n", encoding="utf-8")
+
+    with pytest.raises(
+        module.PublicEdgeMutationLockUnavailable,
+        match="owner token changed identity",
+    ):
+        with module.public_edge_mutation_lock(activate=True):
+            token_path = lock_path / module.PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE
+            token_path.unlink()
+            token_path.symlink_to(victim)
+
+    assert victim.read_text(encoding="utf-8") == "preserve\n"
+    assert (lock_path / module.PUBLIC_EDGE_MUTATION_LOCK_TOKEN_FILE).is_symlink()
+
+
+def test_main_persists_shared_mutation_lock_receipt_while_both_locks_are_held(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    module = load_module()
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    output = tmp_path / "receipt.json"
+    release_channel_receipt = tmp_path / "release.json"
+    release_channel_receipt.write_text("{}\n", encoding="utf-8")
+    args = publisher_args(
+        output=output,
+        release_channel_receipt=release_channel_receipt,
+        release_channel_receipt_sha256="0" * 64,
+        source_root=source_root,
+        staging_root=tmp_path / "staging" / "app",
+        active_root=tmp_path / "active" / "app",
+        backup_root=tmp_path / "backups",
+        build_root=tmp_path / "build",
+    )
+    args.activate = True
+    module.PUBLIC_EDGE_MUTATION_LOCK = tmp_path / ".state" / "public-edge-mutation.lock"
+    monkeypatch.setattr(module, "parse_args", lambda: args)
+    monkeypatch.setattr(
+        module,
+        "require_disk_capacity",
+        lambda **_kwargs: {"status": "pass"},
+    )
+    monkeypatch.setattr(module, "invalidate_prior_publisher_outputs", lambda _plan: [])
+
+    def fake_materialize(path: Path, **_kwargs):
+        payload = {"contractName": module.CONTRACT_NAME, "status": "pass"}
+        module.atomic_write_json(path, payload)
+        return payload
+
+    monkeypatch.setattr(module, "materialize", fake_materialize)
+
+    assert module.main() == 0
+    capsys.readouterr()
+
+    persisted = json.loads(output.read_text(encoding="utf-8"))
+    assert persisted["sharedMutationLock"] == {
+        "required": True,
+        "status": "held",
+        "path": str(module.PUBLIC_EDGE_MUTATION_LOCK),
+        "inherited": False,
+        "acquiredBeforeOverlayPublishLock": True,
+    }
+    assert not module.PUBLIC_EDGE_MUTATION_LOCK.exists()
+
+
 def publisher_args(
     *,
     output: Path,
