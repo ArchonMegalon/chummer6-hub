@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -14,7 +16,9 @@ public sealed record ReleaseBundlePromotionResult(
     string DownloadsUrl,
     IReadOnlyList<string> InstallDispatchUrls,
     IReadOnlyList<string> DirectFileUrls,
-    IReadOnlyList<ReleasePromotionInstallClaim>? SignedInInstallClaims = null);
+    IReadOnlyList<ReleasePromotionInstallClaim>? SignedInInstallClaims = null,
+    string? CanonicalManifestSha256 = null,
+    string? CompatibilityManifestSha256 = null);
 
 public sealed record ReleasePromotionInstallClaim(
     string ArtifactId,
@@ -28,11 +32,20 @@ public sealed class ReleaseBundlePromotionService
     private const string DefaultDownloadsRoot = "/downloads-source";
     private const string CompatibilityManifestName = "releases.json";
     private const string CanonicalManifestName = "RELEASE_CHANNEL.generated.json";
+    private const string RegistryContractName = "Chummer.Hub.Registry.Contracts";
+    private const string ActivationReceiptName = ".release-channel-activation.json";
+    private const string ActivationReceiptContractName = "chummer.run.registry_manifest_activation.v1";
     private const string PromotionEvidenceRelativePath = "release-evidence/public-promotion.json";
     private const string PublicBaseUrlKey = "GOOGLE_OIDC_REDIRECT_URI";
     private static readonly TimeSpan MaximumReleaseProofPublicationLag = TimeSpan.FromHours(24);
     private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows", "macos"];
     private static readonly string[] RequiredDesktopHeads = ["avalonia"];
+    private static readonly string[] RequiredDesktopPlatformHeadRidTuples =
+    [
+        "avalonia:linux-x64:linux",
+        "avalonia:osx-arm64:macos",
+        "avalonia:win-x64:windows"
+    ];
     private static readonly string[] DesktopRouteTruthHeads = ["avalonia", "blazor-desktop"];
     private static readonly IReadOnlyDictionary<string, string> DesktopRouteRoles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -146,10 +159,28 @@ public sealed class ReleaseBundlePromotionService
         string? proofRoot = ResolveSiblingDirectory(compatibilityManifestPath, "proof");
         string? promotionEvidencePath = ResolveOptionalFile(bundleRoot, PromotionEvidenceRelativePath);
 
-        PublicReleaseManifestDto incomingCompatibilityManifest = LoadCompatibilityManifest(compatibilityManifestPath);
-        JsonObject incomingCanonicalManifest = LoadJsonObject(canonicalManifestPath);
+        byte[] incomingCompatibilityBytes = ReadManifestBytes(
+            compatibilityManifestPath,
+            CompatibilityManifestName);
+        byte[] incomingCanonicalBytes = ReadManifestBytes(
+            canonicalManifestPath,
+            CanonicalManifestName);
+        PublicReleaseManifestDto incomingCompatibilityManifest = LoadCompatibilityManifest(
+            incomingCompatibilityBytes,
+            compatibilityManifestPath);
+        JsonObject incomingCompatibilityJson = LoadJsonObject(
+            incomingCompatibilityBytes,
+            compatibilityManifestPath);
+        JsonObject incomingCanonicalManifest = LoadJsonObject(
+            incomingCanonicalBytes,
+            canonicalManifestPath);
 
         IReadOnlyList<CanonicalArtifactRecord> incomingCanonicalArtifacts = LoadCanonicalArtifacts(incomingCanonicalManifest);
+        ValidateRegistryAuthoredManifestPair(
+            incomingCompatibilityJson,
+            incomingCanonicalManifest,
+            incomingCompatibilityManifest,
+            incomingCanonicalArtifacts);
         ValidateIncomingBundle(
             incomingCompatibilityManifest,
             incomingCanonicalArtifacts,
@@ -162,9 +193,6 @@ public sealed class ReleaseBundlePromotionService
         PublicReleaseManifestDto? existingCompatibilityManifest = File.Exists(liveCompatibilityManifestPath)
             ? LoadCompatibilityManifest(liveCompatibilityManifestPath)
             : null;
-        JsonObject? existingCanonicalManifest = File.Exists(liveCanonicalManifestPath)
-            ? LoadJsonObject(liveCanonicalManifestPath)
-            : null;
 
         List<string> existingFileNames = existingCompatibilityManifest?.Downloads
             .Select(ResolveDownloadFileName)
@@ -172,12 +200,6 @@ public sealed class ReleaseBundlePromotionService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList()
             ?? new List<string>();
-
-        PublicReleaseManifestDto mergedCompatibilityManifest = MergeCompatibilityManifest(existingCompatibilityManifest, incomingCompatibilityManifest);
-        JsonObject mergedCanonicalManifest = MergeCanonicalManifest(existingCanonicalManifest, incomingCanonicalManifest);
-        (mergedCompatibilityManifest, mergedCanonicalManifest) = NormalizeMergedShelfProjection(
-            mergedCompatibilityManifest,
-            mergedCanonicalManifest);
 
         string filesDestinationRoot = Path.Combine(downloadsRoot, "files");
         Directory.CreateDirectory(filesDestinationRoot);
@@ -204,13 +226,13 @@ public sealed class ReleaseBundlePromotionService
                 cancellationToken);
         }
 
-        HashSet<string> mergedFileNames = mergedCompatibilityManifest.Downloads
+        HashSet<string> incomingFileNames = incomingCompatibilityManifest.Downloads
             .Select(ResolveDownloadFileName)
             .Where(static fileName => !string.IsNullOrWhiteSpace(fileName))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (string replacedFileName in existingFileNames)
         {
-            if (mergedFileNames.Contains(replacedFileName))
+            if (incomingFileNames.Contains(replacedFileName))
             {
                 continue;
             }
@@ -222,8 +244,11 @@ public sealed class ReleaseBundlePromotionService
             }
         }
 
-        WriteJsonAtomically(liveCompatibilityManifestPath, mergedCompatibilityManifest);
-        WriteJsonAtomically(liveCanonicalManifestPath, mergedCanonicalManifest);
+        WriteBytesAtomically(liveCompatibilityManifestPath, incomingCompatibilityBytes);
+        WriteBytesAtomically(liveCanonicalManifestPath, incomingCanonicalBytes);
+
+        string compatibilityManifestSha256 = Sha256For(incomingCompatibilityBytes);
+        string canonicalManifestSha256 = Sha256For(incomingCanonicalBytes);
 
         IReadOnlyList<string> promotedArtifactIds = incomingCompatibilityManifest.Downloads
             .Select(static artifact => artifact.Id)
@@ -235,7 +260,21 @@ public sealed class ReleaseBundlePromotionService
             downloadsRoot,
             liveCompatibilityManifestPath,
             liveCanonicalManifestPath,
-            promotedArtifactIds);
+            promotedArtifactIds,
+            compatibilityManifestSha256,
+            canonicalManifestSha256);
+        DateTimeOffset activatedAt = DateTimeOffset.UtcNow;
+        WriteJsonAtomically(
+            Path.Combine(downloadsRoot, ActivationReceiptName),
+            new RegistryManifestActivationReceipt(
+                ContractName: ActivationReceiptContractName,
+                RegistryContractName: RegistryContractName,
+                Version: incomingCompatibilityManifest.Version,
+                Channel: incomingCompatibilityManifest.Channel,
+                PublishedAt: incomingCompatibilityManifest.PublishedAt,
+                ActivatedAt: activatedAt,
+                CompatibilityManifestSha256: $"sha256:{compatibilityManifestSha256}",
+                CanonicalManifestSha256: $"sha256:{canonicalManifestSha256}"));
         ReleaseBundlePromotionResult result = new(
             Version: incomingCompatibilityManifest.Version,
             Channel: incomingCompatibilityManifest.Channel,
@@ -246,7 +285,9 @@ public sealed class ReleaseBundlePromotionService
             DirectFileUrls: publicShelfManifest.Downloads
                 .Where(download => promotedArtifactIds.Contains(download.Id, StringComparer.OrdinalIgnoreCase))
                 .Select(download => $"{baseUrl}{NormalizePublicPath(download.Url)}")
-                .ToArray());
+                .ToArray(),
+            CanonicalManifestSha256: $"sha256:{canonicalManifestSha256}",
+            CompatibilityManifestSha256: $"sha256:{compatibilityManifestSha256}");
         return Task.FromResult(result);
     }
 
@@ -398,7 +439,15 @@ public sealed class ReleaseBundlePromotionService
 
     private static PublicReleaseManifestDto LoadCompatibilityManifest(string manifestPath)
     {
-        CompatibilityManifestPayload? parsed = JsonSerializer.Deserialize<CompatibilityManifestPayload>(File.ReadAllText(manifestPath), JsonOptions);
+        byte[] bytes = ReadManifestBytes(manifestPath, Path.GetFileName(manifestPath));
+        return LoadCompatibilityManifest(bytes, manifestPath);
+    }
+
+    private static PublicReleaseManifestDto LoadCompatibilityManifest(byte[] bytes, string source)
+    {
+        CompatibilityManifestPayload? parsed = JsonSerializer.Deserialize<CompatibilityManifestPayload>(
+            DecodeManifestUtf8(bytes, source),
+            JsonOptions);
         PublicReleaseManifestDto? manifest = parsed is null
             ? null
             : new PublicReleaseManifestDto(
@@ -436,13 +485,65 @@ public sealed class ReleaseBundlePromotionService
                     ? registryBoundaryCoverage.Clone()
                     : null
             };
-        return manifest ?? throw new InvalidDataException($"compatibility release manifest could not be parsed: {manifestPath}");
+        return manifest ?? throw new InvalidDataException($"compatibility release manifest could not be parsed: {source}");
     }
 
     private static JsonObject LoadJsonObject(string path)
     {
-        JsonNode? parsed = JsonNode.Parse(File.ReadAllText(path));
-        return parsed?.AsObject() ?? throw new InvalidDataException($"json object could not be parsed: {path}");
+        byte[] bytes = ReadManifestBytes(path, Path.GetFileName(path));
+        return LoadJsonObject(bytes, path);
+    }
+
+    private static JsonObject LoadJsonObject(byte[] bytes, string source)
+    {
+        JsonNode? parsed = JsonNode.Parse(DecodeManifestUtf8(bytes, source));
+        return parsed?.AsObject() ?? throw new InvalidDataException($"json object could not be parsed: {source}");
+    }
+
+    private static byte[] ReadManifestBytes(string path, string label)
+    {
+        try
+        {
+            using var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                bufferSize: 64 * 1024,
+                FileOptions.SequentialScan);
+            long length = stream.Length;
+            if (length <= 0 || length > ReleaseShelfGenerationStore.MaximumManifestBytes)
+            {
+                throw new InvalidDataException($"{label} exceeds the permitted manifest byte length.");
+            }
+
+            byte[] bytes = new byte[checked((int)length)];
+            stream.ReadExactly(bytes);
+            if (stream.ReadByte() != -1 || stream.Length != length)
+            {
+                throw new InvalidDataException($"{label} changed while it was being read.");
+            }
+
+            _ = DecodeManifestUtf8(bytes, label);
+            return bytes;
+        }
+        catch (EndOfStreamException exception)
+        {
+            throw new InvalidDataException($"{label} changed while it was being read.", exception);
+        }
+    }
+
+    private static string DecodeManifestUtf8(byte[] bytes, string label)
+    {
+        try
+        {
+            return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)
+                .GetString(bytes);
+        }
+        catch (DecoderFallbackException exception)
+        {
+            throw new InvalidDataException($"{label} is not valid UTF-8.", exception);
+        }
     }
 
     private static IReadOnlyList<CanonicalArtifactRecord> LoadCanonicalArtifacts(JsonObject manifest)
@@ -466,6 +567,582 @@ public sealed class ReleaseBundlePromotionService
         }
 
         return artifacts;
+    }
+
+    private static void ValidateRegistryAuthoredManifestPair(
+        JsonObject compatibility,
+        JsonObject canonical,
+        PublicReleaseManifestDto compatibilityManifest,
+        IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts)
+    {
+        RequireRegistryContract(compatibility, CompatibilityManifestName);
+        RequireRegistryContract(canonical, CanonicalManifestName);
+        if (!string.Equals(
+                NormalizeToken(GetJsonString(compatibility["source"])),
+                "registry",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"{CompatibilityManifestName} must identify Registry as its source.");
+        }
+
+        string canonicalVersion = RequireAliasString(
+            canonical,
+            "version",
+            "releaseVersion",
+            CanonicalManifestName);
+        string canonicalChannel = RequireAliasString(
+            canonical,
+            "channel",
+            "channelId",
+            CanonicalManifestName);
+        RequireEqual(
+            compatibilityManifest.Version,
+            canonicalVersion,
+            "release version");
+        string compatibilityRolloutState = NormalizeToken(GetJsonString(compatibility["rolloutState"]));
+        string expectedCompatibilityChannel = compatibilityRolloutState is
+            "public_stable" or "stable" or "preview" or "local" or "docker"
+                ? compatibilityRolloutState
+                : canonicalChannel;
+        RequireEqual(
+            compatibilityManifest.Channel,
+            expectedCompatibilityChannel,
+            "release channel projection");
+        RequireEqual(
+            NormalizeToken(compatibilityManifest.Status),
+            NormalizeToken(GetJsonString(canonical["status"])),
+            "publication status");
+
+        DateTimeOffset canonicalPublishedAt = RequireTimestamp(
+            canonical,
+            "publishedAt",
+            CanonicalManifestName);
+        if (canonicalPublishedAt.ToUniversalTime() != compatibilityManifest.PublishedAt.ToUniversalTime())
+        {
+            throw new InvalidDataException(
+                "Registry canonical and compatibility manifests disagree about publishedAt.");
+        }
+
+        foreach (string fieldName in new[]
+                 {
+                     "rolloutState",
+                     "rolloutReason",
+                     "supportabilityState",
+                     "supportabilitySummary",
+                     "knownIssueSummary",
+                     "fixAvailabilitySummary"
+                 })
+        {
+            RequireEqual(
+                GetJsonString(compatibility[fieldName]),
+                GetJsonString(canonical[fieldName]),
+                fieldName);
+        }
+
+        RequireEqualJsonProjection(
+            compatibility["releaseProof"],
+            canonical["releaseProof"],
+            "releaseProof");
+        RequireEqualJsonProjection(
+            compatibility["desktopTupleCoverage"],
+            canonical["desktopTupleCoverage"],
+            "desktopTupleCoverage");
+        ValidateRegistryArtifactProjection(compatibility, canonical);
+        ValidateCanonicalPlatformFloor(canonical, canonicalArtifacts);
+    }
+
+    private static void RequireRegistryContract(JsonObject manifest, string label)
+    {
+        string contractName = GetJsonString(manifest["contractName"]) ?? string.Empty;
+        string contractNameAlias = GetJsonString(manifest["contract_name"]) ?? string.Empty;
+        if (!string.Equals(contractName, RegistryContractName, StringComparison.Ordinal)
+            || !string.Equals(contractNameAlias, RegistryContractName, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"{label} must be materialized by {RegistryContractName} and preserve both contract aliases.");
+        }
+    }
+
+    private static string RequireAliasString(
+        JsonObject source,
+        string firstName,
+        string secondName,
+        string label)
+    {
+        string first = GetJsonString(source[firstName])?.Trim() ?? string.Empty;
+        string second = GetJsonString(source[secondName])?.Trim() ?? string.Empty;
+        if (first.Length == 0 || second.Length == 0 || !string.Equals(first, second, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"{label} must preserve equal non-empty {firstName}/{secondName} aliases.");
+        }
+
+        return first;
+    }
+
+    private static DateTimeOffset RequireTimestamp(JsonObject source, string propertyName, string label)
+    {
+        string raw = GetJsonString(source[propertyName])?.Trim() ?? string.Empty;
+        if (!DateTimeOffset.TryParse(
+                raw,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal,
+                out DateTimeOffset parsed))
+        {
+            throw new InvalidDataException($"{label} {propertyName} must be an ISO-8601 timestamp.");
+        }
+
+        return parsed;
+    }
+
+    private static void RequireEqual(string? left, string? right, string fieldName)
+    {
+        if (!string.Equals(left?.Trim(), right?.Trim(), StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Registry canonical and compatibility manifests disagree about {fieldName}.");
+        }
+    }
+
+    private static void RequireEqualJsonProjection(JsonNode? left, JsonNode? right, string fieldName)
+    {
+        if (left is null || right is null || !JsonNode.DeepEquals(left, right))
+        {
+            throw new InvalidDataException(
+                $"Registry canonical and compatibility manifests disagree about {fieldName}.");
+        }
+    }
+
+    private static void ValidateRegistryArtifactProjection(JsonObject compatibility, JsonObject canonical)
+    {
+        if (compatibility["downloads"] is not JsonArray downloads
+            || canonical["artifacts"] is not JsonArray artifacts)
+        {
+            throw new InvalidDataException(
+                "Registry manifest pair must contain compatibility downloads and canonical artifacts.");
+        }
+
+        Dictionary<string, JsonObject> compatibilityById = IndexArtifactRows(
+            downloads,
+            CompatibilityManifestName);
+        Dictionary<string, JsonObject> canonicalById = IndexArtifactRows(
+            artifacts,
+            CanonicalManifestName);
+        if (!compatibilityById.Keys.Order(StringComparer.Ordinal).SequenceEqual(
+                canonicalById.Keys.Order(StringComparer.Ordinal),
+                StringComparer.Ordinal))
+        {
+            throw new InvalidDataException(
+                "Registry canonical and compatibility manifests expose different artifact ids.");
+        }
+
+        foreach ((string artifactId, JsonObject canonicalArtifact) in canonicalById)
+        {
+            JsonObject compatibilityArtifact = compatibilityById[artifactId];
+            RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "head", artifactId);
+            RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "platform", artifactId);
+            RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "rid", artifactId);
+            RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "arch", artifactId);
+            RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "kind", artifactId);
+            RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "fileName", artifactId, normalize: false);
+            RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "sha256", artifactId);
+            RequireArtifactFieldEqual(canonicalArtifact, compatibilityArtifact, "installAccessClass", artifactId);
+            RequireArtifactAliasFieldEqual(
+                canonicalArtifact,
+                compatibilityArtifact,
+                "downloadUrl",
+                "url",
+                artifactId,
+                normalize: false);
+            RequireArtifactAliasFieldEqual(
+                canonicalArtifact,
+                compatibilityArtifact,
+                "version",
+                "version",
+                artifactId,
+                normalize: false);
+            RequireArtifactAliasFieldEqual(
+                canonicalArtifact,
+                compatibilityArtifact,
+                "channelId",
+                "channelId",
+                artifactId);
+            long canonicalSize = GetJsonInt64(canonicalArtifact["sizeBytes"]);
+            long compatibilitySize = GetJsonInt64(compatibilityArtifact["sizeBytes"]);
+            if (canonicalSize <= 0 || canonicalSize != compatibilitySize)
+            {
+                throw new InvalidDataException(
+                    $"Registry canonical and compatibility manifests disagree about artifact {artifactId} sizeBytes.");
+            }
+        }
+    }
+
+    private static Dictionary<string, JsonObject> IndexArtifactRows(JsonArray rows, string label)
+    {
+        var indexed = new Dictionary<string, JsonObject>(StringComparer.Ordinal);
+        foreach (JsonObject row in rows.OfType<JsonObject>())
+        {
+            string artifactId = (GetJsonString(row["artifactId"])
+                                 ?? GetJsonString(row["id"])
+                                 ?? string.Empty).Trim();
+            if (artifactId.Length == 0 || !indexed.TryAdd(artifactId, row))
+            {
+                throw new InvalidDataException($"{label} contains a missing or duplicate artifact id.");
+            }
+        }
+
+        if (indexed.Count != rows.Count)
+        {
+            throw new InvalidDataException($"{label} contains a non-object artifact row.");
+        }
+
+        return indexed;
+    }
+
+    private static void RequireArtifactFieldEqual(
+        JsonObject canonical,
+        JsonObject compatibility,
+        string fieldName,
+        string artifactId,
+        bool normalize = true)
+        => RequireArtifactAliasFieldEqual(
+            canonical,
+            compatibility,
+            fieldName,
+            fieldName,
+            artifactId,
+            normalize);
+
+    private static void RequireArtifactAliasFieldEqual(
+        JsonObject canonical,
+        JsonObject compatibility,
+        string canonicalFieldName,
+        string compatibilityFieldName,
+        string artifactId,
+        bool normalize = true)
+    {
+        string canonicalValue = GetJsonString(canonical[canonicalFieldName])?.Trim() ?? string.Empty;
+        string compatibilityValue = GetJsonString(compatibility[compatibilityFieldName])?.Trim() ?? string.Empty;
+        if (normalize)
+        {
+            canonicalValue = NormalizeToken(canonicalValue);
+            compatibilityValue = NormalizeToken(compatibilityValue);
+        }
+
+        if (canonicalValue.Length == 0
+            || !string.Equals(canonicalValue, compatibilityValue, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"Registry canonical and compatibility manifests disagree about artifact {artifactId} {canonicalFieldName}.");
+        }
+    }
+
+    private static void ValidateCanonicalPlatformFloor(
+        JsonObject canonical,
+        IReadOnlyList<CanonicalArtifactRecord> canonicalArtifacts)
+    {
+        JsonObject coverage = canonical["desktopTupleCoverage"] as JsonObject
+            ?? throw new InvalidDataException(
+                $"{CanonicalManifestName} must contain Registry desktopTupleCoverage.");
+        RequireExactStringArray(
+            coverage,
+            "requiredDesktopPlatforms",
+            RequiredDesktopPlatforms,
+            "canonical desktop platform floor");
+        RequireExactStringArray(
+            coverage,
+            "requiredDesktopHeads",
+            RequiredDesktopHeads,
+            "canonical desktop head floor");
+        RequireExactStringArray(
+            coverage,
+            "requiredDesktopPlatformHeadRidTuples",
+            RequiredDesktopPlatformHeadRidTuples,
+            "canonical desktop platform/head/RID floor");
+
+        HashSet<string> promotedPlatforms = new(StringComparer.Ordinal);
+        HashSet<string> promotedHeads = new(StringComparer.Ordinal);
+        HashSet<string> promotedPairs = new(StringComparer.Ordinal);
+        HashSet<string> promotedRequiredTuples = new(StringComparer.Ordinal);
+        HashSet<string> promotedAllTuples = new(StringComparer.Ordinal);
+        HashSet<string> promotedInstallerTupleIds = new(StringComparer.Ordinal);
+        foreach (CanonicalArtifactRecord artifact in canonicalArtifacts)
+        {
+            string platform = NormalizePlatform(artifact.Platform);
+            string head = NormalizeToken(artifact.Head);
+            string rid = NormalizeToken(artifact.Rid);
+            if (rid.Length == 0)
+            {
+                rid = RidForPlatformAndArch(platform, NormalizeToken(artifact.Arch));
+            }
+
+            if (!RequiredDesktopPlatforms.Contains(platform, StringComparer.Ordinal)
+                || !IsPromotedDesktopInstaller(artifact, platform)
+                || head.Length == 0
+                || rid.Length == 0)
+            {
+                continue;
+            }
+
+            promotedPlatforms.Add(platform);
+            promotedHeads.Add(head);
+            promotedPairs.Add($"{head}:{platform}");
+            promotedAllTuples.Add($"{head}:{rid}:{platform}");
+            promotedInstallerTupleIds.Add($"{head}:{platform}:{rid}");
+            if (RequiredDesktopHeads.Contains(head, StringComparer.Ordinal))
+            {
+                promotedRequiredTuples.Add($"{head}:{rid}:{platform}");
+            }
+        }
+
+        string[] missingPlatforms = RequiredDesktopPlatforms
+            .Where(platform => !promotedPlatforms.Contains(platform))
+            .ToArray();
+        string[] missingHeads = RequiredDesktopHeads
+            .Where(head => !promotedHeads.Contains(head))
+            .ToArray();
+        string[] missingPairs = RequiredDesktopPlatforms
+            .SelectMany(platform => RequiredDesktopHeads.Select(head => $"{head}:{platform}"))
+            .Where(pair => !promotedPairs.Contains(pair))
+            .ToArray();
+        string[] missingTuples = RequiredDesktopPlatformHeadRidTuples
+            .Where(tuple => !promotedRequiredTuples.Contains(tuple))
+            .ToArray();
+
+        RequireExactStringArray(coverage, "missingRequiredPlatforms", missingPlatforms, "missing platform truth");
+        RequireExactStringArray(coverage, "missingRequiredHeads", missingHeads, "missing head truth");
+        RequireExactStringArray(coverage, "missingRequiredPlatformHeadPairs", missingPairs, "missing platform/head truth");
+        RequireExactStringArray(coverage, "missingRequiredPlatformHeadRidTuples", missingTuples, "missing platform/head/RID truth");
+        RequireExactStringArray(
+            coverage,
+            "promotedPlatformHeadRidTuples",
+            promotedAllTuples.Order(StringComparer.Ordinal).ToArray(),
+            "promoted platform/head/RID truth");
+
+        string[] reportedInstallerTupleIds = ReadObjectStringArray(
+                coverage,
+                "promotedInstallerTuples",
+                "tupleId")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!reportedInstallerTupleIds.SequenceEqual(
+                promotedInstallerTupleIds.Order(StringComparer.Ordinal),
+                StringComparer.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} desktopTupleCoverage.promotedInstallerTuples disagrees with Registry artifacts.");
+        }
+
+        bool expectedComplete = missingTuples.Length == 0;
+        if (!TryGetJsonBoolean(coverage["complete"], out bool reportedComplete)
+            || reportedComplete != expectedComplete)
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} desktopTupleCoverage.complete disagrees with the canonical platform floor.");
+        }
+
+        ValidateCanonicalPostureFloors(canonical, expectedComplete);
+    }
+
+    private static bool IsPromotedDesktopInstaller(CanonicalArtifactRecord artifact, string platform)
+    {
+        if (NormalizeToken(artifact.Status) == "revoked"
+            || NormalizeToken(artifact.RolloutState) == "revoked"
+            || NormalizeToken(artifact.RevokeState) == "revoked")
+        {
+            return false;
+        }
+
+        string kind = NormalizeToken(artifact.Kind);
+        return platform == "macos"
+            ? kind is "installer" or "dmg" or "pkg"
+            : kind == "installer";
+    }
+
+    private static string RidForPlatformAndArch(string platform, string arch)
+        => (platform, arch) switch
+        {
+            ("linux", "arm64") => "linux-arm64",
+            ("linux", _) => "linux-x64",
+            ("windows", "arm64") => "win-arm64",
+            ("windows", _) => "win-x64",
+            ("macos", "x64") => "osx-x64",
+            ("macos", _) => "osx-arm64",
+            _ => string.Empty
+        };
+
+    private static void ValidateCanonicalPostureFloors(JsonObject canonical, bool desktopCoverageComplete)
+    {
+        string status = NormalizeToken(GetJsonString(canonical["status"]));
+        if (status != "published")
+        {
+            return;
+        }
+
+        string rolloutState = NormalizeToken(GetJsonString(canonical["rolloutState"]));
+        string supportabilityState = NormalizeToken(GetJsonString(canonical["supportabilityState"]));
+        JsonObject publicTrustMetrics = canonical["publicTrustMetrics"] as JsonObject
+            ?? throw new InvalidDataException($"{CanonicalManifestName} must contain publicTrustMetrics.");
+        JsonObject trustReleaseChannel = publicTrustMetrics["releaseChannel"] as JsonObject
+            ?? throw new InvalidDataException(
+                $"{CanonicalManifestName} must contain publicTrustMetrics.releaseChannel.");
+        JsonObject proofFreshness = publicTrustMetrics["proofFreshness"] as JsonObject
+            ?? throw new InvalidDataException(
+                $"{CanonicalManifestName} must contain publicTrustMetrics.proofFreshness.");
+        JsonObject registryBoundary = canonical["registryBoundaryCoverage"] as JsonObject
+            ?? throw new InvalidDataException($"{CanonicalManifestName} must contain registryBoundaryCoverage.");
+        if (NormalizeToken(GetJsonString(registryBoundary["owner"])) != "chummer6-hub-registry"
+            || NormalizeToken(GetJsonString(registryBoundary["status"])) != "closed")
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} registryBoundaryCoverage must be closed and owned by chummer6-hub-registry.");
+        }
+
+        JsonObject registryReleaseChannel = registryBoundary["releaseChannel"] as JsonObject
+            ?? throw new InvalidDataException(
+                $"{CanonicalManifestName} must contain registryBoundaryCoverage.releaseChannel.");
+
+        string trustSupportability = NormalizeToken(GetJsonString(trustReleaseChannel["supportabilityState"]));
+        string registrySupportability = NormalizeToken(GetJsonString(registryReleaseChannel["supportabilityState"]));
+        if (supportabilityState.Length == 0
+            || trustSupportability != supportabilityState
+            || registrySupportability != supportabilityState)
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} supportabilityState must agree across Registry truth projections.");
+        }
+
+        if (!TryGetJsonBoolean(registryReleaseChannel["desktopTupleComplete"], out bool registryComplete)
+            || registryComplete != desktopCoverageComplete)
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} registryBoundaryCoverage.releaseChannel.desktopTupleComplete disagrees with desktopTupleCoverage.");
+        }
+
+        if (!desktopCoverageComplete)
+        {
+            if (rolloutState != "coverage_incomplete" || supportabilityState != "review_required")
+            {
+                throw new InvalidDataException(
+                    $"{CanonicalManifestName} must remain coverage_incomplete/review_required while the canonical desktop floor is incomplete.");
+            }
+
+            return;
+        }
+
+        string freshnessStatus = NormalizeToken(GetJsonString(proofFreshness["status"]));
+        if (freshnessStatus is not "stale" and not "missing")
+        {
+            return;
+        }
+
+        if (rolloutState != "public_release_review_required"
+            || supportabilityState != "review_required"
+            || NormalizeToken(GetJsonString(trustReleaseChannel["posture"])) != "blocked"
+            || NormalizeToken(GetJsonString(registryReleaseChannel["publicTrustPosture"])) != "blocked")
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} stale or missing proof freshness must stay review-required with blocked public trust posture.");
+        }
+
+        foreach (string fieldName in new[]
+                 {
+                     "rolloutReason",
+                     "supportabilitySummary",
+                     "knownIssueSummary",
+                     "fixAvailabilitySummary"
+                 })
+        {
+            if (!(GetJsonString(canonical[fieldName]) ?? string.Empty).Contains(
+                    "stale or incomplete proof receipts",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    $"{CanonicalManifestName} {fieldName} must explain stale or incomplete proof receipts.");
+            }
+        }
+    }
+
+    private static void RequireExactStringArray(
+        JsonObject source,
+        string propertyName,
+        IReadOnlyList<string> expected,
+        string description)
+    {
+        string[] actual = ReadStringArray(source, propertyName);
+        if (!actual.SequenceEqual(expected, StringComparer.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} desktopTupleCoverage.{propertyName} does not match {description}.");
+        }
+    }
+
+    private static string[] ReadStringArray(JsonObject source, string propertyName)
+    {
+        if (source[propertyName] is not JsonArray array)
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} desktopTupleCoverage.{propertyName} must be an array.");
+        }
+
+        string[] values = array
+            .Select(GetJsonString)
+            .Where(static value => value is not null)
+            .Select(static value => value!.Trim())
+            .ToArray();
+        if (values.Length != array.Count || values.Any(static value => value.Length == 0))
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} desktopTupleCoverage.{propertyName} must contain non-empty strings.");
+        }
+
+        return values;
+    }
+
+    private static string[] ReadObjectStringArray(
+        JsonObject source,
+        string propertyName,
+        string childPropertyName)
+    {
+        if (source[propertyName] is not JsonArray array)
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} desktopTupleCoverage.{propertyName} must be an array.");
+        }
+
+        string[] values = array
+            .OfType<JsonObject>()
+            .Select(row => GetJsonString(row[childPropertyName])?.Trim() ?? string.Empty)
+            .ToArray();
+        if (values.Length != array.Count || values.Any(static value => value.Length == 0))
+        {
+            throw new InvalidDataException(
+                $"{CanonicalManifestName} desktopTupleCoverage.{propertyName} contains an invalid row.");
+        }
+
+        return values;
+    }
+
+    private static bool TryGetJsonBoolean(JsonNode? node, out bool value)
+    {
+        value = false;
+        if (node is JsonValue jsonValue && jsonValue.TryGetValue<bool>(out value))
+        {
+            return true;
+        }
+
+        return bool.TryParse(GetJsonString(node), out value);
+    }
+
+    private static long GetJsonInt64(JsonNode? node)
+    {
+        if (node is JsonValue jsonValue && jsonValue.TryGetValue<long>(out long value))
+        {
+            return value;
+        }
+
+        return long.TryParse(GetJsonString(node), out value) ? value : 0;
     }
 
     private static void ValidateIncomingBundle(
@@ -2220,6 +2897,35 @@ public sealed class ReleaseBundlePromotionService
         File.Move(tempPath, path, overwrite: true);
     }
 
+    private static void WriteBytesAtomically(string path, byte[] bytes)
+    {
+        string tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        try
+        {
+            using (var stream = new FileStream(
+                       tempPath,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None,
+                       bufferSize: 64 * 1024,
+                       FileOptions.WriteThrough))
+            {
+                stream.Write(bytes);
+                stream.Flush(flushToDisk: true);
+            }
+
+            File.Move(tempPath, path, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
+    }
+
     private static string ResolveDownloadFileName(PublicReleaseArtifactDto artifact)
         => ResolveArtifactFileName(artifact.FileName, artifact.Url);
 
@@ -2307,16 +3013,21 @@ public sealed class ReleaseBundlePromotionService
 
     private static string Sha256For(string path)
     {
-        using var sha = System.Security.Cryptography.SHA256.Create();
+        using var sha = SHA256.Create();
         using FileStream stream = File.OpenRead(path);
         return Convert.ToHexString(sha.ComputeHash(stream)).ToLowerInvariant();
     }
+
+    private static string Sha256For(byte[] bytes)
+        => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
     private PublicReleaseManifestDto ValidatePublicShelfCoherence(
         string downloadsRoot,
         string liveCompatibilityManifestPath,
         string liveCanonicalManifestPath,
-        IReadOnlyList<string> promotedArtifactIds)
+        IReadOnlyList<string> promotedArtifactIds,
+        string expectedCompatibilitySha256,
+        string expectedCanonicalSha256)
     {
         if (!File.Exists(liveCompatibilityManifestPath))
         {
@@ -2326,6 +3037,18 @@ public sealed class ReleaseBundlePromotionService
         if (!File.Exists(liveCanonicalManifestPath))
         {
             throw new InvalidOperationException("promotion wrote no canonical manifest.");
+        }
+
+        if (!FixedTimeDigestEquals(Sha256For(liveCompatibilityManifestPath), expectedCompatibilitySha256))
+        {
+            throw new InvalidOperationException(
+                "public compatibility manifest bytes do not match the Registry-verified activation digest.");
+        }
+
+        if (!FixedTimeDigestEquals(Sha256For(liveCanonicalManifestPath), expectedCanonicalSha256))
+        {
+            throw new InvalidOperationException(
+                "public canonical manifest bytes do not match the Registry-verified activation digest.");
         }
 
         PublicReleaseManifestDto liveCompatibilityManifest = LoadCompatibilityManifest(liveCompatibilityManifestPath);
@@ -2369,30 +3092,47 @@ public sealed class ReleaseBundlePromotionService
         return releaseSelection.ApplyAccessPolicy(liveCompatibilityManifest);
     }
 
+    private static bool FixedTimeDigestEquals(string left, string right)
+    {
+        try
+        {
+            return CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(left),
+                Convert.FromHexString(right));
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
     private static void ValidateRegistryBoundaryCompatibilityCounts(
         PublicReleaseManifestDto compatibilityManifest,
         JsonObject canonicalManifest)
     {
         int publishedArtifactCount = compatibilityManifest.Downloads.Count;
         JsonObject? canonicalCoverage = canonicalManifest["registryBoundaryCoverage"] as JsonObject;
+        JsonObject? canonicalPersistence = canonicalCoverage?["persistence"] as JsonObject;
         JsonObject? canonicalCompatibility = canonicalCoverage?["compatibility"] as JsonObject;
-        JsonObject? compatibilityCoverage = compatibilityManifest.RegistryBoundaryCoverage is JsonElement compatibilityCoverageElement
-            && compatibilityCoverageElement.ValueKind == JsonValueKind.Object
-            ? JsonNode.Parse(compatibilityCoverageElement.GetRawText())?.AsObject()
-            : null;
-        JsonObject? compatibilityBoundary = compatibilityCoverage?["compatibility"] as JsonObject;
+        int persistedArtifactCount = GetJsonInt32(canonicalPersistence?["artifactCount"]);
         int canonicalCompatible = GetJsonInt32(canonicalCompatibility?["compatibleArtifactCount"]);
-        int compatibilityCompatible = GetJsonInt32(compatibilityBoundary?["compatibleArtifactCount"]);
-        if (canonicalCompatible != publishedArtifactCount)
+        if (persistedArtifactCount != publishedArtifactCount)
+        {
+            throw new InvalidOperationException(
+                $"RELEASE_CHANNEL.generated.json registryBoundaryCoverage.persistence.artifactCount must equal the published artifact count ({publishedArtifactCount}), got {persistedArtifactCount}");
+        }
+
+        if (canonicalCompatible < 0 || canonicalCompatible > publishedArtifactCount)
+        {
+            throw new InvalidOperationException(
+                $"RELEASE_CHANNEL.generated.json registryBoundaryCoverage.compatibility.compatibleArtifactCount must be between zero and the published artifact count ({publishedArtifactCount}), got {canonicalCompatible}");
+        }
+
+        if (NormalizeToken(GetJsonString(canonicalManifest["supportabilityState"])) == "preview_supported"
+            && canonicalCompatible != publishedArtifactCount)
         {
             throw new InvalidOperationException(
                 $"RELEASE_CHANNEL.generated.json preview_supported release must keep registryBoundaryCoverage.compatibility.compatibleArtifactCount equal to published artifact count ({publishedArtifactCount}), got {canonicalCompatible}");
-        }
-
-        if (compatibilityCompatible != publishedArtifactCount)
-        {
-            throw new InvalidOperationException(
-                $"dist/releases.json preview_supported release must keep registryBoundaryCoverage.compatibility.compatibleArtifactCount equal to published artifact count ({publishedArtifactCount}), got {compatibilityCompatible}");
         }
     }
 
@@ -2447,12 +3187,26 @@ public sealed class ReleaseBundlePromotionService
         [property: JsonPropertyName("artifactId")] string ArtifactId,
         [property: JsonPropertyName("head")] string? Head,
         [property: JsonPropertyName("platform")] string? Platform,
+        [property: JsonPropertyName("rid")] string? Rid,
         [property: JsonPropertyName("arch")] string? Arch,
         [property: JsonPropertyName("kind")] string? Kind,
+        [property: JsonPropertyName("status")] string? Status,
+        [property: JsonPropertyName("rolloutState")] string? RolloutState,
+        [property: JsonPropertyName("revokeState")] string? RevokeState,
         [property: JsonPropertyName("fileName")] string? FileName,
         [property: JsonPropertyName("downloadUrl")] string? DownloadUrl,
         [property: JsonPropertyName("sha256")] string? Sha256,
         [property: JsonPropertyName("sizeBytes")] long? SizeBytes);
+
+    private sealed record RegistryManifestActivationReceipt(
+        string ContractName,
+        string RegistryContractName,
+        string Version,
+        string Channel,
+        DateTimeOffset PublishedAt,
+        DateTimeOffset ActivatedAt,
+        string CompatibilityManifestSha256,
+        string CanonicalManifestSha256);
 
     private sealed record StartupSmokeReceipt(
         [property: JsonPropertyName("headId")] string HeadId,

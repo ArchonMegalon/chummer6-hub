@@ -2,6 +2,7 @@ using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -45,8 +46,11 @@ public sealed class InternalReleaseBundlesControllerTests
         OkObjectResult sessionResponse = Assert.IsType<OkObjectResult>(fixture.Controller.CreateUploadSession().Result);
         var created = Assert.IsType<InternalReleaseBundlesController.ReleaseUploadSessionCreatedResponse>(sessionResponse.Value);
 
-        await UploadFileAsync(fixture.Controller, created.SessionId, "releases.json", "application/json", BuildCompatibilityManifest());
-        await UploadFileAsync(fixture.Controller, created.SessionId, "RELEASE_CHANNEL.generated.json", "application/json", BuildCanonicalManifest());
+        byte[] compatibilityManifest = BuildCompatibilityManifest();
+        byte[] canonicalManifest = BuildCanonicalManifest();
+
+        await UploadFileAsync(fixture.Controller, created.SessionId, "releases.json", "application/json", compatibilityManifest);
+        await UploadFileAsync(fixture.Controller, created.SessionId, "RELEASE_CHANNEL.generated.json", "application/json", canonicalManifest);
         await UploadFileAsync(fixture.Controller, created.SessionId, "release-evidence/public-promotion.json", "application/json", BuildPromotionEvidence());
         await UploadFileAsync(fixture.Controller, created.SessionId, "files/chummer-avalonia-osx-arm64-installer.dmg", "application/octet-stream", "mac-live"u8.ToArray());
         await UploadFileAsync(fixture.Controller, created.SessionId, "startup-smoke/startup-smoke-avalonia-macos-arm64.receipt.json", "application/json", BuildStartupSmokeReceipt());
@@ -62,6 +66,10 @@ public sealed class InternalReleaseBundlesControllerTests
         Assert.Contains("avalonia-osx-arm64-dmg", promoted.PromotedArtifactIds);
         Assert.NotNull(promoted.SignedInInstallClaims);
         Assert.NotEmpty(promoted.SignedInInstallClaims!);
+        Assert.Equal(compatibilityManifest, File.ReadAllBytes(Path.Combine(fixture.DownloadsRoot, "releases.json")));
+        Assert.Equal(canonicalManifest, File.ReadAllBytes(Path.Combine(fixture.DownloadsRoot, "RELEASE_CHANNEL.generated.json")));
+        Assert.Equal($"sha256:{Sha256For(compatibilityManifest)}", promoted.CompatibilityManifestSha256);
+        Assert.Equal($"sha256:{Sha256For(canonicalManifest)}", promoted.CanonicalManifestSha256);
     }
 
     [Fact]
@@ -283,35 +291,84 @@ public sealed class InternalReleaseBundlesControllerTests
         fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = $"Bearer {issued.Ticket}";
     }
 
+    private static string Sha256For(byte[] bytes)
+        => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
     private static byte[] BuildCompatibilityManifest()
         => System.Text.Encoding.UTF8.GetBytes("""
 {
+  "contractName": "Chummer.Hub.Registry.Contracts",
+  "contract_name": "Chummer.Hub.Registry.Contracts",
+  "source": "registry",
+  "schemaVersion": 1,
   "version": "run-test",
+  "releaseVersion": "run-test",
   "channel": "preview",
+  "channelId": "preview",
   "publishedAt": "2026-04-02T06:00:00Z",
-  "registryBoundaryCoverage": {
-    "compatibility": {
-      "compatibleArtifactCount": 1,
-      "compatibleRuntimeBundleHeadCount": 0,
-      "compatibleExchangeArtifactCount": 0,
-      "unknownArtifactCount": 0,
-      "unknownRuntimeBundleHeadCount": 0,
-      "summary": "Compatibility boundary tracks 1 compatible artifact, 0 compatible runtime bundle heads, and 0 compatible exchange-lineage rows while 0 artifact rows and 0 runtime bundle heads remain unknown."
-    }
+  "status": "published",
+  "rolloutState": "coverage_incomplete",
+  "rolloutReason": "Registry requires Linux, Windows, and macOS desktop installer coverage.",
+  "supportabilityState": "review_required",
+  "supportabilitySummary": "Registry review is required until the desktop platform floor is complete.",
+  "knownIssueSummary": "The desktop platform floor is incomplete.",
+  "fixAvailabilitySummary": "Publish the missing Registry-validated desktop installers.",
+  "releaseProof": {
+    "status": "passed",
+    "generatedAt": "2026-04-02T06:00:00Z",
+    "baseUrl": "https://chummer.run",
+    "journeysPassed": ["build_explain_publish"],
+    "proofRoutes": ["/downloads/install/avalonia-osx-arm64-dmg"]
+  },
+  "desktopTupleCoverage": {
+    "requiredDesktopPlatforms": ["linux", "windows", "macos"],
+    "requiredDesktopHeads": ["avalonia"],
+    "requiredDesktopPlatformHeadRidTuples": [
+      "avalonia:linux-x64:linux",
+      "avalonia:osx-arm64:macos",
+      "avalonia:win-x64:windows"
+    ],
+    "promotedInstallerTuples": [
+      {
+        "tupleId": "avalonia:macos:osx-arm64",
+        "artifactId": "avalonia-osx-arm64-dmg",
+        "head": "avalonia",
+        "platform": "macos",
+        "rid": "osx-arm64",
+        "arch": "arm64",
+        "kind": "dmg"
+      }
+    ],
+    "promotedPlatformHeadRidTuples": ["avalonia:osx-arm64:macos"],
+    "missingRequiredPlatforms": ["linux", "windows"],
+    "missingRequiredHeads": [],
+    "missingRequiredPlatformHeadPairs": ["avalonia:linux", "avalonia:windows"],
+    "missingRequiredPlatformHeadRidTuples": [
+      "avalonia:linux-x64:linux",
+      "avalonia:win-x64:windows"
+    ],
+    "complete": false
   },
   "downloads": [
     {
       "id": "avalonia-osx-arm64-dmg",
-      "platform": "Avalonia Desktop macOS arm64",
-      "url": "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
-      "sha256": "6f63f1170506eaca21ee53bf90415ee7ed4f40937c505f140137259e27a65bab",
-      "sizeBytes": 8,
+      "artifactId": "avalonia-osx-arm64-dmg",
       "head": "avalonia",
-      "platformId": "macos-arm64",
+      "platform": "macos",
+      "platformId": "macos",
+      "rid": "osx-arm64",
       "arch": "arm64",
       "kind": "dmg",
       "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
-      "installAccessClass": "account_required"
+      "url": "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+      "sha256": "6f63f1170506eaca21ee53bf90415ee7ed4f40937c505f140137259e27a65bab",
+      "sizeBytes": 8,
+      "installAccessClass": "account_required",
+      "version": "run-test",
+      "releaseVersion": "run-test",
+      "channel": "preview",
+      "channelId": "preview",
+      "status": "available"
     }
   ]
 }
@@ -320,20 +377,80 @@ public sealed class InternalReleaseBundlesControllerTests
     private static byte[] BuildCanonicalManifest()
         => System.Text.Encoding.UTF8.GetBytes("""
 {
+  "contractName": "Chummer.Hub.Registry.Contracts",
+  "contract_name": "Chummer.Hub.Registry.Contracts",
   "schemaVersion": 1,
   "product": "chummer",
-  "channelId": "preview",
   "version": "run-test",
+  "releaseVersion": "run-test",
+  "channel": "preview",
+  "channelId": "preview",
   "publishedAt": "2026-04-02T06:00:00Z",
   "status": "published",
+  "rolloutState": "coverage_incomplete",
+  "rolloutReason": "Registry requires Linux, Windows, and macOS desktop installer coverage.",
+  "supportabilityState": "review_required",
+  "supportabilitySummary": "Registry review is required until the desktop platform floor is complete.",
+  "knownIssueSummary": "The desktop platform floor is incomplete.",
+  "fixAvailabilitySummary": "Publish the missing Registry-validated desktop installers.",
+  "releaseProof": {
+    "status": "passed",
+    "generatedAt": "2026-04-02T06:00:00Z",
+    "baseUrl": "https://chummer.run",
+    "journeysPassed": ["build_explain_publish"],
+    "proofRoutes": ["/downloads/install/avalonia-osx-arm64-dmg"]
+  },
+  "desktopTupleCoverage": {
+    "requiredDesktopPlatforms": ["linux", "windows", "macos"],
+    "requiredDesktopHeads": ["avalonia"],
+    "requiredDesktopPlatformHeadRidTuples": [
+      "avalonia:linux-x64:linux",
+      "avalonia:osx-arm64:macos",
+      "avalonia:win-x64:windows"
+    ],
+    "promotedInstallerTuples": [
+      {
+        "tupleId": "avalonia:macos:osx-arm64",
+        "artifactId": "avalonia-osx-arm64-dmg",
+        "head": "avalonia",
+        "platform": "macos",
+        "rid": "osx-arm64",
+        "arch": "arm64",
+        "kind": "dmg"
+      }
+    ],
+    "promotedPlatformHeadRidTuples": ["avalonia:osx-arm64:macos"],
+    "missingRequiredPlatforms": ["linux", "windows"],
+    "missingRequiredHeads": [],
+    "missingRequiredPlatformHeadPairs": ["avalonia:linux", "avalonia:windows"],
+    "missingRequiredPlatformHeadRidTuples": [
+      "avalonia:linux-x64:linux",
+      "avalonia:win-x64:windows"
+    ],
+    "complete": false
+  },
+  "publicTrustMetrics": {
+    "releaseChannel": {
+      "posture": "preview",
+      "supportabilityState": "review_required"
+    },
+    "proofFreshness": {
+      "status": "fresh"
+    }
+  },
   "registryBoundaryCoverage": {
+    "owner": "chummer6-hub-registry",
+    "status": "closed",
+    "persistence": {
+      "artifactCount": 1
+    },
     "compatibility": {
-      "compatibleArtifactCount": 1,
-      "compatibleRuntimeBundleHeadCount": 0,
-      "compatibleExchangeArtifactCount": 0,
-      "unknownArtifactCount": 0,
-      "unknownRuntimeBundleHeadCount": 0,
-      "summary": "Compatibility boundary tracks 1 compatible artifact, 0 compatible runtime bundle heads, and 0 compatible exchange-lineage rows while 0 artifact rows and 0 runtime bundle heads remain unknown."
+      "compatibleArtifactCount": 1
+    },
+    "releaseChannel": {
+      "supportabilityState": "review_required",
+      "desktopTupleComplete": false,
+      "publicTrustPosture": "preview"
     }
   },
   "artifacts": [
@@ -341,13 +458,21 @@ public sealed class InternalReleaseBundlesControllerTests
       "artifactId": "avalonia-osx-arm64-dmg",
       "head": "avalonia",
       "platform": "macos",
+      "rid": "osx-arm64",
       "arch": "arm64",
       "kind": "dmg",
       "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
       "downloadUrl": "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
       "sha256": "6f63f1170506eaca21ee53bf90415ee7ed4f40937c505f140137259e27a65bab",
       "sizeBytes": 8,
-      "platformLabel": "Avalonia Desktop macOS ARM64"
+      "platformLabel": "Avalonia Desktop macOS ARM64",
+      "installAccessClass": "account_required",
+      "version": "run-test",
+      "releaseVersion": "run-test",
+      "channel": "preview",
+      "channelId": "preview",
+      "status": "available",
+      "rolloutState": "promoted"
     }
   ]
 }
@@ -425,6 +550,8 @@ public sealed class InternalReleaseBundlesControllerTests
         public ReleaseUploadTicketService ReleaseUploadTickets { get; }
 
         public InternalReleaseBundlesController Controller { get; }
+
+        public string DownloadsRoot => Path.Combine(_root, "downloads");
 
         public string SessionRoot => Path.Combine(_root, "sessions");
 

@@ -15,6 +15,9 @@ public sealed class ReleaseBundlePromotionServiceTests
 {
     private static readonly JsonSerializerOptions TestJsonOptions = new(JsonSerializerDefaults.Web);
 
+    private static string Sha256For(byte[] bytes)
+        => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
     [Fact]
     public async Task PromoteAsyncReplacesShelfWithIncomingBundleArtifacts()
     {
@@ -426,139 +429,11 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
-    public async Task PromoteAsyncReplacesDesktopTupleCoverageWithIncomingBundleShelf()
+    public async Task PromoteAsyncPreservesRegistryAuthoredManifestBytesAndBindsDigests()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
-
-        string initialBundle = fixture.CreateBundle(
-            version: "run-20260419-190000",
-            artifacts:
-            [
-                new BundleArtifact(
-                    ArtifactId: "avalonia-linux-x64-installer",
-                    Head: "avalonia",
-                    Platform: "linux",
-                    Arch: "x64",
-                    Kind: "installer",
-                    FileName: "chummer-avalonia-linux-x64-installer.deb",
-                    Bytes: "linux"u8.ToArray(),
-                    RequiresSigning: false,
-                    RequiresNotarization: false),
-                new BundleArtifact(
-                    ArtifactId: "avalonia-win-x64-installer",
-                    Head: "avalonia",
-                    Platform: "windows",
-                    Arch: "x64",
-                    Kind: "installer",
-                    FileName: "chummer-avalonia-win-x64-installer.exe",
-                    Bytes: "windows"u8.ToArray(),
-                    RequiresSigning: false,
-                    RequiresNotarization: false,
-                    SigningStatusOverride: "skipped_preview",
-                    NotarizationStatusOverride: "skipped_preview")
-            ]);
-        await fixture.PromoteAsync(initialBundle);
-
-        string macBundle = fixture.CreateBundle(
-            version: "run-20260419-201110",
-            artifacts:
-            [
-                new BundleArtifact(
-                    ArtifactId: "avalonia-osx-arm64-installer",
-                    Head: "avalonia",
-                    Platform: "macos",
-                    Arch: "arm64",
-                    Kind: "dmg",
-                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
-                    Bytes: "mac"u8.ToArray(),
-                    RequiresSigning: false,
-                    RequiresNotarization: false,
-                    SigningStatusOverride: "skipped_preview",
-                    NotarizationStatusOverride: "skipped_preview")
-            ]);
-
-        await fixture.PromoteAsync(macBundle);
-
-        using JsonDocument compatibility = fixture.ReadCompatibilityManifest();
-        JsonElement coverage = compatibility.RootElement.GetProperty("desktopTupleCoverage");
-        Assert.True(coverage.GetProperty("complete").GetBoolean());
-        string[] promotedTupleIds = coverage.GetProperty("promotedInstallerTuples")
-            .EnumerateArray()
-            .Select(item => item.GetProperty("tupleId").GetString()!)
-            .OrderBy(static value => value, StringComparer.Ordinal)
-            .ToArray();
-        Assert.Equal(["avalonia:macos:osx-arm64"], promotedTupleIds);
-        Assert.Equal(
-            ["macos"],
-            coverage.GetProperty("requiredDesktopPlatforms")
-                .EnumerateArray()
-                .Select(item => item.GetString()!)
-                .ToArray());
-        Assert.Equal("promoted_preview", compatibility.RootElement.GetProperty("rolloutState").GetString());
-        Assert.Equal("preview_supported", compatibility.RootElement.GetProperty("supportabilityState").GetString());
-    }
-
-    [Fact]
-    public async Task PromoteAsyncFiltersExternalProofRequestsAgainstIncomingShelfCoverage()
-    {
-        using var fixture = new ReleaseBundlePromotionFixture();
-
-        string initialBundle = fixture.CreateBundle(
-            version: "run-20260419-180000",
-            artifacts:
-            [
-                new BundleArtifact(
-                    ArtifactId: "avalonia-linux-x64-installer",
-                    Head: "avalonia",
-                    Platform: "linux",
-                    Arch: "x64",
-                    Kind: "installer",
-                    FileName: "chummer-avalonia-linux-x64-installer.deb",
-                    Bytes: "linux"u8.ToArray(),
-                    RequiresSigning: false,
-                    RequiresNotarization: false)
-            ]);
-        await fixture.PromoteAsync(initialBundle);
-
-        string macBundle = fixture.CreateBundle(
-            version: "run-20260419-201110",
-            artifacts:
-            [
-                new BundleArtifact(
-                    ArtifactId: "avalonia-osx-arm64-installer",
-                    Head: "avalonia",
-                    Platform: "macos",
-                    Arch: "arm64",
-                    Kind: "dmg",
-                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
-                    Bytes: "mac"u8.ToArray(),
-                    RequiresSigning: false,
-                    RequiresNotarization: false,
-                    SigningStatusOverride: "skipped_preview",
-                    NotarizationStatusOverride: "skipped_preview")
-            ]);
-
-        await fixture.PromoteAsync(macBundle);
-
-        using JsonDocument compatibility = fixture.ReadCompatibilityManifest();
-        JsonElement coverage = compatibility.RootElement.GetProperty("desktopTupleCoverage");
-        string[] promotedTupleIds = coverage.GetProperty("promotedInstallerTuples")
-            .EnumerateArray()
-            .Select(item => item.GetProperty("tupleId").GetString()!)
-            .ToArray();
-        Assert.Equal(["avalonia:macos:osx-arm64"], promotedTupleIds);
-        Assert.Empty(coverage.GetProperty("externalProofRequests")
-            .EnumerateArray()
-            .ToArray());
-    }
-
-    [Fact]
-    public async Task PromoteAsyncPublishesCanonicalRouteTruthWithRevokeSource()
-    {
-        using var fixture = new ReleaseBundlePromotionFixture();
-
         string bundlePath = fixture.CreateBundle(
-            version: "run-20260502-214500",
+            version: "run-20260717-010203",
             artifacts:
             [
                 new BundleArtifact(
@@ -568,7 +443,45 @@ public sealed class ReleaseBundlePromotionServiceTests
                     Arch: "arm64",
                     Kind: "dmg",
                     FileName: "chummer-avalonia-osx-arm64-installer.dmg",
-                    Bytes: "mac-route-truth"u8.ToArray(),
+                    Bytes: "registry-byte-proof"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ]);
+
+        byte[] expectedCompatibility = fixture.ReadBundleEntryBytes(bundlePath, "releases.json");
+        byte[] expectedCanonical = fixture.ReadBundleEntryBytes(bundlePath, "RELEASE_CHANNEL.generated.json");
+
+        ReleaseBundlePromotionResult result = await fixture.PromoteAsync(bundlePath);
+
+        Assert.Equal(expectedCompatibility, File.ReadAllBytes(Path.Combine(fixture.DownloadsRoot, "releases.json")));
+        Assert.Equal(expectedCanonical, File.ReadAllBytes(Path.Combine(fixture.DownloadsRoot, "RELEASE_CHANNEL.generated.json")));
+        Assert.Equal($"sha256:{Sha256For(expectedCompatibility)}", result.CompatibilityManifestSha256);
+        Assert.Equal($"sha256:{Sha256For(expectedCanonical)}", result.CanonicalManifestSha256);
+
+        using JsonDocument receipt = JsonDocument.Parse(
+            File.ReadAllBytes(Path.Combine(fixture.DownloadsRoot, ".release-channel-activation.json")));
+        Assert.Equal(result.CompatibilityManifestSha256, receipt.RootElement.GetProperty("compatibilityManifestSha256").GetString());
+        Assert.Equal(result.CanonicalManifestSha256, receipt.RootElement.GetProperty("canonicalManifestSha256").GetString());
+    }
+
+    [Fact]
+    public async Task PromoteAsyncKeepsMacOnlyRegistryShelfIncompleteAndReviewRequired()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260717-020304",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-only"u8.ToArray(),
                     RequiresSigning: false,
                     RequiresNotarization: false,
                     SigningStatusOverride: "skipped_preview",
@@ -578,134 +491,57 @@ public sealed class ReleaseBundlePromotionServiceTests
         await fixture.PromoteAsync(bundlePath);
 
         using JsonDocument canonical = fixture.ReadCanonicalManifest();
-        JsonElement[] rows = canonical.RootElement
-            .GetProperty("desktopTupleCoverage")
-            .GetProperty("desktopRouteTruth")
-            .EnumerateArray()
-            .ToArray();
+        JsonElement coverage = canonical.RootElement.GetProperty("desktopTupleCoverage");
+        Assert.False(coverage.GetProperty("complete").GetBoolean());
+        Assert.Equal(["linux", "windows", "macos"], coverage.GetProperty("requiredDesktopPlatforms").EnumerateArray().Select(static item => item.GetString()!).ToArray());
+        Assert.Equal(["linux", "windows"], coverage.GetProperty("missingRequiredPlatforms").EnumerateArray().Select(static item => item.GetString()!).ToArray());
+        Assert.Equal("coverage_incomplete", canonical.RootElement.GetProperty("rolloutState").GetString());
+        Assert.Equal("review_required", canonical.RootElement.GetProperty("supportabilityState").GetString());
+    }
 
-        Assert.NotEmpty(rows);
-        foreach (JsonElement row in rows)
-        {
-            Assert.True(row.TryGetProperty("revokeSource", out JsonElement revokeSource));
-            Assert.Equal("none", revokeSource.GetString());
-
-            if (row.GetProperty("promotionState").GetString() == "promoted")
+    [Fact]
+    public async Task PromoteAsyncRejectsOptimisticMacOnlyRegistryShelf()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260717-030405",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "optimistic-mac-only"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ],
+            mutateManifestPair: static (compatibility, canonical) =>
             {
-                string artifactId = row.GetProperty("artifactId").GetString()!;
-                Assert.Contains(artifactId, row.GetProperty("installPostureReason").GetString());
-            }
-        }
+                compatibility["rolloutState"] = "promoted_preview";
+                compatibility["supportabilityState"] = "preview_supported";
+                canonical["rolloutState"] = "promoted_preview";
+                canonical["supportabilityState"] = "preview_supported";
+                canonical["publicTrustMetrics"]!["releaseChannel"]!["supportabilityState"] = "preview_supported";
+                canonical["registryBoundaryCoverage"]!["releaseChannel"]!["supportabilityState"] = "preview_supported";
+            });
+
+        InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(() => fixture.PromoteAsync(bundlePath));
+
+        Assert.Contains("coverage_incomplete/review_required", exception.Message, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(fixture.DownloadsRoot, "RELEASE_CHANNEL.generated.json")));
     }
 
     [Fact]
-    public async Task PromoteAsyncMarksPromotedPrimaryInstallerAsReinstallRecoveryWhenFallbackIsMissing()
+    public async Task PromoteAsyncRejectsCanonicalCompatibilityProjectionDrift()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
-
         string bundlePath = fixture.CreateBundle(
-            version: "run-20260618-142358",
-            artifacts:
-            [
-                new BundleArtifact(
-                    ArtifactId: "avalonia-linux-x64-installer",
-                    Head: "avalonia",
-                    Platform: "linux",
-                    Arch: "x64",
-                    Kind: "installer",
-                    FileName: "chummer-avalonia-linux-x64-installer.deb",
-                    Bytes: "linux-stable"u8.ToArray(),
-                    RequiresSigning: false,
-                    RequiresNotarization: false)
-            ],
-            channel: "stable");
-
-        await fixture.PromoteAsync(bundlePath);
-
-        using JsonDocument canonical = fixture.ReadCanonicalManifest();
-        JsonElement primary = canonical.RootElement
-            .GetProperty("desktopTupleCoverage")
-            .GetProperty("desktopRouteTruth")
-            .EnumerateArray()
-            .Single(row => row.GetProperty("tupleId").GetString() == "avalonia:linux:linux-x64");
-
-        Assert.Equal("promoted", primary.GetProperty("promotionState").GetString());
-        Assert.Equal("primary_reinstall_available", primary.GetProperty("rollbackState").GetString());
-        Assert.Equal("primary_installer_reinstall_available", primary.GetProperty("rollbackReasonCode").GetString());
-        Assert.Contains("avalonia-linux-x64-installer", primary.GetProperty("rollbackReason").GetString());
-
-        JsonElement releaseChannel = canonical.RootElement
-            .GetProperty("publicTrustMetrics")
-            .GetProperty("releaseChannel");
-        Assert.Equal("live", releaseChannel.GetProperty("posture").GetString());
-        Assert.Equal("public_stable", releaseChannel.GetProperty("rolloutState").GetString());
-        Assert.Equal("gold_supported", releaseChannel.GetProperty("supportabilityState").GetString());
-        Assert.Equal(1, releaseChannel.GetProperty("recommendedRouteCount").GetInt32());
-
-        JsonElement boundaryReleaseChannel = canonical.RootElement
-            .GetProperty("registryBoundaryCoverage")
-            .GetProperty("releaseChannel");
-        Assert.Equal("published", boundaryReleaseChannel.GetProperty("publicationStatus").GetString());
-        Assert.Equal("public_stable", boundaryReleaseChannel.GetProperty("rolloutState").GetString());
-        Assert.Equal("gold_supported", boundaryReleaseChannel.GetProperty("supportabilityState").GetString());
-        Assert.True(boundaryReleaseChannel.GetProperty("desktopTupleComplete").GetBoolean());
-        Assert.Equal(1, boundaryReleaseChannel.GetProperty("promotedInstallerTupleCount").GetInt32());
-        Assert.Equal("live", boundaryReleaseChannel.GetProperty("publicTrustPosture").GetString());
-    }
-
-    [Fact]
-    public async Task PromoteAsyncRebuildsInstallAwareRegistryFromNormalizedRouteTruth()
-    {
-        using var fixture = new ReleaseBundlePromotionFixture();
-
-        string bundlePath = fixture.CreateBundle(
-            version: "run-20260522-201500",
-            artifacts:
-            [
-                new BundleArtifact(
-                    ArtifactId: "avalonia-osx-arm64-installer",
-                    Head: "avalonia",
-                    Platform: "macos",
-                    Arch: "arm64",
-                    Kind: "dmg",
-                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
-                    Bytes: "mac-install-aware"u8.ToArray(),
-                    RequiresSigning: false,
-                    RequiresNotarization: false,
-                    SigningStatusOverride: "skipped_preview",
-                    NotarizationStatusOverride: "skipped_preview")
-            ]);
-
-        await fixture.PromoteAsync(bundlePath);
-
-        using JsonDocument canonical = fixture.ReadCanonicalManifest();
-        JsonElement[] rows = canonical.RootElement
-            .GetProperty("installAwareArtifactRegistry")
-            .EnumerateArray()
-            .ToArray();
-
-        JsonElement primary = Assert.Single(
-            rows,
-            row => row.GetProperty("artifactId").GetString() == "avalonia-osx-arm64-installer");
-        Assert.True(primary.GetProperty("currentForInstalledBuild").GetBoolean());
-        Assert.Contains(
-            "primary-route avalonia:macos:osx-arm64 current",
-            primary.GetProperty("channelRationale").GetString(),
-            StringComparison.Ordinal);
-
-        JsonElement fallback = Assert.Single(
-            rows,
-            row => row.GetProperty("artifactId").GetString() == "blazor-desktop-osx-arm64-installer");
-        Assert.False(fallback.GetProperty("currentForInstalledBuild").GetBoolean());
-    }
-
-    [Fact]
-    public async Task PromoteAsyncDowngradesPassedReleaseProofWhenItPredatesCurrentPublicationWindow()
-    {
-        using var fixture = new ReleaseBundlePromotionFixture();
-
-        string bundlePath = fixture.CreateBundle(
-            version: "run-20260501-040136",
+            version: "run-20260717-040506",
             artifacts:
             [
                 new BundleArtifact(
@@ -715,68 +551,19 @@ public sealed class ReleaseBundlePromotionServiceTests
                     Arch: "x64",
                     Kind: "installer",
                     FileName: "chummer-avalonia-win-x64-installer.exe",
-                    Bytes: "windows"u8.ToArray(),
+                    Bytes: "windows-drift"u8.ToArray(),
                     RequiresSigning: false,
                     RequiresNotarization: false,
-                    SigningStatusOverride: "skipped_preview",
-                    NotarizationStatusOverride: "skipped_preview")
+                    SigningStatusOverride: "skipped_preview")
             ],
-            publishedAt: "2026-05-01T04:01:36Z",
-            proofGeneratedAt: "2026-04-25T22:43:00Z");
+            mutateManifestPair: static (compatibility, _) =>
+            {
+                compatibility["downloads"]![0]!["sha256"] = new string('0', 64);
+            });
 
-        await fixture.PromoteAsync(bundlePath);
+        InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(() => fixture.PromoteAsync(bundlePath));
 
-        using JsonDocument compatibility = fixture.ReadCompatibilityManifest();
-        using JsonDocument canonical = fixture.ReadCanonicalManifest();
-
-        Assert.Equal("review_required", compatibility.RootElement.GetProperty("releaseProof").GetProperty("status").GetString());
-        Assert.Equal("review_required", canonical.RootElement.GetProperty("releaseProof").GetProperty("status").GetString());
-        Assert.Equal("review_required", compatibility.RootElement.GetProperty("supportabilityState").GetString());
-    }
-
-    [Fact]
-    public async Task PromoteAsyncNormalizesExistingCanonicalArtifactsToIncomingChannelAndVersion()
-    {
-        using var fixture = new ReleaseBundlePromotionFixture();
-        fixture.WriteLiveArtifact(
-            artifactId: "avalonia-linux-x64-installer",
-            fileName: "chummer-avalonia-linux-x64-installer.deb",
-            platform: "linux",
-            arch: "x64",
-            kind: "installer",
-            bytes: "linux-live");
-        fixture.SetCanonicalMetadata(
-            channelId: "public_stable",
-            version: "run-20260401-200000");
-
-        string bundlePath = fixture.CreateBundle(
-            version: "run-20260420-090000",
-            artifacts:
-            [
-                new BundleArtifact(
-                    ArtifactId: "avalonia-osx-arm64-installer",
-                    Head: "avalonia",
-                    Platform: "macos",
-                    Arch: "arm64",
-                    Kind: "dmg",
-                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
-                    Bytes: "mac-preview"u8.ToArray(),
-                    RequiresSigning: false,
-                    RequiresNotarization: false,
-                    SigningStatusOverride: "skipped_preview",
-                    NotarizationStatusOverride: "skipped_preview")
-            ]);
-
-        await fixture.PromoteAsync(bundlePath);
-        using JsonDocument canonical = fixture.ReadCanonicalManifest();
-
-        foreach (JsonElement artifact in canonical.RootElement.GetProperty("artifacts").EnumerateArray())
-        {
-            Assert.Equal("preview", artifact.GetProperty("channel").GetString());
-            Assert.Equal("preview", artifact.GetProperty("channelId").GetString());
-            Assert.Equal("run-20260420-090000", artifact.GetProperty("version").GetString());
-            Assert.Equal("run-20260420-090000", artifact.GetProperty("releaseVersion").GetString());
-        }
+        Assert.Contains("artifact avalonia-win-x64-installer sha256", exception.Message, StringComparison.Ordinal);
     }
 
     private sealed class ReleaseBundlePromotionFixture : IDisposable
@@ -831,7 +618,7 @@ public sealed class ReleaseBundlePromotionServiceTests
                 [
                     new CompatibilityArtifact(
                         Id: artifactId,
-                        Platform: $"Avalonia Desktop {platform} {arch}",
+                        Platform: platform,
                         Url: $"/downloads/files/{fileName}",
                         Sha256: sha,
                         SizeBytes: size,
@@ -881,7 +668,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             JsonArray downloads = compatibility["downloads"]!.AsArray();
             downloads.Add(JsonSerializer.SerializeToNode(new CompatibilityArtifact(
                 Id: artifactId,
-                Platform: $"Avalonia Desktop {platform} {arch}",
+                Platform: platform,
                 Url: $"/downloads/files/{fileName}",
                 Sha256: sha,
                 SizeBytes: size,
@@ -917,7 +704,8 @@ public sealed class ReleaseBundlePromotionServiceTests
             IReadOnlyList<ProofArtifact>? proofArtifacts = null,
             string publishedAt = "2026-04-01T20:00:00Z",
             string proofGeneratedAt = "2026-04-01T20:00:00Z",
-            string channel = "preview")
+            string channel = "preview",
+            Action<JsonObject, JsonObject>? mutateManifestPair = null)
         {
             string bundleRoot = Path.Combine(_root, "bundle-" + Guid.NewGuid().ToString("N"));
             string filesRoot = Path.Combine(bundleRoot, "files");
@@ -941,7 +729,7 @@ public sealed class ReleaseBundlePromotionServiceTests
 
                 compatibilityArtifacts.Add(new CompatibilityArtifact(
                     Id: artifact.ArtifactId,
-                    Platform: $"Avalonia Desktop {artifact.Platform} {artifact.Arch}",
+                    Platform: artifact.Platform,
                     Url: downloadUrl,
                     Sha256: sha,
                     SizeBytes: size,
@@ -1003,6 +791,17 @@ public sealed class ReleaseBundlePromotionServiceTests
                 proofGeneratedAt,
                 channel);
 
+            if (mutateManifestPair is not null)
+            {
+                string compatibilityPath = Path.Combine(bundleRoot, "releases.json");
+                string canonicalPath = Path.Combine(bundleRoot, "RELEASE_CHANNEL.generated.json");
+                JsonObject compatibility = JsonNode.Parse(File.ReadAllText(compatibilityPath))!.AsObject();
+                JsonObject canonical = JsonNode.Parse(File.ReadAllText(canonicalPath))!.AsObject();
+                mutateManifestPair(compatibility, canonical);
+                File.WriteAllText(compatibilityPath, compatibility.ToJsonString(TestJsonOptions));
+                File.WriteAllText(canonicalPath, canonical.ToJsonString(TestJsonOptions));
+            }
+
             if (includePromotionEvidence)
             {
                 File.WriteAllText(
@@ -1034,6 +833,17 @@ public sealed class ReleaseBundlePromotionServiceTests
             string zipPath = Path.Combine(_root, $"{Path.GetFileName(bundleRoot)}.zip");
             ZipFile.CreateFromDirectory(bundleRoot, zipPath);
             return zipPath;
+        }
+
+        public byte[] ReadBundleEntryBytes(string bundlePath, string entryName)
+        {
+            using ZipArchive archive = ZipFile.OpenRead(bundlePath);
+            ZipArchiveEntry entry = archive.GetEntry(entryName)
+                ?? throw new InvalidOperationException($"Bundle entry {entryName} is missing.");
+            using Stream stream = entry.Open();
+            using var bytes = new MemoryStream();
+            stream.CopyTo(bytes);
+            return bytes.ToArray();
         }
 
         public JsonDocument ReadCompatibilityManifest()
@@ -1085,23 +895,46 @@ public sealed class ReleaseBundlePromotionServiceTests
             string proofGeneratedAt = "2026-04-01T20:00:00Z",
             string channel = "preview")
         {
-            File.WriteAllText(
-                path,
-                JsonSerializer.Serialize(new
-                {
+            RegistryArtifactProjection[] projections = downloads
+                .Select(download => ToRegistryProjection(
+                    download.Id,
+                    download.Head,
+                    download.Platform,
+                    download.Arch,
+                    download.Kind,
+                    download.FileName,
+                    download.Url,
+                    download.Sha256,
+                    download.SizeBytes,
+                    download.InstallAccessClass,
                     version,
-                    channel,
-                    publishedAt,
-                    releaseProof = new
-                    {
-                        status = "passed",
-                        generatedAt = proofGeneratedAt,
-                        baseUrl = "https://chummer.run",
-                        journeysPassed = new[] { "build_explain_publish" },
-                        proofRoutes = downloads.Select(static download => $"/downloads/install/{download.Id}").ToArray()
-                    },
-                    downloads
-                }, TestJsonOptions));
+                    channel))
+                .ToArray();
+            RegistryPosture posture = BuildRegistryPosture(projections, channel);
+
+            var manifest = new JsonObject
+            {
+                ["contractName"] = "Chummer.Hub.Registry.Contracts",
+                ["contract_name"] = "Chummer.Hub.Registry.Contracts",
+                ["source"] = "registry",
+                ["schemaVersion"] = 1,
+                ["version"] = version,
+                ["releaseVersion"] = version,
+                ["channel"] = channel,
+                ["channelId"] = channel,
+                ["publishedAt"] = publishedAt,
+                ["status"] = "published",
+                ["rolloutState"] = posture.RolloutState,
+                ["rolloutReason"] = posture.RolloutReason,
+                ["supportabilityState"] = posture.SupportabilityState,
+                ["supportabilitySummary"] = posture.SupportabilitySummary,
+                ["knownIssueSummary"] = posture.KnownIssueSummary,
+                ["fixAvailabilitySummary"] = posture.FixAvailabilitySummary,
+                ["releaseProof"] = BuildReleaseProof(projections, proofGeneratedAt),
+                ["desktopTupleCoverage"] = BuildDesktopTupleCoverage(projections),
+                ["downloads"] = BuildCompatibilityArtifacts(projections)
+            };
+            File.WriteAllText(path, manifest.ToJsonString(TestJsonOptions));
         }
 
         private static void WriteCanonicalManifest(
@@ -1112,41 +945,345 @@ public sealed class ReleaseBundlePromotionServiceTests
             string proofGeneratedAt = "2026-04-01T20:00:00Z",
             string channel = "preview")
         {
-            string[] proofRoutes = artifacts
-                .Select(static artifact => $"/downloads/install/{artifact.ArtifactId}")
-                .ToArray();
-
-            File.WriteAllText(
-                path,
-                JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    product = "chummer",
-                    channelId = channel,
+            RegistryArtifactProjection[] projections = artifacts
+                .Select(artifact => ToRegistryProjection(
+                    artifact.ArtifactId,
+                    artifact.Head,
+                    artifact.Platform,
+                    artifact.Arch,
+                    artifact.Kind,
+                    artifact.FileName,
+                    artifact.DownloadUrl,
+                    artifact.Sha256,
+                    artifact.SizeBytes,
+                    "account_required",
                     version,
-                    publishedAt,
-                    status = "published",
-                    releaseProof = new
+                    channel))
+                .ToArray();
+            RegistryPosture posture = BuildRegistryPosture(projections, channel);
+            bool complete = IsDesktopFloorComplete(projections);
+
+            var manifest = new JsonObject
+            {
+                ["contractName"] = "Chummer.Hub.Registry.Contracts",
+                ["contract_name"] = "Chummer.Hub.Registry.Contracts",
+                ["schemaVersion"] = 1,
+                ["product"] = "chummer",
+                ["version"] = version,
+                ["releaseVersion"] = version,
+                ["channel"] = channel,
+                ["channelId"] = channel,
+                ["publishedAt"] = publishedAt,
+                ["status"] = "published",
+                ["rolloutState"] = posture.RolloutState,
+                ["rolloutReason"] = posture.RolloutReason,
+                ["supportabilityState"] = posture.SupportabilityState,
+                ["supportabilitySummary"] = posture.SupportabilitySummary,
+                ["knownIssueSummary"] = posture.KnownIssueSummary,
+                ["fixAvailabilitySummary"] = posture.FixAvailabilitySummary,
+                ["releaseProof"] = BuildReleaseProof(projections, proofGeneratedAt),
+                ["desktopTupleCoverage"] = BuildDesktopTupleCoverage(projections),
+                ["artifacts"] = BuildCanonicalArtifacts(projections),
+                ["publicTrustMetrics"] = new JsonObject
+                {
+                    ["releaseChannel"] = new JsonObject
                     {
-                        status = "passed",
-                        generatedAt = proofGeneratedAt,
-                        baseUrl = "https://chummer.run",
-                        journeysPassed = new[] { "build_explain_publish" },
-                        proofRoutes
+                        ["posture"] = posture.PublicTrustPosture,
+                        ["supportabilityState"] = posture.SupportabilityState
                     },
-                    artifacts,
-                    registryBoundaryCoverage = new
+                    ["proofFreshness"] = new JsonObject
                     {
-                        persistence = new
-                        {
-                            artifactCount = artifacts.Count
-                        },
-                        compatibility = new
-                        {
-                            compatibleArtifactCount = artifacts.Count
-                        }
+                        ["status"] = "fresh"
                     }
-                }, TestJsonOptions));
+                },
+                ["registryBoundaryCoverage"] = new JsonObject
+                {
+                    ["owner"] = "chummer6-hub-registry",
+                    ["status"] = "closed",
+                    ["persistence"] = new JsonObject
+                    {
+                        ["artifactCount"] = projections.Length
+                    },
+                    ["compatibility"] = new JsonObject
+                    {
+                        ["compatibleArtifactCount"] = projections.Length
+                    },
+                    ["releaseChannel"] = new JsonObject
+                    {
+                        ["supportabilityState"] = posture.SupportabilityState,
+                        ["desktopTupleComplete"] = complete,
+                        ["publicTrustPosture"] = posture.PublicTrustPosture
+                    }
+                }
+            };
+            File.WriteAllText(path, manifest.ToJsonString(TestJsonOptions));
+        }
+
+        private static RegistryArtifactProjection ToRegistryProjection(
+            string artifactId,
+            string head,
+            string platform,
+            string arch,
+            string kind,
+            string fileName,
+            string downloadUrl,
+            string sha256,
+            long sizeBytes,
+            string installAccessClass,
+            string version,
+            string channel)
+        {
+            string normalizedPlatform = NormalizePlatform(platform);
+            return new RegistryArtifactProjection(
+                artifactId,
+                head,
+                normalizedPlatform,
+                RidFor(normalizedPlatform, arch),
+                arch,
+                kind,
+                fileName,
+                downloadUrl,
+                sha256,
+                sizeBytes,
+                installAccessClass,
+                version,
+                channel);
+        }
+
+        private static JsonObject BuildReleaseProof(
+            IReadOnlyList<RegistryArtifactProjection> artifacts,
+            string generatedAt)
+            => new()
+            {
+                ["status"] = "passed",
+                ["generatedAt"] = generatedAt,
+                ["baseUrl"] = "https://chummer.run",
+                ["journeysPassed"] = JsonStrings(["build_explain_publish"]),
+                ["proofRoutes"] = JsonStrings(
+                    artifacts.Select(static artifact => $"/downloads/install/{artifact.ArtifactId}"))
+            };
+
+        private static JsonArray BuildCompatibilityArtifacts(
+            IReadOnlyList<RegistryArtifactProjection> artifacts)
+        {
+            var rows = new JsonArray();
+            foreach (RegistryArtifactProjection artifact in artifacts)
+            {
+                rows.Add(new JsonObject
+                {
+                    ["id"] = artifact.ArtifactId,
+                    ["artifactId"] = artifact.ArtifactId,
+                    ["head"] = artifact.Head,
+                    ["platform"] = artifact.Platform,
+                    ["platformId"] = artifact.Platform,
+                    ["platformLabel"] = $"Avalonia Desktop {artifact.Platform} {artifact.Arch}",
+                    ["rid"] = artifact.Rid,
+                    ["arch"] = artifact.Arch,
+                    ["kind"] = artifact.Kind,
+                    ["fileName"] = artifact.FileName,
+                    ["url"] = artifact.DownloadUrl,
+                    ["sha256"] = artifact.Sha256,
+                    ["sizeBytes"] = artifact.SizeBytes,
+                    ["installAccessClass"] = artifact.InstallAccessClass,
+                    ["version"] = artifact.Version,
+                    ["releaseVersion"] = artifact.Version,
+                    ["channel"] = artifact.Channel,
+                    ["channelId"] = artifact.Channel,
+                    ["status"] = "available"
+                });
+            }
+
+            return rows;
+        }
+
+        private static JsonArray BuildCanonicalArtifacts(
+            IReadOnlyList<RegistryArtifactProjection> artifacts)
+        {
+            var rows = new JsonArray();
+            foreach (RegistryArtifactProjection artifact in artifacts)
+            {
+                rows.Add(new JsonObject
+                {
+                    ["artifactId"] = artifact.ArtifactId,
+                    ["head"] = artifact.Head,
+                    ["platform"] = artifact.Platform,
+                    ["rid"] = artifact.Rid,
+                    ["arch"] = artifact.Arch,
+                    ["kind"] = artifact.Kind,
+                    ["fileName"] = artifact.FileName,
+                    ["downloadUrl"] = artifact.DownloadUrl,
+                    ["sha256"] = artifact.Sha256,
+                    ["sizeBytes"] = artifact.SizeBytes,
+                    ["installAccessClass"] = artifact.InstallAccessClass,
+                    ["version"] = artifact.Version,
+                    ["releaseVersion"] = artifact.Version,
+                    ["channel"] = artifact.Channel,
+                    ["channelId"] = artifact.Channel,
+                    ["status"] = "available",
+                    ["rolloutState"] = "promoted"
+                });
+            }
+
+            return rows;
+        }
+
+        private static JsonObject BuildDesktopTupleCoverage(
+            IReadOnlyList<RegistryArtifactProjection> artifacts)
+        {
+            const string requiredHead = "avalonia";
+            string[] requiredPlatforms = ["linux", "windows", "macos"];
+            string[] requiredTuples =
+            [
+                "avalonia:linux-x64:linux",
+                "avalonia:osx-arm64:macos",
+                "avalonia:win-x64:windows"
+            ];
+            RegistryArtifactProjection[] installers = artifacts
+                .Where(IsPromotedDesktopInstaller)
+                .ToArray();
+            HashSet<string> promotedPlatforms = installers
+                .Select(static artifact => artifact.Platform)
+                .ToHashSet(StringComparer.Ordinal);
+            HashSet<string> promotedHeads = installers
+                .Select(static artifact => artifact.Head)
+                .ToHashSet(StringComparer.Ordinal);
+            HashSet<string> promotedPairs = installers
+                .Select(static artifact => $"{artifact.Head}:{artifact.Platform}")
+                .ToHashSet(StringComparer.Ordinal);
+            HashSet<string> promotedRequiredTuples = installers
+                .Where(static artifact => artifact.Head == requiredHead)
+                .Select(static artifact => $"{artifact.Head}:{artifact.Rid}:{artifact.Platform}")
+                .ToHashSet(StringComparer.Ordinal);
+            string[] missingPlatforms = requiredPlatforms
+                .Where(platform => !promotedPlatforms.Contains(platform))
+                .ToArray();
+            string[] missingHeads = promotedHeads.Contains(requiredHead) ? [] : [requiredHead];
+            string[] missingPairs = requiredPlatforms
+                .Select(platform => $"{requiredHead}:{platform}")
+                .Where(pair => !promotedPairs.Contains(pair))
+                .ToArray();
+            string[] missingTuples = requiredTuples
+                .Where(tuple => !promotedRequiredTuples.Contains(tuple))
+                .ToArray();
+            var promotedInstallerTuples = new JsonArray();
+            foreach (RegistryArtifactProjection artifact in installers.OrderBy(
+                         static artifact => $"{artifact.Head}:{artifact.Platform}:{artifact.Rid}",
+                         StringComparer.Ordinal))
+            {
+                promotedInstallerTuples.Add(new JsonObject
+                {
+                    ["tupleId"] = $"{artifact.Head}:{artifact.Platform}:{artifact.Rid}",
+                    ["artifactId"] = artifact.ArtifactId,
+                    ["head"] = artifact.Head,
+                    ["platform"] = artifact.Platform,
+                    ["rid"] = artifact.Rid,
+                    ["arch"] = artifact.Arch,
+                    ["kind"] = artifact.Kind
+                });
+            }
+
+            return new JsonObject
+            {
+                ["requiredDesktopPlatforms"] = JsonStrings(requiredPlatforms),
+                ["requiredDesktopHeads"] = JsonStrings([requiredHead]),
+                ["requiredDesktopPlatformHeadRidTuples"] = JsonStrings(requiredTuples),
+                ["promotedInstallerTuples"] = promotedInstallerTuples,
+                ["promotedPlatformHeadRidTuples"] = JsonStrings(
+                    installers
+                        .Select(static artifact => $"{artifact.Head}:{artifact.Rid}:{artifact.Platform}")
+                        .Distinct(StringComparer.Ordinal)
+                        .Order(StringComparer.Ordinal)),
+                ["missingRequiredPlatforms"] = JsonStrings(missingPlatforms),
+                ["missingRequiredHeads"] = JsonStrings(missingHeads),
+                ["missingRequiredPlatformHeadPairs"] = JsonStrings(missingPairs),
+                ["missingRequiredPlatformHeadRidTuples"] = JsonStrings(missingTuples),
+                ["complete"] = missingTuples.Length == 0
+            };
+        }
+
+        private static RegistryPosture BuildRegistryPosture(
+            IReadOnlyList<RegistryArtifactProjection> artifacts,
+            string channel)
+        {
+            if (!IsDesktopFloorComplete(artifacts))
+            {
+                return new RegistryPosture(
+                    "coverage_incomplete",
+                    "Registry requires Linux, Windows, and macOS desktop installer coverage.",
+                    "review_required",
+                    "Registry review is required until the desktop platform floor is complete.",
+                    "The desktop platform floor is incomplete.",
+                    "Publish the missing Registry-validated desktop installers.",
+                    "preview");
+            }
+
+            bool stable = string.Equals(channel, "stable", StringComparison.OrdinalIgnoreCase);
+            return new RegistryPosture(
+                stable ? "public_stable" : "promoted_preview",
+                "Registry verified the complete desktop release shelf.",
+                stable ? "gold_supported" : "preview_supported",
+                "Registry verified the release supportability posture.",
+                "No blocking release issue is known.",
+                "No corrective publication is required.",
+                stable ? "live" : "preview");
+        }
+
+        private static bool IsDesktopFloorComplete(IReadOnlyList<RegistryArtifactProjection> artifacts)
+        {
+            HashSet<string> tuples = artifacts
+                .Where(IsPromotedDesktopInstaller)
+                .Where(static artifact => artifact.Head == "avalonia")
+                .Select(static artifact => $"{artifact.Head}:{artifact.Rid}:{artifact.Platform}")
+                .ToHashSet(StringComparer.Ordinal);
+            return tuples.Contains("avalonia:linux-x64:linux")
+                   && tuples.Contains("avalonia:osx-arm64:macos")
+                   && tuples.Contains("avalonia:win-x64:windows");
+        }
+
+        private static bool IsPromotedDesktopInstaller(RegistryArtifactProjection artifact)
+            => artifact.Platform == "macos"
+                ? artifact.Kind is "installer" or "dmg" or "pkg"
+                : artifact.Kind == "installer";
+
+        private static string NormalizePlatform(string platform)
+        {
+            string token = platform.Trim().ToLowerInvariant().Replace('_', '-');
+            if (token.StartsWith("mac", StringComparison.Ordinal)
+                || token.StartsWith("osx", StringComparison.Ordinal)
+                || token.StartsWith("darwin", StringComparison.Ordinal))
+            {
+                return "macos";
+            }
+
+            if (token.StartsWith("win", StringComparison.Ordinal))
+            {
+                return "windows";
+            }
+
+            return token.StartsWith("linux", StringComparison.Ordinal) ? "linux" : token;
+        }
+
+        private static string RidFor(string platform, string arch)
+            => (platform, arch.ToLowerInvariant()) switch
+            {
+                ("linux", "arm64") => "linux-arm64",
+                ("linux", _) => "linux-x64",
+                ("windows", "arm64") => "win-arm64",
+                ("windows", _) => "win-x64",
+                ("macos", "x64") => "osx-x64",
+                ("macos", _) => "osx-arm64",
+                _ => string.Empty
+            };
+
+        private static JsonArray JsonStrings(IEnumerable<string> values)
+        {
+            var result = new JsonArray();
+            foreach (string value in values)
+            {
+                result.Add(value);
+            }
+
+            return result;
         }
 
         private static string Sha256For(string path)
@@ -1197,6 +1334,30 @@ public sealed class ReleaseBundlePromotionServiceTests
         string Sha256,
         long SizeBytes,
         string PlatformLabel);
+
+    private sealed record RegistryArtifactProjection(
+        string ArtifactId,
+        string Head,
+        string Platform,
+        string Rid,
+        string Arch,
+        string Kind,
+        string FileName,
+        string DownloadUrl,
+        string Sha256,
+        long SizeBytes,
+        string InstallAccessClass,
+        string Version,
+        string Channel);
+
+    private sealed record RegistryPosture(
+        string RolloutState,
+        string RolloutReason,
+        string SupportabilityState,
+        string SupportabilitySummary,
+        string KnownIssueSummary,
+        string FixAvailabilitySummary,
+        string PublicTrustPosture);
 
     private sealed record PromotionEvidenceArtifact(
         string ArtifactId,
