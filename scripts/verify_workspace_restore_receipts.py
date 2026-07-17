@@ -72,6 +72,19 @@ RELEASE_CHANNEL_PROJECTION_KEYS = {
     "supportabilityState",
     "publishedAt",
 }
+REQUIRED_RELEASE_PROOF_ROUTES = (
+    "/downloads/install/avalonia-linux-x64-installer",
+    "/home/access",
+    "/home/work",
+    "/account/access",
+    "/account/work",
+    "/account/support",
+    "/contact",
+    "/downloads",
+)
+RELEASE_PROOF_ARTIFACT_INSTALL_ROUTE_RE = re.compile(
+    r"^/downloads/install/(?P<artifact_id>[a-z0-9][a-z0-9-]*)$"
+)
 PACKAGE_ID = "next90-m105-hub-workspace-continuity"
 PACKAGE_TASK = "Make roaming workspace, entitlement replication, stale state, and conflict posture explicit and recoverable."
 LANDED_COMMIT = "4d4b3856"
@@ -1552,10 +1565,37 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
                 missing.append(f"{path}: successor_queue_packages[{PACKAGE_ID}].{key} must be {expected!r}")
 
     proof_routes = payload.get("proof_routes")
-    proof_route_set = {item for item in proof_routes if isinstance(item, str)} if isinstance(proof_routes, list) else set()
-    for route in ["/home/work", "/account/work"]:
-        if route not in proof_route_set:
-            missing.append(f"{path}: proof_routes missing {route}")
+    if not isinstance(proof_routes, list) or any(
+        not isinstance(item, str) for item in proof_routes
+    ):
+        missing.append(f"{path}: proof_routes must be an array of strings")
+    else:
+        required_prefix = list(REQUIRED_RELEASE_PROOF_ROUTES)
+        actual_prefix = proof_routes[: len(required_prefix)]
+        additional_routes = proof_routes[len(required_prefix) :]
+        if actual_prefix != required_prefix:
+            missing.append(
+                f"{path}: proof_routes must begin with the exact Registry route prefix "
+                f"{required_prefix!r}"
+            )
+        if len(proof_routes) != len(set(proof_routes)):
+            missing.append(f"{path}: proof_routes must not contain duplicates")
+        invalid_additional_routes = [
+            route
+            for route in additional_routes
+            if RELEASE_PROOF_ARTIFACT_INSTALL_ROUTE_RE.fullmatch(route) is None
+        ]
+        if invalid_additional_routes:
+            missing.append(
+                f"{path}: proof_routes additional routes must be installer routes; "
+                f"found {invalid_additional_routes!r}"
+            )
+        canonical_additional_routes = sorted(set(additional_routes))
+        if additional_routes != canonical_additional_routes:
+            missing.append(
+                f"{path}: proof_routes additional installer routes must be unique and "
+                f"canonically sorted as {canonical_additional_routes!r}"
+            )
 
     proof_receipts = payload.get("proof_receipts", [])
     proof_receipt_list = [item for item in proof_receipts if isinstance(item, dict)] if isinstance(proof_receipts, list) else []

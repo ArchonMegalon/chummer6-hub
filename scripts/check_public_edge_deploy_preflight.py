@@ -25,12 +25,14 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
 try:
     from scripts.strict_json_contract import (
         StrictJsonContractError,
+        canonical_json_bytes,
         strict_json_object as decode_strict_json_object,
     )
     from scripts.verify_workspace_restore_receipts import check_local_release_proof
 except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
     from strict_json_contract import (
         StrictJsonContractError,
+        canonical_json_bytes,
         strict_json_object as decode_strict_json_object,
     )
     from verify_workspace_restore_receipts import check_local_release_proof
@@ -67,9 +69,23 @@ MAX_PUBLIC_PWA_BINARY_INPUT_BYTES = 8 * 1024 * 1024
 MAX_PUBLIC_PWA_TOTAL_INPUT_BYTES = 64 * 1024 * 1024
 MAX_OVERLAY_BUILD_INFO_BYTES = 1024 * 1024
 MAX_RUNTIME_PROOF_BIND_BYTES = 2 * 1024 * 1024
+MAX_RELEASE_CHANNEL_RECEIPT_BYTES = 2 * 1024 * 1024
 RUNTIME_PROOF_MAX_AGE_SECONDS = 24 * 60 * 60
 RUNTIME_PROOF_MAX_FUTURE_SKEW_SECONDS = 5 * 60
 MAX_RUNTIME_PROOF_FAILURES = 16
+MAX_RUNTIME_PROOF_DETAIL_CHARS = 320
+RUNTIME_PROOF_RELEASE_CHANNEL_PATH = (
+    "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
+)
+RELEASE_CHANNEL_BINDING_FIELDS = (
+    "channelId",
+    "channel",
+    "version",
+    "releaseVersion",
+    "rolloutState",
+    "supportabilityState",
+    "publishedAt",
+)
 PUBLIC_PWA_PROOF_TIMEOUT_SECONDS = 20.0
 PUBLIC_PWA_CHILD_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 PUBLIC_PWA_CHILD_FILE_BYTES = 16 * 1024 * 1024
@@ -3622,72 +3638,68 @@ def source_requires_operational_mirror_check(source_root: Path) -> bool:
     )
 
 
-def runtime_proof_bind_source_check(
-    path: Path,
-    *,
-    now: datetime | None = None,
-) -> dict[str, Any]:
+def _bounded_runtime_detail(detail: object) -> str:
+    normalized = str(detail or "").replace("\x00", "")
+    if len(normalized) <= MAX_RUNTIME_PROOF_DETAIL_CHARS:
+        return normalized
+    return normalized[: MAX_RUNTIME_PROOF_DETAIL_CHARS - 3] + "..."
+
+
+def _stable_bounded_file_capture(path: Path, *, max_bytes: int) -> dict[str, Any]:
     resolved_path = Path(os.path.abspath(os.fspath(path.expanduser())))
-    checks = {
+    result: dict[str, Any] = {
+        "resolvedPath": resolved_path,
+        "payload": b"",
+        "metadata": None,
         "regularFile": False,
         "singleLink": False,
-        "exactMode0644": False,
         "boundedPayload": False,
         "stableSnapshot": False,
         "pathStillBound": False,
-        "strictJsonObject": False,
-        "canonicalJson": False,
-        "semanticContract": False,
-        "fresh": False,
-        "releaseChannelAvailable": False,
-    }
-    result: dict[str, Any] = {
-        "status": "fail",
-        "sourcePath": str(resolved_path),
-        "expectedMode": f"{PUBLIC_EDGE_RUNTIME_PROOF_BIND_MODE:04o}",
-        "actualMode": "",
-        "linkCount": 0,
-        "sizeBytes": 0,
-        "sha256": "",
-        "generatedAt": "",
-        "checks": checks,
-        "failures": [],
+        "failure": "",
     }
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
         descriptor = os.open(resolved_path, flags)
-    except OSError as exc:
-        result["failures"] = [f"runtime proof bind source cannot be opened safely: {exc}"]
+    except (OSError, ValueError) as exc:
+        result["failure"] = _bounded_runtime_detail(
+            f"file cannot be opened safely: {exc}"
+        )
         return result
 
     try:
         before = os.fstat(descriptor)
     except OSError as exc:
         os.close(descriptor)
-        result["failures"] = [
-            f"runtime proof bind source metadata cannot be read safely: {exc}"
-        ]
+        result["failure"] = _bounded_runtime_detail(
+            f"file metadata cannot be read safely: {exc}"
+        )
         return result
 
     payload = b""
     read_failure = ""
     try:
-        if stat.S_ISREG(before.st_mode) and before.st_size <= MAX_RUNTIME_PROOF_BIND_BYTES:
+        if stat.S_ISREG(before.st_mode) and 0 < before.st_size <= max_bytes:
             chunks: list[bytes] = []
-            while True:
-                chunk = os.read(descriptor, 1024 * 1024)
+            total = 0
+            read_budget = max_bytes + 1
+            while total < read_budget:
+                chunk = os.read(
+                    descriptor,
+                    min(1024 * 1024, read_budget - total),
+                )
                 if not chunk:
                     break
                 chunks.append(chunk)
+                total += len(chunk)
             payload = b"".join(chunks)
         after = os.fstat(descriptor)
     except OSError as exc:
-        read_failure = f"runtime proof bind source could not be read safely: {exc}"
+        read_failure = _bounded_runtime_detail(f"file could not be read safely: {exc}")
         after = before
     finally:
         os.close(descriptor)
 
-    actual_mode = stat.S_IMODE(after.st_mode)
     stable_identity = (
         before.st_dev,
         before.st_ino,
@@ -3705,22 +3717,128 @@ def runtime_proof_bind_source_check(
         after.st_mtime_ns,
         after.st_ctime_ns,
     )
-    checks.update(
+    regular_file = stat.S_ISREG(after.st_mode)
+    single_link = after.st_nlink == 1
+    bounded_payload = (
+        regular_file
+        and 0 < after.st_size <= max_bytes
+        and len(payload) == after.st_size
+    )
+    path_still_bound = False
+    try:
+        final_path_metadata = os.stat(resolved_path, follow_symlinks=False)
+        path_still_bound = (
+            final_path_metadata.st_dev,
+            final_path_metadata.st_ino,
+            final_path_metadata.st_mode,
+            final_path_metadata.st_nlink,
+            final_path_metadata.st_size,
+            final_path_metadata.st_mtime_ns,
+            final_path_metadata.st_ctime_ns,
+        ) == (
+            after.st_dev,
+            after.st_ino,
+            after.st_mode,
+            after.st_nlink,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        )
+    except (OSError, ValueError):
+        path_still_bound = False
+
+    result.update(
         {
-            "regularFile": stat.S_ISREG(after.st_mode),
-            "singleLink": after.st_nlink == 1,
-            "exactMode0644": actual_mode == PUBLIC_EDGE_RUNTIME_PROOF_BIND_MODE,
-            "boundedPayload": (
-                stat.S_ISREG(after.st_mode)
-                and 0 < after.st_size <= MAX_RUNTIME_PROOF_BIND_BYTES
-                and len(payload) == after.st_size
-            ),
+            "payload": payload,
+            "metadata": after,
+            "regularFile": regular_file,
+            "singleLink": single_link,
+            "boundedPayload": bounded_payload,
             "stableSnapshot": stable_identity and not read_failure,
+            "pathStillBound": path_still_bound,
+            "failure": read_failure,
         }
     )
+    return result
+
+
+def _expected_release_channel_projection(
+    receipt: dict[str, Any],
+) -> dict[str, str] | None:
+    if receipt.get("status") != "published":
+        return None
+    values = {field: receipt.get(field) for field in RELEASE_CHANNEL_BINDING_FIELDS}
+    if any(not isinstance(value, str) or not value.strip() for value in values.values()):
+        return None
+    if (
+        values["channelId"] != values["channel"]
+        or values["releaseVersion"] != values["version"]
+    ):
+        return None
+    return {
+        "status": "available",
+        "path": RUNTIME_PROOF_RELEASE_CHANNEL_PATH,
+        **values,
+    }
+
+
+def runtime_proof_bind_source_check(
+    path: Path,
+    *,
+    release_channel_receipt: Path | None = None,
+    release_channel_receipt_sha256: str = "",
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    capture = _stable_bounded_file_capture(
+        path,
+        max_bytes=MAX_RUNTIME_PROOF_BIND_BYTES,
+    )
+    resolved_path = capture["resolvedPath"]
+    metadata = capture.get("metadata")
+    payload = capture.get("payload") or b""
+    actual_mode = stat.S_IMODE(metadata.st_mode) if metadata is not None else 0
+    checks = {
+        "regularFile": bool(capture.get("regularFile")),
+        "singleLink": bool(capture.get("singleLink")),
+        "exactMode0644": (
+            metadata is not None
+            and actual_mode == PUBLIC_EDGE_RUNTIME_PROOF_BIND_MODE
+        ),
+        "boundedPayload": bool(capture.get("boundedPayload")),
+        "stableSnapshot": bool(capture.get("stableSnapshot")),
+        "pathStillBound": bool(capture.get("pathStillBound")),
+        "strictJsonObject": False,
+        "canonicalJson": False,
+        "semanticContract": False,
+        "fresh": False,
+        "releaseChannelAvailable": False,
+        "releaseChannelReceiptStable": False,
+        "releaseChannelReceiptDigestMatches": False,
+        "releaseChannelProjectionMatches": False,
+    }
+    result: dict[str, Any] = {
+        "status": "fail",
+        "sourcePath": str(resolved_path),
+        "expectedMode": f"{PUBLIC_EDGE_RUNTIME_PROOF_BIND_MODE:04o}",
+        "actualMode": f"{actual_mode:04o}" if metadata is not None else "",
+        "linkCount": metadata.st_nlink if metadata is not None else 0,
+        "sizeBytes": metadata.st_size if metadata is not None else 0,
+        "sha256": "",
+        "generatedAt": "",
+        "releaseChannelReceiptPath": (
+            str(Path(os.path.abspath(os.fspath(release_channel_receipt.expanduser()))))
+            if release_channel_receipt is not None
+            else ""
+        ),
+        "releaseChannelReceiptExpectedSha256": release_channel_receipt_sha256,
+        "releaseChannelReceiptActualSha256": "",
+        "checks": checks,
+        "failures": [],
+    }
     failures: list[str] = []
-    if read_failure:
-        failures.append(read_failure)
+    capture_failure = str(capture.get("failure") or "")
+    if capture_failure:
+        failures.append(f"runtime proof bind source {capture_failure}")
     if not checks["regularFile"]:
         failures.append("runtime proof bind source is not a regular file")
     if not checks["singleLink"]:
@@ -3733,29 +3851,51 @@ def runtime_proof_bind_source_check(
         )
     if not checks["stableSnapshot"]:
         failures.append("runtime proof bind source changed while it was being captured")
+    if not checks["pathStillBound"]:
+        failures.append(
+            "runtime proof bind source path changed after its exact bytes were validated"
+        )
 
     parsed: dict[str, Any] | None = None
-    if checks["boundedPayload"] and checks["stableSnapshot"]:
+    if (
+        checks["boundedPayload"]
+        and checks["stableSnapshot"]
+        and checks["pathStillBound"]
+    ):
         try:
             parsed = decode_strict_json_object(payload, label="runtime proof bind source")
             checks["strictJsonObject"] = True
         except StrictJsonContractError as exc:
-            failures.append(str(exc))
+            failures.append(_bounded_runtime_detail(exc))
 
     if parsed is not None:
-        canonical_payload = (json.dumps(parsed, indent=2) + "\n").encode("utf-8")
-        checks["canonicalJson"] = payload == canonical_payload
+        try:
+            canonical_payload = canonical_json_bytes(
+                parsed,
+                label="runtime proof bind source",
+            )
+            checks["canonicalJson"] = payload == canonical_payload
+        except StrictJsonContractError as exc:
+            failures.append(_bounded_runtime_detail(exc))
         if not checks["canonicalJson"]:
             failures.append("runtime proof bind source must use canonical materializer JSON bytes")
 
         semantic_failures: list[str] = []
-        with tempfile.TemporaryDirectory(prefix="chummer-runtime-proof-preflight-") as temp_root:
-            snapshot_path = Path(temp_root) / resolved_path.name
-            snapshot_path.write_bytes(payload)
-            check_local_release_proof(snapshot_path, semantic_failures)
+        try:
+            with tempfile.TemporaryDirectory(
+                prefix="chummer-runtime-proof-preflight-"
+            ) as temp_root:
+                snapshot_path = Path(temp_root) / resolved_path.name
+                snapshot_path.write_bytes(payload)
+                check_local_release_proof(snapshot_path, semantic_failures)
+        except (OSError, UnicodeError, ValueError, OverflowError, RecursionError) as exc:
+            semantic_failures.append(
+                "local release proof validation could not complete safely "
+                f"({type(exc).__name__})"
+            )
         checks["semanticContract"] = not semantic_failures
         failures.extend(
-            f"runtime proof semantic contract: {failure}"
+            "runtime proof semantic contract: " + _bounded_runtime_detail(failure)
             for failure in semantic_failures[:MAX_RUNTIME_PROOF_FAILURES]
         )
         if len(semantic_failures) > MAX_RUNTIME_PROOF_FAILURES:
@@ -3787,7 +3927,7 @@ def runtime_proof_bind_source_check(
                     <= age_seconds
                     <= RUNTIME_PROOF_MAX_AGE_SECONDS
                 )
-            except ValueError:
+            except (TypeError, ValueError, OverflowError):
                 checks["fresh"] = False
         if not checks["fresh"]:
             failures.append(
@@ -3805,40 +3945,79 @@ def runtime_proof_bind_source_check(
                 "runtime proof bind source release_channel.status must be available"
             )
 
-    try:
-        final_path_metadata = os.stat(resolved_path, follow_symlinks=False)
-        checks["pathStillBound"] = (
-            final_path_metadata.st_dev,
-            final_path_metadata.st_ino,
-            final_path_metadata.st_mode,
-            final_path_metadata.st_nlink,
-            final_path_metadata.st_size,
-            final_path_metadata.st_mtime_ns,
-            final_path_metadata.st_ctime_ns,
-        ) == (
-            after.st_dev,
-            after.st_ino,
-            after.st_mode,
-            after.st_nlink,
-            after.st_size,
-            after.st_mtime_ns,
-            after.st_ctime_ns,
-        )
-    except OSError:
-        checks["pathStillBound"] = False
-    if not checks["pathStillBound"]:
-        failures.append(
-            "runtime proof bind source path changed after its exact bytes were validated"
-        )
+        expected_receipt_sha256 = release_channel_receipt_sha256.strip()
+        if release_channel_receipt is None:
+            failures.append("runtime proof requires an independently selected release-channel receipt")
+        elif re.fullmatch(r"[0-9a-f]{64}", expected_receipt_sha256) is None:
+            failures.append(
+                "runtime proof requires an independently supplied lowercase release-channel receipt SHA-256"
+            )
+        else:
+            receipt_capture = _stable_bounded_file_capture(
+                release_channel_receipt,
+                max_bytes=MAX_RELEASE_CHANNEL_RECEIPT_BYTES,
+            )
+            checks["releaseChannelReceiptStable"] = all(
+                bool(receipt_capture.get(check_name))
+                for check_name in (
+                    "regularFile",
+                    "singleLink",
+                    "boundedPayload",
+                    "stableSnapshot",
+                    "pathStillBound",
+                )
+            )
+            receipt_capture_failure = str(receipt_capture.get("failure") or "")
+            if receipt_capture_failure:
+                failures.append(
+                    "release-channel receipt " + receipt_capture_failure
+                )
+            if not checks["releaseChannelReceiptStable"]:
+                failures.append(
+                    "release-channel receipt must remain one stable, bounded, single-link regular file"
+                )
+            else:
+                receipt_payload = receipt_capture.get("payload") or b""
+                actual_receipt_sha256 = hashlib.sha256(receipt_payload).hexdigest()
+                result["releaseChannelReceiptActualSha256"] = actual_receipt_sha256
+                checks["releaseChannelReceiptDigestMatches"] = (
+                    actual_receipt_sha256 == expected_receipt_sha256
+                )
+                if not checks["releaseChannelReceiptDigestMatches"]:
+                    failures.append(
+                        "release-channel receipt does not match its independently supplied SHA-256"
+                    )
+                else:
+                    try:
+                        release_receipt = decode_strict_json_object(
+                            receipt_payload,
+                            label="release-channel receipt",
+                        )
+                    except StrictJsonContractError as exc:
+                        failures.append(_bounded_runtime_detail(exc))
+                    else:
+                        expected_projection = _expected_release_channel_projection(
+                            release_receipt
+                        )
+                        if expected_projection is None:
+                            failures.append(
+                                "release-channel receipt must publish one complete canonical binding"
+                            )
+                        else:
+                            checks["releaseChannelProjectionMatches"] = (
+                                release_channel == expected_projection
+                            )
+                            if not checks["releaseChannelProjectionMatches"]:
+                                failures.append(
+                                    "runtime proof release_channel must exactly match the independently selected release-channel receipt"
+                                )
 
+    if payload and checks["boundedPayload"] and checks["stableSnapshot"]:
+        result["sha256"] = hashlib.sha256(payload).hexdigest()
     result.update(
         {
             "status": "pass" if not failures else "fail",
-            "actualMode": f"{actual_mode:04o}",
-            "linkCount": after.st_nlink,
-            "sizeBytes": after.st_size,
-            "sha256": hashlib.sha256(payload).hexdigest() if payload else "",
-            "failures": failures,
+            "failures": [_bounded_runtime_detail(failure) for failure in failures],
         }
     )
     return result
@@ -3853,6 +4032,8 @@ def verify(
     overlay_root: Path | None = None,
     check_overlay_markers: bool = False,
     runtime_proof_bind_source: Path | None = None,
+    release_channel_receipt: Path | None = None,
+    release_channel_receipt_sha256: str = "",
 ) -> dict[str, Any]:
     locks = matching_processes(process_lines)
     foreign_locks = [lock for lock in locks if lock.get("buildScope") == "foreign"]
@@ -3930,7 +4111,9 @@ def verify(
             mirror_findings, operational_mirror_checks = operational_mirror_root_findings()
         findings.extend(mirror_findings)
         runtime_proof_bind_source_receipt = runtime_proof_bind_source_check(
-            runtime_proof_bind_source or PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE
+            runtime_proof_bind_source or PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE,
+            release_channel_receipt=release_channel_receipt,
+            release_channel_receipt_sha256=release_channel_receipt_sha256,
         )
         if runtime_proof_bind_source_receipt.get("status") != "pass":
             findings.append(
@@ -4023,9 +4206,31 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Do not validate the active mounted /app overlay markers.",
     )
+    parser.add_argument(
+        "--release-channel-receipt",
+        default="",
+        help="Independently selected canonical release-channel receipt used to bind the runtime proof projection.",
+    )
+    parser.add_argument(
+        "--release-channel-receipt-sha256",
+        default="",
+        help="Independently supplied lowercase SHA-256 for --release-channel-receipt.",
+    )
     parser.add_argument("--output", help="Write the JSON receipt to this path.")
     parser.add_argument("--json", action="store_true", help="Print a JSON receipt even on pass.")
     args = parser.parse_args(argv)
+    if not args.skip_source_marker_check:
+        if not args.release_channel_receipt:
+            parser.error(
+                "full source preflight requires --release-channel-receipt"
+            )
+        if re.fullmatch(
+            r"[0-9a-f]{64}",
+            args.release_channel_receipt_sha256,
+        ) is None:
+            parser.error(
+                "full source preflight requires --release-channel-receipt-sha256 as lowercase SHA-256"
+            )
 
     try:
         if args.ps_output_file:
@@ -4040,6 +4245,12 @@ def main(argv: list[str] | None = None) -> int:
             check_source_markers=not args.skip_source_marker_check,
             overlay_root=Path(args.overlay_root) if args.overlay_root else None,
             check_overlay_markers=not args.skip_overlay_marker_check,
+            release_channel_receipt=(
+                Path(args.release_channel_receipt)
+                if args.release_channel_receipt
+                else None
+            ),
+            release_channel_receipt_sha256=args.release_channel_receipt_sha256,
         )
     except Exception as exc:
         receipt = {

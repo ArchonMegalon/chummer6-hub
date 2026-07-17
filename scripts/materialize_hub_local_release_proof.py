@@ -11,6 +11,16 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+if str(SCRIPT_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIRECTORY))
+
+try:
+    from scripts.strict_json_contract import canonical_json_bytes
+except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
+    from strict_json_contract import canonical_json_bytes
+
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 M102_SUCCESSOR_FRONTIER_ID = 2897065929
 M102_ACTIVE_FLAGSHIP_FRONTIER_ID = 2594403904
@@ -1845,7 +1855,10 @@ def main() -> int:
     ):
         _write_public_json_artifact(
             out_path,
-            json.dumps(existing_payload, indent=2) + "\n",
+            canonical_json_bytes(
+                existing_payload,
+                label="hub local release proof",
+            ).decode("utf-8"),
         )
         _sync_served_release_proof_if_needed(out_path=out_path)
         print(f"hub local proof unchanged and still fresh: {out_path}")
@@ -1855,7 +1868,13 @@ def main() -> int:
     payload["generated_at"] = generated_at
     payload["generatedAt"] = generated_at
 
-    _write_public_json_artifact(out_path, json.dumps(payload, indent=2) + "\n")
+    _write_public_json_artifact(
+        out_path,
+        canonical_json_bytes(
+            payload,
+            label="hub local release proof",
+        ).decode("utf-8"),
+    )
     _sync_served_release_proof_if_needed(out_path=out_path)
     print(f"wrote hub local proof: {out_path}")
     return 0
