@@ -27,11 +27,13 @@ try:
         StrictJsonContractError,
         strict_json_object as decode_strict_json_object,
     )
+    from scripts.verify_workspace_restore_receipts import check_local_release_proof
 except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
     from strict_json_contract import (
         StrictJsonContractError,
         strict_json_object as decode_strict_json_object,
     )
+    from verify_workspace_restore_receipts import check_local_release_proof
 
 try:
     import fcntl
@@ -64,6 +66,10 @@ MAX_PUBLIC_PWA_TEXT_INPUT_BYTES = 4 * 1024 * 1024
 MAX_PUBLIC_PWA_BINARY_INPUT_BYTES = 8 * 1024 * 1024
 MAX_PUBLIC_PWA_TOTAL_INPUT_BYTES = 64 * 1024 * 1024
 MAX_OVERLAY_BUILD_INFO_BYTES = 1024 * 1024
+MAX_RUNTIME_PROOF_BIND_BYTES = 2 * 1024 * 1024
+RUNTIME_PROOF_MAX_AGE_SECONDS = 24 * 60 * 60
+RUNTIME_PROOF_MAX_FUTURE_SKEW_SECONDS = 5 * 60
+MAX_RUNTIME_PROOF_FAILURES = 16
 PUBLIC_PWA_PROOF_TIMEOUT_SECONDS = 20.0
 PUBLIC_PWA_CHILD_ADDRESS_SPACE_BYTES = 512 * 1024 * 1024
 PUBLIC_PWA_CHILD_FILE_BYTES = 16 * 1024 * 1024
@@ -3616,12 +3622,24 @@ def source_requires_operational_mirror_check(source_root: Path) -> bool:
     )
 
 
-def runtime_proof_bind_source_check(path: Path) -> dict[str, Any]:
+def runtime_proof_bind_source_check(
+    path: Path,
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
     resolved_path = Path(os.path.abspath(os.fspath(path.expanduser())))
     checks = {
         "regularFile": False,
         "singleLink": False,
         "exactMode0644": False,
+        "boundedPayload": False,
+        "stableSnapshot": False,
+        "pathStillBound": False,
+        "strictJsonObject": False,
+        "canonicalJson": False,
+        "semanticContract": False,
+        "fresh": False,
+        "releaseChannelAvailable": False,
     }
     result: dict[str, Any] = {
         "status": "fail",
@@ -3629,6 +3647,9 @@ def runtime_proof_bind_source_check(path: Path) -> dict[str, Any]:
         "expectedMode": f"{PUBLIC_EDGE_RUNTIME_PROOF_BIND_MODE:04o}",
         "actualMode": "",
         "linkCount": 0,
+        "sizeBytes": 0,
+        "sha256": "",
+        "generatedAt": "",
         "checks": checks,
         "failures": [],
     }
@@ -3640,30 +3661,183 @@ def runtime_proof_bind_source_check(path: Path) -> dict[str, Any]:
         return result
 
     try:
-        metadata = os.fstat(descriptor)
+        before = os.fstat(descriptor)
+    except OSError as exc:
+        os.close(descriptor)
+        result["failures"] = [
+            f"runtime proof bind source metadata cannot be read safely: {exc}"
+        ]
+        return result
+
+    payload = b""
+    read_failure = ""
+    try:
+        if stat.S_ISREG(before.st_mode) and before.st_size <= MAX_RUNTIME_PROOF_BIND_BYTES:
+            chunks: list[bytes] = []
+            while True:
+                chunk = os.read(descriptor, 1024 * 1024)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            payload = b"".join(chunks)
+        after = os.fstat(descriptor)
+    except OSError as exc:
+        read_failure = f"runtime proof bind source could not be read safely: {exc}"
+        after = before
     finally:
         os.close(descriptor)
 
-    actual_mode = stat.S_IMODE(metadata.st_mode)
+    actual_mode = stat.S_IMODE(after.st_mode)
+    stable_identity = (
+        before.st_dev,
+        before.st_ino,
+        before.st_mode,
+        before.st_nlink,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+    ) == (
+        after.st_dev,
+        after.st_ino,
+        after.st_mode,
+        after.st_nlink,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    )
     checks.update(
         {
-            "regularFile": stat.S_ISREG(metadata.st_mode),
-            "singleLink": metadata.st_nlink == 1,
+            "regularFile": stat.S_ISREG(after.st_mode),
+            "singleLink": after.st_nlink == 1,
             "exactMode0644": actual_mode == PUBLIC_EDGE_RUNTIME_PROOF_BIND_MODE,
+            "boundedPayload": (
+                stat.S_ISREG(after.st_mode)
+                and 0 < after.st_size <= MAX_RUNTIME_PROOF_BIND_BYTES
+                and len(payload) == after.st_size
+            ),
+            "stableSnapshot": stable_identity and not read_failure,
         }
     )
     failures: list[str] = []
+    if read_failure:
+        failures.append(read_failure)
     if not checks["regularFile"]:
         failures.append("runtime proof bind source is not a regular file")
     if not checks["singleLink"]:
         failures.append("runtime proof bind source must have exactly one link")
     if not checks["exactMode0644"]:
         failures.append("runtime proof bind source must have exact mode 0644")
+    if not checks["boundedPayload"]:
+        failures.append(
+            f"runtime proof bind source must contain 1..{MAX_RUNTIME_PROOF_BIND_BYTES} bytes"
+        )
+    if not checks["stableSnapshot"]:
+        failures.append("runtime proof bind source changed while it was being captured")
+
+    parsed: dict[str, Any] | None = None
+    if checks["boundedPayload"] and checks["stableSnapshot"]:
+        try:
+            parsed = decode_strict_json_object(payload, label="runtime proof bind source")
+            checks["strictJsonObject"] = True
+        except StrictJsonContractError as exc:
+            failures.append(str(exc))
+
+    if parsed is not None:
+        canonical_payload = (json.dumps(parsed, indent=2) + "\n").encode("utf-8")
+        checks["canonicalJson"] = payload == canonical_payload
+        if not checks["canonicalJson"]:
+            failures.append("runtime proof bind source must use canonical materializer JSON bytes")
+
+        semantic_failures: list[str] = []
+        with tempfile.TemporaryDirectory(prefix="chummer-runtime-proof-preflight-") as temp_root:
+            snapshot_path = Path(temp_root) / resolved_path.name
+            snapshot_path.write_bytes(payload)
+            check_local_release_proof(snapshot_path, semantic_failures)
+        checks["semanticContract"] = not semantic_failures
+        failures.extend(
+            f"runtime proof semantic contract: {failure}"
+            for failure in semantic_failures[:MAX_RUNTIME_PROOF_FAILURES]
+        )
+        if len(semantic_failures) > MAX_RUNTIME_PROOF_FAILURES:
+            failures.append(
+                "runtime proof semantic contract returned "
+                f"{len(semantic_failures) - MAX_RUNTIME_PROOF_FAILURES} additional failure(s)"
+            )
+
+        generated_at = parsed.get("generatedAt")
+        generated_at_alias = parsed.get("generated_at")
+        if (
+            isinstance(generated_at, str)
+            and generated_at
+            and generated_at == generated_at_alias
+        ):
+            result["generatedAt"] = generated_at
+            try:
+                parsed_generated_at = datetime.fromisoformat(
+                    generated_at.replace("Z", "+00:00")
+                )
+                if parsed_generated_at.tzinfo is None:
+                    raise ValueError("timestamp has no timezone")
+                age_seconds = (
+                    (now or datetime.now(UTC))
+                    - parsed_generated_at.astimezone(UTC)
+                ).total_seconds()
+                checks["fresh"] = (
+                    -RUNTIME_PROOF_MAX_FUTURE_SKEW_SECONDS
+                    <= age_seconds
+                    <= RUNTIME_PROOF_MAX_AGE_SECONDS
+                )
+            except ValueError:
+                checks["fresh"] = False
+        if not checks["fresh"]:
+            failures.append(
+                "runtime proof bind source generatedAt/generated_at must match and be "
+                "within the 24-hour freshness window"
+            )
+
+        release_channel = parsed.get("release_channel")
+        checks["releaseChannelAvailable"] = (
+            isinstance(release_channel, dict)
+            and release_channel.get("status") == "available"
+        )
+        if not checks["releaseChannelAvailable"]:
+            failures.append(
+                "runtime proof bind source release_channel.status must be available"
+            )
+
+    try:
+        final_path_metadata = os.stat(resolved_path, follow_symlinks=False)
+        checks["pathStillBound"] = (
+            final_path_metadata.st_dev,
+            final_path_metadata.st_ino,
+            final_path_metadata.st_mode,
+            final_path_metadata.st_nlink,
+            final_path_metadata.st_size,
+            final_path_metadata.st_mtime_ns,
+            final_path_metadata.st_ctime_ns,
+        ) == (
+            after.st_dev,
+            after.st_ino,
+            after.st_mode,
+            after.st_nlink,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        )
+    except OSError:
+        checks["pathStillBound"] = False
+    if not checks["pathStillBound"]:
+        failures.append(
+            "runtime proof bind source path changed after its exact bytes were validated"
+        )
+
     result.update(
         {
             "status": "pass" if not failures else "fail",
             "actualMode": f"{actual_mode:04o}",
-            "linkCount": metadata.st_nlink,
+            "linkCount": after.st_nlink,
+            "sizeBytes": after.st_size,
+            "sha256": hashlib.sha256(payload).hexdigest() if payload else "",
             "failures": failures,
         }
     )
@@ -3765,8 +3939,9 @@ def verify(
                     "severity": "blocker",
                     "scope": "source",
                     "detail": (
-                        "runtime proof bind source is not an exact single-link regular 0644 "
-                        "artifact; rerun scripts/materialize_hub_local_release_proof.py"
+                        "runtime proof bind source is not a fresh, canonical, semantically valid "
+                        "single-link regular 0644 artifact bound to an available release channel; "
+                        "rerun scripts/materialize_hub_local_release_proof.py"
                     ),
                 }
             )
