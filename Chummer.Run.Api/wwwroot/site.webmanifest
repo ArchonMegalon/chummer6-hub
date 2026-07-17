@@ -2,7 +2,7 @@
   "name": "Chummer Turn Companion",
   "short_name": "Chummer Play",
   "id": "/mobile",
-  "description": "Mobile play companion for Shadowrun sessions: track continuity, heat, roles, reconnects, and safe Black Ledger updates.",
+  "description": "Installable public Chummer Play shell. Sign in and use a trusted table invitation for live sessions.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "/mobile/player",

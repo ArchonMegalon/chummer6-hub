@@ -1,7 +1,41 @@
-const CACHE_NAME = "chummer-public-v4";
-const SHELL_CACHE = `${CACHE_NAME}-shell`;
-const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;
-const NAVIGATION_FALLBACK = "/mobile";
+// Deterministic public-edge projection template. Regenerate with:
+// python3 scripts/generate_public_play_worker_projection.py
+const CACHE_VERSION = "v19";
+const CACHE_CONTRACT = "run-api-projection-v2";
+const IS_MOBILE_PLAY_SCOPE = new URL(self.registration.scope).pathname.startsWith("/mobile/");
+const CACHE_FAMILY = IS_MOBILE_PLAY_SCOPE ? "chummer-mobile-play" : "chummer-public-root";
+const SHELL_CACHE = `${CACHE_FAMILY}-static-${CACHE_CONTRACT}-${CACHE_VERSION}`;
+const MEDIA_CACHE = `${CACHE_FAMILY}-media-${CACHE_CONTRACT}-${CACHE_VERSION}`;
+const MEDIA_META_CACHE = `${CACHE_FAMILY}-media-meta-${CACHE_CONTRACT}-${CACHE_VERSION}`;
+const RUNTIME_CACHE = `${SHELL_CACHE}-runtime`;
+const MANAGED_CACHE_PREFIXES = [
+  `${CACHE_FAMILY}-static-`,
+  `${CACHE_FAMILY}-media-`,
+  `${CACHE_FAMILY}-media-meta-`
+];
+const LEGACY_PRIVATE_CACHE_PREFIXES = [
+  "chummer-shell-play-shell-",
+  "chummer-media-play-shell-",
+  "chummer-media-meta-play-shell-"
+];
+const MOBILE_NAV_FALLBACK = "/mobile/player";
+const MOBILE_PLAYER_NAV_FALLBACK = "/mobile/player";
+const MOBILE_GM_NAV_FALLBACK = "/mobile/gm";
+const MOBILE_OBSERVER_NAV_FALLBACK = "/mobile/observer";
+const MEDIA_MAX_ENTRIES = 40;
+const MEDIA_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 3;
+const NON_CACHEABLE_PATHS = new Set([
+  "/mobile/pwa/ledger.json"
+]);
+const NON_CACHEABLE_PATH_PREFIXES = [
+  "/account",
+  "/admin",
+  "/api",
+  "/auth",
+  "/signin",
+  "/signout",
+  "/support"
+];
 const NOTIFICATION_ICON = "/apple-touch-icon.png";
 const NOTIFICATION_BADGE = "/favicon.ico";
 const DEFAULT_NOTIFICATION_TITLE = "Chummer update";
@@ -52,47 +86,17 @@ const NOTIFICATION_ASSET_SUFFIXES = [
   ".svg",
   ".webp"
 ];
-const PRECACHE_URLS = [
-  "/",
-  "/mobile",
-  "/mobile/player",
-  "/mobile/gm",
-  "/mobile/observer",
-  "/play",
-  "/play/continuity",
-  "/packages",
-  "/downloads",
-  "/help",
-  "/status",
-  "/manifest.webmanifest",
-  "/site.webmanifest",
-  "/manifest.json",
-  "/manifest.player.webmanifest",
-  "/manifest.gm.webmanifest",
-  "/css/site.css",
-  "/js/site.js",
-  "/mobile/pwa.json",
-  "/ready/handoff/mobile.json",
-  "/apple-touch-icon.png",
-  "/favicon.ico",
-  "/favicon.svg",
-  "/pwa-icon.svg",
-  "/pwa-maskable.svg",
-  "/pwa-screenshot-mobile.svg",
-  "/pwa-screenshot-wide.svg"
-];
-const PUBLIC_NAVIGATION_CACHE_PATHS = new Set([
-  "/",
-  "/mobile",
-  "/mobile/player",
-  "/mobile/gm",
-  "/mobile/observer",
-  "/play",
-  "/play/continuity",
-  "/packages",
-  "/downloads",
-  "/help",
-  "/status"
+const PUBLIC_CACHEABLE_ASSETS = new Map([
+  ["/mobile.css", new Set(["text/css"])],
+  ["/mobile-install-shell.js", new Set(["application/javascript", "text/javascript"])],
+  ["/manifest.play.webmanifest", new Set(["application/manifest+json", "application/json"])],
+  ["/manifest.player.webmanifest", new Set(["application/manifest+json", "application/json"])],
+  ["/manifest.gm.webmanifest", new Set(["application/manifest+json", "application/json"])],
+  ["/manifest.observer.webmanifest", new Set(["application/manifest+json", "application/json"])],
+  ["/icons/icon-192.png", new Set(["image/png"])],
+  ["/icons/icon-512.png", new Set(["image/png"])],
+  ["/icons/icon-192.svg", new Set(["image/svg+xml"])],
+  ["/icons/icon-512.svg", new Set(["image/svg+xml"])]
 ]);
 const CRITICAL_SHELL_ASSETS = [
   "/mobile-install-shell.js",
