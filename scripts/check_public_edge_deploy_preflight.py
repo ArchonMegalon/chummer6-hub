@@ -176,8 +176,11 @@ namespace = {
 exec(compile(program_bytes, synthetic_file, "exec"), namespace, namespace)
 """.strip()
 DEFAULT_PUBLIC_EDGE_OVERLAY_ROOT = RUN_SERVICES_ROOT / ".state" / "public-edge-portal-overlay" / "app"
+PUBLIC_EDGE_CANONICAL_RUN_SERVICES_ROOT = Path(
+    "/docker/chummercomplete/chummer.run-services"
+)
 PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE = (
-    RUN_SERVICES_ROOT
+    PUBLIC_EDGE_CANONICAL_RUN_SERVICES_ROOT
     / ".codex-studio"
     / "published"
     / "HUB_LOCAL_RELEASE_PROOF.generated.json"
@@ -3752,24 +3755,21 @@ def verify(
         else:
             mirror_findings, operational_mirror_checks = operational_mirror_root_findings()
         findings.extend(mirror_findings)
-        if runtime_proof_bind_source is not None or source_requires_operational_mirror_check(
-            resolved_source_root
-        ):
-            runtime_proof_bind_source_receipt = runtime_proof_bind_source_check(
-                runtime_proof_bind_source or PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE
+        runtime_proof_bind_source_receipt = runtime_proof_bind_source_check(
+            runtime_proof_bind_source or PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE
+        )
+        if runtime_proof_bind_source_receipt.get("status") != "pass":
+            findings.append(
+                {
+                    "id": "public_edge_runtime_proof_bind_source_invalid",
+                    "severity": "blocker",
+                    "scope": "source",
+                    "detail": (
+                        "runtime proof bind source is not an exact single-link regular 0644 "
+                        "artifact; rerun scripts/materialize_hub_local_release_proof.py"
+                    ),
+                }
             )
-            if runtime_proof_bind_source_receipt.get("status") != "pass":
-                findings.append(
-                    {
-                        "id": "public_edge_runtime_proof_bind_source_invalid",
-                        "severity": "blocker",
-                        "scope": "source",
-                        "detail": (
-                            "runtime proof bind source is not an exact single-link regular 0644 "
-                            "artifact; rerun scripts/materialize_hub_local_release_proof.py"
-                        ),
-                    }
-                )
     if check_overlay_markers and resolved_overlay_root is not None:
         overlay_findings, overlay_marker_checks = overlay_marker_findings(resolved_overlay_root)
         findings.extend(overlay_findings)

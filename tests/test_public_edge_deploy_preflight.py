@@ -2128,11 +2128,15 @@ def test_main_checks_default_overlay_root_when_not_explicitly_configured(tmp_pat
     module = load_module()
     source_root = write_complete_marker_source_tree(module, tmp_path / "source")
     overlay_root = write_complete_marker_overlay_tree(module, tmp_path / "overlay", source_root)
+    runtime_proof = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    runtime_proof.write_text('{"status":"pass"}\n', encoding="utf-8")
+    runtime_proof.chmod(0o644)
     output_path = tmp_path / "preflight.json"
 
     module.process_lines_from_system = lambda: []
     module.resolve_default_source_root = lambda: source_root
     module.resolve_default_overlay_root = lambda: overlay_root
+    module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE = runtime_proof
 
     exit_code = module.main(["--output", str(output_path)])
 
@@ -2198,15 +2202,65 @@ def test_full_preflight_requires_exact_runtime_proof_bind_source_mode_and_shape(
     assert symlink_receipt["checks"]["regularFile"] is False
 
 
+def test_runtime_proof_default_matches_canonical_compose_bind_source() -> None:
+    module = load_module()
+    compose_text = (REPO_ROOT / "docker-compose.public-edge.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE == Path(
+        "/docker/chummercomplete/chummer.run-services/"
+        ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+    assert compose_text.count(str(module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE)) == 2
+    assert not module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE.is_relative_to(
+        module.RUN_SERVICES_ROOT
+    ) or module.RUN_SERVICES_ROOT == Path("/docker/chummercomplete/chummer.run-services")
+
+
+def test_alternate_source_still_checks_canonical_runtime_proof_bind_source(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    alternate_source = tmp_path / "alternate-clean-source"
+    checked_paths: list[Path] = []
+
+    module.source_marker_findings = lambda _source: ([], [])
+    module.execute_public_pwa_static_proof = lambda _source: {"status": "pass"}
+    module.operational_mirror_findings = lambda _source: ([], [])
+
+    def capture_runtime_proof(path: Path) -> dict[str, object]:
+        checked_paths.append(path)
+        return {"status": "pass", "sourcePath": str(path)}
+
+    module.runtime_proof_bind_source_check = capture_runtime_proof
+
+    receipt = module.verify(
+        [],
+        allow_stale_foreign_build_locks=False,
+        source_root=alternate_source,
+    )
+
+    assert receipt["status"] == "pass"
+    assert checked_paths == [module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE]
+    assert checked_paths[0] != alternate_source / ".codex-studio" / "published" / (
+        "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+
+
 def test_main_can_skip_overlay_marker_check(tmp_path: Path) -> None:
     module = load_module()
     source_root = write_complete_marker_source_tree(module, tmp_path / "source")
     overlay_root = tmp_path / "overlay-missing"
+    runtime_proof = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    runtime_proof.write_text('{"status":"pass"}\n', encoding="utf-8")
+    runtime_proof.chmod(0o644)
     output_path = tmp_path / "preflight.json"
 
     module.process_lines_from_system = lambda: []
     module.resolve_default_source_root = lambda: source_root
     module.resolve_default_overlay_root = lambda: overlay_root
+    module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE = runtime_proof
 
     exit_code = module.main(["--skip-overlay-marker-check", "--output", str(output_path)])
 
