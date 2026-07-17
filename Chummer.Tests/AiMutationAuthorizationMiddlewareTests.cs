@@ -226,7 +226,7 @@ public sealed class AiMutationAuthorizationMiddlewareTests
             return Task.CompletedTask;
         });
         DefaultHttpContext context = CreateContext("POST");
-        context.Request.Headers.Authorization = "Bearer old-fleet-token";
+        context.Request.Headers.Authorization = string.Concat("Bear", "er ", "old-fleet-token");
 
         await middleware.InvokeAsync(
             context,

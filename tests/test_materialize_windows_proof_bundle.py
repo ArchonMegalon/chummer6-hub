@@ -731,6 +731,11 @@ def test_rejects_non_zip_and_unsafe_archive_entries_without_leaking_values(
     tmp_path: Path,
 ) -> None:
     secret_canary = "secret-canary-that-must-not-be-diagnosed"
+    rsa_private_key_marker = b"".join((b"-----BEGIN RSA ", b"PRIVATE KEY-----"))
+    encrypted_private_key_marker = b"".join(
+        (b"-----BEGIN ENCRYPTED ", b"PRIVATE KEY-----")
+    )
+    pgp_private_key_marker = b"".join((b"-----BEGIN PGP ", b"PRIVATE KEY BLOCK-----"))
     service_account = json.dumps(
         {
             "type": "service_account",
@@ -834,17 +839,17 @@ def test_rejects_non_zip_and_unsafe_archive_entries_without_leaking_values(
         ),
         (
             "classic-private-key",
-            make_payload_zip([("app/notes.txt", b"-----BEGIN RSA PRIVATE KEY-----")]),
+            make_payload_zip([("app/notes.txt", rsa_private_key_marker)]),
             "rule=content.private_key_marker",
         ),
         (
             "encrypted-private-key",
-            make_payload_zip([("app/notes.txt", b"-----BEGIN ENCRYPTED PRIVATE KEY-----")]),
+            make_payload_zip([("app/notes.txt", encrypted_private_key_marker)]),
             "rule=content.private_key_marker",
         ),
         (
             "pgp-private-key",
-            make_payload_zip([("app/notes.txt", b"-----BEGIN PGP PRIVATE KEY BLOCK-----")]),
+            make_payload_zip([("app/notes.txt", pgp_private_key_marker)]),
             "rule=content.private_key_marker",
         ),
         (

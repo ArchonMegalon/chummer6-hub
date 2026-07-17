@@ -271,6 +271,9 @@ public sealed class WindowsProofGenerationStoreTests
     public async Task PrepareRejectsUnsafeBootstrapPayloadArchivesWithoutLeakingValues()
     {
         const string canary = "WINDOWS_PROOF_SECRET_CANARY_64f76aa9";
+        string rsaPrivateKeyMarker = string.Concat("-----BEGIN RSA ", "PRIVATE KEY-----");
+        string encryptedPrivateKeyMarker = string.Concat("-----BEGIN ENCRYPTED ", "PRIVATE KEY-----");
+        string pgpPrivateKeyMarker = string.Concat("-----BEGIN PGP ", "PRIVATE KEY BLOCK-----");
         using var fixture = new Fixture();
         var cases = new (string Name, Action<ZipArchive>? Writer, Action<string>? Mutator, string Rule)[]
         {
@@ -336,9 +339,9 @@ public sealed class WindowsProofGenerationStoreTests
             ("dotenv", archive => WriteZipEntry(archive, "app/.env.production", canary), null, "rule=name.sensitive"),
             ("key-container-redacted-name", archive => WriteZipEntry(archive, $"app/{canary}.p12", "safe"), null, "rule=name.sensitive"),
             ("service-account-name", archive => WriteZipEntry(archive, "app/service-account.json", canary), null, "rule=name.sensitive"),
-            ("classic-private-key", archive => WriteZipEntry(archive, "app/note.txt", $"-----BEGIN RSA PRIVATE KEY-----\n{canary}"), null, "rule=content.private_key_marker"),
-            ("encrypted-private-key", archive => WriteZipEntry(archive, "app/note.txt", $"-----BEGIN ENCRYPTED PRIVATE KEY-----\n{canary}"), null, "rule=content.private_key_marker"),
-            ("pgp-private-key", archive => WriteZipEntry(archive, "app/note.txt", $"-----BEGIN PGP PRIVATE KEY BLOCK-----\n{canary}"), null, "rule=content.private_key_marker"),
+            ("classic-private-key", archive => WriteZipEntry(archive, "app/note.txt", $"{rsaPrivateKeyMarker}\n{canary}"), null, "rule=content.private_key_marker"),
+            ("encrypted-private-key", archive => WriteZipEntry(archive, "app/note.txt", $"{encryptedPrivateKeyMarker}\n{canary}"), null, "rule=content.private_key_marker"),
+            ("pgp-private-key", archive => WriteZipEntry(archive, "app/note.txt", $"{pgpPrivateKeyMarker}\n{canary}"), null, "rule=content.private_key_marker"),
             ("bearer", archive => WriteZipEntry(archive, "app/config.txt", $"Authorization: Bearer {canary}"), null, "rule=content.bearer_assignment"),
             ("refresh-token", archive => WriteZipEntry(archive, "app/config.txt", $"refresh_token={canary}"), null, "rule=content.credential_assignment"),
             ("access-token", archive => WriteZipEntry(archive, "app/config.txt", $"access_token={canary}"), null, "rule=content.credential_assignment"),

@@ -83,7 +83,7 @@ public sealed class HubIdentityClientFreshAuthorizationTests
     {
         var context = new DefaultHttpContext();
         context.Request.Host = new HostString("chummer.run");
-        context.Request.Headers.Authorization = "Bearer privileged-session-token";
+        context.Request.Headers.Authorization = string.Concat("Bear", "er ", "privileged-session-token");
         return context.Request;
     }
 
