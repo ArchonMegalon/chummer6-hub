@@ -10,6 +10,7 @@ HUB_PLAYWRIGHT_TIMEOUT_SECONDS="${CHUMMER_HUB_E2E_TIMEOUT_SECONDS:-300}"
 HUB_BASE_URL="${CHUMMER_HUB_PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
 HUB_PUBLIC_HOST="${CHUMMER_HUB_PUBLIC_HOST:-chummer.run}"
 HUB_SKIP_EDGE_REBUILD="${CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD:-0}"
+PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE:-1}"
 PUBLIC_EDGE_DEPLOY_SOURCE_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE:-1}"
 PUBLIC_EDGE_EXPECTED_HEAD="${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-}"
 PUBLIC_EDGE_DEPLOY_REPO_ROOT="${CHUMMER_PUBLIC_EDGE_DEPLOY_REPO_ROOT:-${CHUMMER_RUN_SERVICES_SOURCE:-$ROOT_DIR}}"
@@ -103,6 +104,14 @@ verify_public_edge_deploy_source() {
   python3 scripts/verify_public_edge_deploy_source.py "${gate_args[@]}"
 }
 
+verify_public_edge_deploy_preflight() {
+  if [[ "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" == "0" || "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" == "false" || "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" == "FALSE" ]]; then
+    return 0
+  fi
+  python3 scripts/check_public_edge_deploy_preflight.py \
+    --source-root "$PUBLIC_EDGE_DEPLOY_REPO_ROOT"
+}
+
 resolve_hub_proof_base_url() {
   if [[ "$HUB_BASE_URL" == http://* ]]; then
     printf 'https://%s\n' "$HUB_PUBLIC_HOST"
@@ -124,6 +133,7 @@ hub_signed_in_work_args() {
 if [[ "$HUB_SKIP_EDGE_REBUILD" == "1" || "$HUB_SKIP_EDGE_REBUILD" == "true" || "$HUB_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
   echo "reusing current hub edge containers for playwright e2e"
 else
+  verify_public_edge_deploy_preflight
   verify_public_edge_deploy_source chummer-run-identity
   verify_public_edge_deploy_source chummer-portal
 

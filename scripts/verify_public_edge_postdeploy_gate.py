@@ -20,6 +20,12 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS = ROOT / "scripts"
+if str(SCRIPTS) not in sys.path:
+    # Keep isolated-mode authority independent of PYTHONPATH while allowing audited siblings.
+    sys.path.insert(0, str(SCRIPTS))
+
 try:
     from scripts.publish_public_edge_portal_overlay import (
         FRONTDOOR_PLAYWRIGHT_PROOF_CLOSURE_ALGORITHM,
@@ -49,13 +55,9 @@ except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
     from strict_json_contract import StrictJsonContractError, strict_json_object
 
 
-ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ROOT / "scripts"
 POSTDEPLOY_VERIFIER_LOADED_SHA256 = hashlib.sha256(
     Path(__file__).read_bytes()
 ).hexdigest()
-if str(SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(SCRIPTS))
 
 import verify_participate_iframe_shell  # noqa: E402
 import verify_mobile_pwa_service_worker_boundary  # noqa: E402

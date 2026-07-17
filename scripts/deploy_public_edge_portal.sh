@@ -7,23 +7,35 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SOURCE_ROOT="${CHUMMER_RUN_SERVICES_SOURCE:-$ROOT_DIR}"
 SOURCE_ROOT="$(cd "$SOURCE_ROOT" && pwd)"
 EXPECTED_HEAD="${CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD:-$(git -C "$SOURCE_ROOT" rev-parse HEAD)}"
-BUILD_CONTEXT="${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-/docker/chummercomplete}"
+CANONICAL_BUILD_CONTEXT="/docker/chummercomplete"
+CANONICAL_COMPOSE_PROJECT="chummer6-hub"
+CANONICAL_ENV_FILE="/docker/chummercomplete/chummer.run-services/.env"
+CANONICAL_IMAGE_TAG="chummer-run-api:local"
+CANONICAL_OVERLAY_ROOT="/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app"
+CANONICAL_PUBLIC_EDGE_PORT="8091"
+CANONICAL_BASE_URL="https://chummer.run"
+CANONICAL_FLEET_MEDIA_CONTRACTS="/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts"
+CANONICAL_DESIGN_PRODUCT_ROOT="/docker/chummercomplete/chummer-design"
+CANONICAL_RELEASE_CHANNEL_RECEIPT="/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json"
+BUILD_CONTEXT="${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-$CANONICAL_BUILD_CONTEXT}"
 COMPOSE_FILE_INPUT="${CHUMMER_PUBLIC_EDGE_COMPOSE_FILE:-$ROOT_DIR/docker-compose.public-edge.yml}"
-COMPOSE_PROJECT="${CHUMMER_PUBLIC_EDGE_PROJECT_NAME:-chummer6-hub}"
-ENV_FILE="${CHUMMER_PUBLIC_EDGE_ENV_FILE:-/docker/chummercomplete/chummer.run-services/.env}"
-IMAGE_TAG="${CHUMMER_PUBLIC_EDGE_PORTAL_IMAGE_TAG:-chummer-run-api:local}"
-BASE_URL="${CHUMMER_PUBLIC_EDGE_BASE_URL:-https://chummer.run}"
-RELEASE_CHANNEL="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL:-nightly}"
-FLEET_MEDIA_CONTRACTS="${CHUMMER_FLEET_MEDIA_CONTRACTS:-/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts}"
-DESIGN_PRODUCT_ROOT="${CHUMMER_DESIGN_PRODUCT_ROOT:-/docker/chummercomplete/chummer-design}"
+COMPOSE_PROJECT="${CHUMMER_PUBLIC_EDGE_PROJECT_NAME:-$CANONICAL_COMPOSE_PROJECT}"
+ENV_FILE_INPUT="${CHUMMER_PUBLIC_EDGE_ENV_FILE:-$CANONICAL_ENV_FILE}"
+IMAGE_TAG="${CHUMMER_PUBLIC_EDGE_PORTAL_IMAGE_TAG:-$CANONICAL_IMAGE_TAG}"
+OVERLAY_ROOT="${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-$CANONICAL_OVERLAY_ROOT}"
+BASE_URL="${CHUMMER_PUBLIC_EDGE_BASE_URL:-$CANONICAL_BASE_URL}"
+RELEASE_CHANNEL_RECEIPT_INPUT="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT:-$CANONICAL_RELEASE_CHANNEL_RECEIPT}"
+FLEET_MEDIA_CONTRACTS="${CHUMMER_FLEET_MEDIA_CONTRACTS:-$CANONICAL_FLEET_MEDIA_CONTRACTS}"
+DESIGN_PRODUCT_ROOT="${CHUMMER_DESIGN_PRODUCT_ROOT:-$CANONICAL_DESIGN_PRODUCT_ROOT}"
 BUILD_CONCURRENCY="${CHUMMER_BUILD_CONCURRENCY:-1}"
 POSTDEPLOY_OUTPUT="${CHUMMER_PUBLIC_EDGE_POSTDEPLOY_OUTPUT:-$SOURCE_ROOT/.codex-studio/published/PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json}"
 PLAYWRIGHT_ARTIFACT_DIR="${CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_ARTIFACT_DIR:-$SOURCE_ROOT/.codex-studio/published/public-edge-browser-proofs}"
+COMPOSE_ATTESTATION_OUTPUT="${CHUMMER_PUBLIC_EDGE_COMPOSE_ATTESTATION_OUTPUT:-$SOURCE_ROOT/.codex-studio/published/PUBLIC_EDGE_COMPOSE_RUNTIME_ATTESTATION.generated.json}"
 PROGRESS="${CHUMMER_PUBLIC_EDGE_BUILD_PROGRESS:-auto}"
 POSTDEPLOY_ATTEMPTS="${CHUMMER_PUBLIC_EDGE_POSTDEPLOY_ATTEMPTS:-3}"
 POSTDEPLOY_RETRY_DELAY_SECONDS="${CHUMMER_PUBLIC_EDGE_POSTDEPLOY_RETRY_DELAY_SECONDS:-10}"
 PORTAL_READY_TIMEOUT_SECONDS="${CHUMMER_PUBLIC_EDGE_PORTAL_READY_TIMEOUT_SECONDS:-180}"
-PUBLIC_EDGE_PORT="${CHUMMER_PUBLIC_EDGE_PORT:-8091}"
+PUBLIC_EDGE_PORT="${CHUMMER_PUBLIC_EDGE_PORT:-$CANONICAL_PUBLIC_EDGE_PORT}"
 DEPLOY_LOCK_ROOT="/docker/chummercomplete/.state"
 DEPLOY_LOCK_DIR="$DEPLOY_LOCK_ROOT/public-edge-mutation.lock"
 
@@ -37,6 +49,55 @@ fi
 CANONICAL_COMPOSE_FILE="$(realpath -e -- "$SOURCE_ROOT/docker-compose.public-edge.yml")"
 if [[ "$COMPOSE_FILE" != "$CANONICAL_COMPOSE_FILE" ]]; then
   echo "public edge deploy refuses a Compose file outside the audited source root" >&2
+  exit 2
+fi
+
+if ! ENV_FILE="$(realpath -e -- "$ENV_FILE_INPUT")"; then
+  echo "canonical public edge environment file does not exist: $ENV_FILE_INPUT" >&2
+  exit 2
+fi
+if [[ "$ENV_FILE" != "$CANONICAL_ENV_FILE" ]]; then
+  echo "public edge deploy refuses a non-canonical Compose environment file" >&2
+  exit 2
+fi
+if [[ "$COMPOSE_PROJECT" != "$CANONICAL_COMPOSE_PROJECT" ]]; then
+  echo "public edge deploy refuses a non-canonical Compose project" >&2
+  exit 2
+fi
+if [[ "$IMAGE_TAG" != "$CANONICAL_IMAGE_TAG" ]]; then
+  echo "public edge deploy refuses a non-canonical portal image tag" >&2
+  exit 2
+fi
+if [[ "$OVERLAY_ROOT" != "$CANONICAL_OVERLAY_ROOT" ]]; then
+  echo "public edge deploy refuses a non-canonical portal overlay root" >&2
+  exit 2
+fi
+if [[ "$BASE_URL" != "$CANONICAL_BASE_URL" ]]; then
+  echo "public edge deploy refuses a non-canonical verification origin" >&2
+  exit 2
+fi
+if [[ "$BUILD_CONTEXT" != "$CANONICAL_BUILD_CONTEXT" ]]; then
+  echo "public edge deploy refuses a non-canonical build context" >&2
+  exit 2
+fi
+if [[ "$FLEET_MEDIA_CONTRACTS" != "$CANONICAL_FLEET_MEDIA_CONTRACTS" ]]; then
+  echo "public edge deploy refuses a non-canonical fleet media context" >&2
+  exit 2
+fi
+if [[ "$DESIGN_PRODUCT_ROOT" != "$CANONICAL_DESIGN_PRODUCT_ROOT" ]]; then
+  echo "public edge deploy refuses a non-canonical design product context" >&2
+  exit 2
+fi
+if [[ "$PUBLIC_EDGE_PORT" != "$CANONICAL_PUBLIC_EDGE_PORT" ]]; then
+  echo "public edge deploy refuses a non-canonical public portal port" >&2
+  exit 2
+fi
+if ! RELEASE_CHANNEL_RECEIPT="$(realpath -e -- "$RELEASE_CHANNEL_RECEIPT_INPUT")"; then
+  echo "public edge release-channel receipt is missing: $RELEASE_CHANNEL_RECEIPT_INPUT" >&2
+  exit 2
+fi
+if [[ "$RELEASE_CHANNEL_RECEIPT" != "$CANONICAL_RELEASE_CHANNEL_RECEIPT" ]]; then
+  echo "public edge deploy refuses a non-canonical release-channel receipt" >&2
   exit 2
 fi
 
@@ -71,6 +132,8 @@ fi
 export CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT="$BUILD_CONTEXT"
 export CHUMMER_RUN_SERVICES_CONTEXT_DIR="$SOURCE_ROOT"
 export CHUMMER_RUN_SERVICES_SOURCE="$SOURCE_ROOT"
+export CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR="$OVERLAY_ROOT"
+export CHUMMER_PUBLIC_EDGE_PORT="$PUBLIC_EDGE_PORT"
 
 install -d -m 0700 -- "$DEPLOY_LOCK_ROOT"
 if [[ ! -d "$DEPLOY_LOCK_ROOT" || -L "$DEPLOY_LOCK_ROOT" || ! -O "$DEPLOY_LOCK_ROOT" ]]; then
@@ -107,17 +170,22 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-compose_args=(-p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE")
-if [[ -f "$ENV_FILE" ]]; then
-  compose_args=(--env-file "$ENV_FILE" "${compose_args[@]}")
-fi
+compose_args=(--env-file "$ENV_FILE" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE")
 
 # Run every non-mutating gate before the image build can retag the local deployment image.
 # Compose interpolation is intentionally checked here so missing certificate, PostgreSQL,
 # and release-shelf posture inputs cannot fail only after the build or portal quiesce.
 python3 "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.py" \
     --source-root "$SOURCE_ROOT"
-docker compose "${compose_args[@]}" config --quiet
+docker compose "${compose_args[@]}" --profile install-linking-postgres-admin \
+    config --format json \
+  | /usr/bin/python3 -I "$SOURCE_ROOT/scripts/validate_public_edge_compose_runtime.py" \
+      --project-name "$COMPOSE_PROJECT" \
+      --source-root "$SOURCE_ROOT" \
+      --build-context "$BUILD_CONTEXT" \
+      --overlay-root "$OVERLAY_ROOT" \
+      --published-port "$PUBLIC_EDGE_PORT" \
+      --output "$COMPOSE_ATTESTATION_OUTPUT"
 
 source_gate_args=(
   --repo-root "$SOURCE_ROOT"
@@ -384,16 +452,32 @@ if ! timeout --kill-after=5s 30s \
   abort_portal_recreate "publication readiness" 1
 fi
 
+verify_candidate_runtime_identity() {
+  local candidate_container_id candidate_container_image_id candidate_tag_image_id
+  candidate_container_id="$(docker compose "${compose_args[@]}" ps --all -q chummer-portal)" || return 1
+  [[ -n "$candidate_container_id" && "$candidate_container_id" != *$'\n'* ]] || return 1
+  candidate_container_image_id="$(docker container inspect --format '{{.Image}}' "$candidate_container_id")" || return 1
+  candidate_tag_image_id="$(resolve_image_tag_id "$IMAGE_TAG")" || return 1
+  [[ "$candidate_container_image_id" == "$image_id" && "$candidate_tag_image_id" == "$image_id" ]]
+}
+
+if ! verify_candidate_runtime_identity; then
+  abort_portal_recreate "candidate image identity" 1
+fi
+
 postdeploy_command=(
-  python3 "$SOURCE_ROOT/scripts/verify_public_edge_postdeploy_gate.py"
-  --self-contained-direct
+  /usr/bin/python3 -I "$SOURCE_ROOT/scripts/verify_public_edge_postdeploy_gate.py"
   --base-url "$BASE_URL"
-  --expected-release-channel "$RELEASE_CHANNEL"
-  --expected-portal-image-id "$image_id"
+  --strict-preflight
+  --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"
+  --overlay-root "$OVERLAY_ROOT"
+  --expected-build-info "$OVERLAY_ROOT/.codex-studio/runtime/PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
   --require-downloads-status-playwright
   --require-mobile-pwa-viewport-playwright
   --require-frontdoor-navigation-playwright
-  --playwright-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR"
+  --playwright-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR/downloads-status"
+  --mobile-pwa-viewport-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR/mobile-pwa-viewport"
+  --frontdoor-navigation-artifact-dir "$PLAYWRIGHT_ARTIFACT_DIR/frontdoor-navigation"
   --output "$POSTDEPLOY_OUTPUT"
 )
 
@@ -406,6 +490,10 @@ for ((attempt = 1; attempt <= POSTDEPLOY_ATTEMPTS; attempt++)); do
   fi
   sleep "$POSTDEPLOY_RETRY_DELAY_SECONDS"
 done
+
+if ! verify_candidate_runtime_identity; then
+  abort_portal_recreate "postdeploy image identity" 1
+fi
 
 portal_transaction_active=0
 replacement_portal_may_exist=0

@@ -150,6 +150,10 @@ if ! mkdir -m 700 -- "$cutover_lock_dir"; then
   echo "Another public-edge mutation is active, or its stale lock requires operator review." >&2
   exit 75
 fi
+cutover_lock_token_file="$cutover_lock_dir/owner-token"
+cutover_lock_token="$(python3 -I -S -c 'import secrets; print(secrets.token_hex(32))')"
+(umask 077; set -o noclobber; printf '%s\n' "$cutover_lock_token" >"$cutover_lock_token_file")
+chmod 600 -- "$cutover_lock_token_file"
 cutover_drained=0
 operator_jobs_started=0
 portal_image_tag_mutated=0
@@ -160,6 +164,7 @@ cf_access_header_file=""
 release_initial_cutover_lock() {
   initial_status=$?
   trap - EXIT HUP INT TERM
+  rm -f -- "$cutover_lock_token_file"
   if ! rmdir -- "$cutover_lock_dir"; then exit 70; fi
   exit "$initial_status"
 }
@@ -352,6 +357,7 @@ cutover_cleanup() {
   if test -n "${cf_access_header_file:-}"; then
     rm -f -- "$cf_access_header_file" || cleanup_failed=1
   fi
+  rm -f -- "$cutover_lock_token_file" || cleanup_failed=1
   rmdir -- "$cutover_lock_dir" >/dev/null 2>&1 || cleanup_failed=1
   if test "$cleanup_failed" -eq 1; then exit 70; fi
   exit "$cleanup_status"
@@ -443,6 +449,7 @@ assert_no_operator_jobs
 # portal is stopped. Reuse rechecks the recorded source fingerprint and activation is atomic.
 timeout --kill-after=30s 1800s \
   python3 scripts/publish_public_edge_portal_overlay.py --activate --reuse-staging \
+  --shared-mutation-lock-token "$cutover_lock_token" \
   --source-root "$source_root" --active-root "$active_root" \
   --staging-root "${overlay_base}-next/app" \
   --backup-root "${overlay_base}-backups" \
@@ -455,14 +462,25 @@ timeout --kill-after=10s 180s \
   python3 scripts/check_public_edge_deploy_preflight.py \
   --source-root "$source_root" --overlay-root "$active_root" \
   --output "$overlay_preflight_receipt"
-portal_image_tag_committed=1
 
 assert_no_operator_jobs
 operator_jobs_started=1
+postgres_boundary_receipt="$(mktemp \
+  "${RUNBOOK_LOG_DIR:-/tmp}/chummer-install-linking-postgres-boundary.XXXXXX.json")"
+chmod 600 "$postgres_boundary_receipt"
+/usr/bin/python3 -I scripts/materialize_install_linking_cutover_boundary.py \
+  --output "$postgres_boundary_receipt" --phase prepare_starting \
+  --cutover-id "$cutover_started_at" --candidate-image-id "$candidate_portal_image_id" \
+  --active-build-info "$active_build_info" >/dev/null
+
 timeout --kill-after=10s 180s \
   docker compose --env-file .env -p chummer6-hub \
   -f docker-compose.public-edge.yml --profile install-linking-postgres-admin \
   run --rm chummer-install-linking-postgres-admin prepare
+/usr/bin/python3 -I scripts/materialize_install_linking_cutover_boundary.py \
+  --output "$postgres_boundary_receipt" --phase prepare_completed \
+  --cutover-id "$cutover_started_at" --candidate-image-id "$candidate_portal_image_id" \
+  --active-build-info "$active_build_info" >/dev/null
 assert_no_operator_jobs
 
 # Run this import exactly once only when migrating an existing protected local store into an
@@ -472,12 +490,20 @@ timeout --kill-after=10s 180s \
   -f docker-compose.public-edge.yml --profile install-linking-postgres-admin \
   run --rm chummer-install-linking-postgres-import \
   import-local --confirm-empty-authority
+/usr/bin/python3 -I scripts/materialize_install_linking_cutover_boundary.py \
+  --output "$postgres_boundary_receipt" --phase import_completed \
+  --cutover-id "$cutover_started_at" --candidate-image-id "$candidate_portal_image_id" \
+  --active-build-info "$active_build_info" >/dev/null
 assert_no_operator_jobs
 
 timeout --kill-after=10s 180s \
   docker compose --env-file .env -p chummer6-hub \
   -f docker-compose.public-edge.yml --profile install-linking-postgres-admin \
   run --rm chummer-install-linking-postgres-admin validate
+/usr/bin/python3 -I scripts/materialize_install_linking_cutover_boundary.py \
+  --output "$postgres_boundary_receipt" --phase validate_completed \
+  --cutover-id "$cutover_started_at" --candidate-image-id "$candidate_portal_image_id" \
+  --active-build-info "$active_build_info" >/dev/null
 assert_no_operator_jobs
 operator_jobs_started=0
 
@@ -543,18 +569,37 @@ rm -f -- "$cf_access_header_file"
 cf_access_header_file=""
 
 timeout --kill-after=30s 1800s \
-  python3 scripts/verify_public_edge_postdeploy_gate.py --self-contained-direct \
+  /usr/bin/python3 -I scripts/verify_public_edge_postdeploy_gate.py \
   --base-url https://chummer.run \
-  --expected-release-channel "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL" \
-  --expected-portal-image-id "$candidate_portal_image_id" \
+  --strict-preflight \
+  --release-channel-receipt "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT" \
+  --overlay-root "$active_root" \
+  --expected-build-info "$active_build_info" \
   --require-downloads-status-playwright \
   --require-mobile-pwa-viewport-playwright \
   --require-frontdoor-navigation-playwright \
-  --playwright-artifact-dir "$postdeploy_artifact_dir" \
+  --playwright-artifact-dir "$postdeploy_artifact_dir/downloads-status" \
+  --mobile-pwa-viewport-artifact-dir "$postdeploy_artifact_dir/mobile-pwa-viewport" \
+  --frontdoor-navigation-artifact-dir "$postdeploy_artifact_dir/frontdoor-navigation" \
   --output "$postdeploy_receipt"
 
+accepted_portal_container_id="$(timeout --kill-after=5s 30s \
+  docker compose --env-file .env -p chummer6-hub \
+  -f docker-compose.public-edge.yml ps --all -q chummer-portal)"
+case "$accepted_portal_container_id" in ""|*$'\n'*) exit 78 ;; esac
+test "$(timeout --kill-after=5s 30s \
+  docker container inspect --format '{{.Image}}' "$accepted_portal_container_id")" \
+  = "$candidate_portal_image_id"
+test "$(resolve_portal_image_tag_id)" = "$candidate_portal_image_id"
+
+/usr/bin/python3 -I scripts/materialize_install_linking_cutover_boundary.py \
+  --output "$postgres_boundary_receipt" --phase public_acceptance_completed \
+  --cutover-id "$cutover_started_at" --candidate-image-id "$candidate_portal_image_id" \
+  --active-build-info "$active_build_info" >/dev/null
+portal_image_tag_committed=1
 cutover_drained=0
 trap - HUP INT TERM
+rm -f -- "$cutover_lock_token_file"
 rmdir -- "$cutover_lock_dir"
 trap - EXIT
 echo "Source preflight receipt: $source_preflight_receipt"
@@ -567,6 +612,7 @@ echo "Container build-info receipt: $container_build_info_receipt"
 echo "Local readiness receipt: $readiness_receipt"
 echo "Public readiness receipt: $public_readiness_receipt"
 echo "Browser-backed postdeploy receipt: $postdeploy_receipt"
+echo "Irreversible PostgreSQL boundary receipt: $postgres_boundary_receipt"
 echo "Browser-backed postdeploy artifacts: $postdeploy_artifact_dir"
 )
 ```
@@ -579,7 +625,13 @@ in-container `/api/ready` response passes the current deep-readiness contract, i
 `install_linking_store` check. A second validated receipt through the canonical public URL proves
 the restored tunnel path through the governed Cloudflare Access service token. The final
 browser-backed postdeploy gate remains inside the same mutation lock and drained rollback boundary.
-Archive all ten
+`prepare` and `import-local` are durable PostgreSQL commits, not operations the shell can reverse.
+The boundary receipt is written before `prepare` starts and advanced after each durable phase; until
+public acceptance it names PostgreSQL PITR or governed recovery as the only rollback authority and
+forbids rewinding the local mirror. Its machine-readable recovery mode is
+`postgres_pitr_or_governed_recovery`; automatic database rollback, local-mirror rollback, and schema
+or generation rewind remain false. The mutable portal image tag is not committed until that final
+acceptance passes. Archive all eleven
 mode-`0600` receipts and inspect portal logs after traffic
 is restored.
 

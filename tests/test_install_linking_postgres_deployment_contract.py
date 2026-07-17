@@ -213,7 +213,17 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         self.assertIn("timeout --kill-after=30s 3600s", section)
         self.assertIn("timeout --kill-after=30s 3000s", section)
         self.assertIn("timeout --kill-after=30s 1800s", section)
-        self.assertIn("verify_public_edge_postdeploy_gate.py --self-contained-direct", section)
+        self.assertIn("verify_public_edge_postdeploy_gate.py", section)
+        self.assertNotIn("--self-contained-direct", section)
+        self.assertIn("--strict-preflight", section)
+        self.assertIn('--release-channel-receipt "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT"', section)
+        self.assertIn('--overlay-root "$active_root"', section)
+        self.assertIn('--expected-build-info "$active_build_info"', section)
+        self.assertIn("--require-downloads-status-playwright", section)
+        self.assertIn("--require-mobile-pwa-viewport-playwright", section)
+        self.assertIn("--require-frontdoor-navigation-playwright", section)
+        self.assertIn("materialize_install_linking_cutover_boundary.py", section)
+        self.assertIn("postgres_pitr_or_governed_recovery", section)
         self.assertIn("restore_prior_portal_image_tag", section)
         self.assertIn("portal_image_tag_committed=1", section)
         self.assertNotIn("CHUMMER_INSTALL_LINKING_POSTGRES_OPERATOR_TIMEOUT_SECONDS", section)
@@ -351,7 +361,7 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
             'https://chummer.run/api/ready >"$public_readiness_receipt"'
         )
         postdeploy_gate_position = shell.index(
-            "verify_public_edge_postdeploy_gate.py --self-contained-direct",
+            "verify_public_edge_postdeploy_gate.py",
             public_readiness_position,
         )
         commit_position = shell.index("cutover_drained=0", postdeploy_gate_position)

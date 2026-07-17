@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -378,12 +379,8 @@ def test_public_edge_rebuild_scripts_call_source_gate() -> None:
         script = script_path.read_text(encoding="utf-8")
         assert "CHUMMER_PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" in script
         assert "scripts/check_public_edge_deploy_preflight.py" in script
-        rebuild_match = re.search(
-            r'(?:docker|"\$BUILD_PROVENANCE_DOCKER_BINARY") compose[^\n]+up -d --build',
-            script,
-        )
-        assert rebuild_match is not None
-        assert script.index("scripts/check_public_edge_deploy_preflight.py") < rebuild_match.start()
+        rebuild_position = script.index("up -d --build")
+        assert script.index("scripts/check_public_edge_deploy_preflight.py") < rebuild_position
         if script_path.name != "e2e-portal.sh":
             assert "CHUMMER_PUBLIC_EDGE_DEPLOY_SOURCE_GATE" in script
             assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD" in script
@@ -428,7 +425,10 @@ def test_public_edge_rebuild_source_gate_still_covers_source_checked_scripts() -
         assert "--compose-service" in script
         assert "chummer-run-identity" in script
         assert "chummer-portal" in script
-        assert "docker compose" in script
+        assert (
+            "docker compose" in script
+            or '"$BUILD_PROVENANCE_DOCKER_BINARY" compose' in script
+        )
 
 
 def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> None:
@@ -453,7 +453,7 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert '--wait --wait-timeout "$PORTAL_READY_TIMEOUT_SECONDS" chummer-portal' in script
     assert "public-edge-mutation.lock" in script
     assert "public edge deploy refuses a Compose file outside the audited source root" in script
-    assert "--self-contained-direct" in script
+    assert "--self-contained-direct" not in script
     stop_index = script.index("stop chummer-portal")
     init_index = script.index("run --rm --no-deps chummer-portal-volume-init")
     recreate_index = script.index(
@@ -465,13 +465,17 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert 'docker start "$prior_portal_container_id"' in script
     assert 'docker tag "$prior_portal_image_id" "$IMAGE_TAG"' in script
     assert "scripts/verify_public_edge_postdeploy_gate.py" in script
-    assert "--expected-portal-image-id \"$image_id\"" in script
+    assert "--strict-preflight" in script
+    assert "--release-channel-receipt \"$RELEASE_CHANNEL_RECEIPT\"" in script
+    assert "--overlay-root \"$OVERLAY_ROOT\"" in script
+    assert "--expected-build-info \"$OVERLAY_ROOT/.codex-studio/runtime/PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json\"" in script
+    assert "verify_candidate_runtime_identity" in script
     assert "--require-downloads-status-playwright" in script
     assert "--require-mobile-pwa-viewport-playwright" in script
     assert "--require-frontdoor-navigation-playwright" in script
-    assert "--playwright-artifact-dir \"$PLAYWRIGHT_ARTIFACT_DIR\"" in script
-    assert "--mobile-pwa-viewport-artifact-dir" not in script
-    assert "--frontdoor-navigation-artifact-dir" not in script
+    assert "--playwright-artifact-dir \"$PLAYWRIGHT_ARTIFACT_DIR/downloads-status\"" in script
+    assert "--mobile-pwa-viewport-artifact-dir \"$PLAYWRIGHT_ARTIFACT_DIR/mobile-pwa-viewport\"" in script
+    assert "--frontdoor-navigation-artifact-dir \"$PLAYWRIGHT_ARTIFACT_DIR/frontdoor-navigation\"" in script
     assert "for ((attempt = 1; attempt <= POSTDEPLOY_ATTEMPTS; attempt++))" in script
     assert "sleep \"$POSTDEPLOY_RETRY_DELAY_SECONDS\"" in script
 
@@ -493,7 +497,7 @@ def test_release_ready_script_calls_public_edge_deploy_source_gate() -> None:
     assert "branch --show-current" in script
     assert "--ignore-generated-proof-drift" in script
     assert "run_function_gate verify_public_edge_deploy_source" in script
-    assert script.index("run_function_gate verify_public_edge_deploy_source") < script.index("run_hub_gate verify_windows_installer_visual_audit")
+    assert script.index("run_function_gate verify_public_edge_deploy_source") < script.index("run_function_gate verify_windows_installer_visual_audit")
 
 
 def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> None:

@@ -703,6 +703,7 @@ PUBLIC_EDGE_DOCKER_RESERVED_CONTEXT_NAMES = frozenset(
     }
 )
 PUBLIC_EDGE_OVERLAY_SOURCE_FINGERPRINT_FILES = {
+    "postdeployVerifier": Path("scripts") / "verify_public_edge_postdeploy_gate.py",
     "landing": Path("Chummer.Run.Api") / "Views" / "PublicLanding" / "Landing.cshtml",
     "downloads": Path("Chummer.Run.Api") / "Views" / "PublicLanding" / "Downloads.cshtml",
     "status": Path("Chummer.Run.Api") / "Views" / "PublicLanding" / "Status.cshtml",
