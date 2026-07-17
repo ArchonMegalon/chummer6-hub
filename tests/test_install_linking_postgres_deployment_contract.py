@@ -327,6 +327,26 @@ class InstallLinkingPostgresDeploymentContractTests(unittest.TestCase):
         self.assertNotIn("chummer.install_linking.compose_root_binding.v1", shell)
         self.assertIn("set -euo pipefail", shell)
         self.assertNotIn("compose_config_json", shell)
+        self.assertEqual(
+            6,
+            shell.count(
+                '--release-channel-receipt "$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT"'
+            ),
+        )
+        self.assertEqual(
+            5,
+            shell.count(
+                '--release-channel-receipt-sha256 '
+                '"$CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256"'
+            ),
+        )
+        self.assertEqual(
+            3,
+            shell.count(
+                '--runtime-proof-bind-source-sha256 '
+                '"$CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256"'
+            ),
+        )
         self.assertIn('CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH" = 1', shell)
         self.assertIn("CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD", shell)
         self.assertIn("CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF", shell)

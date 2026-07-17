@@ -579,9 +579,19 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
         init_index,
     )
     assert stop_index < init_index < recreate_index
-    assert "restore_prior_portal()" in script
-    assert 'docker_cli start "$prior_portal_container_id"' in script
-    assert 'docker_cli tag "$prior_portal_image_id" "$IMAGE_TAG"' in script
+    assert "run_deploy_recovery()" in script
+    assert "scripts/public_edge_deploy_recovery.py" in script
+    assert '--prior-portal-container-id "$prior_portal_container_id"' in script
+    assert '--prior-tool-image-tag-id "$prior_tool_image_tag_id"' in script
+    assert '--prior-tunnel-image-id "$prior_tunnel_image_id"' in script
+    assert (
+        '--expected-runtime-proof-bind-source-sha256 '
+        '"$RUNTIME_PROOF_BIND_SOURCE_SHA256"'
+    ) in script.replace("\\\n      ", "")
+    assert script.count(
+        '--runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"'
+    ) == 4
+    assert "replacement_portal_may_exist" not in script
     assert "scripts/verify_public_edge_postdeploy_gate.py" in script
     assert "--strict-preflight" in script
     assert "--release-channel-receipt \"$RELEASE_CHANNEL_RECEIPT\"" in script

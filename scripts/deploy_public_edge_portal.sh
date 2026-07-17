@@ -12,6 +12,16 @@ if [[ "${CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH-}" != "1" ]]; then
   exit 2
 fi
 
+DEPLOY_OPERATION="${1:-deploy}"
+if (($# > 1)); then
+  echo "usage: deploy_public_edge_portal.sh [deploy|recover]" >&2
+  exit 2
+fi
+case "$DEPLOY_OPERATION" in
+  deploy|recover) ;;
+  *) echo "usage: deploy_public_edge_portal.sh [deploy|recover]" >&2; exit 2 ;;
+esac
+
 readonly TRUSTED_GIT="/usr/bin/git"
 readonly TRUSTED_PYTHON="/usr/bin/python3"
 readonly TRUSTED_DOCKER="/usr/bin/docker"
@@ -215,33 +225,42 @@ if [[ "$PUBLIC_EDGE_PORT" != "$CANONICAL_PUBLIC_EDGE_PORT" ]]; then
   echo "public edge deploy refuses a non-canonical public portal port" >&2
   exit 2
 fi
-if [[ -z "$RELEASE_CHANNEL_RECEIPT_INPUT" ]]; then
-  echo "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT must be externally supplied" >&2
-  exit 2
-fi
-if ! RELEASE_CHANNEL_RECEIPT="$("$TRUSTED_REALPATH" -e -- "$RELEASE_CHANNEL_RECEIPT_INPUT")"; then
-  echo "public edge release-channel receipt is missing: $RELEASE_CHANNEL_RECEIPT_INPUT" >&2
-  exit 2
-fi
-if [[ "$RELEASE_CHANNEL_RECEIPT" != "$CANONICAL_RELEASE_CHANNEL_RECEIPT" ]]; then
-  echo "public edge deploy refuses a non-canonical release-channel receipt" >&2
-  exit 2
-fi
-if [[ ! "$RELEASE_CHANNEL_RECEIPT_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
-  echo "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256 must be independently supplied as a lowercase SHA-256" >&2
-  exit 2
-fi
 if [[ ! "$RUNTIME_PROOF_BIND_SOURCE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
-  echo "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256 must be independently supplied as a lowercase SHA-256" >&2
+  echo "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256 must be externally supplied as a lowercase SHA-256" >&2
   exit 2
 fi
-actual_release_channel_receipt_sha256="$(
-  "$TRUSTED_SHA256SUM" -- "$RELEASE_CHANNEL_RECEIPT"
-)"
-actual_release_channel_receipt_sha256="${actual_release_channel_receipt_sha256%% *}"
-if [[ "$actual_release_channel_receipt_sha256" != "$RELEASE_CHANNEL_RECEIPT_SHA256" ]]; then
-  echo "public edge release-channel receipt does not match its independent SHA-256 pin" >&2
-  exit 2
+RECOVERY_ROUTE_REQUESTED=0
+if [[ "$DEPLOY_OPERATION" == recover \
+  || -e "$CANONICAL_DEPLOY_RECEIPT_ROOT/active-overlay-transaction.json" \
+  || -L "$CANONICAL_DEPLOY_RECEIPT_ROOT/active-overlay-transaction.json" ]]; then
+  RECOVERY_ROUTE_REQUESTED=1
+fi
+RELEASE_CHANNEL_RECEIPT=""
+if ((RECOVERY_ROUTE_REQUESTED == 0)); then
+  if [[ -z "$RELEASE_CHANNEL_RECEIPT_INPUT" ]]; then
+    echo "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT must be externally supplied" >&2
+    exit 2
+  fi
+  if ! RELEASE_CHANNEL_RECEIPT="$("$TRUSTED_REALPATH" -e -- "$RELEASE_CHANNEL_RECEIPT_INPUT")"; then
+    echo "public edge release-channel receipt is missing: $RELEASE_CHANNEL_RECEIPT_INPUT" >&2
+    exit 2
+  fi
+  if [[ "$RELEASE_CHANNEL_RECEIPT" != "$CANONICAL_RELEASE_CHANNEL_RECEIPT" ]]; then
+    echo "public edge deploy refuses a non-canonical release-channel receipt" >&2
+    exit 2
+  fi
+  if [[ ! "$RELEASE_CHANNEL_RECEIPT_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256 must be independently supplied as a lowercase SHA-256" >&2
+    exit 2
+  fi
+  actual_release_channel_receipt_sha256="$(
+    "$TRUSTED_SHA256SUM" -- "$RELEASE_CHANNEL_RECEIPT"
+  )"
+  actual_release_channel_receipt_sha256="${actual_release_channel_receipt_sha256%% *}"
+  if [[ "$actual_release_channel_receipt_sha256" != "$RELEASE_CHANNEL_RECEIPT_SHA256" ]]; then
+    echo "public edge release-channel receipt does not match its independent SHA-256 pin" >&2
+    exit 2
+  fi
 fi
 
 OVERLAY_BASE="${OVERLAY_ROOT%/app}"
@@ -252,6 +271,7 @@ fi
 OVERLAY_STAGING_ROOT="${OVERLAY_BASE}-next/app"
 OVERLAY_BACKUP_ROOT="${OVERLAY_BASE}-backups"
 OVERLAY_BUILD_ROOT="${OVERLAY_BASE}-build"
+TOOL_IMAGE_TAG="chummer-install-linking-postgres-tool:local"
 
 if [[ ! -d "$BUILD_CONTEXT" ]]; then
   echo "public edge build context does not exist: $BUILD_CONTEXT" >&2
@@ -606,8 +626,7 @@ if [[ "$("$TRUSTED_REALPATH" -e -- "$CANONICAL_DEPLOY_RECEIPT_ROOT")" \
 fi
 OVERLAY_PRIOR_STATE_OUTPUT="$CANONICAL_DEPLOY_RECEIPT_ROOT/active-overlay-transaction.json"
 if [[ -e "$OVERLAY_PRIOR_STATE_OUTPUT" || -L "$OVERLAY_PRIOR_STATE_OUTPUT" ]]; then
-  echo "an incomplete public-edge deployment journal requires reconciliation before another deploy" >&2
-  exit 70
+  RECOVERY_ROUTE_REQUESTED=1
 fi
 DEPLOY_RECEIPT_DIR="$(
   "$TRUSTED_MKTEMP" -d -- "$CANONICAL_DEPLOY_RECEIPT_ROOT/deploy.XXXXXXXX"
@@ -618,6 +637,7 @@ OVERLAY_ACTIVATION_OUTPUT="$DEPLOY_RECEIPT_DIR/overlay-activation.json"
 OVERLAY_ROLLBACK_OUTPUT="$DEPLOY_RECEIPT_DIR/overlay-rollback.json"
 OVERLAY_ACTIVE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/active-overlay-preflight.json"
 OVERLAY_POSTRECREATE_PREFLIGHT_OUTPUT="$DEPLOY_RECEIPT_DIR/postrecreate-overlay-preflight.json"
+DEPLOY_RECOVERY_OUTPUT="$DEPLOY_RECEIPT_DIR/deploy-recovery.json"
 
 if [[ -L "$CANONICAL_DOCKER_CONFIG_ROOT" \
   || (-e "$CANONICAL_DOCKER_CONFIG_ROOT" \
@@ -680,12 +700,58 @@ trusted_source_python() {
     "$TRUSTED_PYTHON" -I "$@"
 }
 
+run_deploy_recovery() {
+  trusted_source_python "$SOURCE_ROOT/scripts/public_edge_deploy_recovery.py" \
+    --source-root "$SOURCE_ROOT" \
+    --active-root "$OVERLAY_ROOT" \
+    --backup-root "$OVERLAY_BACKUP_ROOT" \
+    --snapshot "$OVERLAY_PRIOR_STATE_OUTPUT" \
+    --activation-receipt "$OVERLAY_ACTIVATION_OUTPUT" \
+    --overlay-rollback-output "$OVERLAY_ROLLBACK_OUTPUT" \
+    --output "$DEPLOY_RECOVERY_OUTPUT" \
+    --shared-mutation-lock-token "$deploy_lock_owner_token" \
+    --docker-config-root "$CANONICAL_DOCKER_CONFIG_ROOT" \
+    --docker-context "$CANONICAL_DOCKER_CONTEXT" \
+    --compose-file "$COMPOSE_FILE" \
+    --env-file "$ENV_FILE" \
+    --project-name "$COMPOSE_PROJECT" \
+    --build-context "$BUILD_CONTEXT" \
+    --published-port "$PUBLIC_EDGE_PORT" \
+    --portal-image-tag "$IMAGE_TAG" \
+    --tool-image-tag "$TOOL_IMAGE_TAG" \
+    --expected-runtime-proof-bind-source-sha256 \
+      "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
+}
+
 docker_context_identity="$(docker_cli context inspect "$CANONICAL_DOCKER_CONTEXT" \
   --format '{{.Name}}|{{.Endpoints.docker.Host}}|{{.Endpoints.docker.SkipTLSVerify}}')"
 if [[ "$docker_context_identity" != "$CANONICAL_DOCKER_CONTEXT|$CANONICAL_DOCKER_HOST|false" ]]; then
   echo "public edge deploy refuses a non-canonical Docker daemon context" >&2
   exit 2
 fi
+
+# Recovery is an explicit idempotent command and also the only route taken when
+# a prior durable journal exists. A normal deploy performs reconciliation and
+# exits; it never silently treats interrupted state as a new deployment base.
+if ((RECOVERY_ROUTE_REQUESTED == 1)); then
+  if ! run_deploy_recovery; then
+    release_deploy_lock || true
+    trap - EXIT HUP INT TERM
+    exit 70
+  fi
+  if ! release_deploy_lock; then
+    trap - EXIT HUP INT TERM
+    exit 70
+  fi
+  trap - EXIT HUP INT TERM
+  if [[ "$DEPLOY_OPERATION" == deploy ]]; then
+    echo "public_edge_deploy_recovered_interrupted_transaction; rerun deploy explicitly"
+  else
+    echo "public_edge_deploy_recovery_complete"
+  fi
+  exit 0
+fi
+
 if ! builder_identity="$(
   docker_cli buildx ls --format json \
     | "$TRUSTED_PYTHON" -I -c '
@@ -736,12 +802,14 @@ fi
 
 trusted_source_python "$ROOT_DIR/scripts/verify_public_edge_deploy_source.py" \
   "${source_gate_args[@]}"
+# Combined-branch test requirement: proof hardening must provide both receipt flags
+# and runtimeProofBindSource.sha256 before this deployment command is executable.
 trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.py" \
   --source-root "$SOURCE_ROOT" \
-  --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256" \
   --skip-overlay-marker-check \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
-  --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"
+  --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
+  --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
 compose_cli --profile install-linking-postgres-admin config --format json \
   | trusted_source_python "$SOURCE_ROOT/scripts/validate_public_edge_compose_runtime.py" \
       --project-name "$COMPOSE_PROJECT" \
@@ -785,64 +853,32 @@ if [[ -n "$prior_image_tag_id" && "$prior_image_tag_id" != sha256:* ]]; then
   exit 3
 fi
 
-restore_prior_image_tag() {
-  local current_image_tag_id
-  current_image_tag_id="$(resolve_image_tag_id "$IMAGE_TAG")" || return 1
-  if [[ -n "$prior_image_tag_id" ]]; then
-    if [[ "$current_image_tag_id" != "$prior_image_tag_id" ]]; then
-      docker_cli tag "$prior_image_tag_id" "$IMAGE_TAG" || return 1
-    fi
-  elif [[ -n "$current_image_tag_id" ]]; then
-    docker_cli image rm "$IMAGE_TAG" >/dev/null || return 1
-  fi
+mark_deploy_phase() {
+  trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction.py" mark-phase \
+    --source-root "$SOURCE_ROOT" \
+    --active-root "$OVERLAY_ROOT" \
+    --output "$OVERLAY_PRIOR_STATE_OUTPUT" \
+    --phase "$1" \
+    --shared-mutation-lock-token "$deploy_lock_owner_token"
 }
 
-image_tag_transaction_active=1
-rollback_image_tag_on_exit() {
-  local failure_status="$?"
-  trap - EXIT
-  if ((image_tag_transaction_active == 1)) && ! restore_prior_image_tag; then
-    printf 'failed to restore prior public-edge image tag %s\n' "$prior_image_tag_id" >&2
-    release_deploy_lock || true
-    exit 70
-  fi
-  if ! release_deploy_lock; then
-    printf 'failed to release public edge deployment lock\n' >&2
-    exit 70
-  fi
+abort_portal_recreate() {
+  local failure_label="$1"
+  local failure_status="$2"
+  printf 'public-edge portal %s failed; invoking durable reconciliation\n' "$failure_label" >&2
   exit "$failure_status"
 }
 
-trap rollback_image_tag_on_exit EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
-
-docker_cli buildx build \
-  --builder "$CANONICAL_BUILDX_BUILDER" \
-  --load \
-  --progress="$PROGRESS" \
-  -t "$IMAGE_TAG" \
-  -f "$SOURCE_ROOT/Chummer.Run.Api/Dockerfile" \
-  --build-context "run-services-source=$SOURCE_ROOT" \
-  --build-context "fleet-media-factory-contracts=$FLEET_MEDIA_CONTRACTS" \
-  --build-context "design-product=$DESIGN_PRODUCT_ROOT" \
-  --build-arg "CHUMMER_BUILD_CONCURRENCY=$BUILD_CONCURRENCY" \
-  "$BUILD_CONTEXT"
-
-image_id="$(docker_cli image inspect "$IMAGE_TAG" --format '{{.Id}}')"
-if [[ -z "$image_id" || "$image_id" != sha256:* ]]; then
-  echo "could not resolve built portal image id for $IMAGE_TAG" >&2
+if ! prior_tool_image_tag_id="$(resolve_image_tag_id "$TOOL_IMAGE_TAG")"; then
+  echo "could not query prior PostgreSQL tool image tag identity" >&2
   exit 3
 fi
-
-# Rebind the source-only gate after both build lanes. A source mutation between
-# verified staging and this point must fail while the old runtime is still live.
-trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.py" \
-  --source-root "$SOURCE_ROOT" \
-  --skip-overlay-marker-check \
-  --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
-  --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"
+for prior_tag_id in "$prior_image_tag_id" "$prior_tool_image_tag_id"; do
+  if [[ -n "$prior_tag_id" && ! "$prior_tag_id" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+    echo "a prior canonical image tag identity is invalid" >&2
+    exit 3
+  fi
+done
 
 if ! prior_portal_container_id="$(compose_cli ps --all -q chummer-portal)"; then
   echo "could not query prior public-edge portal container" >&2
@@ -857,20 +893,19 @@ prior_portal_was_running=0
 prior_portal_existed=0
 if [[ -n "$prior_portal_container_id" ]]; then
   prior_portal_existed=1
-  if ! prior_portal_image_id="$(docker_cli container inspect --format '{{.Image}}' "$prior_portal_container_id")"; then
-    echo "could not inspect prior public-edge portal image" >&2
-    exit 3
-  fi
-  if ! prior_portal_running_state="$(docker_cli container inspect --format '{{.State.Running}}' "$prior_portal_container_id")"; then
-    echo "could not inspect prior public-edge portal runtime state" >&2
-    exit 3
-  fi
-  if [[ "$prior_portal_running_state" == "true" ]]; then
-    prior_portal_was_running=1
-  elif [[ "$prior_portal_running_state" != "false" ]]; then
-    echo "prior public-edge portal returned an invalid runtime state" >&2
-    exit 3
-  fi
+  prior_portal_container_id="$(docker_cli container inspect --format '{{.Id}}' \
+    "$prior_portal_container_id")" || exit 3
+  [[ "$prior_portal_container_id" =~ ^[0-9a-f]{64}$ ]] || exit 3
+  prior_portal_image_id="$(docker_cli container inspect --format '{{.Image}}' \
+    "$prior_portal_container_id")" || exit 3
+  prior_portal_running_state="$(docker_cli container inspect --format '{{.State.Running}}' \
+    "$prior_portal_container_id")" || exit 3
+  [[ "$prior_portal_image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 3
+  case "$prior_portal_running_state" in
+    true) prior_portal_was_running=1 ;;
+    false) ;;
+    *) exit 3 ;;
+  esac
 fi
 
 if ! prior_tunnel_container_id="$(compose_cli ps --all -q chummer-run-cloudflared)"; then
@@ -881,252 +916,105 @@ if [[ "$prior_tunnel_container_id" == *$'\n'* ]]; then
   echo "public-edge tunnel resolved to more than one prior container" >&2
   exit 3
 fi
+prior_tunnel_image_id=""
 prior_tunnel_was_running=0
 prior_tunnel_existed=0
 if [[ -n "$prior_tunnel_container_id" ]]; then
   prior_tunnel_existed=1
-  if ! prior_tunnel_running_state="$(docker_cli container inspect --format '{{.State.Running}}' "$prior_tunnel_container_id")"; then
-    echo "could not inspect prior public-edge tunnel runtime state" >&2
-    exit 3
-  fi
-  if [[ "$prior_tunnel_running_state" == "true" ]]; then
-    prior_tunnel_was_running=1
-  elif [[ "$prior_tunnel_running_state" != "false" ]]; then
-    echo "prior public-edge tunnel returned an invalid runtime state" >&2
-    exit 3
-  fi
+  prior_tunnel_container_id="$(docker_cli container inspect --format '{{.Id}}' \
+    "$prior_tunnel_container_id")" || exit 3
+  [[ "$prior_tunnel_container_id" =~ ^[0-9a-f]{64}$ ]] || exit 3
+  prior_tunnel_image_id="$(docker_cli container inspect --format '{{.Image}}' \
+    "$prior_tunnel_container_id")" || exit 3
+  prior_tunnel_running_state="$(docker_cli container inspect --format '{{.State.Running}}' \
+    "$prior_tunnel_container_id")" || exit 3
+  [[ "$prior_tunnel_image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 3
+  case "$prior_tunnel_running_state" in
+    true) prior_tunnel_was_running=1 ;;
+    false) ;;
+    *) exit 3 ;;
+  esac
 fi
 
-wait_for_restored_portal_runtime() {
-  local container_id="$1"
-  local deadline=$((SECONDS + PORTAL_READY_TIMEOUT_SECONDS))
-  local running health
-  while ((SECONDS < deadline)); do
-    running="$(docker_cli container inspect --format '{{.State.Running}}' "$container_id")" || return 1
-    if [[ "$running" == "true" ]]; then
-      health="$(docker_cli container inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")" || return 1
-      case "$health" in
-        healthy) return 0 ;;
-        none)
-          "$TRUSTED_TIMEOUT" --kill-after=5s 30s \
-            "$TRUSTED_CURL" --fail --silent --show-error --max-time 20 \
-              --output /dev/null --header 'Host: chummer.run' \
-              "http://127.0.0.1:${PUBLIC_EDGE_PORT}/api/ready" \
-            && return 0
-          return 1
-          ;;
-        unhealthy) return 1 ;;
-        "") return 1 ;;
-      esac
-    elif [[ "$running" != "false" ]]; then
-      return 1
-    fi
-    "$TRUSTED_SLEEP" 1
-  done
-  return 1
-}
-
-restore_prior_portal() {
-  local restored_portal_container_id restored_portal_image_id
-  if ((replacement_portal_may_exist == 1)); then
-    if ! compose_cli stop chummer-portal \
-      || ! compose_cli rm -f -s chummer-portal; then
-      printf 'failed to remove replacement public-edge portal before rollback\n' >&2
-      return 1
-    fi
-    replacement_portal_may_exist=0
-  fi
-
-  if ((prior_portal_existed == 0)); then
-    return 0
-  fi
-
-  if ((prior_portal_was_running == 0)); then
-    if docker_cli container inspect "$prior_portal_container_id" >/dev/null 2>&1; then
-      prior_portal_running_state="$(docker_cli container inspect --format '{{.State.Running}}' "$prior_portal_container_id")" || return 1
-      [[ "$prior_portal_running_state" == "false" ]] || return 1
-      return 0
-    fi
-    if [[ "$prior_portal_image_id" != sha256:* ]] \
-      || ! docker_cli image inspect "$prior_portal_image_id" >/dev/null 2>&1 \
-      || ! docker_cli tag "$prior_portal_image_id" "$IMAGE_TAG" \
-      || ! compose_cli create --no-build --force-recreate chummer-portal; then
-      return 1
-    fi
-    prior_portal_container_id="$(compose_cli ps --all -q chummer-portal)" || return 1
-    [[ -n "$prior_portal_container_id" && "$prior_portal_container_id" != *$'\n'* ]] || return 1
-    [[ "$(docker_cli container inspect --format '{{.Image}}' "$prior_portal_container_id")" == "$prior_portal_image_id" ]] || return 1
-    [[ "$(docker_cli container inspect --format '{{.State.Running}}' "$prior_portal_container_id")" == "false" ]] || return 1
-    printf 'prior_public_edge_portal_stopped_best_effort_recreated_but_identity_changed %s\n' \
-      "$prior_portal_image_id" >&2
-    return 1
-  fi
-
-  if docker_cli container inspect "$prior_portal_container_id" >/dev/null 2>&1 \
-    && docker_cli start "$prior_portal_container_id" >/dev/null \
-    && wait_for_restored_portal_runtime "$prior_portal_container_id"; then
-    printf 'prior_public_edge_portal_restarted %s\n' "$prior_portal_container_id" >&2
-    return 0
-  fi
-
-  if [[ "$prior_portal_image_id" == sha256:* ]] \
-    && docker_cli image inspect "$prior_portal_image_id" >/dev/null 2>&1 \
-    && docker_cli tag "$prior_portal_image_id" "$IMAGE_TAG" \
-    && compose_cli up -d --no-build --no-deps --force-recreate \
-      --wait --wait-timeout "$PORTAL_READY_TIMEOUT_SECONDS" chummer-portal; then
-    restored_portal_container_id="$(compose_cli ps --all -q chummer-portal)" || return 1
-    restored_portal_image_id="$(
-      docker_cli container inspect --format '{{.Image}}' "$restored_portal_container_id"
-    )" || return 1
-    [[ "$restored_portal_image_id" == "$prior_portal_image_id" ]] || return 1
-    printf 'prior_public_edge_portal_best_effort_recreated_but_identity_changed %s\n' \
-      "$prior_portal_image_id" >&2
-    return 1
-  fi
-
-  printf 'failed to restore prior public-edge portal %s (%s)\n' \
-    "$prior_portal_container_id" "$prior_portal_image_id" >&2
-  return 1
-}
-
-restore_prior_overlay() {
-  trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction.py" restore \
-    --source-root "$SOURCE_ROOT" \
-    --active-root "$OVERLAY_ROOT" \
-    --backup-root "$OVERLAY_BACKUP_ROOT" \
-    --snapshot "$OVERLAY_PRIOR_STATE_OUTPUT" \
-    --activation-receipt "$OVERLAY_ACTIVATION_OUTPUT" \
-    --output "$OVERLAY_ROLLBACK_OUTPUT" \
-    --shared-mutation-lock-token "$deploy_lock_owner_token"
-}
-
-restore_prior_tunnel() {
-  local current_tunnel_container_id current_tunnel_running_state
-  current_tunnel_container_id="$(compose_cli ps --all -q chummer-run-cloudflared)" || return 1
-  [[ "$current_tunnel_container_id" != *$'\n'* ]] || return 1
-
-  if ((prior_tunnel_existed == 0)); then
-    if [[ -n "$current_tunnel_container_id" ]]; then
-      compose_cli stop chummer-run-cloudflared || return 1
-      compose_cli rm -f -s chummer-run-cloudflared || return 1
-    fi
-    [[ -z "$(compose_cli ps --all -q chummer-run-cloudflared)" ]]
-    return
-  fi
-
-  # The candidate lane only stops/starts an existing tunnel; it never recreates it.
-  # Losing that exact container identity therefore makes rollback authority uncertain.
-  [[ "$current_tunnel_container_id" == "$prior_tunnel_container_id" ]] || return 1
-  current_tunnel_running_state="$(
-    docker_cli container inspect --format '{{.State.Running}}' "$prior_tunnel_container_id"
-  )" || return 1
-  if ((prior_tunnel_was_running == 1)); then
-    if [[ "$current_tunnel_running_state" != "true" ]]; then
-      docker_cli start "$prior_tunnel_container_id" >/dev/null || return 1
-    fi
-    [[ "$(docker_cli container inspect --format '{{.State.Running}}' "$prior_tunnel_container_id")" == "true" ]]
-    return
-  fi
-  if [[ "$current_tunnel_running_state" == "true" ]]; then
-    docker_cli stop "$prior_tunnel_container_id" >/dev/null || return 1
-  elif [[ "$current_tunnel_running_state" != "false" ]]; then
-    return 1
-  fi
-  [[ "$(docker_cli container inspect --format '{{.State.Running}}' "$prior_tunnel_container_id")" == "false" ]]
-}
-
-mark_deploy_phase() {
-  trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction.py" mark-phase \
-    --source-root "$SOURCE_ROOT" \
-    --active-root "$OVERLAY_ROOT" \
-    --output "$OVERLAY_PRIOR_STATE_OUTPUT" \
-    --phase "$1" \
-    --shared-mutation-lock-token "$deploy_lock_owner_token"
-}
-
-portal_transaction_active=0
-replacement_portal_may_exist=0
-rollback_portal_on_exit() {
-  local failure_status="$?"
-  local rollback_failed=0
-  local portal_quiesced=0
-  local overlay_restored=0
-  local portal_restored=0
-  trap - EXIT
-  if ((portal_transaction_active == 1)); then
-    compose_cli stop chummer-run-cloudflared >/dev/null 2>&1 || rollback_failed=1
-    if compose_cli stop chummer-portal >/dev/null 2>&1; then
-      portal_quiesced=1
-    else
-      rollback_failed=1
-    fi
-    if ((portal_quiesced == 1)) && restore_prior_overlay; then
-      overlay_restored=1
-    else
-      rollback_failed=1
-    fi
-  fi
-  if ((image_tag_transaction_active == 1)); then
-    restore_prior_image_tag || rollback_failed=1
-  fi
-  if ((portal_transaction_active == 1 && overlay_restored == 1)); then
-    if restore_prior_portal; then
-      portal_restored=1
-    else
-      rollback_failed=1
-    fi
-  fi
-  if ((portal_transaction_active == 1)); then
-    # Tunnel restoration is independent: a known prior tunnel must not remain
-    # drained merely because another rollback component is uncertain.
-    restore_prior_tunnel || rollback_failed=1
-    if ((overlay_restored == 0 || portal_restored == 0)); then
-      rollback_failed=1
-    fi
-  fi
-  if ((rollback_failed == 0)); then
-    "$TRUSTED_RM" -f -- "$OVERLAY_PRIOR_STATE_OUTPUT" || rollback_failed=1
-  fi
-  release_deploy_lock || rollback_failed=1
-  if ((rollback_failed == 1)); then
-    printf 'public-edge rollback did not restore the exact prior overlay, runtime, tunnel, and image tag\n' >&2
-    exit 70
-  fi
-  exit "$failure_status"
-}
-
-abort_portal_recreate() {
-  local failure_label="$1"
-  local failure_status="$2"
-  printf 'public-edge portal %s failed; attempting prior portal restore\n' "$failure_label" >&2
-  exit "$failure_status"
-}
-
-trap rollback_portal_on_exit EXIT
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
-
-# This fixed, durable journal is created immediately before the first runtime
-# mutation. A crash leaves it in place, so a later deploy fails closed instead of
-# silently treating a mixed cutover as its new prior state.
+# The fixed journal is durable before Buildx can retag either canonical image.
 if ! trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction.py" snapshot \
   --source-root "$SOURCE_ROOT" \
   --active-root "$OVERLAY_ROOT" \
   --output "$OVERLAY_PRIOR_STATE_OUTPUT" \
   --shared-mutation-lock-token "$deploy_lock_owner_token" \
+  --expected-runtime-proof-bind-source-sha256 \
+    "$RUNTIME_PROOF_BIND_SOURCE_SHA256" \
   --prior-image-tag-id "$prior_image_tag_id" \
+  --prior-tool-image-tag-id "$prior_tool_image_tag_id" \
   --prior-portal-container-id "$prior_portal_container_id" \
   --prior-portal-image-id "$prior_portal_image_id" \
   --prior-portal-existed "$prior_portal_existed" \
   --prior-portal-was-running "$prior_portal_was_running" \
   --prior-tunnel-container-id "$prior_tunnel_container_id" \
+  --prior-tunnel-image-id "$prior_tunnel_image_id" \
   --prior-tunnel-existed "$prior_tunnel_existed" \
-  --prior-tunnel-was-running "$prior_tunnel_was_running"; then
+  --prior-tunnel-was-running "$prior_tunnel_was_running" \
+  --staging-root "$OVERLAY_STAGING_ROOT" \
+  --backup-root "$OVERLAY_BACKUP_ROOT" \
+  --activation-receipt "$OVERLAY_ACTIVATION_OUTPUT"; then
   "$TRUSTED_RM" -f -- "$OVERLAY_PRIOR_STATE_OUTPUT"
   exit 1
 fi
-portal_transaction_active=1
+
+deployment_transaction_active=1
+reconcile_transaction_on_exit() {
+  local failure_status="$?"
+  local recovery_failed=0
+  trap - EXIT HUP INT TERM
+  if ((deployment_transaction_active == 1)); then
+    run_deploy_recovery || recovery_failed=1
+  fi
+  release_deploy_lock || recovery_failed=1
+  if ((recovery_failed == 1)); then
+    exit 70
+  fi
+  exit "$failure_status"
+}
+
+trap reconcile_transaction_on_exit EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+if ! mark_deploy_phase image_build_started; then
+  abort_portal_recreate "image build journal" 1
+fi
+
+docker_cli buildx build \
+  --builder "$CANONICAL_BUILDX_BUILDER" \
+  --load \
+  --progress="$PROGRESS" \
+  -t "$IMAGE_TAG" \
+  -f "$SOURCE_ROOT/Chummer.Run.Api/Dockerfile" \
+  --build-context "run-services-source=$SOURCE_ROOT" \
+  --build-context "fleet-media-factory-contracts=$FLEET_MEDIA_CONTRACTS" \
+  --build-context "design-product=$DESIGN_PRODUCT_ROOT" \
+  --build-arg "CHUMMER_BUILD_CONCURRENCY=$BUILD_CONCURRENCY" \
+  "$BUILD_CONTEXT"
+
+image_id="$(docker_cli image inspect "$IMAGE_TAG" --format '{{.Id}}')"
+if [[ ! "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+  echo "could not resolve built portal image id for $IMAGE_TAG" >&2
+  exit 3
+fi
+if ! mark_deploy_phase image_built; then
+  abort_portal_recreate "image build completion journal" 1
+fi
+
+# Rebind the source-only gate after the image build. A source mutation between
+# verified staging and this point fails while the exact prior runtime is live.
+trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.py" \
+  --source-root "$SOURCE_ROOT" \
+  --skip-overlay-marker-check \
+  --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
+  --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
+  --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
+
 if ! compose_cli stop chummer-run-cloudflared; then
   abort_portal_recreate "tunnel drain" 1
 fi
@@ -1173,11 +1061,11 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_prefli
   --overlay-root "$OVERLAY_ROOT" \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
+  --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256" \
   --output "$OVERLAY_ACTIVE_PREFLIGHT_OUTPUT"; then
   abort_portal_recreate "active overlay preflight" 1
 fi
 
-replacement_portal_may_exist=1
 if ! compose_cli up -d --no-build --no-deps --force-recreate \
   --wait --wait-timeout "$PORTAL_READY_TIMEOUT_SECONDS" chummer-portal; then
   abort_portal_recreate "recreation" 1
@@ -1206,6 +1094,7 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_prefli
   --overlay-root "$OVERLAY_ROOT" \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
+  --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256" \
   --output "$OVERLAY_POSTRECREATE_PREFLIGHT_OUTPUT"; then
   abort_portal_recreate "postrecreate active overlay preflight" 1
 fi
@@ -1241,6 +1130,9 @@ if before != after:
 print(before)
 ' "$OVERLAY_ACTIVE_PREFLIGHT_OUTPUT" "$OVERLAY_POSTRECREATE_PREFLIGHT_OUTPUT")"; then
   abort_portal_recreate "runtime proof bind identity" 1
+fi
+if [[ "$runtime_proof_sha256" != "$RUNTIME_PROOF_BIND_SOURCE_SHA256" ]]; then
+  abort_portal_recreate "runtime proof sealed authority" 1
 fi
 
 container_proof_sha256() {
@@ -1347,13 +1239,15 @@ if ! verify_candidate_tunnel_runtime; then
   abort_portal_recreate "postdeploy tunnel identity" 1
 fi
 
-portal_transaction_active=0
-replacement_portal_may_exist=0
-image_tag_transaction_active=0
-if ! "$TRUSTED_RM" -f -- "$OVERLAY_PRIOR_STATE_OUTPUT"; then
+if ! trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction.py" complete \
+  --source-root "$SOURCE_ROOT" \
+  --active-root "$OVERLAY_ROOT" \
+  --output "$OVERLAY_PRIOR_STATE_OUTPUT" \
+  --shared-mutation-lock-token "$deploy_lock_owner_token"; then
   echo "failed to retire the completed public-edge deployment journal" >&2
   exit 70
 fi
+deployment_transaction_active=0
 if ! release_deploy_lock; then
   echo "failed to release public edge deployment lock" >&2
   exit 70
