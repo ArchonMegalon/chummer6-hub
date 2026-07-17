@@ -1,15 +1,26 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
+import signal
+import subprocess
 from contextlib import nullcontext
 from pathlib import Path
+import sys
 
 import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "public_edge_overlay_transaction.py"
+CANDIDATE_PROOF_BYTES = b"candidate-proof-authority\n"
+PRIOR_PROOF_BYTES = b"prior-proof-authority\n"
+CANDIDATE_PROOF_SHA256 = hashlib.sha256(CANDIDATE_PROOF_BYTES).hexdigest()
+PRIOR_PROOF_SHA256 = hashlib.sha256(PRIOR_PROOF_BYTES).hexdigest()
+CANDIDATE_PORTAL_NAME = "chummer-public-edge-candidate-test"
+CANDIDATE_PORTAL_ID = "c" * 64
+CANDIDATE_PORTAL_IMAGE = "sha256:" + "6" * 64
 
 
 def load_module():
@@ -38,17 +49,38 @@ def disable_host_locks(module, monkeypatch) -> None:
 
 def runtime_prior_state() -> dict[str, object]:
     return {
-        "expectedRuntimeProofBindSourceSha256": "5" * 64,
+        "candidatePortalContainerName": CANDIDATE_PORTAL_NAME,
+        "expectedRuntimeProofBindSourceSha256": CANDIDATE_PROOF_SHA256,
         "priorImageTagId": "sha256:" + "1" * 64,
         "priorToolImageTagId": "sha256:" + "2" * 64,
         "priorPortalContainerId": "a" * 64,
+        "priorPortalContainerName": "chummer6-hub-chummer-portal-1",
         "priorPortalImageId": "sha256:" + "3" * 64,
+        "priorPortalProofAuthorityMountSha256": PRIOR_PROOF_SHA256,
+        "priorPortalProofPublicMountSha256": PRIOR_PROOF_SHA256,
         "priorPortalExisted": True,
         "priorPortalWasRunning": True,
         "priorTunnelContainerId": "b" * 64,
         "priorTunnelImageId": "sha256:" + "4" * 64,
         "priorTunnelExisted": True,
         "priorTunnelWasRunning": True,
+    }
+
+
+def deploy_proof_authority(tmp_path: Path) -> dict[str, Path]:
+    proof_bind_source = tmp_path / "runtime-proof-source.json"
+    candidate_snapshot = tmp_path / "candidate-proof-snapshot.json"
+    prior_authority_snapshot = tmp_path / "prior-authority-proof-snapshot.json"
+    prior_public_snapshot = tmp_path / "prior-public-proof-snapshot.json"
+    proof_bind_source.write_bytes(CANDIDATE_PROOF_BYTES)
+    candidate_snapshot.write_bytes(CANDIDATE_PROOF_BYTES)
+    prior_authority_snapshot.write_bytes(PRIOR_PROOF_BYTES)
+    prior_public_snapshot.write_bytes(PRIOR_PROOF_BYTES)
+    return {
+        "proof_bind_source": proof_bind_source,
+        "candidate_proof_bind_source_snapshot": candidate_snapshot,
+        "prior_portal_proof_authority_snapshot": prior_authority_snapshot,
+        "prior_portal_proof_public_snapshot": prior_public_snapshot,
     }
 
 
@@ -84,6 +116,7 @@ def prepare_deploy_activation(
         staging_root=staging_root,
         backup_root=backup_root,
         activation_receipt=tmp_path / "activation.json",
+        **deploy_proof_authority(tmp_path),
     )
     return (
         source_root,
@@ -446,6 +479,7 @@ def test_deploy_recovery_survives_hard_crash_while_restoring_prior_absence(
         staging_root=staging_root,
         backup_root=backup_root,
         activation_receipt=tmp_path / "activation.json",
+        **deploy_proof_authority(tmp_path),
     )
     activation_journal = module.overlay.activation_transaction_journal_path(
         active_root
@@ -702,12 +736,17 @@ def test_complete_retires_only_fully_advanced_deploy_journal(
         staging_root=staging_root,
         backup_root=backup_root,
         activation_receipt=tmp_path / "activation.json",
+        **deploy_proof_authority(tmp_path),
     )
     with pytest.raises(RuntimeError, match="before tunnel start"):
         module.complete_transaction(
             source_root=source_root,
             active_root=active_root,
             journal_path=journal,
+            runtime_authority_output=tmp_path / "active-runtime-authority.json",
+            candidate_portal_container_id=CANDIDATE_PORTAL_ID,
+            candidate_portal_container_name=CANDIDATE_PORTAL_NAME,
+            candidate_portal_image_id=CANDIDATE_PORTAL_IMAGE,
             shared_mutation_lock_token="4" * 64,
         )
     for phase in module.TRANSACTION_PHASES[1:]:
@@ -719,16 +758,86 @@ def test_complete_retires_only_fully_advanced_deploy_journal(
             shared_mutation_lock_token="4" * 64,
         )
 
+    killed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            """
+import importlib.util
+import os
+import signal
+import sys
+from contextlib import nullcontext
+from pathlib import Path
+
+script, source, active, journal, authority, container_id, name, image = sys.argv[1:]
+spec = importlib.util.spec_from_file_location("killed_complete_transaction", script)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+module.overlay.public_edge_mutation_lock = lambda **_kwargs: nullcontext(None)
+module.overlay.overlay_publish_lock = lambda *_args, **_kwargs: nullcontext(None)
+original_unlink = Path.unlink
+
+def kill_before_journal_retirement(path, *args, **kwargs):
+    if path == Path(journal):
+        os.kill(os.getpid(), signal.SIGKILL)
+    return original_unlink(path, *args, **kwargs)
+
+Path.unlink = kill_before_journal_retirement
+module.complete_transaction(
+    source_root=Path(source),
+    active_root=Path(active),
+    journal_path=Path(journal),
+    runtime_authority_output=Path(authority),
+    candidate_portal_container_id=container_id,
+    candidate_portal_container_name=name,
+    candidate_portal_image_id=image,
+    shared_mutation_lock_token="4" * 64,
+)
+""",
+            str(SCRIPT_PATH),
+            str(source_root),
+            str(active_root),
+            str(journal),
+            str(tmp_path / "active-runtime-authority.json"),
+            CANDIDATE_PORTAL_ID,
+            CANDIDATE_PORTAL_NAME,
+            CANDIDATE_PORTAL_IMAGE,
+        ],
+        check=False,
+    )
+    assert killed.returncode == -signal.SIGKILL
+
+    # A crash after the candidate authority is durable but before journal
+    # retirement remains rollback-authorized: recovery sees the journal first.
+    assert journal.exists()
+    interrupted_authority = json.loads(
+        (tmp_path / "active-runtime-authority.json").read_text(encoding="utf-8")
+    )
+    assert interrupted_authority["portal"]["containerId"] == CANDIDATE_PORTAL_ID
+
     receipt = module.complete_transaction(
         source_root=source_root,
         active_root=active_root,
         journal_path=journal,
+        runtime_authority_output=tmp_path / "active-runtime-authority.json",
+        candidate_portal_container_id=CANDIDATE_PORTAL_ID,
+        candidate_portal_container_name=CANDIDATE_PORTAL_NAME,
+        candidate_portal_image_id=CANDIDATE_PORTAL_IMAGE,
         shared_mutation_lock_token="4" * 64,
     )
 
     assert receipt["status"] == "pass"
     assert receipt["journalRetired"] is True
     assert not journal.exists()
+    authority = json.loads(
+        (tmp_path / "active-runtime-authority.json").read_text(encoding="utf-8")
+    )
+    assert authority["portal"]["containerId"] == CANDIDATE_PORTAL_ID
+    assert authority["portal"]["containerName"] == CANDIDATE_PORTAL_NAME
+    assert authority["portal"]["proofAuthorityMountSha256"] == CANDIDATE_PROOF_SHA256
+    assert authority["portal"]["proofAuthorityMountSha256"] != PRIOR_PROOF_SHA256
 
 
 def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:
@@ -794,13 +903,23 @@ def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:
         "HUB_LOCAL_RELEASE_PROOF.generated.json"
     ) in script
     proof_compare_index = script.index('if [[ "$proof_authority_mount_sha256"')
-    portal_recreate_index = script.index(
-        "--wait --wait-timeout \"$PORTAL_READY_TIMEOUT_SECONDS\" chummer-portal",
+    portal_candidate_index = script.index(
+        "compose_cli run -T -d --no-deps --service-ports --use-aliases",
         full_preflight_index,
     )
     candidate_identity_index = script.index(
         "if ! verify_candidate_runtime_identity; then",
         proof_compare_index,
     )
-    assert portal_recreate_index < proof_compare_index < candidate_identity_index
+    complete_index = script.index(
+        'public_edge_overlay_transaction.py" complete',
+        candidate_identity_index,
+    )
+    prior_cleanup_index = script.index(
+        'docker_cli container rm "$prior_portal_container_id"',
+        complete_index,
+    )
+    assert full_preflight_index < portal_candidate_index < proof_compare_index
+    assert proof_compare_index < candidate_identity_index < complete_index < prior_cleanup_index
+    assert "--force-recreate" not in script
     assert "exit 70" in script

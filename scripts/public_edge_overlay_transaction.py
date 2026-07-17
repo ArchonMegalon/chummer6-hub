@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import re
@@ -42,6 +43,9 @@ overlay = _load_overlay_publisher()
 
 
 CONTRACT_NAME = "chummer.public-edge.overlay-transaction/v1"
+ACTIVE_RUNTIME_AUTHORITY_CONTRACT_NAME = (
+    "chummer.public-edge.active-runtime-authority/v1"
+)
 TRANSACTION_PHASES = (
     "prepared",
     "image_build_started",
@@ -49,17 +53,21 @@ TRANSACTION_PHASES = (
     "tunnel_drained",
     "portal_stopped",
     "overlay_activated",
-    "portal_recreated",
+    "portal_candidate_started",
     "tunnel_started",
 )
 IMAGE_ID_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 CONTAINER_ID_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 RUNTIME_PRIOR_STATE_FIELDS = {
+    "candidatePortalContainerName",
     "expectedRuntimeProofBindSourceSha256",
     "priorImageTagId",
     "priorToolImageTagId",
     "priorPortalContainerId",
+    "priorPortalContainerName",
     "priorPortalImageId",
+    "priorPortalProofAuthorityMountSha256",
+    "priorPortalProofPublicMountSha256",
     "priorPortalExisted",
     "priorPortalWasRunning",
     "priorTunnelContainerId",
@@ -68,9 +76,13 @@ RUNTIME_PRIOR_STATE_FIELDS = {
     "priorTunnelWasRunning",
 }
 DEPLOY_OVERLAY_AUTHORITY_FIELDS = {
-    "stagingRoot",
-    "backupRoot",
     "activationReceipt",
+    "backupRoot",
+    "candidateProofBindSourceSnapshot",
+    "priorPortalProofAuthoritySnapshot",
+    "priorPortalProofPublicSnapshot",
+    "proofBindSourcePath",
+    "stagingRoot",
 }
 
 
@@ -86,6 +98,12 @@ def validate_runtime_prior_state(value: object) -> dict[str, Any]:
         raise RuntimeError(
             "overlay transaction expected runtime proof bind-source SHA-256 is invalid"
         )
+    candidate_name = state["candidatePortalContainerName"]
+    if (
+        not isinstance(candidate_name, str)
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{7,127}", candidate_name) is None
+    ):
+        raise RuntimeError("overlay transaction candidate portal name is invalid")
     for field in ("priorImageTagId", "priorToolImageTagId"):
         image_id = state[field]
         if not isinstance(image_id, str) or (
@@ -117,12 +135,95 @@ def validate_runtime_prior_state(value: object) -> dict[str, Any]:
             raise RuntimeError(
                 f"absent prior {prefix.lower()} cannot claim identity or running state"
             )
+    prior_portal_name = state["priorPortalContainerName"]
+    if not isinstance(prior_portal_name, str) or (
+        prior_portal_name
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", prior_portal_name)
+        is None
+    ):
+        raise RuntimeError("overlay transaction prior portal name is invalid")
+    if state["priorPortalExisted"] != bool(prior_portal_name):
+        raise RuntimeError("prior portal name does not match its existence state")
+    if prior_portal_name and candidate_name == prior_portal_name:
+        raise RuntimeError("candidate portal name must differ from the prior portal")
+    authority_digest = state["priorPortalProofAuthorityMountSha256"]
+    public_digest = state["priorPortalProofPublicMountSha256"]
+    for field, digest in (
+        ("priorPortalProofAuthorityMountSha256", authority_digest),
+        ("priorPortalProofPublicMountSha256", public_digest),
+    ):
+        if not isinstance(digest, str) or (
+            digest and re.fullmatch(r"[0-9a-f]{64}", digest) is None
+        ):
+            raise RuntimeError(f"overlay transaction {field} is invalid")
+    if state["priorPortalWasRunning"]:
+        if not authority_digest or not public_digest:
+            raise RuntimeError(
+                "running prior portal requires both proof mount digests"
+            )
+        if authority_digest != public_digest:
+            raise RuntimeError(
+                "prior portal proof mounts cannot be recreated from one bind source"
+            )
+    elif authority_digest or public_digest:
+        raise RuntimeError(
+            "stopped or absent prior portal cannot claim mounted proof digests"
+        )
     return state
+
+
+def active_runtime_authority_payload(
+    *,
+    portal_existed: bool,
+    portal_container_id: str,
+    portal_container_name: str,
+    portal_image_id: str,
+    portal_was_running: bool,
+    proof_authority_mount_sha256: str,
+    proof_public_mount_sha256: str,
+) -> dict[str, Any]:
+    synthetic_state = {
+        "candidatePortalContainerName": "authority-validation-placeholder",
+        "expectedRuntimeProofBindSourceSha256": "0" * 64,
+        "priorImageTagId": "",
+        "priorToolImageTagId": "",
+        "priorPortalContainerId": portal_container_id,
+        "priorPortalContainerName": portal_container_name,
+        "priorPortalImageId": portal_image_id,
+        "priorPortalProofAuthorityMountSha256": proof_authority_mount_sha256,
+        "priorPortalProofPublicMountSha256": proof_public_mount_sha256,
+        "priorPortalExisted": portal_existed,
+        "priorPortalWasRunning": portal_was_running,
+        "priorTunnelContainerId": "",
+        "priorTunnelImageId": "",
+        "priorTunnelExisted": False,
+        "priorTunnelWasRunning": False,
+    }
+    validate_runtime_prior_state(synthetic_state)
+    return {
+        "contractName": ACTIVE_RUNTIME_AUTHORITY_CONTRACT_NAME,
+        "status": "pass",
+        "generatedAtUtc": overlay.now_iso(),
+        "portal": {
+            "existed": portal_existed,
+            "containerId": portal_container_id,
+            "containerName": portal_container_name,
+            "imageId": portal_image_id,
+            "wasRunning": portal_was_running,
+            "proofAuthorityMountSha256": proof_authority_mount_sha256,
+            "proofPublicMountSha256": proof_public_mount_sha256,
+        },
+    }
 
 
 def _load_object(path: Path, *, label: str) -> dict[str, Any]:
     payload, _metadata = overlay.read_stable_regular_bytes(path, label=label)
     return overlay.strict_json_object_bytes(payload, label=label)
+
+
+def _stable_file_sha256(path: Path, *, label: str) -> str:
+    payload, _metadata = overlay.read_stable_regular_bytes(path, label=label)
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _same_path(left: object, right: Path) -> bool:
@@ -186,6 +287,10 @@ def snapshot(
     staging_root: Path | None = None,
     backup_root: Path | None = None,
     activation_receipt: Path | None = None,
+    proof_bind_source: Path | None = None,
+    candidate_proof_bind_source_snapshot: Path | None = None,
+    prior_portal_proof_authority_snapshot: Path | None = None,
+    prior_portal_proof_public_snapshot: Path | None = None,
 ) -> dict[str, Any]:
     source_root = source_root.resolve()
     active_root = overlay.normalized_absolute_path(active_root)
@@ -205,6 +310,8 @@ def snapshot(
                     staging_root is None
                     or backup_root is None
                     or activation_receipt is None
+                    or proof_bind_source is None
+                    or candidate_proof_bind_source_snapshot is None
                 ):
                     raise RuntimeError(
                         "deploy overlay authority paths are required with runtime prior state"
@@ -214,6 +321,66 @@ def snapshot(
                 normalized_activation_receipt = overlay.normalized_absolute_path(
                     activation_receipt
                 )
+                normalized_proof_bind_source = overlay.normalized_absolute_path(
+                    proof_bind_source
+                )
+                normalized_candidate_proof_snapshot = (
+                    overlay.normalized_absolute_path(
+                        candidate_proof_bind_source_snapshot
+                    )
+                )
+                expected_candidate_digest = prior_runtime[
+                    "expectedRuntimeProofBindSourceSha256"
+                ]
+                if _stable_file_sha256(
+                    normalized_proof_bind_source,
+                    label="runtime proof bind source",
+                ) != expected_candidate_digest or _stable_file_sha256(
+                    normalized_candidate_proof_snapshot,
+                    label="candidate runtime proof snapshot",
+                ) != expected_candidate_digest:
+                    raise RuntimeError(
+                        "candidate runtime proof bytes do not match sealed authority"
+                    )
+                normalized_prior_authority_snapshot: Path | None = None
+                normalized_prior_public_snapshot: Path | None = None
+                if prior_runtime["priorPortalWasRunning"]:
+                    if (
+                        prior_portal_proof_authority_snapshot is None
+                        or prior_portal_proof_public_snapshot is None
+                    ):
+                        raise RuntimeError(
+                            "running prior portal requires both proof snapshots"
+                        )
+                    normalized_prior_authority_snapshot = (
+                        overlay.normalized_absolute_path(
+                            prior_portal_proof_authority_snapshot
+                        )
+                    )
+                    normalized_prior_public_snapshot = (
+                        overlay.normalized_absolute_path(
+                            prior_portal_proof_public_snapshot
+                        )
+                    )
+                    if _stable_file_sha256(
+                        normalized_prior_authority_snapshot,
+                        label="prior authority proof snapshot",
+                    ) != prior_runtime[
+                        "priorPortalProofAuthorityMountSha256"
+                    ] or _stable_file_sha256(
+                        normalized_prior_public_snapshot,
+                        label="prior public proof snapshot",
+                    ) != prior_runtime["priorPortalProofPublicMountSha256"]:
+                        raise RuntimeError(
+                            "prior portal proof snapshots do not match mounted authority"
+                        )
+                elif (
+                    prior_portal_proof_authority_snapshot is not None
+                    or prior_portal_proof_public_snapshot is not None
+                ):
+                    raise RuntimeError(
+                        "stopped or absent prior portal cannot claim proof snapshots"
+                    )
                 if normalized_staging_root == active_root:
                     raise RuntimeError("deploy staging and active roots must be distinct")
                 overlay.assert_no_symlink_components(
@@ -232,10 +399,28 @@ def snapshot(
                     "stagingRoot": str(normalized_staging_root),
                     "backupRoot": str(normalized_backup_root),
                     "activationReceipt": str(normalized_activation_receipt),
+                    "proofBindSourcePath": str(normalized_proof_bind_source),
+                    "candidateProofBindSourceSnapshot": str(
+                        normalized_candidate_proof_snapshot
+                    ),
+                    "priorPortalProofAuthoritySnapshot": str(
+                        normalized_prior_authority_snapshot or ""
+                    ),
+                    "priorPortalProofPublicSnapshot": str(
+                        normalized_prior_public_snapshot or ""
+                    ),
                 }
             elif any(
                 value is not None
-                for value in (staging_root, backup_root, activation_receipt)
+                for value in (
+                    staging_root,
+                    backup_root,
+                    activation_receipt,
+                    proof_bind_source,
+                    candidate_proof_bind_source_snapshot,
+                    prior_portal_proof_authority_snapshot,
+                    prior_portal_proof_public_snapshot,
+                )
             ):
                 raise RuntimeError(
                     "deploy overlay authority paths require runtime prior state"
@@ -312,8 +497,15 @@ def validated_deploy_snapshot(
     if not isinstance(authority, dict) or set(authority) != DEPLOY_OVERLAY_AUTHORITY_FIELDS:
         raise RuntimeError("deploy overlay authority contract is invalid")
     normalized_authority: dict[str, str] = {}
+    optional_prior_snapshot_fields = {
+        "priorPortalProofAuthoritySnapshot",
+        "priorPortalProofPublicSnapshot",
+    }
     for field in DEPLOY_OVERLAY_AUTHORITY_FIELDS:
         value = authority[field]
+        if field in optional_prior_snapshot_fields and value == "":
+            normalized_authority[field] = ""
+            continue
         if not isinstance(value, str) or not value or not Path(value).is_absolute():
             raise RuntimeError(f"deploy overlay authority {field} is invalid")
         try:
@@ -327,6 +519,31 @@ def validated_deploy_snapshot(
         overlay.normalized_absolute_path(active_root)
     ):
         raise RuntimeError("deploy staging and active roots must be distinct")
+    prior = payload["runtimePriorState"]
+    expected_candidate_digest = prior["expectedRuntimeProofBindSourceSha256"]
+    if _stable_file_sha256(
+        Path(normalized_authority["candidateProofBindSourceSnapshot"]),
+        label="candidate runtime proof snapshot",
+    ) != expected_candidate_digest:
+        raise RuntimeError("candidate runtime proof authority changed after snapshot")
+    if prior["priorPortalWasRunning"]:
+        for field, digest_field in (
+            (
+                "priorPortalProofAuthoritySnapshot",
+                "priorPortalProofAuthorityMountSha256",
+            ),
+            (
+                "priorPortalProofPublicSnapshot",
+                "priorPortalProofPublicMountSha256",
+            ),
+        ):
+            if not normalized_authority[field] or _stable_file_sha256(
+                Path(normalized_authority[field]),
+                label="prior portal proof snapshot",
+            ) != prior[digest_field]:
+                raise RuntimeError("prior portal proof authority changed after snapshot")
+    elif any(normalized_authority[field] for field in optional_prior_snapshot_fields):
+        raise RuntimeError("stopped or absent prior portal claims proof snapshots")
     payload["deployOverlayAuthority"] = normalized_authority
     return payload
 
@@ -389,11 +606,18 @@ def complete_transaction(
     source_root: Path,
     active_root: Path,
     journal_path: Path,
+    runtime_authority_output: Path,
+    candidate_portal_container_id: str,
+    candidate_portal_container_name: str,
+    candidate_portal_image_id: str,
     shared_mutation_lock_token: str,
 ) -> dict[str, Any]:
     source_root = source_root.resolve()
     active_root = overlay.normalized_absolute_path(active_root)
     journal_path = overlay.normalized_absolute_path(journal_path)
+    runtime_authority_output = overlay.normalized_absolute_path(
+        runtime_authority_output
+    )
     with overlay.public_edge_mutation_lock(
         activate=True,
         inherited_token=shared_mutation_lock_token,
@@ -409,6 +633,31 @@ def complete_transaction(
                     "public-edge overlay transaction cannot complete before tunnel start"
                 )
             overlay.assert_no_incomplete_activation_transaction(active_root)
+            prior = payload["runtimePriorState"]
+            if (
+                candidate_portal_container_name
+                != prior["candidatePortalContainerName"]
+                or CONTAINER_ID_PATTERN.fullmatch(candidate_portal_container_id)
+                is None
+                or IMAGE_ID_PATTERN.fullmatch(candidate_portal_image_id) is None
+            ):
+                raise RuntimeError(
+                    "candidate portal authority conflicts with deployment journal"
+                )
+            active_authority = active_runtime_authority_payload(
+                portal_existed=True,
+                portal_container_id=candidate_portal_container_id,
+                portal_container_name=candidate_portal_container_name,
+                portal_image_id=candidate_portal_image_id,
+                portal_was_running=True,
+                proof_authority_mount_sha256=prior[
+                    "expectedRuntimeProofBindSourceSha256"
+                ],
+                proof_public_mount_sha256=prior[
+                    "expectedRuntimeProofBindSourceSha256"
+                ],
+            )
+            overlay.atomic_write_json(runtime_authority_output, active_authority)
             journal_path.unlink()
             overlay.fsync_directory(journal_path.parent)
     return {
@@ -416,6 +665,7 @@ def complete_transaction(
         "operation": "complete",
         "status": "pass",
         "journalRetired": True,
+        "activeRuntimeAuthority": str(runtime_authority_output),
     }
 
 
@@ -847,9 +1097,19 @@ def parse_args() -> argparse.Namespace:
         "--expected-runtime-proof-bind-source-sha256",
         required=True,
     )
+    snapshot_parser.add_argument("--candidate-portal-container-name", required=True)
     snapshot_parser.add_argument("--prior-tool-image-tag-id", default="")
     snapshot_parser.add_argument("--prior-portal-container-id", default="")
+    snapshot_parser.add_argument("--prior-portal-container-name", default="")
     snapshot_parser.add_argument("--prior-portal-image-id", default="")
+    snapshot_parser.add_argument(
+        "--prior-portal-proof-authority-mount-sha256",
+        default="",
+    )
+    snapshot_parser.add_argument(
+        "--prior-portal-proof-public-mount-sha256",
+        default="",
+    )
     snapshot_parser.add_argument("--prior-portal-existed", choices=("0", "1"), required=True)
     snapshot_parser.add_argument("--prior-portal-was-running", choices=("0", "1"), required=True)
     snapshot_parser.add_argument("--prior-tunnel-container-id", default="")
@@ -859,6 +1119,22 @@ def parse_args() -> argparse.Namespace:
     snapshot_parser.add_argument("--staging-root", type=Path, required=True)
     snapshot_parser.add_argument("--backup-root", type=Path, required=True)
     snapshot_parser.add_argument("--activation-receipt", type=Path, required=True)
+    snapshot_parser.add_argument("--proof-bind-source", type=Path, required=True)
+    snapshot_parser.add_argument(
+        "--candidate-proof-bind-source-snapshot",
+        type=Path,
+        required=True,
+    )
+    snapshot_parser.add_argument("--prior-portal-proof-authority-snapshot", default="")
+    snapshot_parser.add_argument("--prior-portal-proof-public-snapshot", default="")
+    complete_parser.add_argument(
+        "--runtime-authority-output",
+        type=Path,
+        required=True,
+    )
+    complete_parser.add_argument("--candidate-portal-container-id", required=True)
+    complete_parser.add_argument("--candidate-portal-container-name", required=True)
+    complete_parser.add_argument("--candidate-portal-image-id", required=True)
     phase_parser.add_argument("--phase", choices=TRANSACTION_PHASES, required=True)
     return parser.parse_args()
 
@@ -873,13 +1149,23 @@ def main() -> int:
                 output=args.output,
                 shared_mutation_lock_token=args.shared_mutation_lock_token,
                 runtime_prior_state={
+                    "candidatePortalContainerName": (
+                        args.candidate_portal_container_name
+                    ),
                     "expectedRuntimeProofBindSourceSha256": (
                         args.expected_runtime_proof_bind_source_sha256
                     ),
                     "priorImageTagId": args.prior_image_tag_id,
                     "priorToolImageTagId": args.prior_tool_image_tag_id,
                     "priorPortalContainerId": args.prior_portal_container_id,
+                    "priorPortalContainerName": args.prior_portal_container_name,
                     "priorPortalImageId": args.prior_portal_image_id,
+                    "priorPortalProofAuthorityMountSha256": (
+                        args.prior_portal_proof_authority_mount_sha256
+                    ),
+                    "priorPortalProofPublicMountSha256": (
+                        args.prior_portal_proof_public_mount_sha256
+                    ),
                     "priorPortalExisted": args.prior_portal_existed == "1",
                     "priorPortalWasRunning": args.prior_portal_was_running == "1",
                     "priorTunnelContainerId": args.prior_tunnel_container_id,
@@ -890,6 +1176,20 @@ def main() -> int:
                 staging_root=args.staging_root,
                 backup_root=args.backup_root,
                 activation_receipt=args.activation_receipt,
+                proof_bind_source=args.proof_bind_source,
+                candidate_proof_bind_source_snapshot=(
+                    args.candidate_proof_bind_source_snapshot
+                ),
+                prior_portal_proof_authority_snapshot=(
+                    Path(args.prior_portal_proof_authority_snapshot)
+                    if args.prior_portal_proof_authority_snapshot
+                    else None
+                ),
+                prior_portal_proof_public_snapshot=(
+                    Path(args.prior_portal_proof_public_snapshot)
+                    if args.prior_portal_proof_public_snapshot
+                    else None
+                ),
             )
         elif args.operation == "mark-phase":
             payload = mark_phase(
@@ -904,6 +1204,10 @@ def main() -> int:
                 source_root=args.source_root,
                 active_root=args.active_root,
                 journal_path=args.output,
+                runtime_authority_output=args.runtime_authority_output,
+                candidate_portal_container_id=args.candidate_portal_container_id,
+                candidate_portal_container_name=args.candidate_portal_container_name,
+                candidate_portal_image_id=args.candidate_portal_image_id,
                 shared_mutation_lock_token=args.shared_mutation_lock_token,
             )
         else:

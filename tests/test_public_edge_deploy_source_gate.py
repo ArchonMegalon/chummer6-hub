@@ -552,10 +552,11 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
     assert "--build-context \"fleet-media-factory-contracts=$FLEET_MEDIA_CONTRACTS\"" in script
     assert "--build-context \"design-product=$DESIGN_PRODUCT_ROOT\"" in script
     assert "docker_cli image inspect \"$IMAGE_TAG\" --format '{{.Id}}'" in script
-    assert 'stop chummer-portal' in script
+    assert 'container stop "$prior_portal_container_id"' in script
     assert "run --rm --no-deps chummer-portal-volume-init" in script
-    assert "up -d --no-build --no-deps --force-recreate" in script
-    assert '--wait --wait-timeout "$PORTAL_READY_TIMEOUT_SECONDS" chummer-portal' in script
+    assert "run -T -d --no-deps --service-ports --use-aliases" in script
+    assert '--name "$CANDIDATE_PORTAL_CONTAINER_NAME" chummer-portal' in script
+    assert "--force-recreate" not in script
     assert "public-edge-mutation.lock" in script
     assert "public edge deploy refuses a Compose file outside the audited source root" in script
     assert "BASH_ENV|ENV|CDPATH|GLOBIGNORE|LD_PRELOAD|LD_LIBRARY_PATH" in script
@@ -572,13 +573,18 @@ def test_live_public_edge_deploy_wrapper_is_source_gated_and_image_pinned() -> N
         "compose_cli --profile install-linking-postgres-admin config --format json"
     )
     assert authority_index < selected_source_index < compose_render_index
-    stop_index = script.index("stop chummer-portal")
+    stop_index = script.index('container stop "$prior_portal_container_id"')
     init_index = script.index("run --rm --no-deps chummer-portal-volume-init")
-    recreate_index = script.index(
-        "up -d --no-build --no-deps --force-recreate",
+    candidate_index = script.index(
+        "run -T -d --no-deps --service-ports --use-aliases",
         init_index,
     )
-    assert stop_index < init_index < recreate_index
+    complete_index = script.index('public_edge_overlay_transaction.py" complete')
+    prior_cleanup_index = script.index(
+        'container rm "$prior_portal_container_id"',
+        complete_index,
+    )
+    assert stop_index < init_index < candidate_index < complete_index < prior_cleanup_index
     assert "run_deploy_recovery()" in script
     assert "scripts/public_edge_deploy_recovery.py" in script
     assert '--prior-portal-container-id "$prior_portal_container_id"' in script
@@ -644,6 +650,13 @@ def test_downloads_runbook_documents_public_edge_source_and_browser_gates() -> N
     assert "/usr/bin/bash --noprofile --norc" in runbook
     assert "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD=\"$(git rev-parse HEAD)\"" not in runbook
     assert "bash scripts/deploy_public_edge_portal.sh" not in runbook
+    assert "runtime-proof-bind-source.sha256" in runbook
+    assert 'test "$(/usr/bin/stat -c %a -- "$runtime_proof_authority")" = 400' in runbook
+    assert 'CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256="$approved_runtime_proof_sha256"' in runbook
+    assert "not a value the deploy may obtain by hashing the live bind" in runbook
+    assert "deploy_public_edge_portal.sh recover" in runbook
+    assert "uniquely named blue/green candidate" in runbook
+    assert "prior running portal's two independently measured proof-mount digests" in runbook
     assert "Do not use raw `docker compose ... up -d --build chummer-portal` for release publication." in runbook
     assert "scripts/verify_public_edge_deploy_source.py" in runbook
     assert "CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT" in runbook

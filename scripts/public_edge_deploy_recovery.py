@@ -4,12 +4,15 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import re
+import secrets
 import subprocess
+import stat
 import sys
 from typing import Any, Callable, Protocol
 
@@ -49,6 +52,12 @@ class RuntimeAuthority(Protocol):
     def remove_image_tag(self, tag: str) -> None: ...
 
     def service_container(self, service: str) -> str: ...
+
+    def container_by_name(self, name: str) -> str: ...
+
+    def container_exists(self, container_id: str) -> bool: ...
+
+    def container_labels(self, container_id: str) -> dict[str, str]: ...
 
     def container_image(self, container_id: str) -> str: ...
 
@@ -105,6 +114,7 @@ class DockerRuntime:
             "-f",
             str(compose_file),
         ]
+        self.project_name = project_name
 
     def _run(self, command: list[str], *, label: str) -> str:
         completed = subprocess.run(
@@ -189,6 +199,65 @@ class DockerRuntime:
             ],
             label=f"canonicalize {service} container identity",
         )
+
+    def container_by_name(self, name: str) -> str:
+        output = self._run(
+            [
+                *self.docker_base,
+                "container",
+                "ls",
+                "--all",
+                "--quiet",
+                "--no-trunc",
+                "--filter",
+                f"name=^/{name}$",
+            ],
+            label="resolve deployment candidate container",
+        )
+        identities = tuple(line for line in output.splitlines() if line)
+        if len(identities) > 1:
+            raise RuntimeError("deployment candidate container name is ambiguous")
+        return identities[0] if identities else ""
+
+    def container_exists(self, container_id: str) -> bool:
+        output = self._run(
+            [
+                *self.docker_base,
+                "container",
+                "ls",
+                "--all",
+                "--quiet",
+                "--no-trunc",
+                "--filter",
+                f"id={container_id}",
+            ],
+            label="resolve exact prior container",
+        )
+        identities = tuple(line for line in output.splitlines() if line)
+        return identities == (container_id,)
+
+    def container_labels(self, container_id: str) -> dict[str, str]:
+        rendered = self._run(
+            [
+                *self.docker_base,
+                "container",
+                "inspect",
+                "--format",
+                "{{json .Config.Labels}}",
+                container_id,
+            ],
+            label="inspect deployment candidate labels",
+        )
+        try:
+            labels = json.loads(rendered)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise RuntimeError("deployment candidate labels are invalid") from exc
+        if not isinstance(labels, dict) or not all(
+            isinstance(key, str) and isinstance(value, str)
+            for key, value in labels.items()
+        ):
+            raise RuntimeError("deployment candidate labels are invalid")
+        return labels
 
     def container_image(self, container_id: str) -> str:
         return self._run(
@@ -342,19 +411,58 @@ def reconcile(
     runtime_prior_state: dict[str, Any],
     overlay_matches: Callable[[], bool],
     restore_overlay: Callable[[], None],
+    proof_bind_source_matches_candidate: Callable[[], bool],
+    prepare_prior_proof_bind: Callable[[], None],
+    restore_candidate_proof_bind: Callable[[], None],
     portal_image_tag: str,
     tool_image_tag: str,
+    project_name: str,
 ) -> dict[str, Any]:
     prior = transaction.validate_runtime_prior_state(runtime_prior_state)
     checks: dict[str, dict[str, Any]] = {}
 
+    def remove_candidate_portal() -> str:
+        candidate_name = prior["candidatePortalContainerName"]
+        candidate_id = runtime.container_by_name(candidate_name)
+        if not candidate_id:
+            return "candidate_not_created"
+        if candidate_id == prior["priorPortalContainerId"]:
+            raise RuntimeError("candidate name resolves to the exact prior portal")
+        labels = runtime.container_labels(candidate_id)
+        if (
+            labels.get("com.docker.compose.project") != project_name
+            or labels.get("com.docker.compose.service") != "chummer-portal"
+            or labels.get("com.docker.compose.oneoff", "").lower() != "true"
+        ):
+            raise RuntimeError("candidate container is outside deployment authority")
+        if runtime.container_running(candidate_id):
+            runtime.set_container_running(candidate_id, False)
+        runtime.remove_container(candidate_id)
+        if runtime.container_by_name(candidate_name):
+            raise RuntimeError("candidate portal container was not removed")
+        return "candidate_removed_without_touching_prior"
+
+    candidate_removed = _component(
+        checks,
+        "candidatePortal",
+        remove_candidate_portal,
+    )
+
     def reconcile_overlay() -> str:
+        if not candidate_removed:
+            raise RuntimeError("candidate cleanup is uncertain before overlay recovery")
         if overlay_matches():
             return "already_exact"
-        for service in ("chummer-run-cloudflared", "chummer-portal"):
-            container_id = runtime.service_container(service)
-            if container_id and runtime.container_running(container_id):
-                runtime.set_container_running(container_id, False)
+        tunnel_id = runtime.service_container("chummer-run-cloudflared")
+        if tunnel_id and runtime.container_running(tunnel_id):
+            runtime.set_container_running(tunnel_id, False)
+        prior_portal_id = prior["priorPortalContainerId"]
+        if (
+            prior_portal_id
+            and runtime.container_exists(prior_portal_id)
+            and runtime.container_running(prior_portal_id)
+        ):
+            runtime.set_container_running(prior_portal_id, False)
         restore_overlay()
         if not overlay_matches():
             raise RuntimeError("exact prior overlay was not restored")
@@ -379,39 +487,76 @@ def reconcile(
             prior_image_id=prior["priorToolImageTagId"],
         ),
     )
+
+    def restore_portal_identity() -> str:
+        if not candidate_removed:
+            raise RuntimeError("candidate portal cleanup is uncertain")
+        if not prior["priorPortalExisted"]:
+            if runtime.service_container("chummer-portal"):
+                raise RuntimeError("prior portal absence was not restored")
+            return "prior_portal_absence_restored"
+        portal_id = prior["priorPortalContainerId"]
+        if not runtime.container_exists(portal_id):
+            raise RuntimeError("exact prior portal container identity is unavailable")
+        if runtime.container_by_name(prior["priorPortalContainerName"]) != portal_id:
+            raise RuntimeError("exact prior portal name identity is unavailable")
+        if runtime.container_image(portal_id) != prior["priorPortalImageId"]:
+            raise RuntimeError("exact prior portal image identity drifted")
+        if not prior["priorPortalWasRunning"] and runtime.container_running(portal_id):
+            runtime.set_container_running(portal_id, False)
+        if (
+            runtime.container_image(portal_id) != prior["priorPortalImageId"]
+            or (
+                not prior["priorPortalWasRunning"]
+                and runtime.container_running(portal_id)
+            )
+        ):
+            raise RuntimeError("exact prior portal state was not restored")
+        return (
+            "exact_prior_portal_preserved_running_or_startable"
+            if prior["priorPortalWasRunning"]
+            else "exact_prior_stopped_portal_restored"
+        )
+
     portal_passed = _component(
         checks,
         "portal",
-        lambda: _restore_service(
-            runtime,
-            service="chummer-portal",
-            prior_existed=prior["priorPortalExisted"],
-            prior_container_id=prior["priorPortalContainerId"],
-            prior_image_id=prior["priorPortalImageId"],
-            prior_was_running=prior["priorPortalWasRunning"],
-            may_start=overlay_passed and portal_tag_passed and tool_tag_passed,
-        ),
+        restore_portal_identity,
     )
-    expected_proof_sha256 = prior["expectedRuntimeProofBindSourceSha256"]
+
+    def ensure_candidate_proof_source() -> None:
+        if not proof_bind_source_matches_candidate():
+            restore_candidate_proof_bind()
+        if not proof_bind_source_matches_candidate():
+            raise RuntimeError("candidate proof bind source was not restored")
 
     def verify_runtime_proof_mounts() -> str:
-        if (
-            not portal_passed
-            or not prior["priorPortalExisted"]
-            or not prior["priorPortalWasRunning"]
+        if not (
+            portal_passed
+            and overlay_passed
+            and portal_tag_passed
+            and tool_tag_passed
         ):
-            raise RuntimeError(
-                "exact prior running portal is unavailable for proof verification"
-            )
+            raise RuntimeError("prior portal recovery prerequisites are incomplete")
+        if not prior["priorPortalExisted"]:
+            ensure_candidate_proof_source()
+            return "not_applicable_prior_portal_absent"
         portal_id = prior["priorPortalContainerId"]
-        if (
-            runtime.service_container("chummer-portal") != portal_id
-            or not runtime.container_running(portal_id)
-        ):
-            raise RuntimeError(
-                "exact prior running portal changed before proof verification"
-            )
+        if not prior["priorPortalWasRunning"]:
+            if runtime.container_running(portal_id):
+                runtime.set_container_running(portal_id, False)
+            ensure_candidate_proof_source()
+            return "not_applicable_prior_portal_stopped"
         try:
+            if not runtime.container_running(portal_id):
+                prepare_prior_proof_bind()
+                try:
+                    runtime.set_container_running(portal_id, True)
+                finally:
+                    restore_candidate_proof_bind()
+            ensure_candidate_proof_source()
+            if not runtime.container_running(portal_id):
+                raise RuntimeError("exact prior portal did not restart")
             authority_digest = runtime.container_file_sha256(
                 portal_id,
                 PROOF_AUTHORITY_PATH,
@@ -421,17 +566,18 @@ def reconcile(
                 PROOF_PUBLIC_PATH,
             )
             if (
-                authority_digest != expected_proof_sha256
-                or public_digest != expected_proof_sha256
+                authority_digest
+                != prior["priorPortalProofAuthorityMountSha256"]
+                or public_digest != prior["priorPortalProofPublicMountSha256"]
             ):
                 raise RuntimeError(
-                    "recovered runtime proof mounts do not match sealed authority"
+                    "recovered prior runtime proof mounts changed identity"
                 )
         except Exception:
             if runtime.container_running(portal_id):
                 runtime.set_container_running(portal_id, False)
             raise
-        return "both_runtime_proof_mounts_match_sealed_sha256"
+        return "both_prior_runtime_proof_mounts_match_journaled_digests"
 
     proof_mounts_passed = _component(
         checks,
@@ -488,6 +634,78 @@ def fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def stable_file_sha256(path: Path, *, label: str) -> str:
+    payload, _metadata = transaction.overlay.read_stable_regular_bytes(
+        path,
+        label=label,
+    )
+    return hashlib.sha256(payload).hexdigest()
+
+
+def atomic_replace_from_snapshot(
+    *,
+    snapshot: Path,
+    destination: Path,
+    expected_sha256: str,
+) -> None:
+    snapshot = transaction.overlay.normalized_absolute_path(snapshot)
+    destination = transaction.overlay.normalized_absolute_path(destination)
+    payload, _snapshot_metadata = transaction.overlay.read_stable_regular_bytes(
+        snapshot,
+        label="runtime proof recovery snapshot",
+    )
+    if hashlib.sha256(payload).hexdigest() != expected_sha256:
+        raise RuntimeError("runtime proof recovery snapshot digest changed")
+    transaction.overlay.assert_no_symlink_components(
+        destination,
+        label="runtime proof bind source",
+    )
+    destination_metadata = destination.lstat()
+    if (
+        not stat.S_ISREG(destination_metadata.st_mode)
+        or stat.S_ISLNK(destination_metadata.st_mode)
+        or destination_metadata.st_nlink != 1
+        or destination_metadata.st_uid != os.getuid()
+    ):
+        raise RuntimeError("runtime proof bind source identity is unsafe")
+    temporary = destination.parent / (
+        f".{destination.name}.recovery-{os.getpid()}-{secrets.token_hex(8)}"
+    )
+    descriptor = os.open(
+        temporary,
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0),
+        0o600,
+    )
+    try:
+        os.fchmod(descriptor, stat.S_IMODE(destination_metadata.st_mode))
+        view = memoryview(payload)
+        while view:
+            written = os.write(descriptor, view)
+            if written <= 0:
+                raise RuntimeError("runtime proof snapshot write made no progress")
+            view = view[written:]
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    try:
+        os.replace(temporary, destination)
+        fsync_directory(destination.parent)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+    if stable_file_sha256(
+        destination,
+        label="restored runtime proof bind source",
+    ) != expected_sha256:
+        raise RuntimeError("runtime proof bind source replacement did not commit")
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Reconcile an interrupted standalone public-edge deployment."
@@ -499,6 +717,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--activation-receipt", type=Path, required=True)
     parser.add_argument("--overlay-rollback-output", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--runtime-authority-output", type=Path, required=True)
     parser.add_argument("--shared-mutation-lock-token", required=True)
     parser.add_argument("--docker-config-root", type=Path, required=True)
     parser.add_argument("--docker-context", required=True)
@@ -572,6 +791,44 @@ def main(argv: list[str] | None = None) -> int:
             overlay_root=args.active_root,
             published_port=args.published_port,
         )
+        deploy_authority = snapshot["deployOverlayAuthority"]
+        prior = snapshot["runtimePriorState"]
+        proof_bind_source = Path(deploy_authority["proofBindSourcePath"])
+        candidate_proof_snapshot = Path(
+            deploy_authority["candidateProofBindSourceSnapshot"]
+        )
+
+        def proof_bind_source_matches_candidate() -> bool:
+            try:
+                return stable_file_sha256(
+                    proof_bind_source,
+                    label="runtime proof bind source",
+                ) == prior["expectedRuntimeProofBindSourceSha256"]
+            except (OSError, RuntimeError):
+                return False
+
+        def restore_candidate_proof_bind() -> None:
+            atomic_replace_from_snapshot(
+                snapshot=candidate_proof_snapshot,
+                destination=proof_bind_source,
+                expected_sha256=prior[
+                    "expectedRuntimeProofBindSourceSha256"
+                ],
+            )
+
+        def prepare_prior_proof_bind() -> None:
+            snapshot_value = deploy_authority[
+                "priorPortalProofAuthoritySnapshot"
+            ]
+            if not snapshot_value:
+                raise RuntimeError("prior portal proof snapshot is unavailable")
+            atomic_replace_from_snapshot(
+                snapshot=Path(snapshot_value),
+                destination=proof_bind_source,
+                expected_sha256=prior[
+                    "priorPortalProofAuthorityMountSha256"
+                ],
+            )
 
         def overlay_matches() -> bool:
             return transaction.prior_overlay_matches_snapshot(
@@ -601,13 +858,33 @@ def main(argv: list[str] | None = None) -> int:
                 runtime_prior_state=snapshot["runtimePriorState"],
                 overlay_matches=overlay_matches,
                 restore_overlay=restore_overlay,
+                proof_bind_source_matches_candidate=(
+                    proof_bind_source_matches_candidate
+                ),
+                prepare_prior_proof_bind=prepare_prior_proof_bind,
+                restore_candidate_proof_bind=restore_candidate_proof_bind,
                 portal_image_tag=args.portal_image_tag,
                 tool_image_tag=args.tool_image_tag,
+                project_name=args.project_name,
             )
-        payload["journalPhase"] = snapshot["phase"]
-        if payload["status"] == "pass":
-            snapshot_path.unlink()
-            fsync_directory(snapshot_path.parent)
+            payload["journalPhase"] = snapshot["phase"]
+            if payload["status"] == "pass":
+                runtime_authority = transaction.active_runtime_authority_payload(
+                    portal_existed=prior["priorPortalExisted"],
+                    portal_container_id=prior["priorPortalContainerId"],
+                    portal_container_name=prior["priorPortalContainerName"],
+                    portal_image_id=prior["priorPortalImageId"],
+                    portal_was_running=prior["priorPortalWasRunning"],
+                    proof_authority_mount_sha256=prior[
+                        "priorPortalProofAuthorityMountSha256"
+                    ],
+                    proof_public_mount_sha256=prior[
+                        "priorPortalProofPublicMountSha256"
+                    ],
+                )
+                atomic_write(args.runtime_authority_output, runtime_authority)
+                snapshot_path.unlink()
+                fsync_directory(snapshot_path.parent)
     except Exception as exc:
         payload = {
             "contractName": CONTRACT_NAME,

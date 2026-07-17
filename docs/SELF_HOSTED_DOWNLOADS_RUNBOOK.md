@@ -23,7 +23,9 @@ cutover evidence in `/tmp`. `RUNBOOK_STATE_DIR` may pin other writable tool stat
 
 ## Public-edge mutable storage preflight
 
-The portal process remains non-root and defaults to UID/GID `1654:1654`. Before Buildx can retag the canonical image, the governed deploy writes a durable journal containing the exact prior overlay, image-tag, portal-container, tunnel-container, and externally approved runtime-proof SHA-256 authority. The recovery path stops a replacement only when its identity differs from the recorded prior container, restores the exact prior overlay and tags, and restarts or stops the exact prior containers to their recorded state. It then requires both in-container release-proof mounts to equal the sealed SHA-256 before restoring the tunnel or retiring the journal. If Compose has already destroyed a prior container, a proof mount is missing, or either digest differs, recovery remains fail-closed and retains the journal instead of claiming that a newly created container is exact. The Compose service dependency still requires successful initialization during normal startup. This one-shot service has no network, a read-only root filesystem, `no-new-privileges`, all capabilities dropped except `CHOWN`, `SETUID`, and `SETGID`, and no secret mounts. It migrates the four named mutable roots (`chummer-run-api-state`, `chummer-release-upload-sessions`, `chummer-windows-proof-store`, and `chummer-windows-proof-upload-sessions`) and then creates and removes an owner-only probe as the configured portal identity. Symlinks and special files in those roots fail the preflight.
+The portal process remains non-root and defaults to UID/GID `1654:1654`. Before Buildx can retag the canonical image, the governed deploy writes a durable journal containing the exact prior overlay, image tags, portal and tunnel identities and running states, the externally approved candidate runtime-proof SHA-256, and the prior running portal's two independently measured proof-mount digests. It also preserves owner-only snapshots of the candidate proof and, when the prior portal was running, both prior mounted proof files. The deploy starts a uniquely named blue/green candidate and does not destroy the exact prior portal until the candidate runtime authority is durably committed and the transaction journal is retired.
+
+Recovery first removes only the journal-named candidate after verifying its Compose project, service, and one-off labels. It then restores the exact prior overlay and tags. A prior portal that was absent remains absent; one that was stopped remains stopped, and neither state is subjected to an impossible in-container proof check. To restart a previously running portal, recovery temporarily installs the separately journaled prior proof bytes at the canonical bind source, starts the exact old container so Docker captures that old inode, atomically restores the candidate proof source, and verifies both old in-container mount digests before restoring the tunnel. Missing old authority, identity drift, or either proof mismatch remains fail-closed and retains the journal. The Compose service dependency still requires successful initialization during normal startup. This one-shot service has no network, a read-only root filesystem, `no-new-privileges`, all capabilities dropped except `CHOWN`, `SETUID`, and `SETGID`, and no secret mounts. It migrates the four named mutable roots (`chummer-run-api-state`, `chummer-release-upload-sessions`, `chummer-windows-proof-store`, and `chummer-windows-proof-upload-sessions`) and then creates and removes an owner-only probe as the configured portal identity. Symlinks and special files in those roots fail the preflight.
 
 `/downloads-source` is a host bind, not a named volume. The initializer only creates and removes a probe there; it never changes host ownership or modes. Before deployment, the operator must grant the configured portal identity create, write, and delete access. Choose one governed host-side policy and verify it locally, for example:
 
@@ -39,7 +41,7 @@ Do not make the downloads tree world-writable. If `CHUMMER_PORTAL_UID` or `CHUMM
 
 The read-only data-protection certificate, certificate-password file, and InstallLinking PostgreSQL runtime connection file are also outside the initializer's authority. On the host, each must be explicitly readable by the configured UID/GID while remaining inaccessible to other users (normally portal-owned mode `0400`, or a narrowly scoped ACL on a root-owned mode `0600` file). Never mount these files into the initializer. The guarded deploy wrapper and image-restore tool abort before portal recreation if the volume preflight fails.
 
-The guarded deploy wrapper runs the strict public-edge source preflight and closed Compose runtime attestation before `buildx` can retag the local image. The latter makes the required PKCS#12, password-file, PostgreSQL credential, runtime-role, and release-shelf posture inputs fail before any build or portal quiesce. After the one-shot initializer, Compose waits for the portal `/api/ready` healthcheck; the wrapper then requires `/api/ready/publication`, which additionally proves layout-v1 activation and the configured release-storage free-space admission thresholds. The replacement stays transactional through the full browser-backed postdeploy gate. Any ordinary failure invokes the same idempotent recovery command used after a hard crash; an uncertain recovery exits with status `70` and preserves its journal.
+The guarded deploy wrapper runs the strict public-edge source preflight and closed Compose runtime attestation before `buildx` can retag the local image. The latter makes the required PKCS#12, password-file, PostgreSQL credential, runtime-role, and release-shelf posture inputs fail before any build or portal quiesce. After the one-shot initializer, the wrapper starts the blue/green candidate by exact name, waits for its `/api/ready` healthcheck, and then requires `/api/ready/publication`, which additionally proves layout-v1 activation and the configured release-storage free-space admission thresholds. The candidate stays transactional through the full browser-backed postdeploy gate. Any ordinary failure invokes the same idempotent recovery command used after a hard crash; an uncertain recovery exits with status `70` and preserves its journal.
 
 ## Recommended Production Topology
 
@@ -1046,9 +1048,21 @@ Repository variables:
 
 Required live sequence:
 1. Deploy the updated public edge app first so the proof routes exist. The release authority must
-   independently select the exact merged commit and verifier digest; do not derive either from the
-   checkout being executed:
+   independently select the exact merged commit, verifier digest, release-receipt digest, and
+   candidate runtime-proof digest. Do not derive any expected value from the checkout, receipt, or
+   proof path being executed. In particular, `CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256`
+   is a required external authority input, not a value the deploy may obtain by hashing the live bind
+   source. Place its one-line lowercase digest in an operator-owned, symlink-free mode-`0400` file
+   outside the checkout, verify that file's custody, and pass the value explicitly through the
+   otherwise empty `env -i` environment:
 ```bash
+runtime_proof_authority=/docker/chummercomplete/.state/public-edge-deploy-authority/runtime-proof-bind-source.sha256
+test -f "$runtime_proof_authority" && test ! -L "$runtime_proof_authority"
+test "$(/usr/bin/stat -c %a -- "$runtime_proof_authority")" = 400
+test "$(/usr/bin/stat -c %u -- "$runtime_proof_authority")" = "$(/usr/bin/id -u)"
+IFS= read -r approved_runtime_proof_sha256 < "$runtime_proof_authority"
+[[ "$approved_runtime_proof_sha256" =~ ^[0-9a-f]{64}$ ]]
+
 /usr/bin/env -i \
   PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
   CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH=1 \
@@ -1057,13 +1071,37 @@ Required live sequence:
   CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256='5f9b25d9d2ce75e35542834cca9041eb373f2ff7aded5c21801d97b835bb5290' \
   CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT=/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json \
   CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256='<externally-approved-lowercase-sha256>' \
-  CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256='<externally-approved-proof-lowercase-sha256>' \
+  CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256="$approved_runtime_proof_sha256" \
   CHUMMER_RUN_SERVICES_SOURCE=/docker/chummercomplete/chummer.run-services \
   /usr/bin/bash --noprofile --norc \
   /docker/chummercomplete/chummer.run-services/scripts/deploy_public_edge_portal.sh
+
+unset approved_runtime_proof_sha256
 ```
-   - Do not use raw `docker compose ... up -d --build chummer-portal` for release publication. The guarded wrapper source-gates the audited checkout, builds `chummer-run-api:local` from explicit contexts, runs the volume initializer, recreates `chummer-portal` with `--no-build`, and postdeploy-gates the exact image id before the deploy is considered publishable.
-   - If a durable transaction journal exists, the wrapper reconciles it and exits without starting a new deploy. Rerun the deploy only after that recovery succeeds. To request idempotent reconciliation explicitly, use the same clean launcher, source-authority inputs, and externally approved `CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256` with `deploy_public_edge_portal.sh recover`; release-receipt inputs are not required for recovery. An exact-identity or proof-mount failure returns `70` and keeps the journal for investigation.
+   - Do not use raw `docker compose ... up -d --build chummer-portal` for release publication. The guarded wrapper source-gates the audited checkout, builds `chummer-run-api:local` from explicit contexts, runs the volume initializer, starts a uniquely named blue/green candidate with `--no-build`, and postdeploy-gates its exact image id before durably committing the candidate authority. The exact old portal is retained for rollback until that commit.
+   - If a durable transaction journal exists, the wrapper reconciles it and exits without starting a new deploy. Rerun the deploy only after that recovery succeeds. To request idempotent reconciliation explicitly, repeat the authority-file checks above and use the same clean launcher, source-authority inputs, and explicit proof authority (release-receipt inputs are not required for recovery):
+```bash
+runtime_proof_authority=/docker/chummercomplete/.state/public-edge-deploy-authority/runtime-proof-bind-source.sha256
+test -f "$runtime_proof_authority" && test ! -L "$runtime_proof_authority"
+test "$(/usr/bin/stat -c %a -- "$runtime_proof_authority")" = 400
+test "$(/usr/bin/stat -c %u -- "$runtime_proof_authority")" = "$(/usr/bin/id -u)"
+IFS= read -r approved_runtime_proof_sha256 < "$runtime_proof_authority"
+[[ "$approved_runtime_proof_sha256" =~ ^[0-9a-f]{64}$ ]]
+
+/usr/bin/env -i \
+  PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
+  CHUMMER_PUBLIC_EDGE_CLEAN_LAUNCH=1 \
+  CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD='<externally-approved-40-hex-merged-commit>' \
+  CHUMMER_PUBLIC_EDGE_EXPECTED_UPSTREAM_REF='refs/remotes/origin/main' \
+  CHUMMER_PUBLIC_EDGE_AUTHORITY_VERIFIER_SHA256='5f9b25d9d2ce75e35542834cca9041eb373f2ff7aded5c21801d97b835bb5290' \
+  CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256="$approved_runtime_proof_sha256" \
+  CHUMMER_RUN_SERVICES_SOURCE=/docker/chummercomplete/chummer.run-services \
+  /usr/bin/bash --noprofile --norc \
+  /docker/chummercomplete/chummer.run-services/scripts/deploy_public_edge_portal.sh recover
+
+unset approved_runtime_proof_sha256
+```
+   An exact-identity or old-proof-mount failure returns `70` and keeps the journal for investigation.
 2. Verify the live bootstrap matches the deployed source and the legacy path redirects cleanly:
 `bash scripts/verify-live-mac-bootstrap.sh`
 3. For a Mac release runner, open `https://chummer.run/downloads/release-upload` in a signed-in browser, copy the generated `Command` block, and paste that exact command into the Mac shell. That generated command includes the short-lived upload ticket; do not run the raw `bootstrap.sh` URL for promotion because it has no upload credential.
