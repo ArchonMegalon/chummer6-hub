@@ -296,6 +296,65 @@ def test_repository_dockerfile_has_current_portal_service_worker_publish_guard()
     )
 
 
+def test_portal_service_worker_publish_guard_rejects_comment_only_markers(
+    tmp_path: Path,
+) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(
+        "FROM scratch\n"
+        + "\n".join(
+            f"# {marker}" for marker in MODULE.PORTAL_SERVICE_WORKER_GUARD_MARKERS
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert not MODULE.dockerfile_has_portal_service_worker_guard(dockerfile)
+
+
+def test_portal_service_worker_publish_guard_rejects_commented_guard_block(
+    tmp_path: Path,
+) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    lines = GUARDED_DOCKERFILE.splitlines()
+    dockerfile.write_text(
+        "\n".join(
+            line if index == 0 else f"# {line}"
+            for index, line in enumerate(lines)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert not MODULE.dockerfile_has_portal_service_worker_guard(dockerfile)
+
+
+def test_portal_service_worker_publish_guard_rejects_split_run_markers(
+    tmp_path: Path,
+) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(
+        "FROM scratch\n"
+        + "\n".join(
+            f"RUN {marker.removeprefix('RUN ')}"
+            for marker in MODULE.PORTAL_SERVICE_WORKER_GUARD_MARKERS
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert not MODULE.dockerfile_has_portal_service_worker_guard(dockerfile)
+
+
+def test_portal_service_worker_publish_guard_rejects_escape_directive_drift(
+    tmp_path: Path,
+) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text("# escape=`\n" + GUARDED_DOCKERFILE, encoding="utf-8")
+
+    assert not MODULE.dockerfile_has_portal_service_worker_guard(dockerfile)
+
+
 @pytest.mark.parametrize("marker", MODULE.PORTAL_SERVICE_WORKER_GUARD_MARKERS)
 def test_portal_service_worker_publish_guard_requires_every_current_marker(
     tmp_path: Path, marker: str

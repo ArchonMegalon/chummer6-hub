@@ -28,6 +28,9 @@ PORTAL_SERVICE_WORKER_GUARD_MARKERS = (
     "! grep -Fq 'self.clients.claim()' /app/publish/wwwroot/service-worker.js",
     "! grep -Fq '\"/mobile-turn-companion.js\"' /app/publish/wwwroot/service-worker.js",
 )
+PORTAL_SERVICE_WORKER_GUARD_INSTRUCTION = " && ".join(
+    PORTAL_SERVICE_WORKER_GUARD_MARKERS
+)
 
 
 def expand_compose_value(value: str) -> str:
@@ -138,9 +141,39 @@ def resolve_compose_source_paths(compose_file: Path, service_name: str) -> tuple
     return dockerfile_source, dockerfile_source, dockerfile_path
 
 
+def dockerfile_logical_instructions(text: str) -> list[str]:
+    if any(
+        re.match(r"^\s*#\s*escape\s*=", line, flags=re.IGNORECASE)
+        for line in text.splitlines()
+    ):
+        return []
+
+    instructions: list[str] = []
+    current: list[str] = []
+    for raw_line in text.splitlines():
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            if current:
+                # Fail closed instead of guessing Docker continuation semantics across
+                # blank/comment lines inside an instruction.
+                return []
+            continue
+        continued = stripped.endswith("\\")
+        segment = stripped[:-1].rstrip() if continued else stripped
+        current.append(segment)
+        if not continued:
+            instructions.append(re.sub(r"\s+", " ", " ".join(current)).strip())
+            current = []
+    if current:
+        return []
+    return instructions
+
+
 def dockerfile_has_portal_service_worker_guard(dockerfile_path: Path) -> bool:
     text = dockerfile_path.read_text(encoding="utf-8")
-    return all(marker in text for marker in PORTAL_SERVICE_WORKER_GUARD_MARKERS)
+    return PORTAL_SERVICE_WORKER_GUARD_INSTRUCTION in dockerfile_logical_instructions(
+        text
+    )
 
 
 def dirty_line_paths(line: str) -> list[str]:
