@@ -343,6 +343,7 @@ class MaterializeReleaseReadyReceiptTests(unittest.TestCase):
                 module.AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE,
                 encoding="utf-8",
             )
+            launcher.chmod(0o700)
             self.assertEqual([], verify(launcher))
 
             launcher.write_text(
@@ -353,10 +354,70 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
 """,
                 encoding="utf-8",
             )
+            launcher.chmod(0o700)
             failures = verify(launcher)
 
         self.assertTrue(any("RUN_SERVICES_ROOT" in failure for failure in failures))
         self.assertTrue(any("legacy-checkout-bound" in failure for failure in failures))
+
+    def test_shared_launcher_rejects_noncanonical_raw_shebang_bytes(self) -> None:
+        module = load_module()
+        verify = module._production_source_binding_failures
+        canonical = module.AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE.encode("utf-8")
+        first_line, body = canonical.split(b"\n", 1)
+        variants = {
+            "attacker_interpreter": b"#!/tmp/attacker-controlled-interpreter\n" + body,
+            "byte_order_mark": b"\xef\xbb\xbf" + canonical,
+            "missing": body,
+            "crlf": first_line + b"\r\n" + body,
+        }
+        with tempfile.TemporaryDirectory(prefix="release-controller-shebang-") as temp_dir:
+            launcher = Path(temp_dir) / "verify_chummer6_release_ready.sh"
+            for name, source in variants.items():
+                with self.subTest(name=name):
+                    launcher.write_bytes(source)
+                    launcher.chmod(0o700)
+                    failures = verify(launcher)
+                    self.assertTrue(
+                        any("shebang must be exactly" in failure for failure in failures),
+                        failures,
+                    )
+
+    def test_shared_launcher_requires_caller_owned_executable_regular_file(self) -> None:
+        module = load_module()
+        verify = module._production_source_binding_failures
+        with tempfile.TemporaryDirectory(prefix="release-controller-file-mode-") as temp_dir:
+            root = Path(temp_dir)
+            launcher = root / "verify_chummer6_release_ready.sh"
+            launcher.write_text(
+                module.AUTHORITATIVE_RELEASE_LAUNCHER_SOURCE,
+                encoding="utf-8",
+            )
+            launcher.chmod(0o600)
+            nonexecutable_failures = verify(launcher)
+
+            launcher.chmod(0o700)
+            with mock.patch.object(
+                module.os,
+                "geteuid",
+                return_value=launcher.stat().st_uid + 1,
+            ):
+                owner_failures = verify(launcher)
+
+            target = root / "launcher-target"
+            launcher.rename(target)
+            launcher.symlink_to(target)
+            symlink_failures = verify(launcher)
+
+        self.assertTrue(
+            any("not executable by its owner" in failure for failure in nonexecutable_failures)
+        )
+        self.assertTrue(
+            any("not owned by the current caller" in failure for failure in owner_failures)
+        )
+        self.assertTrue(
+            any("regular nonsymlink" in failure for failure in symlink_failures)
+        )
 
     def test_shared_launcher_rejects_unsafe_sanitizer_body(self) -> None:
         module = load_module()
@@ -369,6 +430,7 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
                 1,
             )
             launcher.write_text(unsafe, encoding="utf-8")
+            launcher.chmod(0o700)
 
             failures = verify(launcher)
 
@@ -385,6 +447,7 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
                 1,
             )
             launcher.write_text(shadowed, encoding="utf-8")
+            launcher.chmod(0o700)
 
             failures = verify(launcher)
 
@@ -401,6 +464,7 @@ MATERIALIZER = ROOT / "chummer.run-services/scripts/materialize_release_ready_re
                 1,
             )
             launcher.write_text(mutated, encoding="utf-8")
+            launcher.chmod(0o700)
 
             failures = verify(launcher)
 
@@ -438,6 +502,7 @@ launch()
 """,
                 encoding="utf-8",
             )
+            launcher.chmod(0o700)
 
             failures = verify(launcher)
 
@@ -472,6 +537,7 @@ launch()
 """,
                 encoding="utf-8",
             )
+            launcher.chmod(0o700)
 
             failures = verify(launcher)
 
@@ -512,6 +578,7 @@ launch()
 """,
                 encoding="utf-8",
             )
+            launcher.chmod(0o700)
 
             failures = verify(launcher)
 
@@ -2862,6 +2929,84 @@ launch()
         )
         projection.assert_not_called()
 
+    def test_diagnostic_replay_receipt_records_mode_without_local_path(self) -> None:
+        module = load_module()
+        transcript_path = Path("/private/operator/release-proof/transcript.txt")
+        transcript_sha256 = "b" * 64
+        with tempfile.TemporaryDirectory(prefix="release-ready-diagnostic-replay-") as temp_dir:
+            output_path = Path(temp_dir) / "RELEASE_READY.generated.json"
+            with (
+                mock.patch.object(module, "OUTPUT_PATH", output_path),
+                mock.patch.object(
+                    module,
+                    "load_replayed_release_verifier_output",
+                    return_value=(
+                        passing_verifier_output(module),
+                        {"sha256": transcript_sha256},
+                    ),
+                ) as replay_mock,
+                mock.patch.object(module, "current_blocking_gate_artifacts", return_value={}),
+                mock.patch.object(module, "current_receipt_states", return_value={}),
+                mock.patch.object(
+                    module,
+                    "current_release_truth_root_context",
+                    return_value={
+                        "root_blocker_ids": [],
+                        "root_blockers": [],
+                        "root_blockers_generated_at": "",
+                        "stable_promotion_command": "",
+                        "post_promotion_verify_command": "",
+                        "root_release_truth_source": "",
+                    },
+                ),
+                mock.patch.object(module, "release_ready_next_actions", return_value=[]),
+                mock.patch.object(module, "load_json", return_value={}),
+            ):
+                result = module.main(
+                    [
+                        "--global-verifier-output",
+                        str(transcript_path),
+                        "--global-verifier-output-sha256",
+                        transcript_sha256,
+                        "--skip-google-oauth-runtime-refresh",
+                        "--skip-windows-runtime-refresh",
+                    ]
+                )
+
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(0, result)
+        replay_mock.assert_called_once_with(transcript_path, transcript_sha256)
+        self.assertEqual("fail", payload["status"])
+        self.assertTrue(payload["diagnostic"])
+        self.assertEqual(
+            module.supported_release_controller_command(
+                global_verifier_output=True,
+                global_verifier_output_sha256=transcript_sha256,
+                skip_windows_runtime_refresh=True,
+                skip_google_oauth_runtime_refresh=True,
+            ),
+            payload["command"],
+        )
+        self.assertEqual(
+            [
+                f"CHUMMER_RUN_SERVICES_ROOT={module.RUN_SERVICES_ROOT}",
+                str(module.VERIFY_SCRIPT),
+                "--global-verifier-output",
+                module.REDACTED_GLOBAL_VERIFIER_OUTPUT_PATH,
+                "--global-verifier-output-sha256",
+                transcript_sha256,
+                "--skip-windows-runtime-refresh",
+                "--skip-google-oauth-runtime-refresh",
+            ],
+            module.shlex.split(payload["command"]),
+        )
+        self.assertNotIn(str(transcript_path), payload["command"])
+        self.assertEqual(
+            {"status": "accepted", "sha256": transcript_sha256},
+            payload["global_verifier_output_replay"],
+        )
+
     def test_failed_receipt_keeps_actions_blocking(self) -> None:
         module = load_module()
         payload = {"status": "fail"}
@@ -2904,6 +3049,7 @@ launch()
             ):
                 result = module.main(
                     [
+                        "--force-global-verifier",
                         module.EXTERNAL_WRITE_AUTHORIZATION_FLAG,
                         "--skip-google-oauth-runtime-refresh",
                         "--skip-windows-runtime-refresh",
@@ -2920,15 +3066,24 @@ launch()
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual(
                 module.supported_release_controller_command(
+                    force_global_verifier=True,
                     external_write_authorized=True,
-                    skip_google_oauth_runtime_refresh=True,
                     skip_windows_runtime_refresh=True,
+                    skip_google_oauth_runtime_refresh=True,
                 ),
                 payload["command"],
             )
-            self.assertIn(module.EXTERNAL_WRITE_AUTHORIZATION_FLAG, payload["command"])
-            self.assertIn("--skip-google-oauth-runtime-refresh", payload["command"])
-            self.assertIn("--skip-windows-runtime-refresh", payload["command"])
+            self.assertEqual(
+                [
+                    f"CHUMMER_RUN_SERVICES_ROOT={module.RUN_SERVICES_ROOT}",
+                    str(module.VERIFY_SCRIPT),
+                    "--force-global-verifier",
+                    module.EXTERNAL_WRITE_AUTHORIZATION_FLAG,
+                    "--skip-windows-runtime-refresh",
+                    "--skip-google-oauth-runtime-refresh",
+                ],
+                module.shlex.split(payload["command"]),
+            )
             self.assertTrue(payload["external_release_writes_authorized"])
             self.assertEqual(
                 {
@@ -2972,13 +3127,26 @@ launch()
                 mock.patch.object(module, "release_ready_next_actions", return_value=[]),
                 mock.patch.object(module, "load_json", return_value={}),
             ):
-                result = module.main()
+                result = module.main(["--force-global-verifier"])
 
             self.assertEqual(0, result)
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             self.assertEqual("fail", payload["status"])
             self.assertEqual("NOT_RELEASE_READY", payload["verdict"])
-            self.assertEqual(module.supported_release_controller_command(), payload["command"])
+            self.assertEqual(
+                module.supported_release_controller_command(
+                    force_global_verifier=True,
+                ),
+                payload["command"],
+            )
+            self.assertEqual(
+                [
+                    f"CHUMMER_RUN_SERVICES_ROOT={module.RUN_SERVICES_ROOT}",
+                    str(module.VERIFY_SCRIPT),
+                    "--force-global-verifier",
+                ],
+                module.shlex.split(payload["command"]),
+            )
             self.assertNotIn("bash", payload["command"])
             self.assertEqual(124, payload["returncode"])
             self.assertTrue(payload["timed_out"])
@@ -6292,7 +6460,13 @@ launch()
                     ),
                 ),
             ):
-                result = module.main(["--skip-windows-runtime-refresh"])
+                result = module.main(
+                    [
+                        "--retry-release-truth-projection",
+                        "--skip-windows-runtime-refresh",
+                        "--skip-google-oauth-runtime-refresh",
+                    ]
+                )
 
             payload = json.loads(output_path.read_text(encoding="utf-8"))
             remaining_names = sorted(path.name for path in output_path.parent.iterdir())
@@ -6304,9 +6478,21 @@ launch()
         self.assertEqual(78, payload["returncode"])
         self.assertEqual(
             module.supported_release_controller_command(
+                retry_release_truth_projection=True,
                 skip_windows_runtime_refresh=True,
+                skip_google_oauth_runtime_refresh=True,
             ),
             payload["command"],
+        )
+        self.assertEqual(
+            [
+                f"CHUMMER_RUN_SERVICES_ROOT={module.RUN_SERVICES_ROOT}",
+                str(module.VERIFY_SCRIPT),
+                "--retry-release-truth-projection",
+                "--skip-windows-runtime-refresh",
+                "--skip-google-oauth-runtime-refresh",
+            ],
+            module.shlex.split(payload["command"]),
         )
         self.assertNotIn("bash", payload["command"])
         self.assertFalse(payload["authoritative"])
@@ -6323,6 +6509,10 @@ launch()
         self.assertEqual(
             "verify_existing_receipts",
             payload["proof_refresh_policy"]["windows_installer"],
+        )
+        self.assertEqual(
+            "verify_existing_receipts",
+            payload["proof_refresh_policy"]["google_oauth"],
         )
         self.assertEqual(["RELEASE_READY.generated.json"], remaining_names)
 

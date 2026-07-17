@@ -71,6 +71,8 @@ TRUSTED_PYTHON_ISOLATED_PREFIX = (
 AUTHORITATIVE_CONTROLLER_SCOPE = "authoritative_controller_runtime"
 DIAGNOSTIC_AUTHORITY_SCOPE = "diagnostic_non_authoritative"
 EXTERNAL_WRITE_AUTHORIZATION_FLAG = "--authorize-external-release-writes"
+REDACTED_GLOBAL_VERIFIER_OUTPUT_PATH = "<redacted-local-verifier-transcript>"
+AUTHORITATIVE_RELEASE_LAUNCHER_SHEBANG = b"#!/usr/bin/python3 -I\n"
 LINUX_PR_SET_CHILD_SUBREAPER = 36
 LINUX_PR_GET_CHILD_SUBREAPER = 37
 PROCESS_CONTAINMENT_MODE = "linux_subreaper_procfs_v1"
@@ -505,20 +507,37 @@ def isolated_python_command(
 
 
 def supported_release_controller_command(
-    *arguments: object,
+    *,
+    force_global_verifier: bool = False,
     external_write_authorized: bool = False,
-    skip_google_oauth_runtime_refresh: bool = False,
+    global_verifier_output: bool = False,
+    global_verifier_output_sha256: str = "",
+    retry_release_truth_projection: bool = False,
     skip_windows_runtime_refresh: bool = False,
+    skip_google_oauth_runtime_refresh: bool = False,
 ) -> str:
     """Return the executable launcher invocation recorded in release receipts."""
 
-    effective_arguments = [str(argument) for argument in arguments]
+    effective_arguments: list[str] = []
+    if force_global_verifier:
+        effective_arguments.append("--force-global-verifier")
     if external_write_authorized:
         effective_arguments.append(EXTERNAL_WRITE_AUTHORIZATION_FLAG)
-    if skip_google_oauth_runtime_refresh:
-        effective_arguments.append("--skip-google-oauth-runtime-refresh")
+    if global_verifier_output:
+        effective_arguments.extend(
+            [
+                "--global-verifier-output",
+                REDACTED_GLOBAL_VERIFIER_OUTPUT_PATH,
+                "--global-verifier-output-sha256",
+                global_verifier_output_sha256,
+            ]
+        )
+    if retry_release_truth_projection:
+        effective_arguments.append("--retry-release-truth-projection")
     if skip_windows_runtime_refresh:
         effective_arguments.append("--skip-windows-runtime-refresh")
+    if skip_google_oauth_runtime_refresh:
+        effective_arguments.append("--skip-google-oauth-runtime-refresh")
     invocation = shlex.join(
         [str(VERIFY_SCRIPT), *effective_arguments]
     )
@@ -724,22 +743,86 @@ def _matches_authoritative_release_launcher_template(tree: ast.Module) -> bool:
     )
 
 
+def _read_authoritative_release_launcher(
+    path: Path,
+) -> tuple[bytes | None, str | None]:
+    """Bind bytes, inode, ownership, and mode without following the final path."""
+
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(path, flags)
+    except FileNotFoundError:
+        return None, "missing"
+    except OSError:
+        return None, "not a readable regular nonsymlink file"
+    try:
+        before = os.fstat(fd)
+        if not stat.S_ISREG(before.st_mode):
+            return None, "not a regular nonsymlink file"
+        if before.st_uid != os.geteuid():
+            return None, "not owned by the current caller"
+        if not before.st_mode & stat.S_IXUSR:
+            return None, "not executable by its owner"
+        if before.st_size > CONTROLLER_OUTPUT_MAX_BYTES:
+            return None, "too_large"
+
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            chunk = os.read(
+                fd,
+                min(65536, CONTROLLER_OUTPUT_MAX_BYTES + 1 - total),
+            )
+            if not chunk:
+                break
+            chunks.append(chunk)
+            total += len(chunk)
+            if total > CONTROLLER_OUTPUT_MAX_BYTES:
+                return None, "too_large"
+
+        after = os.fstat(fd)
+        stable_fields = (
+            "st_dev",
+            "st_ino",
+            "st_mode",
+            "st_uid",
+            "st_gid",
+            "st_size",
+            "st_mtime_ns",
+            "st_ctime_ns",
+        )
+        if any(
+            getattr(before, field) != getattr(after, field)
+            for field in stable_fields
+        ):
+            return None, "changed during identity-bound read"
+        return b"".join(chunks), None
+    except OSError:
+        return None, "unreadable"
+    finally:
+        os.close(fd)
+
+
 def source_binding_failures(launcher_path: Path | None = None) -> list[str]:
     """Prove the shared launcher dispatches this checkout's materializer."""
 
     path = launcher_path or VERIFY_SCRIPT
-    raw, error = read_stable_regular_file_bytes(
-        path,
-        max_bytes=CONTROLLER_OUTPUT_MAX_BYTES,
-    )
+    raw, error = _read_authoritative_release_launcher(path)
     if error is not None or raw is None:
         return [f"shared release launcher is {error or 'unreadable'}: {path}"]
+    first_line = raw.partition(b"\n")[0] + (b"\n" if b"\n" in raw else b"")
+    shebang_failure = first_line != AUTHORITATIVE_RELEASE_LAUNCHER_SHEBANG
+    failures: list[str] = []
+    if shebang_failure:
+        failures.append(
+            "shared release launcher shebang must be exactly #!/usr/bin/python3 -I "
+            "with an LF terminator and no byte prefix"
+        )
     try:
         tree = ast.parse(raw.decode("utf-8"), filename=str(path))
     except (SyntaxError, UnicodeDecodeError) as exc:
-        return [f"shared release launcher is not valid UTF-8 Python: {exc}"]
+        return [*failures, f"shared release launcher is not valid UTF-8 Python: {exc}"]
 
-    failures: list[str] = []
     if not _matches_authoritative_release_launcher_template(tree):
         failures.append(
             "shared release launcher executable syntax must match the governed "
@@ -7311,9 +7394,13 @@ def converge_release_truth_projection(
 def main(argv: list[str] | None = None) -> int:
     args = parse_args([] if argv is None else argv)
     receipt_command = supported_release_controller_command(
+        force_global_verifier=args.force_global_verifier,
         external_write_authorized=args.authorize_external_release_writes,
-        skip_google_oauth_runtime_refresh=args.skip_google_oauth_runtime_refresh,
+        global_verifier_output=bool(args.global_verifier_output),
+        global_verifier_output_sha256=args.global_verifier_output_sha256,
+        retry_release_truth_projection=args.retry_release_truth_projection,
         skip_windows_runtime_refresh=args.skip_windows_runtime_refresh,
+        skip_google_oauth_runtime_refresh=args.skip_google_oauth_runtime_refresh,
     )
 
     def parsed_json_object(value: str, label: str) -> dict[str, object]:
