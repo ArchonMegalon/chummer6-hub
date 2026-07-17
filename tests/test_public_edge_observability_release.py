@@ -532,9 +532,13 @@ class PublicEdgeObservabilityReleaseTests(unittest.TestCase):
 
     def test_root_release_ready_wrapper_runs_observability_after_compose_operability(self) -> None:
         controller = load_release_ready_materializer()
-        environment = controller.authoritative_controller_environment(
-            {"PATH": controller.TRUSTED_PATH}
-        )
+        with (
+            mock.patch.object(controller, "source_binding_failures", return_value=[]),
+            mock.patch.object(controller, "current_git_head", return_value="a" * 40),
+        ):
+            environment = controller.authoritative_controller_environment(
+                {"PATH": controller.TRUSTED_PATH}
+            )
         specs = controller.canonical_release_gate_specs(environment)
         names = [str(spec["name"]) for spec in specs]
         commands = {str(spec["name"]): str(spec["command"]) for spec in specs}

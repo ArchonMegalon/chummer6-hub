@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,44 +17,77 @@ SCRIPT_PATH = (
     / "run_services_restore_drill.sh"
 )
 VERIFY_SCRIPT_PATH = SCRIPT_PATH.with_name("verify.sh")
-ROOT_RELEASE_READY_WRAPPER_PATH = (
-    SCRIPT_PATH.parents[3] / "scripts" / "release" / "verify_chummer6_release_ready.sh"
+RELEASE_READY_MATERIALIZER_PATH = (
+    SCRIPT_PATH.parents[2] / "scripts" / "materialize_release_ready_receipt.py"
 )
 
 
+def canonical_release_gate_specs():  # noqa: ANN201
+    name = "release_ready_materializer_for_restore_drill_test"
+    spec = importlib.util.spec_from_file_location(name, RELEASE_READY_MATERIALIZER_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    environment = {key: "" for key in module.RELEASE_EXECUTION_ENV_KEYS}
+    environment.update(
+        {
+            "CHUMMER_PUBLIC_BASE_URL": "https://chummer.run",
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "a" * 40,
+            "CHUMMER_RUN_SERVICES_ROOT": str(module.RUN_SERVICES_ROOT),
+            "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "0",
+            "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "0",
+            "CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH": "0",
+            "CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH": "0",
+            "CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS": "900",
+            "CHUMMER_RELEASE_READY_GUIDE_GATE_TIMEOUT_SECONDS": "1800",
+            "CHUMMER_RELEASE_READY_GATE_KILL_AFTER_SECONDS": "30",
+            "CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS": "24",
+            "CHUMMER_PUBLIC_EDGE_TIMEOUT_SECONDS": "60",
+            "PATH": module.TRUSTED_PATH,
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONNOUSERSITE": "1",
+        }
+    )
+    validated = module.validate_release_execution_environment(environment)
+    return module, module.canonical_release_gate_specs(validated)
+
+
 class RunServicesRestoreDrillFailClosedTests(unittest.TestCase):
-    def test_root_release_ready_wrapper_runs_restore_drill_directly(self) -> None:
-        wrapper = ROOT_RELEASE_READY_WRAPPER_PATH.read_text(encoding="utf-8")
-        direct_gate = (
-            '"verify_run_services_restore_drill:cd $root/chummer.run-services '
-            '&& bash scripts/ai/run_services_restore_drill.sh"'
+    def test_release_controller_runs_restore_drill_directly(self) -> None:
+        module, specs = canonical_release_gate_specs()
+        restore = next(
+            value for value in specs if value["name"] == "verify_run_services_restore_drill"
         )
+        entrypoint = module.RUN_SERVICES_ROOT / "scripts" / "ai" / "run_services_restore_drill.sh"
 
-        self.assertIn(direct_gate, wrapper)
-        self.assertNotIn(
-            "verify_run_services_restore_drill:cd $root/chummer.run-services "
-            "&& CHUMMER_SKIP_CLEANROOM_BUILD=1",
-            wrapper,
+        self.assertEqual((str(entrypoint),), restore["entrypoints"])
+        self.assertEqual(
+            f"cd {module.RUN_SERVICES_ROOT} && {module.TRUSTED_BASH} {entrypoint}",
+            restore["command"],
         )
+        self.assertNotIn("CHUMMER_SKIP_CLEANROOM_BUILD", str(restore["command"]))
 
-    def test_root_release_ready_wrapper_runs_bundle_transaction_gate_after_restore(self) -> None:
-        wrapper = ROOT_RELEASE_READY_WRAPPER_PATH.read_text(encoding="utf-8")
-        restore_gate = (
-            '"verify_run_services_restore_drill:cd $root/chummer.run-services '
-            '&& bash scripts/ai/run_services_restore_drill.sh"'
+    def test_release_controller_runs_bundle_transaction_gate_after_restore(self) -> None:
+        module, specs = canonical_release_gate_specs()
+        names = [str(value["name"]) for value in specs]
+        transaction = next(
+            value for value in specs if value["name"] == "verify_release_bundle_transaction"
         )
-        transaction_gate = (
-            '"verify_release_bundle_transaction:cd $root/chummer.run-services '
-            '&& bash scripts/verify_release_bundle_transaction_gate.sh"'
-        )
-        release_channel_gate = (
-            '"verify_release_channel:bash '
-            '$root/chummer-hub-registry/scripts/release/verify_release_channel.sh"'
-        )
+        shell_gate = module.RUN_SERVICES_ROOT / "scripts" / "verify_release_bundle_transaction_gate.sh"
+        trx_verifier = module.RUN_SERVICES_ROOT / "scripts" / "verify_release_bundle_transaction_trx.py"
 
-        self.assertIn(transaction_gate, wrapper)
-        self.assertLess(wrapper.index(restore_gate), wrapper.index(transaction_gate))
-        self.assertLess(wrapper.index(transaction_gate), wrapper.index(release_channel_gate))
+        self.assertEqual((str(shell_gate), str(trx_verifier)), transaction["entrypoints"])
+        self.assertIn(str(shell_gate), str(transaction["command"]))
+        self.assertIn(str(trx_verifier), str(transaction["command"]))
+        self.assertLess(
+            names.index("verify_run_services_restore_drill"),
+            names.index("verify_release_bundle_transaction"),
+        )
+        self.assertLess(
+            names.index("verify_release_bundle_transaction"),
+            names.index("verify_release_channel"),
+        )
 
     def test_shared_verifier_runs_restore_drill_and_regression_contract(self) -> None:
         verifier = VERIFY_SCRIPT_PATH.read_text(encoding="utf-8")

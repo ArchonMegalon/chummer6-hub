@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import ast
 import argparse
 import ctypes
 import hashlib
@@ -14,9 +15,11 @@ import signal
 import stat
 import subprocess
 import sys
-from datetime import UTC, datetime
+import tempfile
+import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote, quote_plus, urlsplit
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -43,20 +46,155 @@ from verify_public_edge_observability_release import (
 )
 from writable_temp_root import configure_process_tmpdir, subprocess_env
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
-
-from verify_flagship_product_readiness_gate import current_release_truth_launch_blockers
-
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 ROOT = RUN_SERVICES_ROOT.parent
-LEGACY_RUN_SERVICES_ROOT = ROOT / "chummer.run-services"
-SHARED_WORKSPACE_ROOT = Path(os.environ.get("CHUMMER_SHARED_WORKSPACE_ROOT") or "/docker/chummercomplete")
-OUTPUT_PATH = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "RELEASE_READY.generated.json"
-VERIFY_SCRIPT = RUN_SERVICES_ROOT / "scripts" / "verify_chummer6_release_ready.sh"
-TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_RELEASE_READY_TIMEOUT_SECONDS", "900"))
+CHUMMER_PLAY_ROOT = ROOT / "chummer-play"
+TRUSTED_BASH = Path("/usr/bin/bash").resolve()
+TRUSTED_PYTHON = Path("/usr/bin/python3").resolve()
+TRUSTED_NODE = Path("/usr/bin/node").resolve()
+TRUSTED_GIT = Path("/usr/bin/git").resolve()
+TRUSTED_PATH = "/usr/bin:/bin"
+ISOLATED_PYTHON_RUNNER = (
+    "import runpy,sys;"
+    "script=sys.argv[1];"
+    "sys.path.insert(0,str(__import__('pathlib').Path(script).resolve().parent));"
+    "sys.argv=sys.argv[1:];"
+    "runpy.run_path(script,run_name='__main__')"
+)
+TRUSTED_PYTHON_ISOLATED_PREFIX = (
+    str(TRUSTED_PYTHON),
+    "-I",
+    "-c",
+    ISOLATED_PYTHON_RUNNER,
+)
+AUTHORITATIVE_CONTROLLER_SCOPE = "authoritative_controller_runtime"
+DIAGNOSTIC_AUTHORITY_SCOPE = "diagnostic_non_authoritative"
+EXTERNAL_WRITE_AUTHORIZATION_FLAG = "--authorize-external-release-writes"
+LINUX_PR_SET_CHILD_SUBREAPER = 36
+LINUX_PR_GET_CHILD_SUBREAPER = 37
+PROCESS_CONTAINMENT_MODE = "linux_subreaper_procfs_v1"
+PROCESS_POLL_INTERVAL_SECONDS = 0.05
+PROJECTION_STEP_TIMEOUT_SECONDS = 300
+CONTROLLER_OUTPUT_MAX_BYTES = 1024 * 1024
+GOVERNED_CODE_SUFFIXES = frozenset(
+    {
+        ".bash",
+        ".c",
+        ".cjs",
+        ".cpp",
+        ".cs",
+        ".csproj",
+        ".css",
+        ".dll",
+        ".dockerfile",
+        ".exe",
+        ".fs",
+        ".fsproj",
+        ".go",
+        ".h",
+        ".hpp",
+        ".html",
+        ".js",
+        ".json",
+        ".jsx",
+        ".mjs",
+        ".node",
+        ".props",
+        ".ps1",
+        ".py",
+        ".pyi",
+        ".rs",
+        ".sh",
+        ".sln",
+        ".so",
+        ".sql",
+        ".targets",
+        ".toml",
+        ".ts",
+        ".tsx",
+        ".xml",
+        ".yaml",
+        ".yml",
+    }
+)
+GOVERNED_CODE_BASENAMES = frozenset(
+    {
+        "Dockerfile",
+        "Gemfile",
+        "Makefile",
+        "Pipfile",
+        "go.mod",
+        "go.sum",
+        "gradlew",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "requirements.txt",
+        "yarn.lock",
+    }
+)
+# These are output/state roots, not executable authority.  Their exact list is
+# itself bound into each governed snapshot.  Gate-owned outputs that can carry
+# launch truth are bound separately by RELEASE_VERIFIER_GATE_RECEIPTS.
+GOVERNED_CODE_EXCLUDED_OUTPUTS = (
+    (".codex-studio/", "gate-generated receipts; launch-critical receipts are bound separately"),
+    (".state/", "runtime watcher/import state, never an executable entrypoint"),
+    (".tmp/", "ephemeral workspace scratch output"),
+    ("TestResults/", "test result output"),
+    ("_completion/", "operator completion/delivery output"),
+    ("artifacts/", "build artifact output"),
+    ("bin/", "compiler output; source inputs remain governed"),
+    ("coverage/", "coverage report output"),
+    ("dist/", "packaged distribution output"),
+    ("obj/", "compiler intermediate output"),
+    ("Chummer.Portal/downloads/", "published download shelf bound by release receipts"),
+)
+GOVERNED_CODE_EXCLUDED_OUTPUT_PREFIXES = tuple(
+    prefix for prefix, _reason in GOVERNED_CODE_EXCLUDED_OUTPUTS
+)
+GOVERNED_RESTORED_DEPENDENCY_PREFIXES = (
+    "node_modules/",
+)
+PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
+DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_PATH = PUBLISHED_ROOT / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
+DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_REFRESH_COMMAND = [
+    *TRUSTED_PYTHON_ISOLATED_PREFIX,
+    "scripts/verify_flagship_product_readiness_gate.py",
+    "--summary-output",
+    str(DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_PATH),
+]
+TELEGRAM_TEXT_DELIVERY_ROOT = ROOT / "_completion" / "telegram_text_delivery"
+REGISTRY_PUBLISHED_ROOT = ROOT / "chummer-hub-registry" / ".codex-studio" / "published"
+REGISTRY_RELEASE_CHANNEL = REGISTRY_PUBLISHED_ROOT / "RELEASE_CHANNEL.generated.json"
+PUBLIC_RELEASE_SNAPSHOT = ROOT / ".codex-studio" / "published" / "PUBLIC_RELEASE_SNAPSHOT.generated.json"
+PUBLIC_RELEASE_SNAPSHOT_READONLY_AUDIT = ROOT / ".codex-studio" / "published" / "PUBLIC_RELEASE_SNAPSHOT_READONLY_AUDIT.generated.json"
+RELEASE_BLOCKERS_JSON = ROOT / "RELEASE_BLOCKERS.generated.json"
+CURRENT_AUXILIARY_RELEASE_RECEIPTS: tuple[tuple[str, Path], ...] = (
+    (
+        "supply_chain_evidence",
+        ROOT / ".codex-studio" / "published" / "SUPPLY_CHAIN_RELEASE_GATE.generated.json",
+    ),
+    (
+        "public_edge_observability_release",
+        PUBLISHED_ROOT / "PUBLIC_EDGE_OBSERVABILITY_RELEASE_GATE.generated.json",
+    ),
+)
+SUPPLY_CHAIN_VERIFIER_SCRIPT = ROOT / "scripts" / "release" / "verify_supply_chain_evidence.py"
+WORKSPACE_PORTAL_RELEASE_CHANNEL_CANDIDATES = (
+    ROOT / "chummer.run-services" / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
+    ROOT / "chummer-presentation" / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
+    ROOT / "chummer6-ui" / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json",
+    ROOT / "chummer-presentation" / ".codex-studio" / "published" / "portal" / "RELEASE_CHANNEL.generated.json",
+    ROOT / "chummer6-ui" / ".codex-studio" / "published" / "portal" / "RELEASE_CHANNEL.generated.json",
+)
+LIVE_DOWNLOADS_SHELF_DIR = RUN_SERVICES_ROOT / "Chummer.Portal" / "downloads"
+PORTAL_RELEASE_CHANNEL = LIVE_DOWNLOADS_SHELF_DIR / "RELEASE_CHANNEL.generated.json"
+STABLE_PUBLISH_SCRIPT = ROOT / "chummer6-ui" / "scripts" / "publish-download-bundle.sh"
+DEFAULT_OUTPUT_PATH = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "RELEASE_READY.generated.json"
+OUTPUT_PATH = DEFAULT_OUTPUT_PATH
+VERIFY_SCRIPT = ROOT / "scripts" / "release" / "verify_chummer6_release_ready.sh"
+RELEASE_TRUTH_SYNC_SCRIPT = ROOT / "scripts" / "release" / "_release_gate_common.py"
+TIMEOUT_SECONDS = int(os.environ.get("CHUMMER_RELEASE_READY_TIMEOUT_SECONDS", "3600"))
 TERMINATION_GRACE_SECONDS = int(os.environ.get("CHUMMER_RELEASE_READY_TERMINATION_GRACE_SECONDS", "10"))
 PROJECTION_RETRY_MAX_AGE = timedelta(hours=6)
 PROJECTION_RETRY_MINIMUM_COMPLETED_GATES = 38
@@ -78,6 +216,10 @@ RELEASE_GATE_EXECUTION_BINDING_CONTRACT = "chummer.release_gate_execution_bindin
 RELEASE_EXECUTION_PLAN_MAX_AGE = timedelta(hours=6)
 RELEASE_EXECUTION_ENV_KEYS = (
     "CHUMMER_PUBLIC_BASE_URL",
+    "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD",
+    "CHUMMER_RUN_SERVICES_ROOT",
+    "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E",
+    "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E",
     "CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH",
     "CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH",
     "CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS",
@@ -342,6 +484,177 @@ REQUIRED_RELEASE_VERIFIER_GATES = (
 )
 
 
+def isolated_python_argv(
+    script: str | Path,
+    *arguments: object,
+) -> list[str]:
+    """Run a governed script after isolated Python startup has completed."""
+
+    return [
+        *TRUSTED_PYTHON_ISOLATED_PREFIX,
+        str(script),
+        *(str(argument) for argument in arguments),
+    ]
+
+
+def isolated_python_command(
+    script: str | Path,
+    *arguments: object,
+) -> str:
+    return shlex.join(isolated_python_argv(script, *arguments))
+
+
+def supported_release_controller_command(*arguments: object) -> str:
+    """Return the executable launcher invocation recorded in release receipts."""
+
+    invocation = shlex.join(
+        [str(VERIFY_SCRIPT), *(str(argument) for argument in arguments)]
+    )
+    return (
+        f"CHUMMER_RUN_SERVICES_ROOT={shlex.quote(str(RUN_SERVICES_ROOT))} "
+        f"{invocation}"
+    )
+
+
+def _module_assignment(tree: ast.Module, name: str) -> ast.expr | None:
+    assignments: list[ast.expr] = []
+    for statement in tree.body:
+        if isinstance(statement, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == name
+            for target in statement.targets
+        ):
+            assignments.append(statement.value)
+        elif (
+            isinstance(statement, ast.AnnAssign)
+            and isinstance(statement.target, ast.Name)
+            and statement.target.id == name
+            and statement.value is not None
+        ):
+            assignments.append(statement.value)
+    return assignments[0] if len(assignments) == 1 else None
+
+
+def source_binding_failures(launcher_path: Path | None = None) -> list[str]:
+    """Prove the shared launcher dispatches this checkout's materializer."""
+
+    path = launcher_path or VERIFY_SCRIPT
+    raw, error = read_stable_regular_file_bytes(
+        path,
+        max_bytes=CONTROLLER_OUTPUT_MAX_BYTES,
+    )
+    if error is not None or raw is None:
+        return [f"shared release launcher is {error or 'unreadable'}: {path}"]
+    try:
+        tree = ast.parse(raw.decode("utf-8"), filename=str(path))
+    except (SyntaxError, UnicodeDecodeError) as exc:
+        return [f"shared release launcher is not valid UTF-8 Python: {exc}"]
+
+    failures: list[str] = []
+    run_services_root = _module_assignment(tree, "RUN_SERVICES_ROOT")
+    if run_services_root is None:
+        failures.append("shared release launcher must assign RUN_SERVICES_ROOT exactly once")
+    else:
+        nodes = tuple(ast.walk(run_services_root))
+        constants = {
+            node.value
+            for node in nodes
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        has_environment_lookup = any(
+            isinstance(node, ast.Attribute)
+            and node.attr == "environ"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "os"
+            for node in nodes
+        )
+        if "CHUMMER_RUN_SERVICES_ROOT" not in constants or not has_environment_lookup:
+            failures.append(
+                "shared release launcher RUN_SERVICES_ROOT must come from "
+                "CHUMMER_RUN_SERVICES_ROOT"
+            )
+        if not any(isinstance(node, ast.Name) and node.id == "Path" for node in nodes):
+            failures.append("shared release launcher must normalize RUN_SERVICES_ROOT with Path")
+        if not any(
+            isinstance(node, ast.Attribute) and node.attr == "resolve" for node in nodes
+        ):
+            failures.append("shared release launcher must resolve RUN_SERVICES_ROOT")
+
+    materializer = _module_assignment(tree, "MATERIALIZER")
+    if materializer is None:
+        failures.append("shared release launcher must assign MATERIALIZER exactly once")
+    else:
+        nodes = tuple(ast.walk(materializer))
+        constants = {
+            node.value
+            for node in nodes
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        if not any(
+            isinstance(node, ast.Name) and node.id == "RUN_SERVICES_ROOT"
+            for node in nodes
+        ):
+            failures.append("shared release launcher MATERIALIZER must use RUN_SERVICES_ROOT")
+        has_relative_materializer = (
+            {"scripts", "materialize_release_ready_receipt.py"} <= constants
+            or "scripts/materialize_release_ready_receipt.py" in constants
+        )
+        if not has_relative_materializer:
+            failures.append(
+                "shared release launcher MATERIALIZER must target "
+                "scripts/materialize_release_ready_receipt.py"
+            )
+        if any("chummer.run-services" in value for value in constants):
+            failures.append("shared release launcher MATERIALIZER is legacy-checkout-bound")
+    return failures
+
+
+def current_git_head() -> str:
+    completed = subprocess.run(
+        [
+            str(TRUSTED_GIT),
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.untrackedCache=false",
+            "-C",
+            str(RUN_SERVICES_ROOT),
+            "rev-parse",
+            "--verify",
+            "HEAD",
+        ],
+        cwd=RUN_SERVICES_ROOT,
+        env={
+            "PATH": TRUSTED_PATH,
+            "HOME": "/nonexistent",
+            "LC_ALL": "C",
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_OPTIONAL_LOCKS": "0",
+        },
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    value = coerce_output(completed.stdout).strip()
+    if completed.returncode != 0 or re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", value) is None:
+        detail = coerce_output(completed.stderr).strip()
+        raise ValueError(
+            "current run-services Git HEAD is unavailable"
+            + (f": {detail}" if detail else "")
+        )
+    return value
+
+
+def isolated_python_script(command: list[str]) -> Path:
+    prefix_length = len(TRUSTED_PYTHON_ISOLATED_PREFIX)
+    if (
+        len(command) <= prefix_length
+        or tuple(command[:prefix_length]) != TRUSTED_PYTHON_ISOLATED_PREFIX
+    ):
+        raise ValueError("release command lacks the isolated trusted Python launcher")
+    return Path(command[prefix_length])
+
+
 def canonical_release_gate_specs(
     environment: dict[str, str],
 ) -> tuple[dict[str, object], ...]:
@@ -359,8 +672,12 @@ def canonical_release_gate_specs(
     public_edge_reuse = int(environment["CHUMMER_PUBLIC_EDGE_PLAYWRIGHT_REUSE_MAX_AGE_HOURS"])
     skip_google = environment["CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH"] == "1"
     skip_windows = environment["CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH"] == "1"
+    require_blazor_local_e2e = environment["CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E"] == "1"
+    require_blazor_self_host_e2e = (
+        environment["CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E"] == "1"
+    )
     bash = str(TRUSTED_BASH)
-    python = str(TRUSTED_PYTHON)
+    python = shlex.join(TRUSTED_PYTHON_ISOLATED_PREFIX)
     node = str(TRUSTED_NODE)
     root = str(ROOT)
     services = str(RUN_SERVICES_ROOT)
@@ -455,15 +772,165 @@ def canonical_release_gate_specs(
         f"{python} {services}/scripts/verify_ea_operator_readiness.py"
     )
     public_edge_preflight = " --skip-preflight" if environment["CHUMMER_PUBLIC_BASE_URL"].rstrip("/") == "https://chummer.run" else ""
+    desktop_gold_entrypoints = (
+        f"{root}/scripts/release/verify_desktop_gold_policy.sh",
+        f"{root}/scripts/release/verify_package_boundaries.sh",
+        f"{root}/chummer-hub-registry/scripts/release/verify_release_channel.sh",
+        f"{services}/scripts/materialize_hub_local_release_proof.py",
+        f"{services}/scripts/verify_desktop_native_trust_receipts.py",
+        f"{root}/scripts/release/verify_platform_matrix.sh",
+        f"{root}/chummer-presentation/scripts/verify_desktop_artifact_size_budget.py",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_release_matrix.sh",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_first_minute.sh",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_gold_workflows.sh",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_visual_proof.sh",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_update_rollback_revoke.sh",
+        f"{root}/chummer-presentation/scripts/release/verify_desktop_support_crash_feedback.sh",
+        f"{root}/scripts/release/verify_proof_freshness.sh",
+        f"{root}/scripts/release/verify_public_truth_convergence.sh",
+        f"{root}/scripts/release/verify_no_public_internal_dependencies.sh",
+        f"{root}/scripts/release/verify_repo_release_posture.sh",
+    )
+    desktop_gold_command = " && ".join(
+        (
+            f"{bash} {desktop_gold_entrypoints[0]}",
+            f"{bash} {desktop_gold_entrypoints[1]}",
+            f"{bash} {desktop_gold_entrypoints[2]}",
+            (
+                f"cd {services} && {python} {desktop_gold_entrypoints[3]} "
+                f".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json "
+                f"{public_base} docker-compose.yml 120 true >/dev/null && "
+                f"{python} {desktop_gold_entrypoints[4]}"
+            ),
+            f"{bash} {desktop_gold_entrypoints[5]}",
+            f"{python} {desktop_gold_entrypoints[6]}",
+            *(f"{bash} {entrypoint}" for entrypoint in desktop_gold_entrypoints[7:]),
+        )
+    )
+    blazor_gates: list[tuple[str, str, str]] = [
+        (
+            "verify_blazor_component_shell",
+            f"{root}/chummer-presentation/scripts/test-blazor-components.sh",
+            (
+                f"cd {root}/chummer-presentation && {bash} "
+                f"{root}/chummer-presentation/scripts/test-blazor-components.sh"
+            ),
+        ),
+        (
+            "verify_browser_surface_proxy_timeout_posture",
+            f"{root}/scripts/release/verify_browser_surface_proxy_timeout_posture.sh",
+            f"{bash} {root}/scripts/release/verify_browser_surface_proxy_timeout_posture.sh",
+        ),
+        (
+            "verify_blazor_public_edge_workbench_proof",
+            f"{root}/chummer-presentation/scripts/ai/milestones/blazor-public-edge-workbench-proof-check.sh",
+            (
+                f"{bash} {root}/chummer-presentation/scripts/ai/milestones/"
+                "blazor-public-edge-workbench-proof-check.sh"
+            ),
+        ),
+        (
+            "verify_blazor_public_edge_execution_proof",
+            f"{root}/chummer-presentation/scripts/ai/milestones/blazor-public-edge-execution-proof-check.sh",
+            (
+                f"{bash} {root}/chummer-presentation/scripts/ai/milestones/"
+                "blazor-public-edge-execution-proof-check.sh"
+            ),
+        ),
+        (
+            "verify_blazor_play_surface_horizon",
+            f"{root}/chummer-presentation/scripts/ai/milestones/blazor-play-surface-horizon-check.sh",
+            (
+                f"{bash} {root}/chummer-presentation/scripts/ai/milestones/"
+                "blazor-play-surface-horizon-check.sh"
+            ),
+        ),
+        (
+            "verify_blazor_execution_horizon_bridge",
+            f"{services}/scripts/verify_blazor_execution_horizon_bridge.py",
+            f"cd {services} && {python} {services}/scripts/verify_blazor_execution_horizon_bridge.py",
+        ),
+        (
+            "verify_blazor_public_edge_freshness",
+            f"{root}/chummer-presentation/scripts/release/verify_blazor_public_edge_freshness.sh",
+            (
+                f"{bash} {root}/chummer-presentation/scripts/release/"
+                "verify_blazor_public_edge_freshness.sh"
+            ),
+        ),
+    ]
+    if require_blazor_local_e2e:
+        blazor_gates.append(
+            (
+                "verify_blazor_local_ui_e2e",
+                f"{services}/scripts/e2e-ui.sh",
+                f"cd {services} && {bash} {services}/scripts/e2e-ui.sh",
+            )
+        )
+    if require_blazor_self_host_e2e:
+        blazor_gates.extend(
+            [
+                (
+                    "verify_blazor_self_host_workbench_e2e",
+                    f"{root}/chummer-presentation/scripts/e2e-portal.sh",
+                    (
+                        f"cd {root}/chummer-presentation && {bash} "
+                        f"{root}/chummer-presentation/scripts/e2e-portal.sh"
+                    ),
+                ),
+                (
+                    "verify_blazor_self_host_workbench_freshness",
+                    (
+                        f"{root}/chummer-presentation/scripts/release/"
+                        "verify_blazor_self_host_workbench_freshness.sh"
+                    ),
+                    (
+                        f"{bash} {root}/chummer-presentation/scripts/release/"
+                        "verify_blazor_self_host_workbench_freshness.sh"
+                    ),
+                ),
+            ]
+        )
+    blazor_gold_entrypoints = tuple(entrypoint for _name, entrypoint, _command in blazor_gates)
+    blazor_command_parts = ["failures=()"]
+    for gate_name, _entrypoint, gate_command in blazor_gates:
+        blazor_command_parts.append(
+            f"if ( {gate_command} ); then printf '%s\\n' {shlex.quote(f'PASS {gate_name}')}; "
+            f"else failures+=({shlex.quote(gate_name)}); "
+            f"printf '%s\\n' {shlex.quote(f'FAIL {gate_name}')}; fi"
+        )
+    blazor_command_parts.extend(
+        [
+            (
+                "if (( ${#failures[@]} )); then printf '%s\\n' 'BLAZOR NOT GOLD'; "
+                "printf '%s\\n' \"${failures[@]}\"; exit 1; fi"
+            ),
+            "printf '%s\\n' 'BLAZOR GOLD'",
+        ]
+    )
+    blazor_gold_command = "; ".join(blazor_command_parts)
     values = (
-        spec("verify_chummer6_desktop_gold", f"{bash} {root}/scripts/release/verify_chummer6_desktop_gold.sh", f"{root}/scripts/release/verify_chummer6_desktop_gold.sh"),
-        spec("verify_chummer6_blazor_gold", f"{bash} {root}/scripts/release/verify_chummer6_blazor_gold.sh", f"{root}/scripts/release/verify_chummer6_blazor_gold.sh"),
+        spec(
+            "verify_chummer6_desktop_gold",
+            desktop_gold_command,
+            *desktop_gold_entrypoints,
+        ),
+        spec(
+            "verify_chummer6_blazor_gold",
+            blazor_gold_command,
+            *blazor_gold_entrypoints,
+        ),
         spec("verify_design_release_policy", f"{bash} {root}/scripts/release/verify_design_release_policy.sh", f"{root}/scripts/release/verify_design_release_policy.sh"),
         spec("verify_package_boundaries", f"{bash} {root}/scripts/release/verify_package_boundaries.sh", f"{root}/scripts/release/verify_package_boundaries.sh"),
         spec("verify_supply_chain_evidence", f"collector_status=0; {python} {root}/scripts/release/collect_build_provenance.py --workspace-root {root} || collector_status=$?; verifier_status=0; {python} {root}/scripts/release/verify_supply_chain_evidence.py --workspace-root {root} || verifier_status=$?; if (( collector_status != 0 )); then exit $collector_status; fi; exit $verifier_status", f"{root}/scripts/release/collect_build_provenance.py", f"{root}/scripts/release/verify_supply_chain_evidence.py"),
         spec("verify_core_release_receipts", f"{bash} {root}/chummer-core-engine/scripts/release/verify_core_release_receipts.sh", f"{root}/chummer-core-engine/scripts/release/verify_core_release_receipts.sh"),
         spec("verify_run_services_restore_drill", f"cd {services} && {bash} {services}/scripts/ai/run_services_restore_drill.sh", f"{services}/scripts/ai/run_services_restore_drill.sh"),
-        spec("verify_release_bundle_transaction", f"cd {services} && {bash} {services}/scripts/verify_release_bundle_transaction_gate.sh", f"{services}/scripts/verify_release_bundle_transaction_gate.sh"),
+        spec(
+            "verify_release_bundle_transaction",
+            f"cd {services} && CHUMMER_RELEASE_BUNDLE_TRANSACTION_TRX_VERIFIER={services}/scripts/verify_release_bundle_transaction_trx.py {bash} {services}/scripts/verify_release_bundle_transaction_gate.sh",
+            f"{services}/scripts/verify_release_bundle_transaction_gate.sh",
+            f"{services}/scripts/verify_release_bundle_transaction_trx.py",
+        ),
         spec("verify_release_channel", f"{bash} {root}/chummer-hub-registry/scripts/release/verify_release_channel.sh", f"{root}/chummer-hub-registry/scripts/release/verify_release_channel.sh"),
         spec("verify_public_projection", f"{bash} {services}/scripts/release/verify_public_projection.sh", f"{services}/scripts/release/verify_public_projection.sh"),
         spec("verify_public_edge_compose_operability", f"cd {services} && {python} {services}/scripts/verify_public_edge_compose_operability.py", f"{services}/scripts/verify_public_edge_compose_operability.py"),
@@ -974,6 +1441,40 @@ def google_oauth_receipt_validation_failures(path: Path) -> list[str]:
     if result.get("operator_evidence_pass") is not True:
         issues.append("google OAuth current verifier did not prove operator evidence")
     return list(dict.fromkeys(issues))
+
+
+def direct_receipt_semantic_validation_failures(
+    gate_name: str,
+    payload: dict[str, object],
+    receipt_path: Path,
+    *,
+    observed_at: datetime,
+) -> list[str]:
+    """Apply each direct receipt's available contract-specific verifier."""
+
+    if gate_name == "verify_supply_chain_evidence":
+        failures = supply_chain_receipt_validation_failures(
+            payload,
+            current_time=observed_at,
+        )
+    elif gate_name == "verify_public_edge_observability_release":
+        failures = public_edge_observability_release_blocking_reasons(
+            payload,
+            receipt_path=receipt_path,
+            release_channel_path=REGISTRY_RELEASE_CHANNEL,
+            now=observed_at,
+        )
+    elif gate_name == "verify_windows_installer_visual_audit_intake_request":
+        failures = windows_visual_audit_release_blocking_reasons(payload)
+    elif gate_name == "verify_flagship_product_readiness":
+        failures = flagship_product_readiness_gate_semantic_failures(payload)
+    elif gate_name == "verify_public_edge_postdeploy_gate":
+        failures = public_edge_postdeploy_release_blocking_reasons(payload)
+    elif gate_name == "verify_google_oauth_linking_proof":
+        failures = google_oauth_receipt_validation_failures(receipt_path)
+    else:
+        failures = []
+    return list(dict.fromkeys(str(item).strip() for item in failures if str(item).strip()))
 
 
 def refresh_flagship_product_readiness_gate(path: Path) -> None:
@@ -2444,7 +2945,10 @@ def windows_visual_audit_missing_artifact_failure(
 
 
 def windows_visual_audit_release_blocking_reasons(payload: dict[str, object]) -> list[str]:
-    reasons = receipt_failure_reasons(payload, "windows_installer_visual_audit receipt is not pass")
+    fallback = "windows_installer_visual_audit receipt is not pass"
+    reasons = receipt_failure_reasons(payload, fallback)
+    if normalized_token(payload.get("status")) in PASS_STATES and reasons == [fallback]:
+        reasons = []
     artifact = payload.get("artifact")
     artifact = artifact if isinstance(artifact, dict) else {}
     visual = payload.get("visualAuditSource")
@@ -2992,7 +3496,7 @@ def release_ready_materialization_failure_payload(
         "generated_at_utc": now_iso(),
         "status": "fail",
         "verdict": "NOT_RELEASE_READY",
-        "command": f"{TRUSTED_PYTHON} {Path(__file__).resolve()}",
+        "command": supported_release_controller_command(),
         "returncode": returncode,
         "timed_out": bool(timed_out),
         "timeout_seconds": TIMEOUT_SECONDS,
@@ -3091,6 +3595,32 @@ def controller_gate_environment(
     )
 
 
+def url_encoded_secret_pattern(value: str) -> str:
+    """Match percent-escape hex case without folding credential characters."""
+
+    parts: list[str] = []
+    index = 0
+    while index < len(value):
+        if (
+            value[index] == "%"
+            and index + 2 < len(value)
+            and re.fullmatch(r"[0-9A-Fa-f]{2}", value[index + 1 : index + 3])
+        ):
+            parts.append("%")
+            for digit in value[index + 1 : index + 3]:
+                lowered = digit.lower()
+                parts.append(
+                    f"[{lowered}{lowered.upper()}]"
+                    if lowered in "abcdef"
+                    else re.escape(digit)
+                )
+            index += 3
+            continue
+        parts.append(re.escape(value[index]))
+        index += 1
+    return "".join(parts)
+
+
 def redact_release_output(text: str, environment: dict[str, str]) -> str:
     """Redact credential values plus common assignment/header representations."""
 
@@ -3106,6 +3636,17 @@ def redact_release_output(text: str, environment: dict[str, str]) -> str:
     )
     for value in values:
         redacted = redacted.replace(value, "[REDACTED]")
+        encoded_values = {
+            quote(value, safe=""),
+            quote_plus(value, safe=""),
+        }
+        for encoded_value in sorted(encoded_values, key=len, reverse=True):
+            if encoded_value and encoded_value != value:
+                redacted = re.sub(
+                    url_encoded_secret_pattern(encoded_value),
+                    "[REDACTED]",
+                    redacted,
+                )
     credential_names = "|".join(
         re.escape(key) for key in sorted(RELEASE_SECRET_ENV_KEYS, key=len, reverse=True)
     )
@@ -3155,9 +3696,17 @@ def authoritative_controller_environment(
             "release controller rejects inherited or user-writable PATH; "
             f"expected exactly {TRUSTED_PATH}"
         )
+    binding_failures = source_binding_failures()
+    if binding_failures:
+        raise ValueError(
+            "release controller source binding failed: "
+            + "; ".join(binding_failures)
+        )
 
     controlled_defaults = {
         "CHUMMER_PUBLIC_BASE_URL": "https://chummer.run",
+        "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E": "0",
+        "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E": "0",
         "CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH": "0",
         "CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH": "0",
         "CHUMMER_RELEASE_READY_GATE_TIMEOUT_SECONDS": "900",
@@ -3191,6 +3740,8 @@ def authoritative_controller_environment(
     sanitized["GIT_CONFIG_GLOBAL"] = "/dev/null"
     sanitized["GIT_CONFIG_NOSYSTEM"] = "1"
     sanitized["GIT_OPTIONAL_LOCKS"] = "0"
+    sanitized["CHUMMER_RUN_SERVICES_ROOT"] = str(RUN_SERVICES_ROOT)
+    sanitized["CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD"] = current_git_head()
     if skip_google_oauth_runtime_refresh:
         sanitized[SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH_ENV] = "1"
     if skip_windows_runtime_refresh:
@@ -3225,6 +3776,17 @@ def validate_release_execution_environment(environment: dict[str, object]) -> di
     for key in RELEASE_EXECUTION_FORBIDDEN_ENV_KEYS:
         if normalized[key]:
             raise ValueError(f"release execution environment {key} must be unset")
+    if normalized["CHUMMER_RUN_SERVICES_ROOT"] != str(RUN_SERVICES_ROOT):
+        raise ValueError(
+            "release execution CHUMMER_RUN_SERVICES_ROOT must equal the current checkout"
+        )
+    if re.fullmatch(
+        r"(?:[0-9a-f]{40}|[0-9a-f]{64})",
+        normalized["CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD"],
+    ) is None:
+        raise ValueError(
+            "release execution CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD must be a full Git commit"
+        )
     parsed_url = urlsplit(normalized["CHUMMER_PUBLIC_BASE_URL"])
     try:
         parsed_port = parsed_url.port
@@ -3259,6 +3821,8 @@ def validate_release_execution_environment(environment: dict[str, object]) -> di
         if parsed <= 0 or parsed > 86400:
             raise ValueError(f"release execution environment {key} is out of range")
     for key in (
+        "CHUMMER_BLAZOR_REQUIRE_LOCAL_E2E",
+        "CHUMMER_BLAZOR_REQUIRE_SELF_HOST_E2E",
         "CHUMMER_RELEASE_READY_SKIP_GOOGLE_OAUTH_RUNTIME_REFRESH",
         "CHUMMER_RELEASE_READY_SKIP_WINDOWS_RUNTIME_REFRESH",
     ):
@@ -4592,14 +5156,14 @@ def current_release_gate_receipt_binding(
         raise ValueError(f"{receipt_name} direct receipt version does not match current release")
     if channel_path and receipt_channel != release_binding["channel"]:
         raise ValueError(f"{receipt_name} direct receipt channel does not match current release")
-    if gate_name == "verify_supply_chain_evidence":
-        supply_failures = supply_chain_receipt_validation_failures(payload, current_time=observed_at)
-        if supply_failures:
-            raise ValueError("; ".join(supply_failures))
-    if gate_name == "verify_google_oauth_linking_proof":
-        google_failures = google_oauth_receipt_validation_failures(receipt_path)
-        if google_failures:
-            raise ValueError("; ".join(google_failures))
+    semantic_failures = direct_receipt_semantic_validation_failures(
+        gate_name,
+        payload,
+        receipt_path,
+        observed_at=observed_at,
+    )
+    if semantic_failures:
+        raise ValueError("; ".join(semantic_failures))
     authority_inputs: list[dict[str, object]] = []
     if gate_name == "verify_google_oauth_linking_proof":
         operator_evidence = (
@@ -5780,136 +6344,1140 @@ def parse_receipt_timestamp(value: object) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
-def current_git_head() -> str:
-    result = subprocess.run(
-        ["git", "-C", str(RUN_SERVICES_ROOT), "rev-parse", "HEAD"],
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    if result.returncode != 0:
-        return ""
-    return result.stdout.strip()
-
-
-def resolve_workspace_root() -> Path:
-    candidates = [ROOT, SHARED_WORKSPACE_ROOT]
-    for candidate in candidates:
-        if (candidate / "chummer-hub-registry" / "scripts" / "release" / "verify_release_channel.sh").is_file():
-            return candidate
-    return ROOT
-
-
-def source_binding_failures() -> list[str]:
-    if not VERIFY_SCRIPT.is_file():
-        return [f"release verifier script is missing: {VERIFY_SCRIPT}"]
-
-    try:
-        verifier_text = VERIFY_SCRIPT.read_text(encoding="utf-8")
-    except OSError as exc:
-        return [f"release verifier script is unreadable: {exc}"]
-
-    current_root = RUN_SERVICES_ROOT.resolve()
-    legacy_root = LEGACY_RUN_SERVICES_ROOT.resolve()
-    verifier_uses_legacy_root = "$root/chummer.run-services" in verifier_text or str(legacy_root) in verifier_text
-    verifier_accepts_current_root = "CHUMMER_RUN_SERVICES_ROOT" in verifier_text
-    if current_root != legacy_root and verifier_uses_legacy_root and not verifier_accepts_current_root:
-        return [
-            (
-                "release verifier is bound to the legacy run-services checkout "
-                f"{legacy_root}, not the current repo {current_root}"
-            )
-        ]
-
-    return []
-
-
-def progress_lines(stdout: str, stderr: str) -> list[str]:
-    return [
-        line.strip()
-        for line in [*stdout.splitlines(), *stderr.splitlines()]
-        if line.strip().startswith("RUN ")
+def projection_retry_validation_failures(
+    payload: dict[str, object],
+    proof_refresh_policy: dict[str, str],
+    *,
+    current_time: datetime | None = None,
+    controller_environment: dict[str, str] | None = None,
+) -> list[str]:
+    failures: list[str] = [
+        "projection retry is offline replay and remains disabled until protected detached "
+        "controller execution-attestation trust is enrolled"
     ]
+    if OUTPUT_PATH != DEFAULT_OUTPUT_PATH:
+        failures.append("projection retry is allowed only for the authoritative release-ready receipt")
+    if payload.get("contract_name") != "chummer.release_ready":
+        failures.append("receipt contract_name is not chummer.release_ready")
+    if payload.get("status") != "fail" or payload.get("verdict") != "NOT_RELEASE_READY":
+        failures.append("receipt is not a failed release-ready result")
+    returncode = payload.get("returncode")
+    if not isinstance(returncode, int) or isinstance(returncode, bool) or returncode != 0:
+        failures.append("global verifier returncode is not zero")
+    if payload.get("timed_out") is not False:
+        failures.append("global verifier timed_out is not false")
+    if payload.get("saw_release_ready_marker") is not True:
+        failures.append("global verifier RELEASE READY marker is missing")
+    if normalized_string_list(payload.get("not_release_ready_markers")):
+        failures.append("global verifier emitted NOT RELEASE READY markers")
+    if payload.get("global_verifier_skipped_due_current_blockers") is not False:
+        failures.append("global verifier was skipped")
+    if (
+        payload.get("authority_scope") != AUTHORITATIVE_CONTROLLER_SCOPE
+        or payload.get("authoritative") is not True
+        or payload.get("diagnostic") is not False
+        or payload.get("test_only") is not False
+    ):
+        failures.append("receipt is not authoritative live-controller output")
 
+    started_gates = normalized_string_list(payload.get("started_gates"))
+    completed_gates = normalized_string_list(payload.get("completed_gates"))
+    if tuple(started_gates) != REQUIRED_RELEASE_VERIFIER_GATES:
+        failures.append("started global gate list is not the canonical complete matrix")
+    if tuple(completed_gates) != REQUIRED_RELEASE_VERIFIER_GATES:
+        failures.append("completed global gate list is not the canonical complete matrix")
+    if completed_gates and payload.get("last_completed_gate") != completed_gates[-1]:
+        failures.append("last_completed_gate does not match the completed gate list")
 
-def extract_failed_gates(failure_lines: list[str]) -> list[str]:
-    failed_gates: list[str] = []
-    seen: set[str] = set()
-    for line in failure_lines:
-        text = line.strip()
-        if text.startswith("FAIL "):
-            gate = text.removeprefix("FAIL ").split(":", 1)[0].split(maxsplit=1)[0]
-        elif text.startswith("verify_"):
-            gate = text.split(":", 1)[0].split(maxsplit=1)[0]
-            if text != gate and not text.startswith(f"{gate}:"):
-                continue
-        else:
-            continue
-        gate = gate.rstrip(":")
-        if not gate or gate in seen:
-            continue
-        seen.add(gate)
-        failed_gates.append(gate)
-    return failed_gates
+    receipt_failures = normalized_string_list(payload.get("failures"))
+    if not receipt_failures or any(
+        not failure.startswith("FAIL release_truth_projection_refresh:")
+        for failure in receipt_failures
+    ):
+        failures.append("receipt contains a failure outside release-truth projection")
+    if normalized_string_list(payload.get("failed_gates")) != ["release_truth_projection_refresh"]:
+        failures.append("failed_gates is not projection-only")
+    projection = payload.get("release_truth_projection_refresh")
+    if not isinstance(projection, dict) or projection.get("status") != "fail":
+        failures.append("failed release-truth projection receipt is missing")
+    if payload.get("proof_refresh_policy") != proof_refresh_policy:
+        failures.append("requested proof refresh policy does not match the verified run")
 
-
-def safe_release_truth_blockers() -> list[str]:
-    try:
-        blockers = current_release_truth_launch_blockers()
-    except Exception as exc:  # pragma: no cover - defensive fail-open detail capture
-        return [f"release truth blocker inspection failed: {exc}"]
-    return [str(item).strip() for item in blockers if str(item).strip()]
-
-
-def main() -> int:
-    env = os.environ.copy()
-    env.setdefault("CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE", "1")
-    env.setdefault("CHUMMER_PUBLIC_BASE_URL", "https://chummer.run")
-    env.setdefault("CHUMMER_RUN_SERVICES_ROOT", str(RUN_SERVICES_ROOT))
-    env.setdefault("CHUMMER_WORKSPACE_ROOT", str(resolve_workspace_root()))
-    expected_head = env.setdefault("CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD", current_git_head())
-    binding_failures = source_binding_failures()
-    if binding_failures:
-        returncode, timed_out, stdout, stderr = 78, False, "", ""
+    binding = payload.get("release_verifier_binding")
+    execution_plan = payload.get("release_execution_plan")
+    execution_bindings = payload.get("release_verifier_gate_execution_bindings")
+    direct_bindings = payload.get("release_verifier_gate_receipt_bindings")
+    validated_execution_bindings: list[dict[str, object]] = []
+    validated_direct_bindings: list[dict[str, object]] = []
+    if not isinstance(execution_plan, dict):
+        failures.append("release execution plan is missing")
     else:
-        returncode, timed_out, stdout, stderr = run_release_verifier(env)
+        try:
+            validate_release_execution_plan(
+                execution_plan,
+                now=current_time,
+                enforce_current_environment=False,
+                controller_environment=(
+                    controller_environment
+                    if execution_plan.get("governed_code_snapshot_required") is True
+                    else None
+                ),
+            )
+        except ValueError as exc:
+            failures.append(f"release execution plan is invalid: {exc}")
+    if not isinstance(execution_bindings, list):
+        failures.append("release verifier gate execution bindings are missing")
+    elif isinstance(execution_plan, dict):
+        try:
+            validated_execution_bindings = validate_gate_execution_bindings(
+                execution_plan,
+                [dict(item) for item in execution_bindings if isinstance(item, dict)],
+                now=current_time,
+            )
+        except ValueError as exc:
+            failures.append(f"release verifier gate execution bindings are invalid: {exc}")
+    if not isinstance(direct_bindings, list):
+        failures.append("release verifier direct receipt bindings are missing")
+    elif isinstance(execution_plan, dict):
+        try:
+            validated_direct_bindings = validate_release_gate_receipt_bindings(
+                [dict(item) for item in direct_bindings if isinstance(item, dict)],
+                now=current_time,
+                execution_plan=execution_plan,
+                execution_bindings=validated_execution_bindings,
+                require_execution_binding=True,
+            )
+        except ValueError as exc:
+            failures.append(f"release verifier direct receipt bindings are invalid: {exc}")
+    if not isinstance(binding, dict):
+        failures.append("release verifier authority binding is missing")
+    else:
+        try:
+            validate_release_verifier_binding_payload(
+                binding,
+                now=current_time,
+                execution_plan=execution_plan if isinstance(execution_plan, dict) else None,
+                expected_phase="final",
+                execution_bindings=validated_execution_bindings,
+                direct_receipt_bindings=validated_direct_bindings,
+                enforce_current_environment=False,
+            )
+        except ValueError as exc:
+            failures.append(f"release verifier authority binding is invalid: {exc}")
+
+    generated_at = parse_receipt_timestamp(payload.get("generated_at_utc"))
+    now = (current_time or datetime.now(UTC)).astimezone(UTC)
+    if generated_at is None:
+        failures.append("generated_at_utc is missing or invalid")
+    else:
+        age = now - generated_at
+        if age < timedelta(minutes=-5) or age > PROJECTION_RETRY_MAX_AGE:
+            failures.append("projection-only failure receipt is not fresh enough to retry")
+    return failures
+
+
+def projection_step_environment(environment: dict[str, str]) -> dict[str, str]:
+    """Projection is local-only and receives no provider credential family."""
+
+    return dict(
+        sorted(
+            (key, value)
+            for key, value in environment.items()
+            if key not in RELEASE_PROVIDER_ENV_KEYS
+        )
+    )
+
+
+def projection_step_prebinding(
+    name: str,
+    command: list[str],
+    cwd: Path,
+    environment: dict[str, str],
+    execution_plan: dict[str, object],
+) -> dict[str, object]:
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", name):
+        raise ValueError("release projection step name is invalid")
+    try:
+        entrypoint = isolated_python_script(command)
+    except ValueError as exc:
+        raise ValueError(
+            f"release projection step lacks the isolated trusted Python interpreter: {name}"
+        ) from exc
+    normalized_cwd = absolute_nonsymlink_path(cwd, require_directory=True)
+    if not entrypoint.is_absolute():
+        entrypoint = normalized_cwd / entrypoint
+    entrypoint = absolute_nonsymlink_path(entrypoint)
+    repository = governed_repository_root(entrypoint)
+    relative = str(entrypoint.relative_to(repository))
+    if not governed_code_path(relative):
+        raise ValueError(f"release projection entrypoint is outside governed code: {name}")
+    governed_snapshot = execution_plan.get("governed_code_snapshot")
+    snapshot_repositories = (
+        governed_snapshot.get("repositories")
+        if isinstance(governed_snapshot, dict)
+        else None
+    )
+    bound_repository_roots = {
+        Path(str(item.get("root", {}).get("path") or ""))
+        for item in (snapshot_repositories or [])
+        if isinstance(item, dict) and isinstance(item.get("root"), dict)
+    }
+    if repository not in bound_repository_roots:
+        raise ValueError(f"release projection entrypoint repository is not plan-governed: {name}")
+    command_text = shlex.join(command)
+    body: dict[str, object] = {
+        "contract_name": "chummer.release_projection_step_prebinding.v1",
+        "name": name,
+        "run_nonce": execution_plan["run_nonce"],
+        "execution_plan_sha256": execution_plan["plan_sha256"],
+        "command": command_text,
+        "command_sha256": hashlib.sha256(command_text.encode("utf-8")).hexdigest(),
+        "cwd": directory_execution_identity(normalized_cwd),
+        "interpreter": regular_file_execution_identity(TRUSTED_PYTHON),
+        "entrypoint": regular_file_execution_identity(entrypoint),
+        "timeout_seconds": PROJECTION_STEP_TIMEOUT_SECONDS,
+        "environment_keys": sorted(environment),
+        "environment_value_sha256": controller_environment_value_digests(environment),
+        "external_write": False,
+        "external_write_authorized": bool(execution_plan.get("external_write_authorized")),
+        "outputs": {
+            "authoritative_receipt": str(OUTPUT_PATH),
+            "non_authoritative_staging_receipt": str(projection_staging_path()),
+        },
+    }
+    captured = {**body, "captured_before_at_utc": now_iso()}
+    return {**captured, "prebinding_sha256": canonical_json_sha256(captured)}
+
+
+def refresh_release_truth_projection(
+    env: dict[str, str],
+    execution_plan: dict[str, object] | None = None,
+) -> dict[str, object]:
+    return run_release_truth_projection_step(
+        "release_truth_root",
+        isolated_python_argv(RELEASE_TRUTH_SYNC_SCRIPT),
+        ROOT,
+        env,
+        execution_plan=execution_plan,
+    )
+
+
+def run_release_truth_projection_step(
+    name: str,
+    command: list[str],
+    cwd: Path,
+    env: dict[str, str],
+    *,
+    allow_failure: bool = False,
+    execution_plan: dict[str, object] | None = None,
+) -> dict[str, object]:
+    refresh_env = projection_step_environment(env)
+    refresh_env.setdefault("PATH", TRUSTED_PATH)
+    refresh_env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
+    refresh_env.setdefault("PYTHONNOUSERSITE", "1")
+    refresh_env.setdefault("CHUMMER_RELEASE_READY_GATE_KILL_AFTER_SECONDS", "30")
+    refresh_env["CHUMMER_SKIP_RELEASE_WRAPPER_REFRESH"] = "1"
+    refresh_env["CHUMMER_SKIP_CODEX_HANDOFF_MATERIALIZER"] = "1"
+    refresh_env["CHUMMER_SKIP_PUBLIC_GUIDE_VERIFICATION"] = "1"
+    prebinding: dict[str, object] = {}
+    try:
+        if execution_plan is not None:
+            validate_release_execution_plan(
+                execution_plan,
+                controller_environment=env,
+            )
+            prebinding = projection_step_prebinding(
+                name,
+                command,
+                cwd,
+                refresh_env,
+                execution_plan,
+            )
+        completed = run_controller_gate_command(
+            {
+                "command": shlex.join(command),
+                "cwd": str(cwd),
+                "timeout_seconds": PROJECTION_STEP_TIMEOUT_SECONDS,
+            },
+            refresh_env,
+        )
+        if (
+            execution_plan is not None
+            and completed.get("process_containment")
+            != execution_plan.get("process_containment")
+        ):
+            raise ValueError(f"release projection process containment drifted: {name}")
+        if execution_plan is not None:
+            validate_release_execution_plan(
+                execution_plan,
+                controller_environment=env,
+            )
+            current = projection_step_prebinding(
+                name,
+                command,
+                cwd,
+                refresh_env,
+                execution_plan,
+            )
+            stable_fields = set(prebinding) - {"captured_before_at_utc", "prebinding_sha256"}
+            if any(prebinding.get(field) != current.get(field) for field in stable_fields):
+                raise ValueError(f"release projection step authority drifted: {name}")
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        return {
+            "name": name,
+            "command": shlex.join(command),
+            "returncode": None,
+            "status": "fail",
+            "allow_failure": allow_failure,
+            "error": redact_release_output(str(exc), refresh_env),
+            "stdout_tail": [],
+            "stderr_tail": [],
+        }
+    return {
+        "name": name,
+        "command": shlex.join(command),
+        "returncode": completed["returncode"],
+        "status": (
+            "pass"
+            if completed["returncode"] == 0
+            else "allowed_failure" if allow_failure else "fail"
+        ),
+        "allow_failure": allow_failure,
+        "error": "",
+        "stdout_tail": str(completed["stdout"]).splitlines()[-20:],
+        "stderr_tail": str(completed["stderr"]).splitlines()[-20:],
+        "process_containment": completed.get("process_containment", {}),
+        "containment_violation": bool(completed.get("containment_violation")),
+        "prebinding": prebinding,
+        "completed_at_utc": now_iso(),
+    }
+
+
+def converge_release_truth_dependents(
+    env: dict[str, str],
+    *,
+    final_pass: bool,
+    execution_plan: dict[str, object] | None = None,
+) -> dict[str, object]:
+    refresh_env = dict(env)
+    refresh_env["CHUMMER_SKIP_RELEASE_WRAPPER_REFRESH"] = "1"
+    refresh_env["CHUMMER_SKIP_CODEX_HANDOFF_MATERIALIZER"] = "1"
+    refresh_env["CHUMMER_SKIP_PUBLIC_GUIDE_VERIFICATION"] = "1"
+    steps: list[tuple[str, list[str], Path, bool]] = []
+    if final_pass:
+        steps.extend(
+            [
+                (
+                    "mobile_cross_surface_readiness",
+                    isolated_python_argv(
+                        "scripts/materialize_mobile_cross_surface_readiness.py"
+                    ),
+                    CHUMMER_PLAY_ROOT,
+                    False,
+                ),
+                (
+                    "mobile_release_boundary",
+                    isolated_python_argv("scripts/materialize_mobile_release_boundary.py"),
+                    CHUMMER_PLAY_ROOT,
+                    False,
+                ),
+                (
+                    "mobile_local_release_proof",
+                    isolated_python_argv("scripts/materialize_mobile_local_release_proof.py"),
+                    CHUMMER_PLAY_ROOT,
+                    False,
+                ),
+            ]
+        )
+    steps.extend(
+        [
+            (
+                "operator_release_dashboard",
+                isolated_python_argv(
+                    "scripts/materialize_operator_release_dashboard.py",
+                    "--skip-windows-runtime-refresh",
+                ),
+                RUN_SERVICES_ROOT,
+                not final_pass,
+            ),
+            (
+                "final_gold_janitor",
+                isolated_python_argv(
+                    "scripts/final_gold_janitor.py",
+                    "--skip-materializers",
+                    "--skip-windows-runtime-refresh",
+                ),
+                RUN_SERVICES_ROOT,
+                False,
+            ),
+            (
+                "flagship_product_readiness",
+                isolated_python_argv(
+                    "scripts/verify_flagship_product_readiness_gate.py",
+                    "--summary-output",
+                    ".codex-studio/published/FLAGSHIP_PRODUCT_READINESS_GATE.generated.json",
+                ),
+                RUN_SERVICES_ROOT,
+                False,
+            ),
+            (
+                "release_truth_projection",
+                isolated_python_argv(RELEASE_TRUTH_SYNC_SCRIPT),
+                ROOT,
+                False,
+            ),
+        ]
+    )
+    results: list[dict[str, object]] = []
+    for name, command, cwd, allow_failure in steps:
+        result = run_release_truth_projection_step(
+            name,
+            command,
+            cwd,
+            refresh_env,
+            allow_failure=allow_failure,
+            execution_plan=execution_plan,
+        )
+        results.append(result)
+        if result["status"] == "fail":
+            break
+    return {
+        "status": "pass" if all(result["status"] != "fail" for result in results) else "fail",
+        "phase": "final" if final_pass else "wrapper_cycle",
+        "steps": results,
+    }
+
+
+def current_projection_blocker_failures(
+    blocking_gate_artifacts: dict[str, dict[str, object]],
+    receipt_states: dict[str, dict[str, object]],
+    root_context: dict[str, object],
+) -> list[str]:
+    """Return current truth that is incompatible with a ready projection."""
+
+    failures = [
+        f"FAIL current_release_truth: root blocker remains: {blocker_id}"
+        for blocker_id in normalized_string_list(root_context.get("root_blocker_ids"))
+    ]
+    blocking_statuses = {"blocked", "fail", "failed", "invalid", "missing", "not_ready"}
+    for name, artifact in sorted(blocking_gate_artifacts.items()):
+        if name == "release_truth_root" or not isinstance(artifact, dict):
+            continue
+        status = normalized_token(artifact.get("status"))
+        if status in blocking_statuses or artifact.get("pass") is False:
+            failures.append(
+                f"FAIL current_release_truth: blocking gate artifact is not pass: {name}"
+            )
+    allowed_receipt_statuses = {*PASS_STATES, "not_required", "published"}
+    for name, state in sorted(receipt_states.items()):
+        if not isinstance(state, dict):
+            continue
+        status = normalized_token(state.get("status"))
+        load_status = normalized_token(state.get("load_status"))
+        if load_status in {"invalid", "missing"} or status not in allowed_receipt_statuses:
+            failures.append(
+                f"FAIL current_release_truth: current receipt is not pass: {name}"
+            )
+    return list(dict.fromkeys(failures))
+
+
+def apply_current_release_truth_projection(
+    payload: dict[str, object],
+    release_channel: dict[str, object],
+    *,
+    enforce_status_consistency: bool = True,
+) -> list[str]:
+    blocking_gate_artifacts = current_blocking_gate_artifacts(
+        refresh_windows_runtime_receipts=False
+    )
+    root_context = current_release_truth_root_context()
+    receipt_states = current_receipt_states()
+    payload.update(
+        {
+            "generated_at_utc": now_iso(),
+            "blocking_gate_artifacts": blocking_gate_artifacts,
+            "current_receipt_states": receipt_states,
+            "root_blocker_ids": root_context["root_blocker_ids"],
+            "root_blockers": root_context["root_blockers"],
+            "root_blockers_generated_at": root_context["root_blockers_generated_at"],
+            "stable_promotion_command": root_context["stable_promotion_command"],
+            "post_promotion_verify_command": root_context["post_promotion_verify_command"],
+            "root_release_truth_source": root_context["root_release_truth_source"],
+        }
+    )
+    if not enforce_status_consistency:
+        actions = release_ready_next_actions(
+            blocking_gate_artifacts,
+            release_channel,
+            root_context,
+        )
+        apply_release_ready_actions(payload, actions)
+        return []
+    consistency_failures = current_projection_blocker_failures(
+        blocking_gate_artifacts,
+        receipt_states,
+        root_context,
+    )
+    if consistency_failures:
+        failures = normalized_string_list(payload.get("failures"))
+        failures.extend(
+            failure for failure in consistency_failures if failure not in failures
+        )
+        payload.update(
+            {
+                "status": "fail",
+                "verdict": "NOT_RELEASE_READY",
+                "failures": failures,
+                "failed_gates": extract_failed_gates(failures),
+            }
+        )
+    actions = release_ready_next_actions(
+        blocking_gate_artifacts,
+        release_channel,
+        root_context,
+    )
+    if consistency_failures:
+        if not actions:
+            blocker_summary = "; ".join(
+                failure.removeprefix("FAIL current_release_truth: ")
+                for failure in consistency_failures
+            )
+            actions = [
+                "Resolve the current release-truth blockers "
+                f"({blocker_summary}), then rerun: {supported_release_controller_command()}"
+            ]
+    apply_release_ready_actions(payload, actions)
+    return consistency_failures
+
+
+def converge_release_truth_projection(
+    payload: dict[str, object],
+    release_channel: dict[str, object],
+    env: dict[str, str],
+    *,
+    execution_plan: dict[str, object] | None = None,
+) -> dict[str, object]:
+    if OUTPUT_PATH == DEFAULT_OUTPUT_PATH and execution_plan is None:
+        raise ValueError("authoritative release projection requires the controller execution plan")
+    durable_unlink(OUTPUT_PATH)
+
+    def write_staging(phase: str) -> None:
+        staged = json.loads(json.dumps(payload))
+        release_binding = payload.get("release_verifier_binding")
+        if not isinstance(release_binding, dict):
+            release_binding = {}
+        staged.update(
+            {
+                "status": "in_progress",
+                "verdict": "NOT_RELEASE_READY",
+                "authority_scope": DIAGNOSTIC_AUTHORITY_SCOPE,
+                "authoritative": False,
+                "diagnostic": True,
+                "test_only": False,
+                "projection_staging": {
+                    "status": "in_progress",
+                    "phase": phase,
+                    "run_nonce": str((execution_plan or {}).get("run_nonce") or ""),
+                    "execution_plan_sha256": str(
+                        (execution_plan or {}).get("plan_sha256") or ""
+                    ),
+                    "release_channel_sha256": str(
+                        release_binding.get("release_channel_sha256") or ""
+                    ),
+                    "release_version": str(release_binding.get("release_version") or ""),
+                    "authoritative_output": str(OUTPUT_PATH),
+                },
+            }
+        )
+        atomic_write_json(projection_staging_path(), staged)
+
+    write_staging("root")
+    root_refresh = refresh_release_truth_projection(env, execution_plan)
+    root_refresh["phase"] = "root"
+    projection_phases: list[dict[str, object]] = [root_refresh]
+    if root_refresh.get("status") == "pass":
+        apply_current_release_truth_projection(
+            payload,
+            release_channel,
+            enforce_status_consistency=False,
+        )
+        write_staging("wrapper_cycle")
+        wrapper_cycle = converge_release_truth_dependents(
+            env,
+            final_pass=False,
+            execution_plan=execution_plan,
+        )
+        projection_phases.append(wrapper_cycle)
+        if wrapper_cycle.get("status") == "pass":
+            apply_current_release_truth_projection(
+                payload,
+                release_channel,
+                enforce_status_consistency=False,
+            )
+            write_staging("final")
+            projection_phases.append(
+                converge_release_truth_dependents(
+                    env,
+                    final_pass=True,
+                    execution_plan=execution_plan,
+                )
+            )
+
+    projection_refresh = {
+        "status": (
+            "pass"
+            if projection_phases and all(phase.get("status") == "pass" for phase in projection_phases)
+            else "fail"
+        ),
+        "phases": projection_phases,
+    }
+    payload["release_truth_projection_refresh"] = projection_refresh
+    if projection_refresh["status"] != "pass":
+        failed_phase = next(
+            (phase for phase in projection_phases if phase.get("status") != "pass"),
+            {},
+        )
+        projection_error = str(failed_phase.get("error") or "").strip()
+        if not projection_error:
+            projection_error = f"phase={failed_phase.get('phase') or 'unknown'}"
+        failure_lines = normalized_string_list(payload.get("failures"))
+        projection_failure = f"FAIL release_truth_projection_refresh: {projection_error}"
+        if projection_failure not in failure_lines:
+            failure_lines.append(projection_failure)
+        payload["status"] = "fail"
+        payload["verdict"] = "NOT_RELEASE_READY"
+        payload["failures"] = failure_lines
+        payload["failed_gates"] = extract_failed_gates(failure_lines)
+    consistency_failures = apply_current_release_truth_projection(
+        payload,
+        release_channel,
+    )
+    if consistency_failures:
+        projection_refresh.update(
+            {
+                "status": "fail",
+                "current_truth_consistency": "fail",
+                "current_blocker_failures": consistency_failures,
+            }
+        )
+    write_staging("complete_pending_authority_revalidation")
+    return projection_refresh
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args([] if argv is None else argv)
+
+    def parsed_json_object(value: str, label: str) -> dict[str, object]:
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{label} is invalid JSON") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError(f"{label} is not a JSON object")
+        return parsed
+
+    def parsed_json_objects(values: list[str], label: str) -> list[dict[str, object]]:
+        return [parsed_json_object(value, label) for value in values]
+
+    if args.run_authoritative_controller:
+        durable_unlink(OUTPUT_PATH)
+        durable_unlink(projection_staging_path())
+        try:
+            controller_environment = authoritative_controller_environment(
+                skip_google_oauth_runtime_refresh=args.skip_google_oauth_runtime_refresh,
+                skip_windows_runtime_refresh=args.skip_windows_runtime_refresh,
+            )
+        except ValueError as exc:
+            print(NOT_READY_MARKER)
+            print(f"release controller environment rejected: {exc}", file=sys.stderr)
+            return 78
+        result = run_authoritative_release_controller(
+            controller_environment,
+            external_write_authorized=args.authorize_external_release_writes,
+        )
+        sys.stdout.write(str(result["stdout"]))
+        sys.stderr.write(str(result["stderr"]))
+        return int(result["returncode"])
+
+    if args.emit_release_execution_plan:
+        try:
+            plan = build_release_execution_plan(
+                args.release_gate_spec,
+                args.release_interpreter,
+                args.release_code_root,
+            )
+        except ValueError as exc:
+            print(f"release execution plan rejected: {exc}", file=sys.stderr)
+            return 1
+        print(
+            json.dumps(
+                diagnostic_artifact("release_execution_plan", plan),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
+    if args.emit_release_verifier_binding:
+        try:
+            execution_plan = (
+                parsed_json_object(args.release_execution_plan_json, "release execution plan")
+                if args.release_execution_plan_json
+                else None
+            )
+            execution_bindings = parsed_json_objects(
+                args.release_gate_execution_binding_json,
+                "release gate execution binding",
+            )
+            receipt_bindings = parsed_json_objects(
+                args.release_gate_receipt_binding_json,
+                "release gate receipt binding",
+            )
+            if args.release_verifier_binding_phase in {"start", "final"} and execution_plan is None:
+                raise ValueError("start/final release verifier binding requires an execution plan")
+            if args.release_verifier_binding_phase == "final":
+                execution_bindings = validate_gate_execution_bindings(
+                    execution_plan or {},
+                    execution_bindings,
+                )
+                receipt_bindings = validate_release_gate_receipt_bindings(
+                    receipt_bindings,
+                    execution_plan=execution_plan,
+                    execution_bindings=execution_bindings,
+                    require_execution_binding=True,
+                )
+            binding = current_release_verifier_replay_binding(
+                gate_names=args.release_verifier_gate or None,
+                execution_plan=execution_plan,
+                binding_phase=args.release_verifier_binding_phase,
+                execution_bindings=execution_bindings,
+                direct_receipt_bindings=receipt_bindings,
+            )
+        except ValueError as exc:
+            print(f"release verifier binding rejected: {exc}", file=sys.stderr)
+            return 1
+        print(
+            json.dumps(
+                diagnostic_artifact("release_verifier_binding", binding),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
+    if args.validate_release_verifier_binding_json:
+        try:
+            parsed_binding = parsed_json_object(
+                args.validate_release_verifier_binding_json,
+                "release verifier binding",
+            )
+            execution_plan = (
+                parsed_json_object(args.release_execution_plan_json, "release execution plan")
+                if args.release_execution_plan_json
+                else None
+            )
+            execution_bindings = parsed_json_objects(
+                args.release_gate_execution_binding_json,
+                "release gate execution binding",
+            )
+            receipt_bindings = parsed_json_objects(
+                args.release_gate_receipt_binding_json,
+                "release gate receipt binding",
+            )
+            validate_release_verifier_binding_payload(
+                parsed_binding,
+                enforce_max_age=False,
+                execution_plan=execution_plan,
+                expected_phase=str(parsed_binding.get("binding_phase") or ""),
+                execution_bindings=execution_bindings,
+                direct_receipt_bindings=receipt_bindings,
+                enforce_current_environment=True,
+            )
+        except ValueError as exc:
+            print(f"release verifier binding rejected: {exc}", file=sys.stderr)
+            return 1
+        print(
+            json.dumps(
+                diagnostic_artifact(
+                    "release_verifier_binding_validation",
+                    {"status": "structurally_valid"},
+                ),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
+    if args.emit_release_gate_execution_prebinding:
+        try:
+            execution_plan = parsed_json_object(
+                args.release_execution_plan_json,
+                "release execution plan",
+            )
+            start_binding = parsed_json_object(
+                args.release_verifier_start_binding_json,
+                "release verifier start binding",
+            )
+            binding = current_gate_execution_prebinding(
+                execution_plan,
+                args.emit_release_gate_execution_prebinding,
+                start_binding,
+            )
+        except ValueError as exc:
+            print(f"release gate execution prebinding rejected: {exc}", file=sys.stderr)
+            return 1
+        print(
+            json.dumps(
+                diagnostic_artifact("release_gate_execution_prebinding", binding),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
+    if args.complete_release_gate_execution_prebinding_json:
+        try:
+            execution_plan = parsed_json_object(
+                args.release_execution_plan_json,
+                "release execution plan",
+            )
+            prebinding = parsed_json_object(
+                args.complete_release_gate_execution_prebinding_json,
+                "release gate execution prebinding",
+            )
+            binding = complete_gate_execution_binding(execution_plan, prebinding)
+        except ValueError as exc:
+            print(f"release gate execution binding rejected: {exc}", file=sys.stderr)
+            return 1
+        print(
+            json.dumps(
+                diagnostic_artifact("release_gate_execution_binding", binding),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
+    if args.validate_release_gate_execution_bindings:
+        try:
+            execution_plan = parsed_json_object(
+                args.release_execution_plan_json,
+                "release execution plan",
+            )
+            execution_bindings = parsed_json_objects(
+                args.release_gate_execution_binding_json,
+                "release gate execution binding",
+            )
+            validate_gate_execution_bindings(execution_plan, execution_bindings)
+        except ValueError as exc:
+            print(f"release gate execution bindings rejected: {exc}", file=sys.stderr)
+            return 1
+        print(
+            json.dumps(
+                diagnostic_artifact(
+                    "release_gate_execution_binding_validation",
+                    {"status": "structurally_valid"},
+                ),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
+    if args.emit_release_gate_receipt_binding:
+        try:
+            execution_plan = parsed_json_object(
+                args.release_execution_plan_json,
+                "release execution plan",
+            )
+            execution_bindings = parsed_json_objects(
+                args.release_gate_execution_binding_json,
+                "release gate execution binding",
+            )
+            execution_binding = next(
+                (
+                    item
+                    for item in execution_bindings
+                    if item.get("gate") == args.emit_release_gate_receipt_binding
+                ),
+                None,
+            )
+            binding = current_release_gate_receipt_binding(
+                args.emit_release_gate_receipt_binding,
+                execution_binding=execution_binding,
+                execution_plan=execution_plan,
+            )
+        except ValueError as exc:
+            print(f"release gate receipt binding rejected: {exc}", file=sys.stderr)
+            return 1
+        print(
+            json.dumps(
+                diagnostic_artifact("release_gate_receipt_binding", binding),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
+    if args.validate_release_gate_receipt_binding_json:
+        try:
+            parsed_bindings = parsed_json_objects(
+                args.validate_release_gate_receipt_binding_json,
+                "release gate receipt binding",
+            )
+            execution_plan = parsed_json_object(
+                args.release_execution_plan_json,
+                "release execution plan",
+            )
+            execution_bindings = parsed_json_objects(
+                args.release_gate_execution_binding_json,
+                "release gate execution binding",
+            )
+            validate_release_gate_receipt_bindings(
+                parsed_bindings,
+                execution_plan=execution_plan,
+                execution_bindings=execution_bindings,
+                require_execution_binding=True,
+            )
+        except ValueError as exc:
+            print(f"release gate receipt binding rejected: {exc}", file=sys.stderr)
+            return 1
+        print(
+            json.dumps(
+                diagnostic_artifact(
+                    "release_gate_receipt_binding_validation",
+                    {"status": "structurally_valid"},
+                ),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
+    if not args.retry_release_truth_projection and not args.global_verifier_output:
+        durable_unlink(OUTPUT_PATH)
+        durable_unlink(projection_staging_path())
+    try:
+        env = authoritative_controller_environment(
+            skip_google_oauth_runtime_refresh=args.skip_google_oauth_runtime_refresh,
+            skip_windows_runtime_refresh=args.skip_windows_runtime_refresh,
+        )
+    except ValueError as exc:
+        publish_release_ready_materialization_failure(
+            phase="controller_environment",
+            reason=str(exc),
+            returncode=78,
+            proof_refresh_policy={
+                "google_oauth": (
+                    "verify_existing_receipts"
+                    if args.skip_google_oauth_runtime_refresh
+                    else "refresh_live_proof"
+                ),
+                "windows_installer": (
+                    "verify_existing_receipts"
+                    if args.skip_windows_runtime_refresh
+                    else "refresh_runtime_receipts"
+                ),
+            },
+        )
+        print(f"release controller environment rejected: {exc}", file=sys.stderr)
+        return 78
+    proof_refresh_policy = {
+        "google_oauth": (
+            "verify_existing_receipts"
+            if args.skip_google_oauth_runtime_refresh
+            else "refresh_live_proof"
+        ),
+        "windows_installer": (
+            "verify_existing_receipts"
+            if args.skip_windows_runtime_refresh
+            else "refresh_runtime_receipts"
+        ),
+    }
+    refresh_windows_runtime_receipts = not args.skip_windows_runtime_refresh
+    if args.retry_release_truth_projection:
+        payload, load_status = load_json_with_status(OUTPUT_PATH)
+        retry_failures = (
+            [f"authoritative release-ready receipt is {load_status}"]
+            if load_status != "loaded"
+            else projection_retry_validation_failures(
+                payload,
+                proof_refresh_policy,
+                controller_environment=env,
+            )
+        )
+        if retry_failures:
+            print(
+                json.dumps(
+                    {
+                        "status": "rejected",
+                        "operation": "retry_release_truth_projection",
+                        "failures": retry_failures,
+                    },
+                    indent=2,
+                ),
+                file=sys.stderr,
+            )
+            return 1
+
+        source_generated_at = str(payload.get("generated_at_utc") or "").strip()
+        source_failures = normalized_string_list(payload.get("failures"))
+        retry_actions = normalized_string_list(payload.get("nextActions"))
+        if not retry_actions:
+            retry_actions = normalized_string_list(payload.get("advisoryActions"))
+        payload.pop("release_truth_projection_refresh", None)
+        payload.update(
+            {
+                "generated_at_utc": now_iso(),
+                "status": "pass",
+                "verdict": "RELEASE_READY",
+                "failures": [],
+                "failed_gates": [],
+                "projection_retry": {
+                    "status": "in_progress",
+                    "retried_at_utc": now_iso(),
+                    "source_generated_at_utc": source_generated_at,
+                    "source_failures": source_failures,
+                    "global_gate_count": len(normalized_string_list(payload.get("completed_gates"))),
+                },
+            }
+        )
+        apply_release_ready_actions(payload, retry_actions)
+        release_channel = load_json(REGISTRY_PUBLISHED_ROOT / "RELEASE_CHANNEL.generated.json")
+        projection_refresh = converge_release_truth_projection(payload, release_channel, env)
+        projection_retry = payload.get("projection_retry")
+        if isinstance(projection_retry, dict):
+            projection_retry["status"] = projection_refresh["status"]
+            projection_retry["completed_at_utc"] = now_iso()
+        atomic_write_json(OUTPUT_PATH, payload)
+        print(f"release_ready_receipt:{payload['status']}")
+        return 0
+
+    current_blocking_failures = (
+        collect_current_blocking_failures(
+            refresh_windows_runtime_receipts=refresh_windows_runtime_receipts
+        )
+        if current_blocker_precheck_enabled(args)
+        else []
+    )
+    if current_blocking_failures:
+        failures = list(current_blocking_failures)
+        failed_gates = extract_failed_gates(failures)
+        blocking_gate_artifacts = current_blocking_gate_artifacts(
+            refresh_windows_runtime_receipts=refresh_windows_runtime_receipts
+        )
+        root_context = current_release_truth_root_context()
+        release_channel = load_json(REGISTRY_PUBLISHED_ROOT / "RELEASE_CHANNEL.generated.json")
+        payload = {
+            "contract_name": "chummer.release_ready",
+            "generated_at_utc": now_iso(),
+            "status": "fail",
+            "verdict": "NOT_RELEASE_READY",
+            "command": supported_release_controller_command(),
+            "returncode": None,
+            "timed_out": False,
+            "timeout_seconds": TIMEOUT_SECONDS,
+            "saw_release_ready_marker": False,
+            "not_release_ready_markers": ["current receipt precheck found launch blockers"],
+            "failures": failures,
+            "failed_gates": failed_gates,
+            "blocking_gate_artifacts": blocking_gate_artifacts,
+            "current_receipt_states": current_receipt_states(),
+            "global_verifier_skipped_due_current_blockers": True,
+            "global_verifier_skip_reason": "current receipts already prove launch blockers",
+            "stdout_tail": [],
+            "stderr_tail": [],
+            "root_blocker_ids": root_context["root_blocker_ids"],
+            "root_blockers": root_context["root_blockers"],
+            "root_blockers_generated_at": root_context["root_blockers_generated_at"],
+            "stable_promotion_command": root_context["stable_promotion_command"],
+            "post_promotion_verify_command": root_context["post_promotion_verify_command"],
+            "root_release_truth_source": root_context["root_release_truth_source"],
+            "proof_refresh_policy": proof_refresh_policy,
+        }
+        apply_release_ready_actions(
+            payload,
+            release_ready_next_actions(blocking_gate_artifacts, release_channel, root_context),
+        )
+        atomic_write_json(OUTPUT_PATH, payload)
+        print(f"release_ready_receipt:{payload['status']}")
+        return 0
+    replay_metadata: dict[str, object] | None = None
+    controller_result: dict[str, object] | None = None
+    if args.global_verifier_output:
+        try:
+            stdout, replay_metadata = load_replayed_release_verifier_output(
+                args.global_verifier_output,
+                args.global_verifier_output_sha256,
+            )
+        except ValueError as exc:
+            print(f"global verifier replay rejected: {exc}", file=sys.stderr)
+            return 1
+        returncode, timed_out, stderr = 0, False, ""
+    else:
+        controller_result = run_authoritative_release_controller(
+            env,
+            external_write_authorized=args.authorize_external_release_writes,
+        )
+        returncode = int(controller_result["returncode"])
+        timed_out = bool(controller_result["timed_out"])
+        stdout = str(controller_result["stdout"])
+        stderr = str(controller_result["stderr"])
+    progress = gate_progress_markers(stdout, stderr)
 
     failure_lines = [
         line.strip()
         for line in [*stdout.splitlines(), *stderr.splitlines()]
         if line.strip().startswith("FAIL ") or line.strip().startswith("verify_")
     ]
-    verifier_progress = progress_lines(stdout, stderr)
-    failure_lines.extend(binding_failures)
     if timed_out:
         failure_lines.append(f"verify_release_ready timed out after {TIMEOUT_SECONDS}s")
-        if verifier_progress:
-            failure_lines.append(f"last release-ready gate before timeout: {verifier_progress[-1][4:]}")
+        if progress["last_started_gate"]:
+            failure_lines.append(
+                f"verify_release_ready last started gate: {progress['last_started_gate']}"
+            )
+    release_channel = load_json(REGISTRY_PUBLISHED_ROOT / "RELEASE_CHANNEL.generated.json")
+    failure_lines.extend(
+        f"FAIL release_channel: {failure}"
+        for failure in workspace_portal_release_channel_drift_failures(release_channel)
+    )
     failed_gates = extract_failed_gates(failure_lines)
-    release_truth_blockers = safe_release_truth_blockers() if returncode != 0 else []
+    saw_ready_marker, not_ready_lines = verdict_markers(stdout, stderr)
+    if not_ready_lines:
+        failure_lines.append("verify_release_ready printed NOT_RELEASE_READY marker")
+    if not saw_ready_marker:
+        failure_lines.append("verify_release_ready did not print RELEASE_READY marker")
+    validated_release_binding: dict[str, object] = {}
+    if returncode == 0 and saw_ready_marker and not not_ready_lines:
+        if (
+            controller_result is None
+            or controller_result.get("authority_scope") != AUTHORITATIVE_CONTROLLER_SCOPE
+            or controller_result.get("authoritative") is not True
+            or controller_result.get("diagnostic") is not False
+            or controller_result.get("test_only") is not False
+            or not isinstance(controller_result.get("validated_release_binding"), dict)
+            or not controller_result["validated_release_binding"]
+        ):
+            failure_lines.append(
+                "FAIL release_verifier_binding: result did not originate from the live controller"
+            )
+        else:
+            validated_release_binding = dict(
+                controller_result["validated_release_binding"]
+            )
+    failed_gates = extract_failed_gates(failure_lines)
+    release_ready = returncode == 0 and saw_ready_marker and not not_ready_lines and not failure_lines and not failed_gates
+    blocking_gate_artifacts = current_blocking_gate_artifacts(
+        refresh_windows_runtime_receipts=refresh_windows_runtime_receipts
+    )
+    root_context = current_release_truth_root_context()
     payload = {
         "contract_name": "chummer.release_ready",
         "generated_at_utc": now_iso(),
-        "status": "pass" if returncode == 0 else "fail",
-        "verdict": "RELEASE_READY" if returncode == 0 else "NOT_RELEASE_READY",
-        "command": f"CHUMMER_ALLOW_UNSIGNED_PUBLIC_RELEASE=1 CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD={expected_head} CHUMMER_RUN_SERVICES_ROOT={RUN_SERVICES_ROOT} bash {VERIFY_SCRIPT}",
+        "status": "pass" if release_ready else "fail",
+        "verdict": "RELEASE_READY" if release_ready else "NOT_RELEASE_READY",
+        "command": supported_release_controller_command(),
         "returncode": returncode,
         "timed_out": timed_out,
         "timeout_seconds": TIMEOUT_SECONDS,
-        "failed_gates": failed_gates,
+        "saw_release_ready_marker": saw_ready_marker,
+        "not_release_ready_markers": not_ready_lines,
         "failures": failure_lines,
-        "release_truth_blockers": release_truth_blockers,
-        "release_truth_blocker_count": len(release_truth_blockers),
-        "source_binding": {
-            "current_repo": str(RUN_SERVICES_ROOT),
-            "legacy_run_services_root": str(LEGACY_RUN_SERVICES_ROOT),
-            "verify_script": str(VERIFY_SCRIPT),
-            "pass": not binding_failures,
-            "failures": binding_failures,
-            "verifier_accepts_current_root": True,
-        },
-        "progress": verifier_progress,
+        "failed_gates": failed_gates,
+        "blocking_gate_artifacts": blocking_gate_artifacts,
+        "current_receipt_states": current_receipt_states(),
         "stdout_tail": stdout.splitlines()[-80:],
         "stderr_tail": stderr.splitlines()[-80:],
         "started_gates": progress["started_gates"],
