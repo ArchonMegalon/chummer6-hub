@@ -18,10 +18,39 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "check_public_edge_deploy_preflight.py"
+MATERIALIZER_SCRIPT = REPO_ROOT / "scripts/materialize_hub_local_release_proof.py"
+REGISTRY_RELEASE_PROOF_CONSUMER = (
+    REPO_ROOT.parent
+    / "chummer-hub-registry/scripts/materialize_public_release_channel.py"
+)
 
 
 def load_module():
     spec = importlib.util.spec_from_file_location("check_public_edge_deploy_preflight", SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_registry_release_proof_consumer():
+    spec = importlib.util.spec_from_file_location(
+        "chummer_registry_release_proof_consumer_test",
+        REGISTRY_RELEASE_PROOF_CONSUMER,
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_materializer_module():
+    spec = importlib.util.spec_from_file_location(
+        "chummer_runtime_proof_materializer_lock_test",
+        MATERIALIZER_SCRIPT,
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -79,6 +108,68 @@ def write_release_channel_receipt_for_proof(
     path.write_bytes(payload)
     path.chmod(0o600)
     return hashlib.sha256(payload).hexdigest()
+
+
+def runtime_proof_sha256(proof_text: str) -> str:
+    return hashlib.sha256(proof_text.encode("utf-8")).hexdigest()
+
+
+def test_runtime_proof_materializer_writes_under_shared_mutation_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    materializer = load_materializer_module()
+    output = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    events: list[str] = []
+    lock_active = False
+
+    class RecordingLock:
+        def __enter__(self):
+            nonlocal lock_active
+            assert lock_active is False
+            lock_active = True
+            events.append("enter")
+
+        def __exit__(self, _exc_type, _exc, _traceback):
+            nonlocal lock_active
+            assert lock_active is True
+            events.append("exit")
+            lock_active = False
+
+    materializer._PUBLIC_EDGE_OVERLAY_MODULE = SimpleNamespace(
+        public_edge_mutation_lock=lambda *, activate: RecordingLock()
+        if activate
+        else pytest.fail("proof publication must activate shared mutation authority")
+    )
+    original_write = materializer._write_public_json_artifact
+
+    def locked_write(path: Path, text: str) -> bool:
+        assert lock_active is True
+        return original_write(path, text)
+
+    monkeypatch.setattr(materializer, "_write_public_json_artifact", locked_write)
+
+    changed = materializer._publish_runtime_proof_artifacts(
+        out_path=output,
+        payload={"status": "passed"},
+        proof_max_age_seconds=3600,
+        proof_max_future_skew_seconds=300,
+    )
+
+    assert changed is True
+    assert events == ["enter", "exit"]
+    assert lock_active is False
+    assert json.loads(output.read_text(encoding="utf-8"))["status"] == "passed"
+
+
+def test_runtime_proof_materializer_rejects_fifo_without_blocking(
+    tmp_path: Path,
+) -> None:
+    materializer = load_materializer_module()
+    path = tmp_path / "runtime-proof.fifo"
+    os.mkfifo(path, 0o644)
+
+    assert materializer._stable_regular_file_matches(path, b"{}\n") is False
 
 
 def test_cli_imports_sibling_contract_under_isolated_python(tmp_path: Path) -> None:
@@ -465,6 +556,7 @@ def test_current_source_marker_check_passes(tmp_path: Path) -> None:
         allow_stale_foreign_build_locks=False,
         source_root=REPO_ROOT,
         runtime_proof_bind_source=runtime_proof,
+        runtime_proof_bind_source_sha256=runtime_proof_sha256(proof_text),
         release_channel_receipt=release_receipt,
         release_channel_receipt_sha256=release_receipt_sha256,
     )
@@ -2207,6 +2299,8 @@ def test_main_checks_default_overlay_root_when_not_explicitly_configured(tmp_pat
             str(release_receipt),
             "--release-channel-receipt-sha256",
             release_receipt_sha256,
+            "--runtime-proof-bind-source-sha256",
+            runtime_proof_sha256(proof_text),
             "--output",
             str(output_path),
         ]
@@ -2244,6 +2338,7 @@ def test_full_preflight_requires_exact_runtime_proof_bind_source_mode_and_shape(
         allow_stale_foreign_build_locks=False,
         source_root=source_root,
         runtime_proof_bind_source=proof_path,
+        runtime_proof_bind_source_sha256=runtime_proof_sha256(valid_proof_text),
         release_channel_receipt=release_receipt,
         release_channel_receipt_sha256=release_receipt_sha256,
     )
@@ -2355,6 +2450,9 @@ def test_runtime_proof_requires_exact_registry_route_contract(
     )
     receipt = module.runtime_proof_bind_source_check(
         proof_path,
+        runtime_proof_bind_source_sha256=hashlib.sha256(
+            proof_path.read_bytes()
+        ).hexdigest(),
         release_channel_receipt=release_receipt,
         release_channel_receipt_sha256=release_receipt_sha256,
     )
@@ -2363,6 +2461,59 @@ def test_runtime_proof_requires_exact_registry_route_contract(
     assert receipt["checks"]["canonicalJson"] is True
     assert receipt["checks"]["semanticContract"] is False
     assert any("proof_routes" in failure for failure in receipt["failures"])
+
+
+def test_runtime_proof_rejects_registry_route_alias_drift(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    proof_path = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    valid_proof_text = write_valid_runtime_proof(proof_path)
+    release_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_receipt_sha256 = write_release_channel_receipt_for_proof(
+        release_receipt,
+        valid_proof_text,
+    )
+    proof = json.loads(valid_proof_text)
+    proof["proofRoutes"] = [*proof["proof_routes"], "/account/roster"]
+    proof_payload = (json.dumps(proof, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
+    proof_path.write_bytes(proof_payload)
+
+    receipt = module.runtime_proof_bind_source_check(
+        proof_path,
+        runtime_proof_bind_source_sha256=hashlib.sha256(proof_payload).hexdigest(),
+        release_channel_receipt=release_receipt,
+        release_channel_receipt_sha256=release_receipt_sha256,
+    )
+
+    assert receipt["status"] == "fail"
+    assert receipt["checks"]["digestMatchesExpected"] is True
+    assert receipt["checks"]["canonicalJson"] is True
+    assert receipt["checks"]["semanticContract"] is False
+    assert any("alias values drift" in failure for failure in receipt["failures"])
+
+
+@pytest.mark.skipif(
+    not REGISTRY_RELEASE_PROOF_CONSUMER.is_file(),
+    reason="multi-repository Registry consumer is not present",
+)
+def test_runtime_proof_fixture_is_accepted_by_registry_consumer(
+    tmp_path: Path,
+) -> None:
+    proof_path = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    proof = json.loads(write_valid_runtime_proof(proof_path))
+    consumer = load_registry_release_proof_consumer()
+
+    normalized = consumer.normalize_release_proof_payload(
+        proof,
+        source=str(proof_path),
+    )
+
+    assert normalized["proofRoutes"] == proof["proof_routes"]
+    assert normalized["journeysPassed"] == proof["journeys_passed"]
+    assert normalized["baseUrl"] == proof["base_url"]
 
 
 def test_runtime_proof_capture_never_reads_beyond_max_plus_one(
@@ -2388,6 +2539,18 @@ def test_runtime_proof_capture_never_reads_beyond_max_plus_one(
     assert sum(requested_sizes) == max_bytes + 1
     assert len(capture["payload"]) == max_bytes + 1
     assert capture["boundedPayload"] is False
+
+
+def test_runtime_proof_capture_rejects_fifo_without_blocking(tmp_path: Path) -> None:
+    module = load_module()
+    source = tmp_path / "runtime-proof.fifo"
+    os.mkfifo(source, 0o644)
+
+    capture = module._stable_bounded_file_capture(source, max_bytes=17)
+
+    assert capture["regularFile"] is False
+    assert capture["boundedPayload"] is False
+    assert capture["payload"] == b""
 
 
 @pytest.mark.parametrize(
@@ -2438,6 +2601,9 @@ def test_runtime_proof_requires_deterministic_sorted_canonical_json(
 
     receipt = module.runtime_proof_bind_source_check(
         proof_path,
+        runtime_proof_bind_source_sha256=hashlib.sha256(
+            reversed_payload
+        ).hexdigest(),
         release_channel_receipt=release_receipt,
         release_channel_receipt_sha256=release_receipt_sha256,
     )
@@ -2447,6 +2613,66 @@ def test_runtime_proof_requires_deterministic_sorted_canonical_json(
     assert receipt["checks"]["canonicalJson"] is False
     assert receipt["checks"]["semanticContract"] is True
     assert receipt["sha256"] == hashlib.sha256(reversed_payload).hexdigest()
+
+
+def test_runtime_proof_requires_independently_pinned_exact_bytes(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    proof_path = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    valid_proof_text = write_valid_runtime_proof(proof_path)
+    release_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_receipt_sha256 = write_release_channel_receipt_for_proof(
+        release_receipt,
+        valid_proof_text,
+    )
+    expected_proof_sha256 = runtime_proof_sha256(valid_proof_text)
+    proof = json.loads(valid_proof_text)
+    proof["unknownCanonicalField"] = {"value": "must not bypass byte authority"}
+    changed_payload = (json.dumps(proof, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
+    proof_path.write_bytes(changed_payload)
+
+    receipt = module.runtime_proof_bind_source_check(
+        proof_path,
+        runtime_proof_bind_source_sha256=expected_proof_sha256,
+        release_channel_receipt=release_receipt,
+        release_channel_receipt_sha256=release_receipt_sha256,
+    )
+
+    assert receipt["status"] == "fail"
+    assert receipt["checks"]["canonicalJson"] is True
+    assert receipt["checks"]["semanticContract"] is True
+    assert receipt["checks"]["digestMatchesExpected"] is False
+    assert receipt["expectedSha256"] == expected_proof_sha256
+    assert receipt["sha256"] == hashlib.sha256(changed_payload).hexdigest()
+
+
+def test_runtime_proof_rejects_noncanonical_expected_digest_text(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    proof_path = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    valid_proof_text = write_valid_runtime_proof(proof_path)
+    release_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_receipt_sha256 = write_release_channel_receipt_for_proof(
+        release_receipt,
+        valid_proof_text,
+    )
+    expected_proof_sha256 = runtime_proof_sha256(valid_proof_text)
+
+    receipt = module.runtime_proof_bind_source_check(
+        proof_path,
+        runtime_proof_bind_source_sha256=f" {expected_proof_sha256}",
+        release_channel_receipt=release_receipt,
+        release_channel_receipt_sha256=release_receipt_sha256,
+    )
+
+    assert receipt["status"] == "fail"
+    assert receipt["checks"]["digestMatchesExpected"] is False
+    assert receipt["expectedSha256"] == f" {expected_proof_sha256}"
+    assert any("lowercase SHA-256" in failure for failure in receipt["failures"])
 
 
 def test_runtime_proof_binds_exact_independently_pinned_release_receipt(
@@ -2463,6 +2689,7 @@ def test_runtime_proof_binds_exact_independently_pinned_release_receipt(
 
     passing_receipt = module.runtime_proof_bind_source_check(
         proof_path,
+        runtime_proof_bind_source_sha256=runtime_proof_sha256(valid_proof_text),
         release_channel_receipt=release_receipt,
         release_channel_receipt_sha256=release_receipt_sha256,
     )
@@ -2474,6 +2701,7 @@ def test_runtime_proof_binds_exact_independently_pinned_release_receipt(
 
     wrong_digest_receipt = module.runtime_proof_bind_source_check(
         proof_path,
+        runtime_proof_bind_source_sha256=runtime_proof_sha256(valid_proof_text),
         release_channel_receipt=release_receipt,
         release_channel_receipt_sha256="0" * 64,
     )
@@ -2490,6 +2718,9 @@ def test_runtime_proof_binds_exact_independently_pinned_release_receipt(
     )
     fabricated_receipt = module.runtime_proof_bind_source_check(
         proof_path,
+        runtime_proof_bind_source_sha256=hashlib.sha256(
+            proof_path.read_bytes()
+        ).hexdigest(),
         release_channel_receipt=release_receipt,
         release_channel_receipt_sha256=release_receipt_sha256,
     )
@@ -2510,9 +2741,20 @@ def test_full_preflight_cli_requires_independent_release_receipt_binding(
         module.main([])
     assert missing_receipt.value.code == 2
 
+    with pytest.raises(SystemExit) as malformed_proof_digest:
+        module.main(
+            [
+                "--runtime-proof-bind-source-sha256",
+                "A" * 64,
+            ]
+        )
+    assert malformed_proof_digest.value.code == 2
+
     with pytest.raises(SystemExit) as malformed_digest:
         module.main(
             [
+                "--runtime-proof-bind-source-sha256",
+                "0" * 64,
                 "--release-channel-receipt",
                 str(release_receipt),
                 "--release-channel-receipt-sha256",
@@ -2593,6 +2835,8 @@ def test_main_can_skip_overlay_marker_check(tmp_path: Path) -> None:
             str(release_receipt),
             "--release-channel-receipt-sha256",
             release_receipt_sha256,
+            "--runtime-proof-bind-source-sha256",
+            runtime_proof_sha256(proof_text),
             "--output",
             str(output_path),
         ]

@@ -3658,7 +3658,12 @@ def _stable_bounded_file_capture(path: Path, *, max_bytes: int) -> dict[str, Any
         "pathStillBound": False,
         "failure": "",
     }
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         descriptor = os.open(resolved_path, flags)
     except (OSError, ValueError) as exc:
@@ -3785,6 +3790,7 @@ def _expected_release_channel_projection(
 def runtime_proof_bind_source_check(
     path: Path,
     *,
+    runtime_proof_bind_source_sha256: str = "",
     release_channel_receipt: Path | None = None,
     release_channel_receipt_sha256: str = "",
     now: datetime | None = None,
@@ -3807,6 +3813,7 @@ def runtime_proof_bind_source_check(
         "boundedPayload": bool(capture.get("boundedPayload")),
         "stableSnapshot": bool(capture.get("stableSnapshot")),
         "pathStillBound": bool(capture.get("pathStillBound")),
+        "digestMatchesExpected": False,
         "strictJsonObject": False,
         "canonicalJson": False,
         "semanticContract": False,
@@ -3824,6 +3831,7 @@ def runtime_proof_bind_source_check(
         "linkCount": metadata.st_nlink if metadata is not None else 0,
         "sizeBytes": metadata.st_size if metadata is not None else 0,
         "sha256": "",
+        "expectedSha256": runtime_proof_bind_source_sha256,
         "generatedAt": "",
         "releaseChannelReceiptPath": (
             str(Path(os.path.abspath(os.fspath(release_channel_receipt.expanduser()))))
@@ -3854,6 +3862,24 @@ def runtime_proof_bind_source_check(
     if not checks["pathStillBound"]:
         failures.append(
             "runtime proof bind source path changed after its exact bytes were validated"
+        )
+
+    expected_runtime_proof_sha256 = runtime_proof_bind_source_sha256
+    if re.fullmatch(r"[0-9a-f]{64}", expected_runtime_proof_sha256) is None:
+        failures.append(
+            "runtime proof bind source requires an independently supplied lowercase SHA-256"
+        )
+    if payload and checks["boundedPayload"] and checks["stableSnapshot"]:
+        result["sha256"] = hashlib.sha256(payload).hexdigest()
+        checks["digestMatchesExpected"] = (
+            result["sha256"] == expected_runtime_proof_sha256
+        )
+    if (
+        re.fullmatch(r"[0-9a-f]{64}", expected_runtime_proof_sha256) is not None
+        and not checks["digestMatchesExpected"]
+    ):
+        failures.append(
+            "runtime proof bind source does not match its independently supplied SHA-256"
         )
 
     parsed: dict[str, Any] | None = None
@@ -4012,8 +4038,6 @@ def runtime_proof_bind_source_check(
                                     "runtime proof release_channel must exactly match the independently selected release-channel receipt"
                                 )
 
-    if payload and checks["boundedPayload"] and checks["stableSnapshot"]:
-        result["sha256"] = hashlib.sha256(payload).hexdigest()
     result.update(
         {
             "status": "pass" if not failures else "fail",
@@ -4032,6 +4056,7 @@ def verify(
     overlay_root: Path | None = None,
     check_overlay_markers: bool = False,
     runtime_proof_bind_source: Path | None = None,
+    runtime_proof_bind_source_sha256: str = "",
     release_channel_receipt: Path | None = None,
     release_channel_receipt_sha256: str = "",
 ) -> dict[str, Any]:
@@ -4112,6 +4137,7 @@ def verify(
         findings.extend(mirror_findings)
         runtime_proof_bind_source_receipt = runtime_proof_bind_source_check(
             runtime_proof_bind_source or PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE,
+            runtime_proof_bind_source_sha256=runtime_proof_bind_source_sha256,
             release_channel_receipt=release_channel_receipt,
             release_channel_receipt_sha256=release_channel_receipt_sha256,
         )
@@ -4207,6 +4233,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Do not validate the active mounted /app overlay markers.",
     )
     parser.add_argument(
+        "--runtime-proof-bind-source-sha256",
+        default="",
+        help="Independently supplied lowercase SHA-256 for the exact runtime proof bind source bytes.",
+    )
+    parser.add_argument(
         "--release-channel-receipt",
         default="",
         help="Independently selected canonical release-channel receipt used to bind the runtime proof projection.",
@@ -4220,6 +4251,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="Print a JSON receipt even on pass.")
     args = parser.parse_args(argv)
     if not args.skip_source_marker_check:
+        if re.fullmatch(
+            r"[0-9a-f]{64}",
+            args.runtime_proof_bind_source_sha256,
+        ) is None:
+            parser.error(
+                "full source preflight requires --runtime-proof-bind-source-sha256 as lowercase SHA-256"
+            )
         if not args.release_channel_receipt:
             parser.error(
                 "full source preflight requires --release-channel-receipt"
@@ -4245,6 +4283,7 @@ def main(argv: list[str] | None = None) -> int:
             check_source_markers=not args.skip_source_marker_check,
             overlay_root=Path(args.overlay_root) if args.overlay_root else None,
             check_overlay_markers=not args.skip_overlay_marker_check,
+            runtime_proof_bind_source_sha256=args.runtime_proof_bind_source_sha256,
             release_channel_receipt=(
                 Path(args.release_channel_receipt)
                 if args.release_channel_receipt
