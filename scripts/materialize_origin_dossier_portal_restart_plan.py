@@ -80,7 +80,8 @@ def materialize(
     approval_gate = "explicit_user_deploy_or_restart_approval_required"
     local_status_receipt = branch_path / "public-edge-downloads-version-marker.receipt.json"
     restart_commands = [
-        "docker compose -f docker-compose.public-edge.yml up -d --no-deps --force-recreate chummer-portal",
+        'CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD="$(git rev-parse HEAD)" CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM=1 '
+        "bash scripts/deploy_public_edge_portal.sh",
         "python3 scripts/verify_downloads_version_marker.py --base-url http://127.0.0.1:8091 --output "
         f"{local_status_receipt.as_posix()}",
         "python3 scripts/materialize_origin_dossier_portal_publication_index_preflight.py --output "
