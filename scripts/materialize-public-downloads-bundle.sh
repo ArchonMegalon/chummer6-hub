@@ -652,73 +652,314 @@ replace_file_atomically() {
   mv -f "$temporary_path" "$target_path"
 }
 
-sync_authoritative_published_manifest() {
-  local source_path="${1:-}"
-  local target_name="${2:-}"
-  if [[ -z "$source_path" || ! -f "$source_path" || -z "$target_name" ]]; then
-    return 0
-  fi
-  if [[ "$target_name" != "${target_name##*/}" || "$target_name" == "." || "$target_name" == ".." ]]; then
-    echo "invalid authoritative manifest target: $target_name" >&2
-    return 1
-  fi
-
-  local target_path="$AUTHORITATIVE_PUBLISHED_ROOT/$target_name"
-  replace_file_atomically "$source_path" "$target_path"
-}
-
-sync_authoritative_published_directory() {
+# The legacy Registry shelf exposes these three paths independently, so it has no
+# true cross-path atomic activation primitive. Stage the complete replacement on
+# the target filesystem, serialize writers, install the canonical manifest last,
+# and roll every touched path back on an error or catchable interruption. A
+# durable transaction directory lets the next run recover after an uncatchable
+# process or host failure. Layout-v1 current.json remains the required end state
+# for a real single activation boundary.
+sync_authoritative_publication_with_rollback() {
   local source_root="${1:-}"
-  local target_relative_root="${2:-}"
-  if [[ -z "$source_root" || -z "$target_relative_root" || ! -d "$source_root" ]]; then
+  if [[ -z "$source_root" || ! -d "$source_root" ]]; then
     return 0
   fi
-  if [[ "$target_relative_root" == /* || "$target_relative_root" == *".."* ]]; then
-    echo "invalid authoritative directory target: $target_relative_root" >&2
-    return 1
-  fi
-
-  local target_root="$AUTHORITATIVE_PUBLISHED_ROOT/$target_relative_root"
-  if [[ "$(realpath -m "$source_root")" == "$(realpath -m "$target_root")" ]]; then
+  if [[ "$(realpath -m "$source_root")" == "$(realpath -m "$AUTHORITATIVE_PUBLISHED_ROOT")" ]]; then
     return 0
   fi
-  mkdir -p "$target_root"
 
-  python3 - "$source_root" "$target_root" <<'PY'
+  python3 - \
+    "$source_root" \
+    "$AUTHORITATIVE_PUBLISHED_ROOT" \
+    "${CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISH_TEST_FAIL_AFTER:-}" <<'PY'
 from __future__ import annotations
 
+import fcntl
+import json
 import os
 import shutil
+import signal
+import stat
 import sys
+import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
-source_root = Path(sys.argv[1])
-target_root = Path(sys.argv[2])
+source_root = Path(sys.argv[1]).resolve()
+target_root = Path(sys.argv[2]).resolve()
+fault_after = str(sys.argv[3] or "").strip()
+publication_order = (
+    "startup-smoke",
+    "releases.json",
+    "RELEASE_CHANNEL.generated.json",
+)
+preactivation_fault = "preactivation"
+if fault_after and fault_after not in (*publication_order, preactivation_fault):
+    raise SystemExit(
+        "CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISH_TEST_FAIL_AFTER must name one authoritative publication path or preactivation"
+    )
 
-source_relatives: set[Path] = set()
-for source_path in sorted(source_root.rglob("*")):
-    if not source_path.is_file() or source_path.is_symlink():
-        continue
-    relative_path = source_path.relative_to(source_root)
-    source_relatives.add(relative_path)
-    target_path = target_root / relative_path
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = target_path.with_name(f".{target_path.name}.tmp-{os.getpid()}")
+for relative in publication_order:
+    source = source_root / relative
+    if relative == "startup-smoke":
+        if not source.is_dir() or source.is_symlink():
+            raise SystemExit(f"authoritative publication source directory is missing or unsafe: {source}")
+    elif not source.is_file() or source.is_symlink():
+        raise SystemExit(f"authoritative publication source manifest is missing or unsafe: {source}")
+for source in (source_root / "startup-smoke").rglob("*"):
+    if source.is_symlink() or not (source.is_file() or source.is_dir()):
+        raise SystemExit(f"authoritative publication source contains an unsafe entry: {source}")
+
+target_root.mkdir(parents=True, exist_ok=True)
+
+
+def fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
     try:
-        shutil.copy2(source_path, temporary_path)
-        os.replace(temporary_path, target_path)
+        os.fsync(descriptor)
     finally:
-        temporary_path.unlink(missing_ok=True)
+        os.close(descriptor)
 
-for target_path in sorted(target_root.rglob("*"), reverse=True):
-    relative_path = target_path.relative_to(target_root)
-    if target_path.is_symlink():
-        target_path.unlink()
-    elif target_path.is_file():
-        if relative_path not in source_relatives:
-            target_path.unlink()
-    elif target_path.is_dir() and not any(target_path.iterdir()):
-        target_path.rmdir()
+
+def fsync_tree(root: Path) -> None:
+    directories = [root]
+    for path in sorted(root.rglob("*")):
+        if path.is_dir():
+            directories.append(path)
+        elif path.is_file():
+            with path.open("rb") as handle:
+                os.fsync(handle.fileno())
+    for directory in reversed(directories):
+        fsync_directory(directory)
+
+
+def remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink(missing_ok=True)
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
+def write_state(transaction_root: Path, payload: dict[str, object]) -> None:
+    state_path = transaction_root / "state.json"
+    temporary_path = transaction_root / ".state.json.tmp"
+    with temporary_path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary_path, state_path)
+    fsync_directory(transaction_root)
+
+
+def validate_state(state: object, transaction_root: Path) -> dict[str, object]:
+    if not isinstance(state, dict):
+        raise SystemExit(f"authoritative publication transaction journal is not an object: {transaction_root}")
+    if state.get("schemaVersion") != "chummer.authoritative-release-publication-transaction/v1":
+        raise SystemExit(f"authoritative publication transaction journal has an invalid schema: {transaction_root}")
+    status = state.get("status")
+    touched = state.get("touched")
+    had_original = state.get("hadOriginal")
+    if status not in {"prepared", "activating", "committed"}:
+        raise SystemExit(f"authoritative publication transaction journal has an invalid status: {transaction_root}")
+    if not isinstance(touched, list) or touched != list(publication_order[: len(touched)]):
+        raise SystemExit(f"authoritative publication transaction journal has invalid touched paths: {transaction_root}")
+    if not isinstance(had_original, dict) or set(had_original) != set(touched):
+        raise SystemExit(f"authoritative publication transaction journal has invalid original-path state: {transaction_root}")
+    if any(not isinstance(value, bool) for value in had_original.values()):
+        raise SystemExit(f"authoritative publication transaction journal has invalid original-path flags: {transaction_root}")
+    if status == "prepared" and touched:
+        raise SystemExit(f"prepared authoritative publication transaction journal declares touched paths: {transaction_root}")
+    if status == "committed" and touched != list(publication_order):
+        raise SystemExit(f"committed authoritative publication transaction journal is incomplete: {transaction_root}")
+    return state
+
+
+def rollback(transaction_root: Path, state: dict[str, object]) -> None:
+    touched = list(state.get("touched") or [])
+    had_original = dict(state.get("hadOriginal") or {})
+    backup_root = transaction_root / "backup"
+    for relative in reversed(touched):
+        if relative not in publication_order:
+            continue
+        target = target_root / relative
+        backup = backup_root / relative
+        if backup.exists() or backup.is_symlink():
+            remove_path(target)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(backup, target)
+        elif not bool(had_original.get(relative)):
+            remove_path(target)
+        fsync_directory(target_root)
+
+
+def tombstone_transaction(transaction_root: Path) -> Path:
+    tombstone_root = target_root / transaction_root.name.replace(
+        ".release-publication-transaction-",
+        ".release-publication-tombstone-",
+        1,
+    )
+    os.replace(transaction_root, tombstone_root)
+    fsync_directory(target_root)
+    return tombstone_root
+
+
+def discard_ephemeral_directory(path: Path) -> None:
+    shutil.rmtree(path, ignore_errors=True)
+    fsync_directory(target_root)
+
+
+def recover_abandoned_transactions() -> None:
+    for transaction_root in sorted(target_root.glob(".release-publication-transaction-*")):
+        if not transaction_root.is_dir() or transaction_root.is_symlink():
+            raise SystemExit(f"unsafe authoritative publication transaction path: {transaction_root}")
+        state_path = transaction_root / "state.json"
+        if not state_path.is_file() or state_path.is_symlink():
+            raise SystemExit(f"authoritative publication transaction has no safe state journal: {transaction_root}")
+        try:
+            state = validate_state(
+                json.loads(state_path.read_text(encoding="utf-8")),
+                transaction_root,
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"authoritative publication transaction journal is unreadable: {transaction_root}: {exc}")
+        if state.get("status") != "committed":
+            rollback(transaction_root, state)
+        tombstone_root = tombstone_transaction(transaction_root)
+        discard_ephemeral_directory(tombstone_root)
+
+
+def discard_abandoned_preparations() -> None:
+    for preparing_root in sorted(target_root.glob(".release-publication-preparing-*")):
+        if not preparing_root.is_dir() or preparing_root.is_symlink():
+            raise SystemExit(f"unsafe authoritative publication preparation path: {preparing_root}")
+        discard_ephemeral_directory(preparing_root)
+
+
+def discard_abandoned_tombstones() -> None:
+    for tombstone_root in sorted(target_root.glob(".release-publication-tombstone-*")):
+        if not tombstone_root.is_dir() or tombstone_root.is_symlink():
+            raise SystemExit(f"unsafe authoritative publication tombstone path: {tombstone_root}")
+        discard_ephemeral_directory(tombstone_root)
+
+
+class PublicationInterrupted(RuntimeError):
+    pass
+
+
+def interrupt(signum: int, _frame: object) -> None:
+    raise PublicationInterrupted(f"authoritative publication interrupted by signal {signum}")
+
+
+@contextmanager
+def locked_directory(path: Path):
+    lock_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    lock_descriptor = os.open(path, lock_flags)
+    if not stat.S_ISDIR(os.fstat(lock_descriptor).st_mode):
+        os.close(lock_descriptor)
+        raise SystemExit(f"authoritative publication root is not a regular directory: {path}")
+    try:
+        fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(lock_descriptor)
+
+
+with locked_directory(target_root):
+    discard_abandoned_tombstones()
+    discard_abandoned_preparations()
+    recover_abandoned_transactions()
+
+    state: dict[str, object] = {
+        "schemaVersion": "chummer.authoritative-release-publication-transaction/v1",
+        "status": "prepared",
+        "touched": [],
+        "hadOriginal": {},
+    }
+    previous_handlers = {
+        signum: signal.signal(signum, interrupt)
+        for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)
+    }
+    preparing_root: Path | None = None
+    transaction_root: Path | None = None
+    try:
+        preparing_root = Path(
+            tempfile.mkdtemp(prefix=".release-publication-preparing-", dir=target_root)
+        )
+        fsync_directory(target_root)
+        write_state(preparing_root, state)
+
+        preparing_stage_root = preparing_root / "stage"
+        preparing_backup_root = preparing_root / "backup"
+        preparing_stage_root.mkdir()
+        preparing_backup_root.mkdir()
+        shutil.copytree(source_root / "startup-smoke", preparing_stage_root / "startup-smoke")
+        shutil.copy2(source_root / "releases.json", preparing_stage_root / "releases.json")
+        shutil.copy2(
+            source_root / "RELEASE_CHANNEL.generated.json",
+            preparing_stage_root / "RELEASE_CHANNEL.generated.json",
+        )
+        fsync_tree(preparing_stage_root)
+        fsync_directory(preparing_root)
+
+        if fault_after == preactivation_fault:
+            raise RuntimeError("injected authoritative publication failure before activation")
+
+        transaction_root = target_root / preparing_root.name.replace(
+            ".release-publication-preparing-",
+            ".release-publication-transaction-",
+            1,
+        )
+        os.replace(preparing_root, transaction_root)
+        preparing_root = None
+        fsync_directory(target_root)
+        stage_root = transaction_root / "stage"
+        backup_root = transaction_root / "backup"
+
+        for relative in publication_order:
+            target = target_root / relative
+            staged = stage_root / relative
+            backup = backup_root / relative
+            touched = list(state["touched"])
+            touched.append(relative)
+            state["touched"] = touched
+            had_original = dict(state["hadOriginal"])
+            had_original[relative] = target.exists() or target.is_symlink()
+            state["hadOriginal"] = had_original
+            state["status"] = "activating"
+            write_state(transaction_root, state)
+
+            if had_original[relative]:
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(target, backup)
+                fsync_directory(backup.parent)
+            os.replace(staged, target)
+            fsync_directory(target_root)
+
+            if fault_after == relative:
+                raise RuntimeError(f"injected authoritative publication failure after {relative}")
+
+        state["status"] = "committed"
+        write_state(transaction_root, state)
+    except BaseException:
+        if transaction_root is not None and transaction_root.is_dir() and not transaction_root.is_symlink():
+            rollback(transaction_root, state)
+            tombstone_root = tombstone_transaction(transaction_root)
+            transaction_root = None
+            discard_ephemeral_directory(tombstone_root)
+        elif preparing_root is not None and preparing_root.is_dir() and not preparing_root.is_symlink():
+            discard_ephemeral_directory(preparing_root)
+        fsync_directory(target_root)
+        raise
+    finally:
+        for signum, previous_handler in previous_handlers.items():
+            signal.signal(signum, previous_handler)
+
+    if transaction_root is not None:
+        tombstone_root = tombstone_transaction(transaction_root)
+        transaction_root = None
+        discard_ephemeral_directory(tombstone_root)
+    fsync_directory(target_root)
 PY
 }
 
@@ -1024,46 +1265,50 @@ required_routes = [
     "/contact",
     "/downloads",
 ]
-legacy_unsupported_routes = {"/account/roster"}
-installer_route = re.compile(r"^/downloads/install/[a-z0-9][a-z0-9._-]*$")
+installer_route = re.compile(r"^/downloads/install/[a-z0-9][a-z0-9-]*$")
 
 
-def canonical_routes(value: object) -> list[str] | None:
-    if value is None:
-        return None
+def validated_routes(alias: str, value: object) -> list[str]:
     if not isinstance(value, list) or any(not isinstance(route, str) for route in value):
-        raise SystemExit("release proof routes must be a list of strings")
-    routes = list(dict.fromkeys(route.strip() for route in value if route.strip()))
-    missing = [route for route in required_routes if route not in routes]
-    if missing:
-        raise SystemExit(f"release proof is missing required routes: {', '.join(missing)}")
-    invalid = sorted(
-        route
-        for route in routes
-        if route not in required_routes
-        and route not in legacy_unsupported_routes
-        and installer_route.fullmatch(route) is None
-    )
+        raise SystemExit(f"release proof {alias} must be a list of strings")
+
+    routes = list(value)
+    duplicates = sorted({route for route in routes if routes.count(route) > 1})
+    if duplicates:
+        raise SystemExit(
+            f"release proof {alias} contains duplicate routes: {', '.join(duplicates)}"
+        )
+
+    actual_prefix = routes[:len(required_routes)]
+    if actual_prefix != required_routes:
+        raise SystemExit(
+            f"release proof {alias} must begin with the exact Registry canonical route prefix"
+        )
+
+    additions = routes[len(required_routes):]
+    invalid = sorted(route for route in additions if installer_route.fullmatch(route) is None)
     if invalid:
-        raise SystemExit(f"release proof declares unsupported routes: {', '.join(invalid)}")
-    additions = sorted(
-        route
-        for route in routes
-        if route not in required_routes and route not in legacy_unsupported_routes
-    )
-    return required_routes + additions
+        raise SystemExit(
+            f"release proof {alias} declares unsupported additional routes: {', '.join(invalid)}"
+        )
+    if additions != sorted(additions):
+        raise SystemExit(
+            f"release proof {alias} additional installer routes must use canonical ordering"
+        )
+    return routes
 
 
 route_variants = [
-    canonical
+    validated_routes(key, sanitized[key])
     for key in ("proofRoutes", "proof_routes")
-    if (canonical := canonical_routes(sanitized.get(key))) is not None
+    if key in sanitized
 ]
-if route_variants:
-    if any(routes != route_variants[0] for routes in route_variants[1:]):
-        raise SystemExit("release proof route aliases disagree")
-    sanitized["proofRoutes"] = route_variants[0]
-    sanitized["proof_routes"] = route_variants[0]
+if not route_variants:
+    raise SystemExit("release proof must declare proofRoutes or proof_routes")
+if any(routes != route_variants[0] for routes in route_variants[1:]):
+    raise SystemExit("release proof route aliases disagree")
+sanitized["proofRoutes"] = route_variants[0]
+sanitized["proof_routes"] = route_variants[0]
 if canonical_base_url:
     sanitized["baseUrl"] = canonical_base_url
     sanitized["base_url"] = canonical_base_url
@@ -1410,9 +1655,7 @@ if [[ "${windows_visual_proof_gate_status:-0}" -ne 0 ]]; then
   exit "$windows_visual_proof_gate_status"
 fi
 
-sync_authoritative_published_manifest "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json" "RELEASE_CHANNEL.generated.json"
-sync_authoritative_published_manifest "$OUTPUT_ROOT/releases.json" "releases.json"
-sync_authoritative_published_directory "$OUTPUT_ROOT/startup-smoke" "startup-smoke"
+sync_authoritative_publication_with_rollback "$OUTPUT_ROOT"
 sync_workspace_portal_manifest_mirrors "RELEASE_CHANNEL.generated.json"
 sync_workspace_portal_manifest_mirrors "releases.json"
 

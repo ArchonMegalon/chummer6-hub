@@ -12,6 +12,7 @@ import sys
 import tempfile
 import urllib.parse
 import zlib
+from datetime import datetime
 from pathlib import Path
 
 
@@ -22,6 +23,28 @@ CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "94dd7d42"
 CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Tighten M102 compressed base32/base85 helper proof guard"
 DEFAULT_FLAGSHIP_READINESS_PATH = Path("/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
 FALLBACK_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
+DESKTOP_CLIENT_READINESS_KEYS = {
+    "status",
+    "scoped_status",
+    "generated_at",
+    "missing_coverage_keys",
+    "desktop_client_missing",
+    "reason",
+    "completion_audit_status",
+    "completion_audit_reason",
+    "source_path",
+}
+RELEASE_CHANNEL_PROJECTION_KEYS = {
+    "status",
+    "path",
+    "channelId",
+    "channel",
+    "version",
+    "releaseVersion",
+    "rolloutState",
+    "supportabilityState",
+    "publishedAt",
+}
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -1617,7 +1640,13 @@ def _verify_required_source_markers(errors: list[str], repo_root: Path) -> None:
                 errors.append(f"{relative_path} missing marker: {marker}")
 
 
-def _stable_json_payload(path: Path, errors: list[str], label: str) -> dict | None:
+def _stable_json_payload(
+    path: Path,
+    errors: list[str],
+    label: str,
+    *,
+    schema_normalize_runtime_projections: bool = False,
+) -> dict | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -1628,15 +1657,26 @@ def _stable_json_payload(path: Path, errors: list[str], label: str) -> dict | No
         errors.append(f"{label} is not a json object")
         return None
 
+    _verify_runtime_projection_contracts(errors, payload, label)
+
     stable = dict(payload)
     stable.pop("generatedAt", None)
     stable.pop("generated_at", None)
-    readiness_block = stable.get("desktop_client_readiness")
-    if isinstance(readiness_block, dict):
-        normalized_readiness_block = dict(readiness_block)
-        normalized_readiness_block.pop("generatedAt", None)
-        normalized_readiness_block.pop("generated_at", None)
-        stable["desktop_client_readiness"] = normalized_readiness_block
+    if schema_normalize_runtime_projections:
+        for projection_key in ("desktop_client_readiness", "release_channel"):
+            projection = stable.get(projection_key)
+            if isinstance(projection, dict):
+                stable[projection_key] = {
+                    "projection": projection_key,
+                    "keys": sorted(projection),
+                }
+    else:
+        readiness_block = stable.get("desktop_client_readiness")
+        if isinstance(readiness_block, dict):
+            normalized_readiness_block = dict(readiness_block)
+            normalized_readiness_block.pop("generatedAt", None)
+            normalized_readiness_block.pop("generated_at", None)
+            stable["desktop_client_readiness"] = normalized_readiness_block
     return stable
 
 
@@ -1885,7 +1925,12 @@ def _verify_materialized_proof_reproducible(errors: list[str], repo_root: Path, 
         errors.append("missing proof materializer: scripts/materialize_hub_local_release_proof.py")
         return
 
-    published = _stable_json_payload(proof_path, errors, "published proof file")
+    published = _stable_json_payload(
+        proof_path,
+        errors,
+        "published proof file",
+        schema_normalize_runtime_projections=True,
+    )
     if published is None:
         return
 
@@ -1905,7 +1950,12 @@ def _verify_materialized_proof_reproducible(errors: list[str], repo_root: Path, 
             )
             return
 
-        expected = _stable_json_payload(expected_path, errors, "materialized proof file")
+        expected = _stable_json_payload(
+            expected_path,
+            errors,
+            "materialized proof file",
+            schema_normalize_runtime_projections=True,
+        )
         if expected is None:
             return
 
@@ -2077,11 +2127,118 @@ def _load_flagship_readiness_snapshot(errors: list[str]) -> dict | None:
     }
 
 
-def _verify_desktop_client_readiness_block(errors: list[str], proof: dict, label: str) -> None:
-    readiness_snapshot = _load_flagship_readiness_snapshot(errors)
+def _verify_desktop_client_readiness_contract(errors: list[str], proof: dict, label: str) -> dict | None:
     block = proof.get("desktop_client_readiness")
     if not isinstance(block, dict):
         errors.append(f"{label} missing desktop_client_readiness block")
+        return None
+
+    if set(block) != DESKTOP_CLIENT_READINESS_KEYS:
+        errors.append(
+            f"{label} desktop_client_readiness keys must be exactly "
+            f"{sorted(DESKTOP_CLIENT_READINESS_KEYS)!r}"
+        )
+
+    for key in (
+        "status",
+        "scoped_status",
+        "generated_at",
+        "reason",
+        "completion_audit_status",
+        "completion_audit_reason",
+        "source_path",
+    ):
+        if not isinstance(block.get(key), str):
+            errors.append(f"{label} desktop_client_readiness.{key} must be a string")
+
+    missing_coverage_keys = block.get("missing_coverage_keys")
+    if not isinstance(missing_coverage_keys, list) or any(
+        not isinstance(item, str) for item in missing_coverage_keys
+    ):
+        errors.append(
+            f"{label} desktop_client_readiness.missing_coverage_keys must be a list of strings"
+        )
+    if not isinstance(block.get("desktop_client_missing"), bool):
+        errors.append(f"{label} desktop_client_readiness.desktop_client_missing must be a boolean")
+
+    return block
+
+
+def _verify_release_channel_contract(errors: list[str], proof: dict, label: str) -> dict | None:
+    block = proof.get("release_channel")
+    if not isinstance(block, dict):
+        errors.append(f"{label} missing release_channel block")
+        return None
+
+    if set(block) != RELEASE_CHANNEL_PROJECTION_KEYS:
+        errors.append(
+            f"{label} release_channel keys must be exactly "
+            f"{sorted(RELEASE_CHANNEL_PROJECTION_KEYS)!r}"
+        )
+
+    for key in RELEASE_CHANNEL_PROJECTION_KEYS:
+        if not isinstance(block.get(key), str):
+            errors.append(f"{label} release_channel.{key} must be a string")
+
+    release_status = block.get("status")
+    if release_status not in {"available", "unavailable", "invalid"}:
+        errors.append(f"{label} release_channel.status must be available, unavailable, or invalid")
+    if not isinstance(block.get("path"), str) or not block.get("path", "").strip():
+        errors.append(f"{label} release_channel.path must not be blank")
+
+    binding_values = {
+        "channel": block.get("channel", "").strip() if isinstance(block.get("channel"), str) else "",
+        "version": block.get("version", "").strip() if isinstance(block.get("version"), str) else "",
+        "rolloutState": (
+            block.get("rolloutState", "").strip() if isinstance(block.get("rolloutState"), str) else ""
+        ),
+        "supportabilityState": (
+            block.get("supportabilityState", "").strip()
+            if isinstance(block.get("supportabilityState"), str)
+            else ""
+        ),
+        "publishedAt": (
+            block.get("publishedAt", "").strip() if isinstance(block.get("publishedAt"), str) else ""
+        ),
+    }
+    binding_is_complete = all(binding_values.values())
+    published_at_is_valid = False
+    if binding_values["publishedAt"]:
+        try:
+            parsed_published_at = datetime.fromisoformat(
+                binding_values["publishedAt"].replace("Z", "+00:00")
+            )
+            published_at_is_valid = parsed_published_at.tzinfo is not None
+        except ValueError:
+            pass
+    aliases_match = (
+        block.get("channelId") == block.get("channel")
+        and block.get("releaseVersion") == block.get("version")
+    )
+    if release_status == "available" and not (
+        binding_is_complete and published_at_is_valid and aliases_match
+    ):
+        errors.append(f"{label} available release_channel must publish one complete canonical binding")
+    if release_status == "unavailable" and any(
+        isinstance(block.get(key), str) and block.get(key, "").strip()
+        for key in RELEASE_CHANNEL_PROJECTION_KEYS - {"status", "path"}
+    ):
+        errors.append(f"{label} unavailable release_channel must not publish partial binding values")
+    if release_status == "invalid" and binding_is_complete and published_at_is_valid and aliases_match:
+        errors.append(f"{label} invalid release_channel must not contain a complete canonical binding")
+
+    return block
+
+
+def _verify_runtime_projection_contracts(errors: list[str], proof: dict, label: str) -> None:
+    _verify_desktop_client_readiness_contract(errors, proof, label)
+    _verify_release_channel_contract(errors, proof, label)
+
+
+def _verify_desktop_client_readiness_block(errors: list[str], proof: dict, label: str) -> None:
+    block = _verify_desktop_client_readiness_contract(errors, proof, label)
+    readiness_snapshot = _load_flagship_readiness_snapshot(errors)
+    if block is None:
         return
     if readiness_snapshot is None:
         return
@@ -2109,6 +2266,7 @@ def _verify_desktop_client_readiness_block(errors: list[str], proof: dict, label
 def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> None:
     _verify_json_has_no_forbidden_markers(errors, proof, label)
     _verify_desktop_client_readiness_block(errors, proof, label)
+    _verify_release_channel_contract(errors, proof, label)
 
     package_repo = proof.get("package_repo")
     if package_repo != REQUIRED_PROOF_PACKAGE_REPO:

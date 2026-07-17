@@ -35,6 +35,8 @@ public sealed class InstallLinkingController : ControllerBase
         "secret", "token", "ticket", "ticketId", "version", "installLinkMode",
         "installLinkTransport"
     };
+    private static readonly HashSet<string> InstallLinkCallbackPreservedStateKeys =
+        new(StringComparer.OrdinalIgnoreCase) { "state", "nonce" };
     private readonly HubIdentityClient _identity;
     private readonly AccountService _accounts;
     private readonly InstallLinkingService _installLinking;
@@ -2130,7 +2132,31 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     private static string? NormalizeCallbackUri(string? callbackUri)
-        => HubBrowserAuthService.SanitizeInstallLinkCallbackUri(callbackUri);
+    {
+        if (string.IsNullOrWhiteSpace(callbackUri)
+            || !Uri.TryCreate(callbackUri.Trim(), UriKind.Absolute, out Uri? parsed)
+            || !string.IsNullOrEmpty(parsed.UserInfo))
+        {
+            return null;
+        }
+
+        bool customScheme = string.Equals(parsed.Scheme, "chummer", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(parsed.Host, "install-link", StringComparison.OrdinalIgnoreCase)
+            && (string.IsNullOrEmpty(parsed.AbsolutePath) || string.Equals(parsed.AbsolutePath, "/", StringComparison.Ordinal));
+        bool loopbackHttp = (string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+            && IsAppLocalCallbackHost(parsed.Host)
+            && IsAppLocalInstallLinkCallbackPath(parsed.AbsolutePath);
+        if (!customScheme && !loopbackHttp)
+        {
+            return null;
+        }
+
+        string? sanitized = HubBrowserAuthService.SanitizeInstallLinkCallbackUri(parsed.ToString());
+        return sanitized is null
+            ? null
+            : AppendPreservedInstallLinkCallbackFragment(sanitized, parsed.Fragment);
+    }
 
     private static bool IsAppLocalCallbackHost(string host)
         => string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
@@ -2177,8 +2203,7 @@ public sealed class InstallLinkingController : ControllerBase
         string platform,
         string arch)
         => QueryHelpers.AddQueryString(
-            HubBrowserAuthService.SanitizeInstallLinkCallbackUri(callbackUri)
-                ?? throw new InvalidOperationException("Install-link callback URI is invalid."),
+            StripReservedInstallLinkCallbackState(callbackUri),
             new Dictionary<string, string?>
             {
                 ["code"] = callbackCode,
@@ -2191,6 +2216,84 @@ public sealed class InstallLinkingController : ControllerBase
                 ["installLinkMode"] = "browser_callback",
                 ["installLinkTransport"] = "grant_callback"
             });
+
+    private static string StripReservedInstallLinkCallbackState(string callbackUri)
+    {
+        string normalizedCallbackUri = NormalizeCallbackUri(callbackUri)
+            ?? throw new InvalidOperationException("Install-link callback URI is invalid.");
+        if (!Uri.TryCreate(normalizedCallbackUri, UriKind.Absolute, out Uri? parsed)
+            || (string.IsNullOrEmpty(parsed.Query) && string.IsNullOrEmpty(parsed.Fragment)))
+        {
+            return normalizedCallbackUri;
+        }
+
+        var builder = new UriBuilder(parsed)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        string baseUri = builder.Uri.ToString();
+        string withQuery = AddPreservedInstallLinkCallbackComponent(baseUri, parsed.Query, prefix: "?");
+        return AppendPreservedInstallLinkCallbackFragment(withQuery, parsed.Fragment);
+    }
+
+    private static string AddPreservedInstallLinkCallbackComponent(string baseUri, string component, string prefix)
+    {
+        Dictionary<string, string?> preserved = PreserveInstallLinkCallbackComponent(component, prefix);
+        return preserved.Count == 0
+            ? baseUri
+            : QueryHelpers.AddQueryString(baseUri, preserved);
+    }
+
+    private static string AppendPreservedInstallLinkCallbackFragment(string baseUri, string fragment)
+    {
+        Dictionary<string, string?> preserved = PreserveInstallLinkCallbackComponent(fragment, "#");
+        return preserved.Count == 0
+            ? baseUri
+            : $"{baseUri}#{BuildInstallLinkCallbackComponent(preserved)}";
+    }
+
+    private static Dictionary<string, string?> PreserveInstallLinkCallbackComponent(string component, string prefix)
+    {
+        var preserved = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrEmpty(component)
+            || !component.StartsWith(prefix, StringComparison.Ordinal)
+            || component.Length == prefix.Length
+            || !component.Contains('=', StringComparison.Ordinal))
+        {
+            return preserved;
+        }
+
+        foreach (var item in QueryHelpers.ParseQuery(component[prefix.Length..]))
+        {
+            if (InstallLinkCallbackReservedQueryKeys.Contains(item.Key)
+                || !InstallLinkCallbackPreservedStateKeys.Contains(item.Key)
+                || item.Value.Count != 1
+                || !IsSafeInstallLinkCallbackStateValue(item.Value[0]))
+            {
+                continue;
+            }
+
+            preserved[item.Key] = item.Value[0];
+        }
+
+        return preserved;
+    }
+
+    private static bool IsSafeInstallLinkCallbackStateValue(string? value)
+        => !string.IsNullOrEmpty(value)
+           && value.Length <= 128
+           && value.All(static character =>
+               character is >= 'a' and <= 'z'
+               or >= 'A' and <= 'Z'
+               or >= '0' and <= '9'
+               or '-' or '_' or '.' or '~');
+
+    private static string BuildInstallLinkCallbackComponent(Dictionary<string, string?> values)
+        => string.Join(
+            "&",
+            values.Select(static item =>
+                $"{Uri.EscapeDataString(item.Key)}={Uri.EscapeDataString(item.Value ?? string.Empty)}"));
 
     private NativeRouteProofStatus BuildNativeRouteProofStatus(string route, string boundedFailureReason)
     {

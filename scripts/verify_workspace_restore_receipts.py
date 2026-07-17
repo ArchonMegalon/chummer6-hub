@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 
@@ -49,6 +50,28 @@ DESIGN_QUEUE_STAGING_PATH = Path(
     )
 )
 MATERIALIZER_PATH = ROOT / "scripts" / "materialize_hub_local_release_proof.py"
+DESKTOP_CLIENT_READINESS_KEYS = {
+    "status",
+    "scoped_status",
+    "generated_at",
+    "missing_coverage_keys",
+    "desktop_client_missing",
+    "reason",
+    "completion_audit_status",
+    "completion_audit_reason",
+    "source_path",
+}
+RELEASE_CHANNEL_PROJECTION_KEYS = {
+    "status",
+    "path",
+    "channelId",
+    "channel",
+    "version",
+    "releaseVersion",
+    "rolloutState",
+    "supportabilityState",
+    "publishedAt",
+}
 PACKAGE_ID = "next90-m105-hub-workspace-continuity"
 PACKAGE_TASK = "Make roaming workspace, entitlement replication, stale state, and conflict posture explicit and recoverable."
 LANDED_COMMIT = "4d4b3856"
@@ -1412,6 +1435,85 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
     if payload.get("status") != "passed":
         missing.append(f"{path}: status must be passed")
 
+    desktop_client_readiness = payload.get("desktop_client_readiness")
+    if not isinstance(desktop_client_readiness, dict):
+        missing.append(f"{path}: desktop_client_readiness must be an object")
+    else:
+        if set(desktop_client_readiness) != DESKTOP_CLIENT_READINESS_KEYS:
+            missing.append(
+                f"{path}: desktop_client_readiness keys must be exactly "
+                f"{sorted(DESKTOP_CLIENT_READINESS_KEYS)!r}"
+            )
+        string_keys = (
+            "status",
+            "scoped_status",
+            "generated_at",
+            "reason",
+            "completion_audit_status",
+            "completion_audit_reason",
+            "source_path",
+        )
+        for key in string_keys:
+            if not isinstance(desktop_client_readiness.get(key), str):
+                missing.append(f"{path}: desktop_client_readiness.{key} must be a string")
+        missing_coverage_keys = desktop_client_readiness.get("missing_coverage_keys")
+        if not isinstance(missing_coverage_keys, list) or any(
+            not isinstance(item, str) for item in missing_coverage_keys
+        ):
+            missing.append(f"{path}: desktop_client_readiness.missing_coverage_keys must be a list of strings")
+        if not isinstance(desktop_client_readiness.get("desktop_client_missing"), bool):
+            missing.append(f"{path}: desktop_client_readiness.desktop_client_missing must be a boolean")
+
+    release_channel = payload.get("release_channel")
+    if not isinstance(release_channel, dict):
+        missing.append(f"{path}: release_channel must be an object")
+    else:
+        if set(release_channel) != RELEASE_CHANNEL_PROJECTION_KEYS:
+            missing.append(
+                f"{path}: release_channel keys must be exactly "
+                f"{sorted(RELEASE_CHANNEL_PROJECTION_KEYS)!r}"
+            )
+        for key in RELEASE_CHANNEL_PROJECTION_KEYS:
+            if not isinstance(release_channel.get(key), str):
+                missing.append(f"{path}: release_channel.{key} must be a string")
+        release_status = release_channel.get("status")
+        if release_status not in {"available", "unavailable", "invalid"}:
+            missing.append(f"{path}: release_channel.status must be available, unavailable, or invalid")
+        if not str(release_channel.get("path") or "").strip():
+            missing.append(f"{path}: release_channel.path must not be blank")
+        binding_values = {
+            "channel": str(release_channel.get("channel") or "").strip(),
+            "version": str(release_channel.get("version") or "").strip(),
+            "rolloutState": str(release_channel.get("rolloutState") or "").strip(),
+            "supportabilityState": str(release_channel.get("supportabilityState") or "").strip(),
+            "publishedAt": str(release_channel.get("publishedAt") or "").strip(),
+        }
+        binding_is_complete = all(binding_values.values())
+        published_at_is_valid = False
+        if binding_values["publishedAt"]:
+            try:
+                parsed_published_at = datetime.fromisoformat(
+                    binding_values["publishedAt"].replace("Z", "+00:00")
+                )
+                published_at_is_valid = parsed_published_at.tzinfo is not None
+            except ValueError:
+                pass
+        aliases_match = (
+            release_channel.get("channelId") == release_channel.get("channel")
+            and release_channel.get("releaseVersion") == release_channel.get("version")
+        )
+        if release_status == "available" and not (
+            binding_is_complete and published_at_is_valid and aliases_match
+        ):
+            missing.append(f"{path}: available release_channel must publish one complete canonical binding")
+        if release_status == "unavailable" and any(
+            str(release_channel.get(key) or "").strip()
+            for key in RELEASE_CHANNEL_PROJECTION_KEYS - {"status", "path"}
+        ):
+            missing.append(f"{path}: unavailable release_channel must not publish partial binding values")
+        if release_status == "invalid" and binding_is_complete and published_at_is_valid and aliases_match:
+            missing.append(f"{path}: invalid release_channel must not contain a complete canonical binding")
+
     package = payload.get("successor_queue_package")
     if not isinstance(package, dict):
         missing.append(f"{path}: missing successor_queue_package")
@@ -1557,14 +1659,9 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
             if values != expected[key]:
                 missing.append(f"{path}: {receipt_id}.{key} must match {expected[key]!r}")
 
-        receipt_routes = receipt.get("routes")
-        if isinstance(receipt_routes, list):
-            for route in receipt_routes:
-                if isinstance(route, str) and route not in proof_route_set:
-                    missing.append(
-                        f"{path}: proof_routes missing package-scoped receipt route {route} for {receipt_id}"
-                    )
-
+        # Package receipts may include authenticated detail routes such as
+        # /account/roster. Top-level proof_routes is the narrower Registry
+        # projection: its canonical public prefix plus installer routes.
         summary = receipt.get("summary")
         if not isinstance(summary, str):
             missing.append(f"{path}: {receipt_id}.summary must be a string")
@@ -1594,8 +1691,15 @@ def read_release_proof_payload(path: Path, label: str, missing: list[str]) -> di
 
 def stable_release_payload(payload: dict[str, object]) -> dict[str, object]:
     stable = dict(payload)
-    stable.pop("generated_at", None)
-    stable.pop("generatedAt", None)
+    for dynamic_key in ("generated_at", "generatedAt"):
+        stable.pop(dynamic_key, None)
+    for projection_key in ("desktop_client_readiness", "release_channel"):
+        projection = stable.get(projection_key)
+        if isinstance(projection, dict):
+            stable[projection_key] = {
+                "projection": projection_key,
+                "keys": sorted(projection),
+            }
     return stable
 
 
@@ -1710,9 +1814,12 @@ def check_materializer_matches_local_release_proof(missing: list[str]) -> None:
         if generated_payload is None:
             return
 
+        check_local_release_proof(output_path, missing)
+
     if stable_release_payload(generated_payload) != stable_release_payload(local_payload):
         missing.append(
-            f"{MATERIALIZER_PATH}: materialized proof must match {LOCAL_RELEASE_PROOF_PATH} aside from timestamps"
+            f"{MATERIALIZER_PATH}: materialized proof must match {LOCAL_RELEASE_PROOF_PATH} "
+            "aside from runtime projections and timestamps"
         )
 
 

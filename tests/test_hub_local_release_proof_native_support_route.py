@@ -62,7 +62,6 @@ class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
                 "/home/work",
                 "/account/access",
                 "/account/work",
-                "/account/roster",
                 "/account/support",
                 "/contact",
                 "/downloads",

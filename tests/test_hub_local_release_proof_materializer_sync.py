@@ -121,11 +121,172 @@ class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stdout)
             payload = json.loads(proof_path.read_text(encoding="utf-8"))
             release_channel = payload.get("release_channel") or {}
+            self.assertEqual("available", release_channel.get("status"))
             self.assertEqual(str(release_channel_path), release_channel.get("path"))
             self.assertEqual("preview", release_channel.get("channelId"))
             self.assertEqual("run-20260703-170551", release_channel.get("releaseVersion"))
             self.assertEqual("promoted_preview", release_channel.get("rolloutState"))
             self.assertEqual("preview_supported", release_channel.get("supportabilityState"))
+
+    def test_materializer_marks_missing_release_channel_binding_unavailable(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-missing-release-channel-") as temp_dir:
+            missing_path = Path(temp_dir) / "missing" / "RELEASE_CHANNEL.generated.json"
+            old_env = os.environ.get("CHUMMER_HUB_RELEASE_CHANNEL_PATH")
+            os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = str(missing_path)
+            try:
+                release_channel = module._load_release_channel_snapshot()
+                self.assertEqual("unavailable", release_channel.get("status"))
+                self.assertEqual(str(missing_path), release_channel.get("path"))
+                self.assertEqual("", release_channel.get("releaseVersion"))
+            finally:
+                if old_env is None:
+                    os.environ.pop("CHUMMER_HUB_RELEASE_CHANNEL_PATH", None)
+                else:
+                    os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = old_env
+
+    def test_materializer_marks_empty_release_channel_binding_invalid(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-invalid-release-channel-") as temp_dir:
+            release_channel_path = Path(temp_dir) / "RELEASE_CHANNEL.generated.json"
+            release_channel_path.write_text("{}\n", encoding="utf-8")
+            old_env = os.environ.get("CHUMMER_HUB_RELEASE_CHANNEL_PATH")
+            os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = str(release_channel_path)
+            try:
+                release_channel = module._load_release_channel_snapshot()
+                self.assertEqual("invalid", release_channel.get("status"))
+                self.assertEqual("", release_channel.get("releaseVersion"))
+            finally:
+                if old_env is None:
+                    os.environ.pop("CHUMMER_HUB_RELEASE_CHANNEL_PATH", None)
+                else:
+                    os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = old_env
+
+    def test_materializer_marks_malformed_release_channel_binding_invalid(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-malformed-release-channel-") as temp_dir:
+            release_channel_path = Path(temp_dir) / "RELEASE_CHANNEL.generated.json"
+            release_channel_path.write_text("{not-json\n", encoding="utf-8")
+            old_env = os.environ.get("CHUMMER_HUB_RELEASE_CHANNEL_PATH")
+            os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = str(release_channel_path)
+            try:
+                release_channel = module._load_release_channel_snapshot()
+                self.assertEqual("invalid", release_channel.get("status"))
+                self.assertEqual("", release_channel.get("channelId"))
+            finally:
+                if old_env is None:
+                    os.environ.pop("CHUMMER_HUB_RELEASE_CHANNEL_PATH", None)
+                else:
+                    os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = old_env
+
+    def test_materializer_marks_non_object_release_channel_binding_invalid(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-non-object-release-channel-") as temp_dir:
+            release_channel_path = Path(temp_dir) / "RELEASE_CHANNEL.generated.json"
+            release_channel_path.write_text("[]\n", encoding="utf-8")
+            old_env = os.environ.get("CHUMMER_HUB_RELEASE_CHANNEL_PATH")
+            os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = str(release_channel_path)
+            try:
+                release_channel = module._load_release_channel_snapshot()
+                self.assertEqual("invalid", release_channel.get("status"))
+                self.assertEqual("", release_channel.get("releaseVersion"))
+            finally:
+                if old_env is None:
+                    os.environ.pop("CHUMMER_HUB_RELEASE_CHANNEL_PATH", None)
+                else:
+                    os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = old_env
+
+    def test_materializer_rejects_conflicting_release_channel_aliases(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-conflicting-release-channel-") as temp_dir:
+            release_channel_path = Path(temp_dir) / "RELEASE_CHANNEL.generated.json"
+            release_channel_path.write_text(
+                json.dumps(
+                    {
+                        "channelId": "preview",
+                        "channel": "stable",
+                        "releaseVersion": "run-1",
+                        "version": "run-2",
+                        "rolloutState": "promoted_preview",
+                        "supportabilityState": "preview_supported",
+                        "publishedAt": "2026-07-03T17:28:45Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            old_env = os.environ.get("CHUMMER_HUB_RELEASE_CHANNEL_PATH")
+            os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = str(release_channel_path)
+            try:
+                release_channel = module._load_release_channel_snapshot()
+                self.assertEqual("invalid", release_channel.get("status"))
+                self.assertEqual("", release_channel.get("channelId"))
+                self.assertEqual("", release_channel.get("releaseVersion"))
+            finally:
+                if old_env is None:
+                    os.environ.pop("CHUMMER_HUB_RELEASE_CHANNEL_PATH", None)
+                else:
+                    os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = old_env
+
+    def test_materializer_rejects_naive_release_channel_timestamp(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-naive-release-channel-") as temp_dir:
+            release_channel_path = Path(temp_dir) / "RELEASE_CHANNEL.generated.json"
+            release_channel_path.write_text(
+                json.dumps(
+                    {
+                        "channelId": "preview",
+                        "channel": "preview",
+                        "releaseVersion": "run-1",
+                        "version": "run-1",
+                        "rolloutState": "promoted_preview",
+                        "supportabilityState": "preview_supported",
+                        "publishedAt": "2026-07-03T17:28:45",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            old_env = os.environ.get("CHUMMER_HUB_RELEASE_CHANNEL_PATH")
+            os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = str(release_channel_path)
+            try:
+                release_channel = module._load_release_channel_snapshot()
+                self.assertEqual("invalid", release_channel.get("status"))
+                self.assertEqual("", release_channel.get("publishedAt"))
+            finally:
+                if old_env is None:
+                    os.environ.pop("CHUMMER_HUB_RELEASE_CHANNEL_PATH", None)
+                else:
+                    os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = old_env
+
+    def test_materializer_allows_distinct_published_and_generated_timestamps(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-distinct-timestamps-") as temp_dir:
+            release_channel_path = Path(temp_dir) / "RELEASE_CHANNEL.generated.json"
+            release_channel_path.write_text(
+                json.dumps(
+                    {
+                        "channelId": "preview",
+                        "channel": "preview",
+                        "releaseVersion": "run-1",
+                        "version": "run-1",
+                        "rolloutState": "promoted_preview",
+                        "supportabilityState": "preview_supported",
+                        "publishedAt": "2026-07-03T17:28:45.250+02:00",
+                        "generatedAt": "2026-07-03T15:29:00Z",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            old_env = os.environ.get("CHUMMER_HUB_RELEASE_CHANNEL_PATH")
+            os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = str(release_channel_path)
+            try:
+                release_channel = module._load_release_channel_snapshot()
+                self.assertEqual("available", release_channel.get("status"))
+                self.assertEqual("2026-07-03T17:28:45.250+02:00", release_channel.get("publishedAt"))
+            finally:
+                if old_env is None:
+                    os.environ.pop("CHUMMER_HUB_RELEASE_CHANNEL_PATH", None)
+                else:
+                    os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = old_env
 
     def test_default_read_path_prefers_local_canonical_flagship_readiness_after_sync(self) -> None:
         module = load_materializer_module()

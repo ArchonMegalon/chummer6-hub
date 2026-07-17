@@ -85,3 +85,12 @@ def test_external_windows_gap_can_be_subsumed_when_user_journey_audit_is_not_req
         ),
         blockers,
     )
+
+
+def test_external_windows_gap_is_not_subsumed_when_user_journey_requirement_is_missing() -> None:
+    module = load_module()
+    blockers = ["Windows installer visual audit source digest does not match promoted installer"]
+    payload = external_windows_only_payload()
+    del payload["coverage_details"]["desktop_client"]["evidence"]["ui_user_journey_tester_audit_required"]
+
+    assert not module.desktop_client_gap_subsumed_by_launch_blockers(payload, blockers)

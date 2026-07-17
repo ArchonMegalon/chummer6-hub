@@ -53,6 +53,75 @@ array_count() {
   printf '%s\n' "$count"
 }
 
+array_values_nul() {
+  local array_name="${1:-}"
+  [[ -n "$array_name" ]] || return 0
+
+  local restore_nounset=0
+  case "$-" in
+    *u*)
+      restore_nounset=1
+      set +u
+      ;;
+  esac
+
+  eval "printf '%s\\0' \"\${${array_name}[@]}\""
+  local status="$?"
+
+  if (( restore_nounset == 1 )); then
+    set -u
+  fi
+
+  return "$status"
+}
+
+cleanup_bootstrap_tmp_paths() {
+  local status="$?"
+  local path
+  if (( $(array_count bootstrap_tmp_paths) > 0 )); then
+    while IFS= read -r -d '' path; do
+      [[ -f "$path" ]] && rm -f "$path"
+    done < <(array_values_nul bootstrap_tmp_paths)
+  fi
+
+  if [[ "${BOOTSTRAP_KEEP_UPLOAD_RESPONSE:-0}" != "1" ]] \
+    && [[ -n "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH:-}" ]] \
+    && [[ -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" ]]; then
+    chmod 600 "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" 2>/dev/null || true
+    rm -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}"
+  fi
+
+  if (( status != 0 )) && [[ "${BOOTSTRAP_RELEASE_UPLOAD_ACCEPTED:-0}" == "1" ]]; then
+    printf '[chummer-mac-release] ERROR: Release completion was accepted before a later check failed; the release may already be public. Do not create or publish another session. Inspect %s and reconcile the recorded session.\n' \
+      "${BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-the durable upload handoff}" >&2
+  fi
+  return "$status"
+}
+
+require_all_reviewed_commit_pins() {
+  local setting=""
+  local value=""
+  local normalized=""
+  local -a settings=(
+    CHUMMER_UI_EXPECTED_COMMIT
+    CHUMMER_CORE_EXPECTED_COMMIT
+    CHUMMER_HUB_EXPECTED_COMMIT
+    CHUMMER_UI_KIT_EXPECTED_COMMIT
+    CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT
+    CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT
+    CHUMMER_LEGACY_EXPECTED_COMMIT
+  )
+
+  for setting in "${settings[@]}"; do
+    value="${!setting:-}"
+    [[ "$value" =~ ^[0-9a-fA-F]{40}$ ]] \
+      || die "$setting must be set to a reviewed full 40-character hexadecimal commit SHA before release work begins"
+    normalized="$(to_lower_ascii "$value")"
+    printf -v "$setting" '%s' "$normalized"
+    export "$setting"
+  done
+}
+
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "required command missing: $1"
 }
@@ -855,21 +924,25 @@ PY
 
     local url http_code
     if (( $(array_count install_urls) > 0 )); then
-      for url in "${install_urls[@]}"; do
+      while IFS= read -r -d '' url; do
+        url="$(validate_release_response_probe_url "$url" "$canonical_url" install)" \
+          || die "release upload response contained an unsafe install handoff URL; do not retry the published session until it is reconciled"
         http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url")"
         if [[ "$http_code" == "404" ]]; then
-          die "install dispatch returned 404 after promotion: $url"
+          die "install dispatch returned 404 after promotion; do not retry the published session until it is reconciled"
         fi
-      done
+      done < <(array_values_nul install_urls)
     fi
 
     if (( $(array_count direct_urls) > 0 )); then
-      for url in "${direct_urls[@]}"; do
+      while IFS= read -r -d '' url; do
+        url="$(validate_release_response_probe_url "$url" "$canonical_url" direct)" \
+          || die "release upload response contained an unsafe direct-file URL; do not retry the published session until it is reconciled"
         http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$url")"
         if [[ "$http_code" == "404" ]]; then
-          die "direct artifact returned 404 after promotion: $url"
+          die "direct artifact returned 404 after promotion; do not retry the published session until it is reconciled"
         fi
-      done
+      done < <(array_values_nul direct_urls)
     fi
   fi
 
@@ -4850,24 +4923,6 @@ main() {
   ensure_link_target "$ui_kit_alias" "$complete_alias_root/chummer-ui-kit"
   ensure_link_target "$registry_alias" "$complete_alias_root/chummer-hub-registry"
   ensure_link_target "$ui_repo" "$complete_alias_root/chummer6-ui"
-
-  local -a bootstrap_tmp_paths=()
-  cleanup_bootstrap_tmp_paths() {
-    local path
-    if (( $(array_count bootstrap_tmp_paths) > 0 )); then
-      for path in "${bootstrap_tmp_paths[@]}"; do
-        [[ -f "$path" ]] && rm -f "$path"
-      done
-    fi
-
-    if [[ "${BOOTSTRAP_KEEP_UPLOAD_RESPONSE:-0}" != "1" ]] \
-      && [[ -n "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH:-}" ]] \
-      && [[ -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" ]]; then
-      chmod 600 "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" 2>/dev/null || true
-      rm -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}"
-    fi
-  }
-  trap cleanup_bootstrap_tmp_paths EXIT
 
   local requested_release_proof="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}}}"
   local requested_ui_localization_release_gate="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_FILE:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}}}"
