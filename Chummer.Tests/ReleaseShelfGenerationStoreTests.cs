@@ -251,7 +251,7 @@ public sealed class ReleaseShelfGenerationStoreTests
     }
 
     [Fact]
-    public void CaptureRejectsNestedReleaseProofLookalikeWithCanonicalRoute()
+    public void CaptureRejectsNestedReleaseProofLookalikeEvenWithGenerationBoundRoute()
     {
         using var fixture = new ReleaseShelfFixture();
         fixture.WriteGeneration(
@@ -259,13 +259,53 @@ public sealed class ReleaseShelfGenerationStoreTests
             "run-a",
             "artifact-a",
             topLevelProofRoutes: ["/downloads/install/test-installer"],
-            nestedProofRoutes: ["/downloads/install/test-installer"]);
+            nestedProofRoutes: ["/downloads/g/generation-a/install/test-installer"]);
         fixture.Activate("generation-a", "run-a");
 
         InvalidDataException error = Assert.Throws<InvalidDataException>(
             () => fixture.CreateStore().Capture());
 
-        Assert.Contains("non-generation-bound release URL", error.Message, StringComparison.Ordinal);
+        Assert.Contains("lookalike", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CaptureRejectsManifestMissingGenerationId(bool canonical)
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            omitCanonicalGenerationId: canonical,
+            omitCompatibilityGenerationId: !canonical);
+        fixture.Activate("generation-a", "run-a");
+
+        InvalidDataException error = Assert.Throws<InvalidDataException>(
+            () => fixture.CreateStore().Capture());
+
+        Assert.Contains("generationId", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CaptureRejectsManifestGenerationIdThatDoesNotMatchActiveGeneration(bool canonical)
+    {
+        using var fixture = new ReleaseShelfFixture();
+        fixture.WriteGeneration(
+            "generation-a",
+            "run-a",
+            "artifact-a",
+            canonicalGenerationIdOverride: canonical ? "generation-b" : null,
+            compatibilityGenerationIdOverride: canonical ? null : "generation-b");
+        fixture.Activate("generation-a", "run-a");
+
+        InvalidDataException error = Assert.Throws<InvalidDataException>(
+            () => fixture.CreateStore().Capture());
+
+        Assert.Contains("does not match the active generation", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -616,7 +656,12 @@ public sealed class ReleaseShelfGenerationStoreTests
     [InlineData("/downloads/g/generation-a/install/test-installer?ticket=x")]
     [InlineData("/downloads/g/generation-a/install/test-installer#claim")]
     [InlineData("/downloads/g/generation-a/install/test-installer%2Fclaim")]
-    public void CaptureRejectsNonExactGenerationInstallRoute(string route)
+    [InlineData("/downloads/g/generation-a/files/nested/chummer-test.bin")]
+    [InlineData("/downloads/g/generation-a/proof")]
+    [InlineData("https://chummer.run/downloads/g/generation-a/install/test-installer")]
+    [InlineData("//chummer.run/downloads/g/generation-a/install/test-installer")]
+    [InlineData("/downloads/g/generation-a/files\\chummer-test.bin")]
+    public void CaptureRejectsMalformedOrNoncanonicalGenerationRoute(string route)
     {
         using var fixture = new ReleaseShelfFixture();
         fixture.WriteGeneration(
@@ -1396,7 +1441,11 @@ public sealed class ReleaseShelfGenerationStoreTests
             string? artifactDownloadUrlOverride = null,
             IReadOnlyDictionary<string, string>? extraFiles = null,
             IReadOnlyList<string>? topLevelProofRoutes = null,
-            IReadOnlyList<string>? nestedProofRoutes = null)
+            IReadOnlyList<string>? nestedProofRoutes = null,
+            bool omitCanonicalGenerationId = false,
+            bool omitCompatibilityGenerationId = false,
+            string? canonicalGenerationIdOverride = null,
+            string? compatibilityGenerationIdOverride = null)
         {
             string generationRoot = Path.Combine(DownloadsRoot, "generations", generationId);
             Directory.CreateDirectory(Path.Combine(generationRoot, "files"));
@@ -1472,6 +1521,23 @@ public sealed class ReleaseShelfGenerationStoreTests
                     }
                 }
             };
+            if (omitCanonicalGenerationId)
+            {
+                canonical.Remove("generationId");
+            }
+            else if (!string.IsNullOrWhiteSpace(canonicalGenerationIdOverride))
+            {
+                canonical["generationId"] = canonicalGenerationIdOverride;
+            }
+
+            if (omitCompatibilityGenerationId)
+            {
+                compatibility.Remove("generationId");
+            }
+            else if (!string.IsNullOrWhiteSpace(compatibilityGenerationIdOverride))
+            {
+                compatibility["generationId"] = compatibilityGenerationIdOverride;
+            }
             if (topLevelProofRoutes is not null)
             {
                 canonical["releaseProof"] = new Dictionary<string, object?>

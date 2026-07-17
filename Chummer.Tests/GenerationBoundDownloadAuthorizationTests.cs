@@ -81,6 +81,7 @@ public sealed class GenerationBoundDownloadAuthorizationTests
     public async Task ProtectedGenerationFileFailsClosedWithoutGenerationCredential()
     {
         using GenerationFixture fixture = new();
+        fixture.SetConfiguration("CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS", "true");
         fixture.SetQuery(null, null);
 
         IActionResult result = await fixture.Controller.DownloadGenerationFile(
@@ -381,6 +382,57 @@ public sealed class GenerationBoundDownloadAuthorizationTests
             fixture.ManifestService.CaptureUnpinnedActiveShelfSnapshot().GenerationId);
     }
 
+    [Fact]
+    public async Task CompletionClaimsStayBoundToPromotedGenerationWhenCurrentShelfAdvances()
+    {
+        using GenerationFixture fixture = new();
+        fixture.Activate(GenerationFixture.ProtectedGenerationId);
+        var resultA = new ReleaseBundlePromotionResult(
+            Version: "run-a",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-07-15T12:00:00Z"),
+            PromotedArtifactIds: [GenerationFixture.ArtifactId],
+            DownloadsUrl: "/downloads",
+            InstallDispatchUrls:
+            [
+                $"/downloads/g/generation-a/install/{GenerationFixture.ArtifactId}"
+            ],
+            DirectFileUrls: [],
+            GenerationId: "generation-a",
+            ActivationReceiptId: "activation-generation-a");
+        var claims = new ReleaseUploadTicketClaims(
+            SubjectId: "subject-release-operator",
+            DisplayName: "Release operator",
+            Email: "operator@example.test",
+            IssuedAtUtc: DateTimeOffset.UtcNow,
+            ExpiresAtUtc: DateTimeOffset.UtcNow.AddHours(1),
+            TicketId: "ticket-generation-a");
+
+        ReleaseBundlePromotionResult attached = fixture.InternalController.AttachSignedInInstallClaims(
+            resultA,
+            claims);
+
+        ReleasePromotionInstallClaim claimA = Assert.Single(attached.SignedInInstallClaims!);
+        Assert.StartsWith(
+            $"/downloads/g/generation-a/install/{GenerationFixture.ArtifactId}",
+            claimA.InstallDispatchUrl,
+            StringComparison.Ordinal);
+        Assert.Contains("claimCode=", claimA.InstallDispatchUrl, StringComparison.Ordinal);
+
+        fixture.SetQuery("claimCode", claimA.ClaimCode);
+        IActionResult currentB = await fixture.Controller.DownloadGenerationArtifact(
+            GenerationFixture.ProtectedGenerationId,
+            GenerationFixture.ArtifactId,
+            CancellationToken.None);
+        Assert.IsType<UnauthorizedObjectResult>(currentB);
+
+        fixture.SetQuery("claimCode", claimA.ClaimCode);
+        IActionResult retainedA = await fixture.Controller.DownloadGenerationArtifact(
+            "generation-a",
+            GenerationFixture.ArtifactId,
+            CancellationToken.None);
+        Assert.Equal("artifact-a", await ReadFileResultAsync(retainedA));
+    }
 
     private static async Task<string> ReadFileResultAsync(IActionResult result)
     {
@@ -457,6 +509,20 @@ public sealed class GenerationBoundDownloadAuthorizationTests
                 configuration);
             InstallBootstrapTickets = new InstallBootstrapTicketService(dataProtection, configuration);
             DeliveryPolicy = _serviceProvider.GetRequiredService<ArtifactDeliveryPolicy>();
+            var accounts = new AccountService(
+                new CommunityStore(configuration, NullLogger<CommunityStore>.Instance));
+            InternalController = new InternalReleaseBundlesController(
+                new ReleaseBundlePromotionService(
+                    configuration,
+                    NullLogger<ReleaseBundlePromotionService>.Instance),
+                new ReleaseBundleUploadSessionService(
+                    configuration,
+                    NullLogger<ReleaseBundleUploadSessionService>.Instance),
+                configuration,
+                new ReleaseUploadTicketService(dataProtection, configuration),
+                ManifestService,
+                accounts,
+                InstallLinking);
             var releaseSelection = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
             Controller = new DownloadsCompatibilityController(
                 ManifestService,
@@ -478,6 +544,7 @@ public sealed class GenerationBoundDownloadAuthorizationTests
         public IConfigurationRoot Configuration { get; }
         public ArtifactDeliveryPolicy DeliveryPolicy { get; }
         public DownloadsCompatibilityController Controller { get; }
+        public InternalReleaseBundlesController InternalController { get; }
 
         public (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto Artifact) LoadArtifact(string generationId)
         {

@@ -72,6 +72,37 @@ RELEASE_CHANNEL_PROJECTION_KEYS = {
     "supportabilityState",
     "publishedAt",
 }
+REQUIRED_RELEASE_PROOF_ROUTES = (
+    "/downloads/install/avalonia-linux-x64-installer",
+    "/home/access",
+    "/home/work",
+    "/account/access",
+    "/account/work",
+    "/account/support",
+    "/contact",
+    "/downloads",
+)
+RELEASE_PROOF_ARTIFACT_INSTALL_ROUTE_RE = re.compile(
+    r"^/downloads/install/(?P<artifact_id>[a-z0-9][a-z0-9-]*)$"
+)
+REQUIRED_RELEASE_PROOF_JOURNEYS = (
+    "install_claim_restore_continue",
+    "build_explain_publish",
+    "campaign_session_recover_recap",
+    "report_cluster_release_notify",
+    "organize_community_and_close_loop",
+)
+RELEASE_PROOF_ALIAS_PAIRS = (
+    ("generatedAt", "generated_at", "generated_at"),
+    ("baseUrl", "base_url", "base_url"),
+    ("journeysPassed", "journeys_passed", "journeys_passed"),
+    ("proofRoutes", "proof_routes", "proof_routes"),
+    (
+        "uiLocalizationReleaseGate",
+        "ui_localization_release_gate",
+        "uiLocalizationReleaseGate",
+    ),
+)
 PACKAGE_ID = "next90-m105-hub-workspace-continuity"
 PACKAGE_TASK = "Make roaming workspace, entitlement replication, stale state, and conflict posture explicit and recoverable."
 LANDED_COMMIT = "4d4b3856"
@@ -1418,6 +1449,35 @@ def require_commit_citations_resolve(label: str, text: str, missing: list[str]) 
             missing.append(f"{label}: cited proof commit does not resolve locally: {commit}")
 
 
+def resolve_release_proof_alias_value(
+    payload: dict,
+    *,
+    primary_key: str,
+    secondary_key: str,
+    field_name: str,
+    path: Path,
+    missing: list[str],
+):
+    """Mirror Registry alias resolution so producer and consumer cannot disagree."""
+
+    has_primary = primary_key in payload
+    has_secondary = secondary_key in payload
+    if has_primary and has_secondary:
+        primary_value = payload.get(primary_key)
+        secondary_value = payload.get(secondary_key)
+        if primary_value != secondary_value:
+            missing.append(
+                f"{path}: {field_name} alias values drift between "
+                f"{primary_key} and {secondary_key}"
+            )
+        return primary_value
+    if has_primary:
+        return payload.get(primary_key)
+    if has_secondary:
+        return payload.get(secondary_key)
+    return None
+
+
 def check_local_release_proof(path: Path, missing: list[str]) -> None:
     if not path.is_file():
         missing.append(f"missing local release proof: {path}")
@@ -1432,8 +1492,31 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
         missing.append(f"invalid local release proof: {path}: {exc}")
         return
 
+    if not isinstance(payload, dict):
+        missing.append(f"{path}: local release proof must contain a JSON object")
+        return
+
     if payload.get("status") != "passed":
         missing.append(f"{path}: status must be passed")
+
+    resolved_aliases = {
+        field_name: resolve_release_proof_alias_value(
+            payload,
+            primary_key=primary_key,
+            secondary_key=secondary_key,
+            field_name=field_name,
+            path=path,
+            missing=missing,
+        )
+        for primary_key, secondary_key, field_name in RELEASE_PROOF_ALIAS_PAIRS
+    }
+    if resolved_aliases["base_url"] != "https://chummer.run":
+        missing.append(f"{path}: base_url must be the canonical https://chummer.run origin")
+    if resolved_aliases["journeys_passed"] != list(REQUIRED_RELEASE_PROOF_JOURNEYS):
+        missing.append(
+            f"{path}: journeys_passed must preserve the exact Registry journey order "
+            f"{list(REQUIRED_RELEASE_PROOF_JOURNEYS)!r}"
+        )
 
     desktop_client_readiness = payload.get("desktop_client_readiness")
     if not isinstance(desktop_client_readiness, dict):
@@ -1551,11 +1634,38 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
             if closed_package.get(key) != expected:
                 missing.append(f"{path}: successor_queue_packages[{PACKAGE_ID}].{key} must be {expected!r}")
 
-    proof_routes = payload.get("proof_routes")
-    proof_route_set = {item for item in proof_routes if isinstance(item, str)} if isinstance(proof_routes, list) else set()
-    for route in ["/home/work", "/account/work"]:
-        if route not in proof_route_set:
-            missing.append(f"{path}: proof_routes missing {route}")
+    proof_routes = resolved_aliases["proof_routes"]
+    if not isinstance(proof_routes, list) or any(
+        not isinstance(item, str) for item in proof_routes
+    ):
+        missing.append(f"{path}: proof_routes must be an array of strings")
+    else:
+        required_prefix = list(REQUIRED_RELEASE_PROOF_ROUTES)
+        actual_prefix = proof_routes[: len(required_prefix)]
+        additional_routes = proof_routes[len(required_prefix) :]
+        if actual_prefix != required_prefix:
+            missing.append(
+                f"{path}: proof_routes must begin with the exact Registry route prefix "
+                f"{required_prefix!r}"
+            )
+        if len(proof_routes) != len(set(proof_routes)):
+            missing.append(f"{path}: proof_routes must not contain duplicates")
+        invalid_additional_routes = [
+            route
+            for route in additional_routes
+            if RELEASE_PROOF_ARTIFACT_INSTALL_ROUTE_RE.fullmatch(route) is None
+        ]
+        if invalid_additional_routes:
+            missing.append(
+                f"{path}: proof_routes additional routes must be installer routes; "
+                f"found {invalid_additional_routes!r}"
+            )
+        canonical_additional_routes = sorted(set(additional_routes))
+        if additional_routes != canonical_additional_routes:
+            missing.append(
+                f"{path}: proof_routes additional installer routes must be unique and "
+                f"canonically sorted as {canonical_additional_routes!r}"
+            )
 
     proof_receipts = payload.get("proof_receipts", [])
     proof_receipt_list = [item for item in proof_receipts if isinstance(item, dict)] if isinstance(proof_receipts, list) else []

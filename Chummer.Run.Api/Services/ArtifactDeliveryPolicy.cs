@@ -79,6 +79,9 @@ public sealed class ArtifactDeliveryPolicy
         _configuration = configuration;
     }
 
+    public bool AnonymousRawArtifactDownloadsEnabled
+        => !ParseBooleanSetting(_configuration[ForceAccountRequiredKey]);
+
     public ArtifactDeliveryResolution ResolveByArtifactId(
         ReleaseShelfSnapshot snapshot,
         string? artifactId,

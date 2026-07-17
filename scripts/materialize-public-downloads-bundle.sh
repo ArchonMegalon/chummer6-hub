@@ -123,6 +123,27 @@ WINDOWS_VISUAL_AUDIT_PUBLISHED_PATH="${CHUMMER_WINDOWS_VISUAL_AUDIT_PUBLISHED_PA
 WINDOWS_VISUAL_AUDIT_INTAKE_REQUEST_PATH="${CHUMMER_WINDOWS_VISUAL_AUDIT_INTAKE_REQUEST_PATH:-$REPO_ROOT/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json}"
 WINDOWS_VISUAL_AUDIT_AUTO_IMPORT_PATH="${CHUMMER_WINDOWS_VISUAL_AUDIT_AUTO_IMPORT_PATH:-$REPO_ROOT/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json}"
 
+assert_legacy_release_shelf_target() {
+  local target_root="${1:-}"
+  if [[ -z "$target_root" ]]; then
+    echo "legacy release shelf target is required" >&2
+    return 1
+  fi
+  if [[ -e "$target_root/.release-shelf-writer-policy.json" ]]; then
+    echo "Refusing source-bundle materialization into server-journal-v1 release shelf: $target_root" >&2
+    return 1
+  fi
+  if [[ -e "$target_root/.release-shelf-layout-v1" || -e "$target_root/current.json" ]]; then
+    echo "Refusing legacy top-level materialization into generation-aware release shelf: $target_root" >&2
+    return 1
+  fi
+}
+
+# Materialize only into source/candidate roots. Production generation activation
+# belongs to the staged HTTP server transaction.
+assert_legacy_release_shelf_target "$OUTPUT_ROOT"
+assert_legacy_release_shelf_target "$AUTHORITATIVE_PUBLISHED_ROOT"
+
 detect_auto_disabled_artifact_ids() {
   local files_root="$1"
   local manifest_path="$2"

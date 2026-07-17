@@ -2,13 +2,25 @@
 from __future__ import annotations
 
 import datetime as dt
+import importlib.util
 import json
 import os
 import stat
 import sys
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 from urllib.parse import urlparse
+
+
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+if str(SCRIPT_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIRECTORY))
+
+try:
+    from scripts.strict_json_contract import canonical_json_bytes
+except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
+    from strict_json_contract import canonical_json_bytes
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -27,14 +39,49 @@ M141_UI_FRONTIER_ID = 2354698282
 M141_UI_FLAGSHIP_FRONTIER_ID = 1922169755
 PUBLIC_JSON_ARTIFACT_MODE = 0o644
 STABLE_READ_CHUNK_BYTES = 1024 * 1024
+_PUBLIC_EDGE_OVERLAY_MODULE = None
 
 
 def iso_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _load_public_edge_overlay_module():
+    global _PUBLIC_EDGE_OVERLAY_MODULE
+    if _PUBLIC_EDGE_OVERLAY_MODULE is not None:
+        return _PUBLIC_EDGE_OVERLAY_MODULE
+    module_path = SCRIPT_DIRECTORY / "publish_public_edge_portal_overlay.py"
+    spec = importlib.util.spec_from_file_location(
+        "chummer_hub_release_proof_public_edge_lock",
+        module_path,
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(
+            f"unable to load shared public-edge mutation authority: {module_path}"
+        )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    _PUBLIC_EDGE_OVERLAY_MODULE = module
+    return module
+
+
+@contextmanager
+def _public_edge_proof_mutation_lock():
+    """Serialize proof replacement with standalone overlay deploy/recovery."""
+
+    overlay = _load_public_edge_overlay_module()
+    with overlay.public_edge_mutation_lock(activate=True):
+        yield
+
+
 def _stable_regular_file_matches(path: Path, expected_bytes: bytes) -> bool:
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         descriptor = os.open(path, flags)
     except OSError:
@@ -51,11 +98,17 @@ def _stable_regular_file_matches(path: Path, expected_bytes: bytes) -> bool:
             return False
 
         chunks: list[bytes] = []
-        while True:
-            chunk = os.read(descriptor, STABLE_READ_CHUNK_BYTES)
+        total = 0
+        read_budget = len(expected_bytes) + 1
+        while total < read_budget:
+            chunk = os.read(
+                descriptor,
+                min(STABLE_READ_CHUNK_BYTES, read_budget - total),
+            )
             if not chunk:
                 break
             chunks.append(chunk)
+            total += len(chunk)
         after = os.fstat(descriptor)
     finally:
         os.close(descriptor)
@@ -579,6 +632,49 @@ def _sync_served_release_proof_if_needed(*, out_path: Path) -> None:
         print(f"synced served hub local proof: {sync_path} <- {out_path}")
 
 
+def _publish_runtime_proof_artifacts(
+    *,
+    out_path: Path,
+    payload: dict,
+    proof_max_age_seconds: int,
+    proof_max_future_skew_seconds: int,
+) -> bool:
+    """Write proof artifacts while the caller owns shared mutation authority."""
+
+    existing_payload = _load_existing_payload(out_path)
+    if (
+        existing_payload is not None
+        and _stable_payload(existing_payload) == _stable_payload(payload)
+        and _payload_is_fresh(
+            existing_payload,
+            max_age_seconds=proof_max_age_seconds,
+            max_future_skew_seconds=proof_max_future_skew_seconds,
+        )
+    ):
+        _write_public_json_artifact(
+            out_path,
+            canonical_json_bytes(
+                existing_payload,
+                label="hub local release proof",
+            ).decode("utf-8"),
+        )
+        _sync_served_release_proof_if_needed(out_path=out_path)
+        return False
+
+    generated_at = iso_now()
+    payload["generated_at"] = generated_at
+    payload["generatedAt"] = generated_at
+    _write_public_json_artifact(
+        out_path,
+        canonical_json_bytes(
+            payload,
+            label="hub local release proof",
+        ).decode("utf-8"),
+    )
+    _sync_served_release_proof_if_needed(out_path=out_path)
+    return True
+
+
 def _m141_direct_import_route_receipts() -> list[dict]:
     return [
         {
@@ -671,15 +767,13 @@ def _m141_direct_import_route_receipts() -> list[dict]:
     ]
 
 
-def main() -> int:
-    if len(sys.argv) != 6:
-        print(
-            "usage: materialize_hub_local_release_proof.py <out_path> <base_url> <compose_file> <timeout_seconds> <skip_rebuild>",
-            file=sys.stderr,
-        )
-        return 1
-
-    out_path_text, base_url, compose_file, timeout_seconds, skip_rebuild = sys.argv[1:]
+def _materialize_under_shared_mutation_lock(
+    out_path_text: str,
+    base_url: str,
+    compose_file: str,
+    timeout_seconds: str,
+    skip_rebuild: str,
+) -> int:
     out_path = Path(out_path_text)
     proof_max_age_seconds = _parse_int_env(
         "CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS",
@@ -1833,32 +1927,51 @@ def main() -> int:
         source_path=str(desktop_client_readiness.get("source_path") or "").strip(),
     )
 
-    existing_payload = _load_existing_payload(out_path)
-    if (
-        existing_payload is not None
-        and _stable_payload(existing_payload) == _stable_payload(payload)
-        and _payload_is_fresh(
-            existing_payload,
-            max_age_seconds=proof_max_age_seconds,
-            max_future_skew_seconds=proof_max_future_skew_seconds,
-        )
-    ):
-        _write_public_json_artifact(
-            out_path,
-            json.dumps(existing_payload, indent=2) + "\n",
-        )
-        _sync_served_release_proof_if_needed(out_path=out_path)
+    # The caller owns the same fixed host mutation authority used by standalone
+    # deploy and recovery. All input reads and payload construction above therefore
+    # describe one post-lock snapshot, and these replacements cannot race container
+    # recreation, rollback verification, or a newer materializer invocation.
+    changed = _publish_runtime_proof_artifacts(
+        out_path=out_path,
+        payload=payload,
+        proof_max_age_seconds=proof_max_age_seconds,
+        proof_max_future_skew_seconds=proof_max_future_skew_seconds,
+    )
+    if changed:
+        print(f"wrote hub local proof: {out_path}")
+    else:
         print(f"hub local proof unchanged and still fresh: {out_path}")
-        return 0
-
-    generated_at = iso_now()
-    payload["generated_at"] = generated_at
-    payload["generatedAt"] = generated_at
-
-    _write_public_json_artifact(out_path, json.dumps(payload, indent=2) + "\n")
-    _sync_served_release_proof_if_needed(out_path=out_path)
-    print(f"wrote hub local proof: {out_path}")
     return 0
+
+
+def materialize_with_shared_mutation_lock(
+    out_path_text: str,
+    base_url: str,
+    compose_file: str,
+    timeout_seconds: str,
+    skip_rebuild: str,
+) -> int:
+    """Capture inputs, build the projection, and publish under one shared lock."""
+
+    with _public_edge_proof_mutation_lock():
+        return _materialize_under_shared_mutation_lock(
+            out_path_text,
+            base_url,
+            compose_file,
+            timeout_seconds,
+            skip_rebuild,
+        )
+
+
+def main() -> int:
+    if len(sys.argv) != 6:
+        print(
+            "usage: materialize_hub_local_release_proof.py <out_path> <base_url> <compose_file> <timeout_seconds> <skip_rebuild>",
+            file=sys.stderr,
+        )
+        return 1
+
+    return materialize_with_shared_mutation_lock(*sys.argv[1:])
 
 
 if __name__ == "__main__":

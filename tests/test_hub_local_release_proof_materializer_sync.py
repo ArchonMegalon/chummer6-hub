@@ -7,7 +7,9 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import threading
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -127,6 +129,126 @@ class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
             self.assertEqual("run-20260703-170551", release_channel.get("releaseVersion"))
             self.assertEqual("promoted_preview", release_channel.get("rolloutState"))
             self.assertEqual("preview_supported", release_channel.get("supportabilityState"))
+
+    def test_older_started_materializer_cannot_overwrite_newer_post_lock_snapshot(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-lock-snapshot-") as temp_dir:
+            temp_root = Path(temp_dir)
+            proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            readiness_path = temp_root / "FLAGSHIP_PRODUCT_READINESS.generated.json"
+            release_channel_path = temp_root / "RELEASE_CHANNEL.generated.json"
+            readiness_path.write_text(
+                json.dumps(
+                    {
+                        "contract_name": "fleet.flagship_product_readiness",
+                        "generated_at": "2026-07-17T20:00:00Z",
+                        "status": "pass",
+                        "scoped_status": "ready",
+                        "missing_keys": [],
+                        "scoped_missing_keys": [],
+                        "completion_audit": {"status": "pass", "reason": "ready"},
+                        "flagship_readiness_audit": {
+                            "reason": "ready",
+                            "missing_coverage_keys": [],
+                            "scoped_missing_coverage_keys": [],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            def write_release(version: str, published_at: str) -> None:
+                release_channel_path.write_text(
+                    json.dumps(
+                        {
+                            "channelId": "preview",
+                            "channel": "preview",
+                            "version": version,
+                            "releaseVersion": version,
+                            "rolloutState": "promoted_preview",
+                            "supportabilityState": "review_required",
+                            "publishedAt": published_at,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            write_release("run-older", "2026-07-17T20:01:00Z")
+            prior_readiness = os.environ.get("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH")
+            prior_release = os.environ.get("CHUMMER_HUB_RELEASE_CHANNEL_PATH")
+            os.environ["CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH"] = str(readiness_path)
+            os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = str(release_channel_path)
+
+            serialization_lock = threading.Lock()
+            older_waiting = threading.Event()
+            allow_older = threading.Event()
+            failures: list[BaseException] = []
+
+            @contextmanager
+            def ordered_shared_lock():
+                if threading.current_thread().name == "older-materializer":
+                    older_waiting.set()
+                    if not allow_older.wait(timeout=10):
+                        raise RuntimeError("older materializer was not released by the test")
+                with serialization_lock:
+                    yield
+
+            module._public_edge_proof_mutation_lock = ordered_shared_lock
+
+            def run_materializer() -> None:
+                try:
+                    exit_code = module.materialize_with_shared_mutation_lock(
+                        str(proof_path),
+                        "https://chummer.run",
+                        "docker-compose.public-edge.yml",
+                        "300",
+                        "true",
+                    )
+                    if exit_code != 0:
+                        raise AssertionError(f"materializer exited {exit_code}")
+                except BaseException as exc:  # Thread exceptions must fail the parent test.
+                    failures.append(exc)
+
+            older: threading.Thread | None = None
+            newer: threading.Thread | None = None
+            try:
+                older = threading.Thread(target=run_materializer, name="older-materializer")
+                older.start()
+                self.assertTrue(older_waiting.wait(timeout=10))
+
+                write_release("run-newer", "2026-07-17T20:02:00Z")
+                newer = threading.Thread(target=run_materializer, name="newer-materializer")
+                newer.start()
+                newer.join(timeout=20)
+                self.assertFalse(newer.is_alive())
+                self.assertFalse(failures, failures)
+                self.assertEqual(
+                    "run-newer",
+                    json.loads(proof_path.read_text(encoding="utf-8"))["release_channel"]["version"],
+                )
+
+                allow_older.set()
+                older.join(timeout=20)
+                self.assertFalse(older.is_alive())
+                self.assertFalse(failures, failures)
+                self.assertEqual(
+                    "run-newer",
+                    json.loads(proof_path.read_text(encoding="utf-8"))["release_channel"]["version"],
+                )
+            finally:
+                allow_older.set()
+                if newer is not None:
+                    newer.join(timeout=20)
+                if older is not None:
+                    older.join(timeout=20)
+                if prior_readiness is None:
+                    os.environ.pop("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH", None)
+                else:
+                    os.environ["CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH"] = prior_readiness
+                if prior_release is None:
+                    os.environ.pop("CHUMMER_HUB_RELEASE_CHANNEL_PATH", None)
+                else:
+                    os.environ["CHUMMER_HUB_RELEASE_CHANNEL_PATH"] = prior_release
 
     def test_materializer_marks_missing_release_channel_binding_unavailable(self) -> None:
         module = load_materializer_module()
@@ -532,6 +654,15 @@ class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
 
             repo_script_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(MATERIALIZER, repo_script_path)
+            for dependency_name in (
+                "strict_json_contract.py",
+                "public_edge_payload_modes.py",
+                "publish_public_edge_portal_overlay.py",
+            ):
+                shutil.copyfile(
+                    REPO_ROOT / "scripts" / dependency_name,
+                    repo_script_path.parent / dependency_name,
+                )
             readiness_path.write_text(
                 json.dumps(
                     {

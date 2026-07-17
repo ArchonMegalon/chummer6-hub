@@ -1068,7 +1068,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             ? ArtifactDeliveryDenied(resolution)
             : await DownloadResolvedBindingFromSnapshot(
                 resolution.Binding!,
-                retainedRawPath,
+                generationBoundRawPath: retainedRawPath,
+                isRawArtifactPath: false,
                 cancellationToken);
     }
 
@@ -1091,13 +1092,15 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         return await DownloadResolvedBindingFromSnapshot(
             resolution.Binding!,
-            retainedRawPath: generationBound,
+            generationBoundRawPath: generationBound,
+            isRawArtifactPath: true,
             cancellationToken);
     }
 
     private async Task<IActionResult> DownloadResolvedBindingFromSnapshot(
         ArtifactDeliveryBinding binding,
-        bool retainedRawPath,
+        bool generationBoundRawPath,
+        bool isRawArtifactPath,
         CancellationToken cancellationToken)
     {
         ReleaseShelfSnapshot snapshot = binding.Snapshot;
@@ -1106,6 +1109,25 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         if (ControllerContext?.HttpContext is null)
         {
             return NotFound();
+        }
+
+        if (isRawArtifactPath
+            && _artifactDelivery.AnonymousRawArtifactDownloadsEnabled
+            && !binding.RequiresAccount
+            && !HasCredentialQuery(Request))
+        {
+            if (generationBoundRawPath)
+            {
+                TryApplyImmutableGenerationHeaders();
+            }
+
+            return BuildVerifiedArtifactFileResult(
+                binding,
+                ResolveDirectFileContentType(
+                    binding.FileName,
+                    binding.Role == ArtifactDeliveryRoles.PayloadMetadata),
+                fileDownloadName: null,
+                enableRangeProcessing: true);
         }
 
         string? bootstrapTicket = Request.Query["ticket"].ToString();
@@ -1181,7 +1203,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
                 enableRangeProcessing: true);
         }
 
-        if (retainedRawPath)
+        if (generationBoundRawPath)
         {
             Response.Headers["Cache-Control"] = "private, no-store";
             return StatusCode(StatusCodes.Status409Conflict, new

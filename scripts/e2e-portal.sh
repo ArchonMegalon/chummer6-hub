@@ -14,6 +14,10 @@ PORTAL_FORWARDED_PROTO="${CHUMMER_PORTAL_FORWARDED_PROTO:-https}"
 PORTAL_REQUIRE_BLAZOR="${CHUMMER_PORTAL_REQUIRE_BLAZOR:-0}"
 PORTAL_SKIP_EDGE_REBUILD="${CHUMMER_PORTAL_E2E_SKIP_EDGE_REBUILD:-0}"
 PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE="${CHUMMER_PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE:-1}"
+CANONICAL_RELEASE_CHANNEL_RECEIPT="/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json"
+PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT:-$CANONICAL_RELEASE_CHANNEL_RECEIPT}"
+PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256-}"
+PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256="${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256-}"
 if [[ -n "${CHUMMER_PORTAL_PLAYWRIGHT:-}" ]]; then
   RUN_PORTAL_PLAYWRIGHT="$CHUMMER_PORTAL_PLAYWRIGHT"
 elif [[ "${CI:-}" == "true" || "${GITHUB_ACTIONS:-}" == "true" ]]; then
@@ -64,7 +68,23 @@ if [[ "$PORTAL_SKIP_EDGE_REBUILD" == "1" || "$PORTAL_SKIP_EDGE_REBUILD" == "true
   echo "reusing current public-edge containers for portal playwright e2e"
 else
   if [[ "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" != "0" && "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" != "false" && "$PUBLIC_EDGE_DEPLOY_PREFLIGHT_GATE" != "FALSE" ]]; then
-    python3 scripts/check_public_edge_deploy_preflight.py
+    if [[ "$PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT" != "$CANONICAL_RELEASE_CHANNEL_RECEIPT" ]]; then
+      echo "public-edge preflight refuses a non-canonical release-channel receipt" >&2
+      exit 2
+    fi
+    if [[ ! "$PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256 must be independently supplied as a lowercase SHA-256" >&2
+      exit 2
+    fi
+    if [[ ! "$PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+      echo "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256 must be independently supplied as a lowercase SHA-256" >&2
+      exit 2
+    fi
+    python3 scripts/check_public_edge_deploy_preflight.py \
+      --source-root "$ROOT_DIR" \
+      --runtime-proof-bind-source-sha256 "$PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256" \
+      --release-channel-receipt "$PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT" \
+      --release-channel-receipt-sha256 "$PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256"
   fi
 
   compose_up_log="$(mktemp)"

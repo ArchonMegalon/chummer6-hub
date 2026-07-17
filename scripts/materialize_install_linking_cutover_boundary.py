@@ -26,7 +26,7 @@ except ModuleNotFoundError:  # Direct ``python3 scripts/...`` execution.
     from strict_json_contract import strict_json_object
 
 
-CONTRACT_NAME = "chummer.install_linking_postgres_cutover_boundary.v2"
+CONTRACT_NAME = "chummer.install_linking_postgres_cutover_boundary.v3"
 PHASES = (
     "prepare_starting",
     "prepare_completed",
@@ -34,6 +34,23 @@ PHASES = (
     "validate_completed",
     "public_acceptance_completed",
 )
+IMPORT_SKIPPED_PHASE = "import_skipped_no_local_store"
+SUPPORTED_PHASES = (
+    "prepare_starting",
+    "prepare_completed",
+    "import_completed",
+    IMPORT_SKIPPED_PHASE,
+    "validate_completed",
+    "public_acceptance_completed",
+)
+PHASE_SEQUENCE = {
+    "prepare_starting": 0,
+    "prepare_completed": 1,
+    "import_completed": 2,
+    IMPORT_SKIPPED_PHASE: 2,
+    "validate_completed": 3,
+    "public_acceptance_completed": 4,
+}
 OPERATOR_COMPLETION_PHASES = {
     "prepare_completed",
     "import_completed",
@@ -193,7 +210,7 @@ def materialize(
     operator_container_image_id: str | None = None,
     active_build_info: Path,
 ) -> dict[str, Any]:
-    if phase not in PHASES:
+    if phase not in SUPPORTED_PHASES:
         raise ValueError("unsupported cutover boundary phase")
     if re.fullmatch(r"sha256:[0-9a-f]{64}", candidate_image_id) is None:
         raise ValueError("candidate image id must be a full lowercase SHA-256 image id")
@@ -211,7 +228,7 @@ def materialize(
     output = _validate_receipt_directory(output)
     active_build_info, active_build_info_sha256 = bind_active_build_info(active_build_info)
     existing, prior_receipt_sha256 = load_existing(output)
-    phase_index = PHASES.index(phase)
+    phase_index = PHASE_SEQUENCE[phase]
     created_at = now_iso()
     if existing is None:
         if phase != PHASES[0]:
@@ -231,9 +248,9 @@ def materialize(
         ):
             raise ValueError("cutover boundary active build-info binding drifted")
         prior_phase = str(existing.get("phase") or "")
-        if prior_phase not in PHASES:
+        if prior_phase not in SUPPORTED_PHASES:
             raise ValueError("cutover boundary prior phase is invalid")
-        prior_phase_index = PHASES.index(prior_phase)
+        prior_phase_index = PHASE_SEQUENCE[prior_phase]
         if phase_index < prior_phase_index:
             raise ValueError("cutover boundary phase cannot move backwards")
         if phase_index == prior_phase_index:
@@ -241,6 +258,19 @@ def materialize(
         if phase_index > prior_phase_index + 1:
             raise ValueError("cutover boundary phase cannot skip an irreversible checkpoint")
         created_at = str(existing.get("createdAtUtc") or created_at)
+    if phase == "import_completed":
+        import_disposition = "completed"
+    elif phase == IMPORT_SKIPPED_PHASE:
+        import_disposition = "skipped_no_local_store"
+    elif existing is None:
+        import_disposition = None
+    else:
+        import_disposition = existing.get("importDisposition")
+    if phase_index >= PHASE_SEQUENCE["import_completed"] and import_disposition not in {
+        "completed",
+        "skipped_no_local_store",
+    }:
+        raise ValueError("cutover boundary import disposition is missing or invalid")
     accepted = phase == "public_acceptance_completed"
     payload: dict[str, Any] = {
         "contractName": CONTRACT_NAME,
@@ -259,8 +289,13 @@ def materialize(
         "previousReceiptSha256": prior_receipt_sha256,
         "irreversibleDatabaseBoundaryMayHaveBeenEntered": True,
         "prepareCompleted": phase_index >= PHASES.index("prepare_completed"),
-        "importCompleted": phase_index >= PHASES.index("import_completed"),
-        "validateCompleted": phase_index >= PHASES.index("validate_completed"),
+        "importDisposition": import_disposition,
+        "importCompleted": import_disposition == "completed",
+        "importSkippedNoLocalStore": import_disposition == "skipped_no_local_store",
+        "localStorePresentAtCutover": (
+            None if import_disposition is None else import_disposition == "completed"
+        ),
+        "validateCompleted": phase_index >= PHASE_SEQUENCE["validate_completed"],
         "publicAcceptanceCompleted": accepted,
         "automaticDatabaseRollbackAllowed": False,
         "recoveryAuthority": {
@@ -283,7 +318,7 @@ def main() -> int:
         description="Advance the durable InstallLinking cutover-boundary receipt."
     )
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--phase", choices=PHASES, required=True)
+    parser.add_argument("--phase", choices=SUPPORTED_PHASES, required=True)
     parser.add_argument("--cutover-id", required=True)
     parser.add_argument("--candidate-image-id", required=True)
     parser.add_argument("--candidate-tool-image-id", required=True)

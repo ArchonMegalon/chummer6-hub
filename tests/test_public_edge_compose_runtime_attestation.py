@@ -368,6 +368,78 @@ def test_compose_attestation_accepts_only_canonical_runtime_and_omits_environmen
 
 
 @pytest.mark.parametrize(
+    "runtime_role",
+    (
+        "chummer_runtime",
+        "_",
+        "r" + "0" * 62,
+    ),
+)
+def test_compose_attestation_accepts_postgres_tool_runtime_role_contract(
+    tmp_path: Path,
+    runtime_role: str,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+    )
+    payload["services"]["chummer-install-linking-postgres-admin"][
+        "environment"
+    ]["CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE"] = runtime_role
+
+    receipt = module.validate_runtime(
+        payload,
+        project_name="chummer6-hub",
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+        published_port=8091,
+    )
+
+    assert receipt["status"] == "pass"
+
+
+@pytest.mark.parametrize(
+    "runtime_role",
+    (
+        "",
+        "9runtime",
+        "Runtime",
+        "runtime-role",
+        "runtime role",
+        "r" + "0" * 63,
+    ),
+)
+def test_compose_attestation_rejects_roles_rejected_by_postgres_tool(
+    tmp_path: Path,
+    runtime_role: str,
+) -> None:
+    module = load_module()
+    source_root, build_context, overlay_root = fixture_roots(tmp_path)
+    payload = rendered_compose(
+        source_root=source_root,
+        build_context=build_context,
+        overlay_root=overlay_root,
+    )
+    payload["services"]["chummer-install-linking-postgres-admin"][
+        "environment"
+    ]["CHUMMER_INSTALL_LINKING_POSTGRES_RUNTIME_ROLE"] = runtime_role
+
+    with pytest.raises(ValueError, match="\\^\\[a-z_\\]"):
+        module.validate_runtime(
+            payload,
+            project_name="chummer6-hub",
+            source_root=source_root,
+            build_context=build_context,
+            overlay_root=overlay_root,
+            published_port=8091,
+        )
+
+
+@pytest.mark.parametrize(
     ("mutation", "message"),
     [
         (lambda payload: payload.update(name="other"), "project name"),

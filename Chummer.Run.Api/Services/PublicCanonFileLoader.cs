@@ -24,6 +24,22 @@ public sealed class PublicCanonFileLoader
 
     public string ResolveRepoRoot(string requiredRelativePath)
     {
+        if (PublicStrictConfiguredRoot.IsEnabled(_configuration))
+        {
+            string strictRoot = PublicStrictConfiguredRoot.Require(_configuration);
+            foreach (string relativePathCandidate in ExpandRelativePathCandidates(requiredRelativePath))
+            {
+                string fullPath = PublicStrictConfiguredRoot.ResolveContainedPath(strictRoot, relativePathCandidate);
+                if (File.Exists(fullPath))
+                {
+                    return strictRoot;
+                }
+            }
+
+            throw new DirectoryNotFoundException(
+                $"Strict public canon root does not contain '{requiredRelativePath}'.");
+        }
+
         var configured = _configuration["CHUMMER_PUBLIC_CANON_ROOT"];
         var candidates = new string?[]
         {
@@ -67,7 +83,9 @@ public sealed class PublicCanonFileLoader
         string repoRoot = ResolveRepoRoot(relativePath);
         foreach (string relativePathCandidate in ExpandRelativePathCandidates(relativePath))
         {
-            string fullPath = Path.Combine(repoRoot, relativePathCandidate.Replace('/', Path.DirectorySeparatorChar));
+            string fullPath = PublicStrictConfiguredRoot.IsEnabled(_configuration)
+                ? PublicStrictConfiguredRoot.ResolveContainedPath(repoRoot, relativePathCandidate)
+                : Path.Combine(repoRoot, relativePathCandidate.Replace('/', Path.DirectorySeparatorChar));
             if (File.Exists(fullPath))
             {
                 lock (_cacheLock)
@@ -181,5 +199,121 @@ public sealed class PublicCanonFileLoader
     {
         public bool Matches(FileInfo info)
             => info.LastWriteTimeUtc == LastWriteUtc && info.Length == Length;
+    }
+}
+
+internal static class PublicStrictConfiguredRoot
+{
+    internal const string EnabledConfigKey = "CHUMMER_PUBLIC_STRICT_CONFIGURED_ROOT";
+    internal const string RootConfigKey = "CHUMMER_PUBLIC_CANON_ROOT";
+
+    internal static bool IsEnabled(IConfiguration configuration)
+        => bool.TryParse(configuration[EnabledConfigKey], out bool enabled) && enabled;
+
+    internal static string Require(IConfiguration configuration)
+    {
+        string? configuredRoot = configuration[RootConfigKey]?.Trim();
+        if (string.IsNullOrWhiteSpace(configuredRoot))
+        {
+            throw new InvalidOperationException(
+                $"{EnabledConfigKey}=true requires {RootConfigKey} to be configured.");
+        }
+
+        if (!Path.IsPathFullyQualified(configuredRoot))
+        {
+            throw new InvalidOperationException(
+                $"{EnabledConfigKey}=true requires {RootConfigKey} to be an absolute path.");
+        }
+
+        string normalizedRoot;
+        try
+        {
+            normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(configuredRoot));
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new InvalidOperationException(
+                $"{RootConfigKey} is not a valid absolute path.",
+                exception);
+        }
+
+        if (!Directory.Exists(normalizedRoot))
+        {
+            throw new DirectoryNotFoundException(
+                $"Strict public canon root does not exist: {normalizedRoot}");
+        }
+
+        EnsureNoReparsePoints(normalizedRoot);
+        return normalizedRoot;
+    }
+
+    internal static string ResolveContainedPath(string normalizedRoot, string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            throw new InvalidOperationException("Strict public canon paths must not be empty.");
+        }
+
+        string platformRelativePath = relativePath
+            .Replace('/', Path.DirectorySeparatorChar)
+            .Replace('\\', Path.DirectorySeparatorChar);
+        if (Path.IsPathFullyQualified(platformRelativePath))
+        {
+            throw new InvalidOperationException(
+                $"Strict public canon path must be relative: {relativePath}");
+        }
+
+        string fullPath = Path.GetFullPath(Path.Combine(normalizedRoot, platformRelativePath));
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        string rootPrefix = normalizedRoot.EndsWith(Path.DirectorySeparatorChar)
+            ? normalizedRoot
+            : normalizedRoot + Path.DirectorySeparatorChar;
+        if (!string.Equals(fullPath, normalizedRoot, comparison)
+            && !fullPath.StartsWith(rootPrefix, comparison))
+        {
+            throw new InvalidOperationException(
+                $"Strict public canon path escapes {RootConfigKey}: {relativePath}");
+        }
+
+        EnsureNoReparsePoints(fullPath);
+        return fullPath;
+    }
+
+    private static void EnsureNoReparsePoints(string fullPath)
+    {
+        string normalizedPath = Path.GetFullPath(fullPath);
+        string pathRoot = Path.GetPathRoot(normalizedPath)
+            ?? throw new InvalidOperationException($"Unable to determine filesystem root for '{fullPath}'.");
+        string current = pathRoot;
+        string remainder = normalizedPath[pathRoot.Length..];
+        char[] separators = Path.DirectorySeparatorChar == Path.AltDirectorySeparatorChar
+            ? [Path.DirectorySeparatorChar]
+            : [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar];
+
+        foreach (string segment in remainder.Split(separators, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            FileAttributes attributes;
+            try
+            {
+                attributes = File.GetAttributes(current);
+            }
+            catch (FileNotFoundException)
+            {
+                break;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                break;
+            }
+
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Strict public canon path contains a symbolic link or reparse point: {current}");
+            }
+        }
     }
 }
