@@ -7,6 +7,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "verify_public_edge_deploy_source.py"
@@ -18,8 +20,15 @@ SPEC.loader.exec_module(MODULE)
 GUARDED_DOCKERFILE = """
 FROM scratch
 RUN test -f /app/publish/wwwroot/service-worker.js \
- && grep -q 'const CACHE_NAME = "chummer-public-v4";' /app/publish/wwwroot/service-worker.js \
- && ! grep -q 'play-shell-v' /app/publish/wwwroot/service-worker.js
+ && grep -Fq 'const CACHE_VERSION = "v19";' /app/publish/wwwroot/service-worker.js \
+ && grep -Fq 'const CACHE_CONTRACT = "run-api-projection-v2";' /app/publish/wwwroot/service-worker.js \
+ && grep -Fq 'const CRITICAL_SHELL_ASSETS = [' /app/publish/wwwroot/service-worker.js \
+ && grep -Fq '"/manifest.play.webmanifest"' /app/publish/wwwroot/service-worker.js \
+ && grep -Fq 'play_public_route_network_unavailable' /app/publish/wwwroot/service-worker.js \
+ && grep -Fq 'url.pathname.startsWith("/api/play/")' /app/publish/wwwroot/service-worker.js \
+ && ! grep -Fq 'self.skipWaiting()' /app/publish/wwwroot/service-worker.js \
+ && ! grep -Fq 'self.clients.claim()' /app/publish/wwwroot/service-worker.js \
+ && ! grep -Fq '"/mobile-turn-companion.js"' /app/publish/wwwroot/service-worker.js
 """.lstrip()
 
 
@@ -279,6 +288,81 @@ def test_compose_build_source_requires_portal_service_worker_publish_guard() -> 
 
     assert receipt["status"] == "fail"
     assert any(finding["id"] == "missing_portal_service_worker_publish_guard" for finding in receipt["findings"])
+
+
+def test_repository_dockerfile_has_current_portal_service_worker_publish_guard() -> None:
+    assert MODULE.dockerfile_has_portal_service_worker_guard(
+        ROOT / "Chummer.Run.Api" / "Dockerfile"
+    )
+
+
+def test_portal_service_worker_publish_guard_rejects_comment_only_markers(
+    tmp_path: Path,
+) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(
+        "FROM scratch\n"
+        + "\n".join(
+            f"# {marker}" for marker in MODULE.PORTAL_SERVICE_WORKER_GUARD_MARKERS
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert not MODULE.dockerfile_has_portal_service_worker_guard(dockerfile)
+
+
+def test_portal_service_worker_publish_guard_rejects_commented_guard_block(
+    tmp_path: Path,
+) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    lines = GUARDED_DOCKERFILE.splitlines()
+    dockerfile.write_text(
+        "\n".join(
+            line if index == 0 else f"# {line}"
+            for index, line in enumerate(lines)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert not MODULE.dockerfile_has_portal_service_worker_guard(dockerfile)
+
+
+def test_portal_service_worker_publish_guard_rejects_split_run_markers(
+    tmp_path: Path,
+) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(
+        "FROM scratch\n"
+        + "\n".join(
+            f"RUN {marker.removeprefix('RUN ')}"
+            for marker in MODULE.PORTAL_SERVICE_WORKER_GUARD_MARKERS
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert not MODULE.dockerfile_has_portal_service_worker_guard(dockerfile)
+
+
+def test_portal_service_worker_publish_guard_rejects_escape_directive_drift(
+    tmp_path: Path,
+) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text("# escape=`\n" + GUARDED_DOCKERFILE, encoding="utf-8")
+
+    assert not MODULE.dockerfile_has_portal_service_worker_guard(dockerfile)
+
+
+@pytest.mark.parametrize("marker", MODULE.PORTAL_SERVICE_WORKER_GUARD_MARKERS)
+def test_portal_service_worker_publish_guard_requires_every_current_marker(
+    tmp_path: Path, marker: str
+) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(GUARDED_DOCKERFILE.replace(marker, "", 1), encoding="utf-8")
+
+    assert not MODULE.dockerfile_has_portal_service_worker_guard(dockerfile)
 
 
 def test_compose_build_source_rejects_split_additional_context_and_dockerfile_source() -> None:
