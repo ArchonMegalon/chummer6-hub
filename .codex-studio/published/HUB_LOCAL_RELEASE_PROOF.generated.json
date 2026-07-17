@@ -5,15 +5,26 @@
   "desktop_client_readiness": {
     "status": "fail",
     "scoped_status": "fail",
-    "generated_at": "2026-07-01T15:07:43Z",
+    "generated_at": "2026-07-17T10:19:42Z",
     "missing_coverage_keys": [
-      "desktop_client"
+      "fleet_and_operator_loop"
     ],
-    "desktop_client_missing": true,
-    "reason": "flagship product readiness proof is not green: fail; missing coverage: desktop_client; readiness plane gaps: flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready",
+    "desktop_client_missing": false,
+    "reason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is promoted_preview, not public_stable, workspace portal release channel artifact chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json disagrees with authoritative registry receipt (local status=published, channel=preview, version=run-20260715-140426, supportability=review_required, rollout=public_release_review_required; authoritative status=published, channel=preview, version=run-20260712-174412, supportability=preview_supported, rollout=promoted_preview), Windows installer visual audit source digest does not match promoted installer, Portal release channel Windows installer binding disagrees with authoritative release channel, promoted Windows installer artifact file is missing, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json, windows installer gold proof artifact is still missing: /docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-d0857d0a6e5c.zip, supervisor completion status is 'fail', supervisor completion evidence is stale, root RELEASE_BLOCKERS receipt is stale (generated_at=2026-07-14T03:51:55Z; max_age_seconds=86400): /docker/chummercomplete/RELEASE_BLOCKERS.generated.json, Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decisions remain unresolved: quota_policy, logical_bytes, recreation_and_undo, offline_compatibility, tombstone_privacy_policy, stable_owner_identity, writer_epoch, delete_replay_and_rpo, provider_and_topology, enforcement_boundary, migration_posture, capacity_and_retention. Coverage gaps: fleet_and_operator_loop, desktop_client.",
     "completion_audit_status": "fail",
-    "completion_audit_reason": "Flagship product readiness planes are not green: flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, feedback_loop_ready, public_shelf_ready, recovery_trust_ready.",
-    "source_path": "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
+    "completion_audit_reason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is promoted_preview, not public_stable, workspace portal release channel artifact chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json disagrees with authoritative registry receipt (local status=published, channel=preview, version=run-20260715-140426, supportability=review_required, rollout=public_release_review_required; authoritative status=published, channel=preview, version=run-20260712-174412, supportability=preview_supported, rollout=promoted_preview), Windows installer visual audit source digest does not match promoted installer, Portal release channel Windows installer binding disagrees with authoritative release channel, promoted Windows installer artifact file is missing, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json, windows installer gold proof artifact is still missing: /docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-d0857d0a6e5c.zip, supervisor completion status is 'fail', supervisor completion evidence is stale, root RELEASE_BLOCKERS receipt is stale (generated_at=2026-07-14T03:51:55Z; max_age_seconds=86400): /docker/chummercomplete/RELEASE_BLOCKERS.generated.json, Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decisions remain unresolved: quota_policy, logical_bytes, recreation_and_undo, offline_compatibility, tombstone_privacy_policy, stable_owner_identity, writer_epoch, delete_replay_and_rpo, provider_and_topology, enforcement_boundary, migration_posture, capacity_and_retention. Coverage gaps: fleet_and_operator_loop, desktop_client.",
+    "source_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
+  },
+  "release_channel": {
+    "status": "unavailable",
+    "path": "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
+    "channelId": "",
+    "channel": "",
+    "version": "",
+    "releaseVersion": "",
+    "rolloutState": "",
+    "supportabilityState": "",
+    "publishedAt": ""
   },
   "publicTrustSurface": {
     "summary": "This governor-visible trust surface bundle keeps status, current release, downloads, proof shelf, and public pulse routes aligned on the same outward-facing release truth.",
@@ -897,7 +908,6 @@
     "/home/work",
     "/account/access",
     "/account/work",
-    "/account/roster",
     "/account/support",
     "/contact",
     "/downloads",
@@ -1643,6 +1653,6 @@
       ]
     }
   ],
-  "generated_at": "2026-07-12T21:54:24Z",
-  "generatedAt": "2026-07-12T21:54:24Z"
+  "generated_at": "2026-07-17T19:28:18Z",
+  "generatedAt": "2026-07-17T19:28:18Z"
 }

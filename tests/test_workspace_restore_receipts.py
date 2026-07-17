@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import runpy
 import subprocess
 import tempfile
 import unittest
@@ -1374,34 +1375,48 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("proof_routes must match", result.stderr)
         self.assertIn("served-proof.json", result.stderr)
 
-    def test_verifier_fails_closed_when_local_release_proof_drops_package_scoped_receipt_route(self) -> None:
+    def test_verifier_keeps_package_scoped_receipt_routes_outside_registry_top_level_routes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-proof-route-gap-") as temp_dir:
             temp_root = Path(temp_dir)
             release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
             source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
             payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
-            payload["proof_routes"] = [
-                route
-                for route in payload["proof_routes"]
-                if route != "/account/roster"
-            ]
             release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
-            env = os.environ.copy()
-            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+            receipt_routes = {
+                receipt["receipt_id"]: receipt["routes"]
+                for receipt in payload["proof_receipts"]
+                if receipt.get("receipt_id")
+                in {"workspace_restore:provenance", "entitlement_sync:conflict_receipts"}
+            }
+            self.assertNotIn("/account/roster", payload["proof_routes"])
+            self.assertIn("/account/roster", receipt_routes["workspace_restore:provenance"])
+            self.assertIn("/account/roster", receipt_routes["entitlement_sync:conflict_receipts"])
 
-            result = subprocess.run(
-                ["python3", str(SCRIPT)],
-                cwd=REPO_ROOT,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
+            namespace = runpy.run_path(str(SCRIPT))
+            missing: list[str] = []
+            namespace["check_local_release_proof"](release_proof_path, missing)
 
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("proof_routes missing package-scoped receipt route /account/roster", result.stderr)
-        self.assertIn("workspace_restore:provenance", result.stderr)
+        self.assertEqual([], missing)
+
+    def test_verifier_rejects_empty_runtime_projection_schemas(self) -> None:
+        namespace = runpy.run_path(str(SCRIPT))
+        source_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        payload = json.loads(source_path.read_text(encoding="utf-8"))
+        payload["desktop_client_readiness"] = {}
+        payload["release_channel"] = {}
+
+        stable = namespace["stable_release_payload"]
+        self.assertNotEqual(stable(payload), stable(json.loads(source_path.read_text(encoding="utf-8"))))
+
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-empty-runtime-projection-") as temp_dir:
+            proof_path = Path(temp_dir) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            missing: list[str] = []
+            namespace["check_local_release_proof"](proof_path, missing)
+
+        self.assertTrue(any("desktop_client_readiness keys must be exactly" in item for item in missing))
+        self.assertTrue(any("release_channel keys must be exactly" in item for item in missing))
 
     def test_verifier_fails_closed_when_release_proof_contains_untracked_package_receipt(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-untracked-receipt-") as temp_dir:

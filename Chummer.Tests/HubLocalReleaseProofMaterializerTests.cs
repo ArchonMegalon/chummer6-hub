@@ -70,7 +70,6 @@ public sealed class HubLocalReleaseProofMaterializerTests
                 "/home/work",
                 "/account/access",
                 "/account/work",
-                "/account/roster",
                 "/account/support",
                 "/contact",
                 "/downloads",
@@ -191,20 +190,29 @@ public sealed class HubLocalReleaseProofMaterializerTests
 
         Directory.CreateDirectory(tempRoot);
 
-        RunMaterializer(materializerPath, proofPath);
+        RunMaterializer(materializerPath, proofPath, baseUrl: "https://chummer.run");
         RunRegistryReleaseProofValidator(registryValidatorPath, proofPath);
     }
 
-    private static void RunMaterializer(string scriptPath, string proofPath, IReadOnlyDictionary<string, string>? environment = null)
+    private static void RunMaterializer(
+        string scriptPath,
+        string proofPath,
+        IReadOnlyDictionary<string, string>? environment = null,
+        string baseUrl = "http://127.0.0.1:8091")
     {
         var startInfo = new ProcessStartInfo
         {
             FileName = "python3",
-            Arguments = $"{scriptPath} {proofPath} http://127.0.0.1:8091 docker-compose.public-edge.yml 300 true",
             RedirectStandardError = true,
             RedirectStandardOutput = true,
             UseShellExecute = false,
         };
+        startInfo.ArgumentList.Add(scriptPath);
+        startInfo.ArgumentList.Add(proofPath);
+        startInfo.ArgumentList.Add(baseUrl);
+        startInfo.ArgumentList.Add("docker-compose.public-edge.yml");
+        startInfo.ArgumentList.Add("300");
+        startInfo.ArgumentList.Add("true");
 
         if (environment is not null)
         {
@@ -252,36 +260,4 @@ public sealed class HubLocalReleaseProofMaterializerTests
             $"Registry release-proof validator should accept the generated Hub proof but exited with {process.ExitCode}\nstdout:\n{stdout}\nstderr:\n{stderr}");
     }
 
-    private static string[] ExpectedProofRoutes()
-    {
-        using JsonDocument releaseChannel = JsonDocument.Parse(
-            File.ReadAllText(RepoPaths.FromRoot("Chummer.Portal", "downloads", "RELEASE_CHANNEL.generated.json")));
-
-        string[] installRoutes = releaseChannel.RootElement
-            .GetProperty("artifacts")
-            .EnumerateArray()
-            .Where(static item => string.Equals(item.GetProperty("kind").GetString(), "installer", StringComparison.OrdinalIgnoreCase))
-            .Select(static item => $"/downloads/install/{item.GetProperty("artifactId").GetString()}")
-            .Where(static route => !string.IsNullOrWhiteSpace(route))
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(static route => route, StringComparer.Ordinal)
-            .ToArray();
-
-        string[] additionalInstallRoutes = installRoutes
-            .Where(static route => !string.Equals(route, "/downloads/install/avalonia-linux-x64-installer", StringComparison.Ordinal))
-            .ToArray();
-
-        return
-        [
-            "/downloads/install/avalonia-linux-x64-installer",
-            "/home/access",
-            "/home/work",
-            "/account/access",
-            "/account/work",
-            "/account/support",
-            "/contact",
-            "/downloads",
-            .. additionalInstallRoutes,
-        ];
-    }
 }

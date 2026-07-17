@@ -106,6 +106,8 @@ PRESENTATION_STARTUP_SMOKE_ROOT="${CHUMMER_PRESENTATION_STARTUP_SMOKE_ROOT:-$(re
 RUNSERVICES_PORTAL_STARTUP_SMOKE_ROOT="${CHUMMER_RUNSERVICES_PORTAL_STARTUP_SMOKE_ROOT:-$REPO_ROOT/Chummer.Portal/downloads/startup-smoke}"
 PRESENTATION_RELEASE_CHANNEL_PATH="${CHUMMER_PRESENTATION_RELEASE_CHANNEL_PATH:-$(resolve_ui_downloads_path "RELEASE_CHANNEL.generated.json")}"
 PRESENTATION_RELEASE_EVIDENCE_SOURCE="${CHUMMER_PRESENTATION_RELEASE_EVIDENCE_SOURCE:-$PRESENTATION_ROOT/Docker/Downloads/release-evidence/public-promotion.json}"
+RELEASE_BUILD_HANDOFF_SCRIPT_PATH="${CHUMMER_PUBLIC_RELEASE_BUILD_HANDOFF_SCRIPT_PATH:-$PRESENTATION_ROOT/scripts/materialize_release_candidate_handoff.py}"
+WINDOWS_EXIT_GATE_SCRIPT_PATH="${CHUMMER_WINDOWS_EXIT_GATE_SCRIPT_PATH:-$PRESENTATION_ROOT/scripts/materialize-windows-desktop-exit-gate.sh}"
 RELEASE_PROOF_SOURCE="${CHUMMER_RUN_LOCAL_RELEASE_PROOF_SOURCE:-$REPO_ROOT/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
 UI_LOCALIZATION_RELEASE_GATE_SOURCE="$(resolve_ui_localization_release_gate_source)"
 STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-172800}"
@@ -114,7 +116,12 @@ PUBLIC_RELEASE_PROOF_BASE_URL="${CHUMMER_PUBLIC_RELEASE_PROOF_BASE_URL:-https://
 DISABLED_ARTIFACT_IDS="${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-${CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS:-}}"
 FORCE_ACCOUNT_REQUIRED_DOWNLOADS="${CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS:-false}"
 REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-$REPO_ROOT/../chummer-hub-registry}"
+REGISTRY_PUBLISHED_FILES_ROOT="${CHUMMER_HUB_REGISTRY_PUBLISHED_FILES_ROOT:-$REGISTRY_ROOT/.codex-studio/published/files}"
+AUTHORITATIVE_PUBLISHED_ROOT="${CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISHED_ROOT:-$REGISTRY_ROOT/.codex-studio/published}"
 PUBLIC_RELEASE_CHANNEL_SOURCE_PATH="$(resolve_public_release_channel_source)"
+WINDOWS_VISUAL_AUDIT_PUBLISHED_PATH="${CHUMMER_WINDOWS_VISUAL_AUDIT_PUBLISHED_PATH:-$REPO_ROOT/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT.generated.json}"
+WINDOWS_VISUAL_AUDIT_INTAKE_REQUEST_PATH="${CHUMMER_WINDOWS_VISUAL_AUDIT_INTAKE_REQUEST_PATH:-$REPO_ROOT/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_INTAKE_REQUEST.generated.json}"
+WINDOWS_VISUAL_AUDIT_AUTO_IMPORT_PATH="${CHUMMER_WINDOWS_VISUAL_AUDIT_AUTO_IMPORT_PATH:-$REPO_ROOT/.codex-studio/published/WINDOWS_INSTALLER_VISUAL_AUDIT_AUTO_IMPORT.generated.json}"
 
 detect_auto_disabled_artifact_ids() {
   local files_root="$1"
@@ -471,6 +478,624 @@ copy_public_artifacts() {
   shopt -u nullglob
 }
 
+hydrate_manifest_owned_artifacts_from_candidate_roots() {
+  local target_root="${1:-}"
+  local manifest_path="${2:-}"
+  shift 2 || true
+  if [[ -z "$target_root" || -z "$manifest_path" || ! -d "$target_root" || ! -f "$manifest_path" ]]; then
+    return 0
+  fi
+
+  python3 - "$target_root" "$manifest_path" "$@" <<'PY'
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import sys
+from pathlib import Path
+from urllib.parse import urlparse
+
+
+target_root = Path(sys.argv[1])
+manifest_path = Path(sys.argv[2])
+candidate_roots = [Path(raw) for raw in sys.argv[3:] if str(raw).strip()]
+
+
+def normalized_sha(value: object) -> str:
+    return str(value or "").strip().lower().removeprefix("sha256:")
+
+
+def integer(value: object) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest().lower()
+
+
+def safe_name(value: object) -> str:
+    raw = str(value or "").strip()
+    name = Path(raw).name if raw else ""
+    return name if name == raw and name not in {".", ".."} else ""
+
+
+def url_name(value: object) -> str:
+    raw = str(value or "").strip()
+    return safe_name(Path(urlparse(raw).path).name) if raw else ""
+
+
+def matching_file(path: Path, *, expected_sha: str, expected_size: int | None) -> bool:
+    if not path.is_file():
+        return False
+    if expected_size is not None and path.stat().st_size != expected_size:
+        return False
+    return not expected_sha or sha256_file(path) == expected_sha
+
+
+def replace_file(source_path: Path, target_path: Path) -> None:
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = target_path.with_name(f".{target_path.name}.tmp-{os.getpid()}")
+    try:
+        shutil.copy2(source_path, temporary_path)
+        os.replace(temporary_path, target_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def payload_sidecar_matches(
+    path: Path,
+    *,
+    payload_name: str,
+    payload_sha: str,
+    payload_size: int | None,
+    installer_name: str,
+) -> bool:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    if safe_name(payload.get("fileName")) != payload_name:
+        return False
+    if payload_sha and normalized_sha(payload.get("sha256")) != payload_sha:
+        return False
+    recorded_size = integer(payload.get("sizeBytes"))
+    if payload_size is not None and recorded_size != payload_size:
+        return False
+    recorded_installer = safe_name(payload.get("installerFileName"))
+    return not installer_name or not recorded_installer or recorded_installer == installer_name
+
+
+def hydrate(name: str, *, expected_sha: str = "", expected_size: int | None = None) -> None:
+    if not name:
+        return
+    target_path = target_root / name
+    # Bytes already merged from run-services/presentation are newer input truth.
+    # Candidate roots are recovery-only and must never overwrite them.
+    if target_path.is_file():
+        return
+    for root in candidate_roots:
+        source_path = root / name
+        if matching_file(source_path, expected_sha=expected_sha, expected_size=expected_size):
+            replace_file(source_path, target_path)
+            return
+
+
+payload = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+rows = payload.get("artifacts")
+if not isinstance(rows, list):
+    rows = payload.get("downloads")
+if not isinstance(rows, list):
+    rows = []
+
+for row in rows:
+    if not isinstance(row, dict):
+        continue
+    installer_name = safe_name(row.get("fileName")) or url_name(row.get("downloadUrl") or row.get("url"))
+    hydrate(
+        installer_name,
+        expected_sha=normalized_sha(row.get("sha256") or row.get("artifactSha256")),
+        expected_size=integer(row.get("sizeBytes") or row.get("artifactSizeBytes")),
+    )
+
+    payload_name = safe_name(row.get("payloadFileName")) or url_name(row.get("payloadDownloadUrl"))
+    payload_sha = normalized_sha(row.get("payloadSha256"))
+    payload_size = integer(row.get("payloadSizeBytes"))
+    hydrate(payload_name, expected_sha=payload_sha, expected_size=payload_size)
+    if not payload_name:
+        continue
+    sidecar_name = f"{payload_name}.json"
+    sidecar_target = target_root / sidecar_name
+    if sidecar_target.is_file():
+        continue
+    for root in candidate_roots:
+        source_path = root / sidecar_name
+        if payload_sidecar_matches(
+            source_path,
+            payload_name=payload_name,
+            payload_sha=payload_sha,
+            payload_size=payload_size,
+            installer_name=installer_name,
+        ):
+            replace_file(source_path, sidecar_target)
+            break
+PY
+}
+
+replace_file_atomically() {
+  local source_path="${1:-}"
+  local target_path="${2:-}"
+  if [[ -z "$source_path" || -z "$target_path" || ! -f "$source_path" ]]; then
+    return 0
+  fi
+  if [[ "$(realpath -m "$source_path")" == "$(realpath -m "$target_path")" ]]; then
+    return 0
+  fi
+
+  local target_dir
+  target_dir="$(dirname "$target_path")"
+  mkdir -p "$target_dir"
+  local temporary_path
+  temporary_path="$(mktemp "$target_dir/.${target_path##*/}.tmp.XXXXXX")"
+  cp "$source_path" "$temporary_path"
+  chmod --reference="$source_path" "$temporary_path" 2>/dev/null || true
+  mv -f "$temporary_path" "$target_path"
+}
+
+# The legacy Registry shelf exposes these three paths independently, so it has no
+# true cross-path atomic activation primitive. Stage the complete replacement on
+# the target filesystem, serialize writers, install the canonical manifest last,
+# and roll every touched path back on an error or catchable interruption. A
+# durable transaction directory lets the next run recover after an uncatchable
+# process or host failure. Layout-v1 current.json remains the required end state
+# for a real single activation boundary.
+sync_authoritative_publication_with_rollback() {
+  local source_root="${1:-}"
+  if [[ -z "$source_root" || ! -d "$source_root" ]]; then
+    return 0
+  fi
+  if [[ "$(realpath -m "$source_root")" == "$(realpath -m "$AUTHORITATIVE_PUBLISHED_ROOT")" ]]; then
+    return 0
+  fi
+
+  python3 - \
+    "$source_root" \
+    "$AUTHORITATIVE_PUBLISHED_ROOT" \
+    "${CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISH_TEST_FAIL_AFTER:-}" <<'PY'
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+import shutil
+import signal
+import stat
+import sys
+import tempfile
+from contextlib import contextmanager
+from pathlib import Path
+
+source_root = Path(sys.argv[1]).resolve()
+target_root = Path(sys.argv[2]).resolve()
+fault_after = str(sys.argv[3] or "").strip()
+publication_order = (
+    "startup-smoke",
+    "releases.json",
+    "RELEASE_CHANNEL.generated.json",
+)
+preactivation_fault = "preactivation"
+if fault_after and fault_after not in (*publication_order, preactivation_fault):
+    raise SystemExit(
+        "CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISH_TEST_FAIL_AFTER must name one authoritative publication path or preactivation"
+    )
+
+for relative in publication_order:
+    source = source_root / relative
+    if relative == "startup-smoke":
+        if not source.is_dir() or source.is_symlink():
+            raise SystemExit(f"authoritative publication source directory is missing or unsafe: {source}")
+    elif not source.is_file() or source.is_symlink():
+        raise SystemExit(f"authoritative publication source manifest is missing or unsafe: {source}")
+for source in (source_root / "startup-smoke").rglob("*"):
+    if source.is_symlink() or not (source.is_file() or source.is_dir()):
+        raise SystemExit(f"authoritative publication source contains an unsafe entry: {source}")
+
+target_root.mkdir(parents=True, exist_ok=True)
+
+
+def fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def fsync_tree(root: Path) -> None:
+    directories = [root]
+    for path in sorted(root.rglob("*")):
+        if path.is_dir():
+            directories.append(path)
+        elif path.is_file():
+            with path.open("rb") as handle:
+                os.fsync(handle.fileno())
+    for directory in reversed(directories):
+        fsync_directory(directory)
+
+
+def remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink(missing_ok=True)
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
+def write_state(transaction_root: Path, payload: dict[str, object]) -> None:
+    state_path = transaction_root / "state.json"
+    temporary_path = transaction_root / ".state.json.tmp"
+    with temporary_path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary_path, state_path)
+    fsync_directory(transaction_root)
+
+
+def validate_state(state: object, transaction_root: Path) -> dict[str, object]:
+    if not isinstance(state, dict):
+        raise SystemExit(f"authoritative publication transaction journal is not an object: {transaction_root}")
+    if state.get("schemaVersion") != "chummer.authoritative-release-publication-transaction/v1":
+        raise SystemExit(f"authoritative publication transaction journal has an invalid schema: {transaction_root}")
+    status = state.get("status")
+    touched = state.get("touched")
+    had_original = state.get("hadOriginal")
+    if status not in {"prepared", "activating", "committed"}:
+        raise SystemExit(f"authoritative publication transaction journal has an invalid status: {transaction_root}")
+    if not isinstance(touched, list) or touched != list(publication_order[: len(touched)]):
+        raise SystemExit(f"authoritative publication transaction journal has invalid touched paths: {transaction_root}")
+    if not isinstance(had_original, dict) or set(had_original) != set(touched):
+        raise SystemExit(f"authoritative publication transaction journal has invalid original-path state: {transaction_root}")
+    if any(not isinstance(value, bool) for value in had_original.values()):
+        raise SystemExit(f"authoritative publication transaction journal has invalid original-path flags: {transaction_root}")
+    if status == "prepared" and touched:
+        raise SystemExit(f"prepared authoritative publication transaction journal declares touched paths: {transaction_root}")
+    if status == "committed" and touched != list(publication_order):
+        raise SystemExit(f"committed authoritative publication transaction journal is incomplete: {transaction_root}")
+    return state
+
+
+def rollback(transaction_root: Path, state: dict[str, object]) -> None:
+    touched = list(state.get("touched") or [])
+    had_original = dict(state.get("hadOriginal") or {})
+    backup_root = transaction_root / "backup"
+    for relative in reversed(touched):
+        if relative not in publication_order:
+            continue
+        target = target_root / relative
+        backup = backup_root / relative
+        if backup.exists() or backup.is_symlink():
+            remove_path(target)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(backup, target)
+        elif not bool(had_original.get(relative)):
+            remove_path(target)
+        fsync_directory(target_root)
+
+
+def tombstone_transaction(transaction_root: Path) -> Path:
+    tombstone_root = target_root / transaction_root.name.replace(
+        ".release-publication-transaction-",
+        ".release-publication-tombstone-",
+        1,
+    )
+    os.replace(transaction_root, tombstone_root)
+    fsync_directory(target_root)
+    return tombstone_root
+
+
+def discard_ephemeral_directory(path: Path) -> None:
+    shutil.rmtree(path, ignore_errors=True)
+    fsync_directory(target_root)
+
+
+def recover_abandoned_transactions() -> None:
+    for transaction_root in sorted(target_root.glob(".release-publication-transaction-*")):
+        if not transaction_root.is_dir() or transaction_root.is_symlink():
+            raise SystemExit(f"unsafe authoritative publication transaction path: {transaction_root}")
+        state_path = transaction_root / "state.json"
+        if not state_path.is_file() or state_path.is_symlink():
+            raise SystemExit(f"authoritative publication transaction has no safe state journal: {transaction_root}")
+        try:
+            state = validate_state(
+                json.loads(state_path.read_text(encoding="utf-8")),
+                transaction_root,
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"authoritative publication transaction journal is unreadable: {transaction_root}: {exc}")
+        if state.get("status") != "committed":
+            rollback(transaction_root, state)
+        tombstone_root = tombstone_transaction(transaction_root)
+        discard_ephemeral_directory(tombstone_root)
+
+
+def discard_abandoned_preparations() -> None:
+    for preparing_root in sorted(target_root.glob(".release-publication-preparing-*")):
+        if not preparing_root.is_dir() or preparing_root.is_symlink():
+            raise SystemExit(f"unsafe authoritative publication preparation path: {preparing_root}")
+        discard_ephemeral_directory(preparing_root)
+
+
+def discard_abandoned_tombstones() -> None:
+    for tombstone_root in sorted(target_root.glob(".release-publication-tombstone-*")):
+        if not tombstone_root.is_dir() or tombstone_root.is_symlink():
+            raise SystemExit(f"unsafe authoritative publication tombstone path: {tombstone_root}")
+        discard_ephemeral_directory(tombstone_root)
+
+
+class PublicationInterrupted(RuntimeError):
+    pass
+
+
+def interrupt(signum: int, _frame: object) -> None:
+    raise PublicationInterrupted(f"authoritative publication interrupted by signal {signum}")
+
+
+@contextmanager
+def locked_directory(path: Path):
+    lock_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    lock_descriptor = os.open(path, lock_flags)
+    if not stat.S_ISDIR(os.fstat(lock_descriptor).st_mode):
+        os.close(lock_descriptor)
+        raise SystemExit(f"authoritative publication root is not a regular directory: {path}")
+    try:
+        fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(lock_descriptor)
+
+
+with locked_directory(target_root):
+    discard_abandoned_tombstones()
+    discard_abandoned_preparations()
+    recover_abandoned_transactions()
+
+    state: dict[str, object] = {
+        "schemaVersion": "chummer.authoritative-release-publication-transaction/v1",
+        "status": "prepared",
+        "touched": [],
+        "hadOriginal": {},
+    }
+    previous_handlers = {
+        signum: signal.signal(signum, interrupt)
+        for signum in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)
+    }
+    preparing_root: Path | None = None
+    transaction_root: Path | None = None
+    try:
+        preparing_root = Path(
+            tempfile.mkdtemp(prefix=".release-publication-preparing-", dir=target_root)
+        )
+        fsync_directory(target_root)
+        write_state(preparing_root, state)
+
+        preparing_stage_root = preparing_root / "stage"
+        preparing_backup_root = preparing_root / "backup"
+        preparing_stage_root.mkdir()
+        preparing_backup_root.mkdir()
+        shutil.copytree(source_root / "startup-smoke", preparing_stage_root / "startup-smoke")
+        shutil.copy2(source_root / "releases.json", preparing_stage_root / "releases.json")
+        shutil.copy2(
+            source_root / "RELEASE_CHANNEL.generated.json",
+            preparing_stage_root / "RELEASE_CHANNEL.generated.json",
+        )
+        fsync_tree(preparing_stage_root)
+        fsync_directory(preparing_root)
+
+        if fault_after == preactivation_fault:
+            raise RuntimeError("injected authoritative publication failure before activation")
+
+        transaction_root = target_root / preparing_root.name.replace(
+            ".release-publication-preparing-",
+            ".release-publication-transaction-",
+            1,
+        )
+        os.replace(preparing_root, transaction_root)
+        preparing_root = None
+        fsync_directory(target_root)
+        stage_root = transaction_root / "stage"
+        backup_root = transaction_root / "backup"
+
+        for relative in publication_order:
+            target = target_root / relative
+            staged = stage_root / relative
+            backup = backup_root / relative
+            touched = list(state["touched"])
+            touched.append(relative)
+            state["touched"] = touched
+            had_original = dict(state["hadOriginal"])
+            had_original[relative] = target.exists() or target.is_symlink()
+            state["hadOriginal"] = had_original
+            state["status"] = "activating"
+            write_state(transaction_root, state)
+
+            if had_original[relative]:
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(target, backup)
+                fsync_directory(backup.parent)
+            os.replace(staged, target)
+            fsync_directory(target_root)
+
+            if fault_after == relative:
+                raise RuntimeError(f"injected authoritative publication failure after {relative}")
+
+        state["status"] = "committed"
+        write_state(transaction_root, state)
+    except BaseException:
+        if transaction_root is not None and transaction_root.is_dir() and not transaction_root.is_symlink():
+            rollback(transaction_root, state)
+            tombstone_root = tombstone_transaction(transaction_root)
+            transaction_root = None
+            discard_ephemeral_directory(tombstone_root)
+        elif preparing_root is not None and preparing_root.is_dir() and not preparing_root.is_symlink():
+            discard_ephemeral_directory(preparing_root)
+        fsync_directory(target_root)
+        raise
+    finally:
+        for signum, previous_handler in previous_handlers.items():
+            signal.signal(signum, previous_handler)
+
+    if transaction_root is not None:
+        tombstone_root = tombstone_transaction(transaction_root)
+        transaction_root = None
+        discard_ephemeral_directory(tombstone_root)
+    fsync_directory(target_root)
+PY
+}
+
+sync_workspace_portal_manifest_mirrors() {
+  local source_name="${1:-}"
+  if [[ -z "$source_name" || "$source_name" != "${source_name##*/}" ]]; then
+    return 0
+  fi
+  case "${CHUMMER_PUBLIC_DISABLE_WORKSPACE_MANIFEST_MIRRORS:-}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+  esac
+
+  local source_path="$OUTPUT_ROOT/$source_name"
+  [[ -f "$source_path" ]] || return 0
+
+  local -a mirror_root_candidates=(
+    "$REPO_ROOT"
+    "$PRESENTATION_ROOT"
+    "/docker/chummercomplete/chummer6-ui"
+    "/docker/chummercomplete/chummer-presentation"
+    "$REPO_ROOT/../chummer6-ui"
+    "$REPO_ROOT/../chummer-presentation"
+  )
+  local -A seen_targets=()
+  local mirror_root
+  for mirror_root in "${mirror_root_candidates[@]}"; do
+    [[ -n "$mirror_root" && -d "$mirror_root" ]] || continue
+    local target_path
+    for target_path in \
+      "$mirror_root/Chummer.Portal/downloads/$source_name" \
+      "$mirror_root/Docker/Downloads/$source_name" \
+      "$mirror_root/.codex-studio/published/portal/$source_name"
+    do
+      [[ -z "${seen_targets[$target_path]:-}" ]] || continue
+      seen_targets[$target_path]=1
+      replace_file_atomically "$source_path" "$target_path"
+    done
+  done
+}
+
+refresh_release_build_handoff() {
+  local stage_dir="${1:-}"
+  if [[ -z "$stage_dir" || ! -d "$stage_dir" ]]; then
+    return 0
+  fi
+
+  rm -f \
+    "$stage_dir/RELEASE_BUILD_HANDOFF.generated.json" \
+    "$stage_dir/RELEASE_BUILD_HANDOFF.generated.md" \
+    "$stage_dir/UI_WINDOWS_DESKTOP_EXIT_GATE.generated.json" \
+    "$stage_dir/WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.json" \
+    "$stage_dir/WINDOWS_INSTALLER_VISUAL_PROOF_HANDOFF.generated.md"
+
+  [[ -f "$RELEASE_BUILD_HANDOFF_SCRIPT_PATH" ]] || return 0
+  local -a handoff_env=()
+  if [[ -f "$WINDOWS_EXIT_GATE_SCRIPT_PATH" ]]; then
+    handoff_env+=("CHUMMER_WINDOWS_EXIT_GATE_SCRIPT_PATH=$WINDOWS_EXIT_GATE_SCRIPT_PATH")
+  fi
+  if [[ -d "$REGISTRY_ROOT" ]]; then
+    handoff_env+=("CHUMMER_HUB_REGISTRY_ROOT=$REGISTRY_ROOT")
+  fi
+  env "${handoff_env[@]}" python3 "$RELEASE_BUILD_HANDOFF_SCRIPT_PATH" "$stage_dir" >/dev/null
+}
+
+refresh_windows_visual_proof_operator_receipts() {
+  local release_channel_path="${1:-}"
+  local downloads_root="${2:-}"
+  local startup_receipt_path="${3:-}"
+  local source_path="${4:-}"
+  if [[ -z "$release_channel_path" || -z "$downloads_root" || -z "$source_path" ]]; then
+    echo "warning: skipped Windows visual-proof receipt refresh; required paths missing" >&2
+    return 0
+  fi
+
+  local required_script
+  for required_script in \
+    verify_windows_installer_visual_audit.py \
+    materialize_windows_installer_visual_audit_intake_request.py \
+    verify_windows_installer_visual_audit_intake_request.py \
+    auto_import_windows_installer_gold_proof.py
+  do
+    if [[ ! -f "$SCRIPT_DIR/$required_script" ]]; then
+      echo "warning: skipped Windows visual-proof receipt refresh; missing $SCRIPT_DIR/$required_script" >&2
+      return 0
+    fi
+  done
+
+  local -a audit_args=(
+    --release-channel "$release_channel_path"
+    --downloads-root "$downloads_root"
+    --source "$source_path"
+    --output "$WINDOWS_VISUAL_AUDIT_PUBLISHED_PATH"
+  )
+  local -a intake_args=(
+    --release-channel "$release_channel_path"
+    --downloads-root "$downloads_root"
+    --source "$source_path"
+    --output "$WINDOWS_VISUAL_AUDIT_INTAKE_REQUEST_PATH"
+  )
+  if [[ -f "$startup_receipt_path" ]]; then
+    audit_args+=(--startup-receipt "$startup_receipt_path")
+    intake_args+=(--startup-receipt "$startup_receipt_path")
+  fi
+
+  set +e
+  python3 "$SCRIPT_DIR/verify_windows_installer_visual_audit.py" "${audit_args[@]}"
+  local audit_status=$?
+  set -e
+  if (( audit_status > 1 )); then
+    echo "warning: Windows visual audit refresh failed with status $audit_status" >&2
+  fi
+
+  if ! python3 "$SCRIPT_DIR/materialize_windows_installer_visual_audit_intake_request.py" "${intake_args[@]}"; then
+    echo "warning: Windows visual audit intake refresh failed" >&2
+    return 0
+  fi
+  if ! python3 "$SCRIPT_DIR/verify_windows_installer_visual_audit_intake_request.py" --receipt "$WINDOWS_VISUAL_AUDIT_INTAKE_REQUEST_PATH"; then
+    echo "warning: Windows visual audit intake request did not verify" >&2
+  fi
+
+  set +e
+  python3 "$SCRIPT_DIR/auto_import_windows_installer_gold_proof.py" \
+    --refresh-intake-request \
+    --intake-request "$WINDOWS_VISUAL_AUDIT_INTAKE_REQUEST_PATH" \
+    --output "$WINDOWS_VISUAL_AUDIT_AUTO_IMPORT_PATH" \
+    --downloads-root "$downloads_root" \
+    --wait-seconds 0
+  local auto_import_status=$?
+  set -e
+  if (( auto_import_status != 0 && auto_import_status != 2 )); then
+    echo "warning: Windows visual audit auto-import refresh failed with status $auto_import_status" >&2
+  fi
+}
+
 filter_files_to_manifest_truth() {
   local files_root="${1:-}"
   local manifest_path="${2:-}"
@@ -541,6 +1166,12 @@ mkdir -p "$combined_files_root" "$combined_startup_smoke_root" "$generated_root"
 
 copy_public_artifacts "$RUNSERVICES_SOURCE_FILES_ROOT" "$combined_files_root"
 copy_public_artifacts "$PRESENTATION_FILES_ROOT" "$combined_files_root"
+hydrate_manifest_owned_artifacts_from_candidate_roots \
+  "$combined_files_root" \
+  "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" \
+  "$REGISTRY_PUBLISHED_FILES_ROOT" \
+  "$RUNSERVICES_SOURCE_FILES_ROOT" \
+  "$PRESENTATION_FILES_ROOT"
 filter_files_to_manifest_truth "$combined_files_root" "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH"
 
 AUTO_DISABLED_ARTIFACT_IDS="$(detect_auto_disabled_artifact_ids "$combined_files_root" "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" | paste -sd, -)"
@@ -571,6 +1202,7 @@ windows_payload_gate_args=(
 windows_visual_proof_gate_args=(
   --files-dir "$combined_files_root"
   --manifest "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH"
+  --visual-audit "$WINDOWS_VISUAL_AUDIT_PUBLISHED_PATH"
   --allow-empty
 )
 if [[ -n "$DISABLED_ARTIFACT_IDS" ]]; then
@@ -578,7 +1210,10 @@ if [[ -n "$DISABLED_ARTIFACT_IDS" ]]; then
   windows_visual_proof_gate_args+=(--disabled-artifact-id "$DISABLED_ARTIFACT_IDS")
 fi
 python3 "$SCRIPT_DIR/verify-windows-installer-payloads.py" "${windows_payload_gate_args[@]}"
+set +e
 python3 "$SCRIPT_DIR/verify-windows-installer-visual-proof.py" "${windows_visual_proof_gate_args[@]}"
+windows_visual_proof_gate_status=$?
+set -e
 
 if [[ -d "$PRESENTATION_STARTUP_SMOKE_ROOT" ]]; then
   find "$PRESENTATION_STARTUP_SMOKE_ROOT" -maxdepth 1 -type f -name 'startup-smoke-*.receipt.json' -print0 \
@@ -597,6 +1232,7 @@ fi
 sanitized_release_proof_path="$tmp_root/HUB_LOCAL_RELEASE_PROOF.generated.json"
 python3 - "$RELEASE_PROOF_SOURCE" "$sanitized_release_proof_path" "$PUBLIC_RELEASE_PROOF_BASE_URL" <<'PY'
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -618,6 +1254,61 @@ allowed = {
 }
 payload = json.loads(source.read_text(encoding="utf-8"))
 sanitized = {key: value for key, value in payload.items() if key in allowed}
+
+required_routes = [
+    "/downloads/install/avalonia-linux-x64-installer",
+    "/home/access",
+    "/home/work",
+    "/account/access",
+    "/account/work",
+    "/account/support",
+    "/contact",
+    "/downloads",
+]
+installer_route = re.compile(r"^/downloads/install/[a-z0-9][a-z0-9-]*$")
+
+
+def validated_routes(alias: str, value: object) -> list[str]:
+    if not isinstance(value, list) or any(not isinstance(route, str) for route in value):
+        raise SystemExit(f"release proof {alias} must be a list of strings")
+
+    routes = list(value)
+    duplicates = sorted({route for route in routes if routes.count(route) > 1})
+    if duplicates:
+        raise SystemExit(
+            f"release proof {alias} contains duplicate routes: {', '.join(duplicates)}"
+        )
+
+    actual_prefix = routes[:len(required_routes)]
+    if actual_prefix != required_routes:
+        raise SystemExit(
+            f"release proof {alias} must begin with the exact Registry canonical route prefix"
+        )
+
+    additions = routes[len(required_routes):]
+    invalid = sorted(route for route in additions if installer_route.fullmatch(route) is None)
+    if invalid:
+        raise SystemExit(
+            f"release proof {alias} declares unsupported additional routes: {', '.join(invalid)}"
+        )
+    if additions != sorted(additions):
+        raise SystemExit(
+            f"release proof {alias} additional installer routes must use canonical ordering"
+        )
+    return routes
+
+
+route_variants = [
+    validated_routes(key, sanitized[key])
+    for key in ("proofRoutes", "proof_routes")
+    if key in sanitized
+]
+if not route_variants:
+    raise SystemExit("release proof must declare proofRoutes or proof_routes")
+if any(routes != route_variants[0] for routes in route_variants[1:]):
+    raise SystemExit("release proof route aliases disagree")
+sanitized["proofRoutes"] = route_variants[0]
+sanitized["proof_routes"] = route_variants[0]
 if canonical_base_url:
     sanitized["baseUrl"] = canonical_base_url
     sanitized["base_url"] = canonical_base_url
@@ -703,9 +1394,17 @@ find "$combined_files_root" -maxdepth 1 -type f -name 'chummer-*-win-x64-install
       cp "$installer_path" "$OUTPUT_ROOT/proof/windows"/
     done
 
+release_evidence_source="$PRESENTATION_RELEASE_EVIDENCE_SOURCE"
+release_evidence_target="$OUTPUT_ROOT/release-evidence/public-promotion.json"
+if [[ -f "$release_evidence_source" ]] \
+  && [[ "$(realpath -m "$release_evidence_source")" == "$(realpath -m "$release_evidence_target")" ]]; then
+  staged_release_evidence="$tmp_root/public-promotion.json"
+  cp "$release_evidence_source" "$staged_release_evidence"
+  release_evidence_source="$staged_release_evidence"
+fi
 rm -rf "$OUTPUT_ROOT/release-evidence"
 mkdir -p "$OUTPUT_ROOT/release-evidence"
-cp "$PRESENTATION_RELEASE_EVIDENCE_SOURCE" "$OUTPUT_ROOT/release-evidence/public-promotion.json"
+cp "$release_evidence_source" "$release_evidence_target"
 
 rm -rf "$OUTPUT_ROOT/startup-smoke"
 mkdir -p "$OUTPUT_ROOT/startup-smoke"
@@ -944,6 +1643,21 @@ if [[ -f "$SCRIPT_DIR/materialize-aur-package.py" ]]; then
     --downloads-prefix "${CHUMMER_PUBLIC_DOWNLOADS_PREFIX:-https://chummer.run/downloads/files}" \
     --optional >/dev/null
 fi
+
+refresh_release_build_handoff "$OUTPUT_ROOT"
+
+if [[ "${windows_visual_proof_gate_status:-0}" -ne 0 ]]; then
+  refresh_windows_visual_proof_operator_receipts \
+    "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json" \
+    "$OUTPUT_ROOT" \
+    "$OUTPUT_ROOT/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json" \
+    "$OUTPUT_ROOT/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json"
+  exit "$windows_visual_proof_gate_status"
+fi
+
+sync_authoritative_publication_with_rollback "$OUTPUT_ROOT"
+sync_workspace_portal_manifest_mirrors "RELEASE_CHANNEL.generated.json"
+sync_workspace_portal_manifest_mirrors "releases.json"
 
 python3 - "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json" <<'PY'
 import json

@@ -179,17 +179,24 @@ QUEUE_PROOF_LINES = [
 
 def expected_current_proof_routes() -> list[str]:
     release_channel_path = REPO_ROOT / "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
-    payload = json.loads(release_channel_path.read_text(encoding="utf-8"))
-    install_routes = sorted(
-        {
-            f"/downloads/install/{str(item.get('artifactId') or item.get('id') or '').strip()}"
-            for collection_name in ("artifacts", "downloads")
-            for item in payload.get(collection_name, [])
-            if isinstance(item, dict)
-            and str(item.get("kind") or "").strip().lower() == "installer"
-            and str(item.get("artifactId") or item.get("id") or "").strip()
-        }
-    )
+    if release_channel_path.is_file():
+        payload = json.loads(release_channel_path.read_text(encoding="utf-8"))
+        install_routes = sorted(
+            {
+                f"/downloads/install/{str(item.get('artifactId') or item.get('id') or '').strip()}"
+                for collection_name in ("artifacts", "downloads")
+                for item in payload.get(collection_name, [])
+                if isinstance(item, dict)
+                and str(item.get("kind") or "").strip().lower() == "installer"
+                and str(item.get("artifactId") or item.get("id") or "").strip()
+            }
+        )
+    else:
+        install_routes = [
+            "/downloads/install/avalonia-linux-x64-installer",
+            "/downloads/install/avalonia-osx-arm64-installer",
+            "/downloads/install/avalonia-win-x64-installer",
+        ]
     additional_install_routes = [
         route for route in install_routes if route != "/downloads/install/avalonia-linux-x64-installer"
     ]
@@ -749,22 +756,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn("/api/v1/install-linking/continuation", proof)
             payload = json.loads(proof)
             self.assertEqual("chummer6-hub", payload["package_repo"])
-            self.assertEqual(
-                [
-                    "/downloads/install/avalonia-linux-x64-installer",
-                    "/home/access",
-                    "/home/work",
-                    "/account/access",
-                    "/account/work",
-                    "/account/roster",
-                    "/account/support",
-                    "/contact",
-                    "/downloads",
-                    "/downloads/install/avalonia-osx-arm64-installer",
-                    "/downloads/install/avalonia-win-x64-installer",
-                ],
-                payload["proof_routes"],
-            )
+            self.assertEqual(expected_current_proof_routes(), payload["proof_routes"])
             m102_package = next(
                 item
                 for item in payload["successor_queue_packages"]
@@ -2413,6 +2405,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_allows_generated_at_timestamp_only_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            readiness_path = load_verifier_module()._flagship_readiness_path()
             materialize = subprocess.run(
                 [
                     "python3",
@@ -2427,6 +2420,10 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 text=True,
                 capture_output=True,
                 check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH": str(readiness_path),
+                },
             )
             self.assertEqual(
                 0,
@@ -2449,6 +2446,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 env={
                     **dict(os.environ),
                     "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                    "CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH": str(proof_path),
+                    "CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH": str(readiness_path),
                 },
             )
 
@@ -4167,6 +4166,239 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn("desktop_client_readiness has wrong reason", result.stderr)
+
+    def test_runtime_projection_contracts_require_exact_fixed_schemas_and_types(self) -> None:
+        verifier = load_verifier_module()
+        canonical = json.loads(
+            (REPO_ROOT / ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        cases = [
+            (
+                "desktop extra key",
+                lambda payload: payload["desktop_client_readiness"].__setitem__("unexpected", "value"),
+                "desktop_client_readiness keys must be exactly",
+            ),
+            (
+                "desktop wrong list type",
+                lambda payload: payload["desktop_client_readiness"].__setitem__(
+                    "missing_coverage_keys", "desktop_client"
+                ),
+                "desktop_client_readiness.missing_coverage_keys must be a list of strings",
+            ),
+            (
+                "desktop wrong boolean type",
+                lambda payload: payload["desktop_client_readiness"].__setitem__(
+                    "desktop_client_missing", "false"
+                ),
+                "desktop_client_readiness.desktop_client_missing must be a boolean",
+            ),
+            (
+                "release missing key",
+                lambda payload: payload["release_channel"].pop("publishedAt"),
+                "release_channel keys must be exactly",
+            ),
+            (
+                "release wrong string type",
+                lambda payload: payload["release_channel"].__setitem__("channelId", 7),
+                "release_channel.channelId must be a string",
+            ),
+        ]
+
+        for case_name, mutate, expected_error in cases:
+            with self.subTest(case=case_name):
+                payload = json.loads(json.dumps(canonical))
+                mutate(payload)
+                errors: list[str] = []
+                verifier._verify_runtime_projection_contracts(errors, payload, "materialized proof file")
+                self.assertTrue(
+                    any(expected_error in error for error in errors),
+                    msg=f"expected {expected_error!r} in {errors!r}",
+                )
+
+    def test_release_channel_projection_statuses_require_canonical_binding_semantics(self) -> None:
+        verifier = load_verifier_module()
+        canonical = json.loads(
+            (REPO_ROOT / ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        complete_binding = {
+            "status": "available",
+            "path": "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
+            "channelId": "preview",
+            "channel": "preview",
+            "version": "run-20260717-100000",
+            "releaseVersion": "run-20260717-100000",
+            "rolloutState": "review_required",
+            "supportabilityState": "review_required",
+            "publishedAt": "2026-07-17T10:00:00Z",
+        }
+        cases = [
+            (
+                "unknown status",
+                {**complete_binding, "status": "published"},
+                "release_channel.status must be available, unavailable, or invalid",
+            ),
+            (
+                "available partial binding",
+                {**complete_binding, "releaseVersion": ""},
+                "available release_channel must publish one complete canonical binding",
+            ),
+            (
+                "available naive timestamp",
+                {**complete_binding, "publishedAt": "2026-07-17T10:00:00"},
+                "available release_channel must publish one complete canonical binding",
+            ),
+            (
+                "unavailable partial binding",
+                {**complete_binding, "status": "unavailable"},
+                "unavailable release_channel must not publish partial binding values",
+            ),
+            (
+                "invalid complete binding",
+                {**complete_binding, "status": "invalid"},
+                "invalid release_channel must not contain a complete canonical binding",
+            ),
+        ]
+
+        for case_name, release_channel, expected_error in cases:
+            with self.subTest(case=case_name):
+                payload = json.loads(json.dumps(canonical))
+                payload["release_channel"] = release_channel
+                errors: list[str] = []
+                verifier._verify_runtime_projection_contracts(errors, payload, "served release proof file")
+                self.assertTrue(
+                    any(expected_error in error for error in errors),
+                    msg=f"expected {expected_error!r} in {errors!r}",
+                )
+
+        valid_payload = json.loads(json.dumps(canonical))
+        valid_payload["release_channel"] = complete_binding
+        valid_errors: list[str] = []
+        verifier._verify_runtime_projection_contracts(
+            valid_errors, valid_payload, "materialized proof file"
+        )
+        self.assertEqual([], valid_errors)
+
+    def test_stable_payload_schema_normalizes_both_runtime_projections(self) -> None:
+        verifier = load_verifier_module()
+        canonical = json.loads(
+            (REPO_ROOT / ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        with tempfile.TemporaryDirectory() as temp_root:
+            first_path = Path(temp_root) / "published.json"
+            second_path = Path(temp_root) / "materialized.json"
+            first = json.loads(json.dumps(canonical))
+            second = json.loads(json.dumps(canonical))
+            second["desktop_client_readiness"]["generated_at"] = "2099-01-01T00:00:00Z"
+            second["desktop_client_readiness"]["reason"] = "runtime readiness changed"
+            second["release_channel"]["path"] = "runtime/RELEASE_CHANNEL.generated.json"
+            first_path.write_text(json.dumps(first), encoding="utf-8")
+            second_path.write_text(json.dumps(second), encoding="utf-8")
+
+            errors: list[str] = []
+            first_exact = verifier._stable_json_payload(first_path, errors, "published proof file")
+            second_exact = verifier._stable_json_payload(second_path, errors, "served release proof file")
+            first_stable = verifier._stable_json_payload(
+                first_path,
+                errors,
+                "published proof file",
+                schema_normalize_runtime_projections=True,
+            )
+            second_stable = verifier._stable_json_payload(
+                second_path,
+                errors,
+                "materialized proof file",
+                schema_normalize_runtime_projections=True,
+            )
+
+        self.assertEqual([], errors)
+        self.assertNotEqual(first_exact, second_exact)
+        self.assertEqual(first_stable, second_stable)
+        self.assertEqual(
+            {
+                "projection": "desktop_client_readiness",
+                "keys": sorted(verifier.DESKTOP_CLIENT_READINESS_KEYS),
+            },
+            first_stable["desktop_client_readiness"],
+        )
+        self.assertEqual(
+            {
+                "projection": "release_channel",
+                "keys": sorted(verifier.RELEASE_CHANNEL_PROJECTION_KEYS),
+            },
+            first_stable["release_channel"],
+        )
+
+    def test_served_release_channel_projection_drift_still_fails_parity(self) -> None:
+        verifier = load_verifier_module()
+        canonical = json.loads(
+            (REPO_ROOT / ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        with tempfile.TemporaryDirectory() as temp_root:
+            published_path = Path(temp_root) / "published.json"
+            served_path = Path(temp_root) / "served.json"
+            served = json.loads(json.dumps(canonical))
+            served["release_channel"]["path"] = "served/RELEASE_CHANNEL.generated.json"
+            published_path.write_text(json.dumps(canonical), encoding="utf-8")
+            served_path.write_text(json.dumps(served), encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_served_proof_matches_published(
+                errors, published_path, served_path
+            )
+
+        self.assertIn(
+            "served HUB_LOCAL_RELEASE_PROOF.generated.json drifts from "
+            "published HUB_LOCAL_RELEASE_PROOF.generated.json for "
+            "next90-m102-hub-desktop-native-trust",
+            errors,
+        )
+
+    def test_rematerialized_runtime_projection_is_semantically_validated(self) -> None:
+        verifier = load_verifier_module()
+        canonical_path = REPO_ROOT / ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json"
+        with tempfile.TemporaryDirectory() as temp_root:
+            fake_repo_root = Path(temp_root)
+            scripts_dir = fake_repo_root / "scripts"
+            scripts_dir.mkdir()
+            proof_path = fake_repo_root / "published.json"
+            proof_path.write_text(canonical_path.read_text(encoding="utf-8"), encoding="utf-8")
+            materializer_path = scripts_dir / "materialize_hub_local_release_proof.py"
+            materializer_path.write_text(
+                "\n".join(
+                    [
+                        "import json",
+                        "import sys",
+                        "from pathlib import Path",
+                        f"payload = json.loads(Path({str(canonical_path)!r}).read_text(encoding='utf-8'))",
+                        "payload['release_channel'].pop('publishedAt', None)",
+                        "Path(sys.argv[1]).write_text(json.dumps(payload), encoding='utf-8')",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            errors: list[str] = []
+            verifier._verify_materialized_proof_reproducible(
+                errors, fake_repo_root, proof_path
+            )
+
+        self.assertTrue(
+            any(
+                "materialized proof file release_channel keys must be exactly" in error
+                for error in errors
+            ),
+            msg=errors,
+        )
 
 
 if __name__ == "__main__":

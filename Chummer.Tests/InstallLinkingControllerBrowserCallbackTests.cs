@@ -323,7 +323,7 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
     }
 
     [Fact]
-    public async Task Browser_install_link_strips_stale_grant_claim_and_receipt_query_from_app_local_callback()
+    public async Task Browser_install_link_preserves_only_bounded_state_from_app_local_callback()
     {
         using Fixture fixture = new(authenticated: true);
         fixture.Controller.ControllerContext = new ControllerContext
@@ -340,13 +340,15 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             releaseChannel: "preview",
             platform: "windows",
             arch: "x64",
-            installLinkCallbackUri: "http://127.0.0.1:47761/install-link/callback?state=desktop&accessToken=stale-access&grantId=stale-grant&claimCode=stale-claim&claimTicketId=stale-ticket&ticketId=stale-ticket-id&receiptId=stale-receipt&installedBuildReceiptId=stale-installed-receipt&callbackCode=stale-callback&code=stale-code",
+            installLinkCallbackUri: "http://127.0.0.1:47761/install-link/callback?state=desktop&accessToken=stale-access&grantId=stale-grant&claimCode=stale-claim&claimTicketId=stale-ticket&ticketId=stale-ticket-id&receiptId=stale-receipt&installedBuildReceiptId=stale-installed-receipt&callbackCode=stale-callback&code=stale-code&unknown=unknown-query-secret#state=desktop-fragment&nonce=fragment-proof&accessToken=fragment-access&unknown=unknown-fragment-secret",
             cancellationToken: CancellationToken.None);
 
         ContentResult page = Assert.IsType<ContentResult>(result);
         Assert.True(TryExtractPrimaryHref(page.Content!, out string callbackHref), "The controller should render a manual callback link.");
         string decodedCallbackHref = WebUtility.HtmlDecode(callbackHref);
         Assert.Contains("state=desktop", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.Contains("#state=desktop-fragment", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.Contains("nonce=fragment-proof", decodedCallbackHref, StringComparison.Ordinal);
         Assert.Contains("code=", decodedCallbackHref, StringComparison.Ordinal);
         Assert.Contains("installationId=ins-authoritative", decodedCallbackHref, StringComparison.Ordinal);
         Assert.DoesNotContain("stale-access", decodedCallbackHref, StringComparison.Ordinal);
@@ -358,6 +360,9 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.DoesNotContain("stale-installed-receipt", decodedCallbackHref, StringComparison.Ordinal);
         Assert.DoesNotContain("stale-callback", decodedCallbackHref, StringComparison.Ordinal);
         Assert.DoesNotContain("stale-code", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("fragment-access", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("unknown-query-secret", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("unknown-fragment-secret", decodedCallbackHref, StringComparison.Ordinal);
         Assert.Contains("installLinkTransport=grant_callback", decodedCallbackHref, StringComparison.Ordinal);
     }
 

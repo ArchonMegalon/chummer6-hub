@@ -220,7 +220,7 @@ def _flagship_readiness_path() -> Path:
 
         return max(
             candidates,
-            key=lambda path: (generated_at(path), path == FALLBACK_FLAGSHIP_READINESS_PATH),
+            key=lambda path: (generated_at(path), path == DEFAULT_FLAGSHIP_READINESS_PATH),
         )
     return FALLBACK_FLAGSHIP_READINESS_PATH
 
@@ -298,8 +298,13 @@ def _release_readiness_reason(value: str) -> str:
 
 def _load_release_channel_snapshot() -> dict:
     release_channel_path = _release_channel_path()
+    try:
+        release_channel_label = release_channel_path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        release_channel_label = str(release_channel_path)
     snapshot = {
-        "path": str(release_channel_path),
+        "status": "unavailable",
+        "path": release_channel_label,
         "channelId": "",
         "channel": "",
         "version": "",
@@ -313,19 +318,55 @@ def _load_release_channel_snapshot() -> dict:
 
     loaded = _load_existing_payload(release_channel_path)
     if loaded is None:
+        snapshot["status"] = "invalid"
         return snapshot
 
-    channel = str(loaded.get("channelId") or loaded.get("channel") or "").strip()
-    version = str(loaded.get("releaseVersion") or loaded.get("version") or "").strip()
+    def strict_alias_value(*keys: str) -> str | None:
+        present = [loaded[key] for key in keys if key in loaded]
+        if any(not isinstance(value, str) for value in present):
+            return None
+        normalized = [value.strip() for value in present]
+        if len(set(normalized)) > 1:
+            return None
+        return normalized[0] if normalized else ""
+
+    channel = strict_alias_value("channelId", "channel")
+    version = strict_alias_value("releaseVersion", "version")
+    rollout_state = strict_alias_value("rolloutState", "rollout_state")
+    supportability_state = strict_alias_value("supportabilityState", "supportability_state")
+    published_at = (
+        strict_alias_value("publishedAt")
+        if "publishedAt" in loaded
+        else strict_alias_value("generatedAt", "generated_at")
+    )
+    if None in (channel, version, rollout_state, supportability_state, published_at):
+        snapshot["status"] = "invalid"
+        return snapshot
+
+    parsed_published_at: dt.datetime | None = None
+    if published_at:
+        normalized_published_at = published_at[:-1] + "+00:00" if published_at.endswith("Z") else published_at
+        try:
+            parsed_published_at = dt.datetime.fromisoformat(normalized_published_at)
+        except ValueError:
+            pass
+    binding_is_complete = all(
+        (channel, version, rollout_state, supportability_state, published_at)
+    ) and parsed_published_at is not None and parsed_published_at.tzinfo is not None
+    if not binding_is_complete:
+        snapshot["status"] = "invalid"
+        return snapshot
+
     snapshot.update(
         {
+            "status": "available",
             "channelId": channel,
             "channel": channel,
             "version": version,
             "releaseVersion": version,
-            "rolloutState": str(loaded.get("rolloutState") or loaded.get("rollout_state") or "").strip(),
-            "supportabilityState": str(loaded.get("supportabilityState") or loaded.get("supportability_state") or "").strip(),
-            "publishedAt": str(loaded.get("publishedAt") or loaded.get("generatedAt") or loaded.get("generated_at") or "").strip(),
+            "rolloutState": rollout_state,
+            "supportabilityState": supportability_state,
+            "publishedAt": published_at,
         }
     )
     return snapshot
@@ -1139,7 +1180,6 @@ def main() -> int:
             "/home/work",
             "/account/access",
             "/account/work",
-            "/account/roster",
             "/account/support",
             "/contact",
             "/downloads",

@@ -505,6 +505,111 @@ def run_materializer(output_root: Path, env: dict[str, str]) -> subprocess.Compl
 
 
 class PublicDownloadsBundleTests(unittest.TestCase):
+    def assert_materializer_rejects_release_proof_routes(
+        self,
+        routes: list[str],
+        expected_error: str,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="chummer-public-proof-routes-invalid-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            proof_payload = json.loads(fixture.release_proof_path.read_text(encoding="utf-8"))
+            proof_payload["proofRoutes"] = routes
+            write_json(fixture.release_proof_path, proof_payload)
+
+            output_root = temp_path / "downloads"
+            output_root.mkdir(parents=True)
+            output_sentinel = output_root / "RELEASE_CHANNEL.generated.json"
+            output_sentinel.write_text("existing output must survive\n", encoding="utf-8")
+            authoritative_sentinel = fixture.authoritative_root / "RELEASE_CHANNEL.generated.json"
+            authoritative_sentinel.write_text("existing publication must survive\n", encoding="utf-8")
+
+            completed = run_materializer(output_root, materializer_fixture_env(fixture))
+
+            self.assertNotEqual(completed.returncode, 0, msg=completed.stdout)
+            self.assertIn(expected_error, completed.stderr or completed.stdout)
+            self.assertEqual(output_sentinel.read_text(encoding="utf-8"), "existing output must survive\n")
+            self.assertEqual(
+                authoritative_sentinel.read_text(encoding="utf-8"),
+                "existing publication must survive\n",
+            )
+
+    def test_materializer_accepts_registry_canonical_proof_routes(self):
+        with tempfile.TemporaryDirectory(prefix="chummer-public-proof-routes-valid-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            output_root = temp_path / "downloads"
+
+            completed = run_materializer(output_root, materializer_fixture_env(fixture))
+
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+            self.assertTrue((output_root / "RELEASE_CHANNEL.generated.json").is_file())
+
+    def test_materializer_rejects_roster_route_in_release_proof(self):
+        self.assert_materializer_rejects_release_proof_routes(
+            [*FIXTURE_PROOF_ROUTES[:8], "/account/roster", *FIXTURE_PROOF_ROUTES[8:]],
+            "declares unsupported additional routes: /account/roster",
+        )
+
+    def test_materializer_rejects_duplicate_route_in_release_proof(self):
+        self.assert_materializer_rejects_release_proof_routes(
+            [*FIXTURE_PROOF_ROUTES, FIXTURE_PROOF_ROUTES[-1]],
+            "contains duplicate routes: /downloads/install/avalonia-win-x64-installer",
+        )
+
+    def test_materializer_rejects_reordered_registry_prefix_in_release_proof(self):
+        reordered_routes = list(FIXTURE_PROOF_ROUTES)
+        reordered_routes[1], reordered_routes[2] = reordered_routes[2], reordered_routes[1]
+        self.assert_materializer_rejects_release_proof_routes(
+            reordered_routes,
+            "must begin with the exact Registry canonical route prefix",
+        )
+
+    def test_materializer_rejects_arbitrary_extension_in_release_proof(self):
+        self.assert_materializer_rejects_release_proof_routes(
+            [*FIXTURE_PROOF_ROUTES[:8], "/account/admin", *FIXTURE_PROOF_ROUTES[8:]],
+            "declares unsupported additional routes: /account/admin",
+        )
+
+    def test_materializer_rejects_non_registry_installer_identifier(self):
+        self.assert_materializer_rejects_release_proof_routes(
+            [*FIXTURE_PROOF_ROUTES, "/downloads/install/experimental.build"],
+            "declares unsupported additional routes: /downloads/install/experimental.build",
+        )
+
+    def test_materializer_rejects_null_primary_route_alias(self):
+        with tempfile.TemporaryDirectory(prefix="chummer-public-proof-null-primary-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            proof_payload = json.loads(fixture.release_proof_path.read_text(encoding="utf-8"))
+            proof_payload["proof_routes"] = list(FIXTURE_PROOF_ROUTES)
+            proof_payload["proofRoutes"] = None
+            write_json(fixture.release_proof_path, proof_payload)
+
+            completed = run_materializer(temp_path / "downloads", materializer_fixture_env(fixture))
+
+            self.assertNotEqual(completed.returncode, 0, msg=completed.stdout)
+            self.assertIn("release proof proofRoutes must be a list of strings", completed.stderr or completed.stdout)
+
+    def test_materializer_rejects_null_secondary_route_alias(self):
+        with tempfile.TemporaryDirectory(prefix="chummer-public-proof-null-secondary-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            proof_payload = json.loads(fixture.release_proof_path.read_text(encoding="utf-8"))
+            proof_payload["proof_routes"] = None
+            write_json(fixture.release_proof_path, proof_payload)
+
+            completed = run_materializer(temp_path / "downloads", materializer_fixture_env(fixture))
+
+            self.assertNotEqual(completed.returncode, 0, msg=completed.stdout)
+            self.assertIn("release proof proof_routes must be a list of strings", completed.stderr or completed.stdout)
+
+    def test_materializer_rejects_unsorted_installer_extensions_in_release_proof(self):
+        self.assert_materializer_rejects_release_proof_routes(
+            [*FIXTURE_PROOF_ROUTES[:8], *reversed(FIXTURE_PROOF_ROUTES[8:])],
+            "additional installer routes must use canonical ordering",
+        )
+
     def test_materializer_declares_workspace_portal_manifest_mirror_sync(self):
         if not MATERIALIZER.exists():
             self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
@@ -535,9 +640,8 @@ class PublicDownloadsBundleTests(unittest.TestCase):
         self.assertIn('replace_file(source_path, target_path)', script_text)
         self.assertIn('payload_sidecar_matches(', script_text)
         self.assertIn('"$REGISTRY_PUBLISHED_FILES_ROOT"', script_text)
-        self.assertIn("sync_authoritative_published_manifest() {", script_text)
-        self.assertIn('sync_authoritative_published_manifest "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json" "RELEASE_CHANNEL.generated.json"', script_text)
-        self.assertIn('sync_authoritative_published_manifest "$OUTPUT_ROOT/releases.json" "releases.json"', script_text)
+        self.assertIn("sync_authoritative_publication_with_rollback() {", script_text)
+        self.assertIn('sync_authoritative_publication_with_rollback "$OUTPUT_ROOT"', script_text)
         self.assertIn('hydrate_manifest_owned_artifacts_from_candidate_roots \\', script_text)
         self.assertIn('"$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" \\', script_text)
         self.assertIn('"$RUNSERVICES_SOURCE_FILES_ROOT" \\', script_text)
@@ -1101,15 +1205,248 @@ class PublicDownloadsBundleTests(unittest.TestCase):
                     f"authoritative published manifest {name} must not retain stale pre-run content",
                 )
 
+    def test_materializer_rolls_back_all_authoritative_paths_when_publication_fails(self):
+        if not MATERIALIZER.exists():
+            self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
+
+        with tempfile.TemporaryDirectory(prefix="chummer-public-downloads-bundle-rollback-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            output_root = temp_path / "downloads"
+            authoritative_root = fixture.authoritative_root
+            old_canonical = b'{"version":"old-canonical"}\n'
+            old_compatibility = b'{"version":"old-compatibility"}\n'
+            old_receipt = b'{"version":"old-startup"}\n'
+            (authoritative_root / "RELEASE_CHANNEL.generated.json").write_bytes(old_canonical)
+            (authoritative_root / "releases.json").write_bytes(old_compatibility)
+            old_startup_root = authoritative_root / "startup-smoke"
+            old_startup_root.mkdir(parents=True)
+            (old_startup_root / "old.receipt.json").write_bytes(old_receipt)
+
+            env = materializer_fixture_env(fixture)
+            env["CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISH_TEST_FAIL_AFTER"] = "releases.json"
+
+            completed = run_materializer(output_root, env)
+
+            self.assertNotEqual(completed.returncode, 0, msg=completed.stdout)
+            self.assertIn("injected authoritative publication failure", completed.stderr or completed.stdout)
+            self.assertEqual(
+                (authoritative_root / "RELEASE_CHANNEL.generated.json").read_bytes(),
+                old_canonical,
+            )
+            self.assertEqual((authoritative_root / "releases.json").read_bytes(), old_compatibility)
+            self.assertEqual(
+                (authoritative_root / "startup-smoke" / "old.receipt.json").read_bytes(),
+                old_receipt,
+            )
+            self.assertEqual(
+                list(authoritative_root.glob(".release-publication-transaction-*")),
+                [],
+            )
+
+    def test_materializer_recovers_abandoned_authoritative_publication_before_retry(self):
+        if not MATERIALIZER.exists():
+            self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
+
+        with tempfile.TemporaryDirectory(prefix="chummer-public-downloads-bundle-recovery-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            output_root = temp_path / "downloads"
+            authoritative_root = fixture.authoritative_root
+            old_canonical = b'{"version":"old-canonical"}\n'
+            old_compatibility = b'{"version":"old-compatibility"}\n'
+            old_receipt = b'{"version":"old-startup"}\n'
+            new_receipt = b'{"version":"interrupted-startup"}\n'
+            (authoritative_root / "RELEASE_CHANNEL.generated.json").write_bytes(old_canonical)
+            (authoritative_root / "releases.json").write_bytes(old_compatibility)
+            current_startup_root = authoritative_root / "startup-smoke"
+            current_startup_root.mkdir(parents=True)
+            (current_startup_root / "new.receipt.json").write_bytes(new_receipt)
+
+            abandoned_root = authoritative_root / ".release-publication-transaction-abandoned"
+            backup_startup_root = abandoned_root / "backup" / "startup-smoke"
+            backup_startup_root.mkdir(parents=True)
+            (backup_startup_root / "old.receipt.json").write_bytes(old_receipt)
+            write_json(
+                abandoned_root / "state.json",
+                {
+                    "schemaVersion": "chummer.authoritative-release-publication-transaction/v1",
+                    "status": "activating",
+                    "touched": ["startup-smoke"],
+                    "hadOriginal": {"startup-smoke": True},
+                },
+            )
+
+            env = materializer_fixture_env(fixture)
+            env["CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISH_TEST_FAIL_AFTER"] = "startup-smoke"
+
+            completed = run_materializer(output_root, env)
+
+            self.assertNotEqual(completed.returncode, 0, msg=completed.stdout)
+            self.assertIn("injected authoritative publication failure", completed.stderr or completed.stdout)
+            self.assertEqual(
+                (authoritative_root / "RELEASE_CHANNEL.generated.json").read_bytes(),
+                old_canonical,
+            )
+            self.assertEqual((authoritative_root / "releases.json").read_bytes(), old_compatibility)
+            self.assertEqual(
+                (authoritative_root / "startup-smoke" / "old.receipt.json").read_bytes(),
+                old_receipt,
+            )
+            self.assertFalse((authoritative_root / "startup-smoke" / "new.receipt.json").exists())
+            self.assertEqual(
+                list(authoritative_root.glob(".release-publication-transaction-*")),
+                [],
+            )
+
+    def test_materializer_discards_abandoned_preparation_and_cleans_preactivation_failure(self):
+        if not MATERIALIZER.exists():
+            self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
+
+        with tempfile.TemporaryDirectory(prefix="chummer-public-downloads-bundle-preparation-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            output_root = temp_path / "downloads"
+            authoritative_root = fixture.authoritative_root
+            old_canonical = b'{"version":"old-canonical"}\n'
+            old_compatibility = b'{"version":"old-compatibility"}\n'
+            old_receipt = b'{"version":"old-startup"}\n'
+            (authoritative_root / "RELEASE_CHANNEL.generated.json").write_bytes(old_canonical)
+            (authoritative_root / "releases.json").write_bytes(old_compatibility)
+            old_startup_root = authoritative_root / "startup-smoke"
+            old_startup_root.mkdir(parents=True)
+            (old_startup_root / "old.receipt.json").write_bytes(old_receipt)
+
+            abandoned_preparing_root = authoritative_root / ".release-publication-preparing-abandoned"
+            abandoned_preparing_root.mkdir()
+            (abandoned_preparing_root / "partial-copy").write_bytes(b"interrupted before journal\n")
+            abandoned_tombstone_root = authoritative_root / ".release-publication-tombstone-abandoned"
+            abandoned_tombstone_root.mkdir()
+            (abandoned_tombstone_root / "partial-cleanup").write_bytes(b"committed transaction cleanup\n")
+
+            env = materializer_fixture_env(fixture)
+            env["CHUMMER_PUBLIC_AUTHORITATIVE_PUBLISH_TEST_FAIL_AFTER"] = "preactivation"
+
+            completed = run_materializer(output_root, env)
+
+            self.assertNotEqual(completed.returncode, 0, msg=completed.stdout)
+            self.assertIn("injected authoritative publication failure before activation", completed.stderr or completed.stdout)
+            self.assertEqual(
+                (authoritative_root / "RELEASE_CHANNEL.generated.json").read_bytes(),
+                old_canonical,
+            )
+            self.assertEqual((authoritative_root / "releases.json").read_bytes(), old_compatibility)
+            self.assertEqual(
+                (authoritative_root / "startup-smoke" / "old.receipt.json").read_bytes(),
+                old_receipt,
+            )
+            self.assertEqual(
+                list(authoritative_root.glob(".release-publication-preparing-*")),
+                [],
+            )
+            self.assertEqual(
+                list(authoritative_root.glob(".release-publication-transaction-*")),
+                [],
+            )
+            self.assertEqual(
+                list(authoritative_root.glob(".release-publication-tombstone-*")),
+                [],
+            )
+
+    def test_materializer_discards_journalless_tombstone_after_interrupted_cleanup(self):
+        if not MATERIALIZER.exists():
+            self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
+
+        with tempfile.TemporaryDirectory(prefix="chummer-public-downloads-bundle-tombstone-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            output_root = temp_path / "downloads"
+            authoritative_root = fixture.authoritative_root
+            abandoned_tombstone_root = authoritative_root / ".release-publication-tombstone-abandoned"
+            abandoned_tombstone_root.mkdir()
+            (abandoned_tombstone_root / "state-was-already-deleted").write_bytes(
+                b"interrupted recursive cleanup\n"
+            )
+
+            completed = run_materializer(output_root, materializer_fixture_env(fixture))
+
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+            self.assertEqual(
+                (authoritative_root / "RELEASE_CHANNEL.generated.json").read_bytes(),
+                (output_root / "RELEASE_CHANNEL.generated.json").read_bytes(),
+            )
+            self.assertEqual(
+                list(authoritative_root.glob(".release-publication-tombstone-*")),
+                [],
+            )
+
+    def test_materializer_hydrates_missing_manifest_artifacts_from_registry_fallback(self):
+        if not MATERIALIZER.exists():
+            self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
+
+        with tempfile.TemporaryDirectory(prefix="chummer-public-downloads-bundle-hydration-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            output_root = temp_path / "downloads"
+            empty_runservices_root = temp_path / "empty-runservices-files"
+            empty_presentation_root = temp_path / "empty-presentation-files"
+            empty_runservices_root.mkdir()
+            empty_presentation_root.mkdir()
+            copy_fixture_files(fixture.files_root, fixture.registry_files_root)
+
+            env = materializer_fixture_env(fixture)
+            env["CHUMMER_RUNSERVICES_SOURCE_FILES_ROOT"] = str(empty_runservices_root)
+            env["CHUMMER_PRESENTATION_FILES_ROOT"] = str(empty_presentation_root)
+
+            completed = run_materializer(output_root, env)
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+
+            for row in (fixture.linux_row, fixture.windows_row, fixture.macos_row):
+                artifact_path = output_root / "files" / str(row["fileName"])
+                self.assertTrue(artifact_path.is_file(), f"missing hydrated artifact: {artifact_path}")
+                self.assertEqual(sha256_file(artifact_path), str(row["sha256"]))
+            payload_name = str(fixture.windows_row["payloadFileName"])
+            self.assertTrue((output_root / "files" / payload_name).is_file())
+            self.assertTrue((output_root / "files" / f"{payload_name}.json").is_file())
+
+    def test_materializer_syncs_authoritative_startup_smoke_as_exact_directory_truth(self):
+        if not MATERIALIZER.exists():
+            self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
+
+        with tempfile.TemporaryDirectory(prefix="chummer-public-downloads-bundle-startup-authority-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            output_root = temp_path / "downloads"
+            authoritative_startup_root = fixture.authoritative_root / "startup-smoke"
+            authoritative_startup_root.mkdir(parents=True)
+            (authoritative_startup_root / "stale.receipt.json").write_text("{}\n", encoding="utf-8")
+
+            completed = run_materializer(output_root, materializer_fixture_env(fixture))
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+
+            output_startup_root = output_root / "startup-smoke"
+            output_files = {
+                path.relative_to(output_startup_root): path.read_bytes()
+                for path in output_startup_root.rglob("*")
+                if path.is_file()
+            }
+            authoritative_files = {
+                path.relative_to(authoritative_startup_root): path.read_bytes()
+                for path in authoritative_startup_root.rglob("*")
+                if path.is_file()
+            }
+            self.assertEqual(authoritative_files, output_files)
+            self.assertNotIn(Path("stale.receipt.json"), authoritative_files)
+
     def test_materializer_declares_authoritative_registry_startup_smoke_sync(self):
         if not MATERIALIZER.exists():
             self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
 
         script_text = MATERIALIZER.read_text(encoding="utf-8")
 
-        self.assertIn("sync_authoritative_published_directory() {", script_text)
-        self.assertIn('local target_root="$AUTHORITATIVE_PUBLISHED_ROOT/$target_relative_root"', script_text)
-        self.assertIn("for source_path in sorted(source_root.rglob(\"*\")):", script_text)
-        self.assertIn("source_relatives.add(relative_path)", script_text)
-        self.assertIn("if relative_path not in source_relatives:", script_text)
-        self.assertIn('sync_authoritative_published_directory "$OUTPUT_ROOT/startup-smoke" "startup-smoke"', script_text)
+        self.assertIn("sync_authoritative_publication_with_rollback() {", script_text)
+        self.assertIn(
+            'publication_order = (\n    "startup-smoke",\n    "releases.json",\n    "RELEASE_CHANNEL.generated.json",\n)',
+            script_text,
+        )
+        self.assertIn('sync_authoritative_publication_with_rollback "$OUTPUT_ROOT"', script_text)
