@@ -70,7 +70,6 @@ public sealed class HubLocalReleaseProofMaterializerTests
                 "/home/work",
                 "/account/access",
                 "/account/work",
-                "/account/roster",
                 "/account/support",
                 "/contact",
                 "/downloads",
@@ -191,16 +190,20 @@ public sealed class HubLocalReleaseProofMaterializerTests
 
         Directory.CreateDirectory(tempRoot);
 
-        RunMaterializer(materializerPath, proofPath);
+        RunMaterializer(materializerPath, proofPath, baseUrl: "https://chummer.run");
         RunRegistryReleaseProofValidator(registryValidatorPath, proofPath);
     }
 
-    private static void RunMaterializer(string scriptPath, string proofPath, IReadOnlyDictionary<string, string>? environment = null)
+    private static void RunMaterializer(
+        string scriptPath,
+        string proofPath,
+        IReadOnlyDictionary<string, string>? environment = null,
+        string baseUrl = "http://127.0.0.1:8091")
     {
         var startInfo = new ProcessStartInfo
         {
             FileName = "python3",
-            Arguments = $"{scriptPath} {proofPath} http://127.0.0.1:8091 docker-compose.public-edge.yml 300 true",
+            Arguments = $"{scriptPath} {proofPath} {baseUrl} docker-compose.public-edge.yml 300 true",
             RedirectStandardError = true,
             RedirectStandardOutput = true,
             UseShellExecute = false,

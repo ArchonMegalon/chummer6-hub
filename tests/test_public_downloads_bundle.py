@@ -1101,6 +1101,64 @@ class PublicDownloadsBundleTests(unittest.TestCase):
                     f"authoritative published manifest {name} must not retain stale pre-run content",
                 )
 
+    def test_materializer_hydrates_missing_manifest_artifacts_from_registry_fallback(self):
+        if not MATERIALIZER.exists():
+            self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
+
+        with tempfile.TemporaryDirectory(prefix="chummer-public-downloads-bundle-hydration-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            output_root = temp_path / "downloads"
+            empty_runservices_root = temp_path / "empty-runservices-files"
+            empty_presentation_root = temp_path / "empty-presentation-files"
+            empty_runservices_root.mkdir()
+            empty_presentation_root.mkdir()
+            copy_fixture_files(fixture.files_root, fixture.registry_files_root)
+
+            env = materializer_fixture_env(fixture)
+            env["CHUMMER_RUNSERVICES_SOURCE_FILES_ROOT"] = str(empty_runservices_root)
+            env["CHUMMER_PRESENTATION_FILES_ROOT"] = str(empty_presentation_root)
+
+            completed = run_materializer(output_root, env)
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+
+            for row in (fixture.linux_row, fixture.windows_row, fixture.macos_row):
+                artifact_path = output_root / "files" / str(row["fileName"])
+                self.assertTrue(artifact_path.is_file(), f"missing hydrated artifact: {artifact_path}")
+                self.assertEqual(sha256_file(artifact_path), str(row["sha256"]))
+            payload_name = str(fixture.windows_row["payloadFileName"])
+            self.assertTrue((output_root / "files" / payload_name).is_file())
+            self.assertTrue((output_root / "files" / f"{payload_name}.json").is_file())
+
+    def test_materializer_syncs_authoritative_startup_smoke_as_exact_directory_truth(self):
+        if not MATERIALIZER.exists():
+            self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
+
+        with tempfile.TemporaryDirectory(prefix="chummer-public-downloads-bundle-startup-authority-") as temp_root:
+            temp_path = Path(temp_root)
+            fixture = write_public_downloads_fixture(temp_path)
+            output_root = temp_path / "downloads"
+            authoritative_startup_root = fixture.authoritative_root / "startup-smoke"
+            authoritative_startup_root.mkdir(parents=True)
+            (authoritative_startup_root / "stale.receipt.json").write_text("{}\n", encoding="utf-8")
+
+            completed = run_materializer(output_root, materializer_fixture_env(fixture))
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+
+            output_startup_root = output_root / "startup-smoke"
+            output_files = {
+                path.relative_to(output_startup_root): path.read_bytes()
+                for path in output_startup_root.rglob("*")
+                if path.is_file()
+            }
+            authoritative_files = {
+                path.relative_to(authoritative_startup_root): path.read_bytes()
+                for path in authoritative_startup_root.rglob("*")
+                if path.is_file()
+            }
+            self.assertEqual(authoritative_files, output_files)
+            self.assertNotIn(Path("stale.receipt.json"), authoritative_files)
+
     def test_materializer_declares_authoritative_registry_startup_smoke_sync(self):
         if not MATERIALIZER.exists():
             self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")

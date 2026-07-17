@@ -930,6 +930,10 @@ def test_materialize_public_downloads_bundle_refreshes_stage_handoff_before_visu
     presentation_files.mkdir()
     presentation_startup_smoke.mkdir()
     runservices_startup_smoke.mkdir()
+    authoritative_root = tmp_path / "authoritative-published"
+    authoritative_root.mkdir()
+    authoritative_manifest = authoritative_root / "RELEASE_CHANNEL.generated.json"
+    authoritative_manifest.write_text('{"version":"still-live"}\n', encoding="utf-8")
 
     installer_path = presentation_files / "chummer-avalonia-win-x64-installer.exe"
     payload_path = presentation_files / "chummer-avalonia-win-x64-payload.zip"
@@ -1057,6 +1061,9 @@ def test_materialize_public_downloads_bundle_refreshes_stage_handoff_before_visu
     assert handoff_payload["windows_visual_proof_handoff"]["visual_proof_path"] == str(
         output_root / "WINDOWS_INSTALLER_VISUAL_PROOF.generated.json"
     )
+    assert authoritative_manifest.read_text(encoding="utf-8") == '{"version":"still-live"}\n'
+    assert not (authoritative_root / "releases.json").exists()
+    assert not (authoritative_root / "startup-smoke").exists()
 
 
 def test_materialize_public_downloads_bundle_replaces_stale_duplicate_artifacts_with_manifest_matching_bytes(tmp_path: Path) -> None:
