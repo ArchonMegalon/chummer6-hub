@@ -1562,22 +1562,41 @@ exit 0
 
 def test_all_public_edge_mutators_share_one_nonoverrideable_host_lock() -> None:
     lock_path = "/docker/chummercomplete/.state/public-edge-mutation.lock"
-    deploy_text = DEPLOY.read_text(encoding="utf-8")
+    deploy_text = (ROOT / "scripts" / "deploy_public_edge_portal.sh").read_text(
+        encoding="utf-8"
+    )
     restore_text = RESTORE.read_text(encoding="utf-8")
     shared_lock_text = (ROOT / "scripts" / "public_edge_mutation_lock.py").read_text(
         encoding="utf-8"
     )
     publisher_text = PUBLISHER.read_text(encoding="utf-8")
     runbook_text = RUNBOOK.read_text(encoding="utf-8")
+    production_cutover = runbook_text[
+        runbook_text.index("### Sole production application cutover") :
+        runbook_text.index("### Authenticated manual stale-lock recovery")
+    ]
 
+    assert 'DEPLOY_LOCK_ROOT="/docker/chummercomplete/.state"' in deploy_text
     assert f'DEPLOY_LOCK_DIR="$DEPLOY_LOCK_ROOT/public-edge-mutation.lock"' in deploy_text
     assert "LOCK_PATH as PUBLIC_EDGE_MUTATION_LOCK" in restore_text
     assert 'LOCK_ROOT = Path("/docker/chummercomplete/.state")' in shared_lock_text
     assert 'LOCK_PATH = LOCK_ROOT / "public-edge-mutation.lock"' in shared_lock_text
     assert f'Path("{lock_path}")' in publisher_text
-    assert f"cutover_lock_dir={lock_path}" in runbook_text
     assert "CHUMMER_PUBLIC_EDGE_DEPLOY_LOCK_ROOT" not in deploy_text
-    assert '--shared-mutation-lock-token "$cutover_lock_token"' in runbook_text
+    assert 'DEPLOY_LOCK_ROOT="${' not in deploy_text
+    assert 'DEPLOY_LOCK_DIR="${' not in deploy_text
+    assert production_cutover.count("scripts/deploy_public_edge_portal.sh") == 2
+    assert "scripts/deploy_public_edge_portal.sh recover" in production_cutover
+    assert "Operators do not stop the portal" in production_cutover
+    for retired_manual_lock in (
+        "cutover_lock_dir=",
+        "--shared-mutation-lock-token",
+        "public_edge_mutation_lock.py acquire",
+        "CHUMMER_PUBLIC_EDGE_DEPLOY_LOCK_ROOT",
+        "DEPLOY_LOCK_ROOT=",
+        "DEPLOY_LOCK_DIR=",
+    ):
+        assert retired_manual_lock not in runbook_text
     assert publisher_text.index("with public_edge_mutation_lock(") < publisher_text.index(
         "with overlay_publish_lock(",
         publisher_text.index("with public_edge_mutation_lock("),
