@@ -59,6 +59,16 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
     assert all(spec.repository.startswith("https://github.com/ArchonMegalon/") for spec in lock.packages)
 
 
+def test_repository_sdk_policy_disables_roll_forward() -> None:
+    global_json = json.loads((ROOT / "global.json").read_text(encoding="utf-8"))
+    assert global_json == {
+        "sdk": {
+            "version": "10.0.103",
+            "rollForward": "disable",
+        }
+    }
+
+
 @pytest.mark.parametrize(
     "bad_commit",
     ["main", "refs/heads/main", "v1.0.0", "A" * 40, "0" * 39],
