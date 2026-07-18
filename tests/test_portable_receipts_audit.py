@@ -60,23 +60,27 @@ def test_scan_does_not_treat_public_home_routes_as_host_paths(tmp_path: Path) ->
 
 def test_scan_recurses_and_redacts_macos_and_windows_user_homes(tmp_path: Path) -> None:
     module = load_module()
-    write_json(tmp_path / "startup-smoke" / "mac.json", {"binary": "/Users/alice/build/Chummer"})
-    write_json(tmp_path / "portal" / "windows.json", {"binary": r"C:\Users\Bob\build\Chummer.exe"})
+    write_json(tmp_path / "startup-smoke" / "mac.json", {"binary": "/Users/Ålice User/build/Chummer"})
+    write_json(tmp_path / "portal" / "windows.json", {"binary": r"C:\Users\Bob Builder\build\Chummer.exe"})
+    write_json(tmp_path / "portal" / "linux.json", {"binary": "/home/José Runner/build/Chummer"})
 
     scan = module.scan_published_receipts([tmp_path])
 
-    assert scan["scanned_artifact_count"] == 2
+    assert scan["scanned_artifact_count"] == 3
     assert scan["machine_specific_hits"] == [
+        "scan-root-1/portal/linux.json",
         "scan-root-1/portal/windows.json",
         "scan-root-1/startup-smoke/mac.json",
     ]
     assert {detail["category"] for detail in scan["machine_specific_hit_details"]} == {
+        "linux_user_home",
         "macos_user_home",
         "windows_user_home",
     }
     serialized = json.dumps(scan)
-    assert "alice" not in serialized
-    assert "Bob" not in serialized
+    assert "Ålice User" not in serialized
+    assert "Bob Builder" not in serialized
+    assert "José Runner" not in serialized
     assert str(tmp_path) not in serialized
 
 
@@ -92,6 +96,99 @@ def test_scan_rejects_absolute_process_path_even_outside_user_home(tmp_path: Pat
     assert scan["machine_specific_hits"] == ["scan-root-1/startup-smoke/linux.json"]
     assert scan["machine_specific_hit_details"][0]["category"] == "host_absolute_path_field"
     assert "/tmp/chummer-smoke" not in json.dumps(scan)
+
+
+def test_scan_rejects_absolute_docker_opt_and_srv_roots_in_arbitrary_text(tmp_path: Path) -> None:
+    module = load_module()
+    for index, absolute_path in enumerate(
+        (
+            "/docker/chummer/build/output.json",
+            "/opt/chummer/build/output.json",
+            "/srv/chummer/build/output.json",
+        )
+    ):
+        write_json(
+            tmp_path / f"receipt-{index}.json",
+            {"note": f"materialized from {absolute_path}"},
+        )
+
+    scan = module.scan_published_receipts([tmp_path])
+
+    assert len(scan["machine_specific_hits"]) == 3
+    assert {detail["category"] for detail in scan["machine_specific_hit_details"]} == {
+        "host_absolute_root"
+    }
+    serialized = json.dumps(scan)
+    for forbidden in ("/docker/", "/opt/", "/srv/"):
+        assert forbidden not in serialized
+
+
+def test_scan_rejects_absolute_candidate_path_list_fields(tmp_path: Path) -> None:
+    module = load_module()
+    write_json(
+        tmp_path / "startup-smoke" / "candidate-paths.json",
+        {
+            "startup_smoke": {
+                "candidate_paths": ["/tmp/private/one.json", "/var/tmp/private/two.json"],
+            }
+        },
+    )
+    write_json(
+        tmp_path / "startup-smoke" / "artifact-path-candidates.json",
+        {
+            "startup_smoke": {
+                "artifactPathCandidates": [r"C:\\Temp\\private\\three.json"],
+            }
+        },
+    )
+
+    scan = module.scan_published_receipts([tmp_path])
+
+    assert scan["machine_specific_hits"] == [
+        "scan-root-1/startup-smoke/artifact-path-candidates.json",
+        "scan-root-1/startup-smoke/candidate-paths.json",
+    ]
+    assert {detail["category"] for detail in scan["machine_specific_hit_details"]} == {
+        "host_absolute_path_field"
+    }
+    serialized = json.dumps(scan)
+    assert "/tmp/private" not in serialized
+    assert "C:\\\\Temp" not in serialized
+
+
+def test_scan_rejects_nested_generic_host_path_fields_and_allows_portable_values(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    write_json(
+        tmp_path / "host-paths.json",
+        {
+            "nested": {
+                "artifactPath": "/tmp/private/chummer.exe",
+                "diagnosticLogPath": "/var/tmp/chummer/startup.log",
+                "sourceRepositoryRoot": "/workspace/chummer-presentation",
+            }
+        },
+    )
+    write_json(
+        tmp_path / "portable-paths.json",
+        {
+            "nested": {
+                "artifactPath": "files/chummer.exe",
+                "diagnosticLogPath": "startup.log",
+                "sourceRepositoryRoot": "chummer-presentation",
+                "artifactPathDisclosure": "artifact_shelf_relative_path",
+            }
+        },
+    )
+
+    scan = module.scan_published_receipts([tmp_path])
+
+    assert scan["machine_specific_hits"] == ["scan-root-1/host-paths.json"]
+    assert scan["machine_specific_hit_details"][0]["category"] == "host_absolute_path_field"
+    serialized = json.dumps(scan)
+    for forbidden in ("/tmp/private", "/var/tmp/chummer", "/workspace/chummer-presentation"):
+        assert forbidden not in serialized
 
 
 def test_scan_fails_closed_on_invalid_utf8_nested_json_without_echoing_host_path(tmp_path: Path) -> None:

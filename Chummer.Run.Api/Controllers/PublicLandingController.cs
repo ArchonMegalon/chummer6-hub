@@ -12375,6 +12375,12 @@ Boundary:
             return null;
         }
 
+        ReleaseTruthPresentationGate releaseTruthGate = BuildReleaseTruthPresentationGate(manifest);
+        if (releaseTruthGate.ReviewRequired)
+        {
+            return BuildReleaseTruthGatedPulsePanel(manifest, releaseTruthGate);
+        }
+
         List<string> microProof =
         [
             string.IsNullOrWhiteSpace(pulse.AsOf) ? "Current weekly pulse" : $"As of {pulse.AsOf}"
@@ -12457,6 +12463,93 @@ Boundary:
             MissingDesktopClientCoverage: pulse.MissingDesktopClientCoverage,
             ParityClaimsReviewRequired: pulse.ParityClaimsReviewRequired,
             RouteGuardSummary: BuildTrustPulseLaunchReadinessSummary(pulse));
+    }
+
+    internal static ReleaseTruthPresentationGate BuildReleaseTruthPresentationGate(PublicReleaseManifestDto manifest)
+    {
+        string proofFreshnessStatus = "missing";
+        if (manifest.PublicTrustMetrics is JsonElement metrics
+            && metrics.ValueKind == JsonValueKind.Object
+            && metrics.TryGetProperty("proofFreshness", out JsonElement proofFreshness)
+            && proofFreshness.ValueKind == JsonValueKind.Object)
+        {
+            string? publishedFreshness = TryGetJsonString(proofFreshness, "status")?.Trim().ToLowerInvariant();
+            if (!string.IsNullOrWhiteSpace(publishedFreshness))
+            {
+                proofFreshnessStatus = publishedFreshness;
+            }
+        }
+
+        bool supportabilityReviewRequired = string.Equals(
+            manifest.SupportabilityState?.Trim(),
+            "review_required",
+            StringComparison.OrdinalIgnoreCase);
+        bool rolloutReviewRequired = (manifest.RolloutState ?? string.Empty)
+            .Contains("review_required", StringComparison.OrdinalIgnoreCase);
+        bool proofFreshnessRequiresReview = !string.Equals(
+            proofFreshnessStatus,
+            "fresh",
+            StringComparison.OrdinalIgnoreCase);
+        bool reviewRequired = supportabilityReviewRequired
+            || rolloutReviewRequired
+            || proofFreshnessRequiresReview;
+
+        if (!reviewRequired)
+        {
+            return new(false, proofFreshnessStatus, string.Empty);
+        }
+
+        string proofReason = proofFreshnessStatus switch
+        {
+            "stale" => "canonical release proof freshness is stale",
+            "missing" => "canonical release proof freshness is missing",
+            { Length: > 0 } => $"canonical release proof freshness is {HumanizeToken(proofFreshnessStatus, "under review").ToLowerInvariant()}",
+            _ => "canonical release supportability requires review"
+        };
+        string summary =
+            $"Release review is required because {proofReason}. Current installers may remain listed, but launch-ready, completion-percentage, and no-blocker claims are withheld until current release proof is published.";
+        return new(true, proofFreshnessStatus, summary);
+    }
+
+    internal static PublicTrustPulsePanelViewModel BuildReleaseTruthGatedPulsePanel(
+        PublicReleaseManifestDto manifest,
+        ReleaseTruthPresentationGate gate)
+    {
+        string installerSummary = manifest.Downloads.Count switch
+        {
+            <= 0 => "No current installer is published on the release shelf.",
+            1 => "1 current installer remains listed while release proof is refreshed.",
+            _ => $"{manifest.Downloads.Count} current installers remain listed while release proof is refreshed."
+        };
+        string freshnessLabel = string.IsNullOrWhiteSpace(gate.ProofFreshnessStatus)
+            ? "Proof freshness · not published"
+            : $"Proof freshness · {HumanizeToken(gate.ProofFreshnessStatus, "under review")}";
+        IReadOnlyList<PublicTrustPulseRowViewModel> rows =
+        [
+            new("Recommended now", "Use the current downloads page only with its review-required status visible; keep parity-sensitive rollout with support."),
+            new("Who can get it now", installerSummary),
+            new("Release truth", gate.Summary),
+            new("Launch readiness", "Wider launch remains paused until canonical release proof is fresh and the review-required posture is cleared."),
+            new("Current caution", gate.Summary)
+        ];
+
+        return new PublicTrustPulsePanelViewModel(
+            Eyebrow: "Release truth",
+            Heading: "Release review required",
+            Summary: gate.Summary,
+            MicroProof:
+            [
+                $"Build · {manifest.Version}",
+                freshnessLabel,
+                $"Supportability · {HumanizeToken(manifest.SupportabilityState, "review required")}"
+            ],
+            TrendSamples: Array.Empty<PublicTrustPulseTrendPointViewModel>(),
+            Rows: rows,
+            PrimaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
+            SecondaryAction: new TrustPageActionViewModel("Open progress", "/progress", "ghost"),
+            MissingDesktopClientCoverage: false,
+            ParityClaimsReviewRequired: true,
+            RouteGuardSummary: gate.Summary);
     }
 
     private async Task<SignedInTrustStatusPanelViewModel?> BuildSignedInTrustStatusPanelAsync(
@@ -18705,6 +18798,11 @@ echo "Help: ${HELP_URL}"
         string ExecutableName,
         string LauncherName,
         string DesktopEntryName);
+
+    internal sealed record ReleaseTruthPresentationGate(
+        bool ReviewRequired,
+        string ProofFreshnessStatus,
+        string Summary);
 
     private sealed record GuidedBootstrapScriptContext(
         PublicReleaseManifestDto Manifest,

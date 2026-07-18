@@ -24,21 +24,29 @@ MACHINE_SPECIFIC_PATH_PATTERNS = {
     # also valid public application routes in Chummer and are not sufficient
     # evidence of a host path on their own.
     "linux_user_home": re.compile(
-        r"/home/[A-Za-z0-9_.-]+/(?=[^/?#\"'<>])"
+        r"/home/(?!\[[^\]/]+\][+*?]?/)[^/\r\n]+/(?=[^/?#\"'<>])"
     ),
     "macos_user_home": re.compile(
-        r"/Users/[A-Za-z0-9_.-]+/(?=[^/?#\"'<>])"
+        r"/Users/(?!\[[^\]/]+\][+*?]?/)[^/\r\n]+/(?=[^/?#\"'<>])"
     ),
     "windows_user_home": re.compile(
         r"(?i)(?:[A-Z]:[\\/])(?:Users|Documents and Settings)[\\/]"
-        r"[^\\/\s\"'<>]+[\\/](?=[^\\/?#\"'<>])"
+        r"[^\\/\r\n]+[\\/](?=[^\\/?#\"'<>])"
     ),
 }
+HOST_ABSOLUTE_ROOT_PATTERN = re.compile(
+    r"(?<![:\w])/(?:docker|opt|srv)(?:/|$)"
+)
 HOST_ABSOLUTE_PATH_FIELDS = {
     "processpath",
     "startup_smoke_bootstrap_temp_root",
     "startup_smoke_payload_download_target",
 }
+HOST_ABSOLUTE_PATH_FIELD_SUFFIXES = (
+    "artifactpath",
+    "logpath",
+    "repositoryroot",
+)
 # Compatibility alias for callers that display the original Linux-only pattern.
 HOME_PATH_PATTERN = MACHINE_SPECIFIC_PATH_PATTERNS["linux_user_home"]
 DEFAULT_SCAN_ROOTS = (
@@ -60,6 +68,9 @@ def _machine_specific_path_category(text: str) -> str | None:
     parsed = urlparse(text)
     if parsed.scheme and parsed.scheme.lower() != "file":
         return None
+
+    if HOST_ABSOLUTE_ROOT_PATTERN.search(text) is not None:
+        return "host_absolute_root"
 
     boundary_positions = [position for marker in ("?", "#") if (position := text.find(marker)) >= 0]
     content_boundary = min(boundary_positions) if boundary_positions else len(text)
@@ -86,26 +97,32 @@ def _is_absolute_host_path(text: str) -> bool:
     )
 
 
-def find_machine_specific_match(node: Any) -> str | None:
+def _is_host_absolute_path_field(key: str) -> bool:
+    normalized = re.sub(r"[^a-z]", "", str(key).casefold())
+    return (
+        normalized in HOST_ABSOLUTE_PATH_FIELDS
+        or normalized.endswith(HOST_ABSOLUTE_PATH_FIELD_SUFFIXES)
+        or normalized.endswith(("candidatepath", "candidatepaths"))
+        or ("candidate" in normalized and "path" in normalized)
+    )
+
+
+def find_machine_specific_match(node: Any, semantic_key: str = "") -> str | None:
     if isinstance(node, dict):
         for key, value in node.items():
-            match = find_machine_specific_match(value)
+            match = find_machine_specific_match(value, str(key))
             if match is not None:
                 return match
-            if (
-                str(key).strip().casefold() in HOST_ABSOLUTE_PATH_FIELDS
-                and isinstance(value, str)
-                and _is_absolute_host_path(value)
-            ):
-                return "host_absolute_path_field"
         return None
     if isinstance(node, list):
         for item in node:
-            match = find_machine_specific_match(item)
+            match = find_machine_specific_match(item, semantic_key)
             if match is not None:
                 return match
         return None
     if isinstance(node, str):
+        if _is_host_absolute_path_field(semantic_key) and _is_absolute_host_path(node):
+            return "host_absolute_path_field"
         return _machine_specific_path_category(node)
     return None
 
@@ -244,7 +261,7 @@ def scan_published_receipts(
                     "path": artifact_ref,
                     "category": match,
                     "match": f"<redacted:{match}>",
-                    "sample": "Machine-specific user-home path redacted.",
+                    "sample": "Machine-specific host path redacted.",
                 }
             )
 
@@ -264,7 +281,9 @@ def scan_published_receipts(
             category: pattern.pattern
             for category, pattern in MACHINE_SPECIFIC_PATH_PATTERNS.items()
         },
+        "host_absolute_root_pattern": HOST_ABSOLUTE_ROOT_PATTERN.pattern,
         "host_absolute_path_fields": sorted(HOST_ABSOLUTE_PATH_FIELDS),
+        "host_absolute_path_field_suffixes": list(HOST_ABSOLUTE_PATH_FIELD_SUFFIXES),
         "recursive_scan": True,
         "stable_regular_file_snapshots": True,
     }
@@ -276,7 +295,7 @@ def materialize(output_path: Path = DEFAULT_OUTPUT, roots: list[Path] | tuple[Pa
     machine_specific_path_hits = scan["machine_specific_path_hits"]
     artifact_integrity_hits = scan["artifact_integrity_hits"]
     if ok:
-        summary = "Portable receipts audit passed. Published proof artifacts do not embed machine-specific home paths."
+        summary = "Portable receipts audit passed. Published proof artifacts do not embed machine-specific host paths."
     elif machine_specific_path_hits and artifact_integrity_hits:
         summary = (
             "Portable receipts audit failed. Published proof artifacts include machine-specific host paths "
@@ -313,8 +332,8 @@ def materialize(output_path: Path = DEFAULT_OUTPUT, roots: list[Path] | tuple[Pa
             "scan_nested_json_artifacts": True,
             "fail_on_artifact_integrity_errors": True,
             "machine_specific_pattern_description": (
-                "literal Linux, macOS, and Windows user-home path segments are forbidden "
-                "in published receipts"
+                "literal Linux, macOS, and Windows user-home paths; absolute /docker, /opt, "
+                "/srv roots; and absolute candidate-path evidence are forbidden in published receipts"
             ),
         },
         "abs_ids": ["ABS-012"],
