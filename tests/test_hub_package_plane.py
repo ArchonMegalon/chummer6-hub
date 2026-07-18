@@ -194,6 +194,29 @@ def test_build_feed_rejects_any_existing_destination(tmp_path: Path) -> None:
         module.build_feed(lock, lock_sha256="0" * 64, feed=feed, dotnet="dotnet")
 
 
+def test_build_feed_rejects_sdk_roll_forward(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    calls: list[tuple[str, ...]] = []
+
+    def fake_run(command, **_kwargs):
+        rendered = tuple(command)
+        calls.append(rendered)
+        if rendered[-1] == "--version":
+            return "10.0.110\n"
+        raise AssertionError(f"unexpected command after SDK mismatch: {rendered}")
+
+    monkeypatch.setattr(module, "_run", fake_run)
+    with pytest.raises(module.PackagePlaneError, match="expected 10.0.103, observed 10.0.110"):
+        module.build_feed(
+            lock,
+            lock_sha256="0" * 64,
+            feed=tmp_path / "feed",
+            dotnet="dotnet",
+        )
+    assert calls == [("dotnet", "--version")]
+
+
 def test_external_project_references_require_explicit_local_tree_opt_in() -> None:
     for relative in PACKAGE_PLANE_PROJECTS:
         root = ElementTree.fromstring((ROOT / relative).read_text(encoding="utf-8-sig"))

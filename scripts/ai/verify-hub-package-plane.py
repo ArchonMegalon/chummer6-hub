@@ -351,6 +351,7 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "package_plane_lock_sha256": lock_sha,
             "package_inventory_sha256": inventory_sha,
             "package_version": lock.package_version,
+            "dotnet_sdk": lock.dotnet_sdk,
             "source_authorities": [
                 {"id": spec.package_id, "repository": spec.repository, "commit": spec.commit}
                 for spec in lock.packages

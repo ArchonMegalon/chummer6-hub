@@ -487,6 +487,11 @@ def build_feed(
         for directory in (source_root, package_root, cli_home, http_cache, staged_feed):
             directory.mkdir(parents=True, exist_ok=True)
         env = isolated_environment(os.environ, package_root, cli_home, http_cache)
+        observed_sdk = _run((dotnet, "--version"), env=env).strip()
+        if observed_sdk != lock.dotnet_sdk:
+            raise PackagePlaneError(
+                f"dotnet SDK mismatch: expected {lock.dotnet_sdk}, observed {observed_sdk}"
+            )
         nuget_config = root / "NuGet.Config"
         nuget_config.write_text(
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
