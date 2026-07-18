@@ -386,7 +386,7 @@ def isolated_environment(
             "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1",
             "DOTNET_NOLOGO": "1",
             "DOTNET_MULTILEVEL_LOOKUP": "0",
-            "DOTNET_ROLL_FORWARD": "Disable",
+            "DOTNET_ROLL_FORWARD": "LatestPatch",
             "DOTNET_ROLL_FORWARD_TO_PRERELEASE": "0",
             "CI": "true",
             "LANG": "C.UTF-8",

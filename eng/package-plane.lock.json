@@ -15,7 +15,7 @@
   "approved_remote_source": "https://api.nuget.org/v3/index.json",
   "build_recipe": {
     "path": "scripts/ai/bootstrap-hub-package-feed.py",
-    "sha256": "b7529f90da464a2a3c4a141e6284ec55a6a33e9e9fe983630cf1302acba2583d"
+    "sha256": "88113858a309329d152e5882d0285350a2997ad81736dbf59dd34953960d029d"
   },
   "packages": [
     {

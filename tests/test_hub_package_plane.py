@@ -176,6 +176,8 @@ def test_isolated_environment_overrides_ambient_cache_and_sibling_inputs(
     assert "MSBuildSDKsPath" not in result
     assert result["CI"] == "true"
     assert result["SOURCE_DATE_EPOCH"] == "0"
+    assert result["DOTNET_ROLL_FORWARD"] == "LatestPatch"
+    assert result["DOTNET_MULTILEVEL_LOOKUP"] == "0"
     assert result["TZ"] == "UTC"
     assert result["TMPDIR"] == str(tmp_path / "tmp")
 
