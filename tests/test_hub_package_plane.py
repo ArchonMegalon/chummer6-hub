@@ -126,6 +126,11 @@ def test_isolated_environment_overrides_ambient_cache_and_sibling_inputs(
         "CHUMMER_WORKSPACE_ROOT": "/ambient/siblings",
         "CHUMMER_PACKAGE_FEED": "/ambient/packages",
         "ChummerUseLocalCompatibilityTree": "true",
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_SHA": "f" * 40,
+        "GITHUB_WORKSPACE": "/ambient/github-workspace",
+        "MSBuildSDKsPath": "/ambient/msbuild-sdks",
+        "SOURCE_DATE_EPOCH": "1234567890",
     }
     result = module.isolated_environment(
         poisoned,
@@ -139,6 +144,14 @@ def test_isolated_environment_overrides_ambient_cache_and_sibling_inputs(
     assert not any(value.startswith("/ambient") for value in result.values())
     assert "CHUMMER_WORKSPACE_ROOT" not in result
     assert "CHUMMER_PACKAGE_FEED" not in result
+    assert "GITHUB_ACTIONS" not in result
+    assert "GITHUB_SHA" not in result
+    assert "GITHUB_WORKSPACE" not in result
+    assert "MSBuildSDKsPath" not in result
+    assert result["CI"] == "true"
+    assert result["SOURCE_DATE_EPOCH"] == "0"
+    assert result["TZ"] == "UTC"
+    assert result["TMPDIR"] == str(tmp_path / "tmp")
 
 
 def test_exact_head_checkout_validator_rejects_dirty_tree(tmp_path: Path) -> None:

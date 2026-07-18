@@ -216,17 +216,21 @@ def _run(
 def isolated_environment(
     base: Mapping[str, str], package_root: Path, cli_home: Path, http_cache: Path
 ) -> dict[str, str]:
-    blocked = {
-        "dotnet_cli_home",
-        "nuget_packages",
-        "nuget_http_cache_path",
-        "restorepackagespath",
-        "restoreadditionalprojectsources",
-        "chummer_workspace_root",
-        "chummer_package_feed",
-        "chummeruselocalcompatibilitytree",
+    inherited = {
+        "PATH",
+        "DOTNET_ROOT",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "no_proxy",
     }
-    result = {key: value for key, value in base.items() if key.lower() not in blocked}
+    result = {key: value for key, value in base.items() if key in inherited}
+    temporary_root = cli_home.parent / "tmp"
+    temporary_root.mkdir(parents=True, exist_ok=True)
     result.update(
         {
             "DOTNET_CLI_HOME": str(cli_home),
@@ -234,6 +238,13 @@ def isolated_environment(
             "NUGET_HTTP_CACHE_PATH": str(http_cache),
             "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
             "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1",
+            "DOTNET_NOLOGO": "1",
+            "CI": "true",
+            "LANG": "C.UTF-8",
+            "LC_ALL": "C.UTF-8",
+            "TZ": "UTC",
+            "TMPDIR": str(temporary_root),
+            "SOURCE_DATE_EPOCH": "0",
             "GIT_CONFIG_NOSYSTEM": "1",
             "GIT_CONFIG_GLOBAL": os.devnull,
             "GIT_TERMINAL_PROMPT": "0",
