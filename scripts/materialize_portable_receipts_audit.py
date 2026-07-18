@@ -42,6 +42,11 @@ HOST_ABSOLUTE_PATH_FIELDS = {
     "startup_smoke_bootstrap_temp_root",
     "startup_smoke_payload_download_target",
 }
+HOST_ABSOLUTE_PATH_FIELD_SUFFIXES = (
+    "artifactpath",
+    "logpath",
+    "repositoryroot",
+)
 # Compatibility alias for callers that display the original Linux-only pattern.
 HOME_PATH_PATTERN = MACHINE_SPECIFIC_PATH_PATTERNS["linux_user_home"]
 DEFAULT_SCAN_ROOTS = (
@@ -96,6 +101,7 @@ def _is_host_absolute_path_field(key: str) -> bool:
     normalized = re.sub(r"[^a-z]", "", str(key).casefold())
     return (
         normalized in HOST_ABSOLUTE_PATH_FIELDS
+        or normalized.endswith(HOST_ABSOLUTE_PATH_FIELD_SUFFIXES)
         or normalized.endswith(("candidatepath", "candidatepaths"))
         or ("candidate" in normalized and "path" in normalized)
     )
@@ -277,6 +283,7 @@ def scan_published_receipts(
         },
         "host_absolute_root_pattern": HOST_ABSOLUTE_ROOT_PATTERN.pattern,
         "host_absolute_path_fields": sorted(HOST_ABSOLUTE_PATH_FIELDS),
+        "host_absolute_path_field_suffixes": list(HOST_ABSOLUTE_PATH_FIELD_SUFFIXES),
         "recursive_scan": True,
         "stable_regular_file_snapshots": True,
     }

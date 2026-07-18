@@ -156,6 +156,41 @@ def test_scan_rejects_absolute_candidate_path_list_fields(tmp_path: Path) -> Non
     assert "C:\\\\Temp" not in serialized
 
 
+def test_scan_rejects_nested_generic_host_path_fields_and_allows_portable_values(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    write_json(
+        tmp_path / "host-paths.json",
+        {
+            "nested": {
+                "artifactPath": "/tmp/private/chummer.exe",
+                "diagnosticLogPath": "/var/tmp/chummer/startup.log",
+                "sourceRepositoryRoot": "/workspace/chummer-presentation",
+            }
+        },
+    )
+    write_json(
+        tmp_path / "portable-paths.json",
+        {
+            "nested": {
+                "artifactPath": "files/chummer.exe",
+                "diagnosticLogPath": "startup.log",
+                "sourceRepositoryRoot": "chummer-presentation",
+                "artifactPathDisclosure": "artifact_shelf_relative_path",
+            }
+        },
+    )
+
+    scan = module.scan_published_receipts([tmp_path])
+
+    assert scan["machine_specific_hits"] == ["scan-root-1/host-paths.json"]
+    assert scan["machine_specific_hit_details"][0]["category"] == "host_absolute_path_field"
+    serialized = json.dumps(scan)
+    for forbidden in ("/tmp/private", "/var/tmp/chummer", "/workspace/chummer-presentation"):
+        assert forbidden not in serialized
+
+
 def test_scan_fails_closed_on_invalid_utf8_nested_json_without_echoing_host_path(tmp_path: Path) -> None:
     module = load_module()
     invalid = tmp_path / "nested" / "invalid.json"
