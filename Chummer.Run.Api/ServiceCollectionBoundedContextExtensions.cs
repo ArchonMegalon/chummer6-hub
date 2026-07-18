@@ -57,11 +57,14 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PublicProgressService>();
         services.AddSingleton<PublicTrustPulseService>();
         services.AddSingleton<CampaignOsLocalProofService>();
-        services.AddSingleton<ReleaseShelfGenerationStore>();
+        services.AddSingleton(static provider => new ReleaseShelfGenerationStore(
+            provider.GetRequiredService<IConfiguration>(),
+            provider.GetRequiredService<IHttpContextAccessor>()));
         services.AddSingleton(static provider => new PublicReleaseManifestService(
             provider.GetRequiredService<IConfiguration>(),
             provider.GetRequiredService<ReleaseShelfGenerationStore>()));
         services.AddSingleton<ArtifactDeliveryPolicy>();
+        services.AddSingleton<IReleaseTruthProjection, PublicReleaseTruthProjectionService>();
         services.AddSingleton<WindowsProofManifestValidator>();
         services.AddSingleton<WindowsProofGenerationStore>();
         services.AddSingleton<IWindowsProofGenerationStore>(static provider =>

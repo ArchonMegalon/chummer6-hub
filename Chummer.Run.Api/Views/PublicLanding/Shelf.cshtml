@@ -7,7 +7,9 @@
     var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
         || Model.TrustPulse?.ParityClaimsReviewRequired == true;
     // Keep public comparisons narrow until the related route records are current.
-    var liveItems = Model.Items.Where(card => PublicSurfaceStatus.IsAvailableToday(card.Card.Badge)).ToArray();
+    var liveItems = Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true
+        ? Model.Items.Where(card => PublicSurfaceStatus.IsAvailableToday(card.Card.Badge)).ToArray()
+        : Array.Empty<ResolvedPublicCardViewModel>();
     var previewItems = Model.Items.Except(liveItems).ToArray();
     var selectedSignedInArtifactView = Model.SignedInArtifactView;
     var signedInRecapShelf = Model.SignedInRecapShelf is { Count: > 0 }
@@ -146,6 +148,8 @@
         ? "These campaign, primer, dossier, recap, replay, and run-module outputs are visible now. Some comparisons stay brief until they are useful and current."
         : "These campaign, primer, dossier, recap, replay, and run-module outputs are live now.";
 }
+
+<partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
 
 <section class="minimal-page-hero route-anchor-target">
     <div>

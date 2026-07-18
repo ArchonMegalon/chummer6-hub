@@ -2,18 +2,7 @@
 @{
     var manifest = Model.Manifest;
 
-    static bool IsPublishedStableRelease(PublicReleaseManifestDto releaseManifest)
-    {
-        var stableLanePublished = string.Equals((releaseManifest.Channel ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((releaseManifest.Channel ?? string.Empty).Trim(), "stable", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((releaseManifest.Channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((releaseManifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase);
-        return stableLanePublished
-            && string.Equals((releaseManifest.SupportabilityState ?? string.Empty).Trim(), "gold_supported", StringComparison.OrdinalIgnoreCase)
-            && string.Equals((releaseManifest.Status ?? string.Empty).Trim(), "published", StringComparison.OrdinalIgnoreCase);
-    }
-
-    var isStableRelease = IsPublishedStableRelease(manifest);
+    var isStableRelease = Model.ReleaseTruthProjection?.StableClaimsAllowed == true;
     var currentReleaseHeading = isStableRelease
         ? "Current handoff"
         : "Current release";
@@ -67,6 +56,8 @@
         return resolvedHref;
     }
 }
+
+<partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
 
 <section class="minimal-page-hero route-anchor-target" id="public-shipped-closeout">
     <div>

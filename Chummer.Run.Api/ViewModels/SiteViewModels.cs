@@ -681,7 +681,8 @@ public sealed record LandingPageViewModel(
     BlackLedgerDispatchViewModel? LatestBlackLedgerDispatch = null,
     AccountCampaignSummary? CampaignSpine = null,
     LandingOpenRailViewModel? OpenRail = null,
-    PublicAccessPostureViewModel? AccessPosture = null);
+    PublicAccessPostureViewModel? AccessPosture = null,
+    PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null);
 
 public sealed record LandingOpenRailViewModel(
     string Heading,
@@ -918,7 +919,8 @@ public sealed record NowPageViewModel(
     PublicSignalProjectionPacketViewModel? SignalProjection = null,
     CampaignOsLocalProofSnapshot? CampaignOsProof = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null,
+    PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null);
 
 public sealed record HorizonsPageViewModel(
     SiteChromeViewModel Chrome,
@@ -953,7 +955,8 @@ public sealed record ShelfPageViewModel(
     SignedInTrustStatusPanelViewModel? SignedInStatus = null,
     IReadOnlyList<RecapShelfEntry>? SignedInRecapShelf = null,
     IReadOnlyList<CreatorPublicationProjection>? SignedInCreatorPublications = null,
-    string SignedInArtifactView = "all");
+    string SignedInArtifactView = "all",
+    PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null);
 
 public sealed record DownloadsPageViewModel(
     SiteChromeViewModel Chrome,
@@ -968,7 +971,8 @@ public sealed record DownloadsPageViewModel(
     IReadOnlyList<AurPackageEntry>? AurPackages = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null,
-    PublicAccessPostureViewModel? AccessPosture = null);
+    PublicAccessPostureViewModel? AccessPosture = null,
+    PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null);
 
 public sealed record ReleaseUploadPageViewModel(
     SiteChromeViewModel Chrome,
@@ -1175,7 +1179,8 @@ public sealed record StatusPageViewModel(
     ReleaseTruthDisplayViewModel ReleaseTruth,
     ReleaseExperienceViewModel ReleaseExperience,
     string ReleaseSummary,
-    string CautionSummary);
+    string CautionSummary,
+    PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null);
 
 public sealed record GoldReadinessStatusViewModel(
     string StatusLabel,

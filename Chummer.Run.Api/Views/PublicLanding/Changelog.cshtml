@@ -11,6 +11,7 @@
     var shippedNow = Model.AvailableToday.Take(4).ToArray();
     var stillCaution = Model.Inspectable.Take(4).ToArray();
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
+    var availabilityClaimsAllowed = Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true;
     string ContextualPreviewHref(string? href)
     {
         var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
@@ -29,6 +30,8 @@
             .Replace("maintenance", "planned work", StringComparison.OrdinalIgnoreCase);
 }
 
+<partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
+
 <section class="minimal-page-hero route-anchor-target" id="public-shipped-closeout">
     <div>
         <p class="eyebrow">Changelog</p>
@@ -37,15 +40,15 @@
     </div>
     <div class="minimal-status-pill">
         <span>Release notes</span>
-        <strong>Current app</strong>
+        <strong>@(availabilityClaimsAllowed ? "Current app" : "Release under review")</strong>
     </div>
 </section>
 
 <section class="status-decision-strip" aria-label="Shipped closeout rules">
     <article class="status-decision-strip__card">
-        <span class="tag">Live now</span>
-        <h2>If it is here, you can use it.</h2>
-        <p>This page only covers changes that reached the current app, installer, or public route.</p>
+        <span class="tag">@(availabilityClaimsAllowed ? "Live now" : "Review required")</span>
+        <h2>@(availabilityClaimsAllowed ? "If it is here, you can use it." : "Published notes remain inspectable while availability is reviewed.")</h2>
+        <p>@(availabilityClaimsAllowed ? "This page only covers changes that reached the current app, installer, or public route." : "Use the release-truth status and Downloads page before treating a listed change as generally available.")</p>
         <a class="button-like button-like--ghost" href="/now">Open current release</a>
     </article>
     <article class="status-decision-strip__card">

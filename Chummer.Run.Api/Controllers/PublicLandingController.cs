@@ -50,6 +50,7 @@ public sealed class PublicLandingController : Controller
     private readonly FlipLinkDocumentPortalService _flipLinkDocumentPortal;
     private readonly PublicFlagshipCoverageService _flagshipCoverage;
     private readonly PublicReleaseManifestService _releases;
+    private readonly IReleaseTruthProjection _releaseTruth;
     private readonly CampaignOsLocalProofService _campaignOsProof;
     private readonly ReleaseSelectionService _releaseSelection;
     private readonly PublicActionResolver _actions;
@@ -172,7 +173,8 @@ public sealed class PublicLandingController : Controller
         HorizonArtifactAccessTokenService? artifactAccessTokens = null,
         IMemoryCache? hostedBoardHtmlCache = null,
         PublicCanonicalOriginPolicy? publicOrigin = null,
-        ArtifactDeliveryPolicy? artifactDelivery = null)
+        ArtifactDeliveryPolicy? artifactDelivery = null,
+        IReleaseTruthProjection? releaseTruthProjection = null)
     {
         _landing = landing;
         _flipLinkDocumentPortal = flipLinkDocumentPortal;
@@ -228,6 +230,8 @@ public sealed class PublicLandingController : Controller
         _configuration = configuration;
         _installBootstrapTickets = installBootstrapTickets;
         _artifactDelivery = artifactDelivery ?? new ArtifactDeliveryPolicy(releases, configuration);
+        _releaseTruth = releaseTruthProjection
+            ?? new PublicReleaseTruthProjectionService(releases, releaseSelection, _artifactDelivery);
         _personalizedInstallScripts = personalizedInstallScripts;
         _releaseUploadTickets = releaseUploadTickets;
         _windowsProofInstallers = windowsProofInstallers;
@@ -364,7 +368,11 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> LandingPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        ReleaseShelfSnapshot releaseSnapshot = _releases.CaptureShelfSnapshot();
+        var manifest = _artifactDelivery.FilterRevokedArtifacts(
+            releaseSnapshot,
+            _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(releaseSnapshot)));
+        var releaseTruth = ResolveReleaseTruthProjection();
         bool hasAuthCookie = Request.Cookies.ContainsKey(HubBrowserAuthConstants.AccessTokenCookieName);
         var authenticated = hasAuthCookie && await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
@@ -395,8 +403,12 @@ public sealed class PublicLandingController : Controller
             Workflows: ResolveCards(_landing.CardsForBucket(surface, "start_here"), assetCatalog, authenticated: false, "/"),
             TrustPillars: _landing.CardsForBucket(surface, "why_trust_it"),
             Lanes: ResolveCards(_landing.CardsForBucket(surface, "choose_your_lane"), assetCatalog, authenticated: false, "/"),
-            AvailableToday: ResolveCards(nowCards.Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/"),
-            PreviewItems: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/"),
+            AvailableToday: ResolveCards((releaseTruth.AvailabilityClaimsAllowed
+                ? nowCards.Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge))
+                : []).ToArray(), assetCatalog, authenticated: false, "/"),
+            PreviewItems: ResolveCards((releaseTruth.AvailabilityClaimsAllowed
+                ? nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge))
+                : nowCards).ToArray(), assetCatalog, authenticated: false, "/"),
             ComingNext: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: false, "/"),
             Artifacts: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/"),
             FlagshipCoverage: new FlagshipCoverageStripViewModel(string.Empty, string.Empty, string.Empty, Array.Empty<FlagshipCoverageCardViewModel>()),
@@ -405,7 +417,8 @@ public sealed class PublicLandingController : Controller
             LatestBlackLedgerDispatch: null,
             CampaignSpine: null,
             OpenRail: null,
-            AccessPosture: accessPosture);
+            AccessPosture: accessPosture,
+            ReleaseTruthProjection: releaseTruth);
         return View("~/Views/PublicLanding/Landing.cshtml", model);
     }
 
@@ -461,8 +474,12 @@ public sealed class PublicLandingController : Controller
         ApplyNoStoreHeaders(Response.Headers);
         ApplyDownloadClientHintHeaders(Response.Headers);
         var surface = _landing.LoadSurface();
-        var rawManifest = _releases.LoadManifest();
-        var manifest = _releaseSelection.ApplyAccessPolicy(rawManifest);
+        ReleaseShelfSnapshot releaseSnapshot = _releases.CaptureShelfSnapshot();
+        var rawManifest = _releases.LoadManifest(releaseSnapshot);
+        var manifest = _artifactDelivery.FilterRevokedArtifacts(
+            releaseSnapshot,
+            _releaseSelection.ApplyAccessPolicy(rawManifest));
+        var releaseTruth = ResolveReleaseTruthProjection();
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, BuildDownloadSelectionUserAgent(), authenticated);
         var signedInWindowsBuilds = authenticated
@@ -491,7 +508,8 @@ public sealed class PublicLandingController : Controller
             AurPackages: _aurPackages.LoadCatalog().Packages,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
-            AccessPosture: accessPosture);
+            AccessPosture: accessPosture,
+            ReleaseTruthProjection: releaseTruth);
         return View("~/Views/PublicLanding/Downloads.cshtml", model);
     }
 
@@ -7536,7 +7554,11 @@ document.addEventListener('DOMContentLoaded', function () {
     public async Task<IActionResult> StatusPage(CancellationToken cancellationToken)
     {
         ApplyNoStoreHeaders(Response.Headers);
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        ReleaseShelfSnapshot releaseSnapshot = _releases.CaptureShelfSnapshot();
+        var manifest = _artifactDelivery.FilterRevokedArtifacts(
+            releaseSnapshot,
+            _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(releaseSnapshot)));
+        var releaseTruth = ResolveReleaseTruthProjection();
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         PublicTrustPulseSnapshot? pulse = _trustPulse.LoadSnapshot();
@@ -7545,8 +7567,9 @@ document.addEventListener('DOMContentLoaded', function () {
             Manifest: manifest,
             ReleaseTruth: BuildReleaseTruthDisplay(manifest),
             ReleaseExperience: releaseExperience,
-            ReleaseSummary: BuildPublicStatusReleaseSummary(manifest, releaseExperience, pulse),
-            CautionSummary: BuildPublicStatusCautionSummary(manifest, pulse));
+            ReleaseSummary: BuildPublicStatusReleaseSummary(manifest, releaseExperience, pulse, releaseTruth),
+            CautionSummary: BuildPublicStatusCautionSummary(manifest, pulse, releaseTruth),
+            ReleaseTruthProjection: releaseTruth);
         return View("~/Views/PublicLanding/Status.cshtml", model);
     }
 
@@ -7556,7 +7579,11 @@ document.addEventListener('DOMContentLoaded', function () {
     {
         var surface = _landing.LoadSurface();
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        ReleaseShelfSnapshot releaseSnapshot = _releases.CaptureShelfSnapshot();
+        var manifest = _artifactDelivery.FilterRevokedArtifacts(
+            releaseSnapshot,
+            _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(releaseSnapshot)));
+        var releaseTruth = ResolveReleaseTruthProjection();
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var signedInArtifactView = NormalizeSignedInArtifactView(Request.Query["view"].ToString());
@@ -7598,7 +7625,8 @@ document.addEventListener('DOMContentLoaded', function () {
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
             SignedInRecapShelf: signedInRecapShelf,
             SignedInCreatorPublications: signedInCreatorPublications,
-            SignedInArtifactView: signedInArtifactView);
+            SignedInArtifactView: signedInArtifactView,
+            ReleaseTruthProjection: releaseTruth);
         return View("~/Views/PublicLanding/Shelf.cshtml", model);
     }
 
@@ -12375,7 +12403,9 @@ Boundary:
             return null;
         }
 
-        ReleaseTruthPresentationGate releaseTruthGate = BuildReleaseTruthPresentationGate(manifest);
+        ReleaseTruthPresentationGate releaseTruthGate = BuildReleaseTruthPresentationGate(
+            manifest,
+            ResolveReleaseTruthProjection());
         if (releaseTruthGate.ReviewRequired)
         {
             return BuildReleaseTruthGatedPulsePanel(manifest, releaseTruthGate);
@@ -12465,7 +12495,9 @@ Boundary:
             RouteGuardSummary: BuildTrustPulseLaunchReadinessSummary(pulse));
     }
 
-    internal static ReleaseTruthPresentationGate BuildReleaseTruthPresentationGate(PublicReleaseManifestDto manifest)
+    internal static ReleaseTruthPresentationGate BuildReleaseTruthPresentationGate(
+        PublicReleaseManifestDto manifest,
+        PublicReleaseTruthProjectionDto? releaseTruth = null)
     {
         string proofFreshnessStatus = "missing";
         if (manifest.PublicTrustMetrics is JsonElement metrics
@@ -12492,19 +12524,26 @@ Boundary:
             StringComparison.OrdinalIgnoreCase);
         bool reviewRequired = supportabilityReviewRequired
             || rolloutReviewRequired
-            || proofFreshnessRequiresReview;
+            || proofFreshnessRequiresReview
+            || releaseTruth?.ReviewBannerRequired == true;
 
         if (!reviewRequired)
         {
             return new(false, proofFreshnessStatus, string.Empty);
         }
 
-        string proofReason = proofFreshnessStatus switch
+        string proofReason = releaseTruth?.ReleaseDecisionStatus switch
         {
-            "stale" => "canonical release proof freshness is stale",
-            "missing" => "canonical release proof freshness is missing",
-            { Length: > 0 } => $"canonical release proof freshness is {HumanizeToken(proofFreshnessStatus, "under review").ToLowerInvariant()}",
-            _ => "canonical release supportability requires review"
+            "review_required" => "the immutable release decision requires review",
+            "missing" => "the immutable release decision is missing",
+            "invalid" => "the immutable release decision is invalid",
+            _ => proofFreshnessStatus switch
+            {
+                "stale" => "canonical release proof freshness is stale",
+                "missing" => "canonical release proof freshness is missing",
+                { Length: > 0 } => $"canonical release proof freshness is {HumanizeToken(proofFreshnessStatus, "under review").ToLowerInvariant()}",
+                _ => "canonical release supportability requires review"
+            }
         };
         string summary =
             $"Release review is required because {proofReason}. Current installers may remain listed, but launch-ready, completion-percentage, and no-blocker claims are withheld until current release proof is published.";
@@ -13217,7 +13256,11 @@ Boundary:
         var surface = _landing.LoadSurface();
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        ReleaseShelfSnapshot releaseSnapshot = _releases.CaptureShelfSnapshot();
+        var manifest = _artifactDelivery.FilterRevokedArtifacts(
+            releaseSnapshot,
+            _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(releaseSnapshot)));
+        var releaseTruth = ResolveReleaseTruthProjection();
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var signalLoop = BuildPublicSignalLoopSnapshot(surface, assetCatalog, authenticated, currentPath);
@@ -13229,8 +13272,12 @@ Boundary:
             Assets: assetCatalog,
             ReleaseExperience: releaseExperience,
             ProofModules: ResolveCards(_landing.CardsForBucket(surface, "start_here").Take(3).ToArray(), assetCatalog, authenticated: false, currentPath),
-            AvailableToday: ResolveCards(nowCards.Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, currentPath),
-            Inspectable: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, currentPath),
+            AvailableToday: ResolveCards((releaseTruth.AvailabilityClaimsAllowed
+                ? nowCards.Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge))
+                : []).ToArray(), assetCatalog, authenticated: false, currentPath),
+            Inspectable: ResolveCards((releaseTruth.AvailabilityClaimsAllowed
+                ? nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge))
+                : nowCards).ToArray(), assetCatalog, authenticated: false, currentPath),
             SignedInPreview: surface.RegisteredOverlays,
             Manifest: manifest,
             ReleaseTruth: BuildReleaseTruthDisplay(manifest),
@@ -13238,7 +13285,8 @@ Boundary:
             SignalProjection: signalProjection,
             CampaignOsProof: _campaignOsProof.LoadProof(),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
+            ReleaseTruthProjection: releaseTruth);
     }
 
     private async Task<RoadmapPageViewModel> BuildRoadmapFallbackPageModelAsync(
@@ -13318,6 +13366,10 @@ Boundary:
         => new(
             PublishedDateLabel: manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd"),
             VerifiedDateLabel: BuildLiveVerificationLabel(manifest));
+
+    private PublicReleaseTruthProjectionDto ResolveReleaseTruthProjection()
+        => PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext)
+           ?? _releaseTruth.Capture();
 
     private static string BuildLiveVerificationLabel(PublicReleaseManifestDto manifest)
     {
@@ -14057,13 +14109,29 @@ Boundary:
     private static string BuildPublicStatusReleaseSummary(
         PublicReleaseManifestDto manifest,
         ReleaseExperienceViewModel releaseExperience,
-        PublicTrustPulseSnapshot? pulse)
-        => BuildPreviewLaunchSummary(manifest, releaseExperience, pulse);
+        PublicTrustPulseSnapshot? pulse,
+        PublicReleaseTruthProjectionDto releaseTruth)
+        => releaseTruth.AvailabilityClaimsAllowed
+            ? BuildPreviewLaunchSummary(manifest, releaseExperience, pulse)
+            : releaseTruth.ArtifactCount switch
+            {
+                <= 0 => "No authority-bound installer availability is published right now.",
+                1 => "One installer remains listed while immutable release authority is under review; availability is not asserted.",
+                _ => $"{releaseTruth.ArtifactCount} installers remain listed while immutable release authority is under review; availability is not asserted."
+            };
 
     private static string BuildPublicStatusCautionSummary(
         PublicReleaseManifestDto manifest,
-        PublicTrustPulseSnapshot? pulse)
+        PublicTrustPulseSnapshot? pulse,
+        PublicReleaseTruthProjectionDto releaseTruth)
     {
+        if (!releaseTruth.AvailabilityClaimsAllowed)
+        {
+            return releaseTruth.KnownIssueSummary == PublicReleaseTruthProjectionDto.Unknown
+                ? $"Release decision is {HumanizeToken(releaseTruth.ReleaseDecisionStatus, "under review").ToLowerInvariant()}."
+                : releaseTruth.KnownIssueSummary;
+        }
+
         string blockedSummary = BuildBlockedLaunchSummary(manifest, pulse);
         if (!blockedSummary.StartsWith("No blocked", StringComparison.OrdinalIgnoreCase))
         {
