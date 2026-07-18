@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -73,6 +75,34 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _audit_dotnet_toolchain(dotnet: str, sdk_version: str) -> dict[str, str]:
+    executable = Path(shutil.which(dotnet) or dotnet).resolve()
+    if not executable.is_file():
+        raise VerificationError(f"dotnet host is not a regular file: {executable}")
+    sdk_rows = []
+    for line in _run((dotnet, "--list-sdks")).splitlines():
+        version, separator, location = line.partition(" [")
+        if version == sdk_version and separator and location.endswith("]"):
+            sdk_rows.append(Path(location[:-1]) / sdk_version)
+    if len(sdk_rows) != 1:
+        raise VerificationError(
+            f"expected one exact SDK {sdk_version}, observed {len(sdk_rows)}"
+        )
+    sdk_root = sdk_rows[0].resolve()
+    files = {
+        "dotnet_host_sha256": executable,
+        "csc_sha256": sdk_root / "Roslyn/bincore/csc.dll",
+        "msbuild_sha256": sdk_root / "Microsoft.Build.dll",
+        "nuget_packaging_sha256": sdk_root / "NuGet.Packaging.dll",
+    }
+    if any(not path.is_file() for path in files.values()):
+        raise VerificationError("exact SDK toolchain files are incomplete")
+    result = {key: _sha256(path) for key, path in files.items()}
+    print("dotnet-toolchain: " + json.dumps(result, sort_keys=True))
+    _run((dotnet, "--info"))
+    return result
 
 
 def _load_bootstrap(repo_root: Path):
@@ -281,6 +311,7 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
     lock_path = repo_root / "eng/package-plane.lock.json"
     lock = bootstrap.load_lock(lock_path)
     lock_sha = _sha256(lock_path)
+    toolchain = _audit_dotnet_toolchain(dotnet, lock.dotnet_sdk)
     with tempfile.TemporaryDirectory(prefix="chummer-hub-no-siblings-") as temporary:
         root = Path(temporary)
         feed = root / "feed"
@@ -309,9 +340,19 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
                     f"{name}={hashlib.sha256(archive.read(name)).hexdigest()}"
                     for name in archive.namelist()
                 )
+                core_properties = [
+                    archive.read(name)
+                    for name in archive.namelist()
+                    if name.endswith(".psmdcp")
+                ]
+                if len(core_properties) != 1:
+                    raise VerificationError(
+                        f"unexpected core-properties count for {row['id']}"
+                    )
             print(
                 f"external-package: {row['id']} sha256={row['sha256']} "
-                f"members={member_digests}"
+                f"members={member_digests} core_properties_base64="
+                f"{base64.b64encode(core_properties[0]).decode('ascii')}"
             )
 
         _run(("git", "clone", "--quiet", "--no-hardlinks", "--no-checkout", str(repo_root), str(consumer)))
@@ -411,6 +452,7 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "package_inventory_sha256": inventory_sha,
             "package_version": lock.package_version,
             "dotnet_sdk": lock.dotnet_sdk,
+            "dotnet_toolchain": toolchain,
             "source_authorities": [
                 {"id": spec.package_id, "repository": spec.repository, "commit": spec.commit}
                 for spec in lock.packages
