@@ -5,6 +5,34 @@ namespace Chummer.Tests;
 public sealed class PublicLandingReleaseTrustViewTests
 {
     [Fact]
+    public void EveryReviewedReleaseHelpSurfaceSuppressesIndependentAvailabilityClaims()
+    {
+        string help = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml"));
+        string concierge = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Concierge.cshtml"));
+        string now = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"));
+        string changelog = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Changelog.cshtml"));
+        string dispatch = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
+        string conciergeController = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicConciergeController.cs"));
+        string progressService = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "PublicProgressService.cs"));
+
+        Assert.Contains("releaseReviewChoice", help, StringComparison.Ordinal);
+        Assert.Contains("Open release status", help, StringComparison.Ordinal);
+        Assert.Contains("model=\"Model.ReleaseTruthProjection\"", help, StringComparison.Ordinal);
+        Assert.Contains("releaseReviewRequired", concierge, StringComparison.Ordinal);
+        Assert.Contains("No concierge branch will claim or start a current installer handoff", concierge, StringComparison.Ordinal);
+        Assert.Contains("?.AvailabilityClaimsAllowed != true", conciergeController, StringComparison.Ordinal);
+        Assert.Contains("@if (availabilityClaimsAllowed)", now, StringComparison.Ordinal);
+        Assert.Contains("Updater availability is withheld", now, StringComparison.Ordinal);
+        Assert.Contains("Change cards are withheld", changelog, StringComparison.Ordinal);
+        Assert.Contains("No current installer or platform-availability claim", changelog, StringComparison.Ordinal);
+        Assert.Contains("@if (!availabilityClaimsAllowed)", dispatch, StringComparison.Ordinal);
+        Assert.Contains("No download or setup command is started", dispatch, StringComparison.Ordinal);
+        Assert.Contains("model=\"Model.ReleaseTruthProjection\"", dispatch, StringComparison.Ordinal);
+        Assert.Contains("Release routes remain inspectable, but installer handoffs", progressService, StringComparison.Ordinal);
+        Assert.DoesNotContain("Working download links remain visible", progressService, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DownloadsViewKeepsOnlyStableNightlyVisibleAndMovesLinuxSourceBehindOtherDownloads()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml");

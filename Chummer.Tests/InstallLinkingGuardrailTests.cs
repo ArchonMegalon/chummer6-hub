@@ -15,6 +15,42 @@ namespace Chummer.Tests;
 
 public sealed class InstallLinkingGuardrailTests
 {
+    [Fact]
+    public void NativeContinuationRoutesExposeAReadOnlyReleaseTruthProbe()
+    {
+        MethodInfo method = typeof(InstallLinkingController).GetMethod(
+            nameof(InstallLinkingController.GetNativeContinuationReleaseTruth))
+            ?? throw new InvalidOperationException("Native release-truth probe was not found.");
+        string[] templates = method.GetCustomAttributes<HttpGetAttribute>()
+            .Select(static attribute => attribute.Template ?? string.Empty)
+            .OrderBy(static template => template, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            [
+                "continuation",
+                "continuation/rollback",
+                "continuation/support",
+                "continuation/update"
+            ],
+            templates);
+    }
+
+    [Fact]
+    public void NativeContinuationAndUpdaterResponsesAreBoundToCapturedReleaseTruth()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot(
+            "Chummer.Run.Api",
+            "Controllers",
+            "InstallLinkingController.cs"));
+
+        Assert.Equal(4, controller.Split("bool releaseAvailabilityAllowed = IsReleaseAvailabilityAllowed();", StringSplitOptions.None).Length - 1);
+        Assert.Equal(4, controller.Split("ReleaseTruth: CaptureReleaseTruth()", StringSplitOptions.None).Length - 1);
+        Assert.Equal(5, controller.Split("BuildNativeRecoveryAction(installation, continuation, releaseAvailabilityAllowed)", StringSplitOptions.None).Length - 1);
+        Assert.Contains("PublicReleaseTruthProjectionDto? ReleaseTruth = null", controller, StringComparison.Ordinal);
+        Assert.Contains("PublicReleaseTruthProjectionMiddleware.IsReleaseFacingRoute(Request.Path)", controller, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(nameof(InstallLinkingController.Redeem))]
     [InlineData(nameof(InstallLinkingController.RefreshGrant))]

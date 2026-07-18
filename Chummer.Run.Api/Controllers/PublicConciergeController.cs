@@ -2,6 +2,7 @@ using System.Text.Json;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.ViewModels;
+using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 
@@ -317,11 +318,13 @@ public sealed class PublicConciergeController : Controller
         CancellationToken cancellationToken)
     {
         SiteChromeViewModel chrome = await BuildChromeAsync(title, description, currentPath, cancellationToken);
+        PublicReleaseTruthProjectionDto? releaseTruth = PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext);
         PublicConciergePageViewModel model = _concierge.BuildPage(
             surfaceKey,
             chrome,
             Request.Query["locale"].ToString(),
-            Request.Headers.AcceptLanguage.ToString());
+            Request.Headers.AcceptLanguage.ToString(),
+            releaseTruth: releaseTruth);
         if (!string.IsNullOrWhiteSpace(model.Widget.ContentSecurityPolicy))
         {
             Response.Headers["Content-Security-Policy"] = model.Widget.ContentSecurityPolicy;
@@ -334,6 +337,13 @@ public sealed class PublicConciergeController : Controller
     {
         try
         {
+            if ((string.Equals(surfaceKey, "downloads", StringComparison.OrdinalIgnoreCase)
+                 || string.Equals(surfaceKey, "now", StringComparison.OrdinalIgnoreCase))
+                && PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext)?.AvailabilityClaimsAllowed != true)
+            {
+                return Redirect("/status");
+            }
+
             bool authenticated = await TryIsAuthenticatedAsync(cancellationToken);
             ConciergeRedirectResolution resolution = _concierge.ResolveBranchRedirect(
                 surfaceKey,

@@ -1235,7 +1235,8 @@ public sealed record DownloadDispatchPageViewModel(
     DateTimeOffset? ClaimCodeExpiresAtUtc,
     IReadOnlyList<string> Steps,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null,
+    PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null);
 
 public sealed record DownloadDispatchFeatureCardViewModel(
     string Heading,
@@ -1281,7 +1282,9 @@ public sealed record PublicConciergePageViewModel(
     IReadOnlyList<string> ProofPoints,
     IReadOnlyList<PublicConciergeBranchCardViewModel> Branches,
     IReadOnlyList<TrustPageActionViewModel> Actions,
-    PublicConciergeWidgetViewModel Widget);
+    PublicConciergeWidgetViewModel Widget,
+    PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null,
+    bool ReleaseAvailabilitySurface = false);
 
 public sealed record CampaignInvitePrimerSectionViewModel(
     string Id,
@@ -1430,7 +1433,8 @@ public sealed record TrustPageViewModel(
     SignedInTrustStatusPanelViewModel? SignedInStatus = null,
     PrivacyBoundaryPanelViewModel? PrivacyBoundary = null,
     PublicHorizonCapabilityViewModel? HorizonCapability = null,
-    SharedArtifactSurfaceRoutesViewModel? SharedArtifacts = null);
+    SharedArtifactSurfaceRoutesViewModel? SharedArtifacts = null,
+    PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null);
 
 public sealed record FaqEntryViewModel(
     string Question,

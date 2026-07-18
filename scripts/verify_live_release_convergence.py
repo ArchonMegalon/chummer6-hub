@@ -10,6 +10,7 @@ import sys
 from typing import Any, Mapping, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
+from urllib.parse import quote
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
@@ -46,6 +47,7 @@ DEFAULT_ROUTES = (
     "/progress",
     "/help",
     "/now/concierge",
+    "/now/concierge/read_notes",
     "/api/v1/public/progress-report",
     "/api/public/progress-report",
     "/api/v1/public/progress-poster.svg",
@@ -53,12 +55,23 @@ DEFAULT_ROUTES = (
     "/api/v1/public/weekly-pulse",
     "/api/public/weekly-pulse",
     "/api/public/release-truth",
+    "/api/v1/install-linking/continuation",
+    "/api/v1/install-linking/continuation/support",
+    "/api/v1/install-linking/continuation/update",
+    "/api/v1/install-linking/continuation/rollback",
     "/downloads/releases.json",
     "/downloads/RELEASE_CHANNEL.generated.json",
+    # Exercise endpoint-routing normalization as part of the live denominator.
+    "/Now/",
+    "/Help/",
+    "/Downloads/Concierge/",
+    "/Now/Concierge/",
+    "/Now/Concierge/read_notes/",
 )
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 GIT_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 GENERATION_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+ARTIFACT_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 SCRIPT_PATTERN = re.compile(
     r"<script\b[^>]*\bid=[\"']chummer-release-truth[\"'][^>]*>(.*?)</script>",
     re.IGNORECASE | re.DOTALL,
@@ -87,6 +100,11 @@ class SameOriginRedirectHandler(HTTPRedirectHandler):
         )
 
 
+class NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, request, file_pointer, code, message, headers, new_url):
+        return None
+
+
 def canonicalize_projection(payload: Any, *, source: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ConvergenceError(f"{source}: release truth must be a JSON object")
@@ -96,13 +114,6 @@ def canonicalize_projection(payload: Any, *, source: str) -> dict[str, Any]:
         raise ConvergenceError(
             f"{source}: contractName must be {PROJECTION_CONTRACT}"
         )
-    if "releaseStatus" not in projection and "status" in projection:
-        projection["releaseStatus"] = projection.pop("status")
-    elif "status" in projection:
-        if projection["status"] != projection.get("releaseStatus"):
-            raise ConvergenceError(f"{source}: status contradicts releaseStatus")
-        projection.pop("status")
-
     allowed_fields = {"contractName", *REQUIRED_FIELDS}
     unknown = sorted(set(projection) - allowed_fields)
     if unknown:
@@ -241,7 +252,13 @@ def _strict_json_loads(value: str, *, source: str) -> Any:
     return json.loads(value, object_pairs_hook=reject_duplicates)
 
 
-def _body_projection(body: bytes, content_type: str, *, source: str) -> dict[str, Any] | None:
+def _body_projection(
+    body: bytes,
+    content_type: str,
+    *,
+    source: str,
+    require_textual_projection: bool = True,
+) -> dict[str, Any] | None:
     try:
         text = body.decode("utf-8")
     except UnicodeDecodeError as error:
@@ -250,12 +267,14 @@ def _body_projection(body: bytes, content_type: str, *, source: str) -> dict[str
         raise ConvergenceError(f"{source}: response body is not UTF-8") from error
 
     candidate: Any | None = None
+    native_payload: dict[str, Any] | None = None
     if "json" in content_type:
         try:
             payload = _strict_json_loads(text, source=source)
         except json.JSONDecodeError as error:
             raise ConvergenceError(f"{source}: response JSON is malformed") from error
         if isinstance(payload, dict):
+            native_payload = payload
             candidate = payload.get("releaseTruth")
             if candidate is None and payload.get("contractName") == PROJECTION_CONTRACT:
                 candidate = payload
@@ -274,11 +293,183 @@ def _body_projection(body: bytes, content_type: str, *, source: str) -> dict[str
             except json.JSONDecodeError as error:
                 raise ConvergenceError(f"{source}: SVG release truth is malformed") from error
 
-    return (
-        canonicalize_projection(candidate, source=f"{source} body")
-        if candidate is not None
-        else None
+    if require_textual_projection and candidate is None and any(
+        media_type in content_type for media_type in ("json", "html", "svg")
+    ):
+        raise ConvergenceError(
+            f"{source}: textual release-facing response is missing embedded releaseTruth"
+        )
+
+    if candidate is None:
+        return None
+
+    projection = canonicalize_projection(candidate, source=f"{source} body")
+    if (
+        native_payload is not None
+        and native_payload is not candidate
+        and _is_release_manifest_route(source)
+    ):
+        _validate_native_manifest_claims(native_payload, projection, source=source)
+    return projection
+
+
+def _is_release_manifest_route(route: str) -> bool:
+    normalized = route.rstrip("/").lower()
+    return normalized.endswith("/releases.json") or normalized.endswith(
+        "/release_channel.generated.json"
     )
+
+
+def _validate_native_manifest_claims(
+    payload: Mapping[str, Any],
+    projection: Mapping[str, Any],
+    *,
+    source: str,
+) -> None:
+    claim_aliases = {
+        "releaseVersion": ("releaseVersion", "version"),
+        "channel": ("channel", "channelId"),
+        "releaseStatus": ("releaseStatus", "status"),
+        "rolloutState": ("rolloutState",),
+        "supportabilityState": ("supportabilityState",),
+        "downloadAccessPosture": ("downloadAccessPosture",),
+        "knownIssueSummary": ("knownIssueSummary",),
+        "manifestSha256": ("manifestSha256",),
+        "registryCommit": ("registryCommit",),
+        "releaseDecisionStatus": ("releaseDecisionStatus",),
+        "releaseDecisionSha256": ("releaseDecisionSha256",),
+    }
+    drift: list[str] = []
+    for projection_field, aliases in claim_aliases.items():
+        present = [alias for alias in aliases if alias in payload]
+        if not present:
+            continue
+        values = [payload[alias] for alias in present]
+        if any(not isinstance(value, str) or value != value.strip() for value in values):
+            raise ConvergenceError(
+                f"{source}: native {present[0]} must be a canonical string"
+            )
+        if any(value != projection[projection_field] for value in values):
+            drift.append(projection_field)
+
+    artifact_fields = [field for field in ("downloads", "artifacts") if field in payload]
+    for field in artifact_fields:
+        artifacts = payload[field]
+        if not isinstance(artifacts, list):
+            raise ConvergenceError(f"{source}: native {field} must be an array")
+        if len(artifacts) != projection["artifactCount"]:
+            drift.append("artifactCount")
+        rows: list[Mapping[str, Any]] = []
+        for index, artifact in enumerate(artifacts):
+            if not isinstance(artifact, dict):
+                raise ConvergenceError(
+                    f"{source}: native {field}[{index}] must be an object"
+                )
+            rows.append(artifact)
+
+        if rows:
+            platforms: list[str] = []
+            access_classes: list[str] = []
+            platform_heads: set[tuple[str, str]] = set()
+            for index, artifact in enumerate(rows):
+                platform = _native_artifact_string(
+                    artifact,
+                    ("platformId",) if "platformId" in artifact else ("platform",),
+                    source=f"{source}: native {field}[{index}]",
+                )
+                head = _native_artifact_string(
+                    artifact,
+                    ("head", "headId"),
+                    source=f"{source}: native {field}[{index}]",
+                )
+                access_class = _native_artifact_string(
+                    artifact,
+                    ("installAccessClass",),
+                    source=f"{source}: native {field}[{index}]",
+                )
+                if access_class not in {
+                    "open_public",
+                    "account_recommended",
+                    "account_required",
+                }:
+                    raise ConvergenceError(
+                        f"{source}: native {field}[{index}] installAccessClass is unsupported"
+                    )
+                platforms.append(platform)
+                access_classes.append(access_class)
+                platform_heads.add((platform, head))
+
+            derived_platforms = sorted(set(platforms))
+            if derived_platforms != projection["availablePlatforms"]:
+                drift.append("availablePlatforms")
+
+            distinct_access = set(access_classes)
+            derived_access_posture = (
+                next(iter(distinct_access))
+                if len(distinct_access) == 1
+                else "mixed"
+            )
+            if derived_access_posture != projection["downloadAccessPosture"]:
+                drift.append("downloadAccessPosture")
+
+            if any(
+                (platform, head) not in platform_heads
+                for platform, head in projection["primaryHeadByPlatform"].items()
+            ):
+                drift.append("primaryHeadByPlatform")
+        elif projection["availablePlatforms"]:
+            drift.extend(("availablePlatforms", "primaryHeadByPlatform"))
+
+    if "artifactCount" in payload:
+        value = payload["artifactCount"]
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ConvergenceError(f"{source}: native artifactCount must be an integer")
+        if value != projection["artifactCount"]:
+            drift.append("artifactCount")
+
+    if "availablePlatforms" in payload:
+        platforms = payload["availablePlatforms"]
+        if not isinstance(platforms, list) or any(not isinstance(item, str) for item in platforms):
+            raise ConvergenceError(f"{source}: native availablePlatforms must be a string array")
+        if platforms != projection["availablePlatforms"]:
+            drift.append("availablePlatforms")
+
+    if "primaryHeadByPlatform" in payload:
+        heads = payload["primaryHeadByPlatform"]
+        if not isinstance(heads, dict) or any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in heads.items()
+        ):
+            raise ConvergenceError(f"{source}: native primaryHeadByPlatform must be a string map")
+        if heads != projection["primaryHeadByPlatform"]:
+            drift.append("primaryHeadByPlatform")
+
+    if drift:
+        raise ConvergenceError(
+            f"{source}: native body/releaseTruth drift: {', '.join(sorted(set(drift)))}"
+        )
+
+
+def _native_artifact_string(
+    artifact: Mapping[str, Any],
+    aliases: Sequence[str],
+    *,
+    source: str,
+) -> str:
+    present = [alias for alias in aliases if alias in artifact]
+    if not present:
+        raise ConvergenceError(f"{source}: missing {aliases[0]}")
+    values = [artifact[alias] for alias in present]
+    if any(
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        for value in values
+    ):
+        raise ConvergenceError(f"{source}: {present[0]} must be a canonical string")
+    if any(value != values[0] for value in values[1:]):
+        raise ConvergenceError(f"{source}: contradictory {present[0]} aliases")
+    return values[0]
 
 
 def extract_route_projection(
@@ -287,6 +478,7 @@ def extract_route_projection(
     headers: Mapping[str, str],
     body: bytes,
     content_type: str,
+    require_body_projection: bool = True,
 ) -> dict[str, Any]:
     normalized_headers = {str(key).lower(): str(value) for key, value in headers.items()}
     encoded = normalized_headers.get(PROJECTION_HEADER)
@@ -294,7 +486,14 @@ def extract_route_projection(
         raise ConvergenceError(f"{route}: missing {PROJECTION_HEADER} header")
 
     header_projection = decode_projection_header(encoded, source=route)
-    body_projection = _body_projection(body, content_type.lower(), source=route)
+    body_projection = None
+    if body or require_body_projection:
+        body_projection = _body_projection(
+            body,
+            content_type.lower(),
+            source=route,
+            require_textual_projection=require_body_projection,
+        )
     if body_projection is not None and body_projection != header_projection:
         differing = [
             field
@@ -387,23 +586,107 @@ def _validate_base_url(value: str) -> str:
     return value.rstrip("/") + "/"
 
 
-def fetch_route(opener, base_url: str, route: str, timeout: float) -> tuple[dict[str, str], bytes, str]:
+def fetch_route(
+    opener,
+    base_url: str,
+    route: str,
+    timeout: float,
+    *,
+    method: str = "GET",
+    accept_redirect_response: bool = False,
+    accepted_error_statuses: Sequence[int] = (),
+) -> tuple[dict[str, str], bytes, str]:
     if not route.startswith("/") or route.startswith("//"):
         raise ConvergenceError(f"unsafe route: {route}")
     url = urljoin(base_url, route.lstrip("/"))
-    request = Request(url, headers={"Accept": "*/*", "User-Agent": "chummer-release-convergence/1"})
+    request = Request(
+        url,
+        headers={"Accept": "*/*", "User-Agent": "chummer-release-convergence/1"},
+        method=method,
+    )
     try:
         with opener.open(request, timeout=timeout) as response:
-            body = response.read(8 * 1024 * 1024 + 1)
-            if len(body) > 8 * 1024 * 1024:
-                raise ConvergenceError(f"{route}: response exceeds 8 MiB")
-            headers = {key: value for key, value in response.headers.items()}
-            content_type = response.headers.get_content_type()
-            return headers, body, content_type
+            return _read_bounded_response(response, route)
     except HTTPError as error:
+        if (
+            (accept_redirect_response and 300 <= error.code < 400)
+            or error.code in accepted_error_statuses
+        ):
+            try:
+                return _read_bounded_response(error, route)
+            finally:
+                error.close()
         raise ConvergenceError(f"{route}: HTTP {error.code}") from error
     except URLError as error:
         raise ConvergenceError(f"{route}: request failed: {error.reason}") from error
+
+
+def _read_bounded_response(response, route: str) -> tuple[dict[str, str], bytes, str]:
+    body = response.read(8 * 1024 * 1024 + 1)
+    if len(body) > 8 * 1024 * 1024:
+        raise ConvergenceError(f"{route}: response exceeds 8 MiB")
+    headers = {key: value for key, value in response.headers.items()}
+    content_type = response.headers.get_content_type()
+    return headers, body, content_type
+
+
+def _requires_source_hop_validation(route: str) -> bool:
+    path = urlparse(route).path.rstrip("/").lower()
+    return (
+        path.startswith("/now/concierge/")
+        or path.startswith("/downloads/concierge/")
+        or path.startswith("/downloads/install/")
+        or bool(re.match(r"^/downloads/g/[^/]+/install/", path))
+    )
+
+
+def _requires_header_only_head(route: str) -> bool:
+    path = urlparse(route).path.rstrip("/").lower()
+    return path.startswith("/downloads/install/") or bool(
+        re.match(r"^/downloads/g/[^/]+/install/", path)
+    )
+
+
+def _availability_claims_allowed(projection: Mapping[str, Any]) -> bool:
+    rollout_state = projection["rolloutState"]
+    supportability_state = projection["supportabilityState"]
+    blocking_rollout = (
+        rollout_state in {"missing", "unknown", "invalid"}
+        or any(
+            marker in rollout_state
+            for marker in (
+                "review",
+                "revoked",
+                "blocked",
+                "withdrawn",
+                "unpublished",
+                "coverage_incomplete",
+            )
+        )
+    )
+    blocking_supportability = (
+        supportability_state in {"missing", "unknown", "invalid"}
+        or any(
+            marker in supportability_state
+            for marker in ("review", "unsupported", "unavailable", "blocked")
+        )
+    )
+    return (
+        projection["releaseDecisionStatus"] in {"preview_ready", "stable_ready"}
+        and projection["releaseStatus"] == "published"
+        and projection["artifactCount"] > 0
+        and bool(projection["availablePlatforms"])
+        and projection["downloadAccessPosture"]
+        in {"open_public", "account_recommended", "account_required", "mixed"}
+        and not blocking_rollout
+        and not blocking_supportability
+    )
+
+
+def _accepted_handoff_error_statuses(
+    projection: Mapping[str, Any],
+) -> tuple[int, ...]:
+    return () if _availability_claims_allowed(projection) else (409,)
 
 
 def _validate_generation_id(value: str | None) -> str | None:
@@ -420,7 +703,66 @@ def generation_routes(generation_id: str) -> tuple[str, ...]:
         f"/api/public/release-truth/g/{generation_id}",
         f"/downloads/g/{generation_id}/releases.json",
         f"/downloads/g/{generation_id}/RELEASE_CHANNEL.generated.json",
+        f"/downloads/g/{generation_id}/releases.json/",
     )
+
+
+def discover_install_route(
+    manifest_body: bytes,
+    *,
+    generation_id: str | None = None,
+) -> str | None:
+    try:
+        payload = _strict_json_loads(manifest_body.decode("utf-8"), source="install-route discovery")
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ConvergenceError("install-route discovery: manifest JSON is malformed") from error
+    if not isinstance(payload, dict):
+        raise ConvergenceError("install-route discovery: manifest must be an object")
+
+    candidates = payload.get("downloads") or payload.get("artifacts") or []
+    if not isinstance(candidates, list):
+        raise ConvergenceError("install-route discovery: artifact collection must be an array")
+    rows = [row for row in candidates if isinstance(row, dict)]
+    preferred = [
+        row for row in rows
+        if row.get("installAccessClass") == "open_public"
+    ] or rows
+    for row in preferred:
+        artifact_id = row.get("id") or row.get("artifactId")
+        if isinstance(artifact_id, str) and ARTIFACT_ID_PATTERN.fullmatch(artifact_id):
+            encoded = quote(artifact_id, safe="._-")
+            return (
+                f"/downloads/g/{generation_id}/install/{encoded}"
+                if generation_id
+                else f"/downloads/install/{encoded}"
+            )
+    return None
+
+
+def build_failure_receipt(
+    detail: str,
+    *,
+    authority_route: str = "/api/v1/public/release-truth",
+) -> dict[str, Any]:
+    mismatch = "contradict" in detail or "drift" in detail
+    return {
+        "contractName": RECEIPT_CONTRACT,
+        "contractVersion": 1,
+        "status": "fail",
+        "mismatchCount": 1 if mismatch else 0,
+        "failureCount": 1,
+        "mismatches": [detail] if mismatch else [],
+        "failures": [detail],
+        "authorityRoute": authority_route,
+        "checkedRouteCount": 0,
+        "checkedRoutes": [],
+        "comparedFields": list(REQUIRED_FIELDS),
+        "releaseTruth": {},
+        "manifestSha256": "missing",
+        "releaseDecisionStatus": "missing",
+        "releaseDecisionSha256": "missing",
+        "authoritySnapshotSha256": "missing",
+    }
 
 
 def verify_live(
@@ -434,6 +776,7 @@ def verify_live(
     parsed = urlparse(normalized_base)
     authority = (parsed.scheme.lower(), parsed.netloc.lower())
     opener = build_opener(SameOriginRedirectHandler(authority))
+    no_redirect_opener = build_opener(NoRedirectHandler())
 
     authority_route = (
         f"/api/v1/public/release-truth/g/{generation_id}"
@@ -454,15 +797,51 @@ def verify_live(
         headers=authority_headers,
     )
 
+    route_list = list(dict.fromkeys(routes))
+    fetched: dict[str, tuple[dict[str, str], bytes, str]] = {}
+    manifest_route = (
+        f"/downloads/g/{generation_id}/releases.json"
+        if generation_id
+        else "/downloads/releases.json"
+    )
+    if manifest_route in route_list:
+        fetched[manifest_route] = fetch_route(opener, normalized_base, manifest_route, timeout)
+        install_route = discover_install_route(
+            fetched[manifest_route][1],
+            generation_id=generation_id,
+        )
+        if install_route:
+            route_list.append(install_route)
+
+    route_list = list(dict.fromkeys(route_list))
     observed: dict[str, dict[str, Any]] = {}
     observed_snapshot_sha256: dict[str, str] = {}
-    for route in routes:
-        headers, body, content_type = fetch_route(opener, normalized_base, route, timeout)
+    for route in route_list:
+        header_only_head = _requires_header_only_head(route)
+        prefetched = fetched.get(route)
+        if prefetched is not None:
+            headers, body, content_type = prefetched
+        else:
+            validate_source_hop = _requires_source_hop_validation(route)
+            headers, body, content_type = fetch_route(
+                no_redirect_opener if validate_source_hop else opener,
+                normalized_base,
+                route,
+                timeout,
+                method="HEAD" if header_only_head else "GET",
+                accept_redirect_response=validate_source_hop,
+                accepted_error_statuses=(
+                    _accepted_handoff_error_statuses(expected)
+                    if header_only_head
+                    else ()
+                ),
+            )
         observed[route] = extract_route_projection(
             route=route,
             headers=headers,
             body=body,
             content_type=content_type,
+            require_body_projection=not header_only_head,
         )
         observed_snapshot_sha256[route] = extract_authority_snapshot_sha256(
             route=route,
@@ -498,8 +877,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    authority_route = "/api/v1/public/release-truth"
     try:
         generation_id = _validate_generation_id(args.generation_id)
+        if generation_id:
+            authority_route = f"/api/v1/public/release-truth/g/{generation_id}"
         routes = tuple(
             args.routes
             or (generation_routes(generation_id) if generation_id else DEFAULT_ROUTES)
@@ -513,17 +895,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ConvergenceError as error:
         detail = str(error)
         json.dump(
-            {
-                "contractName": RECEIPT_CONTRACT,
-                "contractVersion": 1,
-                "status": "fail",
-                "mismatchCount": 1 if "contradict" in detail else 0,
-                "failureCount": 1,
-                "mismatches": [detail] if "contradict" in detail else [],
-                "failures": [detail],
-                "error": detail,
-                "authoritySnapshotSha256": "missing",
-            },
+            build_failure_receipt(detail, authority_route=authority_route),
             sys.stdout,
             indent=2,
         )

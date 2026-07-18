@@ -1714,6 +1714,8 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> DownloadDispatchPage([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
         var (manifest, artifact) = ResolveInstallDispatchArtifact(artifactId);
+        var releaseTruth = ResolveReleaseTruthProjection();
+        var releaseTruthGate = BuildReleaseTruthPresentationGate(manifest, releaseTruth);
         if (artifact is null)
         {
             ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByArtifactId(
@@ -1851,7 +1853,7 @@ public sealed class PublicLandingController : Controller
                 CopyCommandLabel: BuildCopyCommandLabel(bootstrapPlatform),
                 CompactDispatchLayout: bootstrapScriptDownload && string.Equals(bootstrapPlatform, "macos", StringComparison.Ordinal),
                 BootstrapFeatureCards: BuildBootstrapFeatureCards(bootstrapPlatform),
-                AutoStartDownload: !bootstrapScriptDownload,
+                AutoStartDownload: releaseTruth.AvailabilityClaimsAllowed && !bootstrapScriptDownload,
                 BootstrapScriptDownload: bootstrapScriptDownload,
                 PromoteSecondaryDownload: false,
                 SecondaryDownloadHref: bootstrapScriptDownload ? rawDownloadHref : null,
@@ -1874,8 +1876,12 @@ public sealed class PublicLandingController : Controller
                 ClaimCode: dispatch?.ClaimTicket?.ClaimCode,
                 ClaimCodeExpiresAtUtc: dispatch?.ClaimTicket?.ExpiresAtUtc,
                 Steps: steps,
-                TrustPulse: BuildPublicTrustPulsePanel(manifest, release),
-                SignedInStatus: _signedInTrustStatus.Build(user, manifest, release));
+                TrustPulse: BuildPublicTrustPulsePanel(manifest, release, releaseTruth: releaseTruth),
+                SignedInStatus: RebindSignedInTrustStatusToReleaseTruth(
+                    _signedInTrustStatus.Build(user, manifest, release),
+                    releaseTruth,
+                    releaseTruthGate),
+                ReleaseTruthProjection: releaseTruth);
             ApplyNoStoreHeaders(Response.Headers);
             return View("~/Views/PublicLanding/DownloadDispatch.cshtml", model);
         }
@@ -1904,6 +1910,8 @@ public sealed class PublicLandingController : Controller
             primaryDownloadHref,
             cancellationToken: cancellationToken);
         var release = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var releaseTruth = ResolveReleaseTruthProjection();
+        var releaseTruthGate = BuildReleaseTruthPresentationGate(manifest, releaseTruth);
         string headLabel = string.Equals(proofInstaller.Head, "blazor-desktop", StringComparison.OrdinalIgnoreCase)
             ? "Blazor Desktop"
             : "Avalonia Desktop";
@@ -1924,7 +1932,7 @@ public sealed class PublicLandingController : Controller
             CopyCommandLabel: "Copy command",
             CompactDispatchLayout: false,
             BootstrapFeatureCards: Array.Empty<DownloadDispatchFeatureCardViewModel>(),
-            AutoStartDownload: true,
+            AutoStartDownload: releaseTruth.AvailabilityClaimsAllowed,
             BootstrapScriptDownload: false,
             PromoteSecondaryDownload: false,
             SecondaryDownloadHref: null,
@@ -1963,8 +1971,12 @@ public sealed class PublicLandingController : Controller
                 "Install and validate the current Windows build.",
                 "Use install help and support if this Windows installer needs more help."
             ],
-            TrustPulse: BuildPublicTrustPulsePanel(manifest, release),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, release, cancellationToken));
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, release, releaseTruth: releaseTruth),
+            SignedInStatus: RebindSignedInTrustStatusToReleaseTruth(
+                await BuildSignedInTrustStatusPanelAsync(manifest, release, cancellationToken),
+                releaseTruth,
+                releaseTruthGate),
+            ReleaseTruthProjection: releaseTruth);
         ApplyNoStoreHeaders(Response.Headers);
         return View("~/Views/PublicLanding/DownloadDispatch.cshtml", model);
     }
@@ -7945,7 +7957,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 SignedInStatus = RebindSignedInTrustStatusToReleaseTruth(
                     signedInStatus,
                     releaseTruth,
-                    releaseTruthGate)
+                    releaseTruthGate),
+                ReleaseTruthProjection = releaseTruth
             });
     }
 
@@ -13324,6 +13337,7 @@ Boundary:
             releaseSnapshot,
             _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(releaseSnapshot)));
         var releaseTruth = ResolveReleaseTruthProjection();
+        var releaseTruthGate = BuildReleaseTruthPresentationGate(manifest, releaseTruth);
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var signalLoop = BuildPublicSignalLoopSnapshot(surface, assetCatalog, authenticated, currentPath);
@@ -13347,8 +13361,11 @@ Boundary:
             SignalLoop: signalLoop,
             SignalProjection: signalProjection,
             CampaignOsProof: _campaignOsProof.LoadProof(),
-            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience, releaseTruth: releaseTruth),
+            SignedInStatus: RebindSignedInTrustStatusToReleaseTruth(
+                await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
+                releaseTruth,
+                releaseTruthGate),
             ReleaseTruthProjection: releaseTruth);
     }
 

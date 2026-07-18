@@ -2,6 +2,7 @@ using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -72,6 +73,45 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.Equal("application/json; charset=utf-8", content.ContentType);
         using JsonDocument document = JsonDocument.Parse(content.Content ?? "{}");
         Assert.True(document.RootElement.TryGetProperty("installAwareArtifactRegistry", out _));
+    }
+
+    [Fact]
+    public void ManifestBodiesEmbedTheExactMiddlewareCapturedReleaseTruth()
+    {
+        using Fixture fixture = new();
+        var projection = new PublicReleaseTruthProjectionDto(
+            ContractName: PublicReleaseTruthProjectionDto.Schema,
+            ReleaseVersion: "run-test",
+            Channel: "preview",
+            ReleaseStatus: "published",
+            RolloutState: "promoted_preview",
+            SupportabilityState: "preview_supported",
+            AvailablePlatforms: ["windows"],
+            PrimaryHeadByPlatform: new Dictionary<string, string> { ["windows"] = "avalonia" },
+            ArtifactCount: 1,
+            DownloadAccessPosture: "open_public",
+            KnownIssueSummary: "Known caution.",
+            ManifestSha256: new string('a', 64),
+            RegistryCommit: new string('b', 40),
+            ReleaseDecisionStatus: "preview_ready",
+            ReleaseDecisionSha256: new string('c', 64));
+        var context = new DefaultHttpContext();
+        context.Items[PublicReleaseTruthProjectionMiddleware.HttpContextItemKey] = projection;
+        fixture.Controller.ControllerContext = new ControllerContext { HttpContext = context };
+
+        OkObjectResult compatibility = Assert.IsType<OkObjectResult>(fixture.Controller.ReleaseManifest());
+        using JsonDocument compatibilityBody = JsonDocument.Parse(JsonSerializer.Serialize(
+            compatibility.Value,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        ContentResult canonical = Assert.IsType<ContentResult>(fixture.Controller.CanonicalReleaseManifest());
+        using JsonDocument canonicalBody = JsonDocument.Parse(canonical.Content ?? "{}");
+
+        Assert.Equal(
+            projection.ReleaseDecisionSha256,
+            compatibilityBody.RootElement.GetProperty("releaseTruth").GetProperty("releaseDecisionSha256").GetString());
+        Assert.Equal(
+            projection.ReleaseDecisionSha256,
+            canonicalBody.RootElement.GetProperty("releaseTruth").GetProperty("releaseDecisionSha256").GetString());
     }
 
     [Fact]

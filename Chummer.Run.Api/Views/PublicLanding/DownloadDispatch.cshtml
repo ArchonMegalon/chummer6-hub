@@ -6,6 +6,7 @@
     ViewData["Title"] = "Download setup";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-downloads surface-minimal";
+    var availabilityClaimsAllowed = Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true;
     var showCompactDispatchInfo = Model.CompactDispatchLayout
         && (!string.IsNullOrWhiteSpace(Model.DispatchNote)
             || !string.IsNullOrWhiteSpace(Model.BootstrapCommandNote)
@@ -69,6 +70,25 @@
     };
 }
 
+<partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
+
+@if (!availabilityClaimsAllowed)
+{
+    <section class="release-stage">
+        <div class="release-stage__lead">
+            <p class="eyebrow">Review required</p>
+            <h1 class="page-title">This installer is not available for a trusted handoff.</h1>
+            <p class="page-copy">Release authority has not approved availability for this installer. No download or setup command is started from this page.</p>
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="/status">Open release status</a>
+                <a class="button-like button-like--secondary" href="/downloads">Back to downloads</a>
+                <a class="button-like button-like--ghost" href="/help">Open help</a>
+            </div>
+        </div>
+    </section>
+}
+else
+{
 <section class="release-stage">
     <div class="release-stage__lead">
         <p class="eyebrow">@PublicDispatchText(Model.Eyebrow)</p>
@@ -267,6 +287,7 @@
 </section>
 
 <iframe id="signedInDownloadFrame" title="Download setup" hidden></iframe>
+}
 
 @section Scripts {
 <script>

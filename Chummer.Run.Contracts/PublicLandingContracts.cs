@@ -111,6 +111,10 @@ public sealed record PublicReleaseManifestDto(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? GenerationId { get; init; }
 
+    [JsonPropertyName("releaseTruth")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public PublicReleaseTruthProjectionDto? ReleaseTruth { get; init; }
+
     [JsonPropertyName("generated_at")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DateTimeOffset? GeneratedAtAlias => GeneratedAt;

@@ -60,7 +60,7 @@ public sealed class PublicProgressService
         PublicReleaseTruthProjectionDto projection = CurrentProjection();
         string projectionJson = JsonSerializer.Serialize(projection, JsonOptions);
         string banner = projection.ReviewBannerRequired
-            ? $"<section data-release-truth-banner=\"{WebUtility.HtmlEncode(projection.ReleaseDecisionStatus)}\" role=\"status\"><strong>Release review required</strong><p>Working download links remain visible, but availability and stable-release claims are withheld.</p></section>"
+            ? $"<section data-release-truth-banner=\"{WebUtility.HtmlEncode(projection.ReleaseDecisionStatus)}\" role=\"status\"><strong>Release review required</strong><p>Release routes remain inspectable, but installer handoffs and availability or stable-release claims are withheld until immutable release authority is ready.</p></section>"
             : string.Empty;
         string marker = $"<script id=\"chummer-release-truth\" type=\"application/json\">{projectionJson}</script>{banner}";
         int bodyTag = html.IndexOf("<body", StringComparison.OrdinalIgnoreCase);
