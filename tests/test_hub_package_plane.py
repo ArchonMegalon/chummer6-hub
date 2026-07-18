@@ -185,6 +185,26 @@ def test_exact_head_checkout_validator_rejects_dirty_tree(tmp_path: Path) -> Non
         module.validate_checkout(checkout, spec, env=os.environ)
 
 
+def test_owner_build_properties_pin_revision_and_normalize_paths(tmp_path: Path) -> None:
+    module = load_module()
+    lock = module.load_lock(LOCK_PATH)
+    spec = lock.packages[0]
+    checkout = tmp_path / "machine-specific" / spec.checkout_directory
+    package_root = tmp_path / "packages"
+    properties = module.package_build_properties(lock, spec, checkout, package_root)
+    assert f"-p:RepositoryCommit={spec.commit}" in properties
+    assert f"-p:SourceRevisionId={spec.commit}" in properties
+    assert "-p:RepositoryBranch=" in properties
+    assert "-p:ContinuousIntegrationBuild=true" in properties
+    assert "-p:Deterministic=true" in properties
+    assert "-p:DeterministicSourcePaths=true" in properties
+    assert "-p:EmbedUntrackedSources=false" in properties
+    assert (
+        f"-p:PathMap={checkout.resolve()}=/_/src/{spec.checkout_directory}"
+        in properties
+    )
+
+
 def _write_fake_engine_package(module, feed: Path, assembly: bytes) -> tuple[object, str]:
     version = PACKAGE_VERSION
     repository = "https://github.com/ArchonMegalon/chummer6-core.git"

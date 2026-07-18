@@ -286,6 +286,31 @@ def acquire_source(
     return checkout
 
 
+def package_build_properties(
+    lock: PackagePlaneLock,
+    spec: PackageSpec,
+    checkout: Path,
+    package_root: Path,
+) -> tuple[str, ...]:
+    normalized_source_root = f"/_/src/{spec.checkout_directory}"
+    return (
+        f"-p:PackageVersion={lock.package_version}",
+        f"-p:Version={lock.package_version}",
+        f"-p:RepositoryCommit={spec.commit}",
+        f"-p:SourceRevisionId={spec.commit}",
+        f"-p:RepositoryUrl={spec.repository}",
+        "-p:RepositoryBranch=",
+        "-p:PublishRepositoryUrl=true",
+        "-p:ContinuousIntegrationBuild=true",
+        "-p:Deterministic=true",
+        "-p:DeterministicSourcePaths=true",
+        "-p:EmbedUntrackedSources=false",
+        f"-p:PathMap={checkout.resolve()}={normalized_source_root}",
+        "-p:UseSharedCompilation=false",
+        f"-p:RestorePackagesPath={package_root}",
+    )
+
+
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -679,15 +704,11 @@ def build_feed(
             project = checkout / Path(spec.project)
             if not project.is_file():
                 raise PackagePlaneError(f"locked project is missing: {spec.project}")
-            common_properties = (
-                f"-p:PackageVersion={lock.package_version}",
-                f"-p:Version={lock.package_version}",
-                f"-p:RepositoryCommit={spec.commit}",
-                f"-p:RepositoryUrl={spec.repository}",
-                "-p:PublishRepositoryUrl=true",
-                "-p:ContinuousIntegrationBuild=true",
-                "-p:UseSharedCompilation=false",
-                f"-p:RestorePackagesPath={package_root}",
+            common_properties = package_build_properties(
+                lock,
+                spec,
+                checkout,
+                package_root,
             )
             _run(
                 (
