@@ -3,12 +3,22 @@
     ViewData["Title"] = "Status";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-status surface-minimal";
-    var publicPlatformLabels = Model.ReleaseExperience.PlatformAvailability
-        .Where(static platform => platform.PubliclyAvailable)
-        .Select(static platform => platform.PlatformLabel)
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToArray();
-    var publicPlatformSummary = publicPlatformLabels.Length switch
+    static string PlatformLabel(string platform) => platform switch
+    {
+        "windows" => "Windows",
+        "linux" => "Linux",
+        "macos" => "macOS",
+        _ => UndetectableHumanizerCopyAdapter.Humanize(platform)
+    };
+    var publicPlatformLabels = Model.ReleaseTruthProjection?.AvailablePlatforms
+        .Select(PlatformLabel)
+        .ToArray() ?? Array.Empty<string>();
+    var availabilityClaimsAllowed = Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true;
+    var publicPlatformSummary = !availabilityClaimsAllowed
+        ? publicPlatformLabels.Length == 0
+            ? "No authority-bound installer availability is published right now."
+            : $"{string.Join(", ", publicPlatformLabels)} installers remain listed for review; availability is not asserted."
+        : publicPlatformLabels.Length switch
     {
         0 => "No public installer right now.",
         1 => $"{publicPlatformLabels[0]} download is live.",
@@ -16,24 +26,13 @@
         _ => $"{string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]} downloads are live."
     };
 
-    static bool IsPublishedStableRelease(PublicReleaseManifestDto manifest)
-    {
-        var stableLanePublished = string.Equals((manifest.Channel ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((manifest.Channel ?? string.Empty).Trim(), "stable", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((manifest.Channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((manifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase);
-        return stableLanePublished
-            && string.Equals((manifest.SupportabilityState ?? string.Empty).Trim(), "gold_supported", StringComparison.OrdinalIgnoreCase)
-            && string.Equals((manifest.Status ?? string.Empty).Trim(), "published", StringComparison.OrdinalIgnoreCase);
-    }
-
-    var isStableRelease = IsPublishedStableRelease(Model.Manifest);
+    var isStableRelease = Model.ReleaseTruthProjection?.StableClaimsAllowed == true;
     var heading = Model.ReleaseExperience.Recommended is null
         ? "Downloads paused"
-        : isStableRelease ? "Stable downloads" : "Preview downloads";
+        : !availabilityClaimsAllowed ? "Downloads under review" : isStableRelease ? "Stable downloads" : "Preview downloads";
     var statusLine = Model.ReleaseExperience.Recommended is null
         ? "Downloads are paused."
-        : isStableRelease ? publicPlatformSummary : $"{publicPlatformSummary} Stable is still unavailable.";
+        : !availabilityClaimsAllowed ? publicPlatformSummary : isStableRelease ? publicPlatformSummary : $"{publicPlatformSummary} Stable is still unavailable.";
 
     static string PublicStatusText(string? value)
     {
@@ -50,6 +49,8 @@
     }
 
 }
+
+<partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
 
 <section class="minimal-page-hero minimal-status-pill">
     <div>

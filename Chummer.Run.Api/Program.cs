@@ -276,6 +276,7 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseRouting();
+app.UseMiddleware<PublicReleaseTruthProjectionMiddleware>();
 app.UseMiddleware<WindowsProofUploadRequestGateMiddleware>();
 app.UseMiddleware<ReleaseUploadRequestGateMiddleware>();
 app.UsePlayAuthorizationApiGate();

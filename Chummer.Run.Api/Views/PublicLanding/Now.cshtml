@@ -2,21 +2,13 @@
 @{
     var manifest = Model.Manifest;
 
-    static bool IsPublishedStableRelease(PublicReleaseManifestDto releaseManifest)
-    {
-        var stableLanePublished = string.Equals((releaseManifest.Channel ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((releaseManifest.Channel ?? string.Empty).Trim(), "stable", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((releaseManifest.Channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((releaseManifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase);
-        return stableLanePublished
-            && string.Equals((releaseManifest.SupportabilityState ?? string.Empty).Trim(), "gold_supported", StringComparison.OrdinalIgnoreCase)
-            && string.Equals((releaseManifest.Status ?? string.Empty).Trim(), "published", StringComparison.OrdinalIgnoreCase);
-    }
-
-    var isStableRelease = IsPublishedStableRelease(manifest);
-    var currentReleaseHeading = isStableRelease
-        ? "Current handoff"
-        : "Current release";
+    var isStableRelease = Model.ReleaseTruthProjection?.StableClaimsAllowed == true;
+    var availabilityClaimsAllowed = Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true;
+    var currentReleaseHeading = !availabilityClaimsAllowed
+        ? "Release review"
+        : isStableRelease
+            ? "Current handoff"
+            : "Current release";
     ViewData["Title"] = currentReleaseHeading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-now surface-minimal";
@@ -49,7 +41,9 @@
         .ToArray();
     var signedInBenefits = Model.SignedInPreview.ToArray();
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
-    var currentReleaseLabel = Model.ReleaseTruth.VerifiedDateLabel;
+    var currentReleaseLabel = availabilityClaimsAllowed
+        ? Model.ReleaseTruth.VerifiedDateLabel
+        : "Authority review required";
 
     static string PublicNowText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
@@ -68,11 +62,13 @@
     }
 }
 
+<partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
+
 <section class="minimal-page-hero route-anchor-target" id="public-shipped-closeout">
     <div>
         <p class="eyebrow">@currentReleaseHeading</p>
         <h1>@currentReleaseHeading</h1>
-        <p>Use this page when you want the short answer before you install.</p>
+        <p>@(availabilityClaimsAllowed ? "Use this page when you want the short answer before you install." : "Use this page to inspect release status while installer availability is under review.")</p>
         @if (fromChangelogAlias)
         {
             <details class="minimal-help-card__details">
@@ -87,7 +83,7 @@
         }
     </div>
     <div class="minimal-status-pill">
-        <span>Current app</span>
+        <span>@(availabilityClaimsAllowed ? "Current app" : "Release review")</span>
         <strong>@currentReleaseLabel</strong>
     </div>
 </section>
@@ -95,12 +91,14 @@
 <section class="minimal-section minimal-section--tight">
     <div class="minimal-lane-grid">
         <article class="minimal-lane-card">
-            <span>Install</span>
-            <h2>Start from downloads.</h2>
-            <p>Downloads has the current package, setup help, and the shortest path to a real first launch from the current downloads page.</p>
-            <p>@PublicNowText(Model.ReleaseExperience.ReleaseNotesSummary)</p>
+            <span>@(availabilityClaimsAllowed ? "Install" : "Review required")</span>
+            <h2>@(availabilityClaimsAllowed ? "Start from downloads." : "Check release status before installing.")</h2>
+            <p>@(availabilityClaimsAllowed ? "Downloads has the current package, setup help, and the shortest path to a real first launch from the current downloads page." : "Release authority has not approved a current installer handoff. Downloads remains inspectable without an availability claim.")</p>
+            <p>@(availabilityClaimsAllowed
+                ? PublicNowText(Model.ReleaseExperience.ReleaseNotesSummary)
+                : "Published release notes remain inspectable without asserting that an installer is ready.")</p>
             <div class="minimal-actions">
-                <a class="button-like button-like--primary" href="@ContextualPreviewHref("/downloads")">Download Chummer</a>
+                <a class="button-like button-like--primary" href="@(availabilityClaimsAllowed ? ContextualPreviewHref("/downloads") : "/status")">@(availabilityClaimsAllowed ? "Download Chummer" : "Open release status")</a>
             </div>
         </article>
         <article class="minimal-lane-card">
@@ -109,7 +107,9 @@
             <h2>Use help before you guess.</h2>
             <p>Install notes, updates, and support stay close to the install path.</p>
             <p>@PublicNowText(Model.ReleaseExperience.KnownIssuesLabel)</p>
-            <p>@PublicNowText(Model.ReleaseExperience.UpdatePostureSummary)</p>
+            <p>@(availabilityClaimsAllowed
+                ? PublicNowText(Model.ReleaseExperience.UpdatePostureSummary)
+                : "Updater availability is withheld until release authority leaves review-required status.")</p>
             <div class="minimal-actions">
                 <a class="button-like button-like--ghost" href="/help">Open help</a>
             </div>
@@ -117,6 +117,8 @@
     </div>
 </section>
 
+@if (availabilityClaimsAllowed)
+{
 <section class="minimal-section" id="now-details">
     <div class="minimal-section__lead">
         <p class="eyebrow">What matters now</p>
@@ -141,8 +143,9 @@
         }
     </div>
 </section>
+}
 
-@if (supportingDetails.Length > 0)
+@if (availabilityClaimsAllowed && supportingDetails.Length > 0)
 {
     <section class="minimal-section minimal-section--tight">
         <details class="minimal-details">
@@ -165,7 +168,7 @@
     </section>
 }
 
-@if (Model.SignedInStatus is not null)
+@if (availabilityClaimsAllowed && Model.SignedInStatus is not null)
 {
     <section class="minimal-section minimal-section--tight">
         @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
@@ -176,9 +179,11 @@
         <div class="minimal-section__lead">
             <p class="eyebrow">Account is optional</p>
             <h2>Keep installs and support history together</h2>
-            <p>Use an account only if you want your installs and support history in one place. If you want a quick tour before building from scratch, start from Home after the first launch.</p>
+            <p>@(availabilityClaimsAllowed
+                ? "Use an account only if you want your installs and support history in one place. If you want a quick tour before building from scratch, start from Home after the first launch."
+                : "Account and support history remain available, but they do not establish installer availability. Check release status before starting or updating a copy.")</p>
         </div>
-    @if (signedInBenefits.Length > 0)
+    @if (availabilityClaimsAllowed && signedInBenefits.Length > 0)
     {
         <div class="minimal-help-grid">
             @foreach (var overlay in signedInBenefits)

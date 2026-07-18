@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Net;
 using Chummer.Contracts.Receipts;
 using Chummer.Run.Api.ViewModels;
+using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 
@@ -46,7 +47,8 @@ public sealed class PublicConciergeService
         string? requestedLocale,
         string? acceptLanguage,
         string? entryRouteOverride = null,
-        string? contextId = null)
+        string? contextId = null,
+        PublicReleaseTruthProjectionDto? releaseTruth = null)
     {
         ConciergeSurfaceDefinition surface = ResolveSurface(surfaceKey);
         ConciergeFlowDocument flow = ResolveFlow(surface.FlowId);
@@ -55,15 +57,29 @@ public sealed class PublicConciergeService
         PublicConciergeWidgetViewModel widget = BuildWidget(surface, enabled);
         string entryRoute = entryRouteOverride ?? surface.EntryRoute;
 
-        PublicConciergeBranchCardViewModel[] branches = flow.Branches
-            .Select(branch => BuildBranchCard(surface, branch, chrome.Authenticated, locale, contextId))
-            .ToArray();
+        bool releaseAvailabilitySurface =
+            string.Equals(surface.SurfaceKey, "downloads", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(surface.SurfaceKey, "now", StringComparison.OrdinalIgnoreCase);
+        bool releaseReviewRequired =
+            releaseAvailabilitySurface
+            && releaseTruth?.AvailabilityClaimsAllowed != true;
+        PublicConciergeBranchCardViewModel[] branches = releaseReviewRequired
+            ? []
+            : flow.Branches
+                .Select(branch => BuildBranchCard(surface, branch, chrome.Authenticated, locale, contextId))
+                .ToArray();
 
-        TrustPageActionViewModel[] actions =
-        [
-            new(surface.ReturnActionLabel, entryRoute, "primary"),
-            new(surface.SecondaryActionLabel, surface.SecondaryActionHref, "secondary")
-        ];
+        TrustPageActionViewModel[] actions = releaseReviewRequired
+            ?
+            [
+                new("Open release status", "/status", "primary"),
+                new("Open help", "/help", "secondary")
+            ]
+            :
+            [
+                new(surface.ReturnActionLabel, entryRoute, "primary"),
+                new(surface.SecondaryActionLabel, surface.SecondaryActionHref, "secondary")
+            ];
 
         List<string> proofPoints =
         [
@@ -85,7 +101,13 @@ public sealed class PublicConciergeService
             ProofPoints: proofPoints.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             Branches: branches,
             Actions: actions,
-            Widget: widget);
+            Widget: releaseReviewRequired
+                ? new PublicConciergeWidgetViewModel(
+                    StatusLabel: "review_required",
+                    Summary: "Optional release guidance is withheld while immutable release authority requires review.")
+                : widget,
+            ReleaseTruthProjection: releaseTruth,
+            ReleaseAvailabilitySurface: releaseAvailabilitySurface);
     }
 
     public ConciergeRedirectResolution ResolveBranchRedirect(

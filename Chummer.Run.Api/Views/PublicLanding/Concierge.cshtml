@@ -5,22 +5,47 @@
     ViewData["Title"] = PublicConciergeText(Model.Heading);
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-public-concierge";
+    var releaseReviewRequired = Model.ReleaseAvailabilitySurface
+        && Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed != true;
 }
+
+<partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
 
 <section class="trust-page-hero">
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@PublicConciergeText(Model.Eyebrow)</p>
         <h1 class="page-title">@PublicConciergeText(Model.Heading)</h1>
-        <p class="page-copy">@PublicConciergeText(Model.Intro)</p>
+        <p class="page-copy">@(releaseReviewRequired
+            ? "Release availability is under authority review. Status and support remain available without an installer claim."
+            : PublicConciergeText(Model.Intro))</p>
     </div>
+    @if (!releaseReviewRequired)
+    {
     <div class="stacked-actions">
         @foreach (var action in Model.Actions)
         {
             <a class="button-like button-like--@action.Tone" href="@action.Href">@PublicConciergeText(action.Label)</a>
         }
     </div>
+    }
 </section>
 
+@if (releaseReviewRequired)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Review required</p>
+            <h2 class="editorial-title">Release help is limited to status and support while availability is reviewed.</h2>
+            <p class="editorial-copy">No concierge branch will claim or start a current installer handoff until immutable release authority allows availability claims.</p>
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="/status">Open release status</a>
+                <a class="button-like button-like--secondary" href="/help">Open help</a>
+            </div>
+        </div>
+    </section>
+}
+else
+{
 <section class="continuity-band trust-doc-band">
     <div class="continuity-band__copy">
         <p class="eyebrow">Instant help</p>
@@ -45,8 +70,9 @@
         </article>
     </div>
 </section>
+}
 
-@if (!string.IsNullOrWhiteSpace(Model.Widget.IframeHref))
+@if (!releaseReviewRequired && !string.IsNullOrWhiteSpace(Model.Widget.IframeHref))
 {
     <section class="release-shelf">
         <details class="release-accordion">
@@ -64,6 +90,8 @@
     </section>
 }
 
+@if (!releaseReviewRequired)
+{
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Choose one</p>
@@ -82,6 +110,7 @@
         }
     </div>
 </section>
+}
 
 <section class="release-footnote">
     <p class="eyebrow">Still blocked?</p>

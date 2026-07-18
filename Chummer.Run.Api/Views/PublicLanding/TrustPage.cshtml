@@ -7,6 +7,7 @@
     var contactPage = string.Equals(Model.PageId, "contact", StringComparison.OrdinalIgnoreCase);
     var policyPage = string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Model.PageId, "terms", StringComparison.OrdinalIgnoreCase);
+    var availabilityClaimsAllowed = Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true;
     ViewData["SurfaceClass"] = helpPage || contactPage
         ? "surface-help surface-minimal"
         : "surface-trust-page";
@@ -45,9 +46,10 @@
 
     string PublicText(string? value) => UndetectableHumanizerCopyAdapter.Humanize(value);
 
-    static TrustPageActionViewModel? HelpActionFor(string sectionId, bool authenticated) => sectionId switch
+    static TrustPageActionViewModel? HelpActionFor(string sectionId, bool authenticated, bool availabilityAllowed) => sectionId switch
     {
-        "install-update" => new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
+        "install-update" when availabilityAllowed => new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
+        "install-update" => new TrustPageActionViewModel("Open release status", "/status", "secondary"),
         "sign-in-recovery" => new TrustPageActionViewModel(authenticated ? "Open account" : "Claim your copy", authenticated ? "/account" : "/signup?next=/home", "secondary"),
         "product-bug" => new TrustPageActionViewModel("Open contact", "/contact", "secondary"),
         "product-question" => new TrustPageActionViewModel("Read the FAQ", "/faq", "secondary"),
@@ -71,16 +73,22 @@
     {
         foreach (var pageSection in Model.Sections)
         {
-            var quickAction = HelpActionFor(pageSection.Id, Model.Chrome.Authenticated);
+            var quickAction = HelpActionFor(pageSection.Id, Model.Chrome.Authenticated, availabilityClaimsAllowed);
             var routeAction = quickAction ?? new TrustPageActionViewModel("Open details", $"#{pageSection.Id}", "ghost");
+            var releaseReviewChoice = string.Equals(pageSection.Id, "install-update", StringComparison.Ordinal)
+                && !availabilityClaimsAllowed;
             helpRouteChoices.Add((
                 Id: pageSection.Id,
-                Badge: pageSection.Eyebrow,
-                Title: pageSection.Heading,
-                Summary: pageSection.Body,
+                Badge: releaseReviewChoice ? "Review required" : pageSection.Eyebrow,
+                Title: releaseReviewChoice ? "Release status" : pageSection.Heading,
+                Summary: releaseReviewChoice
+                    ? "Installer availability is under authority review. Check release status before using any build or update path."
+                    : pageSection.Body,
                 Href: ContextualPreviewHref(routeAction.Href),
                 Label: routeAction.Label,
-                Details: (pageSection.Bullets ?? Array.Empty<string>())
+                Details: (releaseReviewChoice
+                        ? new[] { "No stable-use claim", "No automatic installer handoff" }
+                        : pageSection.Bullets ?? Array.Empty<string>())
                     .Where(static bullet => !string.IsNullOrWhiteSpace(bullet))
                     .ToArray()));
         }
@@ -97,6 +105,11 @@
             Label: "Open Discord",
             Details: new[] { "Normal contact", "Community context", "Fastest path" }));
     }
+}
+
+@if (helpPage)
+{
+    <partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
 }
 
 <section class="@((helpPage || contactPage) ? "minimal-page-hero" : "trust-page-hero")">

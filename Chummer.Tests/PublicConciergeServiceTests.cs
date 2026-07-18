@@ -1,6 +1,7 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Contracts.Receipts;
+using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Metadata;
 using Microsoft.AspNetCore.Mvc;
@@ -73,7 +74,8 @@ public sealed class PublicConciergeServiceTests
             "downloads",
             CreateChrome(authenticated: false),
             requestedLocale: "de-AT",
-            acceptLanguage: null);
+            acceptLanguage: null,
+            releaseTruth: BuildReleaseTruth("preview_ready"));
 
         Assert.Equal("downloads_concierge", page.FlowId);
         Assert.Equal("de-AT", page.Locale);
@@ -84,6 +86,43 @@ public sealed class PublicConciergeServiceTests
         Assert.Equal(4, page.Branches.Count);
         Assert.Contains(page.Branches, branch => branch.BranchId == "download_now" && branch.ActionHref.Contains("/downloads/concierge/download_now", StringComparison.Ordinal));
         Assert.Contains(page.Branches, branch => branch.BranchId == "unresolved_setup_issue" && branch.DestinationLabel.Contains("Support follow-up", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void BuildPage_NonReleaseSurfaceKeepsActionsVisibleWithoutReleaseTruth()
+    {
+        using TempRoot temp = new("public-concierge-non-release");
+        IConfiguration configuration = BuildConfiguration(temp.Root, new Dictionary<string, string?>());
+
+        PublicConciergeService service = CreateService(configuration);
+
+        PublicConciergePageViewModel page = service.BuildPage(
+            "campaign-invite",
+            CreateChrome(authenticated: false),
+            requestedLocale: null,
+            acceptLanguage: null);
+
+        Assert.False(page.ReleaseAvailabilitySurface);
+        Assert.NotEmpty(page.Actions);
+        Assert.NotEqual("review_required", page.Widget.StatusLabel);
+    }
+
+    [Fact]
+    public void ReleaseBoundConciergeFailsClosedWithoutCapturedReleaseTruth()
+    {
+        using TempRoot temp = new("public-concierge-release-review");
+        IConfiguration configuration = BuildConfiguration(temp.Root, new Dictionary<string, string?>());
+        PublicConciergeService service = CreateService(configuration);
+
+        PublicConciergePageViewModel page = service.BuildPage(
+            "downloads",
+            CreateChrome(authenticated: false),
+            requestedLocale: "en-US",
+            acceptLanguage: null);
+
+        Assert.Empty(page.Branches);
+        Assert.Equal(["/status", "/help"], page.Actions.Select(static action => action.Href));
+        Assert.Equal("review_required", page.Widget.StatusLabel);
     }
 
     [Fact]
@@ -282,6 +321,27 @@ public sealed class PublicConciergeServiceTests
             configuration,
             NullLogger<PublicConciergeService>.Instance);
     }
+
+    private static PublicReleaseTruthProjectionDto BuildReleaseTruth(string decisionStatus)
+        => new(
+            ContractName: PublicReleaseTruthProjectionDto.Schema,
+            ReleaseVersion: "6.2.0",
+            Channel: "preview",
+            ReleaseStatus: "published",
+            RolloutState: "canary",
+            SupportabilityState: "supported",
+            AvailablePlatforms: ["windows"],
+            PrimaryHeadByPlatform: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["windows"] = "avalonia"
+            },
+            ArtifactCount: 1,
+            DownloadAccessPosture: "open_public",
+            KnownIssueSummary: "No blocking issue.",
+            ManifestSha256: new string('a', 64),
+            RegistryCommit: new string('b', 40),
+            ReleaseDecisionStatus: decisionStatus,
+            ReleaseDecisionSha256: new string('c', 64));
 
     private static IConfiguration BuildConfiguration(string tempRoot, IReadOnlyDictionary<string, string?> overrides)
     {

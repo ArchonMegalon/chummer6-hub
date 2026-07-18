@@ -1,0 +1,15 @@
+@model PublicReleaseTruthProjectionDto?
+@using System.Text.Json
+@if (Model is not null)
+{
+    <script id="chummer-release-truth" type="application/json">@Html.Raw(JsonSerializer.Serialize(Model, new JsonSerializerOptions(JsonSerializerDefaults.Web)))</script>
+    @if (Model.ReviewBannerRequired)
+    {
+        <section class="minimal-section minimal-section--tight" data-release-truth-banner="@Model.ReleaseDecisionStatus" role="status">
+            <div class="minimal-status-pill">
+                <strong>Release review required</strong>
+                <span>Decision: @Model.ReleaseDecisionStatus. Release routes remain inspectable, but installer handoffs and availability or stable-release claims are withheld until immutable release authority is ready.</span>
+            </div>
+        </section>
+    }
+}

@@ -3,29 +3,29 @@
     ViewData["Title"] = "Chummer — Shadowrun character manager";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing surface-minimal";
-    var publicPlatformLabels = Model.ReleaseExperience.PlatformAvailability
-        .Where(static platform => platform.PubliclyAvailable)
-        .Select(static platform => platform.PlatformLabel)
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToArray();
-    var publicPlatformSummary = publicPlatformLabels.Length switch
+    static string PlatformLabel(string platform) => platform switch
+    {
+        "windows" => "Windows",
+        "linux" => "Linux",
+        "macos" => "macOS",
+        _ => UndetectableHumanizerCopyAdapter.Humanize(platform)
+    };
+    var publicPlatformLabels = Model.ReleaseTruthProjection?.AvailablePlatforms
+        .Select(PlatformLabel)
+        .ToArray() ?? Array.Empty<string>();
+    var availabilityClaimsAllowed = Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true;
+    var publicPlatformSummary = !availabilityClaimsAllowed
+        ? publicPlatformLabels.Length == 0
+            ? "No authority-bound installer availability is published right now."
+            : $"Listed for review: {string.Join(", ", publicPlatformLabels)}. Availability is not asserted."
+        : publicPlatformLabels.Length switch
     {
         0 => "No public installer right now.",
         1 => $"Current public installer: {publicPlatformLabels[0]}.",
         2 => $"Current public installers: {publicPlatformLabels[0]} and {publicPlatformLabels[1]}.",
         _ => $"Current public installers: {string.Join(", ", publicPlatformLabels.Take(publicPlatformLabels.Length - 1))}, and {publicPlatformLabels[^1]}."
     };
-    static bool IsPublishedStableRelease(PublicReleaseManifestDto manifest)
-    {
-        var stableLanePublished = string.Equals((manifest.Channel ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((manifest.Channel ?? string.Empty).Trim(), "stable", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((manifest.Channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((manifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase);
-        return stableLanePublished
-            && string.Equals((manifest.SupportabilityState ?? string.Empty).Trim(), "gold_supported", StringComparison.OrdinalIgnoreCase)
-            && string.Equals((manifest.Status ?? string.Empty).Trim(), "published", StringComparison.OrdinalIgnoreCase);
-    }
-    var isStableRelease = IsPublishedStableRelease(Model.Manifest);
+    var isStableRelease = Model.ReleaseTruthProjection?.StableClaimsAllowed == true;
     var publicReleasePostureSummary = Model.ReleaseExperience.Recommended is null
         ? "Current public lane: Downloads paused."
         : isStableRelease
@@ -35,6 +35,8 @@
     var entryLabel = Model.Chrome.Authenticated ? "Account" : "Sign in first";
     var playAnalyticsEvent = "homepage_open_play";
 }
+
+<partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
 
 <section class="minimal-hero" data-homepage-section="hero">
     <div class="minimal-hero__copy">

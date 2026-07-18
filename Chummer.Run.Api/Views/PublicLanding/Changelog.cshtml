@@ -11,6 +11,7 @@
     var shippedNow = Model.AvailableToday.Take(4).ToArray();
     var stillCaution = Model.Inspectable.Take(4).ToArray();
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
+    var availabilityClaimsAllowed = Model.ReleaseTruthProjection?.AvailabilityClaimsAllowed == true;
     string ContextualPreviewHref(string? href)
     {
         var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
@@ -29,6 +30,8 @@
             .Replace("maintenance", "planned work", StringComparison.OrdinalIgnoreCase);
 }
 
+<partial name="_ReleaseTruthProjection" model="Model.ReleaseTruthProjection" />
+
 <section class="minimal-page-hero route-anchor-target" id="public-shipped-closeout">
     <div>
         <p class="eyebrow">Changelog</p>
@@ -37,21 +40,21 @@
     </div>
     <div class="minimal-status-pill">
         <span>Release notes</span>
-        <strong>Current app</strong>
+        <strong>@(availabilityClaimsAllowed ? "Current app" : "Release under review")</strong>
     </div>
 </section>
 
 <section class="status-decision-strip" aria-label="Shipped closeout rules">
     <article class="status-decision-strip__card">
-        <span class="tag">Live now</span>
-        <h2>If it is here, you can use it.</h2>
-        <p>This page only covers changes that reached the current app, installer, or public route.</p>
+        <span class="tag">@(availabilityClaimsAllowed ? "Live now" : "Review required")</span>
+        <h2>@(availabilityClaimsAllowed ? "If it is here, you can use it." : "Published notes remain inspectable while availability is reviewed.")</h2>
+        <p>@(availabilityClaimsAllowed ? "This page only covers changes that reached the current app, installer, or public route." : "Use the release-truth status and Downloads page before treating a listed change as generally available.")</p>
         <a class="button-like button-like--ghost" href="/now">Open current release</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Install</span>
-        <h2>Downloads stays the install page.</h2>
-        <p>Use Downloads for the installer, platform choice, and setup notes.</p>
+        <h2>@(availabilityClaimsAllowed ? "Downloads stays the install page." : "Downloads remains inspectable during review.")</h2>
+        <p>@(availabilityClaimsAllowed ? "Use Downloads for the installer, platform choice, and setup notes." : "No current installer or platform-availability claim is made until release authority is ready.")</p>
         <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
     </article>
     <article class="status-decision-strip__card">
@@ -65,9 +68,11 @@
 <section class="minimal-section">
     <div class="minimal-section__lead">
         <p class="eyebrow">What changed</p>
-        <h2>Recent changes in the current release</h2>
-        <p>These product improvements are live enough to belong in the changelog.</p>
+        <h2>@(availabilityClaimsAllowed ? "Recent changes in the current release" : "Published notes under release review")</h2>
+        <p>@(availabilityClaimsAllowed ? "These product improvements are live enough to belong in the changelog." : "These notes remain inspectable, but they do not claim current availability while release authority requires review.")</p>
     </div>
+    @if (availabilityClaimsAllowed)
+    {
     <div class="minimal-lane-grid">
         @foreach (var card in shippedDetails)
         {
@@ -85,21 +90,30 @@
             </article>
         }
     </div>
+    }
+    else
+    {
+        <p class="muted-copy">Change cards are withheld from the current-release lane until immutable release authority allows availability claims.</p>
+    }
 </section>
 
 <section class="minimal-section minimal-section--tight">
     <div class="minimal-lane-grid">
         <article class="minimal-lane-card">
-            <span>Available now</span>
-            <h2>Ready to use</h2>
-            <p>These items already have a public path and belong in the changelog.</p>
+            <span>@(availabilityClaimsAllowed ? "Available now" : "Review required")</span>
+            <h2>@(availabilityClaimsAllowed ? "Ready to use" : "Availability is not asserted")</h2>
+            <p>@(availabilityClaimsAllowed ? "These items already have a public path and belong in the changelog." : "Release notes stay visible, but current-use and installer claims are withheld.")</p>
             <div class="minimal-help-grid">
                 <article class="minimal-help-card">
                     <h3>Release notes and update status</h3>
-                    <p>@PublicChangelogText(Model.ReleaseExperience.ReleaseNotesSummary)</p>
-                    <p>@PublicChangelogText(Model.ReleaseExperience.UpdatePostureSummary)</p>
+                    <p>@(availabilityClaimsAllowed
+                        ? PublicChangelogText(Model.ReleaseExperience.ReleaseNotesSummary)
+                        : "Published notes remain inspectable without a current-availability claim.")</p>
+                    <p>@(availabilityClaimsAllowed
+                        ? PublicChangelogText(Model.ReleaseExperience.UpdatePostureSummary)
+                        : "Updater availability is withheld while immutable release authority requires review.")</p>
                 </article>
-                @foreach (var card in shippedNow)
+                @foreach (var card in availabilityClaimsAllowed ? shippedNow : Array.Empty<ResolvedPublicCardViewModel>())
                 {
                     <article class="minimal-help-card" id="@card.Card.Id.Replace('_', '-')">
                         <h3>@PublicChangelogText(card.Card.Title)</h3>
@@ -173,7 +187,7 @@
     <div class="minimal-section__lead">
         <p class="eyebrow">Next</p>
         <h2>Read the changes, then move on.</h2>
-        <p>Open Downloads for the app, Participate for planned work, or Chummer help for support.</p>
+        <p>@(availabilityClaimsAllowed ? "Open Downloads for the app, Participate for planned work, or Chummer help for support." : "Open release status before Downloads; Participate and Chummer help remain available without a release claim.")</p>
     </div>
     <div class="minimal-actions">
         <a class="button-like button-like--primary" href="@ContextualPreviewHref("/downloads")">Open downloads</a>

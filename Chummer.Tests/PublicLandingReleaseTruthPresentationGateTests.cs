@@ -41,6 +41,73 @@ public sealed class PublicLandingReleaseTruthPresentationGateTests
     }
 
     [Fact]
+    public void ReviewRequiredHelpCopyCannotRenderOptimisticAvailability()
+    {
+        PublicReleaseManifestDto manifest = BuildManifest(
+            proofFreshnessStatus: "fresh",
+            supportabilityState: "preview_supported",
+            rolloutState: "promoted_preview");
+        var releaseTruth = new PublicReleaseTruthProjectionDto(
+            ContractName: PublicReleaseTruthProjectionDto.Schema,
+            ReleaseVersion: "run-authority-20260718",
+            Channel: "preview",
+            ReleaseStatus: "published",
+            RolloutState: "promoted_preview",
+            SupportabilityState: "preview_supported",
+            AvailablePlatforms: ["windows"],
+            PrimaryHeadByPlatform: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["windows"] = "avalonia"
+            },
+            ArtifactCount: 2,
+            DownloadAccessPosture: "open_public",
+            KnownIssueSummary: "Immutable release review remains open.",
+            ManifestSha256: new string('a', 64),
+            RegistryCommit: new string('b', 40),
+            ReleaseDecisionStatus: "review_required",
+            ReleaseDecisionSha256: new string('c', 64));
+        PublicLandingController.ReleaseTruthPresentationGate gate =
+            PublicLandingController.BuildReleaseTruthPresentationGate(manifest, releaseTruth);
+        PublicTrustPulsePanelViewModel pulse =
+            PublicLandingController.BuildReleaseTruthGatedPulsePanel(manifest, gate, releaseTruth);
+        var optimisticSignedInStatus = new SignedInTrustStatusPanelViewModel(
+            Eyebrow: "Signed-in trust status",
+            Heading: "Your linked install can verify a fix now",
+            Summary: "Preview builds are available for this linked install.",
+            Rows:
+            [
+                new("Who can get it now", "Preview builds are available."),
+                new("Recommended for this install", "Install the promoted preview now."),
+                new("Install status", "This install matches the promoted release."),
+                new("Fix availability", "This install can verify the fix now."),
+                new("Current caution", "No extra caution is needed."),
+                new("Release checks", "Passed")
+            ],
+            PrimaryAction: new TrustPageActionViewModel("Verify fix on this install", "/account/support/case-1", "primary"));
+
+        SignedInTrustStatusPanelViewModel signedInStatus = Assert.IsType<SignedInTrustStatusPanelViewModel>(
+            PublicLandingController.RebindSignedInTrustStatusToReleaseTruth(
+                optimisticSignedInStatus,
+                releaseTruth,
+                gate));
+
+        string pulseText = string.Join(" ", pulse.MicroProof.Concat(pulse.Rows.Select(row => row.Value)));
+        string signedInText = string.Join(
+            " ",
+            new[] { signedInStatus.Heading, signedInStatus.Summary }
+                .Concat(signedInStatus.Rows.Select(row => row.Value)));
+        Assert.True(gate.ReviewRequired);
+        Assert.Contains("2 authority-listed installers", pulseText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("availability is not asserted", pulseText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("availability is not asserted", signedInText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("review required", signedInStatus.Heading, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Preview builds are available", signedInText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("can verify", signedInText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("matches the promoted", signedInText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("/downloads", signedInStatus.PrimaryAction.Href);
+    }
+
+    [Fact]
     public void FreshSupportedCanonicalTruthDoesNotGateTheWeeklyPulse()
     {
         PublicReleaseManifestDto manifest = BuildManifest(

@@ -3,7 +3,9 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Mvc;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -60,7 +62,10 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         PublicReleaseManifestDto manifest = _artifactDelivery.FilterRevokedArtifacts(
             snapshot,
             _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest(snapshot)));
-        return Ok(manifest);
+        return Ok(manifest with
+        {
+            ReleaseTruth = PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext)
+        });
     }
 
     [HttpGet("/downloads/RELEASE_CHANNEL.generated.json")]
@@ -73,7 +78,9 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             ApplyGenerationHeader(httpContext.Response.Headers, snapshot);
         }
 
-        string? filteredManifest = _releases.LoadCanonicalManifestJson(snapshot);
+        string? filteredManifest = EmbedReleaseTruth(
+            _releases.LoadCanonicalManifestJson(snapshot),
+            PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext));
         return filteredManifest is null
             ? NotFound()
             : Content(filteredManifest, "application/json; charset=utf-8");
@@ -90,7 +97,9 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         TryApplyGenerationHeader(snapshot);
         TryApplyImmutableGenerationHeaders();
-        byte[]? manifestBytes = _releases.LoadGenerationCompatibilityManifestBytes(snapshot);
+        byte[]? manifestBytes = EmbedReleaseTruth(
+            _releases.LoadGenerationCompatibilityManifestBytes(snapshot),
+            PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext));
         return manifestBytes is null
             ? NotFound()
             : File(manifestBytes, "application/json; charset=utf-8");
@@ -107,7 +116,9 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         TryApplyGenerationHeader(snapshot);
         TryApplyImmutableGenerationHeaders();
-        byte[]? manifestBytes = _releases.LoadGenerationCanonicalManifestBytes(snapshot);
+        byte[]? manifestBytes = EmbedReleaseTruth(
+            _releases.LoadGenerationCanonicalManifestBytes(snapshot),
+            PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext));
         return manifestBytes is null
             ? NotFound()
             : File(manifestBytes, "application/json; charset=utf-8");
@@ -903,6 +914,19 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         }
 
         TryApplyGenerationHeader(snapshot);
+        PublicReleaseTruthProjectionDto? releaseTruth =
+            PublicReleaseTruthProjectionMiddleware.TryGet(HttpContext);
+        if (releaseTruth?.AvailabilityClaimsAllowed != true)
+        {
+            TryApplyImmutableGenerationHeaders();
+            return Ok(new
+            {
+                status = "review_required",
+                message = "This retained installer is withheld until its immutable release authority allows availability claims.",
+                releaseTruth
+            });
+        }
+
         ArtifactDeliveryResolution resolution = _artifactDelivery.ResolveByArtifactId(snapshot, artifactId);
         if (!resolution.Allowed)
         {
@@ -1559,4 +1583,35 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
     private static string? NormalizeOptionalRoute(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? EmbedReleaseTruth(
+        string? manifestJson,
+        PublicReleaseTruthProjectionDto? releaseTruth)
+    {
+        if (manifestJson is null || releaseTruth is null)
+        {
+            return manifestJson;
+        }
+
+        JsonObject root = JsonNode.Parse(manifestJson)?.AsObject()
+            ?? throw new InvalidDataException("release manifest must be a JSON object.");
+        root["releaseTruth"] = JsonSerializer.SerializeToNode(
+            releaseTruth,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        return root.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web));
+    }
+
+    private static byte[]? EmbedReleaseTruth(
+        byte[]? manifestBytes,
+        PublicReleaseTruthProjectionDto? releaseTruth)
+    {
+        if (manifestBytes is null || releaseTruth is null)
+        {
+            return manifestBytes;
+        }
+
+        string embedded = EmbedReleaseTruth(Encoding.UTF8.GetString(manifestBytes), releaseTruth)
+            ?? throw new InvalidDataException("release manifest could not be projected.");
+        return Encoding.UTF8.GetBytes(embedded);
+    }
 }
