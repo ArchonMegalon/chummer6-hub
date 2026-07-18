@@ -98,6 +98,64 @@ def test_scan_rejects_absolute_process_path_even_outside_user_home(tmp_path: Pat
     assert "/tmp/chummer-smoke" not in json.dumps(scan)
 
 
+def test_scan_rejects_absolute_docker_opt_and_srv_roots_in_arbitrary_text(tmp_path: Path) -> None:
+    module = load_module()
+    for index, absolute_path in enumerate(
+        (
+            "/docker/chummer/build/output.json",
+            "/opt/chummer/build/output.json",
+            "/srv/chummer/build/output.json",
+        )
+    ):
+        write_json(
+            tmp_path / f"receipt-{index}.json",
+            {"note": f"materialized from {absolute_path}"},
+        )
+
+    scan = module.scan_published_receipts([tmp_path])
+
+    assert len(scan["machine_specific_hits"]) == 3
+    assert {detail["category"] for detail in scan["machine_specific_hit_details"]} == {
+        "host_absolute_root"
+    }
+    serialized = json.dumps(scan)
+    for forbidden in ("/docker/", "/opt/", "/srv/"):
+        assert forbidden not in serialized
+
+
+def test_scan_rejects_absolute_candidate_path_list_fields(tmp_path: Path) -> None:
+    module = load_module()
+    write_json(
+        tmp_path / "startup-smoke" / "candidate-paths.json",
+        {
+            "startup_smoke": {
+                "candidate_paths": ["/tmp/private/one.json", "/var/tmp/private/two.json"],
+            }
+        },
+    )
+    write_json(
+        tmp_path / "startup-smoke" / "artifact-path-candidates.json",
+        {
+            "startup_smoke": {
+                "artifactPathCandidates": [r"C:\\Temp\\private\\three.json"],
+            }
+        },
+    )
+
+    scan = module.scan_published_receipts([tmp_path])
+
+    assert scan["machine_specific_hits"] == [
+        "scan-root-1/startup-smoke/artifact-path-candidates.json",
+        "scan-root-1/startup-smoke/candidate-paths.json",
+    ]
+    assert {detail["category"] for detail in scan["machine_specific_hit_details"]} == {
+        "host_absolute_path_field"
+    }
+    serialized = json.dumps(scan)
+    assert "/tmp/private" not in serialized
+    assert "C:\\\\Temp" not in serialized
+
+
 def test_scan_fails_closed_on_invalid_utf8_nested_json_without_echoing_host_path(tmp_path: Path) -> None:
     module = load_module()
     invalid = tmp_path / "nested" / "invalid.json"

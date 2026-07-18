@@ -12467,14 +12467,17 @@ Boundary:
 
     internal static ReleaseTruthPresentationGate BuildReleaseTruthPresentationGate(PublicReleaseManifestDto manifest)
     {
-        string proofFreshnessStatus = string.Empty;
+        string proofFreshnessStatus = "missing";
         if (manifest.PublicTrustMetrics is JsonElement metrics
             && metrics.ValueKind == JsonValueKind.Object
             && metrics.TryGetProperty("proofFreshness", out JsonElement proofFreshness)
             && proofFreshness.ValueKind == JsonValueKind.Object)
         {
-            proofFreshnessStatus = TryGetJsonString(proofFreshness, "status")?.Trim().ToLowerInvariant()
-                ?? string.Empty;
+            string? publishedFreshness = TryGetJsonString(proofFreshness, "status")?.Trim().ToLowerInvariant();
+            if (!string.IsNullOrWhiteSpace(publishedFreshness))
+            {
+                proofFreshnessStatus = publishedFreshness;
+            }
         }
 
         bool supportabilityReviewRequired = string.Equals(
@@ -12483,8 +12486,10 @@ Boundary:
             StringComparison.OrdinalIgnoreCase);
         bool rolloutReviewRequired = (manifest.RolloutState ?? string.Empty)
             .Contains("review_required", StringComparison.OrdinalIgnoreCase);
-        bool proofFreshnessRequiresReview = !string.IsNullOrWhiteSpace(proofFreshnessStatus)
-            && !string.Equals(proofFreshnessStatus, "fresh", StringComparison.OrdinalIgnoreCase);
+        bool proofFreshnessRequiresReview = !string.Equals(
+            proofFreshnessStatus,
+            "fresh",
+            StringComparison.OrdinalIgnoreCase);
         bool reviewRequired = supportabilityReviewRequired
             || rolloutReviewRequired
             || proofFreshnessRequiresReview;

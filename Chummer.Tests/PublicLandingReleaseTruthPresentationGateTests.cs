@@ -56,6 +56,44 @@ public sealed class PublicLandingReleaseTruthPresentationGateTests
         Assert.Empty(gate.Summary);
     }
 
+    [Theory]
+    [InlineData("absent_metrics")]
+    [InlineData("missing_freshness")]
+    [InlineData("blank_status")]
+    public void AbsentFreshnessTruthFailsClosedInsteadOfPublishingOptimism(string variant)
+    {
+        PublicReleaseManifestDto manifest = BuildManifest(
+            proofFreshnessStatus: "fresh",
+            supportabilityState: "preview_supported",
+            rolloutState: "promoted_preview");
+        manifest = variant switch
+        {
+            "absent_metrics" => manifest with { PublicTrustMetrics = null },
+            "missing_freshness" => manifest with
+            {
+                PublicTrustMetrics = JsonSerializer.SerializeToElement(new
+                {
+                    releaseChannel = new { supportabilityState = "preview_supported" }
+                })
+            },
+            "blank_status" => manifest with
+            {
+                PublicTrustMetrics = JsonSerializer.SerializeToElement(new
+                {
+                    proofFreshness = new { status = " " }
+                })
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(variant), variant, null)
+        };
+
+        PublicLandingController.ReleaseTruthPresentationGate gate =
+            PublicLandingController.BuildReleaseTruthPresentationGate(manifest);
+
+        Assert.True(gate.ReviewRequired);
+        Assert.Equal("missing", gate.ProofFreshnessStatus);
+        Assert.Contains("freshness is missing", gate.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static PublicReleaseManifestDto BuildManifest(
         string proofFreshnessStatus,
         string supportabilityState,
