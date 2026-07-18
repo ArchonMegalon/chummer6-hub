@@ -431,6 +431,8 @@ def _validate_canonical_package(
 ) -> None:
     if names != sorted(names) or archive.comment:
         raise PackagePlaneError(f"non-canonical archive layout in {spec.package_id}")
+    if "_rels/.rels" not in names:
+        raise PackagePlaneError(f"canonical relationships are missing from {spec.package_id}")
     for info in archive.infolist():
         if (
             info.date_time != CANONICAL_ZIP_TIMESTAMP
