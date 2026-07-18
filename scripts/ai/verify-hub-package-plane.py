@@ -327,7 +327,6 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "-p:RestoreAdditionalProjectSources=",
             f"-p:RestorePackagesPath={package_root}",
             "-p:UseSharedCompilation=false",
-            "-p:TargetFramework=net10.0",
         )
         test_project = consumer / "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj"
         _run(

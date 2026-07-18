@@ -198,10 +198,33 @@ def _write_fake_engine_package(module, feed: Path, assembly: bytes) -> tuple[obj
 </package>
 """
     path = feed / f"{package_id}.{version}.nupkg"
+    core_properties = b"<coreProperties><identifier>fixture</identifier></coreProperties>"
+    core_name = "package/services/metadata/core-properties/" + "a" * 32 + ".psmdcp"
+    relationships = f"""<?xml version="1.0" encoding="utf-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Type="{module.MANIFEST_RELATIONSHIP}" Target="/{package_id}.nuspec" Id="random-manifest" />
+  <Relationship Type="{module.CORE_PROPERTIES_RELATIONSHIP}" Target="/{core_name}" Id="random-core" />
+</Relationships>"""
     with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("_rels/.rels", relationships)
         archive.writestr(f"{package_id}.nuspec", nuspec)
         archive.writestr(f"lib/net10.0/{package_id}.dll", assembly)
+        archive.writestr(core_name, core_properties)
+    module.canonicalize_package(path, spec)
     return spec, nuspec
+
+
+def test_package_canonicalization_is_byte_reproducible(tmp_path: Path) -> None:
+    module = load_module()
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    first_spec, _ = _write_fake_engine_package(module, first, b"same assembly")
+    second_spec, _ = _write_fake_engine_package(module, second, b"same assembly")
+    first_path = module.validate_package(first, first_spec, PACKAGE_VERSION)
+    second_path = module.validate_package(second, second_spec, PACKAGE_VERSION)
+    assert first_path.read_bytes() == second_path.read_bytes()
 
 
 def test_inventory_rejects_metadata_valid_package_byte_replacement(tmp_path: Path) -> None:

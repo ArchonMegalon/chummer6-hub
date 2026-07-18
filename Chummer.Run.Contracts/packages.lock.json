@@ -6,13 +6,13 @@
         "type": "Direct",
         "requested": "[0.0.0-packageplane.20260718.1, )",
         "resolved": "0.0.0-packageplane.20260718.1",
-        "contentHash": "MZ3qpuy71zhyGdJAjx2Q5L8Eq4nRKi9S4Dpz0djl99s+AJPNFrjjbBrTN3skyASd7reHHnfuaxl6BcFVz7C9Pw=="
+        "contentHash": "cMSM12jFS9A6EBpR4djH4auZt3P5lQ48LqSVv1axlBaxfSkwjCdO97ycLrEbDITjSdFAVjCYJ74P+sHImtxNng=="
       },
       "Chummer.Hub.Registry.Contracts": {
         "type": "Direct",
         "requested": "[0.0.0-packageplane.20260718.1, )",
         "resolved": "0.0.0-packageplane.20260718.1",
-        "contentHash": "a0q/lpHkVYzeG9biDH9IRSBIJBlLnAemm6Z0jOfiu3roxorRG8JhZaMMORZsQAcMsDvibypjJddcuo76nr/L/g=="
+        "contentHash": "/Yvk+CS2kMlj4TeBrHG2QGJo2hqC+cGd62ffjO57BW76p4AYHKra6xA2rd6FVglmqCKBIyxsktFd8x6fAki7BA=="
       },
       "chummer.play.contracts": {
         "type": "Project"

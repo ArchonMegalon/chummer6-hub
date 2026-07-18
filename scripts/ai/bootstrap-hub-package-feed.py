@@ -49,6 +49,16 @@ HTTPS_GITHUB_PATTERN = re.compile(
 CORE_PROPERTIES_PATTERN = re.compile(
     r"^package/services/metadata/core-properties/[0-9a-f]{32}\.psmdcp$"
 )
+CORE_PROPERTIES_RELATIONSHIP = (
+    "http://schemas.openxmlformats.org/package/2006/relationships/metadata/"
+    "core-properties"
+)
+MANIFEST_RELATIONSHIP = "http://schemas.microsoft.com/packaging/2010/07/manifest"
+RELATIONSHIPS_NAMESPACE = (
+    "http://schemas.openxmlformats.org/package/2006/relationships"
+)
+CANONICAL_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+CANONICAL_ZIP_EXTERNAL_ATTR = 0o100644 << 16
 
 
 class PackagePlaneError(RuntimeError):
@@ -346,12 +356,112 @@ def _validate_payload_names(names: list[str], spec: PackageSpec) -> None:
         raise PackagePlaneError(f"expected assembly is missing from {spec.package_id}")
 
 
+def _canonical_relationships(spec: PackageSpec, core_properties_path: str) -> bytes:
+    ET.register_namespace("", RELATIONSHIPS_NAMESPACE)
+    root = ET.Element(f"{{{RELATIONSHIPS_NAMESPACE}}}Relationships")
+    relationships = (
+        (MANIFEST_RELATIONSHIP, f"/{spec.package_id}.nuspec"),
+        (CORE_PROPERTIES_RELATIONSHIP, f"/{core_properties_path}"),
+    )
+    for relationship_type, target in sorted(relationships):
+        identifier = "R" + hashlib.sha256(
+            f"{relationship_type}\n{target}".encode("utf-8")
+        ).hexdigest()[:16].upper()
+        ET.SubElement(
+            root,
+            f"{{{RELATIONSHIPS_NAMESPACE}}}Relationship",
+            {"Type": relationship_type, "Target": target, "Id": identifier},
+        )
+    ET.indent(root, space="  ")
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def canonicalize_package(path: Path, spec: PackageSpec) -> None:
+    """Rewrite a NuGet package into one byte-stable, platform-neutral ZIP."""
+
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = archive.namelist()
+            _validate_payload_names(names, spec)
+            if len(names) != len(set(names)):
+                raise PackagePlaneError(f"duplicate package paths in {spec.package_id}")
+            payloads = {name: archive.read(name) for name in names}
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise PackagePlaneError(f"invalid package {path}: {exc}") from exc
+
+    core_paths = [name for name in names if CORE_PROPERTIES_PATTERN.fullmatch(name)]
+    if len(core_paths) != 1 or "_rels/.rels" not in payloads:
+        raise PackagePlaneError(
+            f"{spec.package_id} must contain one core-properties part and relationships"
+        )
+    old_core_path = core_paths[0]
+    core_bytes = payloads.pop(old_core_path)
+    core_digest = hashlib.sha256(core_bytes).hexdigest()
+    core_path = (
+        "package/services/metadata/core-properties/"
+        f"{core_digest[:32]}.psmdcp"
+    )
+    payloads[core_path] = core_bytes
+    payloads["_rels/.rels"] = _canonical_relationships(spec, core_path)
+
+    handle, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    os.close(handle)
+    temporary_path = Path(temporary)
+    try:
+        with zipfile.ZipFile(temporary_path, "w", compression=zipfile.ZIP_STORED) as archive:
+            archive.comment = b""
+            for name in sorted(payloads):
+                info = zipfile.ZipInfo(name, date_time=CANONICAL_ZIP_TIMESTAMP)
+                info.compress_type = zipfile.ZIP_STORED
+                info.create_system = 3
+                info.external_attr = CANONICAL_ZIP_EXTERNAL_ATTR
+                info.extra = b""
+                info.comment = b""
+                archive.writestr(info, payloads[name])
+        with temporary_path.open("rb") as stream:
+            os.fsync(stream.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        if temporary_path.exists():
+            temporary_path.unlink()
+
+
+def _validate_canonical_package(
+    archive: zipfile.ZipFile, names: list[str], spec: PackageSpec
+) -> None:
+    if names != sorted(names) or archive.comment:
+        raise PackagePlaneError(f"non-canonical archive layout in {spec.package_id}")
+    for info in archive.infolist():
+        if (
+            info.date_time != CANONICAL_ZIP_TIMESTAMP
+            or info.compress_type != zipfile.ZIP_STORED
+            or info.create_system != 3
+            or info.external_attr != CANONICAL_ZIP_EXTERNAL_ATTR
+            or info.extra
+            or info.comment
+        ):
+            raise PackagePlaneError(f"non-canonical ZIP metadata in {spec.package_id}")
+    core_paths = [name for name in names if CORE_PROPERTIES_PATTERN.fullmatch(name)]
+    if len(core_paths) != 1:
+        raise PackagePlaneError(f"non-canonical core-properties part in {spec.package_id}")
+    core_path = core_paths[0]
+    expected_core_path = (
+        "package/services/metadata/core-properties/"
+        f"{hashlib.sha256(archive.read(core_path)).hexdigest()[:32]}.psmdcp"
+    )
+    if core_path != expected_core_path:
+        raise PackagePlaneError(f"core-properties digest path mismatch in {spec.package_id}")
+    if archive.read("_rels/.rels") != _canonical_relationships(spec, core_path):
+        raise PackagePlaneError(f"non-canonical relationships in {spec.package_id}")
+
+
 def validate_package(feed: Path, spec: PackageSpec, version: str) -> Path:
     path = _package_path(feed, spec.package_id, version)
     try:
         with zipfile.ZipFile(path) as archive:
             names = archive.namelist()
             _validate_payload_names(names, spec)
+            _validate_canonical_package(archive, names, spec)
             nuspec_names = [name for name in names if name.lower().endswith(".nuspec")]
             if len(nuspec_names) != 1:
                 raise PackagePlaneError(f"{path.name} must contain exactly one nuspec")
@@ -598,6 +708,10 @@ def build_feed(
                 pack_command.append(f"-p:PackageLicenseExpression={spec.license_value}")
             pack_command.extend(("--output", str(staged_feed)))
             sys.stdout.write(_run(pack_command, cwd=checkout, env=env))
+            canonicalize_package(
+                staged_feed / f"{spec.package_id}.{lock.package_version}.nupkg",
+                spec,
+            )
             validate_checkout(checkout, spec, env=env)
             validate_package(staged_feed, spec, lock.package_version)
         inventory = _inventory_payload(lock, staged_feed, lock_sha256)
