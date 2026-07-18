@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
+    <RestorePackagesWithLockFile Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true'">true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true' and '$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
     <PreferBundledChummerMediaContracts Condition="'$(PreferBundledChummerMediaContracts)' == '' and '$(ChummerUseLocalCompatibilityTree)' != 'true'">true</PreferBundledChummerMediaContracts>
     <PreferBundledChummerMediaContracts Condition="'$(PreferBundledChummerMediaContracts)' == ''">false</PreferBundledChummerMediaContracts>
     <ChummerMediaContractsProject Condition="'$(ChummerUseLocalCompatibilityTree)' == 'true' and '$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(ChummerMediaFactoryRoot)/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(ChummerMediaFactoryRoot)/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>

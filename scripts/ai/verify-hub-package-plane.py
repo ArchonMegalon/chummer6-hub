@@ -28,6 +28,15 @@ CONTRACT_PROJECTS = (
     "Chummer.Run.Contracts/Chummer.Run.Contracts.csproj",
     "Chummer.World.Contracts/Chummer.World.Contracts.csproj",
 )
+LOCKED_PROJECTS = (
+    "Chummer.Campaign.Contracts",
+    "Chummer.Control.Contracts",
+    "Chummer.Play.Contracts",
+    "Chummer.Run.Contracts",
+    "Chummer.World.Contracts",
+    "Chummer.Run.Api",
+    "Chummer.Run.Api.Tests",
+)
 
 
 class VerificationError(RuntimeError):
@@ -144,6 +153,45 @@ def _audit_assets(
         if not isinstance(metadata, dict) or metadata.get("type") != "package":
             raise VerificationError(f"locked package was not restored as a package: {identity}")
     return len(asset_paths)
+
+
+def _audit_package_locks(consumer: Path, package_version: str) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for project_name in LOCKED_PROJECTS:
+        path = consumer / project_name / "packages.lock.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("version") != 1 or not isinstance(payload.get("dependencies"), dict):
+            raise VerificationError(f"invalid NuGet lock contract for {project_name}")
+        package_count = 0
+        for framework, dependencies in payload["dependencies"].items():
+            if not isinstance(framework, str) or not isinstance(dependencies, dict):
+                raise VerificationError(f"invalid locked framework graph for {project_name}")
+            for package_id, metadata in dependencies.items():
+                if not isinstance(metadata, dict):
+                    raise VerificationError(f"invalid locked dependency {package_id}")
+                if metadata.get("type") == "Project":
+                    continue
+                package_count += 1
+                if not isinstance(metadata.get("resolved"), str) or not isinstance(
+                    metadata.get("contentHash"), str
+                ):
+                    raise VerificationError(
+                        f"locked package lacks resolved version/content hash: {package_id}"
+                    )
+                if package_id in {
+                    "Chummer.Engine.Contracts",
+                    "Chummer.Hub.Registry.Contracts",
+                    "Chummer.Run.Registry",
+                } and metadata["resolved"] != package_version:
+                    raise VerificationError(f"owner package lock drift: {package_id}")
+        rows.append(
+            {
+                "project": project_name,
+                "sha256": _sha256(path),
+                "package_count": package_count,
+            }
+        )
+    return rows
 
 
 def _audit_contract_packages(
@@ -291,7 +339,7 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
                 str(nuget_config),
                 "--packages",
                 str(package_root),
-                "--force",
+                "--locked-mode",
                 "--no-cache",
                 "--nologo",
                 "-m:1",
@@ -337,6 +385,7 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             env=env,
         )
         asset_count = _audit_assets(consumer, package_root, lock.package_version)
+        package_locks = _audit_package_locks(consumer, lock.package_version)
         contract_packages = _audit_contract_packages(
             consumer, contract_output, commit, lock.package_version, dotnet, common, env
         )
@@ -368,6 +417,8 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
                 "other": lock.approved_remote_source,
             },
             "asset_files_audited": asset_count,
+            "package_lock_files": package_locks,
+            "locked_mode_restore": True,
             "api_build": "pass",
             "api_tests": test_counts,
             "contract_pack_license_gate": "pass",

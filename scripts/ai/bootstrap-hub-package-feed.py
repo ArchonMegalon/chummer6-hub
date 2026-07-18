@@ -423,16 +423,48 @@ def _inventory_payload(
     }
 
 
+def _expected_feed_entry_names(lock: PackagePlaneLock) -> set[str]:
+    return {
+        INVENTORY_FILE_NAME,
+        *(f"{spec.package_id}.{lock.package_version}.nupkg" for spec in lock.packages),
+    }
+
+
+def _assert_exact_feed_entries(feed: Path, lock: PackagePlaneLock) -> None:
+    expected = _expected_feed_entry_names(lock)
+    observed = {entry.name for entry in feed.iterdir()}
+    if observed != expected:
+        missing = sorted(expected - observed)
+        unexpected = sorted(observed - expected)
+        details: list[str] = []
+        if missing:
+            details.append("missing=" + ",".join(missing))
+        if unexpected:
+            details.append("unexpected=" + ",".join(unexpected))
+        raise PackagePlaneError(
+            "feed must contain the exact locked file set (" + "; ".join(details) + ")"
+        )
+
+
 def validate_feed_inventory(
     feed: Path, lock: PackagePlaneLock, lock_sha256: str
 ) -> str:
+    _assert_exact_feed_entries(feed, lock)
     inventory_path = feed / INVENTORY_FILE_NAME
     try:
         inventory_bytes = inventory_path.read_bytes()
         payload = json.loads(inventory_bytes)
     except (OSError, json.JSONDecodeError) as exc:
         raise PackagePlaneError(f"unable to read package inventory: {exc}") from exc
-    if not isinstance(payload, dict) or payload.get("contract") != INVENTORY_CONTRACT:
+    expected_top_level_keys = {
+        "contract",
+        "package_plane_lock_sha256",
+        "package_version",
+        "packages",
+    }
+    if not isinstance(payload, dict) or set(payload) != expected_top_level_keys:
+        raise PackagePlaneError("package inventory must contain the exact top-level fields")
+    if payload.get("contract") != INVENTORY_CONTRACT:
         raise PackagePlaneError(f"package inventory contract must be {INVENTORY_CONTRACT}")
     if payload.get("package_plane_lock_sha256") != lock_sha256:
         raise PackagePlaneError("package inventory does not bind the exact lock bytes")
@@ -444,6 +476,20 @@ def validate_feed_inventory(
     for spec, row in zip(lock.packages, rows, strict=True):
         if not isinstance(row, dict):
             raise PackagePlaneError(f"invalid inventory row for {spec.package_id}")
+        expected_row_keys = {
+            "id",
+            "version",
+            "repository",
+            "commit",
+            "project",
+            "file_name",
+            "sha256",
+            "size_bytes",
+        }
+        if set(row) != expected_row_keys:
+            raise PackagePlaneError(
+                f"inventory row for {spec.package_id} must contain the exact fields"
+            )
         expected = {
             "id": spec.package_id,
             "version": lock.package_version,

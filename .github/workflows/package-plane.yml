@@ -26,7 +26,10 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test runner
-        run: python3 -m pip install --disable-pip-version-check pytest==9.0.2
+        run: >-
+          python3 -m pip install --disable-pip-version-check --no-input
+          --only-binary=:all: --require-hashes
+          --requirement eng/ci-python-requirements.txt
       - name: Verify source policy
         shell: bash
         run: |

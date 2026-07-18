@@ -11,6 +11,8 @@
     <EnableDefaultRazorGenerateItems Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' == 'true'">false</EnableDefaultRazorGenerateItems>
     <RazorCompileOnBuild Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' == 'true'">false</RazorCompileOnBuild>
     <RazorCompileOnPublish Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' == 'true'">false</RazorCompileOnPublish>
+    <RestorePackagesWithLockFile Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true'">true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true' and '$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' == 'true'">

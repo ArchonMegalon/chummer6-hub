@@ -31,6 +31,15 @@ PACKAGE_PLANE_PROJECTS = (
     "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj",
     "Chummer.Tests/Chummer.Tests.csproj",
 )
+LOCKED_PROJECTS = (
+    "Chummer.Campaign.Contracts",
+    "Chummer.Control.Contracts",
+    "Chummer.Play.Contracts",
+    "Chummer.Run.Contracts",
+    "Chummer.World.Contracts",
+    "Chummer.Run.Api",
+    "Chummer.Run.Api.Tests",
+)
 
 
 def load_module():
@@ -67,6 +76,28 @@ def test_repository_sdk_policy_disables_roll_forward() -> None:
             "rollForward": "disable",
         }
     }
+
+
+def test_package_plane_projects_enforce_content_hash_locks() -> None:
+    for project_name in LOCKED_PROJECTS:
+        project_path = ROOT / project_name / f"{project_name}.csproj"
+        project = ElementTree.fromstring(project_path.read_text(encoding="utf-8-sig"))
+        restore_with_lock = project.find(".//RestorePackagesWithLockFile")
+        restore_locked = project.find(".//RestoreLockedMode")
+        assert restore_with_lock is not None and (restore_with_lock.text or "").strip() == "true"
+        assert restore_locked is not None and (restore_locked.text or "").strip() == "true"
+        assert "ChummerUseLocalCompatibilityTree" in restore_with_lock.get("Condition", "")
+        assert "ChummerUseLocalCompatibilityTree" in restore_locked.get("Condition", "")
+
+        lock = json.loads((ROOT / project_name / "packages.lock.json").read_text(encoding="utf-8"))
+        assert lock["version"] == 1
+        assert isinstance(lock["dependencies"], dict)
+        for dependencies in lock["dependencies"].values():
+            for package_id, metadata in dependencies.items():
+                if metadata.get("type") == "Project":
+                    continue
+                assert metadata.get("resolved"), package_id
+                assert metadata.get("contentHash"), package_id
 
 
 @pytest.mark.parametrize(
@@ -186,6 +217,23 @@ def test_inventory_rejects_metadata_valid_package_byte_replacement(tmp_path: Pat
         json.dumps(inventory, indent=2) + "\n", encoding="utf-8"
     )
     module.validate_feed_inventory(feed, lock, lock_sha)
+
+    unlisted = feed / "Newtonsoft.Json.13.0.3.nupkg"
+    unlisted.write_bytes(b"unlisted package bytes")
+    with pytest.raises(module.PackagePlaneError, match="exact locked file set"):
+        module.validate_feed_inventory(feed, lock, lock_sha)
+    unlisted.unlink()
+
+    inventory["unbound_field"] = "must fail closed"
+    (feed / module.INVENTORY_FILE_NAME).write_text(
+        json.dumps(inventory, indent=2) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(module.PackagePlaneError, match="exact top-level fields"):
+        module.validate_feed_inventory(feed, lock, lock_sha)
+    inventory.pop("unbound_field")
+    (feed / module.INVENTORY_FILE_NAME).write_text(
+        json.dumps(inventory, indent=2) + "\n", encoding="utf-8"
+    )
 
     original_digest = hashlib.sha256(package.read_bytes()).hexdigest()
     _write_fake_engine_package(module, feed, b"metadata-valid-malicious-bytes")

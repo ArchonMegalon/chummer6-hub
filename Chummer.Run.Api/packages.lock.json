@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "Chummer.Engine.Contracts": {
+        "type": "Direct",
+        "requested": "[0.0.0-packageplane.20260718.1, )",
+        "resolved": "0.0.0-packageplane.20260718.1",
+        "contentHash": "MZ3qpuy71zhyGdJAjx2Q5L8Eq4nRKi9S4Dpz0djl99s+AJPNFrjjbBrTN3skyASd7reHHnfuaxl6BcFVz7C9Pw=="
+      },
+      "Chummer.Hub.Registry.Contracts": {
+        "type": "Direct",
+        "requested": "[0.0.0-packageplane.20260718.1, )",
+        "resolved": "0.0.0-packageplane.20260718.1",
+        "contentHash": "a0q/lpHkVYzeG9biDH9IRSBIJBlLnAemm6Z0jOfiu3roxorRG8JhZaMMORZsQAcMsDvibypjJddcuo76nr/L/g=="
+      },
+      "Chummer.Run.Registry": {
+        "type": "Direct",
+        "requested": "[0.0.0-packageplane.20260718.1, )",
+        "resolved": "0.0.0-packageplane.20260718.1",
+        "contentHash": "KtSEvkFwp3FJZQ2ndQaEtVqdAC4bnrX47JwOxJ0mfsQvvUk6KWJWGgMvz4fPacoizPNay6e90xuzoAEgmdPgnQ==",
+        "dependencies": {
+          "Chummer.Hub.Registry.Contracts": "0.0.0-packageplane.20260718.1"
+        }
+      },
+      "Npgsql": {
+        "type": "Direct",
+        "requested": "[10.0.3, )",
+        "resolved": "10.0.3",
+        "contentHash": "7nb5YzXuvWWJxB0J8DiyL3we+X4FOctZrt0fIBnucOIaIevFEEwGQVZKtiu9olXdlNAK1eNgqSral6r/jlhI4w=="
+      },
+      "YamlDotNet": {
+        "type": "Direct",
+        "requested": "[16.3.0, )",
+        "resolved": "16.3.0",
+        "contentHash": "SgMOdxbz8X65z8hraIs6hOEdnkH6hESTAIUa7viEngHOYaH+6q5XJmwr1+yb9vJpNQ19hCQY69xbFsLtXpobQA=="
+      },
+      "chummer.campaign.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Chummer.Engine.Contracts": "[0.0.0-packageplane.20260718.1, )"
+        }
+      },
+      "chummer.control.contracts": {
+        "type": "Project"
+      },
+      "chummer.play.contracts": {
+        "type": "Project"
+      },
+      "chummer.run.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Chummer.Engine.Contracts": "[0.0.0-packageplane.20260718.1, )",
+          "Chummer.Hub.Registry.Contracts": "[0.0.0-packageplane.20260718.1, )",
+          "Chummer.Play.Contracts": "[0.0.0-packageplane.20260718.1, )"
+        }
+      },
+      "chummer.world.contracts": {
+        "type": "Project"
+      }
+    }
+  }
+}

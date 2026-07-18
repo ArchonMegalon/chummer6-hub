@@ -7,7 +7,7 @@
     {
       "id": "Chummer.Engine.Contracts",
       "repository": "https://github.com/ArchonMegalon/chummer6-core.git",
-      "commit": "7560c65ee968a3c9eb650255f236524bf7d65144",
+      "commit": "0b0d20959630f7d92b377a522caf9a11cf4bdb9f",
       "checkout_directory": "chummer-core-engine",
       "project": "Chummer.Contracts/Chummer.Contracts.csproj",
       "license_type": "expression",
@@ -16,7 +16,7 @@
     {
       "id": "Chummer.Hub.Registry.Contracts",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
-      "commit": "5ee349b92e14446c345a46724602a214c7084cd7",
+      "commit": "4a312798a10cb7ae97c77731450e24fe6a74d963",
       "checkout_directory": "chummer-hub-registry",
       "project": "Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj",
       "license_type": "file",
@@ -26,7 +26,7 @@
     {
       "id": "Chummer.Run.Registry",
       "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
-      "commit": "5ee349b92e14446c345a46724602a214c7084cd7",
+      "commit": "4a312798a10cb7ae97c77731450e24fe6a74d963",
       "checkout_directory": "chummer-hub-registry",
       "project": "Chummer.Run.Registry/Chummer.Run.Registry.csproj",
       "license_type": "file",

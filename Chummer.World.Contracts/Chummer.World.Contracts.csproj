@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
+    <RestorePackagesWithLockFile Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true'">true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true' and '$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
     <PackageId>Chummer.World.Contracts</PackageId>
     <PackageVersion Condition="'$(PackageVersion)' == ''">$(ChummerPackagePlaneVersion)</PackageVersion>
     <Title>Chummer World Contracts</Title>
