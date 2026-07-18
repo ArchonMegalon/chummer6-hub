@@ -24,7 +24,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
 
 
-LOCK_CONTRACT = "chummer-hub.package-plane-lock/v1"
+LOCK_CONTRACT = "chummer-hub.package-plane-lock/v2"
 INVENTORY_CONTRACT = "chummer-hub.external-package-inventory/v1"
 INVENTORY_FILE_NAME = "chummer-hub-packages.inventory.json"
 EXPECTED_PACKAGE_IDS = (
@@ -36,6 +36,36 @@ EXPECTED_INTERNAL_DEPENDENCIES = {
     "Chummer.Engine.Contracts": (),
     "Chummer.Hub.Registry.Contracts": (),
     "Chummer.Run.Registry": ("Chummer.Hub.Registry.Contracts",),
+}
+EXPECTED_PACKAGE_AUTHORITIES = {
+    "Chummer.Engine.Contracts": {
+        "repository": "https://github.com/ArchonMegalon/chummer6-core.git",
+        "checkout_directory": "chummer-core-engine",
+        "project": "Chummer.Contracts/Chummer.Contracts.csproj",
+        "license_type": "expression",
+        "license_value": "GPL-3.0-only",
+        "license_sha256": None,
+    },
+    "Chummer.Hub.Registry.Contracts": {
+        "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
+        "checkout_directory": "chummer-hub-registry",
+        "project": "Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj",
+        "license_type": "file",
+        "license_value": "LICENSE",
+        "license_sha256": (
+            "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4"
+        ),
+    },
+    "Chummer.Run.Registry": {
+        "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
+        "checkout_directory": "chummer-hub-registry",
+        "project": "Chummer.Run.Registry/Chummer.Run.Registry.csproj",
+        "license_type": "file",
+        "license_value": "LICENSE",
+        "license_sha256": (
+            "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4"
+        ),
+    },
 }
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -75,13 +105,20 @@ class PackageSpec:
     license_type: str
     license_value: str
     license_sha256: str | None
+    nupkg_sha256: str
+    nupkg_size_bytes: int
 
 
 @dataclass(frozen=True)
 class PackagePlaneLock:
     dotnet_sdk: str
+    dotnet_install_url: str
+    dotnet_install_sha256: str
+    toolchain_sha256: Mapping[str, str]
     package_version: str
     approved_remote_source: str
+    build_recipe_path: str
+    build_recipe_sha256: str
     packages: tuple[PackageSpec, ...]
 
 
@@ -105,17 +142,66 @@ def _safe_relative_path(raw: str, label: str) -> str:
 
 
 def validate_lock_payload(payload: Any) -> PackagePlaneLock:
-    if not isinstance(payload, dict) or payload.get("contract") != LOCK_CONTRACT:
+    expected_top_level = {
+        "contract",
+        "dotnet_sdk",
+        "dotnet_install",
+        "toolchain_sha256",
+        "package_version",
+        "approved_remote_source",
+        "build_recipe",
+        "packages",
+    }
+    if not isinstance(payload, dict) or set(payload) != expected_top_level:
+        raise PackagePlaneError("package-plane lock must contain the exact v2 fields")
+    if payload.get("contract") != LOCK_CONTRACT:
         raise PackagePlaneError(f"package-plane lock contract must be {LOCK_CONTRACT}")
     dotnet_sdk = _required_string(payload, "dotnet_sdk")
     if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", dotnet_sdk) is None:
         raise PackagePlaneError("dotnet_sdk must be an exact three-part version")
+    dotnet_install = payload.get("dotnet_install")
+    if not isinstance(dotnet_install, dict) or set(dotnet_install) != {"url", "sha256"}:
+        raise PackagePlaneError("dotnet_install must contain exact url/sha256 fields")
+    dotnet_install_url = _required_string(dotnet_install, "url")
+    dotnet_install_sha256 = _required_string(dotnet_install, "sha256")
+    if dotnet_install_url != "https://dot.net/v1/dotnet-install.sh":
+        raise PackagePlaneError("dotnet installer URL must be the approved HTTPS endpoint")
+    if SHA256_PATTERN.fullmatch(dotnet_install_sha256) is None:
+        raise PackagePlaneError("dotnet installer SHA256 must be canonical")
+
+    toolchain = payload.get("toolchain_sha256")
+    expected_toolchain_keys = {
+        "dotnet_host",
+        "csc",
+        "msbuild",
+        "nuget_packaging",
+    }
+    if not isinstance(toolchain, dict) or set(toolchain) != expected_toolchain_keys:
+        raise PackagePlaneError("toolchain_sha256 must contain the exact tool set")
+    toolchain_sha256 = {
+        key: _required_string(toolchain, key) for key in sorted(expected_toolchain_keys)
+    }
+    if any(SHA256_PATTERN.fullmatch(value) is None for value in toolchain_sha256.values()):
+        raise PackagePlaneError("toolchain SHA256 values must be canonical")
+
     package_version = _required_string(payload, "package_version")
     if VERSION_PATTERN.fullmatch(package_version) is None:
         raise PackagePlaneError("package_version must be one exact SemVer value")
     approved_remote_source = _required_string(payload, "approved_remote_source")
     if approved_remote_source != "https://api.nuget.org/v3/index.json":
         raise PackagePlaneError("approved_remote_source must be the HTTPS NuGet.org v3 index")
+
+    build_recipe = payload.get("build_recipe")
+    if not isinstance(build_recipe, dict) or set(build_recipe) != {"path", "sha256"}:
+        raise PackagePlaneError("build_recipe must contain exact path/sha256 fields")
+    build_recipe_path = _safe_relative_path(
+        _required_string(build_recipe, "path"), "build_recipe.path"
+    )
+    if build_recipe_path != "scripts/ai/bootstrap-hub-package-feed.py":
+        raise PackagePlaneError("build_recipe.path must name the package bootstrap")
+    build_recipe_sha256 = _required_string(build_recipe, "sha256")
+    if SHA256_PATTERN.fullmatch(build_recipe_sha256) is None:
+        raise PackagePlaneError("build recipe SHA256 must be canonical")
 
     rows = payload.get("packages")
     if not isinstance(rows, list):
@@ -126,6 +212,24 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
         if not isinstance(row, dict):
             raise PackagePlaneError(f"packages[{index}] must be an object")
         package_id = _required_string(row, "id")
+        expected_authority = EXPECTED_PACKAGE_AUTHORITIES.get(package_id)
+        if expected_authority is None:
+            raise PackagePlaneError(f"unapproved package id: {package_id}")
+        expected_row_keys = {
+            "id",
+            "repository",
+            "commit",
+            "checkout_directory",
+            "project",
+            "license_type",
+            "license_value",
+            "nupkg_sha256",
+            "nupkg_size_bytes",
+        }
+        if expected_authority["license_type"] == "file":
+            expected_row_keys.add("license_sha256")
+        if set(row) != expected_row_keys:
+            raise PackagePlaneError(f"packages[{index}] must contain the exact fields")
         repository = _required_string(row, "repository")
         commit = _required_string(row, "commit")
         checkout_directory = _safe_relative_path(
@@ -138,6 +242,8 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
         license_type = _required_string(row, "license_type")
         license_value = _required_string(row, "license_value")
         license_sha256 = row.get("license_sha256")
+        nupkg_sha256 = _required_string(row, "nupkg_sha256")
+        nupkg_size_bytes = row.get("nupkg_size_bytes")
         if not HTTPS_GITHUB_PATTERN.fullmatch(repository):
             raise PackagePlaneError("repository must be an allowlisted HTTPS GitHub URL")
         if not SHA_PATTERN.fullmatch(commit):
@@ -153,6 +259,24 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
                 raise PackagePlaneError("file licenses require an exact SHA256")
         elif license_sha256 is not None:
             raise PackagePlaneError("expression licenses must not declare license_sha256")
+        observed_authority = {
+            "repository": repository,
+            "checkout_directory": checkout_directory,
+            "project": project,
+            "license_type": license_type,
+            "license_value": license_value,
+            "license_sha256": license_sha256,
+        }
+        if observed_authority != expected_authority:
+            raise PackagePlaneError(f"immutable authority mismatch for {package_id}")
+        if SHA256_PATTERN.fullmatch(nupkg_sha256) is None:
+            raise PackagePlaneError(f"invalid nupkg SHA256 for {package_id}")
+        if (
+            not isinstance(nupkg_size_bytes, int)
+            or isinstance(nupkg_size_bytes, bool)
+            or nupkg_size_bytes <= 0
+        ):
+            raise PackagePlaneError(f"invalid nupkg size for {package_id}")
         authority = checkout_authority.setdefault(
             checkout_directory, (repository, commit)
         )
@@ -170,6 +294,8 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
                 license_type,
                 license_value,
                 license_sha256,
+                nupkg_sha256,
+                nupkg_size_bytes,
             )
         )
     ids = tuple(spec.package_id for spec in packages)
@@ -179,7 +305,15 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
             + ", ".join(EXPECTED_PACKAGE_IDS)
         )
     return PackagePlaneLock(
-        dotnet_sdk, package_version, approved_remote_source, tuple(packages)
+        dotnet_sdk,
+        dotnet_install_url,
+        dotnet_install_sha256,
+        toolchain_sha256,
+        package_version,
+        approved_remote_source,
+        build_recipe_path,
+        build_recipe_sha256,
+        tuple(packages),
     )
 
 
@@ -188,6 +322,18 @@ def load_lock(path: Path) -> PackagePlaneLock:
         return validate_lock_payload(json.loads(path.read_text(encoding="utf-8")))
     except (OSError, json.JSONDecodeError) as exc:
         raise PackagePlaneError(f"unable to read package-plane lock {path}: {exc}") from exc
+
+
+def validate_build_recipe(repo_root: Path, lock: PackagePlaneLock) -> None:
+    repo_root = repo_root.resolve()
+    recipe = repo_root / lock.build_recipe_path
+    if (
+        recipe.is_symlink()
+        or not recipe.is_file()
+        or recipe.resolve().parent != (repo_root / "scripts/ai").resolve()
+        or _sha256(recipe) != lock.build_recipe_sha256
+    ):
+        raise PackagePlaneError("package build recipe does not match the authority lock")
 
 
 def _run(
@@ -239,6 +385,9 @@ def isolated_environment(
             "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
             "DOTNET_SKIP_FIRST_TIME_EXPERIENCE": "1",
             "DOTNET_NOLOGO": "1",
+            "DOTNET_MULTILEVEL_LOOKUP": "0",
+            "DOTNET_ROLL_FORWARD": "Disable",
+            "DOTNET_ROLL_FORWARD_TO_PRERELEASE": "0",
             "CI": "true",
             "LANG": "C.UTF-8",
             "LC_ALL": "C.UTF-8",
@@ -251,6 +400,39 @@ def isolated_environment(
         }
     )
     return result
+
+
+def validate_dotnet_toolchain(
+    lock: PackagePlaneLock, dotnet: str, *, env: Mapping[str, str]
+) -> dict[str, str]:
+    executable_name = shutil.which(dotnet, path=env.get("PATH")) or dotnet
+    executable = Path(executable_name).resolve()
+    if not executable.is_file():
+        raise PackagePlaneError(f"dotnet host is not a regular file: {executable}")
+    sdk_rows: list[Path] = []
+    for line in _run((dotnet, "--list-sdks"), env=env).splitlines():
+        version, separator, location = line.partition(" [")
+        if version == lock.dotnet_sdk and separator and location.endswith("]"):
+            sdk_rows.append(Path(location[:-1]) / lock.dotnet_sdk)
+    if len(sdk_rows) != 1:
+        raise PackagePlaneError(
+            f"expected one exact SDK {lock.dotnet_sdk}, observed {len(sdk_rows)}"
+        )
+    sdk_root = sdk_rows[0].resolve()
+    files = {
+        "dotnet_host": executable,
+        "csc": sdk_root / "Roslyn/bincore/csc.dll",
+        "msbuild": sdk_root / "Microsoft.Build.dll",
+        "nuget_packaging": sdk_root / "NuGet.Packaging.dll",
+    }
+    if any(not path.is_file() for path in files.values()):
+        raise PackagePlaneError("exact SDK toolchain files are incomplete")
+    observed = {key: _sha256(path) for key, path in files.items()}
+    if observed != dict(lock.toolchain_sha256):
+        raise PackagePlaneError(
+            "dotnet toolchain bytes do not match the package-plane authority lock"
+        )
+    return observed
 
 
 def validate_checkout(
@@ -357,10 +539,14 @@ def _internal_dependencies(root: ET.Element) -> tuple[tuple[str, str], ...]:
 
 def _package_path(feed: Path, package_id: str, version: str) -> Path:
     expected = f"{package_id}.{version}.nupkg".lower()
+    resolved_feed = feed.resolve()
     matches = [
         candidate
         for candidate in feed.iterdir()
-        if candidate.is_file() and candidate.name.lower() == expected
+        if candidate.is_file()
+        and not candidate.is_symlink()
+        and candidate.resolve().parent == resolved_feed
+        and candidate.name.lower() == expected
     ]
     if len(matches) != 1:
         raise PackagePlaneError(f"feed must contain exactly one {package_id} {version}")
@@ -412,7 +598,29 @@ def _canonical_relationships(spec: PackageSpec, core_properties_path: str) -> by
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
-def canonicalize_package(path: Path, spec: PackageSpec) -> None:
+def _canonical_core_properties(spec: PackageSpec, version: str) -> bytes:
+    core_namespace = (
+        "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+    )
+    dc_namespace = "http://purl.org/dc/elements/1.1/"
+    ET.register_namespace("", core_namespace)
+    ET.register_namespace("dc", dc_namespace)
+    root = ET.Element(f"{{{core_namespace}}}coreProperties")
+    fields = (
+        (f"{{{dc_namespace}}}creator", spec.package_id),
+        (f"{{{dc_namespace}}}description", "Chummer deterministic package-plane artifact"),
+        (f"{{{dc_namespace}}}identifier", spec.package_id),
+        (f"{{{core_namespace}}}version", version),
+        (f"{{{core_namespace}}}keywords", ""),
+        (f"{{{core_namespace}}}lastModifiedBy", "Chummer package plane v2"),
+    )
+    for name, value in fields:
+        ET.SubElement(root, name).text = value
+    ET.indent(root, space="  ")
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def canonicalize_package(path: Path, spec: PackageSpec, version: str) -> None:
     """Rewrite a NuGet package into one byte-stable, platform-neutral ZIP."""
 
     try:
@@ -431,7 +639,8 @@ def canonicalize_package(path: Path, spec: PackageSpec) -> None:
             f"{spec.package_id} must contain one core-properties part and relationships"
         )
     old_core_path = core_paths[0]
-    core_bytes = payloads.pop(old_core_path)
+    payloads.pop(old_core_path)
+    core_bytes = _canonical_core_properties(spec, version)
     core_digest = hashlib.sha256(core_bytes).hexdigest()
     core_path = (
         "package/services/metadata/core-properties/"
@@ -463,7 +672,7 @@ def canonicalize_package(path: Path, spec: PackageSpec) -> None:
 
 
 def _validate_canonical_package(
-    archive: zipfile.ZipFile, names: list[str], spec: PackageSpec
+    archive: zipfile.ZipFile, names: list[str], spec: PackageSpec, version: str
 ) -> None:
     if names != sorted(names) or archive.comment:
         raise PackagePlaneError(f"non-canonical archive layout in {spec.package_id}")
@@ -489,6 +698,8 @@ def _validate_canonical_package(
     )
     if core_path != expected_core_path:
         raise PackagePlaneError(f"core-properties digest path mismatch in {spec.package_id}")
+    if archive.read(core_path) != _canonical_core_properties(spec, version):
+        raise PackagePlaneError(f"non-canonical core properties in {spec.package_id}")
     if archive.read("_rels/.rels") != _canonical_relationships(spec, core_path):
         raise PackagePlaneError(f"non-canonical relationships in {spec.package_id}")
 
@@ -499,7 +710,7 @@ def validate_package(feed: Path, spec: PackageSpec, version: str) -> Path:
         with zipfile.ZipFile(path) as archive:
             names = archive.namelist()
             _validate_payload_names(names, spec)
-            _validate_canonical_package(archive, names, spec)
+            _validate_canonical_package(archive, names, spec, version)
             nuspec_names = [name for name in names if name.lower().endswith(".nuspec")]
             if len(nuspec_names) != 1:
                 raise PackagePlaneError(f"{path.name} must contain exactly one nuspec")
@@ -528,6 +739,8 @@ def validate_package(feed: Path, spec: PackageSpec, version: str) -> Path:
     )
     if _internal_dependencies(root) != expected_dependencies:
         raise PackagePlaneError(f"internal dependency drift in {path.name}")
+    if path.stat().st_size != spec.nupkg_size_bytes or _sha256(path) != spec.nupkg_sha256:
+        raise PackagePlaneError(f"locked package byte authority mismatch in {path.name}")
     return path
 
 
@@ -579,8 +792,19 @@ def _expected_feed_entry_names(lock: PackagePlaneLock) -> set[str]:
 
 
 def _assert_exact_feed_entries(feed: Path, lock: PackagePlaneLock) -> None:
+    if feed.is_symlink() or not feed.is_dir():
+        raise PackagePlaneError("feed must be one regular, non-symlink directory")
+    resolved_feed = feed.resolve()
     expected = _expected_feed_entry_names(lock)
-    observed = {entry.name for entry in feed.iterdir()}
+    entries = list(feed.iterdir())
+    for entry in entries:
+        if (
+            entry.is_symlink()
+            or not entry.is_file()
+            or entry.resolve().parent != resolved_feed
+        ):
+            raise PackagePlaneError("feed entries must be contained regular files")
+    observed = {entry.name for entry in entries}
     if observed != expected:
         missing = sorted(expected - observed)
         unexpected = sorted(observed - expected)
@@ -686,6 +910,7 @@ def build_feed(
             raise PackagePlaneError(
                 f"dotnet SDK mismatch: expected {lock.dotnet_sdk}, observed {observed_sdk}"
             )
+        validate_dotnet_toolchain(lock, dotnet, env=env)
         nuget_config = root / "NuGet.Config"
         nuget_config.write_text(
             "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
@@ -745,6 +970,7 @@ def build_feed(
             canonicalize_package(
                 staged_feed / f"{spec.package_id}.{lock.package_version}.nupkg",
                 spec,
+                lock.package_version,
             )
             validate_checkout(checkout, spec, env=env)
             validate_package(staged_feed, spec, lock.package_version)
@@ -770,6 +996,7 @@ def main() -> int:
     repo_root = args.repo_root.resolve()
     lock_path = (args.lock or repo_root / "eng/package-plane.lock.json").resolve()
     lock = load_lock(lock_path)
+    validate_build_recipe(repo_root, lock)
     lock_sha256 = _sha256(lock_path)
     if args.print_version:
         print(lock.package_version)

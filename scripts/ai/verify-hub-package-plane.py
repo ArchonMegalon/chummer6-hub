@@ -77,7 +77,9 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _audit_dotnet_toolchain(dotnet: str, sdk_version: str) -> dict[str, str]:
+def _audit_dotnet_toolchain(
+    dotnet: str, sdk_version: str, expected: Mapping[str, str]
+) -> dict[str, str]:
     executable = Path(shutil.which(dotnet) or dotnet).resolve()
     if not executable.is_file():
         raise VerificationError(f"dotnet host is not a regular file: {executable}")
@@ -92,14 +94,16 @@ def _audit_dotnet_toolchain(dotnet: str, sdk_version: str) -> dict[str, str]:
         )
     sdk_root = sdk_rows[0].resolve()
     files = {
-        "dotnet_host_sha256": executable,
-        "csc_sha256": sdk_root / "Roslyn/bincore/csc.dll",
-        "msbuild_sha256": sdk_root / "Microsoft.Build.dll",
-        "nuget_packaging_sha256": sdk_root / "NuGet.Packaging.dll",
+        "dotnet_host": executable,
+        "csc": sdk_root / "Roslyn/bincore/csc.dll",
+        "msbuild": sdk_root / "Microsoft.Build.dll",
+        "nuget_packaging": sdk_root / "NuGet.Packaging.dll",
     }
     if any(not path.is_file() for path in files.values()):
         raise VerificationError("exact SDK toolchain files are incomplete")
     result = {key: _sha256(path) for key, path in files.items()}
+    if result != dict(expected):
+        raise VerificationError("dotnet toolchain differs from the authority lock")
     print("dotnet-toolchain: " + json.dumps(result, sort_keys=True))
     _run((dotnet, "--info"))
     return result
@@ -310,8 +314,11 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
     bootstrap = _load_bootstrap(repo_root)
     lock_path = repo_root / "eng/package-plane.lock.json"
     lock = bootstrap.load_lock(lock_path)
+    bootstrap.validate_build_recipe(repo_root, lock)
     lock_sha = _sha256(lock_path)
-    toolchain = _audit_dotnet_toolchain(dotnet, lock.dotnet_sdk)
+    toolchain = _audit_dotnet_toolchain(
+        dotnet, lock.dotnet_sdk, lock.toolchain_sha256
+    )
     with tempfile.TemporaryDirectory(prefix="chummer-hub-no-siblings-") as temporary:
         root = Path(temporary)
         feed = root / "feed"

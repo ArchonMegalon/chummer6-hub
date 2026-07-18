@@ -1,8 +1,22 @@
 {
-  "contract": "chummer-hub.package-plane-lock/v1",
+  "contract": "chummer-hub.package-plane-lock/v2",
   "dotnet_sdk": "10.0.103",
-  "package_version": "0.0.0-packageplane.20260718.1",
+  "dotnet_install": {
+    "url": "https://dot.net/v1/dotnet-install.sh",
+    "sha256": "082f7685e156738a1b2e2ed8381a621870d4ce8e8c59278034556f05c186eb2e"
+  },
+  "toolchain_sha256": {
+    "dotnet_host": "bff05e5f15646f8b7bb72d1ba8ea1d60db348f17f848962f49840b58276f6c6d",
+    "csc": "9a4237515874153817a8bf4a9c889cafed5148e2d77b04f5dd925c903d3161dc",
+    "msbuild": "cc96c3846ae171984d29ba572ef6f22d273c675cd745c59dc7225fd5cd69610b",
+    "nuget_packaging": "980fd0205cf99d02e52664ea82c678dcd32232b59d96e277b774d4743e7496b1"
+  },
+  "package_version": "0.0.0-packageplane.20260718.2",
   "approved_remote_source": "https://api.nuget.org/v3/index.json",
+  "build_recipe": {
+    "path": "scripts/ai/bootstrap-hub-package-feed.py",
+    "sha256": "b7529f90da464a2a3c4a141e6284ec55a6a33e9e9fe983630cf1302acba2583d"
+  },
   "packages": [
     {
       "id": "Chummer.Engine.Contracts",
@@ -11,7 +25,9 @@
       "checkout_directory": "chummer-core-engine",
       "project": "Chummer.Contracts/Chummer.Contracts.csproj",
       "license_type": "expression",
-      "license_value": "GPL-3.0-only"
+      "license_value": "GPL-3.0-only",
+      "nupkg_sha256": "b2a4f85df82d5d6aa5390aed641b8829681f20ffb30520382f1b24536ea93181",
+      "nupkg_size_bytes": 1389220
     },
     {
       "id": "Chummer.Hub.Registry.Contracts",
@@ -21,7 +37,9 @@
       "project": "Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
-      "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4"
+      "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
+      "nupkg_sha256": "59fb7cae20edcdc6a0d9a6f20e0c8bd1039c74ae3c8b6bf544eebb3425e5d7ea",
+      "nupkg_size_bytes": 524302
     },
     {
       "id": "Chummer.Run.Registry",
@@ -31,7 +49,9 @@
       "project": "Chummer.Run.Registry/Chummer.Run.Registry.csproj",
       "license_type": "file",
       "license_value": "LICENSE",
-      "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4"
+      "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4",
+      "nupkg_sha256": "dd90e207ba1cc430900c4d21c3ccee3d00c346a8521156429e0862392c8e9322",
+      "nupkg_size_bytes": 331942
     }
   ]
 }

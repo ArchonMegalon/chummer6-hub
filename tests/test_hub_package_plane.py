@@ -8,6 +8,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ElementTree
 import zipfile
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -16,7 +17,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
-PACKAGE_VERSION = "0.0.0-packageplane.20260718.1"
+PACKAGE_VERSION = "0.0.0-packageplane.20260718.2"
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
     "Chummer.Control.Contracts/Chummer.Control.Contracts.csproj",
@@ -65,7 +66,32 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
         "Chummer.Run.Registry",
     ]
     assert all(len(spec.commit) == 40 for spec in lock.packages)
-    assert all(spec.repository.startswith("https://github.com/ArchonMegalon/") for spec in lock.packages)
+    assert all(spec.nupkg_sha256 and spec.nupkg_size_bytes > 0 for spec in lock.packages)
+    assert lock.dotnet_install_url == "https://dot.net/v1/dotnet-install.sh"
+    assert len(lock.dotnet_install_sha256) == 64
+
+
+def test_lock_rejects_unknown_fields_or_authority_substitution() -> None:
+    module = load_module()
+    payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+    payload["unbound"] = True
+    with pytest.raises(module.PackagePlaneError, match="exact v2 fields"):
+        module.validate_lock_payload(payload)
+
+    payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+    payload["packages"][0]["unbound"] = True
+    with pytest.raises(module.PackagePlaneError, match="exact fields"):
+        module.validate_lock_payload(payload)
+
+    for key, value in (
+        ("repository", "https://github.com/ArchonMegalon/chummer6-ui.git"),
+        ("project", "Chummer.Avalonia/Chummer.Avalonia.csproj"),
+        ("license_value", "MIT"),
+    ):
+        payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+        payload["packages"][0][key] = value
+        with pytest.raises(module.PackagePlaneError, match="immutable authority mismatch"):
+            module.validate_lock_payload(payload)
 
 
 def test_repository_sdk_policy_disables_roll_forward() -> None:
@@ -179,6 +205,8 @@ def test_exact_head_checkout_validator_rejects_dirty_tree(tmp_path: Path) -> Non
         "expression",
         "GPL-3.0-only",
         None,
+        "0" * 64,
+        1,
     )
     tracked.write_text("dirty\n", encoding="utf-8")
     with pytest.raises(module.PackagePlaneError, match="exact-HEAD checkout is dirty"):
@@ -219,6 +247,8 @@ def _write_fake_engine_package(module, feed: Path, assembly: bytes) -> tuple[obj
         "expression",
         "GPL-3.0-only",
         None,
+        "0" * 64,
+        1,
     )
     nuspec = f"""<?xml version="1.0"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
@@ -243,7 +273,12 @@ def _write_fake_engine_package(module, feed: Path, assembly: bytes) -> tuple[obj
         archive.writestr(f"{package_id}.nuspec", nuspec)
         archive.writestr(f"lib/net10.0/{package_id}.dll", assembly)
         archive.writestr(core_name, core_properties)
-    module.canonicalize_package(path, spec)
+    module.canonicalize_package(path, spec, version)
+    spec = replace(
+        spec,
+        nupkg_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        nupkg_size_bytes=path.stat().st_size,
+    )
     return spec, nuspec
 
 
@@ -265,7 +300,8 @@ def test_inventory_rejects_metadata_valid_package_byte_replacement(tmp_path: Pat
     feed = tmp_path / "feed"
     feed.mkdir()
     spec, _ = _write_fake_engine_package(module, feed, b"trusted")
-    lock = module.PackagePlaneLock("10.0.103", PACKAGE_VERSION, "https://api.nuget.org/v3/index.json", (spec,))
+    authority = module.load_lock(LOCK_PATH)
+    lock = replace(authority, packages=(spec,))
     lock_sha = "2" * 64
     package = module.validate_package(feed, spec, PACKAGE_VERSION)
     inventory = module._inventory_payload(lock, feed, lock_sha)
@@ -294,9 +330,45 @@ def test_inventory_rejects_metadata_valid_package_byte_replacement(tmp_path: Pat
     original_digest = hashlib.sha256(package.read_bytes()).hexdigest()
     _write_fake_engine_package(module, feed, b"metadata-valid-malicious-bytes")
     assert hashlib.sha256(package.read_bytes()).hexdigest() != original_digest
-    module.validate_package(feed, spec, PACKAGE_VERSION)
-    with pytest.raises(module.PackagePlaneError, match="package byte binding mismatch"):
+    with pytest.raises(module.PackagePlaneError, match="locked package byte authority mismatch"):
+        module.validate_package(feed, spec, PACKAGE_VERSION)
+    with pytest.raises(module.PackagePlaneError, match="locked package byte authority mismatch"):
         module.validate_feed_inventory(feed, lock, lock_sha)
+
+
+def test_feed_validation_rejects_external_symlink_handoffs(tmp_path: Path) -> None:
+    module = load_module()
+    feed = tmp_path / "authority"
+    feed.mkdir()
+    spec, _ = _write_fake_engine_package(module, feed, b"trusted")
+    authority = module.load_lock(LOCK_PATH)
+    lock = replace(authority, packages=(spec,))
+    lock_sha = "2" * 64
+    inventory = module._inventory_payload(lock, feed, lock_sha)
+    (feed / module.INVENTORY_FILE_NAME).write_text(
+        json.dumps(inventory, indent=2) + "\n", encoding="utf-8"
+    )
+
+    linked_feed = tmp_path / "linked-feed"
+    linked_feed.mkdir()
+    for entry in feed.iterdir():
+        (linked_feed / entry.name).symlink_to(entry)
+    with pytest.raises(module.PackagePlaneError, match="contained regular files"):
+        module.validate_feed_inventory(linked_feed, lock, lock_sha)
+
+    feed_alias = tmp_path / "feed-alias"
+    feed_alias.symlink_to(feed, target_is_directory=True)
+    with pytest.raises(module.PackagePlaneError, match="non-symlink directory"):
+        module.validate_feed_inventory(feed_alias, lock, lock_sha)
+
+
+def test_pr_ci_installs_digest_locked_private_sdk() -> None:
+    workflow = (ROOT / ".github/workflows/package-plane.yml").read_text(encoding="utf-8")
+    lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+    assert "actions/setup-dotnet" not in workflow
+    assert lock["dotnet_install"]["url"] in workflow
+    assert lock["dotnet_install"]["sha256"] in workflow
+    assert "${RUNNER_TEMP}/chummer-hub-dotnet" in workflow
 
 
 def test_build_feed_rejects_any_existing_destination(tmp_path: Path) -> None:

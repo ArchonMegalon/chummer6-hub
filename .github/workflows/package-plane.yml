@@ -17,10 +17,22 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           persist-credentials: false
-      - name: Set up .NET 10
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
-        with:
-          dotnet-version: 10.0.103
+      - name: Install the digest-locked private .NET SDK
+        shell: bash
+        run: |
+          hub_dotnet_script="${RUNNER_TEMP}/chummer-hub-dotnet-install.sh"
+          hub_dotnet_root="${RUNNER_TEMP}/chummer-hub-dotnet"
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            https://dot.net/v1/dotnet-install.sh --output "${hub_dotnet_script}"
+          echo "082f7685e156738a1b2e2ed8381a621870d4ce8e8c59278034556f05c186eb2e  ${hub_dotnet_script}" \
+            | sha256sum --check --strict
+          bash "${hub_dotnet_script}" \
+            --version 10.0.103 \
+            --install-dir "${hub_dotnet_root}" \
+            --no-path
+          echo "${hub_dotnet_root}" >> "${GITHUB_PATH}"
+          echo "DOTNET_ROOT=${hub_dotnet_root}" >> "${GITHUB_ENV}"
+          "${hub_dotnet_root}/dotnet" --info
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
