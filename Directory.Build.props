@@ -3,6 +3,10 @@
     <RestorePackagesPath Condition="'$(RestorePackagesPath)' == ''">$(MSBuildThisFileDirectory).tmp/nuget/packages</RestorePackagesPath>
     <ChummerWorkspaceRoot Condition="'$(ChummerWorkspaceRoot)' == '' and '$(CHUMMER_WORKSPACE_ROOT)' != ''">$(CHUMMER_WORKSPACE_ROOT)</ChummerWorkspaceRoot>
     <ChummerWorkspaceRoot Condition="'$(ChummerWorkspaceRoot)' == ''">$(MSBuildThisFileDirectory)..</ChummerWorkspaceRoot>
+    <ChummerUseLocalCompatibilityTree Condition="'$(ChummerUseLocalCompatibilityTree)' == ''">false</ChummerUseLocalCompatibilityTree>
+    <ChummerPackagePlaneVersion Condition="'$(ChummerPackagePlaneVersion)' == ''">0.0.0-packageplane.20260718.1</ChummerPackagePlaneVersion>
+    <ChummerPackageFeed Condition="'$(ChummerPackageFeed)' == '' and '$(CHUMMER_PACKAGE_FEED)' != ''">$(CHUMMER_PACKAGE_FEED)</ChummerPackageFeed>
+    <RestoreAdditionalProjectSources Condition="'$(ChummerPackageFeed)' != ''">$(ChummerPackageFeed);$(RestoreAdditionalProjectSources)</RestoreAdditionalProjectSources>
     <ChummerCoreEngineRoot Condition="'$(ChummerCoreEngineRoot)' == ''">$(ChummerWorkspaceRoot)/chummer-core-engine</ChummerCoreEngineRoot>
     <ChummerHubRegistryRoot Condition="'$(ChummerHubRegistryRoot)' == ''">$(ChummerWorkspaceRoot)/chummer-hub-registry</ChummerHubRegistryRoot>
     <ChummerFleetRoot Condition="'$(ChummerFleetRoot)' == '' and '$(CHUMMER_FLEET_ROOT)' != ''">$(CHUMMER_FLEET_ROOT)</ChummerFleetRoot>

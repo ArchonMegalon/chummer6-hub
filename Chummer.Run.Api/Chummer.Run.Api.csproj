@@ -13,12 +13,23 @@
     <RazorCompileOnPublish Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' == 'true'">false</RazorCompileOnPublish>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' != 'true'">
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' == 'true'">
     <ProjectReference Include="..\..\chummer-core-engine\Chummer.Contracts\Chummer.Contracts.csproj" />
     <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
     <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Run.Registry\Chummer.Run.Registry.csproj">
       <ExcludeAssets>contentFiles</ExcludeAssets>
     </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' != 'true'">
+    <PackageReference Include="Chummer.Engine.Contracts" Version="$(ChummerPackagePlaneVersion)" />
+    <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerPackagePlaneVersion)" />
+    <PackageReference Include="Chummer.Run.Registry" Version="$(ChummerPackagePlaneVersion)">
+      <ExcludeAssets>contentFiles</ExcludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' != 'true'">
     <ProjectReference Include="..\Chummer.Campaign.Contracts\Chummer.Campaign.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Control.Contracts\Chummer.Control.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />

@@ -4,10 +4,21 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
     <PackageId>Chummer.Control.Contracts</PackageId>
+    <PackageVersion Condition="'$(PackageVersion)' == ''">$(ChummerPackagePlaneVersion)</PackageVersion>
     <Title>Chummer Control Contracts</Title>
     <Description>Hosted support, crash, feedback, and product-control DTO surface for Chummer.</Description>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/ArchonMegalon/chummer6-hub.git</RepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../LICENSE" Pack="true" PackagePath="" />
+  </ItemGroup>
 
 </Project>

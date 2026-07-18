@@ -28,8 +28,16 @@
     <ProjectReference Include="..\Chummer.Control.Contracts\Chummer.Control.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Play.Contracts\Chummer.Play.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />
-    <ProjectReference Include="$(ChummerHubRegistryRoot)\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
-    <ProjectReference Include="$(ChummerHubRegistryRoot)\Chummer.Run.Registry\Chummer.Run.Registry.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ChummerUseLocalCompatibilityTree)' == 'true'">
+    <ProjectReference Include="$(ChummerHubRegistryRoot)/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj" />
+    <ProjectReference Include="$(ChummerHubRegistryRoot)/Chummer.Run.Registry/Chummer.Run.Registry.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true'">
+    <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerPackagePlaneVersion)" />
+    <PackageReference Include="Chummer.Run.Registry" Version="$(ChummerPackagePlaneVersion)" />
   </ItemGroup>
 
   <ItemGroup>

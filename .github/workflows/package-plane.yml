@@ -1,0 +1,48 @@
+name: Hub package plane
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  no-siblings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.103
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python3 -m pip install --disable-pip-version-check pytest==9.0.2
+      - name: Verify source policy
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          python3 -m pytest -q tests/test_hub_package_plane.py
+      - name: Build and test without siblings
+        shell: bash
+        run: >-
+          python3 scripts/ai/verify-hub-package-plane.py
+          --repo-root .
+          --receipt "${RUNNER_TEMP}/HUB_NO_SIBLINGS_PACKAGE_PLANE.generated.json"
+      - name: Upload immutable package-plane receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hub-no-siblings-package-plane-${{ github.sha }}
+          path: ${{ runner.temp }}/HUB_NO_SIBLINGS_PACKAGE_PLANE.generated.json
+          if-no-files-found: error
+          retention-days: 30

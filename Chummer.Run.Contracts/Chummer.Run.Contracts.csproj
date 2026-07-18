@@ -6,21 +6,37 @@
     <Nullable>enable</Nullable>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
+    <PreferBundledChummerMediaContracts Condition="'$(PreferBundledChummerMediaContracts)' == '' and '$(ChummerUseLocalCompatibilityTree)' != 'true'">true</PreferBundledChummerMediaContracts>
     <PreferBundledChummerMediaContracts Condition="'$(PreferBundledChummerMediaContracts)' == ''">false</PreferBundledChummerMediaContracts>
-    <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(ChummerMediaFactoryRoot)/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(ChummerMediaFactoryRoot)/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
-    <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
-    <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
+    <ChummerMediaContractsProject Condition="'$(ChummerUseLocalCompatibilityTree)' == 'true' and '$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(ChummerMediaFactoryRoot)/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(ChummerMediaFactoryRoot)/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
+    <ChummerMediaContractsProject Condition="'$(ChummerUseLocalCompatibilityTree)' == 'true' and '$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
+    <ChummerMediaContractsProject Condition="'$(ChummerUseLocalCompatibilityTree)' == 'true' and '$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
     <ChummerMediaContractsAssembly Condition="'$(ChummerMediaContractsAssembly)' == '' and Exists('$(MSBuildThisFileDirectory)../compat/Chummer.Media.Contracts.dll')">$(MSBuildThisFileDirectory)../compat/Chummer.Media.Contracts.dll</ChummerMediaContractsAssembly>
+    <PackageId>Chummer.Run.Contracts</PackageId>
+    <PackageVersion Condition="'$(PackageVersion)' == ''">$(ChummerPackagePlaneVersion)</PackageVersion>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/ArchonMegalon/chummer6-hub.git</RepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
 
+  <ItemGroup Condition="'$(ChummerUseLocalCompatibilityTree)' == 'true'">
+    <ProjectReference Include="$(ChummerCoreEngineRoot)/Chummer.Contracts/Chummer.Contracts.csproj" />
+    <ProjectReference Include="$(ChummerHubRegistryRoot)/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true'">
+    <PackageReference Include="Chummer.Engine.Contracts" Version="$(ChummerPackagePlaneVersion)" />
+    <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerPackagePlaneVersion)" />
+  </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="$(MSBuildProjectDirectory)/../../chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj" />
-    <ProjectReference Include="$(ChummerHubRegistryRoot)\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Play.Contracts\Chummer.Play.Contracts.csproj" />
     <ProjectReference Include="$(ChummerMediaContractsProject)" Condition="'$(ChummerMediaContractsProject)' != ''" />
     <Reference Include="Chummer.Media.Contracts" Condition="'$(ChummerMediaContractsProject)' == '' and '$(ChummerMediaContractsAssembly)' != ''">
       <HintPath>$(ChummerMediaContractsAssembly)</HintPath>
       <Private>true</Private>
     </Reference>
+    <None Include="../LICENSE" Pack="true" PackagePath="" />
   </ItemGroup>
 </Project>

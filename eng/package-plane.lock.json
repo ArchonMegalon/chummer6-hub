@@ -1,0 +1,37 @@
+{
+  "contract": "chummer-hub.package-plane-lock/v1",
+  "dotnet_sdk": "10.0.103",
+  "package_version": "0.0.0-packageplane.20260718.1",
+  "approved_remote_source": "https://api.nuget.org/v3/index.json",
+  "packages": [
+    {
+      "id": "Chummer.Engine.Contracts",
+      "repository": "https://github.com/ArchonMegalon/chummer6-core.git",
+      "commit": "7560c65ee968a3c9eb650255f236524bf7d65144",
+      "checkout_directory": "chummer-core-engine",
+      "project": "Chummer.Contracts/Chummer.Contracts.csproj",
+      "license_type": "expression",
+      "license_value": "GPL-3.0-only"
+    },
+    {
+      "id": "Chummer.Hub.Registry.Contracts",
+      "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
+      "commit": "5ee349b92e14446c345a46724602a214c7084cd7",
+      "checkout_directory": "chummer-hub-registry",
+      "project": "Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj",
+      "license_type": "file",
+      "license_value": "LICENSE",
+      "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4"
+    },
+    {
+      "id": "Chummer.Run.Registry",
+      "repository": "https://github.com/ArchonMegalon/chummer6-hub-registry.git",
+      "commit": "5ee349b92e14446c345a46724602a214c7084cd7",
+      "checkout_directory": "chummer-hub-registry",
+      "project": "Chummer.Run.Registry/Chummer.Run.Registry.csproj",
+      "license_type": "file",
+      "license_value": "LICENSE",
+      "license_sha256": "2ecaed15e0f77335d19138e3a98b82779714a4483c45d356a75053f9d33de0e4"
+    }
+  ]
+}
