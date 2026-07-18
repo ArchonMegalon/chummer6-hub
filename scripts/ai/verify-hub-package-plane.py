@@ -302,6 +302,17 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
         inventory_path = feed / INVENTORY_NAME
         inventory_sha = bootstrap.validate_feed_inventory(feed, lock, lock_sha)
         inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+        for row in inventory["packages"]:
+            package_path = feed / row["file_name"]
+            with zipfile.ZipFile(package_path) as archive:
+                member_digests = ",".join(
+                    f"{name}={hashlib.sha256(archive.read(name)).hexdigest()}"
+                    for name in archive.namelist()
+                )
+            print(
+                f"external-package: {row['id']} sha256={row['sha256']} "
+                f"members={member_digests}"
+            )
 
         _run(("git", "clone", "--quiet", "--no-hardlinks", "--no-checkout", str(repo_root), str(consumer)))
         _run(("git", "checkout", "--quiet", "--detach", commit), cwd=consumer)
