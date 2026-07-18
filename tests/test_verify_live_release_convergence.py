@@ -209,3 +209,11 @@ def test_committed_generation_routes_are_independent_of_current() -> None:
     )
     with pytest.raises(module.ConvergenceError, match="traversal-safe"):
         module.generation_routes("../current")
+
+
+def test_default_routes_cover_help_and_release_concierges() -> None:
+    module = load_module()
+
+    assert "/help" in module.DEFAULT_ROUTES
+    assert "/downloads/concierge" in module.DEFAULT_ROUTES
+    assert "/now/concierge" in module.DEFAULT_ROUTES

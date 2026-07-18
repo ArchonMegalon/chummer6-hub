@@ -7932,14 +7932,20 @@ document.addEventListener('DOMContentLoaded', function () {
     {
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Help", "Help for installs, accounts, and bugs.", "/help", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseTruth = ResolveReleaseTruthProjection();
+        var releaseTruthGate = BuildReleaseTruthPresentationGate(manifest, releaseTruth);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        var signedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
         return View(
             "~/Views/PublicLanding/TrustPage.cshtml",
             _trustContent.BuildHelpPage(chrome) with
             {
                 PrivacyBoundary = _privacyBoundaries.BuildPanel("help"),
-                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
-                SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken)
+                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience, releaseTruth: releaseTruth),
+                SignedInStatus = RebindSignedInTrustStatusToReleaseTruth(
+                    signedInStatus,
+                    releaseTruth,
+                    releaseTruthGate)
             });
     }
 
@@ -12395,7 +12401,8 @@ Boundary:
     private PublicTrustPulsePanelViewModel? BuildPublicTrustPulsePanel(
         PublicReleaseManifestDto manifest,
         ReleaseExperienceViewModel releaseExperience,
-        PublicTrustPulseSnapshot? pulse = null)
+        PublicTrustPulseSnapshot? pulse = null,
+        PublicReleaseTruthProjectionDto? releaseTruth = null)
     {
         pulse ??= _trustPulse.LoadSnapshot();
         if (pulse is null)
@@ -12403,12 +12410,13 @@ Boundary:
             return null;
         }
 
+        PublicReleaseTruthProjectionDto canonicalReleaseTruth = releaseTruth ?? ResolveReleaseTruthProjection();
         ReleaseTruthPresentationGate releaseTruthGate = BuildReleaseTruthPresentationGate(
             manifest,
-            ResolveReleaseTruthProjection());
+            canonicalReleaseTruth);
         if (releaseTruthGate.ReviewRequired)
         {
-            return BuildReleaseTruthGatedPulsePanel(manifest, releaseTruthGate);
+            return BuildReleaseTruthGatedPulsePanel(manifest, releaseTruthGate, canonicalReleaseTruth);
         }
 
         List<string> microProof =
@@ -12552,14 +12560,18 @@ Boundary:
 
     internal static PublicTrustPulsePanelViewModel BuildReleaseTruthGatedPulsePanel(
         PublicReleaseManifestDto manifest,
-        ReleaseTruthPresentationGate gate)
+        ReleaseTruthPresentationGate gate,
+        PublicReleaseTruthProjectionDto? releaseTruth = null)
     {
-        string installerSummary = manifest.Downloads.Count switch
+        int artifactCount = releaseTruth?.ArtifactCount ?? manifest.Downloads.Count;
+        string installerSummary = artifactCount switch
         {
-            <= 0 => "No current installer is published on the release shelf.",
-            1 => "1 current installer remains listed while release proof is refreshed.",
-            _ => $"{manifest.Downloads.Count} current installers remain listed while release proof is refreshed."
+            <= 0 => "No authority-bound installer availability is published right now.",
+            1 => "1 authority-listed installer remains visible while release proof is refreshed; availability is not asserted.",
+            _ => $"{artifactCount} authority-listed installers remain visible while release proof is refreshed; availability is not asserted."
         };
+        string releaseVersion = releaseTruth?.ReleaseVersion ?? manifest.Version;
+        string supportabilityState = releaseTruth?.SupportabilityState ?? manifest.SupportabilityState ?? string.Empty;
         string freshnessLabel = string.IsNullOrWhiteSpace(gate.ProofFreshnessStatus)
             ? "Proof freshness · not published"
             : $"Proof freshness · {HumanizeToken(gate.ProofFreshnessStatus, "under review")}";
@@ -12578,9 +12590,9 @@ Boundary:
             Summary: gate.Summary,
             MicroProof:
             [
-                $"Build · {manifest.Version}",
+                $"Build · {releaseVersion}",
                 freshnessLabel,
-                $"Supportability · {HumanizeToken(manifest.SupportabilityState, "review required")}"
+                $"Supportability · {HumanizeToken(supportabilityState, "review required")}"
             ],
             TrendSamples: Array.Empty<PublicTrustPulseTrendPointViewModel>(),
             Rows: rows,
@@ -12589,6 +12601,57 @@ Boundary:
             MissingDesktopClientCoverage: false,
             ParityClaimsReviewRequired: true,
             RouteGuardSummary: gate.Summary);
+    }
+
+    internal static SignedInTrustStatusPanelViewModel? RebindSignedInTrustStatusToReleaseTruth(
+        SignedInTrustStatusPanelViewModel? panel,
+        PublicReleaseTruthProjectionDto releaseTruth,
+        ReleaseTruthPresentationGate gate)
+    {
+        if (panel is null || (!gate.ReviewRequired && releaseTruth.AvailabilityClaimsAllowed))
+        {
+            return panel;
+        }
+
+        string installerSummary = releaseTruth.ArtifactCount switch
+        {
+            <= 0 => "No authority-bound installer availability is published right now.",
+            1 => "1 installer remains listed under immutable authority review; availability is not asserted.",
+            _ => $"{releaseTruth.ArtifactCount} installers remain listed under immutable authority review; availability is not asserted."
+        };
+        string decisionSummary =
+            $"Immutable release decision · {HumanizeToken(releaseTruth.ReleaseDecisionStatus, "review required")}.";
+        IReadOnlyList<SignedInTrustStatusRowViewModel> rows = panel.Rows
+            .Select(row => row.Label switch
+            {
+                "Who can get it now" => row with { Value = installerSummary },
+                "Recommended for this install" => row with
+                {
+                    Value = "No authority-bound installer recommendation is published while the release decision requires review."
+                },
+                "Install status" => row with
+                {
+                    Value = "The linked install record remains visible, but public-release eligibility is under review."
+                },
+                "Fix availability" => row with
+                {
+                    Value = "No authority-bound fix availability is asserted while the release decision requires review."
+                },
+                "Current caution" => row with { Value = gate.Summary },
+                "Release checks" => row with { Value = decisionSummary },
+                _ => row
+            })
+            .ToArray();
+
+        return panel with
+        {
+            Heading = "Release review required for this linked install",
+            Summary =
+                $"This linked install remains attached, but installer availability and fix-ready claims are withheld. {decisionSummary}",
+            Rows = rows,
+            PrimaryAction = new TrustPageActionViewModel("Open downloads with review status", "/downloads", "secondary"),
+            SecondaryAction = new TrustPageActionViewModel("Open support timeline", "/account/support", "ghost")
+        };
     }
 
     private async Task<SignedInTrustStatusPanelViewModel?> BuildSignedInTrustStatusPanelAsync(

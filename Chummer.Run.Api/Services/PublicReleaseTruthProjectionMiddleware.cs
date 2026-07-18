@@ -68,7 +68,8 @@ public sealed class PublicReleaseTruthProjectionMiddleware
     public static bool IsReleaseFacingRoute(PathString path)
     {
         string value = path.Value ?? string.Empty;
-        if (value is "/" or "/now" or "/changelog" or "/downloads" or "/status" or "/artifacts" or "/progress")
+        if (value is "/" or "/now" or "/changelog" or "/downloads" or "/status" or "/artifacts" or "/progress"
+            or "/help" or "/downloads/concierge" or "/now/concierge")
         {
             return true;
         }
