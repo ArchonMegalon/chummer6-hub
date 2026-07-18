@@ -60,23 +60,27 @@ def test_scan_does_not_treat_public_home_routes_as_host_paths(tmp_path: Path) ->
 
 def test_scan_recurses_and_redacts_macos_and_windows_user_homes(tmp_path: Path) -> None:
     module = load_module()
-    write_json(tmp_path / "startup-smoke" / "mac.json", {"binary": "/Users/alice/build/Chummer"})
-    write_json(tmp_path / "portal" / "windows.json", {"binary": r"C:\Users\Bob\build\Chummer.exe"})
+    write_json(tmp_path / "startup-smoke" / "mac.json", {"binary": "/Users/Ålice User/build/Chummer"})
+    write_json(tmp_path / "portal" / "windows.json", {"binary": r"C:\Users\Bob Builder\build\Chummer.exe"})
+    write_json(tmp_path / "portal" / "linux.json", {"binary": "/home/José Runner/build/Chummer"})
 
     scan = module.scan_published_receipts([tmp_path])
 
-    assert scan["scanned_artifact_count"] == 2
+    assert scan["scanned_artifact_count"] == 3
     assert scan["machine_specific_hits"] == [
+        "scan-root-1/portal/linux.json",
         "scan-root-1/portal/windows.json",
         "scan-root-1/startup-smoke/mac.json",
     ]
     assert {detail["category"] for detail in scan["machine_specific_hit_details"]} == {
+        "linux_user_home",
         "macos_user_home",
         "windows_user_home",
     }
     serialized = json.dumps(scan)
-    assert "alice" not in serialized
-    assert "Bob" not in serialized
+    assert "Ålice User" not in serialized
+    assert "Bob Builder" not in serialized
+    assert "José Runner" not in serialized
     assert str(tmp_path) not in serialized
 
 

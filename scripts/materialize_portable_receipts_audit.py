@@ -24,14 +24,14 @@ MACHINE_SPECIFIC_PATH_PATTERNS = {
     # also valid public application routes in Chummer and are not sufficient
     # evidence of a host path on their own.
     "linux_user_home": re.compile(
-        r"/home/[A-Za-z0-9_.-]+/(?=[^/?#\"'<>])"
+        r"/home/(?!\[[^\]/]+\][+*?]?/)[^/\r\n]+/(?=[^/?#\"'<>])"
     ),
     "macos_user_home": re.compile(
-        r"/Users/[A-Za-z0-9_.-]+/(?=[^/?#\"'<>])"
+        r"/Users/(?!\[[^\]/]+\][+*?]?/)[^/\r\n]+/(?=[^/?#\"'<>])"
     ),
     "windows_user_home": re.compile(
         r"(?i)(?:[A-Z]:[\\/])(?:Users|Documents and Settings)[\\/]"
-        r"[^\\/\s\"'<>]+[\\/](?=[^\\/?#\"'<>])"
+        r"[^\\/\r\n]+[\\/](?=[^\\/?#\"'<>])"
     ),
 }
 HOST_ABSOLUTE_PATH_FIELDS = {
