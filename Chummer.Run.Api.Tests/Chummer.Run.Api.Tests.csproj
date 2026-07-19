@@ -38,8 +38,8 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true'">
-    <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerPackagePlaneVersion)" />
-    <PackageReference Include="Chummer.Run.Registry" Version="$(ChummerPackagePlaneVersion)" />
+    <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerHubRegistryContractsPackageVersion)" />
+    <PackageReference Include="Chummer.Run.Registry" Version="$(ChummerRunRegistryPackageVersion)" />
   </ItemGroup>
 
   <ItemGroup>

@@ -24,8 +24,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
 
 
-LOCK_CONTRACT = "chummer-hub.package-plane-lock/v2"
-INVENTORY_CONTRACT = "chummer-hub.external-package-inventory/v1"
+LOCK_CONTRACT = "chummer-hub.package-plane-lock/v3"
+INVENTORY_CONTRACT = "chummer-hub.external-package-inventory/v2"
 INVENTORY_FILE_NAME = "chummer-hub-packages.inventory.json"
 EXPECTED_PACKAGE_IDS = (
     "Chummer.Engine.Contracts",
@@ -98,6 +98,7 @@ class PackagePlaneError(RuntimeError):
 @dataclass(frozen=True)
 class PackageSpec:
     package_id: str
+    version: str
     repository: str
     commit: str
     checkout_directory: str
@@ -153,7 +154,7 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
         "packages",
     }
     if not isinstance(payload, dict) or set(payload) != expected_top_level:
-        raise PackagePlaneError("package-plane lock must contain the exact v2 fields")
+        raise PackagePlaneError("package-plane lock must contain the exact v3 fields")
     if payload.get("contract") != LOCK_CONTRACT:
         raise PackagePlaneError(f"package-plane lock contract must be {LOCK_CONTRACT}")
     dotnet_sdk = _required_string(payload, "dotnet_sdk")
@@ -217,6 +218,7 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
             raise PackagePlaneError(f"unapproved package id: {package_id}")
         expected_row_keys = {
             "id",
+            "version",
             "repository",
             "commit",
             "checkout_directory",
@@ -231,6 +233,7 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
         if set(row) != expected_row_keys:
             raise PackagePlaneError(f"packages[{index}] must contain the exact fields")
         repository = _required_string(row, "repository")
+        version = _required_string(row, "version")
         commit = _required_string(row, "commit")
         checkout_directory = _safe_relative_path(
             _required_string(row, "checkout_directory"),
@@ -246,6 +249,8 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
         nupkg_size_bytes = row.get("nupkg_size_bytes")
         if not HTTPS_GITHUB_PATTERN.fullmatch(repository):
             raise PackagePlaneError("repository must be an allowlisted HTTPS GitHub URL")
+        if VERSION_PATTERN.fullmatch(version) is None:
+            raise PackagePlaneError(f"invalid package version for {package_id}")
         if not SHA_PATTERN.fullmatch(commit):
             raise PackagePlaneError("commit must be an exact lowercase 40-character SHA")
         if "/" in checkout_directory:
@@ -287,6 +292,7 @@ def validate_lock_payload(payload: Any) -> PackagePlaneLock:
         packages.append(
             PackageSpec(
                 package_id,
+                version,
                 repository,
                 commit,
                 checkout_directory,
@@ -476,8 +482,8 @@ def package_build_properties(
 ) -> tuple[str, ...]:
     normalized_source_root = f"/_/src/{spec.checkout_directory}"
     return (
-        f"-p:PackageVersion={lock.package_version}",
-        f"-p:Version={lock.package_version}",
+        f"-p:PackageVersion={spec.version}",
+        f"-p:Version={spec.version}",
         f"-p:RepositoryCommit={spec.commit}",
         f"-p:SourceRevisionId={spec.commit}",
         f"-p:RepositoryUrl={spec.repository}",
@@ -704,7 +710,12 @@ def _validate_canonical_package(
         raise PackagePlaneError(f"non-canonical relationships in {spec.package_id}")
 
 
-def validate_package(feed: Path, spec: PackageSpec, version: str) -> Path:
+def validate_package(
+    feed: Path,
+    spec: PackageSpec,
+    dependency_versions: Mapping[str, str] | None = None,
+) -> Path:
+    version = spec.version
     path = _package_path(feed, spec.package_id, version)
     try:
         with zipfile.ZipFile(path) as archive:
@@ -734,13 +745,23 @@ def validate_package(feed: Path, spec: PackageSpec, version: str) -> Path:
         raise PackagePlaneError(f"package source provenance mismatch in {path.name}")
     if _license(root) != (spec.license_type, spec.license_value):
         raise PackagePlaneError(f"package license metadata mismatch in {path.name}")
+    versions = dependency_versions or {}
     expected_dependencies = tuple(
-        sorted((package_id, version) for package_id in EXPECTED_INTERNAL_DEPENDENCIES[spec.package_id])
+        sorted(
+            (package_id, versions.get(package_id, version))
+            for package_id in EXPECTED_INTERNAL_DEPENDENCIES[spec.package_id]
+        )
     )
     if _internal_dependencies(root) != expected_dependencies:
         raise PackagePlaneError(f"internal dependency drift in {path.name}")
-    if path.stat().st_size != spec.nupkg_size_bytes or _sha256(path) != spec.nupkg_sha256:
-        raise PackagePlaneError(f"locked package byte authority mismatch in {path.name}")
+    observed_size = path.stat().st_size
+    observed_sha256 = _sha256(path)
+    if observed_size != spec.nupkg_size_bytes or observed_sha256 != spec.nupkg_sha256:
+        raise PackagePlaneError(
+            f"locked package byte authority mismatch in {path.name}: "
+            f"expected sha256={spec.nupkg_sha256} size={spec.nupkg_size_bytes}; "
+            f"observed sha256={observed_sha256} size={observed_size}"
+        )
     return path
 
 
@@ -762,12 +783,13 @@ def _inventory_payload(
     lock: PackagePlaneLock, feed: Path, lock_sha256: str
 ) -> dict[str, Any]:
     packages = []
+    dependency_versions = {spec.package_id: spec.version for spec in lock.packages}
     for spec in lock.packages:
-        path = validate_package(feed, spec, lock.package_version)
+        path = validate_package(feed, spec, dependency_versions)
         packages.append(
             {
                 "id": spec.package_id,
-                "version": lock.package_version,
+                "version": spec.version,
                 "repository": spec.repository,
                 "commit": spec.commit,
                 "project": spec.project,
@@ -787,7 +809,7 @@ def _inventory_payload(
 def _expected_feed_entry_names(lock: PackagePlaneLock) -> set[str]:
     return {
         INVENTORY_FILE_NAME,
-        *(f"{spec.package_id}.{lock.package_version}.nupkg" for spec in lock.packages),
+        *(f"{spec.package_id}.{spec.version}.nupkg" for spec in lock.packages),
     }
 
 
@@ -845,6 +867,7 @@ def validate_feed_inventory(
     rows = payload.get("packages")
     if not isinstance(rows, list) or len(rows) != len(lock.packages):
         raise PackagePlaneError("package inventory must contain the exact locked set")
+    dependency_versions = {spec.package_id: spec.version for spec in lock.packages}
     for spec, row in zip(lock.packages, rows, strict=True):
         if not isinstance(row, dict):
             raise PackagePlaneError(f"invalid inventory row for {spec.package_id}")
@@ -864,11 +887,11 @@ def validate_feed_inventory(
             )
         expected = {
             "id": spec.package_id,
-            "version": lock.package_version,
+            "version": spec.version,
             "repository": spec.repository,
             "commit": spec.commit,
             "project": spec.project,
-            "file_name": f"{spec.package_id}.{lock.package_version}.nupkg",
+            "file_name": f"{spec.package_id}.{spec.version}.nupkg",
         }
         for key, value in expected.items():
             if row.get(key) != value:
@@ -879,7 +902,7 @@ def validate_feed_inventory(
             raise PackagePlaneError(f"invalid inventory digest for {spec.package_id}")
         if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
             raise PackagePlaneError(f"invalid inventory size for {spec.package_id}")
-        path = validate_package(feed, spec, lock.package_version)
+        path = validate_package(feed, spec, dependency_versions)
         if path.stat().st_size != size or _sha256(path) != digest:
             raise PackagePlaneError(f"package byte binding mismatch for {spec.package_id}")
     return hashlib.sha256(inventory_bytes).hexdigest()
@@ -968,12 +991,16 @@ def build_feed(
             pack_command.extend(("--output", str(staged_feed)))
             sys.stdout.write(_run(pack_command, cwd=checkout, env=env))
             canonicalize_package(
-                staged_feed / f"{spec.package_id}.{lock.package_version}.nupkg",
+                staged_feed / f"{spec.package_id}.{spec.version}.nupkg",
                 spec,
-                lock.package_version,
+                spec.version,
             )
             validate_checkout(checkout, spec, env=env)
-            validate_package(staged_feed, spec, lock.package_version)
+            validate_package(
+                staged_feed,
+                spec,
+                {row.package_id: row.version for row in lock.packages},
+            )
         inventory = _inventory_payload(lock, staged_feed, lock_sha256)
         _write_json(staged_feed / INVENTORY_FILE_NAME, inventory)
         os.replace(staged_feed, feed)

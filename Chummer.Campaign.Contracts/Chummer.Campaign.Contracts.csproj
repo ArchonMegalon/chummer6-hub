@@ -5,7 +5,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true'">
-    <PackageReference Include="Chummer.Engine.Contracts" Version="$(ChummerPackagePlaneVersion)" />
+    <PackageReference Include="Chummer.Engine.Contracts" Version="$(ChummerEngineContractsPackageVersion)" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -21,7 +21,7 @@ from typing import Iterable, Mapping
 
 
 INVENTORY_NAME = "chummer-hub-packages.inventory.json"
-RECEIPT_CONTRACT = "chummer-hub.no-siblings-package-plane/v1"
+RECEIPT_CONTRACT = "chummer-hub.no-siblings-package-plane/v2"
 HUB_REPOSITORY = "https://github.com/ArchonMegalon/chummer6-hub.git"
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
@@ -158,7 +158,9 @@ def _write_nuget_config(path: Path, feed: Path, remote: str) -> None:
 
 
 def _audit_assets(
-    consumer: Path, package_root: Path, package_version: str
+    consumer: Path,
+    package_root: Path,
+    owner_versions: Mapping[str, str],
 ) -> int:
     asset_paths = (
         consumer / "Chummer.Campaign.Contracts/obj/project.assets.json",
@@ -177,11 +179,7 @@ def _audit_assets(
         for log in payload.get("logs") or []:
             if str(log.get("level", "")).lower() == "error" or log.get("code") == "NU1605":
                 raise VerificationError(f"restore graph error in {path.name}: {log}")
-    for package_id in (
-        "Chummer.Engine.Contracts",
-        "Chummer.Hub.Registry.Contracts",
-        "Chummer.Run.Registry",
-    ):
+    for package_id, package_version in owner_versions.items():
         identity = f"{package_id}/{package_version}"
         metadata = observed_libraries.get(identity)
         if not isinstance(metadata, dict) or metadata.get("type") != "package":
@@ -189,7 +187,9 @@ def _audit_assets(
     return len(asset_paths)
 
 
-def _audit_package_locks(consumer: Path, package_version: str) -> list[dict[str, object]]:
+def _audit_package_locks(
+    consumer: Path, owner_versions: Mapping[str, str]
+) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for project_name in LOCKED_PROJECTS:
         path = consumer / project_name / "packages.lock.json"
@@ -212,11 +212,8 @@ def _audit_package_locks(consumer: Path, package_version: str) -> list[dict[str,
                     raise VerificationError(
                         f"locked package lacks resolved version/content hash: {package_id}"
                     )
-                if package_id in {
-                    "Chummer.Engine.Contracts",
-                    "Chummer.Hub.Registry.Contracts",
-                    "Chummer.Run.Registry",
-                } and metadata["resolved"] != package_version:
+                expected_version = owner_versions.get(package_id)
+                if expected_version is not None and metadata["resolved"] != expected_version:
                     raise VerificationError(f"owner package lock drift: {package_id}")
         rows.append(
             {
@@ -379,9 +376,16 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
         nuget_config = root / "NuGet.Config"
         _write_nuget_config(nuget_config, feed, lock.approved_remote_source)
         env = bootstrap.isolated_environment(os.environ, package_root, cli_home, http_cache)
+        owner_versions = {spec.package_id: spec.version for spec in lock.packages}
         common = (
             "-p:ChummerUseLocalCompatibilityTree=false",
             f"-p:ChummerPackagePlaneVersion={lock.package_version}",
+            "-p:ChummerEngineContractsPackageVersion="
+            + owner_versions["Chummer.Engine.Contracts"],
+            "-p:ChummerHubRegistryContractsPackageVersion="
+            + owner_versions["Chummer.Hub.Registry.Contracts"],
+            "-p:ChummerRunRegistryPackageVersion="
+            + owner_versions["Chummer.Run.Registry"],
             "-p:ChummerPackageFeed=",
             "-p:RestoreAdditionalProjectSources=",
             f"-p:RestorePackagesPath={package_root}",
@@ -442,8 +446,8 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             cwd=consumer,
             env=env,
         )
-        asset_count = _audit_assets(consumer, package_root, lock.package_version)
-        package_locks = _audit_package_locks(consumer, lock.package_version)
+        asset_count = _audit_assets(consumer, package_root, owner_versions)
+        package_locks = _audit_package_locks(consumer, owner_versions)
         contract_packages = _audit_contract_packages(
             consumer, contract_output, commit, lock.package_version, dotnet, common, env
         )
@@ -461,11 +465,22 @@ def verify(repo_root: Path, receipt_path: Path, dotnet: str) -> None:
             "dotnet_sdk": lock.dotnet_sdk,
             "dotnet_toolchain": toolchain,
             "source_authorities": [
-                {"id": spec.package_id, "repository": spec.repository, "commit": spec.commit}
+                {
+                    "id": spec.package_id,
+                    "version": spec.version,
+                    "repository": spec.repository,
+                    "commit": spec.commit,
+                }
                 for spec in lock.packages
             ],
+            "owner_package_versions": owner_versions,
             "external_packages": [
-                {"id": row["id"], "sha256": row["sha256"], "size_bytes": row["size_bytes"]}
+                {
+                    "id": row["id"],
+                    "version": row["version"],
+                    "sha256": row["sha256"],
+                    "size_bytes": row["size_bytes"],
+                }
                 for row in inventory["packages"]
             ],
             "hub_contract_packages": contract_packages,
