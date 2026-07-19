@@ -210,6 +210,20 @@ app.Use(async (context, next) =>
 
     await next();
 });
+app.Use(async (context, next) =>
+{
+    PublicProjectionProofRequestPathDisposition disposition =
+        PublicProjectionProofRequestPathPolicy.Evaluate(context.Request);
+    if (disposition == PublicProjectionProofRequestPathDisposition.RejectVariant)
+    {
+        PrivateResponseCacheHeaders.Apply(context.Response.Headers);
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    await next();
+});
 // Register private-response and indexing headers before HTTPS redirection so a
 // redirect cannot bypass the account/admin cache boundary.
 app.Use(async (context, next) =>
@@ -568,6 +582,7 @@ static bool RequiresNoStoreHeaders(PathString path)
         || path.Equals("/mobile/service-worker.js", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/manifest.json", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/proof/windows", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/proofs", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/downloads/releases.json", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/downloads/RELEASE_CHANNEL.generated.json", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/release-evidence", StringComparison.OrdinalIgnoreCase)
@@ -595,7 +610,8 @@ static bool RequiresNoReferrerHeaders(PathString path)
 
 static bool IsGovernedReleaseStaticPath(PathString path)
 {
-    return path.Equals("/downloads/current.json", StringComparison.OrdinalIgnoreCase)
+    return PublicProjectionProofRequestPathPolicy.IsCanonical(path)
+        || path.Equals("/downloads/current.json", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/downloads/releases.json", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/downloads/RELEASE_CHANNEL.generated.json", StringComparison.OrdinalIgnoreCase)
         || path.Equals("/downloads/aur-packages.json", StringComparison.OrdinalIgnoreCase)

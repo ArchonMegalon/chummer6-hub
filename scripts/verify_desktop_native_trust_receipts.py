@@ -2054,6 +2054,9 @@ def _effective_readiness_override_reason(readiness_payload: dict, coverage_gap_k
 
 def _load_flagship_readiness_snapshot(errors: list[str]) -> dict | None:
     readiness_path = _flagship_readiness_path()
+    readiness_authority = str(
+        os.environ.get("CHUMMER_FLAGSHIP_PRODUCT_READINESS_AUTHORITY") or ""
+    ).strip()
     _verify_evidence_path_has_no_forbidden_markers(errors, readiness_path, "flagship readiness proof")
     if not readiness_path.is_file():
         errors.append(f"missing flagship readiness proof: {readiness_path}")
@@ -2123,7 +2126,7 @@ def _load_flagship_readiness_snapshot(errors: list[str]) -> dict | None:
         if isinstance(completion_audit, dict)
         else "unknown",
         "completion_audit_reason": completion_audit_reason,
-        "source_path": str(readiness_path),
+        "source_path": readiness_authority or str(readiness_path),
     }
 
 

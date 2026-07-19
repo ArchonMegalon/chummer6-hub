@@ -45,6 +45,7 @@ public sealed class PublicReleaseManifestService
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
     private readonly GoldReadinessArtifactService _goldReadiness;
     private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
+    private readonly PublicProjectionSnapshotService _publicProjection;
     private readonly TimeProvider _timeProvider;
     private readonly PrivacyLaunchGateSnapshot _privacyLaunchGate;
     private readonly object _manifestCacheLock = new();
@@ -122,6 +123,7 @@ public sealed class PublicReleaseManifestService
         _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
         _goldReadiness = new GoldReadinessArtifactService(configuration);
         _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
+        _publicProjection = new PublicProjectionSnapshotService(configuration);
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _privacyLaunchGate = privacyLaunchGate ?? throw new ArgumentNullException(nameof(privacyLaunchGate));
     }
@@ -147,6 +149,11 @@ public sealed class PublicReleaseManifestService
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         DateTimeOffset now = _timeProvider.GetUtcNow();
+        PublicProjectionOutputSnapshot publicProjection =
+            _publicProjection.LoadHubLocalReleaseProof();
+        string manifestCacheKey = PublicProjectionCacheKey(
+            snapshot.CacheKey,
+            publicProjection);
         byte[]? generationCanonicalBytes = snapshot.IsLegacy
             ? null
             : snapshot.ReadVerifiedFileBytes(
@@ -154,7 +161,10 @@ public sealed class PublicReleaseManifestService
                 ReleaseShelfGenerationStore.MaximumManifestBytes)
               ?? throw new InvalidDataException("Captured release shelf canonical manifest no longer matches its inventory binding.");
 
-        PublicReleaseManifestDto? cachedManifest = TryGetCachedManifest(snapshot.CacheKey, now, allowStale: false);
+        PublicReleaseManifestDto? cachedManifest = TryGetCachedManifest(
+            manifestCacheKey,
+            now,
+            allowStale: false);
         if (cachedManifest is not null
             && !CachedManifestProofFreshnessDrifts(cachedManifest, now)
             && !CachedManifestPrivacyReadinessDrifts(cachedManifest, _privacyLaunchGate))
@@ -164,15 +174,18 @@ public sealed class PublicReleaseManifestService
 
         if (!snapshot.IsLegacy)
         {
-            PublicReleaseManifestDto immutableManifest = BindGeneration(
-                LoadRegistryReleaseManifestPayload(
-                    FilterManifestPayload(
-                        DecodeUtf8Manifest(
-                            generationCanonicalBytes!,
-                            ReleaseShelfGenerationStore.CanonicalManifestFileName)),
-                    "registry"),
-                snapshot);
-            WriteManifestCache(snapshot.CacheKey, immutableManifest, now);
+            PublicReleaseManifestDto immutableManifest =
+                ApplyPublicProjectionSnapshotGuard(
+                    BindGeneration(
+                        LoadRegistryReleaseManifestPayload(
+                            FilterManifestPayload(
+                                DecodeUtf8Manifest(
+                                    generationCanonicalBytes!,
+                                    ReleaseShelfGenerationStore.CanonicalManifestFileName)),
+                            "registry"),
+                        snapshot),
+                    publicProjection);
+            WriteManifestCache(manifestCacheKey, immutableManifest, now);
             return immutableManifest;
         }
 
@@ -198,24 +211,30 @@ public sealed class PublicReleaseManifestService
                     generationCanonicalBytes!,
                     ReleaseShelfGenerationStore.CanonicalManifestFileName);
             var canonicalManifest = LoadRegistryReleaseManifestPayload(FilterManifestPayload(canonicalJson), "registry");
-            manifest = ApplyImportRouteParityGuard(ApplyGoldReadinessGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(ChoosePreferredRegistryManifest(runtimeManifest, canonicalManifest), snapshot)))));
+            manifest = ApplyReleaseProofGuards(
+                ChoosePreferredRegistryManifest(runtimeManifest, canonicalManifest),
+                snapshot,
+                publicProjection);
             manifest = BindGeneration(manifest, snapshot);
-            WriteManifestCache(snapshot.CacheKey, manifest, now);
+            WriteManifestCache(manifestCacheKey, manifest, now);
             return manifest;
         }
 
         if (runtimeManifest is not null)
         {
-            manifest = ApplyImportRouteParityGuard(ApplyGoldReadinessGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(runtimeManifest, snapshot)))));
+            manifest = ApplyReleaseProofGuards(
+                runtimeManifest,
+                snapshot,
+                publicProjection);
             manifest = BindGeneration(manifest, snapshot);
-            WriteManifestCache(snapshot.CacheKey, manifest, now);
+            WriteManifestCache(manifestCacheKey, manifest, now);
             return manifest;
         }
 
         var manifestPath = Path.Combine(root, ReleaseShelfGenerationStore.CompatibilityManifestFileName);
         if (snapshot.IsLegacy && !File.Exists(manifestPath))
         {
-            manifest = ApplyImportRouteParityGuard(ApplyGoldReadinessGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(new PublicReleaseManifestDto(
+            manifest = ApplyReleaseProofGuards(new PublicReleaseManifestDto(
                 Version: "unpublished",
                 Channel: "preview",
                 PublishedAt: now,
@@ -224,16 +243,19 @@ public sealed class PublicReleaseManifestService
                 Status: "unpublished",
                 Message: "No published desktop builds are available yet.",
                 HasFallbackSource: false,
-                GeneratedAt: now), snapshot)))));
+                GeneratedAt: now), snapshot, publicProjection);
             manifest = BindGeneration(manifest, snapshot);
-            WriteManifestCache(snapshot.CacheKey, manifest, now);
+            WriteManifestCache(manifestCacheKey, manifest, now);
             return manifest;
         }
 
         string compatibilityJson = ReadLegacyManifestText(manifestPath);
-        manifest = ApplyImportRouteParityGuard(ApplyGoldReadinessGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(LoadReleaseManifestPayload(FilterManifestPayload(compatibilityJson)), snapshot)))));
+        manifest = ApplyReleaseProofGuards(
+            LoadReleaseManifestPayload(FilterManifestPayload(compatibilityJson)),
+            snapshot,
+            publicProjection);
         manifest = BindGeneration(manifest, snapshot);
-        WriteManifestCache(snapshot.CacheKey, manifest, now);
+        WriteManifestCache(manifestCacheKey, manifest, now);
         return manifest;
     }
 
@@ -933,9 +955,81 @@ public sealed class PublicReleaseManifestService
         return File.Exists(path) ? path : null;
     }
 
+    private static string PublicProjectionCacheKey(
+        string releaseShelfCacheKey,
+        PublicProjectionOutputSnapshot projection)
+    {
+        if (!projection.IsConfigured)
+        {
+            return releaseShelfCacheKey;
+        }
+
+        string identity = projection.IsValid
+            ? $"{projection.SnapshotId}:{projection.SnapshotSha256}"
+            : "invalid";
+        return $"{releaseShelfCacheKey}|public-projection:{identity}";
+    }
+
+    private PublicReleaseManifestDto ApplyReleaseProofGuards(
+        PublicReleaseManifestDto manifest,
+        ReleaseShelfSnapshot snapshot,
+        PublicProjectionOutputSnapshot publicProjection)
+    {
+        PublicReleaseManifestDto guarded = ApplyLocalReleaseProofFallback(
+            manifest,
+            snapshot,
+            publicProjection);
+        guarded = ApplyArtifactSuppressionPolicy(guarded);
+        guarded = ApplyFlagshipReadinessGuard(guarded);
+        guarded = ApplyGoldReadinessGuard(guarded);
+        guarded = ApplyImportRouteParityGuard(guarded);
+        return ApplyPublicProjectionSnapshotGuard(guarded, publicProjection);
+    }
+
+    private PublicReleaseManifestDto ApplyPublicProjectionSnapshotGuard(
+        PublicReleaseManifestDto manifest,
+        PublicProjectionOutputSnapshot projection)
+    {
+        if (!projection.IsConfigured || projection.IsValid)
+        {
+            return EnsureContractName(manifest);
+        }
+
+        const string reason =
+            "the current public projection pointer, manifest, or output digest is unavailable or invalid";
+        string publicationStatus = NormalizeStateToken(manifest.Status);
+        string rolloutState = ResolveNonFreshRolloutState(
+            publicationStatus,
+            NormalizeStateToken(manifest.RolloutState),
+            "public_release_review_required");
+        string supportabilityState = ResolveNonFreshSupportabilityState(
+            publicationStatus,
+            rolloutState,
+            NormalizeStateToken(manifest.SupportabilityState));
+        return EnsureContractName(manifest with
+        {
+            ProofStatus = "review_required",
+            RolloutState = rolloutState,
+            RolloutReason = AppendDistinctSentence(
+                manifest.RolloutReason,
+                $"Release posture stays review-required because {reason}."),
+            SupportabilityState = supportabilityState,
+            SupportabilitySummary = AppendDistinctSentence(
+                manifest.SupportabilitySummary,
+                $"Treat the current release as review-required because {reason}."),
+            KnownIssueSummary = AppendDistinctSentence(
+                manifest.KnownIssueSummary,
+                "Current public projection authentication is incomplete, so launch-ready and no-blocker claims remain withheld."),
+            FixAvailabilitySummary = AppendDistinctSentence(
+                manifest.FixAvailabilitySummary,
+                "Only announce a fixed release after one authenticated CURRENT snapshot is deployed across every public route.")
+        });
+    }
+
     private PublicReleaseManifestDto ApplyLocalReleaseProofFallback(
         PublicReleaseManifestDto manifest,
-        ReleaseShelfSnapshot snapshot)
+        ReleaseShelfSnapshot snapshot,
+        PublicProjectionOutputSnapshot projection)
     {
         if (!snapshot.IsLegacy)
         {
@@ -944,19 +1038,31 @@ public sealed class PublicReleaseManifestService
             return EnsureContractName(manifest);
         }
 
-        var proofPath = ResolveLocalReleaseProofPath();
-        if (string.IsNullOrWhiteSpace(proofPath) || !File.Exists(proofPath))
-        {
-            return EnsureContractName(manifest);
-        }
-
         try
         {
+            byte[] proofBytes;
+            if (projection.IsConfigured)
+            {
+                if (!projection.IsValid || projection.Payload is null)
+                {
+                    return EnsureContractName(manifest);
+                }
+                proofBytes = projection.Payload;
+            }
+            else
+            {
+                var proofPath = ResolveLocalReleaseProofPath();
+                if (string.IsNullOrWhiteSpace(proofPath) || !File.Exists(proofPath))
+                {
+                    return EnsureContractName(manifest);
+                }
+                proofBytes = File.ReadAllBytes(proofPath);
+            }
             var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
             {
                 PropertyNameCaseInsensitive = true
             };
-            var parsed = JsonSerializer.Deserialize<LocalReleaseProof>(File.ReadAllText(proofPath), options);
+            var parsed = JsonSerializer.Deserialize<LocalReleaseProof>(proofBytes, options);
             if (parsed is null || !string.Equals(parsed.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal))
             {
                 return EnsureContractName(manifest);

@@ -26,6 +26,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
     private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
+    private readonly PublicProjectionSnapshotService _publicProjection;
     private readonly ILogger<DownloadsCompatibilityController> _logger;
 
     public DownloadsCompatibilityController(
@@ -51,7 +52,28 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         _configuration = configuration;
         _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
         _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
+        _publicProjection = new PublicProjectionSnapshotService(configuration);
         _logger = logger;
+    }
+
+    [HttpGet("/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json")]
+    [HttpGet("/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json")]
+    public IActionResult CurrentHubLocalReleaseProof()
+    {
+        PublicProjectionOutputSnapshot projection = _publicProjection.LoadHubLocalReleaseProof();
+        if (!projection.IsValid || projection.Payload is null)
+        {
+            return NotFound(new
+            {
+                status = "review_required",
+                message = "Current release proof is withheld until the public projection snapshot authenticates."
+            });
+        }
+
+        ApplyCanonicalManifestNoStoreHeaders(Response.Headers);
+        Response.Headers["X-Chummer-Public-Projection"] = projection.SnapshotId;
+        Response.Headers.ETag = $"\"sha256-{projection.Sha256}\"";
+        return File(projection.Payload, "application/json; charset=utf-8");
     }
 
     [HttpGet("/downloads/releases.json")]

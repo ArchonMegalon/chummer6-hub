@@ -5,6 +5,7 @@ import importlib.util
 import json
 from contextlib import nullcontext
 from pathlib import Path
+import shutil
 import sys
 
 
@@ -27,6 +28,72 @@ CANDIDATE_PROOF_BYTES = b"candidate-proof-authority\n"
 PRIOR_PROOF_BYTES = b"prior-proof-authority\n"
 CANDIDATE_PROOF_SHA256 = hashlib.sha256(CANDIDATE_PROOF_BYTES).hexdigest()
 PRIOR_PROOF_SHA256 = hashlib.sha256(PRIOR_PROOF_BYTES).hexdigest()
+
+
+def write_public_projection_snapshot(root: Path) -> Path:
+    output_names = (
+        "HUB_LOCAL_RELEASE_PROOF.generated.json",
+        "HUB_SERVED_RELEASE_PROOF.generated.json",
+        "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
+        "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
+        "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+    )
+    payloads = {
+        output_names[0]: CANDIDATE_PROOF_BYTES,
+        output_names[1]: CANDIDATE_PROOF_BYTES,
+        output_names[2]: b"m125\n",
+        output_names[3]: b"m126\n",
+        output_names[4]: b"windows\n",
+    }
+    digests = {
+        name: hashlib.sha256(payloads[name]).hexdigest() for name in output_names
+    }
+    aggregate = hashlib.sha256()
+    for name in output_names:
+        aggregate.update(name.encode("utf-8"))
+        aggregate.update(b"\0")
+        aggregate.update(digests[name].encode("ascii"))
+        aggregate.update(b"\n")
+    snapshot_sha256 = aggregate.hexdigest()
+    snapshot_id = f"public-projection-{snapshot_sha256}"
+    snapshot = root / snapshot_id
+    snapshot.mkdir(parents=True)
+    for name, payload in payloads.items():
+        (snapshot / name).write_bytes(payload)
+    manifest_name = "PUBLIC_PROJECTION_SNAPSHOT.generated.json"
+    manifest = {
+        "contractName": "chummer.public_projection_snapshot/v1",
+        "status": "pass",
+        "snapshotId": snapshot_id,
+        "snapshotSha256": snapshot_sha256,
+        "authorityInputs": {},
+        "outputs": {
+            name: {
+                "relativePath": name,
+                "sha256": digests[name],
+                "sizeBytes": len(payloads[name]),
+            }
+            for name in output_names
+        },
+    }
+    manifest_bytes = (
+        json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    (snapshot / manifest_name).write_bytes(manifest_bytes)
+    current = {
+        "contractName": "chummer.public_projection_current/v1",
+        "status": "pass",
+        "snapshotId": snapshot_id,
+        "snapshotSha256": snapshot_sha256,
+        "manifestRelativePath": f"{snapshot_id}/{manifest_name}",
+        "manifestSha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "outputs": {name: f"{snapshot_id}/{name}" for name in output_names},
+    }
+    (root / "CURRENT.json").write_text(
+        json.dumps(current, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    return snapshot / output_names[0]
 
 
 def load_module():
@@ -136,17 +203,6 @@ class FakeRuntime:
     def set_container_running(self, container_id: str, running: bool) -> None:
         self.actions.append(("running", container_id, running))
         self.containers[container_id]["running"] = running
-        if container_id == PRIOR_PORTAL and running:
-            self.proof_digests[
-                (container_id, "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json")
-            ] = self.bound_proof_sha256
-            self.proof_digests[
-                (
-                    container_id,
-                    "/app/wwwroot/proofs/mac-codex-release/"
-                    "HUB_LOCAL_RELEASE_PROOF.generated.json",
-                )
-            ] = self.bound_proof_sha256
 
     def remove_container(self, container_id: str) -> None:
         self.actions.append(("remove-container", container_id))
@@ -199,12 +255,10 @@ def run_reconcile(module, runtime: FakeRuntime, state: dict[str, object], overla
         overlay[0] = True
 
     def prepare_prior_proof_bind() -> None:
-        runtime.actions.append(("proof-source", "prior"))
-        runtime.bound_proof_sha256 = PRIOR_PROOF_SHA256
+        return None
 
     def restore_candidate_proof_bind() -> None:
-        runtime.actions.append(("proof-source", "candidate"))
-        runtime.bound_proof_sha256 = CANDIDATE_PROOF_SHA256
+        return None
 
     return module.reconcile(
         runtime=runtime,
@@ -223,6 +277,8 @@ def run_reconcile(module, runtime: FakeRuntime, state: dict[str, object], overla
 
 
 def recovery_argv(tmp_path: Path, source_root: Path, active_root: Path) -> list[str]:
+    journal = json.loads((tmp_path / "journal.json").read_text(encoding="utf-8"))
+    proof_bind_source = journal["deployOverlayAuthority"]["proofBindSourcePath"]
     return [
         "--source-root",
         str(source_root),
@@ -254,6 +310,10 @@ def recovery_argv(tmp_path: Path, source_root: Path, active_root: Path) -> list[
         PROJECT_NAME,
         "--build-context",
         str(tmp_path),
+        "--public-projection-snapshot-root",
+        str(tmp_path / "public-projection"),
+        "--runtime-proof-bind-source",
+        str(proof_bind_source),
         "--published-port",
         "8091",
         "--portal-image-tag",
@@ -270,17 +330,24 @@ def write_deploy_journal(module, tmp_path: Path) -> tuple[Path, Path, Path]:
     active_root = tmp_path / "active" / "app"
     staging_root = tmp_path / "staging" / "app"
     backup_root = tmp_path / "backups"
-    proof_bind_source = tmp_path / "proof-source.json"
+    proof_bind_source = write_public_projection_snapshot(
+        tmp_path / "public-projection"
+    )
     candidate_snapshot = tmp_path / "candidate-proof.json"
     prior_authority_snapshot = tmp_path / "prior-authority-proof.json"
     prior_public_snapshot = tmp_path / "prior-public-proof.json"
     source_root.mkdir()
+    projection_verifier = source_root / "scripts/release/verify_public_projection.py"
+    projection_verifier.parent.mkdir(parents=True)
+    shutil.copyfile(
+        ROOT / "scripts/release/verify_public_projection.py",
+        projection_verifier,
+    )
     active_root.mkdir(parents=True)
     staging_root.mkdir(parents=True)
     backup_root.mkdir()
     (active_root / "payload.txt").write_text("prior\n", encoding="utf-8")
     (staging_root / "payload.txt").write_text("candidate\n", encoding="utf-8")
-    proof_bind_source.write_bytes(CANDIDATE_PROOF_BYTES)
     candidate_snapshot.write_bytes(CANDIDATE_PROOF_BYTES)
     prior_authority_snapshot.write_bytes(PRIOR_PROOF_BYTES)
     prior_public_snapshot.write_bytes(PRIOR_PROOF_BYTES)
@@ -334,8 +401,7 @@ def test_hard_crash_after_candidate_start_removes_only_candidate_and_restores_ol
     assert runtime.container_running(PRIOR_PORTAL) is True
     assert runtime.bound_proof_sha256 == CANDIDATE_PROOF_SHA256
     assert runtime.proof_digests[(PRIOR_PORTAL, module.PROOF_AUTHORITY_PATH)] == PRIOR_PROOF_SHA256
-    assert ("proof-source", "prior") in runtime.actions
-    assert ("proof-source", "candidate") in runtime.actions
+    assert not any(action[0] == "proof-source" for action in runtime.actions)
     assert runtime.actions.index(("remove-container", CANDIDATE_PORTAL)) < runtime.actions.index(
         ("running", PRIOR_TUNNEL, True)
     )
@@ -383,14 +449,13 @@ def test_recovery_restores_prior_stopped_state_without_impossible_proof_check() 
     runtime = FakeRuntime()
     runtime.containers[PRIOR_PORTAL]["running"] = False
     runtime.containers[PRIOR_TUNNEL]["running"] = False
-    runtime.bound_proof_sha256 = PRIOR_PROOF_SHA256
 
     receipt = run_reconcile(module, runtime, prior_state(portal_running=False), [True])
 
     assert receipt["status"] == "pass"
     assert runtime.container_running(PRIOR_PORTAL) is False
     assert runtime.bound_proof_sha256 == CANDIDATE_PROOF_SHA256
-    assert ("proof-source", "candidate") in runtime.actions
+    assert not any(action[0] == "proof-source" for action in runtime.actions)
     assert receipt["componentChecks"]["runtimeProofMounts"] == {
         "status": "pass",
         "disposition": "not_applicable_prior_portal_stopped",
@@ -535,7 +600,7 @@ def test_recovery_command_rejects_external_candidate_proof_authority_mismatch(
 
     assert status == 70
     assert receipt["status"] == "fail"
-    assert "durable journal" in receipt["warning"]
+    assert "authenticated CURRENT" in receipt["warning"]
     assert journal.exists()
 
 
@@ -567,3 +632,38 @@ def test_recovery_command_retains_journal_on_old_runtime_proof_mismatch(
     assert journal.exists()
     assert ("running", PRIOR_PORTAL, False) in runtime.actions
     assert ("running", PRIOR_TUNNEL, False) in runtime.actions
+
+
+def test_recovery_rejects_tampered_current_before_docker_or_journal_mutation(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    module = load_module()
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "public_edge_mutation_lock",
+        lambda **_kwargs: nullcontext(None),
+    )
+    monkeypatch.setattr(
+        module.transaction.overlay,
+        "overlay_publish_lock",
+        lambda *_args, **_kwargs: nullcontext(None),
+    )
+    source_root, active_root, journal = write_deploy_journal(module, tmp_path)
+    argv = recovery_argv(tmp_path, source_root, active_root)
+    (tmp_path / "public-projection/CURRENT.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
+
+    def unexpected_docker(**_kwargs):
+        raise AssertionError("Docker recovery must not start without CURRENT authority")
+
+    monkeypatch.setattr(module, "DockerRuntime", unexpected_docker)
+    status = module.main(argv)
+    receipt = json.loads((tmp_path / "recovery.json").read_text(encoding="utf-8"))
+
+    assert status == 70
+    assert receipt["status"] == "fail"
+    assert "authenticated CURRENT" in receipt["warning"]
+    assert journal.exists()

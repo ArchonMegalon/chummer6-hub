@@ -35,6 +35,22 @@ def _load_transaction_module():
 
 transaction = _load_transaction_module()
 
+
+def _load_public_projection_module(source_root: Path):
+    module_path = source_root / "scripts" / "release" / "verify_public_projection.py"
+    if not module_path.is_file() or module_path.is_symlink():
+        raise RuntimeError("authenticated public projection verifier is unavailable")
+    spec = importlib.util.spec_from_file_location(
+        "chummer_public_edge_recovery_projection_authority",
+        module_path,
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError("unable to load public projection authority")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
 CONTRACT_NAME = "chummer.public-edge.deploy-recovery/v1"
 PROOF_AUTHORITY_PATH = "/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json"
 PROOF_PUBLIC_PATH = (
@@ -82,6 +98,8 @@ class DockerRuntime:
         source_root: Path,
         build_context: Path,
         overlay_root: Path,
+        public_projection_snapshot_root: Path,
+        runtime_proof_bind_source: Path,
         published_port: int,
     ) -> None:
         self.environment = {
@@ -94,6 +112,12 @@ class DockerRuntime:
             "CHUMMER_RUN_SERVICES_CONTEXT_DIR": str(source_root),
             "CHUMMER_RUN_SERVICES_SOURCE": str(source_root),
             "CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR": str(overlay_root),
+            "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT": str(
+                public_projection_snapshot_root
+            ),
+            "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE": str(
+                runtime_proof_bind_source
+            ),
             "CHUMMER_PUBLIC_EDGE_PORT": str(published_port),
         }
         self.docker_base = [
@@ -725,6 +749,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--env-file", type=Path, required=True)
     parser.add_argument("--project-name", required=True)
     parser.add_argument("--build-context", type=Path, required=True)
+    parser.add_argument(
+        "--public-projection-snapshot-root",
+        type=Path,
+        required=True,
+    )
+    parser.add_argument(
+        "--runtime-proof-bind-source",
+        type=Path,
+        required=True,
+    )
     parser.add_argument("--published-port", type=int, required=True)
     parser.add_argument("--portal-image-tag", required=True)
     parser.add_argument("--tool-image-tag", required=True)
@@ -739,6 +773,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     snapshot_path = transaction.overlay.normalized_absolute_path(args.snapshot)
     output_path = transaction.overlay.normalized_absolute_path(args.output)
+    source_root = transaction.overlay.normalized_absolute_path(args.source_root)
+    projection_snapshot_root = transaction.overlay.normalized_absolute_path(
+        args.public_projection_snapshot_root
+    )
+    selected_runtime_proof = transaction.overlay.normalized_absolute_path(
+        args.runtime_proof_bind_source
+    )
     expected_proof_sha256 = str(
         args.expected_runtime_proof_bind_source_sha256
     )
@@ -749,6 +790,35 @@ def main(argv: list[str] | None = None) -> int:
             "status": "fail",
             "exactPriorStateRestored": False,
             "warning": "recovery proof authority SHA-256 is invalid",
+        }
+        atomic_write(output_path, payload)
+        print(json.dumps(payload, sort_keys=True))
+        return 70
+    try:
+        projection_module = _load_public_projection_module(source_root)
+        current_projection = projection_module.resolve_current_snapshot(
+            projection_snapshot_root
+        )
+        authenticated_runtime_proof = current_projection.outputs[
+            "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        ]
+        authenticated_runtime_digest = current_projection.output_sha256[
+            "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        ]
+        if (
+            selected_runtime_proof != authenticated_runtime_proof
+            or authenticated_runtime_digest != expected_proof_sha256
+        ):
+            raise RuntimeError(
+                "recovery runtime proof is not the authenticated CURRENT output"
+            )
+    except Exception:
+        payload = {
+            "contractName": CONTRACT_NAME,
+            "operation": "reconcile",
+            "status": "fail",
+            "exactPriorStateRestored": False,
+            "warning": "authenticated CURRENT public projection is unavailable",
         }
         atomic_write(output_path, payload)
         print(json.dumps(payload, sort_keys=True))
@@ -786,9 +856,11 @@ def main(argv: list[str] | None = None) -> int:
             compose_file=args.compose_file,
             env_file=args.env_file,
             project_name=args.project_name,
-            source_root=args.source_root,
+            source_root=source_root,
             build_context=args.build_context,
             overlay_root=args.active_root,
+            public_projection_snapshot_root=projection_snapshot_root,
+            runtime_proof_bind_source=authenticated_runtime_proof,
             published_port=args.published_port,
         )
         deploy_authority = snapshot["deployOverlayAuthority"]
@@ -797,6 +869,10 @@ def main(argv: list[str] | None = None) -> int:
         candidate_proof_snapshot = Path(
             deploy_authority["candidateProofBindSourceSnapshot"]
         )
+        if proof_bind_source != authenticated_runtime_proof:
+            raise RuntimeError(
+                "durable recovery journal does not bind authenticated CURRENT output"
+            )
 
         def proof_bind_source_matches_candidate() -> bool:
             try:
@@ -808,27 +884,17 @@ def main(argv: list[str] | None = None) -> int:
                 return False
 
         def restore_candidate_proof_bind() -> None:
-            atomic_replace_from_snapshot(
-                snapshot=candidate_proof_snapshot,
-                destination=proof_bind_source,
-                expected_sha256=prior[
-                    "expectedRuntimeProofBindSourceSha256"
-                ],
-            )
+            if not candidate_proof_snapshot.is_file():
+                raise RuntimeError("candidate proof evidence snapshot is unavailable")
+            if not proof_bind_source_matches_candidate():
+                raise RuntimeError(
+                    "immutable authenticated CURRENT proof cannot be repaired in place"
+                )
 
         def prepare_prior_proof_bind() -> None:
-            snapshot_value = deploy_authority[
-                "priorPortalProofAuthoritySnapshot"
-            ]
-            if not snapshot_value:
-                raise RuntimeError("prior portal proof snapshot is unavailable")
-            atomic_replace_from_snapshot(
-                snapshot=Path(snapshot_value),
-                destination=proof_bind_source,
-                expected_sha256=prior[
-                    "priorPortalProofAuthorityMountSha256"
-                ],
-            )
+            # A prior container retains its own immutable bind source identity.
+            # Recovery never rewrites CURRENT output bytes to impersonate it.
+            return None
 
         def overlay_matches() -> bool:
             return transaction.prior_overlay_matches_snapshot(

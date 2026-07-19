@@ -12,23 +12,55 @@ public sealed class LocalReleaseProofArtifactService
     ];
 
     private readonly IConfiguration _configuration;
+    private readonly PublicProjectionSnapshotService _publicProjection;
 
     public LocalReleaseProofArtifactService(IConfiguration configuration)
     {
         _configuration = configuration;
+        _publicProjection = new PublicProjectionSnapshotService(configuration);
     }
 
     public LocalReleaseProofSnapshot? LoadSnapshot()
     {
-        string? path = ResolvePath();
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        PublicProjectionOutputSnapshot projection = _publicProjection.LoadHubLocalReleaseProof();
+        string? path;
+        byte[] payload;
+        if (projection.IsConfigured)
+        {
+            if (!projection.IsValid
+                || projection.Payload is null
+                || string.IsNullOrWhiteSpace(projection.Path))
+            {
+                return null;
+            }
+            path = projection.Path;
+            payload = projection.Payload;
+        }
+        else
+        {
+            path = ResolvePath();
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                return null;
+            }
+            try
+            {
+                payload = File.ReadAllBytes(path);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        if (payload.Length == 0)
         {
             return null;
         }
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+            using JsonDocument document = JsonDocument.Parse(payload);
             JsonElement root = document.RootElement;
             string? contractName = TryGetString(root, "contract_name") ?? TryGetString(root, "contractName");
             if (!string.Equals(contractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal))

@@ -146,7 +146,7 @@ CANONICAL_DOCKER_CONFIG_ROOT="/docker/chummercomplete/.state/public-edge-docker-
 CANONICAL_FLEET_MEDIA_CONTRACTS="/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts"
 CANONICAL_DESIGN_PRODUCT_ROOT="/docker/chummercomplete/chummer-design"
 CANONICAL_RELEASE_CHANNEL_RECEIPT="/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json"
-CANONICAL_RUNTIME_PROOF_BIND_SOURCE="/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json"
+CANONICAL_PUBLIC_PROJECTION_SNAPSHOT_ROOT="/docker/chummercomplete/chummer.run-services/.codex-studio/published"
 BUILD_CONTEXT="${CHUMMER_PUBLIC_EDGE_BUILD_CONTEXT:-$CANONICAL_BUILD_CONTEXT}"
 COMPOSE_FILE_INPUT="${CHUMMER_PUBLIC_EDGE_COMPOSE_FILE:-$ROOT_DIR/docker-compose.public-edge.yml}"
 COMPOSE_PROJECT="${CHUMMER_PUBLIC_EDGE_PROJECT_NAME:-$CANONICAL_COMPOSE_PROJECT}"
@@ -156,6 +156,7 @@ OVERLAY_ROOT="${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-$CANONICAL_OVERLAY_ROOT}"
 BASE_URL="${CHUMMER_PUBLIC_EDGE_BASE_URL:-$CANONICAL_BASE_URL}"
 RELEASE_CHANNEL_RECEIPT_INPUT="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT-}"
 RELEASE_CHANNEL_RECEIPT_SHA256="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256-}"
+PROJECTION_SNAPSHOT_ROOT_INPUT="${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT-}"
 RUNTIME_PROOF_BIND_SOURCE_SHA256="${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256-}"
 FLEET_MEDIA_CONTRACTS="${CHUMMER_FLEET_MEDIA_CONTRACTS:-$CANONICAL_FLEET_MEDIA_CONTRACTS}"
 DESIGN_PRODUCT_ROOT="${CHUMMER_DESIGN_PRODUCT_ROOT:-$CANONICAL_DESIGN_PRODUCT_ROOT}"
@@ -227,8 +228,77 @@ if [[ "$PUBLIC_EDGE_PORT" != "$CANONICAL_PUBLIC_EDGE_PORT" ]]; then
   echo "public edge deploy refuses a non-canonical public portal port" >&2
   exit 2
 fi
+if [[ -z "$PROJECTION_SNAPSHOT_ROOT_INPUT" ]]; then
+  echo "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT must be externally supplied" >&2
+  exit 2
+fi
+if ! PROJECTION_SNAPSHOT_ROOT="$(
+  "$TRUSTED_REALPATH" -e -- "$PROJECTION_SNAPSHOT_ROOT_INPUT"
+)"; then
+  echo "public projection snapshot root is missing" >&2
+  exit 2
+fi
+if [[ "$PROJECTION_SNAPSHOT_ROOT" != "$CANONICAL_PUBLIC_PROJECTION_SNAPSHOT_ROOT" \
+  || ! -d "$PROJECTION_SNAPSHOT_ROOT" || -L "$PROJECTION_SNAPSHOT_ROOT" \
+  || ! -O "$PROJECTION_SNAPSHOT_ROOT" ]]; then
+  echo "public edge deploy refuses an unsafe or non-canonical projection snapshot root" >&2
+  exit 2
+fi
 if [[ ! "$RUNTIME_PROOF_BIND_SOURCE_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
   echo "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256 must be externally supplied as a lowercase SHA-256" >&2
+  exit 2
+fi
+
+TRUSTED_PROJECTION_VERIFIER="$SOURCE_ROOT/scripts/release/verify_public_projection.py"
+if [[ ! -f "$TRUSTED_PROJECTION_VERIFIER" || -L "$TRUSTED_PROJECTION_VERIFIER" ]]; then
+  echo "audited public projection verifier is missing or symlinked" >&2
+  exit 2
+fi
+if ! projection_resolution_json="$(
+  "$TRUSTED_ENV" -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
+    "$TRUSTED_PYTHON" -I "$TRUSTED_PROJECTION_VERIFIER" \
+      --resolve-current "$PROJECTION_SNAPSHOT_ROOT" \
+      --output-name HUB_LOCAL_RELEASE_PROOF.generated.json
+)"; then
+  echo "authenticated CURRENT public projection is unavailable" >&2
+  exit 2
+fi
+if ! projection_binding="$(
+  printf '%s' "$projection_resolution_json" \
+    | "$TRUSTED_ENV" -i PATH=/usr/bin:/bin HOME=/nonexistent LANG=C LC_ALL=C \
+      "$TRUSTED_PYTHON" -I -c '
+import json, re, sys
+payload = json.load(sys.stdin)
+output = payload.get("output") or {}
+snapshot_id = str(payload.get("snapshotId") or "")
+snapshot_sha = str(payload.get("snapshotSha256") or "")
+path = str(output.get("path") or "")
+digest = str(output.get("sha256") or "")
+if (
+    payload.get("contractName") != "chummer.public_projection_current/v1"
+    or payload.get("status") != "pass"
+    or output.get("name") != "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    or re.fullmatch(r"public-projection-[0-9a-f]{64}", snapshot_id) is None
+    or snapshot_id != f"public-projection-{snapshot_sha}"
+    or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+    or "|" in path
+):
+    raise SystemExit(1)
+print("|".join((snapshot_id, snapshot_sha, path, digest)), end="")
+'
+)"; then
+  echo "authenticated CURRENT public projection resolution is malformed" >&2
+  exit 2
+fi
+IFS='|' read -r PUBLIC_PROJECTION_SNAPSHOT_ID PUBLIC_PROJECTION_SNAPSHOT_SHA256 \
+  RUNTIME_PROOF_BIND_SOURCE AUTHENTICATED_RUNTIME_PROOF_SHA256 \
+  <<<"$projection_binding"
+if [[ "$RUNTIME_PROOF_BIND_SOURCE" \
+    != "$PROJECTION_SNAPSHOT_ROOT/$PUBLIC_PROJECTION_SNAPSHOT_ID/HUB_LOCAL_RELEASE_PROOF.generated.json" \
+  || ! -f "$RUNTIME_PROOF_BIND_SOURCE" || -L "$RUNTIME_PROOF_BIND_SOURCE" \
+  || ! -O "$RUNTIME_PROOF_BIND_SOURCE" \
+  || "$AUTHENTICATED_RUNTIME_PROOF_SHA256" != "$RUNTIME_PROOF_BIND_SOURCE_SHA256" ]]; then
+  echo "authenticated CURRENT runtime proof does not match its immutable deploy handoff" >&2
   exit 2
 fi
 RECOVERY_ROUTE_REQUESTED=0
@@ -694,6 +764,8 @@ compose_command=(
   CHUMMER_RUN_SERVICES_CONTEXT_DIR="$SOURCE_ROOT"
   CHUMMER_RUN_SERVICES_SOURCE="$SOURCE_ROOT"
   CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR="$OVERLAY_ROOT"
+  CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT="$PROJECTION_SNAPSHOT_ROOT"
+  CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE="$RUNTIME_PROOF_BIND_SOURCE"
   CHUMMER_PUBLIC_EDGE_PORT="$PUBLIC_EDGE_PORT"
   "$TRUSTED_DOCKER" --context "$CANONICAL_DOCKER_CONTEXT" compose
   --env-file "$ENV_FILE" -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE"
@@ -710,6 +782,8 @@ trusted_source_python() {
     CHUMMER_RUN_SERVICES_CONTEXT_DIR="$SOURCE_ROOT" \
     CHUMMER_RUN_SERVICES_SOURCE="$SOURCE_ROOT" \
     CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR="$OVERLAY_ROOT" \
+    CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT="$PROJECTION_SNAPSHOT_ROOT" \
+    CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE="$RUNTIME_PROOF_BIND_SOURCE" \
     CHUMMER_PUBLIC_EDGE_PORT="$PUBLIC_EDGE_PORT" \
     "$TRUSTED_PYTHON" -I "$@"
 }
@@ -861,6 +935,8 @@ run_deploy_recovery() {
     --env-file "$ENV_FILE" \
     --project-name "$COMPOSE_PROJECT" \
     --build-context "$BUILD_CONTEXT" \
+    --public-projection-snapshot-root "$PROJECTION_SNAPSHOT_ROOT" \
+    --runtime-proof-bind-source "$RUNTIME_PROOF_BIND_SOURCE" \
     --published-port "$PUBLIC_EDGE_PORT" \
     --portal-image-tag "$IMAGE_TAG" \
     --tool-image-tag "$TOOL_IMAGE_TAG" \
@@ -952,6 +1028,7 @@ trusted_source_python "$ROOT_DIR/scripts/verify_public_edge_deploy_source.py" \
 trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.py" \
   --source-root "$SOURCE_ROOT" \
   --skip-overlay-marker-check \
+  --public-projection-snapshot-root "$PROJECTION_SNAPSHOT_ROOT" \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
@@ -977,22 +1054,22 @@ trusted_source_python "$SOURCE_ROOT/scripts/publish_public_edge_portal_overlay.p
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --output "$OVERLAY_STAGE_OUTPUT"
 
-if [[ ! -f "$CANONICAL_RUNTIME_PROOF_BIND_SOURCE" \
-  || -L "$CANONICAL_RUNTIME_PROOF_BIND_SOURCE" \
-  || ! -O "$CANONICAL_RUNTIME_PROOF_BIND_SOURCE" ]]; then
-  echo "canonical runtime proof bind source is unsafe" >&2
+if [[ ! -f "$RUNTIME_PROOF_BIND_SOURCE" \
+  || -L "$RUNTIME_PROOF_BIND_SOURCE" \
+  || ! -O "$RUNTIME_PROOF_BIND_SOURCE" ]]; then
+  echo "authenticated CURRENT runtime proof bind source is unsafe" >&2
   exit 2
 fi
 runtime_proof_bind_source_sha256="$(
-  "$TRUSTED_SHA256SUM" -- "$CANONICAL_RUNTIME_PROOF_BIND_SOURCE"
+  "$TRUSTED_SHA256SUM" -- "$RUNTIME_PROOF_BIND_SOURCE"
 )"
 runtime_proof_bind_source_sha256="${runtime_proof_bind_source_sha256%% *}"
 if [[ "$runtime_proof_bind_source_sha256" != "$RUNTIME_PROOF_BIND_SOURCE_SHA256" ]]; then
-  echo "canonical runtime proof bind source changed after preflight" >&2
+  echo "authenticated CURRENT runtime proof changed after preflight" >&2
   exit 2
 fi
 "$TRUSTED_INSTALL" -m 0600 -- \
-  "$CANONICAL_RUNTIME_PROOF_BIND_SOURCE" \
+  "$RUNTIME_PROOF_BIND_SOURCE" \
   "$CANDIDATE_PROOF_BIND_SOURCE_SNAPSHOT"
 
 resolve_image_tag_id() {
@@ -1242,7 +1319,7 @@ if ! trusted_source_python "$SOURCE_ROOT/scripts/public_edge_overlay_transaction
   --staging-root "$OVERLAY_STAGING_ROOT" \
   --backup-root "$OVERLAY_BACKUP_ROOT" \
   --activation-receipt "$OVERLAY_ACTIVATION_OUTPUT" \
-  --proof-bind-source "$CANONICAL_RUNTIME_PROOF_BIND_SOURCE" \
+  --proof-bind-source "$RUNTIME_PROOF_BIND_SOURCE" \
   --candidate-proof-bind-source-snapshot \
     "$CANDIDATE_PROOF_BIND_SOURCE_SNAPSHOT" \
   --prior-portal-proof-authority-snapshot \
@@ -1303,6 +1380,7 @@ fi
 trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.py" \
   --source-root "$SOURCE_ROOT" \
   --skip-overlay-marker-check \
+  --public-projection-snapshot-root "$PROJECTION_SNAPSHOT_ROOT" \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
@@ -1352,6 +1430,7 @@ fi
 if ! trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.py" \
   --source-root "$SOURCE_ROOT" \
   --overlay-root "$OVERLAY_ROOT" \
+  --public-projection-snapshot-root "$PROJECTION_SNAPSHOT_ROOT" \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256" \
@@ -1422,6 +1501,7 @@ fi
 if ! trusted_source_python "$SOURCE_ROOT/scripts/check_public_edge_deploy_preflight.py" \
   --source-root "$SOURCE_ROOT" \
   --overlay-root "$OVERLAY_ROOT" \
+  --public-projection-snapshot-root "$PROJECTION_SNAPSHOT_ROOT" \
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT" \
   --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256" \
   --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256" \
@@ -1548,6 +1628,9 @@ postdeploy_command=(
   --base-url "$BASE_URL"
   --strict-preflight
   --release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"
+  --release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"
+  --public-projection-snapshot-root "$PROJECTION_SNAPSHOT_ROOT"
+  --runtime-proof-bind-source-sha256 "$RUNTIME_PROOF_BIND_SOURCE_SHA256"
   --overlay-root "$OVERLAY_ROOT"
   --expected-build-info "$OVERLAY_ROOT/.codex-studio/runtime/PUBLIC_EDGE_PORTAL_OVERLAY_BUILD_INFO.generated.json"
   --require-downloads-status-playwright

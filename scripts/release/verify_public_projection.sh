@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
-public_base="${CHUMMER_PUBLIC_BASE_URL:-https://chummer.run}"
-(
-  cd /docker/chummercomplete/chummer.run-services
-  python3 scripts/materialize_hub_local_release_proof.py \
-    .codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json \
-    "$public_base" \
-    docker-compose.yml \
-    120 \
-    true
-) >/dev/null
-python3 /docker/chummercomplete/chummer.run-services/scripts/verify_next90_m120_hub_public_launch_health.py >/dev/null
-python3 /docker/chummercomplete/chummer.run-services/scripts/verify_next90_m125_hub_public_signal_packets.py >/dev/null
-python3 /docker/chummercomplete/chummer.run-services/scripts/verify_next90_m126_hub_hosted_proof_contracts.py >/dev/null
-python3 /docker/chummercomplete/chummer.run-services/scripts/verify_desktop_native_trust_receipts.py >/dev/null
-python3 /docker/chummercomplete/chummer.run-services/scripts/verify_next90_m144_hub_release_truth_alignment.py >/dev/null
-python3 /docker/chummercomplete/chummer.run-services/scripts/verify_live_public_windows_installer.py >/dev/null
-echo "public projection ok"
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+requested_python="${CHUMMER_RELEASE_PYTHON:-}"
+
+for candidate in "$requested_python" python3.13 python3.12 python3.11 python3; do
+  [[ -n "$candidate" ]] || continue
+  command -v "$candidate" >/dev/null 2>&1 || continue
+  if "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+    exec "$candidate" "$script_dir/verify_public_projection.py" "$@"
+  fi
+done
+
+echo "public projection requires Python 3.11 or newer; set CHUMMER_RELEASE_PYTHON to a reviewed interpreter" >&2
+exit 2

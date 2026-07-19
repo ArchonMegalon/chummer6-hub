@@ -47,6 +47,8 @@
     <Compile Include="..\Chummer.Tests\RepoPaths.cs" Link="RepoPaths.cs" />
     <Compile Include="..\Chummer.Tests\BlackLedgerFactionOnboardingTests.cs" Link="BlackLedgerFactionOnboardingTests.cs" />
     <Compile Include="..\Chummer.Tests\BlackLedgerTickNewsTests.cs" Link="BlackLedgerTickNewsTests.cs" />
+    <Compile Include="..\Chummer.Tests\PublicProjectionSnapshotServiceTests.cs" Link="PublicProjectionSnapshotServiceTests.cs" />
+    <Compile Include="..\Chummer.Tests\PublicProjectionProofRequestPathPolicyTests.cs" Link="PublicProjectionProofRequestPathPolicyTests.cs" />
   </ItemGroup>
 
 </Project>

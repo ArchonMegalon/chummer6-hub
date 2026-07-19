@@ -13,8 +13,8 @@
         <div class="recommended-download__copy">
             <span class="tag">Mac build command</span>
             <h2>Run this on your Mac</h2>
-            <p>The command verifies the setup script and release proof, asks for the short-lived access code without echoing it, then clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes, and verifies.</p>
-            <p>Before running it, export reviewed refs and full 40-hex <code>EXPECTED_COMMIT</code> pins for all seven source repositories. The command stops before downloading the bootstrap when any pin is absent or malformed; the <a href="@Model.ReadmeUrl">runbook</a> lists every required setting.</p>
+            <p>The command verifies the setup script and release proof, materializes the five digest-bound authority inputs from authenticated snapshot <code>@Model.AuthoritySnapshotId</code>, asks for the short-lived access code without echoing it, then clones repos, builds the osx-arm64 desktop app, runs startup smoke, publishes, and verifies.</p>
+            <p>Before running it, export reviewed refs and full 40-hex <code>EXPECTED_COMMIT</code> pins for all seven source repositories. The command supplies all 17 Hub-proof authority variables itself; do not override them with machine-local paths. It stops before downloading the bootstrap when any source pin is absent or malformed; the <a href="@Model.ReadmeUrl">runbook</a> lists every required source setting.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Command</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadCommand">@Model.Command</pre>
@@ -23,6 +23,7 @@
                     <a class="button-like button-like--ghost" href="@Model.BootstrapUrl">Open setup script</a>
                 </div>
                 <p class="status-copy">The command contains no access code. Copy a fresh code below, run the command, and paste the code at the hidden prompt. For unattended input, place only the code in a regular mode-0600 file and set <code>CHUMMER_RELEASE_UPLOAD_TICKET_FILE</code> to its path.</p>
+                <p class="status-copy">Authority snapshot SHA-256: <code>@Model.AuthoritySnapshotSha256</code>. Refresh this page instead of reusing the command after CURRENT advances.</p>
                 <p class="status-copy">After a successful upload or a failed run, delete the local release work root and temporary packaging files again so the Mac SSD does not fill up. Typical cleanup targets are the `run-...` workspace under `$HOME/work/chummer-release` plus any `CHUMMER_MAC_RELEASE_TMPDIR` and `CHUMMER_DESKTOP_INSTALLER_TMPDIR` contents.</p>
                 <p class="status-copy" id="releaseUploadCommandNotice" hidden></p>
             </div>

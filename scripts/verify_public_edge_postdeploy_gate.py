@@ -4843,6 +4843,21 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reuse-existing-playwright-artifacts", action="store_true", help="Reuse existing Playwright-generated receipts from the supplied artifact directories instead of rerunning browser proofs.")
     parser.add_argument("--reuse-artifact-max-age-hours", type=float, default=DEFAULT_PLAYWRIGHT_REUSE_MAX_AGE_HOURS, help="Maximum age for reused Playwright receipts before the browser proof must rerun.")
     parser.add_argument("--release-channel-receipt", default=str(DEFAULT_RELEASE_CHANNEL_RECEIPT), help="Release-channel receipt used to require visible downloads version parity.")
+    parser.add_argument(
+        "--release-channel-receipt-sha256",
+        default="",
+        help="Independent lowercase SHA-256 for the release-channel receipt used by strict preflight.",
+    )
+    parser.add_argument(
+        "--public-projection-snapshot-root",
+        default="",
+        help="Authenticated CURRENT public projection root used by strict preflight.",
+    )
+    parser.add_argument(
+        "--runtime-proof-bind-source-sha256",
+        default="",
+        help="Independent lowercase SHA-256 for the CURRENT Hub runtime proof output.",
+    )
     parser.add_argument("--skip-release-version-match", action="store_true", help="Do not require public visible Version text to match the release-channel version.")
     parser.add_argument("--overlay-root", default="", help="Mounted /app overlay root that public-edge preflight must validate.")
     parser.add_argument(
@@ -4863,6 +4878,19 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.skip_preflight and args.strict_preflight:
         parser.error("--strict-preflight cannot be combined with --skip-preflight")
+    if not args.skip_preflight:
+        if not args.public_projection_snapshot_root:
+            parser.error(
+                "postdeploy preflight requires --public-projection-snapshot-root"
+            )
+        if re.fullmatch(r"[0-9a-f]{64}", args.runtime_proof_bind_source_sha256) is None:
+            parser.error(
+                "postdeploy preflight requires --runtime-proof-bind-source-sha256"
+            )
+        if re.fullmatch(r"[0-9a-f]{64}", args.release_channel_receipt_sha256) is None:
+            parser.error(
+                "postdeploy preflight requires --release-channel-receipt-sha256"
+            )
     release_channel = {} if args.skip_release_version_match else load_optional_json(Path(args.release_channel_receipt))
     expected_release_version = "" if args.skip_release_version_match else str(release_channel.get("version") or "").strip()
     expected_release_status = "" if args.skip_release_version_match else str(release_channel.get("status") or "").strip()
@@ -4907,6 +4935,14 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
                 "scripts/check_public_edge_deploy_preflight.py",
                 "--overlay-root",
                 str(overlay_root),
+                "--public-projection-snapshot-root",
+                args.public_projection_snapshot_root,
+                "--runtime-proof-bind-source-sha256",
+                args.runtime_proof_bind_source_sha256,
+                "--release-channel-receipt",
+                args.release_channel_receipt,
+                "--release-channel-receipt-sha256",
+                args.release_channel_receipt_sha256,
             ]
             if not args.strict_preflight:
                 preflight_command[2:2] = [

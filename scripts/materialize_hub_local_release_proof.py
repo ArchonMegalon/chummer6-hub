@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import hmac
 import importlib.util
 import json
 import os
+import re
 import stat
 import sys
 import tempfile
@@ -18,9 +21,17 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 try:
-    from scripts.strict_json_contract import canonical_json_bytes
+    from scripts.strict_json_contract import (
+        StrictJsonContractError,
+        canonical_json_bytes,
+        strict_json_object,
+    )
 except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
-    from strict_json_contract import canonical_json_bytes
+    from strict_json_contract import (
+        StrictJsonContractError,
+        canonical_json_bytes,
+        strict_json_object,
+    )
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -39,11 +50,69 @@ M141_UI_FRONTIER_ID = 2354698282
 M141_UI_FLAGSHIP_FRONTIER_ID = 1922169755
 PUBLIC_JSON_ARTIFACT_MODE = 0o644
 STABLE_READ_CHUNK_BYTES = 1024 * 1024
+MAX_AUTHORITY_INPUT_BYTES = 16 * 1024 * 1024
+MAX_RELEASE_INPUT_AGE_SECONDS = 86400
+MAX_RELEASE_INPUT_FUTURE_SKEW_SECONDS = 300
+SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+PORTABLE_KNOWN_ROOTS = (
+    (
+        "/docker/chummercomplete/chummer.run-services",
+        "repo://ArchonMegalon/chummer6-hub",
+    ),
+    (
+        "/docker/chummercomplete/chummer6-hub",
+        "repo://ArchonMegalon/chummer6-hub",
+    ),
+    (
+        "/docker/chummercomplete/chummer6-ui",
+        "repo://ArchonMegalon/chummer6-ui",
+    ),
+)
+MACHINE_LOCAL_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9:])(?:"
+    r"/private/tmp/|/private/var/|/var/folders/|/var/tmp/|/tmp/|"
+    r"/docker/|/workspace/|/Users/|/root/|/home/[^/\s]+/|"
+    r"[A-Za-z]:[\\/](?:Users|Windows[\\/]Temp|workspace)[\\/]"
+    r")",
+    re.IGNORECASE,
+)
 _PUBLIC_EDGE_OVERLAY_MODULE = None
 
 
 def iso_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _portable_public_value(value, *, location: str = "$"):
+    """Map only known roots to honest portable identities and reject every other host path."""
+
+    if isinstance(value, str):
+        portable = value
+        for local_root, portable_root in PORTABLE_KNOWN_ROOTS:
+            portable = re.sub(
+                rf"{re.escape(local_root)}(?=(?:/|$))",
+                portable_root,
+                portable,
+            )
+        match = MACHINE_LOCAL_PATH_PATTERN.search(portable)
+        if match is not None:
+            raise RuntimeError(
+                "hub local release proof contains an unknown machine-local path at "
+                f"{location}"
+            )
+        return portable
+    if isinstance(value, list):
+        return [
+            _portable_public_value(item, location=f"{location}[{index}]")
+            for index, item in enumerate(value)
+        ]
+    if isinstance(value, dict):
+        return {
+            key: _portable_public_value(item, location=f"{location}.{key}")
+            for key, item in value.items()
+        }
+    return value
 
 
 def _load_public_edge_overlay_module():
@@ -71,6 +140,11 @@ def _public_edge_proof_mutation_lock():
     """Serialize proof replacement with standalone overlay deploy/recovery."""
 
     overlay = _load_public_edge_overlay_module()
+    portable_lock_path = str(
+        os.environ.get("CHUMMER_HUB_LOCAL_PROOF_MUTATION_LOCK_PATH") or ""
+    ).strip()
+    if portable_lock_path:
+        overlay.PUBLIC_EDGE_MUTATION_LOCK = Path(portable_lock_path)
     with overlay.public_edge_mutation_lock(activate=True):
         yield
 
@@ -132,6 +206,157 @@ def _stable_regular_file_matches(path: Path, expected_bytes: bytes) -> bool:
         after.st_nlink,
     )
     return stable_identity_before == stable_identity_after and b"".join(chunks) == expected_bytes
+
+
+def _require_current_release_inputs() -> bool:
+    return str(os.environ.get("CHUMMER_REQUIRE_CURRENT_RELEASE_INPUTS") or "").strip().lower() \
+        in {"1", "true", "yes", "on"}
+
+
+def _required_env(name: str) -> str:
+    value = str(os.environ.get(name) or "").strip()
+    if not value:
+        raise RuntimeError(f"release proof requires {name}")
+    return value
+
+
+def _normalized_expected_sha256(name: str) -> str:
+    value = _required_env(name).lower()
+    if SHA256_PATTERN.fullmatch(value) is None:
+        raise RuntimeError(f"{name} must be a 64-character lowercase SHA256")
+    return value
+
+
+def _bounded_release_age_seconds() -> int:
+    raw = str(
+        os.environ.get("CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS")
+        or os.environ.get("CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS")
+        or MAX_RELEASE_INPUT_AGE_SECONDS
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError("release proof max age must be an integer") from exc
+    if value <= 0 or value > MAX_RELEASE_INPUT_AGE_SECONDS:
+        raise RuntimeError(
+            "release proof max age must be between 1 and "
+            f"{MAX_RELEASE_INPUT_AGE_SECONDS} seconds"
+        )
+    return value
+
+
+def _bounded_release_future_skew_seconds() -> int:
+    raw = str(
+        os.environ.get("CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS")
+        or os.environ.get("CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS")
+        or MAX_RELEASE_INPUT_FUTURE_SKEW_SECONDS
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError("release proof future skew must be an integer") from exc
+    if value < 0 or value > MAX_RELEASE_INPUT_FUTURE_SKEW_SECONDS:
+        raise RuntimeError(
+            "release proof future skew must be between 0 and "
+            f"{MAX_RELEASE_INPUT_FUTURE_SKEW_SECONDS} seconds"
+        )
+    return value
+
+
+def _stable_authority_bytes(
+    path: Path,
+    *,
+    expected_sha256: str,
+    label: str,
+) -> tuple[bytes, str]:
+    """Read one digest-bound authority file exactly once without following links."""
+
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise RuntimeError(f"{label} authority input is unavailable") from exc
+
+    try:
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+            raise RuntimeError(f"{label} authority input must be a single-link regular file")
+        if before.st_size < 2 or before.st_size > MAX_AUTHORITY_INPUT_BYTES:
+            raise RuntimeError(f"{label} authority input has an invalid size")
+
+        chunks: list[bytes] = []
+        remaining = before.st_size + 1
+        while remaining > 0:
+            chunk = os.read(descriptor, min(STABLE_READ_CHUNK_BYTES, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        after = os.fstat(descriptor)
+        try:
+            path_metadata = path.lstat()
+        except OSError as exc:
+            raise RuntimeError(f"{label} authority input changed during stable read") from exc
+    finally:
+        os.close(descriptor)
+
+    identity_before = (
+        before.st_dev,
+        before.st_ino,
+        before.st_size,
+        before.st_mtime_ns,
+        before.st_ctime_ns,
+        before.st_mode,
+        before.st_nlink,
+    )
+    identity_after = (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+        after.st_mode,
+        after.st_nlink,
+    )
+    if identity_before != identity_after or (
+        path_metadata.st_dev,
+        path_metadata.st_ino,
+    ) != (after.st_dev, after.st_ino):
+        raise RuntimeError(f"{label} authority input changed during stable read")
+
+    payload_bytes = b"".join(chunks)
+    if len(payload_bytes) != before.st_size:
+        raise RuntimeError(f"{label} authority input changed during stable read")
+    actual_sha256 = hashlib.sha256(payload_bytes).hexdigest()
+    if not secrets_compare_digest(actual_sha256, expected_sha256):
+        raise RuntimeError(f"{label} authority input SHA256 does not match its immutable handoff")
+    return payload_bytes, actual_sha256
+
+
+def _stable_authority_input(
+    path: Path,
+    *,
+    expected_sha256: str,
+    label: str,
+) -> tuple[dict, str]:
+    """Read and parse one digest-bound authority JSON object without rereading it."""
+
+    payload_bytes, actual_sha256 = _stable_authority_bytes(
+        path,
+        expected_sha256=expected_sha256,
+        label=label,
+    )
+    try:
+        payload = strict_json_object(payload_bytes, label=f"{label} authority input")
+    except StrictJsonContractError as exc:
+        raise RuntimeError(str(exc)) from exc
+    return payload, actual_sha256
+
+
+def secrets_compare_digest(left: str, right: str) -> bool:
+    """Keep digest comparison constant-time without importing release credentials."""
+
+    return hmac.compare_digest(left, right)
 
 
 def _write_public_json_artifact(path: Path, text: str) -> bool:
@@ -327,6 +552,86 @@ def _parse_iso_timestamp(raw_value: str | None) -> dt.datetime | None:
     return parsed.astimezone(dt.timezone.utc)
 
 
+def _strict_string_alias(
+    payload: dict,
+    *keys: str,
+    label: str,
+    required: bool = False,
+) -> str:
+    present = [payload[key] for key in keys if key in payload]
+    if any(not isinstance(value, str) for value in present):
+        raise RuntimeError(f"{label} aliases must all be strings")
+    normalized = [value.strip() for value in present]
+    if len(set(normalized)) > 1:
+        raise RuntimeError(f"{label} aliases disagree")
+    value = normalized[0] if normalized else ""
+    if required and not value:
+        raise RuntimeError(f"{label} is required")
+    return value
+
+
+def _require_fresh_authority_timestamp(
+    raw_timestamp: str,
+    *,
+    label: str,
+    max_age_seconds: int,
+    max_future_skew_seconds: int,
+) -> None:
+    normalized = raw_timestamp.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = dt.datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"{label} timestamp must be an offset-aware ISO-8601 value"
+        ) from exc
+    if parsed.tzinfo is None:
+        raise RuntimeError(f"{label} timestamp must be an offset-aware ISO-8601 value")
+    parsed = parsed.astimezone(dt.timezone.utc)
+    age = dt.datetime.now(dt.timezone.utc) - parsed
+    if age < -dt.timedelta(seconds=max_future_skew_seconds):
+        raise RuntimeError(f"{label} timestamp is too far in the future")
+    if age > dt.timedelta(seconds=max_age_seconds):
+        raise RuntimeError(
+            f"{label} is stale: age {age.total_seconds():.3f}s; maximum {max_age_seconds}s"
+        )
+
+
+def _authority_reference(name: str) -> str:
+    value = _required_env(name)
+    if (
+        re.fullmatch(r"[a-z][a-z0-9+.-]*://[^\s]+", value, re.IGNORECASE) is None
+        or value.lower().startswith("file://")
+    ):
+        raise RuntimeError(f"{name} must be a non-file immutable authority reference")
+    return value
+
+
+def _validate_authority_commit(
+    payload: dict,
+    *,
+    expected_env_name: str,
+    label: str,
+) -> str:
+    commit = _strict_string_alias(
+        payload,
+        "registryCommit",
+        "registry_commit",
+        "sourceCommit",
+        "source_commit",
+        label=f"{label} commit",
+    ).lower()
+    expected = _required_env(expected_env_name).lower()
+    if COMMIT_PATTERN.fullmatch(commit) is None:
+        raise RuntimeError(f"{label} commit must be a full 40-character SHA")
+    if COMMIT_PATTERN.fullmatch(expected) is None:
+        raise RuntimeError(f"{expected_env_name} must be a full 40-character SHA")
+    if not hmac.compare_digest(commit, expected):
+        raise RuntimeError(f"{label} commit does not match its immutable handoff")
+    return commit
+
+
 def _payload_is_fresh(payload: dict, *, max_age_seconds: int, max_future_skew_seconds: int) -> bool:
     raw_generated_at = str(payload.get("generatedAt") or payload.get("generated_at") or "").strip() or None
     generated_at = _parse_iso_timestamp(raw_generated_at)
@@ -349,12 +654,19 @@ def _release_readiness_reason(value: str) -> str:
     return replacements.get(text, text)
 
 
-def _load_release_channel_snapshot() -> dict:
+def _load_release_channel_snapshot(
+    loaded_payload: dict | None = None,
+    *,
+    source_label: str | None = None,
+) -> dict:
     release_channel_path = _release_channel_path()
-    try:
-        release_channel_label = release_channel_path.relative_to(REPO_ROOT).as_posix()
-    except ValueError:
-        release_channel_label = str(release_channel_path)
+    if source_label is not None:
+        release_channel_label = source_label
+    else:
+        try:
+            release_channel_label = release_channel_path.relative_to(REPO_ROOT).as_posix()
+        except ValueError:
+            release_channel_label = str(release_channel_path)
     snapshot = {
         "status": "unavailable",
         "path": release_channel_label,
@@ -366,13 +678,15 @@ def _load_release_channel_snapshot() -> dict:
         "supportabilityState": "",
         "publishedAt": "",
     }
-    if not release_channel_path.is_file():
-        return snapshot
-
-    loaded = _load_existing_payload(release_channel_path)
-    if loaded is None:
-        snapshot["status"] = "invalid"
-        return snapshot
+    if loaded_payload is None:
+        if not release_channel_path.is_file():
+            return snapshot
+        loaded = _load_existing_payload(release_channel_path)
+        if loaded is None:
+            snapshot["status"] = "invalid"
+            return snapshot
+    else:
+        loaded = loaded_payload
 
     def strict_alias_value(*keys: str) -> str | None:
         present = [loaded[key] for key in keys if key in loaded]
@@ -425,8 +739,8 @@ def _load_release_channel_snapshot() -> dict:
     return snapshot
 
 
-def _published_installer_proof_routes() -> list[str]:
-    loaded = _load_existing_payload(_release_channel_path())
+def _published_installer_proof_routes(loaded_payload: dict | None = None) -> list[str]:
+    loaded = loaded_payload if loaded_payload is not None else _load_existing_payload(_release_channel_path())
     if not isinstance(loaded, dict):
         return [
             "/downloads/install/avalonia-linux-x64-installer",
@@ -449,6 +763,138 @@ def _published_installer_proof_routes() -> list[str]:
             routes.append(f"/downloads/install/{artifact_id}")
 
     return sorted(_sorted_unique_strings(routes))
+
+
+def _load_current_release_authorities(
+    *,
+    max_age_seconds: int,
+    max_future_skew_seconds: int,
+) -> tuple[dict, dict, dict]:
+    release_path = _release_channel_path()
+    readiness_path = _flagship_readiness_path()
+    release_sha256 = _normalized_expected_sha256(
+        "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_SHA256"
+    )
+    readiness_sha256 = _normalized_expected_sha256(
+        "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_SHA256"
+    )
+    release_authority = _authority_reference(
+        "CHUMMER_HUB_RELEASE_CHANNEL_AUTHORITY"
+    )
+    readiness_authority = _authority_reference(
+        "CHUMMER_FLAGSHIP_PRODUCT_READINESS_AUTHORITY"
+    )
+
+    release_payload, release_sha256 = _stable_authority_input(
+        release_path,
+        expected_sha256=release_sha256,
+        label="release channel",
+    )
+    readiness_payload, readiness_sha256 = _stable_authority_input(
+        readiness_path,
+        expected_sha256=readiness_sha256,
+        label="flagship readiness",
+    )
+
+    release_contract = _strict_string_alias(
+        release_payload,
+        "contractName",
+        "contract_name",
+        label="release channel contract",
+        required=True,
+    )
+    readiness_contract = _strict_string_alias(
+        readiness_payload,
+        "contractName",
+        "contract_name",
+        label="flagship readiness contract",
+        required=True,
+    )
+    release_generated_at = _strict_string_alias(
+        release_payload,
+        "generatedAt",
+        "generated_at",
+        label="release channel generated timestamp",
+        required=True,
+    )
+    readiness_generated_at = _strict_string_alias(
+        readiness_payload,
+        "generatedAt",
+        "generated_at",
+        label="flagship readiness generated timestamp",
+        required=True,
+    )
+    _require_fresh_authority_timestamp(
+        release_generated_at,
+        label="release channel authority",
+        max_age_seconds=max_age_seconds,
+        max_future_skew_seconds=max_future_skew_seconds,
+    )
+    _require_fresh_authority_timestamp(
+        readiness_generated_at,
+        label="flagship readiness authority",
+        max_age_seconds=max_age_seconds,
+        max_future_skew_seconds=max_future_skew_seconds,
+    )
+    release_commit = _validate_authority_commit(
+        release_payload,
+        expected_env_name="CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_COMMIT",
+        label="release channel authority",
+    )
+    readiness_commit = _validate_authority_commit(
+        readiness_payload,
+        expected_env_name="CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_COMMIT",
+        label="flagship readiness authority",
+    )
+    authority_inputs = {
+        "release_channel": {
+            "authority": release_authority,
+            "sha256": release_sha256,
+            "contract": release_contract,
+            "commit": release_commit,
+            "generated_at": release_generated_at,
+        },
+        "flagship_readiness": {
+            "authority": readiness_authority,
+            "sha256": readiness_sha256,
+            "contract": readiness_contract,
+            "commit": readiness_commit,
+            "generated_at": readiness_generated_at,
+        },
+    }
+    for authority_key, path_name, digest_name, reference_name in (
+        (
+            "fleet_queue",
+            "CHUMMER_FLEET_QUEUE_STAGING_PATH",
+            "CHUMMER_FLEET_QUEUE_STAGING_EXPECTED_SHA256",
+            "CHUMMER_FLEET_QUEUE_STAGING_AUTHORITY",
+        ),
+        (
+            "design_queue",
+            "CHUMMER_DESIGN_QUEUE_STAGING_PATH",
+            "CHUMMER_DESIGN_QUEUE_STAGING_EXPECTED_SHA256",
+            "CHUMMER_DESIGN_QUEUE_STAGING_AUTHORITY",
+        ),
+        (
+            "design_successor_registry",
+            "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_PATH",
+            "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_EXPECTED_SHA256",
+            "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_AUTHORITY",
+        ),
+    ):
+        authority_path = Path(_required_env(path_name))
+        expected_digest = _normalized_expected_sha256(digest_name)
+        authority_reference = _authority_reference(reference_name)
+        _authority_bytes, actual_digest = _stable_authority_bytes(
+            authority_path,
+            expected_sha256=expected_digest,
+            label=authority_key.replace("_", " "),
+        )
+        authority_inputs[authority_key] = {
+            "authority": authority_reference,
+            "sha256": actual_digest,
+        }
+    return release_payload, readiness_payload, authority_inputs
 
 
 def _effective_readiness_override_reason(readiness_payload: dict, coverage_gap_keys: list[str]) -> str:
@@ -487,7 +933,11 @@ def _effective_readiness_override_reason(readiness_payload: dict, coverage_gap_k
     return _append_reason_details(base_reason, details)
 
 
-def _load_flagship_readiness_snapshot() -> dict:
+def _load_flagship_readiness_snapshot(
+    readiness_payload: dict | None = None,
+    *,
+    source_label: str | None = None,
+) -> dict:
     readiness_path = _flagship_readiness_path()
     default_reason = "flagship product readiness checks did not publish a desktop-client reason."
     snapshot = {
@@ -499,15 +949,15 @@ def _load_flagship_readiness_snapshot() -> dict:
         "reason": default_reason,
         "completion_audit_status": "unknown",
         "completion_audit_reason": "",
-        "source_path": str(readiness_path),
+        "source_path": source_label or str(readiness_path),
     }
 
-    if not readiness_path.is_file():
-        return snapshot
-
-    readiness_payload = _load_flagship_readiness_payload(readiness_path)
     if readiness_payload is None:
-        return snapshot
+        if not readiness_path.is_file():
+            return snapshot
+        readiness_payload = _load_flagship_readiness_payload(readiness_path)
+        if readiness_payload is None:
+            return snapshot
 
     coverage_gap_keys = readiness_payload.get("scoped_warning_keys")
     if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
@@ -554,7 +1004,12 @@ def _load_flagship_readiness_snapshot() -> dict:
     return {
         "status": str(readiness_payload.get("status") or "").strip() or "unknown",
         "scoped_status": str(readiness_payload.get("scoped_status") or "").strip() or "unknown",
-        "generated_at": str(readiness_payload.get("generated_at") or "").strip(),
+        "generated_at": _strict_string_alias(
+            readiness_payload,
+            "generatedAt",
+            "generated_at",
+            label="flagship readiness generated timestamp",
+        ),
         "missing_coverage_keys": normalized_coverage_gap_keys,
         "desktop_client_missing": "desktop_client" in {item.casefold() for item in normalized_coverage_gap_keys},
         "reason": reason,
@@ -564,7 +1019,7 @@ def _load_flagship_readiness_snapshot() -> dict:
             else "unknown"
         ),
         "completion_audit_reason": completion_audit_reason,
-        "source_path": str(readiness_path),
+        "source_path": source_label or str(readiness_path),
     }
 
 
@@ -775,23 +1230,50 @@ def _materialize_under_shared_mutation_lock(
     skip_rebuild: str,
 ) -> int:
     out_path = Path(out_path_text)
-    proof_max_age_seconds = _parse_int_env(
-        "CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS",
-        "CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS",
-        default=86400,
-    )
-    proof_max_future_skew_seconds = _parse_int_env(
-        "CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
-        "CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
-        default=300,
-    )
-    _sync_local_flagship_readiness_artifact_if_needed(
-        out_path=out_path,
-        source_path=str(_canonical_flagship_readiness_source_path()),
-    )
-    desktop_client_readiness = _load_flagship_readiness_snapshot()
-    release_channel = _load_release_channel_snapshot()
-    published_installer_proof_routes = _published_installer_proof_routes()
+    require_current_inputs = _require_current_release_inputs()
+    authority_inputs: dict = {}
+    if require_current_inputs:
+        proof_max_age_seconds = _bounded_release_age_seconds()
+        proof_max_future_skew_seconds = _bounded_release_future_skew_seconds()
+        (
+            release_channel_payload,
+            flagship_readiness_payload,
+            authority_inputs,
+        ) = _load_current_release_authorities(
+            max_age_seconds=proof_max_age_seconds,
+            max_future_skew_seconds=proof_max_future_skew_seconds,
+        )
+        release_channel = _load_release_channel_snapshot(
+            release_channel_payload,
+            source_label=authority_inputs["release_channel"]["authority"],
+        )
+        if release_channel.get("status") != "available":
+            raise RuntimeError("release channel authority does not publish one canonical binding")
+        desktop_client_readiness = _load_flagship_readiness_snapshot(
+            flagship_readiness_payload,
+            source_label=authority_inputs["flagship_readiness"]["authority"],
+        )
+        published_installer_proof_routes = _published_installer_proof_routes(
+            release_channel_payload
+        )
+    else:
+        proof_max_age_seconds = _parse_int_env(
+            "CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS",
+            "CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS",
+            default=MAX_RELEASE_INPUT_AGE_SECONDS,
+        )
+        proof_max_future_skew_seconds = _parse_int_env(
+            "CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
+            "CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
+            default=MAX_RELEASE_INPUT_FUTURE_SKEW_SECONDS,
+        )
+        _sync_local_flagship_readiness_artifact_if_needed(
+            out_path=out_path,
+            source_path=str(_canonical_flagship_readiness_source_path()),
+        )
+        desktop_client_readiness = _load_flagship_readiness_snapshot()
+        release_channel = _load_release_channel_snapshot()
+        published_installer_proof_routes = _published_installer_proof_routes()
     additional_installer_proof_routes = [
         route
         for route in published_installer_proof_routes
@@ -1922,18 +2404,23 @@ def _materialize_under_shared_mutation_lock(
         ],
     }
 
-    _sync_local_flagship_readiness_artifact_if_needed(
-        out_path=out_path,
-        source_path=str(desktop_client_readiness.get("source_path") or "").strip(),
-    )
+    if authority_inputs:
+        payload["authority_inputs"] = authority_inputs
+
+    if not require_current_inputs:
+        _sync_local_flagship_readiness_artifact_if_needed(
+            out_path=out_path,
+            source_path=str(desktop_client_readiness.get("source_path") or "").strip(),
+        )
 
     # The caller owns the same fixed host mutation authority used by standalone
     # deploy and recovery. All input reads and payload construction above therefore
     # describe one post-lock snapshot, and these replacements cannot race container
     # recreation, rollback verification, or a newer materializer invocation.
+    public_payload = _portable_public_value(payload) if require_current_inputs else payload
     changed = _publish_runtime_proof_artifacts(
         out_path=out_path,
-        payload=payload,
+        payload=public_payload,
         proof_max_age_seconds=proof_max_age_seconds,
         proof_max_future_skew_seconds=proof_max_future_skew_seconds,
     )
@@ -1971,7 +2458,14 @@ def main() -> int:
         )
         return 1
 
-    return materialize_with_shared_mutation_lock(*sys.argv[1:])
+    try:
+        return materialize_with_shared_mutation_lock(*sys.argv[1:])
+    except RuntimeError as exc:
+        print(f"hub local proof generation blocked: {exc}", file=sys.stderr)
+        return 1
+    except OSError:
+        print("hub local proof generation blocked: filesystem operation failed", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

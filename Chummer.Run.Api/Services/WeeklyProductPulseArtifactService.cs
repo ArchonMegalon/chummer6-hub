@@ -30,6 +30,7 @@ public sealed class WeeklyProductPulseArtifactService
 
     private readonly IConfiguration _configuration;
     private readonly ILogger<WeeklyProductPulseArtifactService> _logger;
+    private readonly PublicProjectionSnapshotService _publicProjection;
 
     public WeeklyProductPulseArtifactService(
         IConfiguration configuration,
@@ -37,6 +38,7 @@ public sealed class WeeklyProductPulseArtifactService
     {
         _configuration = configuration;
         _logger = logger;
+        _publicProjection = new PublicProjectionSnapshotService(configuration);
     }
 
     public string LoadWeeklyPulseJson()
@@ -55,7 +57,10 @@ public sealed class WeeklyProductPulseArtifactService
             JourneyGatesPayload? journeyGates = LoadOptionalJson<JourneyGatesPayload>(ResolveOptionalFleetArtifactPath(JourneyGatesFileName));
             SupportPacketsPayload? supportPackets = LoadOptionalJson<SupportPacketsPayload>(ResolveOptionalFleetArtifactPath(SupportPacketsFileName));
             StatusPlanePayload? statusPlane = LoadOptionalYaml<StatusPlanePayload>(ResolveOptionalFleetArtifactPath(StatusPlaneFileName));
-            LocalReleaseProofPayload? localReleaseProof = LoadOptionalJson<LocalReleaseProofPayload>(ResolveOptionalCanonPath(DefaultLocalReleaseProofRelativePath));
+            PublicProjectionOutputSnapshot projection = _publicProjection.LoadHubLocalReleaseProof();
+            LocalReleaseProofPayload? localReleaseProof = projection.IsConfigured
+                ? LoadOptionalJson<LocalReleaseProofPayload>(projection.Payload)
+                : LoadOptionalJson<LocalReleaseProofPayload>(ResolveOptionalCanonPath(DefaultLocalReleaseProofRelativePath));
 
             ClosureHealthInfo? closureHealth = ComputeClosureHealth(journeyGates, supportPackets);
             AdoptionHealthInfo? adoptionHealth = ComputeAdoptionHealth(progressReport, localReleaseProof);
@@ -228,6 +233,25 @@ public sealed class WeeklyProductPulseArtifactService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping optional JSON artifact from {Path}.", path);
+            return null;
+        }
+    }
+
+    private TPayload? LoadOptionalJson<TPayload>(byte[]? payloadBytes)
+        where TPayload : class
+    {
+        if (payloadBytes is null || payloadBytes.Length == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<TPayload>(payloadBytes, ReadOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping authenticated public projection JSON artifact after parse failure.");
             return null;
         }
     }

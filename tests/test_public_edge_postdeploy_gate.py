@@ -22,6 +22,17 @@ BRIDGE_SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_blazor_execution_horizon_br
 READY_HANDOFF_SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_ready_mobile_handoff_contract.py"
 
 
+def authenticated_preflight_args() -> list[str]:
+    return [
+        "--public-projection-snapshot-root",
+        "/srv/chummer/public-projection",
+        "--runtime-proof-bind-source-sha256",
+        "d" * 64,
+        "--release-channel-receipt-sha256",
+        "e" * 64,
+    ]
+
+
 def load_module():
     spec = importlib.util.spec_from_file_location("verify_public_edge_postdeploy_gate", SCRIPT_PATH)
     module = importlib.util.module_from_spec(spec)
@@ -2294,6 +2305,7 @@ def test_main_threads_preflight_deployment_digest_into_live_pwa_child(
             "--base-url",
             "https://chummer.run",
             "--skip-release-version-match",
+            *authenticated_preflight_args(),
         ]
     ) == 0
     pwa_command = captured["pwa"]
@@ -4332,6 +4344,7 @@ def test_main_passes_custom_release_channel_receipt_to_downloads_child(monkeypat
             "https://chummer.run",
             "--release-channel-receipt",
             str(release_channel),
+            *authenticated_preflight_args(),
             "--output",
             str(output),
         ]
@@ -4397,6 +4410,7 @@ def test_main_strict_preflight_runs_child_without_lock_allowances(monkeypatch, t
             "--base-url",
             "https://chummer.run",
             "--strict-preflight",
+            *authenticated_preflight_args(),
             "--output",
             str(output),
         ]
@@ -4454,6 +4468,7 @@ def test_main_passes_custom_overlay_root_to_preflight_child(monkeypatch, tmp_pat
             "https://chummer.run",
             "--overlay-root",
             str(overlay_root),
+            *authenticated_preflight_args(),
             "--output",
             str(output),
         ]
@@ -4503,6 +4518,7 @@ def test_main_passes_release_match_skip_to_downloads_child(monkeypatch, tmp_path
             "--base-url",
             "https://chummer.run",
             "--skip-release-version-match",
+            *authenticated_preflight_args(),
             "--output",
             str(output),
         ]

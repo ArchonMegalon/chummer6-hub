@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 import ctypes
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 import errno
 import fcntl
 import hashlib
@@ -30,6 +30,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+
+UTC = timezone.utc
 
 try:
     from scripts.strict_json_contract import (

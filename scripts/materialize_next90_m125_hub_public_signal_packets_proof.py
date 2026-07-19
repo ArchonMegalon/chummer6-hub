@@ -34,7 +34,12 @@ REQUIRED_MARKERS = [
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("CHUMMER_NEXT90_M125_ROOT", DEFAULT_ROOT))
 SOURCE = ROOT / "tests" / "RunServicesSmoke" / "Program.cs"
-OUT = ROOT / ".codex-studio" / "published" / "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json"
+OUT = Path(
+    os.environ.get(
+        "CHUMMER_NEXT90_M125_PROOF_PATH",
+        ROOT / ".codex-studio" / "published" / "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
+    )
+)
 
 
 def main() -> int:

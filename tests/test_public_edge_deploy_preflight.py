@@ -88,6 +88,79 @@ def write_valid_runtime_proof(path: Path) -> str:
     return rendered
 
 
+def write_public_projection_snapshot(
+    root: Path,
+    runtime_proof_text: str,
+) -> tuple[Path, str, str]:
+    output_names = (
+        "HUB_LOCAL_RELEASE_PROOF.generated.json",
+        "HUB_SERVED_RELEASE_PROOF.generated.json",
+        "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
+        "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
+        "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+    )
+    root.mkdir(parents=True, exist_ok=True)
+    payloads = {
+        output_names[0]: runtime_proof_text.encode("utf-8"),
+        output_names[1]: runtime_proof_text.encode("utf-8"),
+        output_names[2]: b'{"status":"pass"}\n',
+        output_names[3]: b'{"status":"pass"}\n',
+        output_names[4]: b'{"status":"pass"}\n',
+    }
+    digests = {
+        name: hashlib.sha256(payloads[name]).hexdigest() for name in output_names
+    }
+    aggregate = hashlib.sha256()
+    for name in output_names:
+        aggregate.update(name.encode("utf-8"))
+        aggregate.update(b"\0")
+        aggregate.update(digests[name].encode("ascii"))
+        aggregate.update(b"\n")
+    snapshot_sha256 = aggregate.hexdigest()
+    snapshot_id = f"public-projection-{snapshot_sha256}"
+    snapshot_directory = root / snapshot_id
+    snapshot_directory.mkdir()
+    for name, payload in payloads.items():
+        output = snapshot_directory / name
+        output.write_bytes(payload)
+        output.chmod(0o644)
+    manifest = {
+        "contractName": "chummer.public_projection_snapshot/v1",
+        "status": "pass",
+        "snapshotId": snapshot_id,
+        "snapshotSha256": snapshot_sha256,
+        "authorityInputs": {},
+        "outputs": {
+            name: {
+                "relativePath": name,
+                "sha256": digests[name],
+                "sizeBytes": len(payloads[name]),
+            }
+            for name in output_names
+        },
+    }
+    manifest_bytes = (
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n"
+    ).encode("utf-8")
+    manifest_name = "PUBLIC_PROJECTION_SNAPSHOT.generated.json"
+    (snapshot_directory / manifest_name).write_bytes(manifest_bytes)
+    pointer = {
+        "contractName": "chummer.public_projection_current/v1",
+        "status": "pass",
+        "snapshotId": snapshot_id,
+        "snapshotSha256": snapshot_sha256,
+        "manifestRelativePath": f"{snapshot_id}/{manifest_name}",
+        "manifestSha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "outputs": {name: f"{snapshot_id}/{name}" for name in output_names},
+    }
+    (root / "CURRENT.json").write_text(
+        json.dumps(pointer, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    return snapshot_directory / output_names[0], snapshot_id, snapshot_sha256
+
+
 def write_release_channel_receipt_for_proof(
     path: Path,
     proof_text: str,
@@ -565,12 +638,18 @@ def test_current_source_marker_check_passes(tmp_path: Path) -> None:
         release_receipt,
         proof_text,
     )
+    snapshot_root = tmp_path / "public-projection"
+    authenticated_proof, _, _ = write_public_projection_snapshot(
+        snapshot_root,
+        proof_text,
+    )
 
     receipt = module.verify(
         [],
         allow_stale_foreign_build_locks=False,
         source_root=REPO_ROOT,
-        runtime_proof_bind_source=runtime_proof,
+        public_projection_snapshot_root=snapshot_root,
+        runtime_proof_bind_source=authenticated_proof,
         runtime_proof_bind_source_sha256=runtime_proof_sha256(proof_text),
         release_channel_receipt=release_receipt,
         release_channel_receipt_sha256=release_receipt_sha256,
@@ -626,6 +705,13 @@ def test_current_source_marker_check_passes(tmp_path: Path) -> None:
     assert "${CHUMMER_PUBLIC_PLAY_PROXY_ENABLED" in checks["docker-compose.public-edge.yml"]["forbiddenMarkers"]
     assert "${CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED" in checks["docker-compose.public-edge.yml"]["forbiddenMarkers"]
     assert "${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app}:/app:ro" in checks["docker-compose.public-edge.yml"]["requiredMarkers"]
+    compose_required = checks["docker-compose.public-edge.yml"]["requiredMarkers"]
+    assert 'CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_ROOT: /public-projection' in compose_required
+    assert 'CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_REQUIRED: "true"' in compose_required
+    assert (
+        "${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT:?Set the authenticated public projection snapshot root}:/public-projection:ro"
+        in compose_required
+    )
     assert "TryResolveRoleAliasRedirectPath" in checks["Chummer.Run.Api/Program.cs"]["requiredMarkers"]
     program_markers = checks["Chummer.Run.Api/Program.cs"]["requiredMarkers"]
     assert 'path.Equals("/jammer", StringComparison.OrdinalIgnoreCase)' in program_markers
@@ -2292,6 +2378,7 @@ def test_source_marker_check_requires_public_edge_state_mountpoint_in_image(tmp_
 
 def test_main_checks_default_overlay_root_when_not_explicitly_configured(tmp_path: Path) -> None:
     module = load_module()
+    module.PUBLIC_EDGE_OPERATIONAL_MIRROR_ROOTS = {}
     source_root = write_complete_marker_source_tree(module, tmp_path / "source")
     overlay_root = write_complete_marker_overlay_tree(module, tmp_path / "overlay", source_root)
     runtime_proof = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
@@ -2306,7 +2393,8 @@ def test_main_checks_default_overlay_root_when_not_explicitly_configured(tmp_pat
     module.process_lines_from_system = lambda: []
     module.resolve_default_source_root = lambda: source_root
     module.resolve_default_overlay_root = lambda: overlay_root
-    module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE = runtime_proof
+    snapshot_root = tmp_path / "public-projection"
+    write_public_projection_snapshot(snapshot_root, proof_text)
 
     exit_code = module.main(
         [
@@ -2316,6 +2404,8 @@ def test_main_checks_default_overlay_root_when_not_explicitly_configured(tmp_pat
             release_receipt_sha256,
             "--runtime-proof-bind-source-sha256",
             runtime_proof_sha256(proof_text),
+            "--public-projection-snapshot-root",
+            str(snapshot_root),
             "--output",
             str(output_path),
         ]
@@ -2337,11 +2427,17 @@ def test_full_preflight_requires_exact_runtime_proof_bind_source_mode_and_shape(
     tmp_path: Path,
 ) -> None:
     module = load_module()
+    module.PUBLIC_EDGE_OPERATIONAL_MIRROR_ROOTS = {}
     source_root = write_complete_marker_source_tree(module, tmp_path / "source")
     proof_path = tmp_path / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
     proof_path.parent.mkdir(parents=True)
 
     valid_proof_text = write_valid_runtime_proof(proof_path)
+    snapshot_root = tmp_path / "public-projection"
+    authenticated_proof, _, _ = write_public_projection_snapshot(
+        snapshot_root,
+        valid_proof_text,
+    )
     release_receipt = tmp_path / "published" / "RELEASE_CHANNEL.generated.json"
     release_receipt_sha256 = write_release_channel_receipt_for_proof(
         release_receipt,
@@ -2352,7 +2448,8 @@ def test_full_preflight_requires_exact_runtime_proof_bind_source_mode_and_shape(
         [],
         allow_stale_foreign_build_locks=False,
         source_root=source_root,
-        runtime_proof_bind_source=proof_path,
+        public_projection_snapshot_root=snapshot_root,
+        runtime_proof_bind_source=authenticated_proof,
         runtime_proof_bind_source_sha256=runtime_proof_sha256(valid_proof_text),
         release_channel_receipt=release_receipt,
         release_channel_receipt_sha256=release_receipt_sha256,
@@ -2395,12 +2492,16 @@ def test_full_preflight_requires_exact_runtime_proof_bind_source_mode_and_shape(
 
     proof_path.write_text(valid_proof_text, encoding="utf-8")
 
-    proof_path.chmod(0o664)
+    authenticated_proof.chmod(0o664)
     receipt = module.verify(
         [],
         allow_stale_foreign_build_locks=False,
         source_root=source_root,
-        runtime_proof_bind_source=proof_path,
+        public_projection_snapshot_root=snapshot_root,
+        runtime_proof_bind_source=authenticated_proof,
+        runtime_proof_bind_source_sha256=runtime_proof_sha256(valid_proof_text),
+        release_channel_receipt=release_receipt,
+        release_channel_receipt_sha256=release_receipt_sha256,
     )
 
     assert receipt["status"] == "fail"
@@ -2410,7 +2511,7 @@ def test_full_preflight_requires_exact_runtime_proof_bind_source_mode_and_shape(
         for finding in receipt["findings"]
     )
 
-    proof_path.chmod(0o644)
+    authenticated_proof.chmod(0o644)
     hardlink_path = tmp_path / "published" / "proof-hardlink.json"
     os.link(proof_path, hardlink_path)
     linked_receipt = module.runtime_proof_bind_source_check(proof_path)
@@ -2422,6 +2523,50 @@ def test_full_preflight_requires_exact_runtime_proof_bind_source_mode_and_shape(
     symlink_receipt = module.runtime_proof_bind_source_check(proof_path)
     assert symlink_receipt["status"] == "fail"
     assert symlink_receipt["checks"]["regularFile"] is False
+
+
+def test_full_preflight_rejects_tampered_current_without_legacy_fallback(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    module.PUBLIC_EDGE_OPERATIONAL_MIRROR_ROOTS = {}
+    source_root = write_complete_marker_source_tree(module, tmp_path / "source")
+    proof_source = tmp_path / "proof-source.json"
+    proof_text = write_valid_runtime_proof(proof_source)
+    snapshot_root = tmp_path / "public-projection"
+    write_public_projection_snapshot(snapshot_root, proof_text)
+    release_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_receipt_sha256 = write_release_channel_receipt_for_proof(
+        release_receipt,
+        proof_text,
+    )
+    (snapshot_root / "CURRENT.json").write_text("{}\n", encoding="utf-8")
+    runtime_check_called = False
+
+    def reject_legacy_fallback(*_args: object, **_kwargs: object) -> dict[str, object]:
+        nonlocal runtime_check_called
+        runtime_check_called = True
+        raise AssertionError("legacy runtime proof fallback must not run")
+
+    module.runtime_proof_bind_source_check = reject_legacy_fallback
+    receipt = module.verify(
+        [],
+        allow_stale_foreign_build_locks=False,
+        source_root=source_root,
+        public_projection_snapshot_root=snapshot_root,
+        runtime_proof_bind_source_sha256=runtime_proof_sha256(proof_text),
+        release_channel_receipt=release_receipt,
+        release_channel_receipt_sha256=release_receipt_sha256,
+    )
+
+    assert receipt["status"] == "fail"
+    assert receipt["publicProjectionSnapshot"]["status"] == "fail"
+    assert receipt["runtimeProofBindSource"]["status"] == "fail"
+    assert runtime_check_called is False
+    assert any(
+        finding["id"] == "public_edge_runtime_proof_bind_source_invalid"
+        for finding in receipt["findings"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -2438,6 +2583,7 @@ def test_runtime_proof_requires_exact_registry_route_contract(
     route_mutation: str,
 ) -> None:
     module = load_module()
+    module.PUBLIC_EDGE_OPERATIONAL_MIRROR_ROOTS = {}
     proof_path = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
     valid_proof_text = write_valid_runtime_proof(proof_path)
     release_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
@@ -2792,6 +2938,11 @@ def test_deployment_preflight_argument_shapes_bind_exact_proof_and_receipt_pins(
     release_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
     runtime_digest = "1" * 64
     receipt_digest = "2" * 64
+    snapshot_root = tmp_path / "public-projection"
+    snapshot_root.mkdir()
+    authenticated_proof = snapshot_root / "public-projection-test" / (
+        "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
     output = tmp_path / ("full-overlay.json" if include_overlay else "source-only.json")
     captured: list[dict[str, object]] = []
 
@@ -2803,6 +2954,18 @@ def test_deployment_preflight_argument_shapes_bind_exact_proof_and_receipt_pins(
     module.overlay_marker_findings = lambda _overlay: ([], [])
     module.overlay_build_info_source_fingerprint_check = (
         lambda _source, _overlay: ([], {})
+    )
+    module.resolve_current_snapshot = lambda selected_root: SimpleNamespace(
+        snapshot_id="public-projection-test",
+        snapshot_sha256="3" * 64,
+        outputs={
+            "HUB_LOCAL_RELEASE_PROOF.generated.json": authenticated_proof,
+        },
+        output_sha256={
+            "HUB_LOCAL_RELEASE_PROOF.generated.json": runtime_digest,
+        },
+    ) if selected_root == snapshot_root else (_ for _ in ()).throw(
+        AssertionError("unexpected projection snapshot root")
     )
 
     def capture_runtime_binding(
@@ -2833,6 +2996,8 @@ def test_deployment_preflight_argument_shapes_bind_exact_proof_and_receipt_pins(
         str(source_root),
         "--runtime-proof-bind-source-sha256",
         runtime_digest,
+        "--public-projection-snapshot-root",
+        str(snapshot_root),
         "--release-channel-receipt",
         str(release_receipt),
         "--release-channel-receipt-sha256",
@@ -2848,7 +3013,7 @@ def test_deployment_preflight_argument_shapes_bind_exact_proof_and_receipt_pins(
     assert module.main(arguments) == 0
     assert captured == [
         {
-            "path": module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE,
+            "path": authenticated_proof,
             "runtime_proof_bind_source_sha256": runtime_digest,
             "release_channel_receipt": release_receipt,
             "release_channel_receipt_sha256": receipt_digest,
@@ -2892,12 +3057,20 @@ def test_runtime_proof_default_matches_canonical_compose_bind_source() -> None:
         encoding="utf-8"
     )
 
-    assert module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE == Path(
-        "/docker/chummercomplete/chummer.run-services/"
-        ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json"
+    assert module.PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT == Path(
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published"
     )
-    assert compose_text.count(str(module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE)) == 2
-    assert not module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE.is_relative_to(
+    assert compose_text.count(
+        "${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE:?Set the authenticated CURRENT Hub proof output}"
+    ) == 1
+    assert (
+        "/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
+        not in compose_text
+    )
+    assert compose_text.count(
+        "${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT:?Set the authenticated public projection snapshot root}"
+    ) == 1
+    assert not module.PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT.is_relative_to(
         module.RUN_SERVICES_ROOT
     ) or module.RUN_SERVICES_ROOT == Path("/docker/chummercomplete/chummer.run-services")
 
@@ -2906,6 +3079,7 @@ def test_alternate_source_still_checks_canonical_runtime_proof_bind_source(
     tmp_path: Path,
 ) -> None:
     module = load_module()
+    module.PUBLIC_EDGE_OPERATIONAL_MIRROR_ROOTS = {}
     alternate_source = tmp_path / "alternate-clean-source"
     checked_paths: list[Path] = []
 
@@ -2918,15 +3092,22 @@ def test_alternate_source_still_checks_canonical_runtime_proof_bind_source(
         return {"status": "pass", "sourcePath": str(path)}
 
     module.runtime_proof_bind_source_check = capture_runtime_proof
+    proof_text = write_valid_runtime_proof(tmp_path / "proof-source.json")
+    snapshot_root = tmp_path / "public-projection"
+    authenticated_proof, _, _ = write_public_projection_snapshot(
+        snapshot_root,
+        proof_text,
+    )
 
     receipt = module.verify(
         [],
         allow_stale_foreign_build_locks=False,
         source_root=alternate_source,
+        public_projection_snapshot_root=snapshot_root,
     )
 
     assert receipt["status"] == "pass"
-    assert checked_paths == [module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE]
+    assert checked_paths == [authenticated_proof]
     assert checked_paths[0] != alternate_source / ".codex-studio" / "published" / (
         "HUB_LOCAL_RELEASE_PROOF.generated.json"
     )
@@ -2934,6 +3115,7 @@ def test_alternate_source_still_checks_canonical_runtime_proof_bind_source(
 
 def test_main_can_skip_overlay_marker_check(tmp_path: Path) -> None:
     module = load_module()
+    module.PUBLIC_EDGE_OPERATIONAL_MIRROR_ROOTS = {}
     source_root = write_complete_marker_source_tree(module, tmp_path / "source")
     overlay_root = tmp_path / "overlay-missing"
     runtime_proof = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
@@ -2948,7 +3130,8 @@ def test_main_can_skip_overlay_marker_check(tmp_path: Path) -> None:
     module.process_lines_from_system = lambda: []
     module.resolve_default_source_root = lambda: source_root
     module.resolve_default_overlay_root = lambda: overlay_root
-    module.PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE = runtime_proof
+    snapshot_root = tmp_path / "public-projection"
+    write_public_projection_snapshot(snapshot_root, proof_text)
 
     exit_code = module.main(
         [
@@ -2959,6 +3142,8 @@ def test_main_can_skip_overlay_marker_check(tmp_path: Path) -> None:
             release_receipt_sha256,
             "--runtime-proof-bind-source-sha256",
             runtime_proof_sha256(proof_text),
+            "--public-projection-snapshot-root",
+            str(snapshot_root),
             "--output",
             str(output_path),
         ]

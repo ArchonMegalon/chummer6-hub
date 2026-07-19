@@ -984,6 +984,8 @@ public sealed record ReleaseUploadPageViewModel(
     string UploadUrl,
     string ReadmeUrl,
     string VerifyUrl,
+    string AuthoritySnapshotId,
+    string AuthoritySnapshotSha256,
     string WindowsUploadNote,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);

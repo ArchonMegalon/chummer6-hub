@@ -28,6 +28,72 @@ CANDIDATE_PORTAL_CONTAINER_ID = "b" * 64
 PRIOR_TUNNEL_CONTAINER_ID = "c" * 64
 
 
+def write_public_projection_snapshot(root: Path, proof_bytes: bytes) -> Path:
+    output_names = (
+        "HUB_LOCAL_RELEASE_PROOF.generated.json",
+        "HUB_SERVED_RELEASE_PROOF.generated.json",
+        "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
+        "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
+        "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+    )
+    payloads = {
+        output_names[0]: proof_bytes,
+        output_names[1]: proof_bytes,
+        output_names[2]: b"m125\n",
+        output_names[3]: b"m126\n",
+        output_names[4]: b"windows\n",
+    }
+    digests = {
+        name: hashlib.sha256(payloads[name]).hexdigest() for name in output_names
+    }
+    aggregate = hashlib.sha256()
+    for name in output_names:
+        aggregate.update(name.encode("utf-8"))
+        aggregate.update(b"\0")
+        aggregate.update(digests[name].encode("ascii"))
+        aggregate.update(b"\n")
+    snapshot_sha256 = aggregate.hexdigest()
+    snapshot_id = f"public-projection-{snapshot_sha256}"
+    snapshot = root / snapshot_id
+    snapshot.mkdir(parents=True)
+    for name, payload in payloads.items():
+        (snapshot / name).write_bytes(payload)
+    manifest_name = "PUBLIC_PROJECTION_SNAPSHOT.generated.json"
+    manifest = {
+        "contractName": "chummer.public_projection_snapshot/v1",
+        "status": "pass",
+        "snapshotId": snapshot_id,
+        "snapshotSha256": snapshot_sha256,
+        "authorityInputs": {},
+        "outputs": {
+            name: {
+                "relativePath": name,
+                "sha256": digests[name],
+                "sizeBytes": len(payloads[name]),
+            }
+            for name in output_names
+        },
+    }
+    manifest_bytes = (
+        json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    (snapshot / manifest_name).write_bytes(manifest_bytes)
+    current = {
+        "contractName": "chummer.public_projection_current/v1",
+        "status": "pass",
+        "snapshotId": snapshot_id,
+        "snapshotSha256": snapshot_sha256,
+        "manifestRelativePath": f"{snapshot_id}/{manifest_name}",
+        "manifestSha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "outputs": {name: f"{snapshot_id}/{name}" for name in output_names},
+    }
+    (root / "CURRENT.json").write_text(
+        json.dumps(current, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    return snapshot / output_names[0]
+
+
 @pytest.fixture(autouse=True)
 def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     for forbidden_name in (
@@ -62,7 +128,9 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         "case \"$*\" in\n"
         "  *verify_public_edge_deploy_authority.py*) exit \"${FAKE_AUTHORITY_EXIT:-0}\";;\n"
         "  *verify_public_edge_deploy_source.py*) exit \"${FAKE_SOURCE_GATE_EXIT:-0}\";;\n"
+        "  *verify_public_projection.py*) exec /usr/bin/python3 \"$@\";;\n"
         "  *verify_public_edge_postdeploy_gate.py*) exec /usr/bin/python3 \"$@\";;\n"
+        "  *chummer.public_projection_current/v1*) exec /usr/bin/python3 \"$@\";;\n"
         "  *validate_public_edge_compose_runtime.py*) /usr/bin/cat >/dev/null; exit 0;;\n"
         "  *secrets.token_hex*|*hmac.compare_digest*) exec /usr/bin/python3 \"$@\";;\n"
         "  *matches\\ =\\ \\[\\]*) exec /usr/bin/python3 \"$@\";;\n"
@@ -94,8 +162,11 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     trusted_docker.chmod(0o755)
     release_channel_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
     release_channel_receipt.write_text('{"status":"test"}\n', encoding="utf-8")
-    runtime_proof = tmp_path / "HUB_LOCAL_RELEASE_PROOF.generated.json"
-    runtime_proof.write_text('{"status":"test"}\n', encoding="utf-8")
+    projection_snapshot_root = tmp_path / "public-projection"
+    runtime_proof = write_public_projection_snapshot(
+        projection_snapshot_root,
+        b'{"status":"test"}\n',
+    )
     fake_event_log = tmp_path / "fake-runtime-events.log"
     fake_auto_remove_state = tmp_path / "fake-candidate-auto-remove.state"
     fake_prior_portal_running_state = tmp_path / "fake-prior-portal-running.state"
@@ -122,8 +193,8 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         'CANONICAL_RELEASE_CHANNEL_RECEIPT="/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json"',
         f'CANONICAL_RELEASE_CHANNEL_RECEIPT="{release_channel_receipt}"',
     ).replace(
-        'CANONICAL_RUNTIME_PROOF_BIND_SOURCE="/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json"',
-        f'CANONICAL_RUNTIME_PROOF_BIND_SOURCE="{runtime_proof}"',
+        'CANONICAL_PUBLIC_PROJECTION_SNAPSHOT_ROOT="/docker/chummercomplete/chummer.run-services/.codex-studio/published"',
+        f'CANONICAL_PUBLIC_PROJECTION_SNAPSHOT_ROOT="{projection_snapshot_root}"',
     ).replace("PATH=/usr/bin:/bin", 'PATH="$PATH"').replace(
         '"$TRUSTED_ENV" -i', '"$TRUSTED_ENV"'
     )
@@ -149,6 +220,10 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv(
         "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256",
         hashlib.sha256(release_channel_receipt.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setenv(
+        "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT",
+        str(projection_snapshot_root),
     )
     monkeypatch.setenv(
         "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256",
@@ -241,6 +316,11 @@ def make_fake_authority_source(tmp_path: Path) -> Path:
         "json.dumps(sys.argv[1:]), encoding='utf-8')\n"
         "raise SystemExit(int(os.environ.get('FAKE_POSTDEPLOY_EXIT', '0')))\n",
         encoding="utf-8",
+    )
+    projection_verifier = source / "scripts/release/verify_public_projection.py"
+    projection_verifier.parent.mkdir()
+    projection_verifier.write_bytes(
+        (ROOT / "scripts/release/verify_public_projection.py").read_bytes()
     )
     return source
 
@@ -554,6 +634,10 @@ def test_guarded_deploy_happy_path_promotes_candidate_then_commits_and_cleans_up
             "independently supplied as a lowercase SHA-256",
         ),
         (
+            "CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT",
+            "must be externally supplied",
+        ),
+        (
             "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256",
             "externally supplied as a lowercase SHA-256",
         ),
@@ -579,6 +663,31 @@ def test_guarded_deploy_requires_external_clean_launch_and_source_authorities(
 
     assert result.returncode == 2
     assert message in result.stderr
+    assert not docker_log.exists()
+
+
+def test_guarded_deploy_rejects_tampered_current_before_docker(
+    tmp_path: Path,
+) -> None:
+    docker_log = tmp_path / "docker.log"
+    projection_root = Path(
+        os.environ["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"]
+    )
+    (projection_root / "CURRENT.json").write_text("{}\n", encoding="utf-8")
+    env = os.environ.copy()
+    env["FAKE_DOCKER_LOG"] = str(docker_log)
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY)],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "authenticated CURRENT public projection is unavailable" in result.stderr
     assert not docker_log.exists()
 
 
@@ -1055,6 +1164,12 @@ def test_guarded_deploy_uses_orchestrated_postdeploy_closure_and_no_legacy_flags
         "--strict-preflight",
         "--release-channel-receipt",
         env["CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT"],
+        "--release-channel-receipt-sha256",
+        env["CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256"],
+        "--public-projection-snapshot-root",
+        env["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"],
+        "--runtime-proof-bind-source-sha256",
+        env["CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256"],
         "--overlay-root",
         "/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app",
         "--expected-build-info",

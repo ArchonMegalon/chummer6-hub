@@ -29,6 +29,13 @@ from public_edge_postdeploy_contract import (
 )
 
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+LIVE_PUBLIC_WINDOWS_VERIFIER_PATH = (
+    RUN_SERVICES_ROOT / "scripts" / "verify-windows-installer-payloads.py"
+)
+LIVE_PUBLIC_WINDOWS_VERIFIER_URI = (
+    "repo://ArchonMegalon/chummer6-hub/"
+    "scripts/verify-windows-installer-payloads.py"
+)
 DEFAULT_PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 PUBLISHED_ROOT = DEFAULT_PUBLISHED_ROOT
 DEFAULT_FLAGSHIP_PRODUCT_READINESS_GATE_PATH = PUBLISHED_ROOT / "FLAGSHIP_PRODUCT_READINESS_GATE.generated.json"
@@ -2689,14 +2696,35 @@ def flagship_product_readiness_gate_semantic_failures(summary: dict[str, Any]) -
 
 
 def required_gate_pass_verdict_semantic_failures(name: str, payload: dict[str, Any]) -> list[str]:
+    semantic_failures: list[str] = []
+    if name == "live_public_windows_installer":
+        verifier_sha256 = str(payload.get("verify_script_sha256") or "").strip().lower()
+        verifier_reference = str(payload.get("verify_script_path") or "").strip()
+        try:
+            expected_verifier_sha256 = hashlib.sha256(
+                LIVE_PUBLIC_WINDOWS_VERIFIER_PATH.read_bytes()
+            ).hexdigest()
+        except OSError:
+            expected_verifier_sha256 = ""
+        if not expected_verifier_sha256 or verifier_sha256 != expected_verifier_sha256:
+            semantic_failures.append(
+                "live_public_windows_installer verifier SHA256 does not match the checked-in canonical verifier"
+            )
+        if verifier_reference != LIVE_PUBLIC_WINDOWS_VERIFIER_URI:
+            semantic_failures.append(
+                "live_public_windows_installer verifier URI is not the canonical checked-in verifier"
+            )
     expected_verdicts = PASS_VERDICT_EXPECTATIONS.get(name)
     if not expected_verdicts:
-        return []
+        return semantic_failures
     verdict = str(payload.get("verdict") or "").strip()
     if verdict in expected_verdicts:
-        return []
+        return semantic_failures
     expected_text = ", ".join(sorted(expected_verdicts))
-    return [f"{name} has unexpected verdict (expected one of: {expected_text})"]
+    semantic_failures.append(
+        f"{name} has unexpected verdict (expected one of: {expected_text})"
+    )
+    return semantic_failures
 
 
 def flagship_product_readiness_launch_blockers_recoverable(summary: dict[str, Any]) -> bool:

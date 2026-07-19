@@ -1507,23 +1507,17 @@ public sealed class PublicLandingController : Controller
                 return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
             }
 
-            string? hubLocalReleaseProofPath = ResolveWebAssetPath(
-                "proofs",
-                "mac-codex-release",
-                "HUB_LOCAL_RELEASE_PROOF.generated.json");
-            if (string.IsNullOrWhiteSpace(hubLocalReleaseProofPath))
+            if (!TryBuildReleaseUploadCommand(
+                    templatePath,
+                    out string command,
+                    out ReleaseUploadAuthorityHandoff authorityHandoff))
             {
-                return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload proof is unavailable.");
+                return Problem(
+                    statusCode: StatusCodes.Status503ServiceUnavailable,
+                    detail: "the authenticated CURRENT release authority handoff is unavailable.");
             }
 
             string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
-            string hubLocalReleaseProofUrl = BuildAbsoluteUrl("/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json");
-            string bootstrapTemplate = System.IO.File.ReadAllText(templatePath);
-            string command = BuildReleaseUploadBootstrapCommand(
-                bootstrapUrl,
-                ComputeSha256Hex(bootstrapTemplate),
-                hubLocalReleaseProofUrl,
-                ComputeSha256Hex(System.IO.File.ReadAllBytes(hubLocalReleaseProofPath)));
             var model = new ReleaseUploadPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(
                     "Build macOS",
@@ -1539,6 +1533,8 @@ public sealed class PublicLandingController : Controller
                 UploadUrl: BuildAbsoluteUrl("/api/internal/releases/bundles"),
                 ReadmeUrl: BuildAbsoluteUrl("/artifacts/mac-codex-release-pipeline/readme.md"),
                 VerifyUrl: BuildAbsoluteUrl("/downloads/RELEASE_CHANNEL.generated.json"),
+                AuthoritySnapshotId: authorityHandoff.SnapshotId,
+                AuthoritySnapshotSha256: authorityHandoff.SnapshotSha256,
                 WindowsUploadNote: "Windows bundles use the same upload endpoint and the same signed-in claim-code return path once the signed installer, startup status, and promotion status are present.",
                 TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
                 SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience));
@@ -1635,23 +1631,15 @@ public sealed class PublicLandingController : Controller
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
         }
 
-        string? hubLocalReleaseProofPath = ResolveWebAssetPath(
-            "proofs",
-            "mac-codex-release",
-            "HUB_LOCAL_RELEASE_PROOF.generated.json");
-        if (string.IsNullOrWhiteSpace(hubLocalReleaseProofPath))
+        if (!TryBuildReleaseUploadCommand(
+                templatePath,
+                out string command,
+                out _))
         {
-            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload proof is unavailable.");
+            return Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                detail: "the authenticated CURRENT release authority handoff is unavailable.");
         }
-
-        string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
-        string hubLocalReleaseProofUrl = BuildAbsoluteUrl("/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json");
-        string bootstrapTemplate = System.IO.File.ReadAllText(templatePath);
-        string command = BuildReleaseUploadBootstrapCommand(
-            bootstrapUrl,
-            ComputeSha256Hex(bootstrapTemplate),
-            hubLocalReleaseProofUrl,
-            ComputeSha256Hex(System.IO.File.ReadAllBytes(hubLocalReleaseProofPath)));
 
         Response.Headers["Cache-Control"] = "private, no-store";
         return Content(command + "\n", "text/x-shellscript; charset=utf-8", Encoding.UTF8);
@@ -18879,16 +18867,137 @@ echo "Help: ${HELP_URL}"
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }
 
+    private bool TryBuildReleaseUploadCommand(
+        string bootstrapTemplatePath,
+        out string command,
+        out ReleaseUploadAuthorityHandoff authorityHandoff)
+    {
+        command = string.Empty;
+        authorityHandoff = null!;
+        PublicProjectionOutputSnapshot proofSnapshot =
+            new PublicProjectionSnapshotService(_configuration).LoadHubLocalReleaseProof();
+        if (!proofSnapshot.IsValid)
+        {
+            return false;
+        }
+
+        try
+        {
+            authorityHandoff = ReleaseUploadAuthorityHandoffBuilder.Build(proofSnapshot);
+            string bootstrapTemplate = System.IO.File.ReadAllText(bootstrapTemplatePath);
+            command = BuildReleaseUploadBootstrapCommand(
+                BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh"),
+                ComputeSha256Hex(bootstrapTemplate),
+                BuildAbsoluteUrl("/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"),
+                authorityHandoff.HubLocalReleaseProofSha256,
+                authorityHandoff);
+            return true;
+        }
+        catch (Exception exception) when (exception is InvalidDataException
+                                          or IOException
+                                          or UnauthorizedAccessException
+                                          or JsonException
+                                          or CryptographicException)
+        {
+            _logger.LogWarning(
+                "Release upload command refused an invalid authenticated CURRENT authority handoff.");
+            command = string.Empty;
+            authorityHandoff = null!;
+            return false;
+        }
+    }
+
     private static string BuildReleaseUploadBootstrapCommand(
         string bootstrapUrl,
         string bootstrapSha256,
         string hubLocalReleaseProofUrl,
-        string hubLocalReleaseProofSha256)
+        string hubLocalReleaseProofSha256,
+        ReleaseUploadAuthorityHandoff authorityHandoff)
     {
+        string handoffEnvelopeBase64 = Convert.ToBase64String(
+            JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer.release-upload.authority-handoff/v1",
+                snapshotId = authorityHandoff.SnapshotId,
+                snapshotSha256 = authorityHandoff.SnapshotSha256,
+                inputs = authorityHandoff.Inputs.Select(static input => new
+                {
+                    key = input.Key,
+                    fileName = input.FileName,
+                    payloadBase64 = Convert.ToBase64String(input.Payload)
+                })
+            }));
+        string hydratorPython = Convert.ToBase64String(Encoding.UTF8.GetBytes(
+            """
+            import base64
+            import json
+            import os
+            import pathlib
+            import stat
+            import sys
+
+            root = pathlib.Path(sys.argv[1])
+            root_metadata = root.lstat()
+            if not stat.S_ISDIR(root_metadata.st_mode) or stat.S_ISLNK(root_metadata.st_mode):
+                raise SystemExit("release authority handoff directory is unsafe")
+
+            envelope = json.loads(base64.b64decode(sys.argv[2], validate=True))
+            if envelope.get("contractName") != "chummer.release-upload.authority-handoff/v1":
+                raise SystemExit("release authority handoff contract drifted")
+            entries = envelope.get("inputs")
+            expected = {
+                "release-channel.json",
+                "flagship-readiness.json",
+                "fleet-queue.json",
+                "design-queue.json",
+                "design-successor-registry.json",
+            }
+            if not isinstance(entries, list) or len(entries) != len(expected):
+                raise SystemExit("release authority handoff inventory drifted")
+            file_names = [entry.get("fileName") for entry in entries if isinstance(entry, dict)]
+            if len(file_names) != len(expected) or set(file_names) != expected:
+                raise SystemExit("release authority handoff filenames drifted")
+
+            for entry in entries:
+                raw = base64.b64decode(entry.get("payloadBase64", ""), validate=True)
+                if not raw or len(raw) > 16 * 1024 * 1024:
+                    raise SystemExit("release authority handoff input has an invalid size")
+                path = root / entry["fileName"]
+                descriptor = os.open(
+                    path,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+                    0o600,
+                )
+                try:
+                    offset = 0
+                    while offset < len(raw):
+                        offset += os.write(descriptor, raw[offset:])
+                    os.fsync(descriptor)
+                finally:
+                    os.close(descriptor)
+            """));
+        string authorityAssignments =
+            "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_COMMIT="
+            + SingleQuoteShellValue(authorityHandoff.ReleaseChannelExpectedCommit) + " "
+            + "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_COMMIT="
+            + SingleQuoteShellValue(authorityHandoff.FlagshipReadinessExpectedCommit) + " "
+            + string.Concat(authorityHandoff.Inputs.Select(input =>
+                input.PathEnvironmentVariable + "=\"$TMP_AUTHORITY_DIR/" + input.FileName + "\" "
+                + input.DigestEnvironmentVariable + "=" + SingleQuoteShellValue(input.Sha256) + " "
+                + input.AuthorityEnvironmentVariable + "=" + SingleQuoteShellValue(input.Authority) + " "));
+        string authorityCleanupFiles = string.Join(
+            " ",
+            authorityHandoff.Inputs.Select(static input =>
+                "\"$TMP_AUTHORITY_DIR/" + input.FileName + "\""));
+
         return "set +x; set -euo pipefail; " +
             "python3 -c 'import os,re,sys; names=(\"CHUMMER_UI_EXPECTED_COMMIT\",\"CHUMMER_CORE_EXPECTED_COMMIT\",\"CHUMMER_HUB_EXPECTED_COMMIT\",\"CHUMMER_UI_KIT_EXPECTED_COMMIT\",\"CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT\",\"CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT\",\"CHUMMER_LEGACY_EXPECTED_COMMIT\"); invalid=[name for name in names if re.fullmatch(r\"[0-9A-Fa-f]{40}\", os.environ.get(name, \"\")) is None]; invalid and sys.exit(\"Set reviewed full 40-hex commit pins before running: \" + \", \".join(invalid))'; " +
             "TMP_BOOTSTRAP_SCRIPT=\"$(mktemp)\"; " +
-            "trap 'unset RELEASE_UPLOAD_AUTH TICKET_FILE TICKET_FILE_MODE; rm -f \"$TMP_BOOTSTRAP_SCRIPT\"' EXIT; " +
+            "TMP_AUTHORITY_DIR=\"$(mktemp -d)\"; " +
+            "trap 'unset RELEASE_UPLOAD_AUTH TICKET_FILE TICKET_FILE_MODE AUTHORITY_HANDOFF_B64; rm -f \"$TMP_BOOTSTRAP_SCRIPT\" " + authorityCleanupFiles + "; rmdir \"$TMP_AUTHORITY_DIR\" 2>/dev/null || true' EXIT; " +
+            "AUTHORITY_HANDOFF_B64=" + SingleQuoteShellValue(handoffEnvelopeBase64) + "; " +
+            "python3 -I -S -c 'import base64;exec(compile(base64.b64decode(\"" + hydratorPython + "\"), \"<release-authority-handoff>\", \"exec\"))' \"$TMP_AUTHORITY_DIR\" \"$AUTHORITY_HANDOFF_B64\"; " +
+            "unset AUTHORITY_HANDOFF_B64; " +
             "curl -q -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch setup script; refresh the release page and retry.' >&2; exit 1; }; " +
             "ACTUAL_BOOTSTRAP_SHA256=\"$(python3 -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' \"$TMP_BOOTSTRAP_SCRIPT\")\"; " +
             "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Setup script check failed; refresh the release page and retry.' >&2; exit 1; }; " +
@@ -18906,6 +19015,7 @@ echo "Help: ${HELP_URL}"
             "CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0' " +
             "CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS='4' " +
             "CHUMMER_BOOTSTRAP_EXPECTED_SHA256=" + SingleQuoteShellValue(bootstrapSha256) + " " +
+            authorityAssignments +
             ReleaseUploadTicketEnvironmentVariable + "=\"$RELEASE_UPLOAD_AUTH\" " +
             "bash \"$TMP_BOOTSTRAP_SCRIPT\"";
     }
