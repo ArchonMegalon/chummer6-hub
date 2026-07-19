@@ -49,6 +49,7 @@
     <Compile Include="..\Chummer.Tests\BlackLedgerTickNewsTests.cs" Link="BlackLedgerTickNewsTests.cs" />
     <Compile Include="..\Chummer.Tests\PublicProjectionSnapshotServiceTests.cs" Link="PublicProjectionSnapshotServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\PublicProjectionProofRequestPathPolicyTests.cs" Link="PublicProjectionProofRequestPathPolicyTests.cs" />
+    <Compile Include="..\Chummer.Tests\ReleaseUploadAuthorityHandoffCompatibilityTests.cs" Link="ReleaseUploadAuthorityHandoffCompatibilityTests.cs" />
   </ItemGroup>
 
 </Project>

@@ -475,6 +475,12 @@ PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS = {
         "snapshot.VerifyPathIdentity()",
         "descriptorReader.VerifyRootPathIdentity()",
     ),
+    "Chummer.Run.Api/Services/ReleaseUploadAuthorityHandoffBuilder.cs": (
+        "RequireCanonicalStringArrayWithOptionalAlias(",
+        '"proof_routes"',
+        '"proofRoutes"',
+        "aliases disagree",
+    ),
     "Chummer.Run.Api/Services/PublicProjectionDescriptorReader.cs": (
         "LinuxNative.openat(",
         "LinuxNative.OpenNoFollow",

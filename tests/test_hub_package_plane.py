@@ -518,6 +518,9 @@ def test_hosted_exact_sdk_lane_runs_projection_path_and_descriptor_tests() -> No
     }
     assert "../Chummer.Tests/PublicProjectionSnapshotServiceTests.cs" in linked
     assert "../Chummer.Tests/PublicProjectionProofRequestPathPolicyTests.cs" in linked
+    assert (
+        "../Chummer.Tests/ReleaseUploadAuthorityHandoffCompatibilityTests.cs" in linked
+    )
 
 
 def test_all_packable_hub_contracts_embed_one_proprietary_license() -> None:

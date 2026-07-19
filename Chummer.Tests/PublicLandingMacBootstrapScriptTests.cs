@@ -505,7 +505,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
                         "report_cluster_release_notify",
                         "organize_community_and_close_loop",
                     ],
-                    "proofRoutes": [
+                    "proof_routes": [
                         "/downloads/install/avalonia-linux-x64-installer",
                         "/home/access", "/home/work", "/account/access", "/account/work",
                         "/account/support", "/contact", "/downloads",
@@ -1028,7 +1028,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
                 completion_audit_reason = "fixture completion is current",
                 source_path = "fleet://readiness/run-fixture"
             },
-            proofRoutes = new[]
+            proof_routes = new[]
             {
                 "/downloads/install/avalonia-linux-x64-installer",
                 "/downloads/install/avalonia-osx-arm64-installer",

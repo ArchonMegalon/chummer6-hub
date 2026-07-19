@@ -232,10 +232,10 @@ public static class ReleaseUploadAuthorityHandoffBuilder
             throw new InvalidDataException("release upload publishedAt is invalid");
         }
 
-        string[] installerIds = RequireArray(proof, "proofRoutes")
-            .EnumerateArray()
-            .Where(static value => value.ValueKind == JsonValueKind.String)
-            .Select(static value => value.GetString()?.Trim() ?? string.Empty)
+        string[] installerIds = RequireCanonicalStringArrayWithOptionalAlias(
+            proof,
+            "proof_routes",
+            "proofRoutes")
             .Where(static route => route.StartsWith("/downloads/install/", StringComparison.Ordinal))
             .Select(static route => route["/downloads/install/".Length..])
             .Where(static artifactId => artifactId.Length > 0 && !artifactId.Contains('/'))
@@ -464,6 +464,55 @@ public static class ReleaseUploadAuthorityHandoffBuilder
            && value.ValueKind == JsonValueKind.Array
             ? value
             : throw new InvalidDataException($"release upload {propertyName} is invalid");
+
+    private static string[] RequireCanonicalStringArrayWithOptionalAlias(
+        JsonElement parent,
+        string canonicalName,
+        string compatibilityName)
+    {
+        if (!parent.TryGetProperty(canonicalName, out JsonElement canonical))
+        {
+            throw new InvalidDataException(
+                $"release upload canonical {canonicalName} is missing");
+        }
+
+        string[] canonicalValues = RequireStrictStringArray(canonical, canonicalName);
+        if (parent.TryGetProperty(compatibilityName, out JsonElement compatibility))
+        {
+            string[] compatibilityValues = RequireStrictStringArray(
+                compatibility,
+                compatibilityName);
+            if (!canonicalValues.SequenceEqual(compatibilityValues, StringComparer.Ordinal))
+            {
+                throw new InvalidDataException(
+                    $"release upload {canonicalName}/{compatibilityName} aliases disagree");
+            }
+        }
+        return canonicalValues;
+    }
+
+    private static string[] RequireStrictStringArray(JsonElement value, string propertyName)
+    {
+        if (value.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidDataException($"release upload {propertyName} is invalid");
+        }
+
+        string[] values = value.EnumerateArray()
+            .Select(item => item.ValueKind == JsonValueKind.String
+                            && item.GetString()?.Trim() is { Length: > 0 } text
+                ? text
+                : throw new InvalidDataException(
+                    $"release upload {propertyName} contains an invalid route"))
+            .ToArray();
+        if (values.Length == 0
+            || values.Distinct(StringComparer.Ordinal).Count() != values.Length)
+        {
+            throw new InvalidDataException(
+                $"release upload {propertyName} route inventory is invalid");
+        }
+        return values;
+    }
 
     private static string RequireString(JsonElement parent, string propertyName)
         => parent.TryGetProperty(propertyName, out JsonElement value)
