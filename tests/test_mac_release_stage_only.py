@@ -846,6 +846,17 @@ def test_hosted_upload_persists_recovery_state_around_completion() -> None:
     assert response_argument < main_call
 
 
+def test_hosted_upload_has_no_empty_common_array_expansion_under_bash3_nounset() -> None:
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+    upload_start = bootstrap.index("upload_release_bundle_http() {")
+    upload_end = bootstrap.index("\nstage_local_release_bundle() {", upload_start)
+    upload = bootstrap[upload_start:upload_end]
+
+    # Bash 3 (the native macOS shell) treats an empty array expansion as an
+    # unbound variable under `set -u`, unlike newer Bash releases.
+    assert "request_common" not in upload
+
+
 def test_hosted_upload_retains_request_started_on_ambiguous_completion(tmp_path: Path) -> None:
     bundle = tmp_path / "bundle"
     files = bundle / "files"

@@ -818,7 +818,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("local ui_kit_ref=\"${CHUMMER_UI_KIT_REF:-main}\"", template, StringComparison.Ordinal);
         Assert.Contains("local registry_ref=\"${CHUMMER_HUB_REGISTRY_REF:-main}\"", template, StringComparison.Ordinal);
         Assert.Contains("umask 077", template, StringComparison.Ordinal);
-        Assert.Contains("request_common=(", template, StringComparison.Ordinal);
+        Assert.DoesNotContain("request_common", template, StringComparison.Ordinal);
         Assert.Contains("curl -q --config -", template, StringComparison.Ordinal);
         Assert.Contains("write_release_upload_curl_config()", template, StringComparison.Ordinal);
         Assert.Contains("Authorization: Bearer {escaped}", template, StringComparison.Ordinal);

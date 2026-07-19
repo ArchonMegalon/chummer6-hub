@@ -6650,6 +6650,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="gold-janitor-main-") as temp_dir:
             published = Path(temp_dir) / "published"
             artifact_root = Path(temp_dir) / "v20"
+            legacy_root = Path(temp_dir) / "legacy"
             published.mkdir(parents=True, exist_ok=True)
             for key, path in module.REQUIRED_RECEIPTS.items():
                 payload = passing_required_receipt_payload(module, key)
@@ -6669,7 +6670,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             stderr = io.StringIO()
-            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
                 with self.assertRaises(SystemExit):
                     with redirect_stderr(stderr):
                         module.main()
@@ -6678,6 +6679,14 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("rule_authority_minimum_coverage", stderr_text)
         self.assertIn("human rule review signoff", stderr_text)
         self.assertIn("NOT_GOLD", stderr_text)
+
+    def test_completion_root_follows_the_checkout_workspace(self) -> None:
+        module = load_module()
+
+        self.assertEqual(
+            module.RUN_SERVICES_ROOT.parent / "_completion",
+            module.COMPLETION_ROOT,
+        )
 
     def test_payload_surfaces_ruleset_readiness_human_side_assumption_as_accepted_boundary(self) -> None:
         module = load_module()

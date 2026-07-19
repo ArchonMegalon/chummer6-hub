@@ -4267,7 +4267,6 @@ upload_release_bundle_http() {
   local last_request_status=""
   local session_json session_id files_url chunks_url complete_url
   local file_path relative_path file_size
-  local -a request_common=()
   local attempt_receipt_path="${CHUMMER_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH:-$(dirname "$response_path")/release-upload-handoff.json}"
   local candidate_summary=""
   BOOTSTRAP_RELEASE_UPLOAD_ATTEMPT_RECEIPT_PATH="$attempt_receipt_path"
@@ -4630,8 +4629,7 @@ PY
   if ! post_form_request \
     "$session_json" \
     "create upload session" \
-    "$sessions_url" \
-    "${request_common[@]}"; then
+    "$sessions_url"; then
     rm -f "$session_json"
     case "$last_request_status" in
       400|401|403)
@@ -4705,7 +4703,6 @@ PY
       "" \
       "upload file ${relative_path}" \
       "$files_url" \
-      "${request_common[@]}" \
       -F "path=${relative_path}" \
       -F "file=@${file_path};type=application/octet-stream"; then
       case "$last_request_status" in
@@ -4745,7 +4742,6 @@ PY
         "" \
         "upload chunk ${idx}/${total} for ${relative_path}" \
         "$chunks_url" \
-        "${request_common[@]}" \
         -F "path=${relative_path}" \
         -F "index=${idx}" \
         -F "total=${total}" \
@@ -4819,8 +4815,7 @@ PY
       "$response_path" \
       "complete staged upload" \
       "$complete_url" \
-      --no-retry \
-      "${request_common[@]}"; then
+      --no-retry; then
       case "$last_request_status" in
         400|401|403)
           die "release upload completion returned HTTP ${last_request_status}; its durable state remains request_started. Do not create another session. Reconcile the recorded handoff at $attempt_receipt_path."
