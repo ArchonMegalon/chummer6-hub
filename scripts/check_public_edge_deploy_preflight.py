@@ -29,6 +29,10 @@ try:
         strict_json_object as decode_strict_json_object,
     )
     from scripts.verify_workspace_restore_receipts import check_local_release_proof
+    from scripts.release.verify_public_projection import (
+        ProjectionBlocked as PublicProjectionBlocked,
+        resolve_current_snapshot,
+    )
 except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
     from strict_json_contract import (
         StrictJsonContractError,
@@ -36,6 +40,10 @@ except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
         strict_json_object as decode_strict_json_object,
     )
     from verify_workspace_restore_receipts import check_local_release_proof
+    from release.verify_public_projection import (
+        ProjectionBlocked as PublicProjectionBlocked,
+        resolve_current_snapshot,
+    )
 
 try:
     import fcntl
@@ -201,12 +209,12 @@ DEFAULT_PUBLIC_EDGE_OVERLAY_ROOT = RUN_SERVICES_ROOT / ".state" / "public-edge-p
 PUBLIC_EDGE_CANONICAL_RUN_SERVICES_ROOT = Path(
     "/docker/chummercomplete/chummer.run-services"
 )
-PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE = (
+PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT = (
     PUBLIC_EDGE_CANONICAL_RUN_SERVICES_ROOT
     / ".codex-studio"
     / "published"
-    / "HUB_LOCAL_RELEASE_PROOF.generated.json"
 )
+PUBLIC_EDGE_RUNTIME_PROOF_OUTPUT_NAME = "HUB_LOCAL_RELEASE_PROOF.generated.json"
 PUBLIC_EDGE_RUNTIME_PROOF_BIND_MODE = 0o644
 PUBLIC_EDGE_OPERATIONAL_MIRROR_ROOTS = {
     "public_edge_main": WORKSPACE_ROOT / "chummer.run-services-public-edge-main",
@@ -251,8 +259,10 @@ PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS = {
         'CHUMMER_PUBLIC_PLAY_PROXY_ENABLED: "false"',
         'CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"',
         "${CHUMMER_PUBLIC_PORTAL_APP_OVERLAY_DIR:-/docker/chummercomplete/chummer.run-services/.state/public-edge-portal-overlay/app}:/app:ro",
-        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro",
-        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json:ro",
+        'CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_ROOT: /public-projection',
+        'CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_REQUIRED: "true"',
+        "${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT:?Set the authenticated public projection snapshot root}:/public-projection:ro",
+        "${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE:?Set the authenticated CURRENT Hub proof output}:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro",
     ),
     "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml": (
         "Sign in first",
@@ -448,6 +458,37 @@ PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS = {
         'value.Equals("/js/mobile-app-handoff.js", StringComparison.OrdinalIgnoreCase)',
         'requestPath.Value?.EndsWith(".js", StringComparison.OrdinalIgnoreCase)',
         'fileContext.Context.Response.ContentType = "application/javascript; charset=utf-8";',
+        "PublicProjectionProofRequestPathPolicy.Evaluate(context.Request)",
+        "PublicProjectionProofRequestPathPolicy.IsCanonical(path)",
+    ),
+    "Chummer.Run.Api/Services/PublicProjectionProofRequestPathPolicy.cs": (
+        "PublicProjectionProofRequestPathDisposition.RejectVariant",
+        '"/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json"',
+        '"/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"',
+        "Uri.UnescapeDataString(decoded)",
+        "decoded.Replace('\\\\', '/')",
+    ),
+    "Chummer.Run.Api/Services/PublicProjectionSnapshotService.cs": (
+        "PublicProjectionDescriptorReader.Open(root)",
+        "descriptorReader.ReadRootFile(",
+        "snapshot.ReadFile(",
+        "snapshot.VerifyPathIdentity()",
+        "descriptorReader.VerifyRootPathIdentity()",
+    ),
+    "Chummer.Run.Api/Services/ReleaseUploadAuthorityHandoffBuilder.cs": (
+        "RequireCanonicalStringArrayWithOptionalAlias(",
+        '"proof_routes"',
+        '"proofRoutes"',
+        "aliases disagree",
+        "RequireUnpaddedRoute(",
+        "invalid or padded route",
+    ),
+    "Chummer.Run.Api/Services/PublicProjectionDescriptorReader.cs": (
+        "LinuxNative.openat(",
+        "LinuxNative.OpenNoFollow",
+        "LinuxNative.statx(",
+        "metadata.LinkCount != 1",
+        "OpenAbsoluteDirectory(",
     ),
     "Chummer.Run.Api/Dockerfile": (
         "FROM python:3.12-slim@sha256:c3d81d25b3154142b0b42eb1e61300024426268edeb5b5a26dd7ddf64d9daf28 AS public-pwa-proof",
@@ -4055,6 +4096,7 @@ def verify(
     check_source_markers: bool = True,
     overlay_root: Path | None = None,
     check_overlay_markers: bool = False,
+    public_projection_snapshot_root: Path | None = None,
     runtime_proof_bind_source: Path | None = None,
     runtime_proof_bind_source_sha256: str = "",
     release_channel_receipt: Path | None = None,
@@ -4105,6 +4147,7 @@ def verify(
     public_pwa_static_proof: dict[str, Any] = {}
     public_pwa_docker_build_contract: dict[str, Any] = {}
     public_pwa_compose_context_contract: dict[str, Any] = {}
+    public_projection_snapshot_receipt: dict[str, Any] = {}
     runtime_proof_bind_source_receipt: dict[str, Any] = {}
     if check_source_markers:
         marker_findings, marker_checks = source_marker_findings(resolved_source_root)
@@ -4135,12 +4178,63 @@ def verify(
         else:
             mirror_findings, operational_mirror_checks = operational_mirror_root_findings()
         findings.extend(mirror_findings)
-        runtime_proof_bind_source_receipt = runtime_proof_bind_source_check(
-            runtime_proof_bind_source or PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE,
-            runtime_proof_bind_source_sha256=runtime_proof_bind_source_sha256,
-            release_channel_receipt=release_channel_receipt,
-            release_channel_receipt_sha256=release_channel_receipt_sha256,
+        selected_snapshot_root = (
+            public_projection_snapshot_root
+            or PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT
         )
+        try:
+            projection_snapshot = resolve_current_snapshot(selected_snapshot_root)
+        except (OSError, ValueError, PublicProjectionBlocked):
+            public_projection_snapshot_receipt = {
+                "contractName": "chummer.public_projection_current/v1",
+                "status": "fail",
+                "snapshotRoot": str(selected_snapshot_root),
+                "failure": "authenticated CURRENT public projection is unavailable",
+            }
+            runtime_proof_bind_source_receipt = {
+                "status": "fail",
+                "sourcePath": "",
+                "failures": [
+                    "runtime proof bind source was not resolved through authenticated CURRENT"
+                ],
+            }
+        else:
+            authenticated_proof_path = projection_snapshot.outputs[
+                PUBLIC_EDGE_RUNTIME_PROOF_OUTPUT_NAME
+            ]
+            expected_output_sha256 = projection_snapshot.output_sha256[
+                PUBLIC_EDGE_RUNTIME_PROOF_OUTPUT_NAME
+            ]
+            public_projection_snapshot_receipt = {
+                "contractName": "chummer.public_projection_current/v1",
+                "status": "pass",
+                "snapshotRoot": str(selected_snapshot_root),
+                "snapshotId": projection_snapshot.snapshot_id,
+                "snapshotSha256": projection_snapshot.snapshot_sha256,
+                "runtimeProofPath": str(authenticated_proof_path),
+                "runtimeProofSha256": expected_output_sha256,
+            }
+            runtime_proof_bind_source_receipt = runtime_proof_bind_source_check(
+                authenticated_proof_path,
+                runtime_proof_bind_source_sha256=runtime_proof_bind_source_sha256,
+                release_channel_receipt=release_channel_receipt,
+                release_channel_receipt_sha256=release_channel_receipt_sha256,
+            )
+            runtime_proof_bind_source_receipt.update(
+                {
+                    "publicProjectionSnapshotId": projection_snapshot.snapshot_id,
+                    "publicProjectionSnapshotSha256": projection_snapshot.snapshot_sha256,
+                    "publicProjectionRuntimeProofSha256": expected_output_sha256,
+                }
+            )
+            if runtime_proof_bind_source is not None and (
+                os.path.abspath(runtime_proof_bind_source)
+                != os.path.abspath(authenticated_proof_path)
+            ):
+                runtime_proof_bind_source_receipt["status"] = "fail"
+                runtime_proof_bind_source_receipt.setdefault("failures", []).append(
+                    "runtime proof bind source override does not equal authenticated CURRENT output"
+                )
         if runtime_proof_bind_source_receipt.get("status") != "pass":
             findings.append(
                 {
@@ -4149,8 +4243,8 @@ def verify(
                     "scope": "source",
                     "detail": (
                         "runtime proof bind source is not a fresh, canonical, semantically valid "
-                        "single-link regular 0644 artifact bound to an available release channel; "
-                        "rerun scripts/materialize_hub_local_release_proof.py"
+                        "single-link regular 0644 artifact bound to an available release channel "
+                        "and authenticated through the atomic CURRENT public projection"
                     ),
                 }
             )
@@ -4172,6 +4266,7 @@ def verify(
         "publicPwaDockerBuildContract": public_pwa_docker_build_contract,
         "publicPwaComposeContextContract": public_pwa_compose_context_contract,
         "publicPwaStaticProof": public_pwa_static_proof,
+        "publicProjectionSnapshot": public_projection_snapshot_receipt,
         "runtimeProofBindSource": runtime_proof_bind_source_receipt,
         "operationalMirrorChecks": operational_mirror_checks,
         "operationalMirrorSync": {
@@ -4233,6 +4328,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Do not validate the active mounted /app overlay markers.",
     )
     parser.add_argument(
+        "--public-projection-snapshot-root",
+        default="",
+        help="Root containing the authenticated atomic CURRENT public projection snapshot.",
+    )
+    parser.add_argument(
         "--runtime-proof-bind-source-sha256",
         default="",
         help="Independently supplied lowercase SHA-256 for the exact runtime proof bind source bytes.",
@@ -4251,6 +4351,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="Print a JSON receipt even on pass.")
     args = parser.parse_args(argv)
     if not args.skip_source_marker_check:
+        if not args.public_projection_snapshot_root:
+            parser.error(
+                "full source preflight requires --public-projection-snapshot-root"
+            )
         if re.fullmatch(
             r"[0-9a-f]{64}",
             args.runtime_proof_bind_source_sha256,
@@ -4283,6 +4387,11 @@ def main(argv: list[str] | None = None) -> int:
             check_source_markers=not args.skip_source_marker_check,
             overlay_root=Path(args.overlay_root) if args.overlay_root else None,
             check_overlay_markers=not args.skip_overlay_marker_check,
+            public_projection_snapshot_root=(
+                Path(args.public_projection_snapshot_root)
+                if args.public_projection_snapshot_root
+                else None
+            ),
             runtime_proof_bind_source_sha256=args.runtime_proof_bind_source_sha256,
             release_channel_receipt=(
                 Path(args.release_channel_receipt)

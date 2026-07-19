@@ -1,5 +1,10 @@
+using System.Diagnostics;
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api.Services;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Mvc;
@@ -307,7 +312,8 @@ public sealed class PublicLandingMacBootstrapScriptTests
                 "https://chummer.run/downloads/release-upload/bootstrap.sh",
                 "abc123",
                 "https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json",
-                "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"]) ?? throw new InvalidOperationException("command build returned null"));
+                "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                BuildAuthorityHandoff()]) ?? throw new InvalidOperationException("command build returned null"));
 
         Assert.StartsWith("set +x; set -euo pipefail;", command, StringComparison.Ordinal);
         Assert.Contains("curl -q -fsSL", command, StringComparison.Ordinal);
@@ -324,6 +330,8 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("current-owner, regular, non-symlink file with mode 600", command, StringComparison.Ordinal);
         Assert.Contains("must contain exactly one UTF-8 line", command, StringComparison.Ordinal);
         Assert.Contains("os.O_NOFOLLOW", command, StringComparison.Ordinal);
+        Assert.Contains("AUTHORITY_HANDOFF_B64=", command, StringComparison.Ordinal);
+        Assert.Contains("TMP_AUTHORITY_DIR=\"$(mktemp -d)\"", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_TICKET=\"$RELEASE_UPLOAD_AUTH\"", command, StringComparison.Ordinal);
         Assert.DoesNotContain("ticket-xyz", command, StringComparison.Ordinal);
         Assert.DoesNotContain("bootstrap.sh?ticket=", command, StringComparison.OrdinalIgnoreCase);
@@ -350,6 +358,31 @@ public sealed class PublicLandingMacBootstrapScriptTests
             Assert.Contains(setting, command, StringComparison.Ordinal);
         }
 
+        string[] authenticatedAuthoritySettings =
+        [
+            "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_COMMIT",
+            "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_COMMIT",
+            "CHUMMER_HUB_RELEASE_CHANNEL_PATH",
+            "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_SHA256",
+            "CHUMMER_HUB_RELEASE_CHANNEL_AUTHORITY",
+            "CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH",
+            "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_SHA256",
+            "CHUMMER_FLAGSHIP_PRODUCT_READINESS_AUTHORITY",
+            "CHUMMER_FLEET_QUEUE_STAGING_PATH",
+            "CHUMMER_FLEET_QUEUE_STAGING_EXPECTED_SHA256",
+            "CHUMMER_FLEET_QUEUE_STAGING_AUTHORITY",
+            "CHUMMER_DESIGN_QUEUE_STAGING_PATH",
+            "CHUMMER_DESIGN_QUEUE_STAGING_EXPECTED_SHA256",
+            "CHUMMER_DESIGN_QUEUE_STAGING_AUTHORITY",
+            "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_PATH",
+            "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_EXPECTED_SHA256",
+            "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_AUTHORITY"
+        ];
+        foreach (string setting in authenticatedAuthoritySettings)
+        {
+            Assert.Contains(setting + "=", command, StringComparison.Ordinal);
+        }
+
         Assert.Contains("Set reviewed full 40-hex commit pins before running", command, StringComparison.Ordinal);
         Assert.True(
             command.IndexOf("CHUMMER_UI_EXPECTED_COMMIT", StringComparison.Ordinal)
@@ -358,10 +391,251 @@ public sealed class PublicLandingMacBootstrapScriptTests
     }
 
     [Fact]
+    public void ReleaseUploadAuthorityHandoffProjectsAuthenticatedLineageWithoutLocalPaths()
+    {
+        ReleaseUploadAuthorityHandoff handoff = BuildAuthorityHandoff();
+
+        Assert.StartsWith("public-projection-", handoff.SnapshotId, StringComparison.Ordinal);
+        Assert.Equal(5, handoff.Inputs.Count);
+        Assert.All(handoff.Inputs, input =>
+        {
+            Assert.StartsWith(
+                $"current-snapshot://{handoff.SnapshotSha256}/{input.Key}/",
+                input.Authority,
+                StringComparison.Ordinal);
+            Assert.Equal(
+                Convert.ToHexStringLower(SHA256.HashData(input.Payload)),
+                input.Sha256);
+            string text = Encoding.UTF8.GetString(input.Payload);
+            Assert.Contains(handoff.SnapshotId, text, StringComparison.Ordinal);
+            Assert.Contains("sourceAuthority", text, StringComparison.Ordinal);
+            Assert.Contains("sourceSha256", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("/tmp/", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("/docker/", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("/Users/", text, StringComparison.Ordinal);
+        });
+
+        ReleaseUploadAuthorityInput release = Assert.Single(
+            handoff.Inputs,
+            static input => input.Key == ReleaseUploadAuthorityHandoffBuilder.ReleaseChannelKey);
+        using JsonDocument releaseDocument = JsonDocument.Parse(release.Payload);
+        Assert.Equal(
+            "chummer.release-upload.release-channel-handoff/v1",
+            releaseDocument.RootElement.GetProperty("contractName").GetString());
+        Assert.Equal(3, releaseDocument.RootElement.GetProperty("artifacts").GetArrayLength());
+    }
+
+    [Fact]
+    public void ReleaseUploadCommandRejectsStaleProofAndReachesLocalHubGeneratorWithNoAmbientAuthorityVariables()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        string tempRoot = Path.Combine(
+            Path.GetTempPath(),
+            "chummer-release-authority-handoff-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            ReleaseUploadAuthorityHandoff handoff = BuildAuthorityHandoff();
+            string actualBootstrap = RepoPaths.FromRoot(
+                "Chummer.Run.Api",
+                "wwwroot",
+                "artifacts",
+                "mac-codex-release-pipeline",
+                "bootstrap.sh");
+            string hubAlias = Path.Combine(tempRoot, "hub-alias");
+            string hubRepo = Path.Combine(tempRoot, "hub-repo");
+            string generator = Path.Combine(
+                hubAlias,
+                "scripts",
+                "materialize_hub_local_release_proof.py");
+            string generatedProof = Path.Combine(tempRoot, "generated-proof.json");
+            string observedPaths = Path.Combine(tempRoot, "observed-authority-paths.txt");
+            string staleProof = Path.Combine(tempRoot, "stale-remote-proof.json");
+            string staleProofRejected = Path.Combine(tempRoot, "stale-proof-rejected.txt");
+            Directory.CreateDirectory(Path.GetDirectoryName(generator)!);
+            Directory.CreateDirectory(hubRepo);
+            File.WriteAllText(
+                staleProof,
+                JsonSerializer.Serialize(new
+                {
+                    contract_name = "chummer6-hub.local_release_proof",
+                    status = "passed",
+                    generatedAt = "2000-01-01T00:00:00Z"
+                }) + "\n",
+                Encoding.UTF8);
+            File.WriteAllText(
+                generator,
+                """
+                import datetime
+                import hashlib
+                import json
+                import os
+                import pathlib
+                import re
+                import sys
+
+                commit_names = (
+                    "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_COMMIT",
+                    "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_COMMIT",
+                )
+                handoffs = (
+                    ("CHUMMER_HUB_RELEASE_CHANNEL_PATH", "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_SHA256", "CHUMMER_HUB_RELEASE_CHANNEL_AUTHORITY"),
+                    ("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH", "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_SHA256", "CHUMMER_FLAGSHIP_PRODUCT_READINESS_AUTHORITY"),
+                    ("CHUMMER_FLEET_QUEUE_STAGING_PATH", "CHUMMER_FLEET_QUEUE_STAGING_EXPECTED_SHA256", "CHUMMER_FLEET_QUEUE_STAGING_AUTHORITY"),
+                    ("CHUMMER_DESIGN_QUEUE_STAGING_PATH", "CHUMMER_DESIGN_QUEUE_STAGING_EXPECTED_SHA256", "CHUMMER_DESIGN_QUEUE_STAGING_AUTHORITY"),
+                    ("CHUMMER_DESIGN_SUCCESSOR_REGISTRY_PATH", "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_EXPECTED_SHA256", "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_AUTHORITY"),
+                )
+                assert os.environ.get("CHUMMER_REQUIRE_CURRENT_RELEASE_INPUTS") == "1"
+                assert all(re.fullmatch(r"[0-9a-f]{40}", os.environ[name]) for name in commit_names)
+                for path_name, digest_name, authority_name in handoffs:
+                    raw = pathlib.Path(os.environ[path_name]).read_bytes()
+                    assert hashlib.sha256(raw).hexdigest() == os.environ[digest_name]
+                    assert os.environ[authority_name].startswith("current-snapshot://")
+                payload = {
+                    "status": "pass",
+                    "generatedAt": datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+                    "journeysPassed": [
+                        "install_claim_restore_continue",
+                        "build_explain_publish",
+                        "campaign_session_recover_recap",
+                        "report_cluster_release_notify",
+                        "organize_community_and_close_loop",
+                    ],
+                    "proof_routes": [
+                        "/downloads/install/avalonia-linux-x64-installer",
+                        "/home/access", "/home/work", "/account/access", "/account/work",
+                        "/account/support", "/contact", "/downloads",
+                        "/downloads/install/avalonia-osx-arm64-installer",
+                        "/downloads/install/avalonia-win-x64-installer",
+                    ],
+                }
+                pathlib.Path(sys.argv[1]).write_text(json.dumps(payload) + "\n", encoding="utf-8")
+                """,
+                Encoding.UTF8);
+
+            string wrapper = $$"""
+                #!/usr/bin/env bash
+                set -euo pipefail
+                source {{SingleQuoteForTest(actualBootstrap)}}
+                trap cleanup_bootstrap_tmp_paths EXIT
+                resolved_proof="$(resolve_hub_local_release_proof_path "${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}")"
+                test -f "$resolved_proof"
+                if json_generated_at_health "$resolved_proof" "remote release proof" 86400 300 >/dev/null 2>&1; then
+                  echo "stale remote release proof unexpectedly passed freshness" >&2
+                  exit 91
+                fi
+                printf 'rejected\n' > {{SingleQuoteForTest(staleProofRejected)}}
+                generate_hub_local_release_proof \
+                  {{SingleQuoteForTest(hubAlias)}} \
+                  {{SingleQuoteForTest(hubRepo)}} \
+                  {{SingleQuoteForTest(generatedProof)}}
+                json_generated_at_health \
+                  {{SingleQuoteForTest(generatedProof)}} \
+                  "generated release proof" \
+                  86400 \
+                  300
+                printf '%s\n' \
+                  "$CHUMMER_HUB_RELEASE_CHANNEL_PATH" \
+                  "$CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH" \
+                  "$CHUMMER_FLEET_QUEUE_STAGING_PATH" \
+                  "$CHUMMER_DESIGN_QUEUE_STAGING_PATH" \
+                  "$CHUMMER_DESIGN_SUCCESSOR_REGISTRY_PATH" \
+                  > {{SingleQuoteForTest(observedPaths)}}
+                """;
+            string wrapperPath = Path.Combine(tempRoot, "bootstrap-wrapper.sh");
+            File.WriteAllText(wrapperPath, wrapper, Encoding.UTF8);
+            string ticketPath = Path.Combine(tempRoot, "release-ticket.txt");
+            File.WriteAllText(ticketPath, "fixture-ticket\n", Encoding.UTF8);
+            File.SetUnixFileMode(ticketPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+
+            MethodInfo buildMethod = typeof(PublicLandingController).GetMethod(
+                "BuildReleaseUploadBootstrapCommand",
+                BindingFlags.NonPublic | BindingFlags.Static)
+                ?? throw new InvalidOperationException("missing BuildReleaseUploadBootstrapCommand");
+            byte[] wrapperBytes = File.ReadAllBytes(wrapperPath);
+            string command = (string)(buildMethod.Invoke(
+                obj: null,
+                parameters:
+                [
+                    new Uri(wrapperPath).AbsoluteUri,
+                    Convert.ToHexStringLower(SHA256.HashData(wrapperBytes)),
+                    staleProof,
+                    Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(staleProof))),
+                    handoff
+                ]) ?? throw new InvalidOperationException("command build returned null"));
+
+            var startInfo = new ProcessStartInfo("/bin/bash")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add(command);
+            string[] authorityNames =
+            [
+                "CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_COMMIT",
+                "CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_COMMIT",
+                .. handoff.Inputs.SelectMany(static input => new[]
+                {
+                    input.PathEnvironmentVariable,
+                    input.DigestEnvironmentVariable,
+                    input.AuthorityEnvironmentVariable
+                })
+            ];
+            foreach (string authorityName in authorityNames)
+            {
+                startInfo.Environment.Remove(authorityName);
+            }
+            foreach (string sourcePin in new[]
+                     {
+                         "CHUMMER_UI_EXPECTED_COMMIT",
+                         "CHUMMER_CORE_EXPECTED_COMMIT",
+                         "CHUMMER_HUB_EXPECTED_COMMIT",
+                         "CHUMMER_UI_KIT_EXPECTED_COMMIT",
+                         "CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT",
+                         "CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT",
+                         "CHUMMER_LEGACY_EXPECTED_COMMIT"
+                     })
+            {
+                startInfo.Environment[sourcePin] = new string('a', 40);
+            }
+            startInfo.Environment["CHUMMER_RELEASE_UPLOAD_TICKET_FILE"] = ticketPath;
+            startInfo.Environment["CHUMMER_RELEASE_PYTHON"] = "/usr/bin/python3";
+            startInfo.Environment["TMPDIR"] = tempRoot;
+
+            using Process process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("release command did not start");
+            string stdout = process.StandardOutput.ReadToEnd();
+            string stderr = process.StandardError.ReadToEnd();
+            Assert.True(process.WaitForExit(30_000), "release command timed out");
+            Assert.True(
+                process.ExitCode == 0,
+                $"release command failed ({process.ExitCode})\nstdout:\n{stdout}\nstderr:\n{stderr}");
+            Assert.True(File.Exists(generatedProof), "local Hub generator was not reached");
+            Assert.True(File.Exists(staleProofRejected), "stale remote proof did not reach the local generator fallback");
+            string[] temporaryAuthorityPaths = File.ReadAllLines(observedPaths);
+            Assert.Equal(5, temporaryAuthorityPaths.Length);
+            Assert.All(temporaryAuthorityPaths, path => Assert.False(File.Exists(path)));
+            Assert.False(Directory.Exists(Path.GetDirectoryName(temporaryAuthorityPaths[0])));
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void ReleaseUploadPageMintsTicketOnDemandWithoutRenderingItIntoHtml()
     {
         string view = File.ReadAllText(
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ReleaseUpload.cshtml"));
+        string controller = File.ReadAllText(
+            RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         MethodInfo bootstrapScriptEndpoint = typeof(PublicLandingController).GetMethod(
             nameof(PublicLandingController.ReleaseUploadBootstrapScript))
             ?? throw new InvalidOperationException("missing release upload bootstrap script endpoint");
@@ -376,6 +650,8 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("method: \"POST\"", view, StringComparison.Ordinal);
         Assert.Contains("RequestVerificationToken", view, StringComparison.Ordinal);
         Assert.Contains("pins for all seven source repositories", view, StringComparison.Ordinal);
+        Assert.Contains("supplies all 17 Hub-proof authority variables itself", view, StringComparison.Ordinal);
+        Assert.Contains("Model.AuthoritySnapshotSha256", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Model.HandoffCode", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Model.TicketExpiresAtUtc", view, StringComparison.Ordinal);
         Assert.Null(typeof(ReleaseUploadPageViewModel).GetProperty("HandoffCode"));
@@ -385,6 +661,23 @@ public sealed class PublicLandingMacBootstrapScriptTests
             bootstrapCommandEndpoint.GetParameters(),
             parameter => string.Equals(parameter.Name, "ticket", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(parameter.Name, "apiToken", StringComparison.OrdinalIgnoreCase));
+
+        int commandAction = controller.IndexOf(
+            "public async Task<IActionResult> ReleaseUploadBootstrapCommand(",
+            StringComparison.Ordinal);
+        Assert.True(commandAction >= 0, "release upload command action is missing");
+        int authenticatedSubject = controller.IndexOf(
+            "_identity.RequireSubjectAsync(Request, cancellationToken)",
+            commandAction,
+            StringComparison.Ordinal);
+        Assert.True(authenticatedSubject >= 0, "release upload command authentication is missing");
+        int authenticatedHandoff = controller.IndexOf(
+            "TryBuildReleaseUploadCommand(",
+            authenticatedSubject,
+            StringComparison.Ordinal);
+        Assert.True(
+            commandAction < authenticatedSubject && authenticatedSubject < authenticatedHandoff,
+            "the signed-in command must authenticate before loading the CURRENT authority handoff");
     }
 
     [Theory]
@@ -525,7 +818,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("local ui_kit_ref=\"${CHUMMER_UI_KIT_REF:-main}\"", template, StringComparison.Ordinal);
         Assert.Contains("local registry_ref=\"${CHUMMER_HUB_REGISTRY_REF:-main}\"", template, StringComparison.Ordinal);
         Assert.Contains("umask 077", template, StringComparison.Ordinal);
-        Assert.Contains("request_common=(", template, StringComparison.Ordinal);
+        Assert.DoesNotContain("request_common", template, StringComparison.Ordinal);
         Assert.Contains("curl -q --config -", template, StringComparison.Ordinal);
         Assert.Contains("write_release_upload_curl_config()", template, StringComparison.Ordinal);
         Assert.Contains("Authorization: Bearer {escaped}", template, StringComparison.Ordinal);
@@ -702,4 +995,104 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("chummer6-blazor-desktop.desktop", script, StringComparison.Ordinal);
         Assert.DoesNotContain("claimCode=", script, StringComparison.Ordinal);
     }
+
+    private static ReleaseUploadAuthorityHandoff BuildAuthorityHandoff()
+    {
+        string generatedAt = DateTimeOffset.UtcNow
+            .ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
+        object proof = new
+        {
+            contract_name = "chummer6-hub.local_release_proof",
+            status = "passed",
+            release_channel = new
+            {
+                status = "available",
+                path = "registry://release/run-fixture",
+                channelId = "preview",
+                channel = "preview",
+                version = "run-fixture",
+                releaseVersion = "run-fixture",
+                rolloutState = "promoted_preview",
+                supportabilityState = "preview_supported",
+                publishedAt = generatedAt
+            },
+            desktop_client_readiness = new
+            {
+                status = "pass",
+                scoped_status = "pass",
+                generated_at = generatedAt,
+                missing_coverage_keys = Array.Empty<string>(),
+                desktop_client_missing = false,
+                reason = "fixture readiness is current",
+                completion_audit_status = "pass",
+                completion_audit_reason = "fixture completion is current",
+                source_path = "fleet://readiness/run-fixture"
+            },
+            proof_routes = new[]
+            {
+                "/downloads/install/avalonia-linux-x64-installer",
+                "/downloads/install/avalonia-osx-arm64-installer",
+                "/downloads/install/avalonia-win-x64-installer",
+                "/home/access",
+                "/home/work",
+                "/account/access",
+                "/account/work",
+                "/account/support",
+                "/contact",
+                "/downloads"
+            },
+            authority_inputs = new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                [ReleaseUploadAuthorityHandoffBuilder.ReleaseChannelKey] = new
+                {
+                    authority = "registry://release/run-fixture",
+                    sha256 = new string('1', 64),
+                    contract = "chummer.registry.release-channel/v1",
+                    commit = new string('1', 40),
+                    generated_at = generatedAt
+                },
+                [ReleaseUploadAuthorityHandoffBuilder.FlagshipReadinessKey] = new
+                {
+                    authority = "fleet://readiness/run-fixture",
+                    sha256 = new string('2', 64),
+                    contract = "chummer.flagship-product-readiness/v1",
+                    commit = new string('2', 40),
+                    generated_at = generatedAt
+                },
+                [ReleaseUploadAuthorityHandoffBuilder.FleetQueueKey] = new
+                {
+                    authority = "fleet://queue/run-fixture",
+                    sha256 = new string('3', 64)
+                },
+                [ReleaseUploadAuthorityHandoffBuilder.DesignQueueKey] = new
+                {
+                    authority = "repo://design/run-fixture/queue",
+                    sha256 = new string('4', 64)
+                },
+                [ReleaseUploadAuthorityHandoffBuilder.DesignSuccessorRegistryKey] = new
+                {
+                    authority = "repo://design/run-fixture/registry",
+                    sha256 = new string('5', 64)
+                }
+            },
+            generated_at = generatedAt,
+            generatedAt
+        };
+        byte[] proofBytes = JsonSerializer.SerializeToUtf8Bytes(proof);
+        string proofSha256 = Convert.ToHexStringLower(SHA256.HashData(proofBytes));
+        string snapshotSha256 = new string('a', 64);
+        var snapshot = new PublicProjectionOutputSnapshot(
+            IsConfigured: true,
+            IsValid: true,
+            FailureReason: null,
+            SnapshotId: "public-projection-" + snapshotSha256,
+            SnapshotSha256: snapshotSha256,
+            Path: null,
+            Sha256: proofSha256,
+            Payload: proofBytes);
+        return ReleaseUploadAuthorityHandoffBuilder.Build(snapshot);
+    }
+
+    private static string SingleQuoteForTest(string value)
+        => "'" + value.Replace("'", "'\"'\"'", StringComparison.Ordinal) + "'";
 }

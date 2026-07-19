@@ -81,7 +81,12 @@ DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("CHUMMER_NEXT90_M125_ROOT", DEFAULT_ROOT))
 FLEET_QUEUE_STAGING_PATH = Path(os.environ.get("CHUMMER_NEXT90_M125_QUEUE_STAGING", "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"))
 DESIGN_QUEUE_STAGING_PATH = Path(os.environ.get("CHUMMER_NEXT90_M125_DESIGN_QUEUE_STAGING", "/docker/chummercomplete/chummer-design-m114/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"))
-PROOF_PATH = ROOT / ".codex-studio" / "published" / "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json"
+PROOF_PATH = Path(
+    os.environ.get(
+        "CHUMMER_NEXT90_M125_PROOF_PATH",
+        ROOT / ".codex-studio" / "published" / "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
+    )
+)
 
 
 def read_text(relative_path: str) -> str:
@@ -182,7 +187,7 @@ def main() -> int:
                     missing.append(f"{relative_path}: forbidden marker {forbidden}")
 
     materializer = ROOT / "scripts" / "materialize_next90_m125_hub_public_signal_packets_proof.py"
-    result = subprocess.run(["python3", str(materializer)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    result = subprocess.run([sys.executable, str(materializer)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if result.returncode != 0:
         missing.append(result.stderr.strip() or result.stdout.strip() or "materializer failed")
     elif not PROOF_PATH.is_file():

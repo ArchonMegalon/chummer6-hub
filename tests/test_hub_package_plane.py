@@ -496,6 +496,33 @@ def test_default_package_plane_is_false_even_when_siblings_exist() -> None:
     assert result.stdout.strip() == "false"
 
 
+def test_hosted_exact_sdk_lane_runs_projection_path_and_descriptor_tests() -> None:
+    workflow = (ROOT / ".github/workflows/package-plane.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "--version 10.0.103" in workflow
+    assert "Assert the hosted C# lane uses exact SDK 10.0.103" in workflow
+    assert (
+        "Build and test C# projection contracts without siblings on SDK 10.0.103"
+        in workflow
+    )
+
+    api_tests = ElementTree.fromstring(
+        (ROOT / "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj").read_text(
+            encoding="utf-8-sig"
+        )
+    )
+    linked = {
+        node.get("Include", "").replace("\\", "/")
+        for node in api_tests.findall(".//Compile")
+    }
+    assert "../Chummer.Tests/PublicProjectionSnapshotServiceTests.cs" in linked
+    assert "../Chummer.Tests/PublicProjectionProofRequestPathPolicyTests.cs" in linked
+    assert (
+        "../Chummer.Tests/ReleaseUploadAuthorityHandoffCompatibilityTests.cs" in linked
+    )
+
+
 def test_all_packable_hub_contracts_embed_one_proprietary_license() -> None:
     expected_license = (ROOT / "LICENSE").read_text(encoding="utf-8")
     assert "All rights reserved." in expected_license

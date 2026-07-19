@@ -181,7 +181,13 @@ class LivePublicWindowsInstallerTests(unittest.TestCase):
         output_path = Path(self.id().replace(".", "_")).with_suffix(".json")
         output_path = Path("/tmp") / output_path
         verify_script = self.build_stub_verify_script()
-        payload = module.verify(self.base_url, verify_script, output_path=output_path)
+        verifier_sha256 = hashlib.sha256(verify_script.read_bytes()).hexdigest()
+        payload = module.verify(
+            self.base_url,
+            verify_script,
+            output_path=output_path,
+            expected_verify_script_sha256=verifier_sha256,
+        )
 
         self.assertEqual("pass", payload["status"])
         self.assertEqual("LIVE_PUBLIC_WINDOWS_INSTALLER_READY", payload["verdict"])
@@ -190,6 +196,12 @@ class LivePublicWindowsInstallerTests(unittest.TestCase):
         written = json.loads(output_path.read_text(encoding="utf-8"))
         self.assertEqual("chummer.live_public_windows_installer", written["contract_name"])
         self.assertEqual("pass", written["status"])
+        self.assertEqual(verifier_sha256, written["verify_script_sha256"])
+        self.assertTrue(
+            written["verify_script_path"].startswith(
+                "external://windows-installer-payload-verifier/"
+            )
+        )
         self.assertEqual(1, written["checked_artifact_count"])
         self.assertIsInstance(written["artifact"], dict)
         self.assertEqual(1, len(payload["checked_artifacts"]))
@@ -205,12 +217,17 @@ class LivePublicWindowsInstallerTests(unittest.TestCase):
         output_path = Path(self.id().replace(".", "_")).with_suffix(".json")
         module.OUTPUT_PATH = Path("/tmp") / output_path
         verify_script = self.build_stub_verify_script()
+        verifier_sha256 = hashlib.sha256(verify_script.read_bytes()).hexdigest()
         original_manifest_release_version = _LiveDownloadsHandler.manifest_release_version
         original_release_version = _LiveDownloadsHandler.sidecar_release_version
         _LiveDownloadsHandler.manifest_release_version = "run-test"
         _LiveDownloadsHandler.sidecar_release_version = "run-drifted"
         try:
-            payload = module.verify(self.base_url, verify_script)
+            payload = module.verify(
+                self.base_url,
+                verify_script,
+                expected_verify_script_sha256=verifier_sha256,
+            )
         finally:
             _LiveDownloadsHandler.manifest_release_version = original_manifest_release_version
             _LiveDownloadsHandler.sidecar_release_version = original_release_version
@@ -256,6 +273,62 @@ class LivePublicWindowsInstallerTests(unittest.TestCase):
                 module = load_module()
 
             self.assertEqual(script_path, module.DEFAULT_VERIFY_SCRIPT)
+
+    def test_external_verifier_requires_matching_digest_before_execution(self) -> None:
+        module = load_module()
+        verify_script = self.build_stub_verify_script()
+
+        with self.assertRaisesRegex(RuntimeError, "requires .*EXPECTED_SHA256"):
+            module.authenticate_verifier(verify_script, None)
+        with self.assertRaisesRegex(RuntimeError, "does not match"):
+            module.authenticate_verifier(verify_script, "0" * 64)
+
+    def test_manifest_filenames_and_urls_are_confined(self) -> None:
+        module = load_module()
+
+        for unsafe_name in (
+            "../installer.exe",
+            "/tmp/installer.exe",
+            "folder\\installer.exe",
+            "payload.zip/child",
+        ):
+            with self.assertRaises(ValueError):
+                module.confined_file_name(
+                    unsafe_name,
+                    label="fixture",
+                    suffix=".exe",
+                )
+
+        with self.assertRaises(ValueError):
+            module.confined_download_url(
+                self.base_url,
+                "https://attacker.invalid/downloads/files/installer.exe",
+                file_name="installer.exe",
+            )
+        with self.assertRaises(ValueError):
+            module.confined_download_url(
+                self.base_url,
+                "/downloads/files/installer.exe?token=leak",
+                file_name="installer.exe",
+            )
+
+    def test_child_diagnostic_redacts_credentials_and_machine_paths(self) -> None:
+        module = load_module()
+        secret = "eyJhbGciOiJIUzI1NiJ9.abcdefghijk.secretpart"
+        unlabeled = "eyJ1bmxhYmVsZWQ.abcdefghijklmnop.qrstuvwxyz12345"
+        diagnostic = module.sanitize_child_diagnostic(
+            f"Authorization: Bearer {secret}\n"
+            "token=plain-secret\n"
+            f"child emitted {unlabeled}\n"
+            "/Users/operator/work/verifier.py failed"
+        )
+
+        self.assertNotIn(secret, diagnostic)
+        self.assertNotIn(unlabeled, diagnostic)
+        self.assertNotIn("plain-secret", diagnostic)
+        self.assertNotIn("/Users/operator", diagnostic)
+        self.assertIn("<redacted>", diagnostic)
+        self.assertIn("<local-path>", diagnostic)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,61 @@ namespace Chummer.Tests;
 public sealed class PublicReleaseManifestServiceTests
 {
     [Fact]
+    public void ConfiguredInvalidCurrentProjectionPreservesReleaseFreeze()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifest(includeProof: true);
+        fixture.WriteFlagshipReadiness(status: "pass");
+        string missingSnapshotRoot = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+        PublicReleaseManifestDto manifest = fixture.CreateService(
+            additionalSettings: new Dictionary<string, string?>
+            {
+                [PublicProjectionSnapshotService.SnapshotRootConfigurationKey] = missingSnapshotRoot,
+                [PublicProjectionSnapshotService.SnapshotRequiredConfigurationKey] = "true"
+            }).LoadManifest();
+
+        Assert.Equal("review_required", manifest.ProofStatus);
+        Assert.Equal("review_required", manifest.SupportabilityState);
+        Assert.DoesNotContain(
+            manifest.RolloutState ?? string.Empty,
+            new[] { "public_stable", "stable", "promoted_preview", "live" });
+        Assert.Contains("public projection", manifest.SupportabilitySummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CachedManifestReauthenticatesCurrentProjectionBeforeReuse()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        using var projection =
+            new PublicProjectionSnapshotServiceTests.PublicProjectionFixture();
+        fixture.WriteRegistryManifest(includeProof: true);
+        fixture.WriteFlagshipReadiness(status: "pass");
+        projection.PublishValidSnapshot();
+        PublicReleaseManifestService service = fixture.CreateService(
+            additionalSettings: new Dictionary<string, string?>
+            {
+                [PublicProjectionSnapshotService.SnapshotRootConfigurationKey] =
+                    projection.SnapshotRoot,
+                [PublicProjectionSnapshotService.SnapshotRequiredConfigurationKey] = "true"
+            });
+
+        PublicReleaseManifestDto authenticated = service.LoadManifest();
+        File.AppendAllText(projection.CurrentLocalProofPath, "tamper");
+        PublicReleaseManifestDto blocked = service.LoadManifest();
+
+        Assert.DoesNotContain(
+            "public projection",
+            authenticated.SupportabilitySummary ?? string.Empty,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("review_required", blocked.ProofStatus);
+        Assert.Contains(
+            "public projection",
+            blocked.SupportabilitySummary,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LoadManifestUsesLocalHubProofWhenRegistryProofIsAbsent()
     {
         using var fixture = new PublicReleaseManifestFixture();

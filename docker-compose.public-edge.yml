@@ -366,6 +366,8 @@ services:
       CHUMMER_PUBLIC_PLAY_LIVE_SESSION_PROXY_ENABLED: "false"
       CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE: /proofs/HUB_LOCAL_RELEASE_PROOF.generated.json
       CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE: /proofs/HUB_LOCAL_RELEASE_PROOF.generated.json
+      CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_ROOT: /public-projection
+      CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_REQUIRED: "true"
       CHUMMER_PUBLIC_FINAL_GOLD_JANITOR_FILE: /proofs/FINAL_GOLD_JANITOR.generated.json
       CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS: ${CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS:-false}
       CHUMMER_API_READ_RATE_LIMIT_PER_MINUTE: ${CHUMMER_API_READ_RATE_LIMIT_PER_MINUTE:-5000}
@@ -594,8 +596,10 @@ services:
       - chummer-release-upload-sessions:/release-upload-sessions
       - chummer-windows-proof-store:/windows-proof-store
       - chummer-windows-proof-upload-sessions:/windows-proof-upload-sessions
-      - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
-      - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
+      # The root is the authenticated CURRENT authority. The non-webroot compatibility bind
+      # is resolved from that same immutable snapshot by deploy/recovery before Compose runs.
+      - ${CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT:?Set the authenticated public projection snapshot root}:/public-projection:ro
+      - ${CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE:?Set the authenticated CURRENT Hub proof output}:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
       - /docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json:/proofs/FINAL_GOLD_JANITOR.generated.json:ro
     ports:
       - "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080"

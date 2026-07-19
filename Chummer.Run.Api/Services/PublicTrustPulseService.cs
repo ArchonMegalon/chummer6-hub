@@ -17,6 +17,7 @@ public sealed class PublicTrustPulseService
     private readonly ILogger<PublicTrustPulseService> _logger;
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
     private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
+    private readonly PublicProjectionSnapshotService _publicProjection;
 
     public PublicTrustPulseService(
         WeeklyProductPulseArtifactService weeklyPulse,
@@ -28,6 +29,7 @@ public sealed class PublicTrustPulseService
         _logger = logger;
         _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
         _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
+        _publicProjection = new PublicProjectionSnapshotService(configuration);
     }
 
     public PublicTrustPulseSnapshot? LoadSnapshot()
@@ -67,11 +69,19 @@ public sealed class PublicTrustPulseService
                 progressTrendSamples = ExtractProgressTrendSamples(progressHistory);
             }
 
-            var localReleaseProof = LoadOptionalArtifact<LocalReleaseProofPayload>(
-                ResolveLocalReleaseProofPath(),
-                options,
-                static payload => string.Equals(payload.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal),
-                "hub local release status");
+            PublicProjectionOutputSnapshot projection = _publicProjection.LoadHubLocalReleaseProof();
+            bool projectionBlocked = projection.IsConfigured && !projection.IsValid;
+            var localReleaseProof = projection.IsConfigured
+                ? LoadOptionalArtifact<LocalReleaseProofPayload>(
+                    projection.Payload,
+                    options,
+                    static payload => string.Equals(payload.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal),
+                    "authenticated Hub local release status")
+                : LoadOptionalArtifact<LocalReleaseProofPayload>(
+                    ResolveLocalReleaseProofPath(),
+                    options,
+                    static payload => string.Equals(payload.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal),
+                    "hub local release status");
             FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
             ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
             bool readinessReviewRequired = readiness?.RequiresReview == true;
@@ -101,8 +111,12 @@ public sealed class PublicTrustPulseService
                     : importRouteReadiness;
             }
 
-            string? localReleaseProofStatus = adoptionHealth?.LocalReleaseProofStatus ?? localReleaseProof?.Status;
-            bool parityClaimsReviewRequired = readinessReviewRequired || !importRouteGuard.IsCurrent;
+            string? localReleaseProofStatus = projection.IsConfigured
+                ? localReleaseProof?.Status
+                : adoptionHealth?.LocalReleaseProofStatus ?? localReleaseProof?.Status;
+            bool parityClaimsReviewRequired = readinessReviewRequired
+                || !importRouteGuard.IsCurrent
+                || projectionBlocked;
             if (parityClaimsReviewRequired)
             {
                 localReleaseProofStatus = "review_required";
@@ -148,8 +162,12 @@ public sealed class PublicTrustPulseService
                 ClosureHealthSummary: payload.SupportingSignals?.ClosureHealth?.Summary,
                 NextCheckpointQuestion: payload.NextCheckpointQuestion,
                 LocalReleaseProofStatus: localReleaseProofStatus,
-                ProvenJourneyCount: adoptionHealth?.ProvenJourneyCount ?? localReleaseProof?.JourneysPassed?.Count,
-                ProvenRouteCount: adoptionHealth?.ProvenRouteCount ?? localReleaseProof?.ProofRoutes?.Count,
+                ProvenJourneyCount: projection.IsConfigured
+                    ? localReleaseProof?.JourneysPassed?.Count
+                    : adoptionHealth?.ProvenJourneyCount ?? localReleaseProof?.JourneysPassed?.Count,
+                ProvenRouteCount: projection.IsConfigured
+                    ? localReleaseProof?.ProofRoutes?.Count
+                    : adoptionHealth?.ProvenRouteCount ?? localReleaseProof?.ProofRoutes?.Count,
                 FlagshipReadinessStatus: readiness?.Status,
                 FlagshipReadinessReason: readinessReason,
                 MissingDesktopClientCoverage: readiness?.MissingDesktopClientCoverage == true,
@@ -203,6 +221,30 @@ public sealed class PublicTrustPulseService
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Skipping optional {Label} after load failure from {Path}.", label, path);
+            return null;
+        }
+    }
+
+    private TPayload? LoadOptionalArtifact<TPayload>(
+        byte[]? payloadBytes,
+        JsonSerializerOptions options,
+        Func<TPayload, bool> validator,
+        string label)
+        where TPayload : class
+    {
+        if (payloadBytes is null || payloadBytes.Length == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var payload = JsonSerializer.Deserialize<TPayload>(payloadBytes, options);
+            return payload is not null && validator(payload) ? payload : null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping optional {Label} after authenticated snapshot parse failure.", label);
             return null;
         }
     }

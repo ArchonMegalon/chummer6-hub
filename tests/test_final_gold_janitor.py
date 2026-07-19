@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import io
 import json
@@ -647,7 +648,17 @@ def passing_required_receipt_payload(module, key: str, generated_at: str | None 
             }
         )
     if key == "live_public_windows_installer":
-        payload["verdict"] = "LIVE_PUBLIC_WINDOWS_INSTALLER_READY"
+        payload.update(
+            {
+                "verdict": "LIVE_PUBLIC_WINDOWS_INSTALLER_READY",
+                "verify_script_path": (
+                    module.LIVE_PUBLIC_WINDOWS_VERIFIER_URI
+                ),
+                "verify_script_sha256": hashlib.sha256(
+                    module.LIVE_PUBLIC_WINDOWS_VERIFIER_PATH.read_bytes()
+                ).hexdigest(),
+            }
+        )
     if key == "blazor_execution_horizon_bridge":
         payload = passing_blazor_execution_horizon_bridge_payload(module)
         if generated_at is not None:
@@ -709,6 +720,50 @@ def passing_required_receipt_payload(module, key: str, generated_at: str | None 
 
 
 class FinalGoldJanitorTests(unittest.TestCase):
+    def test_live_windows_pass_receipt_requires_authenticated_verifier_identity(self) -> None:
+        module = load_module()
+        payload = {
+            "verdict": "LIVE_PUBLIC_WINDOWS_INSTALLER_READY",
+            "verify_script_path": module.LIVE_PUBLIC_WINDOWS_VERIFIER_URI,
+            "verify_script_sha256": hashlib.sha256(
+                module.LIVE_PUBLIC_WINDOWS_VERIFIER_PATH.read_bytes()
+            ).hexdigest(),
+        }
+
+        self.assertEqual(
+            [],
+            module.required_gate_pass_verdict_semantic_failures(
+                "live_public_windows_installer",
+                payload,
+            ),
+        )
+        payload["verify_script_sha256"] = "a" * 64
+        self.assertTrue(
+            any(
+                "does not match the checked-in canonical verifier" in failure
+                for failure in module.required_gate_pass_verdict_semantic_failures(
+                "live_public_windows_installer",
+                payload,
+                )
+            )
+        )
+        payload["verify_script_sha256"] = hashlib.sha256(
+            module.LIVE_PUBLIC_WINDOWS_VERIFIER_PATH.read_bytes()
+        ).hexdigest()
+        payload["verify_script_path"] = (
+            "external://windows-installer-payload-verifier/sha256/"
+            + payload["verify_script_sha256"]
+        )
+        self.assertTrue(
+            any(
+                "URI is not the canonical" in failure
+                for failure in module.required_gate_pass_verdict_semantic_failures(
+                    "live_public_windows_installer",
+                    payload,
+                )
+            )
+        )
+
     def test_windows_visual_audit_is_release_blocking_by_default_but_explicit_dev_override_remains(self) -> None:
         with mock.patch.dict(os.environ, {}, clear=True):
             default_module = load_module()
@@ -6595,6 +6650,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="gold-janitor-main-") as temp_dir:
             published = Path(temp_dir) / "published"
             artifact_root = Path(temp_dir) / "v20"
+            legacy_root = Path(temp_dir) / "legacy"
             published.mkdir(parents=True, exist_ok=True)
             for key, path in module.REQUIRED_RECEIPTS.items():
                 payload = passing_required_receipt_payload(module, key)
@@ -6614,7 +6670,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                 (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
             required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
             stderr = io.StringIO()
-            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "LEGACY_GOLD_CLOSURE_ROOT", legacy_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
                 with self.assertRaises(SystemExit):
                     with redirect_stderr(stderr):
                         module.main()
@@ -6623,6 +6679,14 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertIn("rule_authority_minimum_coverage", stderr_text)
         self.assertIn("human rule review signoff", stderr_text)
         self.assertIn("NOT_GOLD", stderr_text)
+
+    def test_completion_root_follows_the_checkout_workspace(self) -> None:
+        module = load_module()
+
+        self.assertEqual(
+            module.RUN_SERVICES_ROOT.parent / "_completion",
+            module.COMPLETION_ROOT,
+        )
 
     def test_payload_surfaces_ruleset_readiness_human_side_assumption_as_accepted_boundary(self) -> None:
         module = load_module()
