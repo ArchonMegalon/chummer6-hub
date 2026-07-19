@@ -5,6 +5,7 @@ import datetime as dt
 import importlib.util
 import json
 import os
+import re
 import stat
 import sys
 import tempfile
@@ -31,7 +32,12 @@ DEFAULT_FLAGSHIP_READINESS_PATH = REPO_ROOT / ".codex-studio" / "published" / "F
 DEFAULT_HUB_LOCAL_RELEASE_PROOF_PATH = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
 DEFAULT_SERVED_HUB_LOCAL_RELEASE_PROOF_PATH = REPO_ROOT / "Chummer.Run.Api" / "wwwroot" / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
 DEFAULT_RELEASE_CHANNEL_PATH = REPO_ROOT / "Chummer.Portal" / "downloads" / "RELEASE_CHANNEL.generated.json"
-FALLBACK_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
+FALLBACK_FLAGSHIP_READINESS_PATH = Path(
+    str(
+        os.environ.get("CHUMMER_FLEET_FLAGSHIP_READINESS_PATH")
+        or DEFAULT_FLAGSHIP_READINESS_PATH
+    )
+)
 CANONICAL_COMPOSE_FILE = "docker-compose.yml"
 CANONICAL_PLAYWRIGHT_TIMEOUT_SECONDS = 120
 M141_UI_PACKAGE_ID = "next90-m141-ui-capture-direct-screenshot-and-runtime-proof-for-translator-xml-amendment"
@@ -40,10 +46,63 @@ M141_UI_FLAGSHIP_FRONTIER_ID = 1922169755
 PUBLIC_JSON_ARTIFACT_MODE = 0o644
 STABLE_READ_CHUNK_BYTES = 1024 * 1024
 _PUBLIC_EDGE_OVERLAY_MODULE = None
+PORTABLE_PATH_REPLACEMENTS = (
+    (
+        "/docker/chummercomplete/chummer.run-services/",
+        "repo://ArchonMegalon/chummer6-hub/",
+    ),
+    (
+        "/docker/chummercomplete/chummer6-hub/",
+        "repo://ArchonMegalon/chummer6-hub/",
+    ),
+    (
+        "/docker/chummercomplete/chummer6-ui/",
+        "repo://ArchonMegalon/chummer6-ui/",
+    ),
+    ("/docker/chummercomplete/", "evidence://whole-product/"),
+    ("/docker/fleet/", "evidence://fleet/"),
+    ("/docker/chummercomplete", "evidence://whole-product"),
+    ("/docker/fleet", "evidence://fleet"),
+)
+MACHINE_LOCAL_PATH_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9:])(?:"
+    r"/private/tmp/|/private/var/|/var/folders/|/var/tmp/|/tmp/|"
+    r"/docker/|/workspace/|/Users/|/root/|/home/[^/\s]+/|"
+    r"[A-Za-z]:[\\/](?:Users|Windows[\\/]Temp|workspace)[\\/]"
+    r")",
+    re.IGNORECASE,
+)
 
 
 def iso_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _portable_public_value(value, *, location: str = "$"):
+    """Return a public receipt value with known roots mapped and unknown roots rejected."""
+
+    if isinstance(value, str):
+        portable = value
+        for local_prefix, portable_prefix in PORTABLE_PATH_REPLACEMENTS:
+            portable = portable.replace(local_prefix, portable_prefix)
+        match = MACHINE_LOCAL_PATH_PATTERN.search(portable)
+        if match is not None:
+            raise RuntimeError(
+                "hub local release proof contains a machine-local path at "
+                f"{location}: {match.group(0)!r}"
+            )
+        return portable
+    if isinstance(value, list):
+        return [
+            _portable_public_value(item, location=f"{location}[{index}]")
+            for index, item in enumerate(value)
+        ]
+    if isinstance(value, dict):
+        return {
+            key: _portable_public_value(item, location=f"{location}.{key}")
+            for key, item in value.items()
+        }
+    return value
 
 
 def _load_public_edge_overlay_module():
@@ -339,6 +398,63 @@ def _payload_is_fresh(payload: dict, *, max_age_seconds: int, max_future_skew_se
     return age_seconds <= max_age_seconds
 
 
+def _require_current_release_input(
+    path: Path,
+    *,
+    label: str,
+    timestamp_keys: tuple[str, ...],
+    max_age_seconds: int,
+    max_future_skew_seconds: int,
+) -> None:
+    payload = _load_existing_payload(path)
+    if payload is None:
+        raise RuntimeError(f"{label} is missing or invalid")
+
+    raw_timestamp = next(
+        (
+            str(payload.get(key) or "").strip()
+            for key in timestamp_keys
+            if str(payload.get(key) or "").strip()
+        ),
+        "",
+    )
+    generated_at = _parse_iso_timestamp(raw_timestamp)
+    if generated_at is None:
+        raise RuntimeError(f"{label} has no valid authority timestamp")
+
+    age_seconds = int((dt.datetime.now(dt.timezone.utc) - generated_at).total_seconds())
+    if age_seconds < -max_future_skew_seconds:
+        raise RuntimeError(
+            f"{label} is too far in the future: age {age_seconds}s; "
+            f"maximum future skew {max_future_skew_seconds}s"
+        )
+    if age_seconds > max_age_seconds:
+        raise RuntimeError(
+            f"{label} is stale: age {age_seconds}s; maximum {max_age_seconds}s"
+        )
+
+
+def _require_current_release_inputs(
+    *,
+    max_age_seconds: int,
+    max_future_skew_seconds: int,
+) -> None:
+    _require_current_release_input(
+        _flagship_readiness_path(),
+        label="flagship readiness input",
+        timestamp_keys=("generatedAt", "generated_at"),
+        max_age_seconds=max_age_seconds,
+        max_future_skew_seconds=max_future_skew_seconds,
+    )
+    _require_current_release_input(
+        _release_channel_path(),
+        label="release-channel authority input",
+        timestamp_keys=("publishedAt", "generatedAt", "generated_at"),
+        max_age_seconds=max_age_seconds,
+        max_future_skew_seconds=max_future_skew_seconds,
+    )
+
+
 def _release_readiness_reason(value: str) -> str:
     text = value.strip()
     replacements = {
@@ -354,7 +470,7 @@ def _load_release_channel_snapshot() -> dict:
     try:
         release_channel_label = release_channel_path.relative_to(REPO_ROOT).as_posix()
     except ValueError:
-        release_channel_label = str(release_channel_path)
+        release_channel_label = "evidence://release-channel/RELEASE_CHANNEL.generated.json"
     snapshot = {
         "status": "unavailable",
         "path": release_channel_label,
@@ -499,7 +615,7 @@ def _load_flagship_readiness_snapshot() -> dict:
         "reason": default_reason,
         "completion_audit_status": "unknown",
         "completion_audit_reason": "",
-        "source_path": str(readiness_path),
+        "source_path": "evidence://fleet/FLAGSHIP_PRODUCT_READINESS.generated.json",
     }
 
     if not readiness_path.is_file():
@@ -564,7 +680,7 @@ def _load_flagship_readiness_snapshot() -> dict:
             else "unknown"
         ),
         "completion_audit_reason": completion_audit_reason,
-        "source_path": str(readiness_path),
+        "source_path": "evidence://fleet/FLAGSHIP_PRODUCT_READINESS.generated.json",
     }
 
 
@@ -785,6 +901,28 @@ def _materialize_under_shared_mutation_lock(
         "CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
         default=300,
     )
+    if str(os.environ.get("CHUMMER_REQUIRE_CURRENT_RELEASE_INPUTS") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        input_max_age_seconds = _parse_int_env(
+            "CHUMMER_RELEASE_INPUT_MAX_AGE_SECONDS",
+            "CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS",
+            "CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS",
+            default=86400,
+        )
+        input_max_future_skew_seconds = _parse_int_env(
+            "CHUMMER_RELEASE_INPUT_MAX_FUTURE_SKEW_SECONDS",
+            "CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
+            "CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
+            default=300,
+        )
+        _require_current_release_inputs(
+            max_age_seconds=input_max_age_seconds,
+            max_future_skew_seconds=input_max_future_skew_seconds,
+        )
     _sync_local_flagship_readiness_artifact_if_needed(
         out_path=out_path,
         source_path=str(_canonical_flagship_readiness_source_path()),
@@ -1924,16 +2062,17 @@ def _materialize_under_shared_mutation_lock(
 
     _sync_local_flagship_readiness_artifact_if_needed(
         out_path=out_path,
-        source_path=str(desktop_client_readiness.get("source_path") or "").strip(),
+        source_path=str(_canonical_flagship_readiness_source_path()),
     )
 
     # The caller owns the same fixed host mutation authority used by standalone
     # deploy and recovery. All input reads and payload construction above therefore
     # describe one post-lock snapshot, and these replacements cannot race container
     # recreation, rollback verification, or a newer materializer invocation.
+    portable_payload = _portable_public_value(payload)
     changed = _publish_runtime_proof_artifacts(
         out_path=out_path,
-        payload=payload,
+        payload=portable_payload,
         proof_max_age_seconds=proof_max_age_seconds,
         proof_max_future_skew_seconds=proof_max_future_skew_seconds,
     )
@@ -1971,7 +2110,11 @@ def main() -> int:
         )
         return 1
 
-    return materialize_with_shared_mutation_lock(*sys.argv[1:])
+    try:
+        return materialize_with_shared_mutation_lock(*sys.argv[1:])
+    except RuntimeError as exc:
+        print(f"hub local proof generation blocked: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

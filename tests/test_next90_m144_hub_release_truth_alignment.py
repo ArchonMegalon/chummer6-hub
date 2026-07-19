@@ -11,6 +11,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_next90_m144_hub_release_truth_alignment.py"
+PRODUCT_EVIDENCE_ROOT = REPO_ROOT / ".codex-design" / "product"
+QUEUE_STAGING = PRODUCT_EVIDENCE_ROOT / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+SUCCESSOR_REGISTRY = PRODUCT_EVIDENCE_ROOT / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
 STATIC_SOURCE_FILES = [
     "Chummer.Run.Api/Services/PublicReleaseManifestService.cs",
     "Chummer.Run.Api/Services/SignedInTrustStatusService.cs",
@@ -180,6 +183,10 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
             target = temp_root / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
+        product_evidence_root = temp_root / ".codex-design" / "product"
+        product_evidence_root.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(QUEUE_STAGING, product_evidence_root / QUEUE_STAGING.name)
+        shutil.copyfile(SUCCESSOR_REGISTRY, product_evidence_root / SUCCESSOR_REGISTRY.name)
 
     def run_verifier(self, temp_root: Path) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
@@ -195,6 +202,15 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
         )
         env["CHUMMER_NEXT90_M144_STARTUP_SMOKE_ROOT"] = str(
             temp_root / "Chummer.Portal/downloads/startup-smoke"
+        )
+        env["CHUMMER_NEXT90_M144_QUEUE_STAGING"] = str(
+            temp_root / ".codex-design/product" / QUEUE_STAGING.name
+        )
+        env["CHUMMER_NEXT90_M144_DESIGN_QUEUE_STAGING"] = env[
+            "CHUMMER_NEXT90_M144_QUEUE_STAGING"
+        ]
+        env["CHUMMER_NEXT90_M144_SUCCESSOR_REGISTRY"] = str(
+            temp_root / ".codex-design/product" / SUCCESSOR_REGISTRY.name
         )
         return subprocess.run(
             ["python3", str(SCRIPT)],

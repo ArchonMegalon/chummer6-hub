@@ -3,7 +3,7 @@
   "generated_at_utc": "2026-07-02T05:38:46Z",
   "base_url": "https://chummer.run",
   "manifest_url": "https://chummer.run/downloads/releases.json",
-  "verify_script_path": "/docker/chummercomplete/chummer-presentation/scripts/verify-windows-installer-payloads.py",
+  "verify_script_path": "external://windows-installer-payload-verifier/verify-windows-installer-payloads.py",
   "status": "pass",
   "verdict": "LIVE_PUBLIC_WINDOWS_INSTALLER_READY",
   "checked_artifacts": [

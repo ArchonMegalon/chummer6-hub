@@ -27,6 +27,125 @@ def load_materializer_module():
 
 
 class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
+    def test_required_current_inputs_reject_stale_authority_without_writing_proof(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-stale-input-") as temp_dir:
+            temp_root = Path(temp_dir)
+            readiness_path = temp_root / "FLAGSHIP_PRODUCT_READINESS.generated.json"
+            release_channel_path = temp_root / "RELEASE_CHANNEL.generated.json"
+            readiness_path.write_text(
+                json.dumps({"generated_at": "2020-01-01T00:00:00Z"}),
+                encoding="utf-8",
+            )
+            release_channel_path.write_text(
+                json.dumps({"publishedAt": "2020-01-01T00:00:00Z"}),
+                encoding="utf-8",
+            )
+
+            old_default = module.DEFAULT_FLAGSHIP_READINESS_PATH
+            old_fallback = module.FALLBACK_FLAGSHIP_READINESS_PATH
+            old_release_channel = module.DEFAULT_RELEASE_CHANNEL_PATH
+            try:
+                module.DEFAULT_FLAGSHIP_READINESS_PATH = readiness_path
+                module.FALLBACK_FLAGSHIP_READINESS_PATH = readiness_path
+                module.DEFAULT_RELEASE_CHANNEL_PATH = release_channel_path
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    r"flagship readiness input is stale: age \d+s; maximum 86400s",
+                ):
+                    module._require_current_release_inputs(
+                        max_age_seconds=86400,
+                        max_future_skew_seconds=300,
+                    )
+            finally:
+                module.DEFAULT_FLAGSHIP_READINESS_PATH = old_default
+                module.FALLBACK_FLAGSHIP_READINESS_PATH = old_fallback
+                module.DEFAULT_RELEASE_CHANNEL_PATH = old_release_channel
+
+    def test_release_cli_reports_stale_input_without_traceback_or_output(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-stale-cli-") as temp_dir:
+            temp_root = Path(temp_dir)
+            readiness_path = temp_root / "FLAGSHIP_PRODUCT_READINESS.generated.json"
+            release_channel_path = temp_root / "RELEASE_CHANNEL.generated.json"
+            proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            readiness_path.write_text(
+                json.dumps({"generated_at": "2020-01-01T00:00:00Z"}),
+                encoding="utf-8",
+            )
+            release_channel_path.write_text(
+                json.dumps({"publishedAt": "2020-01-01T00:00:00Z"}),
+                encoding="utf-8",
+            )
+            env = os.environ.copy()
+            env.update(
+                {
+                    "CHUMMER_REQUIRE_CURRENT_RELEASE_INPUTS": "1",
+                    "CHUMMER_RELEASE_INPUT_MAX_AGE_SECONDS": "86400",
+                    "CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH": str(readiness_path),
+                    "CHUMMER_HUB_RELEASE_CHANNEL_PATH": str(release_channel_path),
+                }
+            )
+
+            completed = subprocess.run(
+                [
+                    "python3",
+                    str(MATERIALIZER),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=60,
+                check=False,
+            )
+
+            self.assertEqual(1, completed.returncode)
+            self.assertRegex(
+                completed.stdout,
+                r"hub local proof generation blocked: flagship readiness input is stale: "
+                r"age \d+s; maximum 86400s",
+            )
+            self.assertNotIn("Traceback", completed.stdout)
+            self.assertFalse(proof_path.exists())
+
+    def test_required_current_inputs_accept_current_readiness_and_release_channel(self) -> None:
+        module = load_materializer_module()
+        with tempfile.TemporaryDirectory(prefix="hub-local-proof-current-input-") as temp_dir:
+            temp_root = Path(temp_dir)
+            readiness_path = temp_root / "FLAGSHIP_PRODUCT_READINESS.generated.json"
+            release_channel_path = temp_root / "RELEASE_CHANNEL.generated.json"
+            current_timestamp = module.iso_now()
+            readiness_path.write_text(
+                json.dumps({"generated_at": current_timestamp}),
+                encoding="utf-8",
+            )
+            release_channel_path.write_text(
+                json.dumps({"publishedAt": current_timestamp}),
+                encoding="utf-8",
+            )
+
+            old_default = module.DEFAULT_FLAGSHIP_READINESS_PATH
+            old_fallback = module.FALLBACK_FLAGSHIP_READINESS_PATH
+            old_release_channel = module.DEFAULT_RELEASE_CHANNEL_PATH
+            try:
+                module.DEFAULT_FLAGSHIP_READINESS_PATH = readiness_path
+                module.FALLBACK_FLAGSHIP_READINESS_PATH = readiness_path
+                module.DEFAULT_RELEASE_CHANNEL_PATH = release_channel_path
+                module._require_current_release_inputs(
+                    max_age_seconds=86400,
+                    max_future_skew_seconds=300,
+                )
+            finally:
+                module.DEFAULT_FLAGSHIP_READINESS_PATH = old_default
+                module.FALLBACK_FLAGSHIP_READINESS_PATH = old_fallback
+                module.DEFAULT_RELEASE_CHANNEL_PATH = old_release_channel
+
     def test_public_json_writer_replaces_linked_or_mode_drifted_destination(self) -> None:
         module = load_materializer_module()
         with tempfile.TemporaryDirectory(prefix="hub-local-proof-public-json-") as temp_dir:
@@ -124,7 +243,10 @@ class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
             payload = json.loads(proof_path.read_text(encoding="utf-8"))
             release_channel = payload.get("release_channel") or {}
             self.assertEqual("available", release_channel.get("status"))
-            self.assertEqual(str(release_channel_path), release_channel.get("path"))
+            self.assertEqual(
+                "evidence://release-channel/RELEASE_CHANNEL.generated.json",
+                release_channel.get("path"),
+            )
             self.assertEqual("preview", release_channel.get("channelId"))
             self.assertEqual("run-20260703-170551", release_channel.get("releaseVersion"))
             self.assertEqual("promoted_preview", release_channel.get("rolloutState"))
@@ -259,7 +381,10 @@ class HubLocalReleaseProofMaterializerSyncTests(unittest.TestCase):
             try:
                 release_channel = module._load_release_channel_snapshot()
                 self.assertEqual("unavailable", release_channel.get("status"))
-                self.assertEqual(str(missing_path), release_channel.get("path"))
+                self.assertEqual(
+                    "evidence://release-channel/RELEASE_CHANNEL.generated.json",
+                    release_channel.get("path"),
+                )
                 self.assertEqual("", release_channel.get("releaseVersion"))
             finally:
                 if old_env is None:

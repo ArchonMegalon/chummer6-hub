@@ -79,8 +79,9 @@ SOURCE_MARKERS = {
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("CHUMMER_NEXT90_M125_ROOT", DEFAULT_ROOT))
-FLEET_QUEUE_STAGING_PATH = Path(os.environ.get("CHUMMER_NEXT90_M125_QUEUE_STAGING", "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"))
-DESIGN_QUEUE_STAGING_PATH = Path(os.environ.get("CHUMMER_NEXT90_M125_DESIGN_QUEUE_STAGING", "/docker/chummercomplete/chummer-design-m114/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"))
+DEFAULT_QUEUE_STAGING_PATH = DEFAULT_ROOT / ".codex-design" / "product" / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+FLEET_QUEUE_STAGING_PATH = Path(os.environ.get("CHUMMER_NEXT90_M125_QUEUE_STAGING", str(DEFAULT_QUEUE_STAGING_PATH)))
+DESIGN_QUEUE_STAGING_PATH = Path(os.environ.get("CHUMMER_NEXT90_M125_DESIGN_QUEUE_STAGING", str(DEFAULT_QUEUE_STAGING_PATH)))
 PROOF_PATH = ROOT / ".codex-studio" / "published" / "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json"
 
 

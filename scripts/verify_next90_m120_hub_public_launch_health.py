@@ -40,6 +40,13 @@ PACKAGE_PROOF = [
     "python3 -m unittest tests/test_next90_m120_hub_public_launch_health.py",
     "bash scripts/ai/verify.sh",
 ]
+PORTABLE_PACKAGE_PROOF = [
+    value.replace(
+        "/docker/chummercomplete/chummer6-hub/",
+        "repo://ArchonMegalon/chummer6-hub/",
+    )
+    for value in PACKAGE_PROOF
+]
 OWNED_SURFACES = [
     "public_trust_surface:v3",
     "launch_health:public",
@@ -71,7 +78,7 @@ LOCAL_RELEASE_PROOF_PACKAGE = {
     "allowed_paths": ALLOWED_PATHS,
     "owned_surfaces": OWNED_SURFACES,
     "exit_criterion": PACKAGE_TASK,
-    "proof": PACKAGE_PROOF,
+    "proof": PORTABLE_PACKAGE_PROOF,
 }
 LOCAL_RELEASE_PROOF_SURFACE = {
     "statusRoute": "/status",
@@ -167,7 +174,8 @@ SOURCE_MARKERS = {
     ],
     "Chummer.Run.Api/ViewModels/SiteViewModels.cs": [
         "public sealed record StatusPageViewModel(",
-        "string CautionSummary);",
+        "string CautionSummary,",
+        "PublicReleaseTruthProjectionDto? ReleaseTruthProjection = null);",
     ],
     "Chummer.Run.Api/Views/PublicLanding/Status.cshtml": [
         "Status",
@@ -212,22 +220,25 @@ SOURCE_MARKERS = {
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("CHUMMER_NEXT90_M120_ROOT", DEFAULT_ROOT))
+DEFAULT_PRODUCT_EVIDENCE_ROOT = DEFAULT_ROOT / ".codex-design" / "product"
+DEFAULT_QUEUE_STAGING_PATH = DEFAULT_PRODUCT_EVIDENCE_ROOT / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+DEFAULT_SUCCESSOR_REGISTRY_PATH = DEFAULT_PRODUCT_EVIDENCE_ROOT / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
 FLEET_QUEUE_STAGING_PATH = Path(
     os.environ.get(
         "CHUMMER_NEXT90_M120_QUEUE_STAGING",
-        "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+        str(DEFAULT_QUEUE_STAGING_PATH),
     )
 )
 DESIGN_QUEUE_STAGING_PATH = Path(
     os.environ.get(
         "CHUMMER_NEXT90_M120_DESIGN_QUEUE_STAGING",
-        "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+        str(DEFAULT_QUEUE_STAGING_PATH),
     )
 )
 SUCCESSOR_REGISTRY_PATH = Path(
     os.environ.get(
         "CHUMMER_NEXT90_M120_SUCCESSOR_REGISTRY",
-        "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml",
+        str(DEFAULT_SUCCESSOR_REGISTRY_PATH),
     )
 )
 LOCAL_RELEASE_PROOF_PATH = Path(
