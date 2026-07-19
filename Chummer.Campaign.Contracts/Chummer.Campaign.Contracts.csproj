@@ -1,7 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <ItemGroup>
-    <ProjectReference Include="$(MSBuildProjectDirectory)/../../chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj" />
+  <ItemGroup Condition="'$(ChummerUseLocalCompatibilityTree)' == 'true'">
+    <ProjectReference Include="$(ChummerCoreEngineRoot)/Chummer.Contracts/Chummer.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true'">
+    <PackageReference Include="Chummer.Engine.Contracts" Version="$(ChummerPackagePlaneVersion)" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -10,9 +14,20 @@
     <Nullable>enable</Nullable>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
+    <RestorePackagesWithLockFile Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true'">true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true' and '$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
     <PackageId>Chummer.Campaign.Contracts</PackageId>
+    <PackageVersion Condition="'$(PackageVersion)' == ''">$(ChummerPackagePlaneVersion)</PackageVersion>
     <Title>Chummer Campaign Contracts</Title>
     <Description>Runner dossier, crew, campaign, continuity, and restore DTO surface for Chummer.</Description>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/ArchonMegalon/chummer6-hub.git</RepositoryUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../LICENSE" Pack="true" PackagePath="" />
+  </ItemGroup>
 </Project>

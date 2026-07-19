@@ -1,4 +1,9 @@
 <Project>
+  <Target Name="ValidateChummerCompatibilityTreeSelection" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(ChummerUseLocalCompatibilityTree)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' != 'false'"
+           Text="ChummerUseLocalCompatibilityTree must be exactly true or false." />
+  </Target>
+
   <Target Name="EnsureRuntimeMetadataForReferencingProjects"
           BeforeTargets="AddDepsJsonAndRuntimeConfigToCopyItemsForReferencingProjects"
           DependsOnTargets="GenerateBuildDependencyFile;GenerateBuildRuntimeConfigurationFiles"

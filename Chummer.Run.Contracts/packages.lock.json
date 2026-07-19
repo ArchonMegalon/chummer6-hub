@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "Chummer.Engine.Contracts": {
+        "type": "Direct",
+        "requested": "[0.0.0-packageplane.20260718.2, )",
+        "resolved": "0.0.0-packageplane.20260718.2",
+        "contentHash": "2Zelo64sI5Fh22oYx6L+kqSEhSYruNatKTievB/t8WH4BCTxPf2aOAe3U5m/oqoUOcNmcEkbmUTE7wbBjNR6rw=="
+      },
+      "Chummer.Hub.Registry.Contracts": {
+        "type": "Direct",
+        "requested": "[0.0.0-packageplane.20260718.2, )",
+        "resolved": "0.0.0-packageplane.20260718.2",
+        "contentHash": "ixhPBm7nREVLmbXcwv1d3zR4xPDW0JsSungCAr37+yxGBEoQZ66fZQMyI0N16P0zAscXOkNg8Y8pXD0ycChWAA=="
+      },
+      "chummer.play.contracts": {
+        "type": "Project"
+      }
+    }
+  }
+}
