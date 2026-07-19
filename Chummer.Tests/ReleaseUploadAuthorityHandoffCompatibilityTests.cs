@@ -158,6 +158,44 @@ public sealed class ReleaseUploadAuthorityHandoffCompatibilityTests
         }
     }
 
+    [Fact]
+    public async Task BuilderRejectsPaddedCanonicalProofRouteValue()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        byte[] proofBytes = await MaterializeCanonicalProofAsync();
+        JsonObject paddedCanonical = JsonNode.Parse(proofBytes)!.AsObject();
+        JsonArray canonicalRoutes = paddedCanonical["proof_routes"]!.AsArray();
+        canonicalRoutes[0] = " " + canonicalRoutes[0]!.GetValue<string>();
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseUploadAuthorityHandoffBuilder.Build(
+                Snapshot(JsonSerializer.SerializeToUtf8Bytes(paddedCanonical))));
+    }
+
+    [Fact]
+    public async Task BuilderRejectsWhitespaceDifferentProofRouteAliasArray()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        byte[] proofBytes = await MaterializeCanonicalProofAsync();
+        JsonObject whitespaceAlias = JsonNode.Parse(proofBytes)!.AsObject();
+        JsonArray compatibilityRoutes =
+            whitespaceAlias["proof_routes"]!.DeepClone().AsArray();
+        compatibilityRoutes[0] = compatibilityRoutes[0]!.GetValue<string>() + " ";
+        whitespaceAlias["proofRoutes"] = compatibilityRoutes;
+
+        Assert.Throws<InvalidDataException>(() =>
+            ReleaseUploadAuthorityHandoffBuilder.Build(
+                Snapshot(JsonSerializer.SerializeToUtf8Bytes(whitespaceAlias))));
+    }
+
     private static Dictionary<string, string> BuildSourceAuthorityEnvironment(
         string root,
         string generatedAt)
@@ -237,6 +275,41 @@ public sealed class ReleaseUploadAuthorityHandoffCompatibilityTests
             ["CHUMMER_DESIGN_SUCCESSOR_REGISTRY_AUTHORITY"] =
                 "repo://design/run-test/registry"
         };
+    }
+
+    private static async Task<byte[]> MaterializeCanonicalProofAsync()
+    {
+        string tempRoot = Path.Combine(
+            Path.GetTempPath(),
+            "chummer-canonical-proof-routes-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            string generatedAt = DateTimeOffset.UtcNow.ToString(
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                System.Globalization.CultureInfo.InvariantCulture);
+            Dictionary<string, string> sourceEnvironment = BuildSourceAuthorityEnvironment(
+                tempRoot,
+                generatedAt);
+            string output = Path.Combine(
+                tempRoot,
+                "output",
+                "HUB_LOCAL_RELEASE_PROOF.generated.json");
+            MaterializerResult result = await RunMaterializerAsync(
+                tempRoot,
+                output,
+                sourceEnvironment,
+                "canonical-proof-routes.lock");
+            Assert.True(
+                result.ExitCode == 0,
+                $"real materializer failed ({result.ExitCode})\n"
+                + $"stdout:\n{result.Stdout}\nstderr:\n{result.Stderr}");
+            return await File.ReadAllBytesAsync(output);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
     }
 
     private static async Task<MaterializerResult> RunMaterializerAsync(

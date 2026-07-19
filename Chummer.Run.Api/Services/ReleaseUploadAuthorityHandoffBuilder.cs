@@ -499,11 +499,7 @@ public static class ReleaseUploadAuthorityHandoffBuilder
         }
 
         string[] values = value.EnumerateArray()
-            .Select(item => item.ValueKind == JsonValueKind.String
-                            && item.GetString()?.Trim() is { Length: > 0 } text
-                ? text
-                : throw new InvalidDataException(
-                    $"release upload {propertyName} contains an invalid route"))
+            .Select(item => RequireUnpaddedRoute(item, propertyName))
             .ToArray();
         if (values.Length == 0
             || values.Distinct(StringComparer.Ordinal).Count() != values.Length)
@@ -512,6 +508,18 @@ public static class ReleaseUploadAuthorityHandoffBuilder
                 $"release upload {propertyName} route inventory is invalid");
         }
         return values;
+    }
+
+    private static string RequireUnpaddedRoute(JsonElement value, string propertyName)
+    {
+        if (value.ValueKind != JsonValueKind.String
+            || value.GetString() is not { Length: > 0 } route
+            || !string.Equals(route, route.Trim(), StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"release upload {propertyName} contains an invalid or padded route");
+        }
+        return route;
     }
 
     private static string RequireString(JsonElement parent, string propertyName)

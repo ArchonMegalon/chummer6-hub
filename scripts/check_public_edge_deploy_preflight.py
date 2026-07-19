@@ -480,6 +480,8 @@ PUBLIC_EDGE_REQUIRED_SOURCE_MARKERS = {
         '"proof_routes"',
         '"proofRoutes"',
         "aliases disagree",
+        "RequireUnpaddedRoute(",
+        "invalid or padded route",
     ),
     "Chummer.Run.Api/Services/PublicProjectionDescriptorReader.cs": (
         "LinuxNative.openat(",
