@@ -13,10 +13,9 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_next90_m120_hub_public_launch_health.py"
-PRODUCT_EVIDENCE_ROOT = REPO_ROOT / ".codex-design" / "product"
-FLEET_QUEUE_STAGING = PRODUCT_EVIDENCE_ROOT / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
-DESIGN_QUEUE_STAGING = FLEET_QUEUE_STAGING
-SUCCESSOR_REGISTRY = PRODUCT_EVIDENCE_ROOT / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+FLEET_QUEUE_STAGING = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+DESIGN_QUEUE_STAGING = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+SUCCESSOR_REGISTRY = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
 SOURCE_FILES = [
     "Chummer.Run.Api/Controllers/PublicLandingController.cs",
     "Chummer.Run.Api/Controllers/PublicProgressController.cs",
@@ -92,8 +91,14 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             self.copy_sources(temp_root)
             queue_path = temp_root / "fleet-queue.yaml"
             design_queue_path = temp_root / "design-queue.yaml"
-            shutil.copyfile(FLEET_QUEUE_STAGING, queue_path)
-            shutil.copyfile(DESIGN_QUEUE_STAGING, design_queue_path)
+            shutil.copyfile(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+                queue_path,
+            )
+            shutil.copyfile(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+                design_queue_path,
+            )
             queue_payload = load_queue_payload(queue_path)
             for item in queue_payload["items"]:
                 if item.get("package_id") == "next90-m120-hub-public-launch-health":

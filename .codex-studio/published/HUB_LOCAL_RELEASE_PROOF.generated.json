@@ -10,10 +10,10 @@
       "fleet_and_operator_loop"
     ],
     "desktop_client_missing": false,
-    "reason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is promoted_preview, not public_stable, workspace portal release channel artifact chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json disagrees with authoritative registry receipt (local status=published, channel=preview, version=run-20260715-140426, supportability=review_required, rollout=public_release_review_required; authoritative status=published, channel=preview, version=run-20260712-174412, supportability=preview_supported, rollout=promoted_preview), Windows installer visual audit source digest does not match promoted installer, Portal release channel Windows installer binding disagrees with authoritative release channel, promoted Windows installer artifact file is missing, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca: repo://ArchonMegalon/chummer6-hub/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json, windows installer gold proof artifact is still missing: repo://ArchonMegalon/chummer6-hub/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-d0857d0a6e5c.zip, supervisor completion status is 'fail', supervisor completion evidence is stale, root RELEASE_BLOCKERS receipt is stale (generated_at=2026-07-14T03:51:55Z; max_age_seconds=86400): evidence://whole-product/RELEASE_BLOCKERS.generated.json, Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decisions remain unresolved: quota_policy, logical_bytes, recreation_and_undo, offline_compatibility, tombstone_privacy_policy, stable_owner_identity, writer_epoch, delete_replay_and_rpo, provider_and_topology, enforcement_boundary, migration_posture, capacity_and_retention. Coverage gaps: fleet_and_operator_loop, desktop_client.",
+    "reason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is promoted_preview, not public_stable, workspace portal release channel artifact chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json disagrees with authoritative registry receipt (local status=published, channel=preview, version=run-20260715-140426, supportability=review_required, rollout=public_release_review_required; authoritative status=published, channel=preview, version=run-20260712-174412, supportability=preview_supported, rollout=promoted_preview), Windows installer visual audit source digest does not match promoted installer, Portal release channel Windows installer binding disagrees with authoritative release channel, promoted Windows installer artifact file is missing, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json, windows installer gold proof artifact is still missing: /docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-d0857d0a6e5c.zip, supervisor completion status is 'fail', supervisor completion evidence is stale, root RELEASE_BLOCKERS receipt is stale (generated_at=2026-07-14T03:51:55Z; max_age_seconds=86400): /docker/chummercomplete/RELEASE_BLOCKERS.generated.json, Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decisions remain unresolved: quota_policy, logical_bytes, recreation_and_undo, offline_compatibility, tombstone_privacy_policy, stable_owner_identity, writer_epoch, delete_replay_and_rpo, provider_and_topology, enforcement_boundary, migration_posture, capacity_and_retention. Coverage gaps: fleet_and_operator_loop, desktop_client.",
     "completion_audit_status": "fail",
-    "completion_audit_reason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is promoted_preview, not public_stable, workspace portal release channel artifact chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json disagrees with authoritative registry receipt (local status=published, channel=preview, version=run-20260715-140426, supportability=review_required, rollout=public_release_review_required; authoritative status=published, channel=preview, version=run-20260712-174412, supportability=preview_supported, rollout=promoted_preview), Windows installer visual audit source digest does not match promoted installer, Portal release channel Windows installer binding disagrees with authoritative release channel, promoted Windows installer artifact file is missing, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca: repo://ArchonMegalon/chummer6-hub/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json, windows installer gold proof artifact is still missing: repo://ArchonMegalon/chummer6-hub/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-d0857d0a6e5c.zip, supervisor completion status is 'fail', supervisor completion evidence is stale, root RELEASE_BLOCKERS receipt is stale (generated_at=2026-07-14T03:51:55Z; max_age_seconds=86400): evidence://whole-product/RELEASE_BLOCKERS.generated.json, Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decisions remain unresolved: quota_policy, logical_bytes, recreation_and_undo, offline_compatibility, tombstone_privacy_policy, stable_owner_identity, writer_epoch, delete_replay_and_rpo, provider_and_topology, enforcement_boundary, migration_posture, capacity_and_retention. Coverage gaps: fleet_and_operator_loop, desktop_client.",
-    "source_path": "evidence://fleet/FLAGSHIP_PRODUCT_READINESS.generated.json"
+    "completion_audit_reason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is promoted_preview, not public_stable, workspace portal release channel artifact chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json disagrees with authoritative registry receipt (local status=published, channel=preview, version=run-20260715-140426, supportability=review_required, rollout=public_release_review_required; authoritative status=published, channel=preview, version=run-20260712-174412, supportability=preview_supported, rollout=promoted_preview), Windows installer visual audit source digest does not match promoted installer, Portal release channel Windows installer binding disagrees with authoritative release channel, promoted Windows installer artifact file is missing, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca: /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/visual-audit/windows-installer/WINDOWS_INSTALLER_VISUAL_AUDIT.source.json, windows installer gold proof artifact is still missing: /docker/chummercomplete/chummer.run-services/.state/incoming_windows_installer_gold_proof/windows-installer-gold-proof-d0857d0a6e5c.zip, supervisor completion status is 'fail', supervisor completion evidence is stale, root RELEASE_BLOCKERS receipt is stale (generated_at=2026-07-14T03:51:55Z; max_age_seconds=86400): /docker/chummercomplete/RELEASE_BLOCKERS.generated.json, Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decisions remain unresolved: quota_policy, logical_bytes, recreation_and_undo, offline_compatibility, tombstone_privacy_policy, stable_owner_identity, writer_epoch, delete_replay_and_rpo, provider_and_topology, enforcement_boundary, migration_posture, capacity_and_retention. Coverage gaps: fleet_and_operator_loop, desktop_client.",
+    "source_path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
   },
   "release_channel": {
     "status": "unavailable",
@@ -317,16 +317,16 @@
         "tests"
       ],
       "proof": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs",
-        "repo://ArchonMegalon/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_next90_m117_hub_artifact_shelf_v2.py",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m117_hub_artifact_shelf_v2.py",
         "python3 scripts/verify_next90_m117_hub_artifact_shelf_v2.py",
         "python3 -m unittest tests/test_next90_m117_hub_artifact_shelf_v2.py",
         "bash scripts/ai/run_services_smoke.sh"
@@ -379,16 +379,16 @@
         "tests"
       ],
       "proof": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs",
-        "repo://ArchonMegalon/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m119_hub_first_session_onboarding.py",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_next90_m119_hub_first_session_onboarding.py",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m119_hub_first_session_onboarding.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m119_hub_first_session_onboarding.py",
         "python3 scripts/verify_next90_m119_hub_first_session_onboarding.py",
         "python3 -m unittest tests/test_next90_m119_hub_first_session_onboarding.py",
         "bash scripts/ai/run_services_smoke.sh"
@@ -418,14 +418,14 @@
         "tests"
       ],
       "proof": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicProgressController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/ViewModels/SiteViewModels.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs",
-        "repo://ArchonMegalon/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m120_hub_public_launch_health.py",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_next90_m120_hub_public_launch_health.py",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicProgressController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ViewModels/SiteViewModels.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m120_hub_public_launch_health.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m120_hub_public_launch_health.py",
         "python3 scripts/verify_next90_m120_hub_public_launch_health.py",
         "python3 -m unittest tests/test_next90_m120_hub_public_launch_health.py",
         "bash scripts/ai/verify.sh"
@@ -454,20 +454,20 @@
         "tests"
       ],
       "proof": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/ImportRouteParityProofGuardService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/PublicReleaseManifestService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/PublicTrustPulseService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/SignedInTrustStatusService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/DownloadsCompatibilityController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m141_hub_import_route_review_required.py",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_next90_m141_hub_import_route_review_required.py",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_hub_local_release_proof_native_support_route.py",
-        "repo://ArchonMegalon/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ImportRouteParityProofGuardService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/PublicReleaseManifestService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/PublicTrustPulseService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/SignedInTrustStatusService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/DownloadsCompatibilityController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m141_hub_import_route_review_required.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m141_hub_import_route_review_required.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_hub_local_release_proof_native_support_route.py",
+        "/docker/chummercomplete/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
         "python3 scripts/verify_next90_m141_hub_import_route_review_required.py",
         "python3 -m unittest tests/test_next90_m141_hub_import_route_review_required.py",
         "python3 -m unittest tests/test_hub_local_release_proof_native_support_route.py",
@@ -729,16 +729,16 @@
         "tests"
       ],
       "proof": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs",
-        "repo://ArchonMegalon/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_next90_m117_hub_artifact_shelf_v2.py",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m117_hub_artifact_shelf_v2.py",
         "python3 scripts/verify_next90_m117_hub_artifact_shelf_v2.py",
         "python3 -m unittest tests/test_next90_m117_hub_artifact_shelf_v2.py",
         "bash scripts/ai/run_services_smoke.sh"
@@ -791,16 +791,16 @@
         "tests"
       ],
       "proof": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs",
-        "repo://ArchonMegalon/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m119_hub_first_session_onboarding.py",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_next90_m119_hub_first_session_onboarding.py",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m119_hub_first_session_onboarding.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m119_hub_first_session_onboarding.py",
         "python3 scripts/verify_next90_m119_hub_first_session_onboarding.py",
         "python3 -m unittest tests/test_next90_m119_hub_first_session_onboarding.py",
         "bash scripts/ai/run_services_smoke.sh"
@@ -830,14 +830,14 @@
         "tests"
       ],
       "proof": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicProgressController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/ViewModels/SiteViewModels.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs",
-        "repo://ArchonMegalon/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m120_hub_public_launch_health.py",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_next90_m120_hub_public_launch_health.py",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicProgressController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ViewModels/SiteViewModels.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m120_hub_public_launch_health.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m120_hub_public_launch_health.py",
         "python3 scripts/verify_next90_m120_hub_public_launch_health.py",
         "python3 -m unittest tests/test_next90_m120_hub_public_launch_health.py",
         "bash scripts/ai/verify.sh"
@@ -866,20 +866,20 @@
         "tests"
       ],
       "proof": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/ImportRouteParityProofGuardService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/PublicReleaseManifestService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/PublicTrustPulseService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/SignedInTrustStatusService.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/DownloadsCompatibilityController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
-        "repo://ArchonMegalon/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m141_hub_import_route_review_required.py",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_next90_m141_hub_import_route_review_required.py",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_hub_local_release_proof_native_support_route.py",
-        "repo://ArchonMegalon/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ImportRouteParityProofGuardService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/PublicReleaseManifestService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/PublicTrustPulseService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/SignedInTrustStatusService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/DownloadsCompatibilityController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m141_hub_import_route_review_required.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m141_hub_import_route_review_required.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_hub_local_release_proof_native_support_route.py",
+        "/docker/chummercomplete/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
         "python3 scripts/verify_next90_m141_hub_import_route_review_required.py",
         "python3 -m unittest tests/test_next90_m141_hub_import_route_review_required.py",
         "python3 -m unittest tests/test_hub_local_release_proof_native_support_route.py",
@@ -1009,9 +1009,9 @@
         "support_followthrough:install_truth"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_desktop_native_trust_receipts.py verifies the M102 generated proof package, owned surfaces, grant-bound native routes, and forbidden operator-helper evidence markers.",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_desktop_native_trust_receipts.py fails closed when generated proof drops the fleet_and_operator_loop desktop-native trust receipt.",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesVerification/InstallLinkingContinuationVerification.cs exercises continuation, support, update, rollback, recovery, callback, receipt-matching, and support-action sanitization on the claimed desktop rail."
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_desktop_native_trust_receipts.py verifies the M102 generated proof package, owned surfaces, grant-bound native routes, and forbidden operator-helper evidence markers.",
+        "/docker/chummercomplete/chummer6-hub/tests/test_desktop_native_trust_receipts.py fails closed when generated proof drops the fleet_and_operator_loop desktop-native trust receipt.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesVerification/InstallLinkingContinuationVerification.cs exercises continuation, support, update, rollback, recovery, callback, receipt-matching, and support-action sanitization on the claimed desktop rail."
       ]
     },
     {
@@ -1052,9 +1052,9 @@
         "artifact_factory:campaign_cold_open"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs composes campaign_cold_open jobs from approved campaign primer packs with explicit audience and locale validation.",
-        "repo://ArchonMegalon/chummer6-hub/scripts/launch_artifact_factory_source_pack_batch.py fail-closes campaign cold-open responses that omit audience/locale proof anchors or drift off the stable campaign cold-open shelf.",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_artifact_factory_source_pack_launcher.py covers locale-matched campaign cold-open launches and fail-closed proof-anchor drift."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs composes campaign_cold_open jobs from approved campaign primer packs with explicit audience and locale validation.",
+        "/docker/chummercomplete/chummer6-hub/scripts/launch_artifact_factory_source_pack_batch.py fail-closes campaign cold-open responses that omit audience/locale proof anchors or drift off the stable campaign cold-open shelf.",
+        "/docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_source_pack_launcher.py covers locale-matched campaign cold-open launches and fail-closed proof-anchor drift."
       ]
     },
     {
@@ -1075,9 +1075,9 @@
         "artifact_factory:mission_briefing"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs composes mission_briefing jobs from approved mission packs with explicit audience and locale validation.",
-        "repo://ArchonMegalon/chummer6-hub/scripts/launch_artifact_factory_source_pack_batch.py fail-closes mission briefing responses that omit audience/locale proof anchors or drift off the stable mission briefing shelf.",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_artifact_factory_source_pack_launcher.py covers locale-matched mission briefing launches and fail-closed proof-anchor drift."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs composes mission_briefing jobs from approved mission packs with explicit audience and locale validation.",
+        "/docker/chummercomplete/chummer6-hub/scripts/launch_artifact_factory_source_pack_batch.py fail-closes mission briefing responses that omit audience/locale proof anchors or drift off the stable mission briefing shelf.",
+        "/docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_source_pack_launcher.py covers locale-matched mission briefing launches and fail-closed proof-anchor drift."
       ]
     },
     {
@@ -1096,9 +1096,9 @@
         "preview_safe_truth:pre_session"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/RunsiteOrientationRequestComposerService.cs composes governed runsite orientation bundles from approved packs, route summaries, and preview-safe inspectable truth refs.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/InternalRunsiteOrientationController.cs exposes the bounded internal request route and rejects unauthorized or malformed orientation requests.",
-        "repo://ArchonMegalon/chummer6-hub/tests/test_runsite_orientation_requests.py covers composed bundle output, preview-safe evidence anchors, duplicate-deduplication rejection, and queue/registry proof drift."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/RunsiteOrientationRequestComposerService.cs composes governed runsite orientation bundles from approved packs, route summaries, and preview-safe inspectable truth refs.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalRunsiteOrientationController.cs exposes the bounded internal request route and rejects unauthorized or malformed orientation requests.",
+        "/docker/chummercomplete/chummer6-hub/tests/test_runsite_orientation_requests.py covers composed bundle output, preview-safe evidence anchors, duplicate-deduplication rejection, and queue/registry proof drift."
       ]
     },
     {
@@ -1117,9 +1117,9 @@
         "runsite_orientation_bundle"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/RunsiteOrientationRequestComposerService.cs rejects pack-owned route preview templates and forces route-summary route preview categories to remain inspectable and preview-safe.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Tests/RunsiteOrientationRequestComposerServiceTests.cs proves route previews stay route-summary governed and that internal authorization still gates the composition route.",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_runsite_orientation_requests.py fail-closes missing route_summary:artifact_launch proof, weakened closure metadata, or worker-unsafe queue and registry evidence."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/RunsiteOrientationRequestComposerService.cs rejects pack-owned route preview templates and forces route-summary route preview categories to remain inspectable and preview-safe.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Tests/RunsiteOrientationRequestComposerServiceTests.cs proves route previews stay route-summary governed and that internal authorization still gates the composition route.",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_runsite_orientation_requests.py fail-closes missing route_summary:artifact_launch proof, weakened closure metadata, or worker-unsafe queue and registry evidence."
       ]
     },
     {
@@ -1250,9 +1250,9 @@
         "rule_environment_studio:hub"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs projects rules navigator answers with stable ExplainEntryId values, before/after diffs, and rule-environment studio lifecycle posture on the signed-in campaign rail.",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs proves signed-in account and home surfaces keep grounded rules navigator answers and studio stages visible.",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m114_hub_rule_environment_receipts.py fail-closes queue, registry, and proof drift if campaign rule-environment receipts stop sharing the same explain-entry ids with support diagnostics."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs projects rules navigator answers with stable ExplainEntryId values, before/after diffs, and rule-environment studio lifecycle posture on the signed-in campaign rail.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves signed-in account and home surfaces keep grounded rules navigator answers and studio stages visible.",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m114_hub_rule_environment_receipts.py fail-closes queue, registry, and proof drift if campaign rule-environment receipts stop sharing the same explain-entry ids with support diagnostics."
       ]
     },
     {
@@ -1272,9 +1272,9 @@
         "rules_truth"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Support/SupportAssistantService.cs forwards RulesNavigator ExplainEntryId values into support citations for grounded rules questions.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Control.Contracts/SupportContracts.cs preserves optional citation receipt ids so support routes can name the same explain receipts without inventing a second contract.",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs proves rules-truth assistant answers expose the same explain receipt ids surfaced by campaign rules navigator entries."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Support/SupportAssistantService.cs forwards RulesNavigator ExplainEntryId values into support citations for grounded rules questions.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Control.Contracts/SupportContracts.cs preserves optional citation receipt ids so support routes can name the same explain receipts without inventing a second contract.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves rules-truth assistant answers expose the same explain receipt ids surfaced by campaign rules navigator entries."
       ]
     },
     {
@@ -1295,9 +1295,9 @@
         "install_aware_diagnostics"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Support/SupportAssistantService.cs keeps installation-aware rules and build questions tied to open_home and open_work actions while carrying shared explain-entry receipt ids.",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs proves install-aware rules and build assistant requests route back to the signed-in home and work surfaces instead of a detached diagnostic lane.",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m114_hub_rule_environment_receipts.py rejects release-proof drift when install-aware support receipts stop naming the shared rule-environment support lane."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Support/SupportAssistantService.cs keeps installation-aware rules and build questions tied to open_home and open_work actions while carrying shared explain-entry receipt ids.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves install-aware rules and build assistant requests route back to the signed-in home and work surfaces instead of a detached diagnostic lane.",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m114_hub_rule_environment_receipts.py rejects release-proof drift when install-aware support receipts stop naming the shared rule-environment support lane."
       ]
     },
     {
@@ -1322,10 +1322,10 @@
         "creator_publication_detail"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs serves the governed artifact shelf, public shelf APIs, public creator publication detail route, and signed-in overlay projections from one bounded controller path.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs keeps public creator discovery published-only and manifest-authority-backed before the shared shelf surfaces it.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml renders signed-in return shelf entries and public creator discovery with audience, publication, trust, discovery, lineage, moderation, and next-step posture kept together.",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs proves personal, campaign, creator, and public artifact views plus the mirrored shelf APIs keep proof, preview, caption, sibling-packet, locale, retention, and publication-state truth visible on the shared shelf."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs serves the governed artifact shelf, public shelf APIs, public creator publication detail route, and signed-in overlay projections from one bounded controller path.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs keeps public creator discovery published-only and manifest-authority-backed before the shared shelf surfaces it.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml renders signed-in return shelf entries and public creator discovery with audience, publication, trust, discovery, lineage, moderation, and next-step posture kept together.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves personal, campaign, creator, and public artifact views plus the mirrored shelf APIs keep proof, preview, caption, sibling-packet, locale, retention, and publication-state truth visible on the shared shelf."
       ]
     },
     {
@@ -1348,10 +1348,10 @@
         "artifact_view:public"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs normalizes the signed-in view query, filters recap and creator-publication overlays, and falls unknown filters back to the all-views shelf.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs and CampaignSpineService.cs stamp creator-linked recap entries with campaign, personal, and creator audience plus publication state before the shelf view filters them.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs requires approved manifest-backed audit authority before creator-publication moderation and publication can widen onto the public shelf.",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py fail-closes queue, registry, and source-proof drift if artifact shelf audience filtering or signed-in view controls regress."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs normalizes the signed-in view query, filters recap and creator-publication overlays, and falls unknown filters back to the all-views shelf.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs and CampaignSpineService.cs stamp creator-linked recap entries with campaign, personal, and creator audience plus publication state before the shelf view filters them.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs requires approved manifest-backed audit authority before creator-publication moderation and publication can widen onto the public shelf.",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py fail-closes queue, registry, and source-proof drift if artifact shelf audience filtering or signed-in view controls regress."
       ]
     },
     {
@@ -1372,9 +1372,9 @@
         "organizer_roster_contracts"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs now serves the organizer operations dashboard from the shared campaign-spine route instead of a detached operator-only endpoint.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs now composes organizer roles, permissions, and roster movement from one governed campaign/community projection.",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs proves organizer role assignments, permissions, and governed roster movement survive the shared organizer operations contract and signed-in rails."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs now serves the organizer operations dashboard from the shared campaign-spine route instead of a detached operator-only endpoint.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs now composes organizer roles, permissions, and roster movement from one governed campaign/community projection.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves organizer role assignments, permissions, and governed roster movement survive the shared organizer operations contract and signed-in rails."
       ]
     },
     {
@@ -1395,9 +1395,9 @@
         "support_escalation:organizer"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs now keeps season lanes, artifact publication posture, and tracked support escalation on the same organizer dashboard instead of splitting them into separate operator notes.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml and repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml surface organizer artifact-publication and support-escalation posture on the shared operator rails.",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs proves governed season lanes, artifact publication receipts, and tracked support escalation survive the organizer contract across the same governed operations lane."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs now keeps season lanes, artifact publication posture, and tracked support escalation on the same organizer dashboard instead of splitting them into separate operator notes.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml and /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml surface organizer artifact-publication and support-escalation posture on the shared operator rails.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves governed season lanes, artifact publication receipts, and tracked support escalation survive the organizer contract across the same governed operations lane."
       ]
     },
     {
@@ -1421,10 +1421,10 @@
         "status_release_guidance"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs binds the shared trust pulse and launch-health model onto the hosted status, release, downloads, and proof-shelf surfaces.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicProgressController.cs serves the hosted weekly pulse and progress-poster routes from the same public-trust surface contract.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml renders the public launch-health card and trust-surface projection instead of leaving governor-backed public posture implicit.",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs proves the status page surfaces the trust pulse, proof shelf guidance, and hosted public launch-health packet on one route family."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs binds the shared trust pulse and launch-health model onto the hosted status, release, downloads, and proof-shelf surfaces.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicProgressController.cs serves the hosted weekly pulse and progress-poster routes from the same public-trust surface contract.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml renders the public launch-health card and trust-surface projection instead of leaving governor-backed public posture implicit.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves the status page surfaces the trust pulse, proof shelf guidance, and hosted public launch-health packet on one route family."
       ]
     },
     {
@@ -1445,10 +1445,10 @@
         "adoption_health:public"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs builds explicit launch-health rows from the public release and release truth.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/ViewModels/SiteViewModels.cs keeps launch-health rows as an explicit status-page projection instead of free-form copy.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml renders Model.LaunchHealthRows on the public status lane.",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs fail-closes the status route if the public launch-health rows stop surfacing the mirrored release and weekly release truth."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs builds explicit launch-health rows from the public release and release truth.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ViewModels/SiteViewModels.cs keeps launch-health rows as an explicit status-page projection instead of free-form copy.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml renders Model.LaunchHealthRows on the public status lane.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs fail-closes the status route if the public launch-health rows stop surfacing the mirrored release and weekly release truth."
       ]
     },
     {
@@ -1471,9 +1471,9 @@
         "install_claim_restore_continue"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs exposes the starter-workspace seeding route so the signed-in first-session path reuses campaign data instead of inventing a second onboarding API.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs projects first-playable-session summaries, legal-runner detail, understandable-return detail, and primer-safe publication titles on the same campaign return path.",
-        "repo://ArchonMegalon/chummer6-hub/tests/RunServicesSmoke/Program.cs checks landing, home, account, and starter-workspace API surfaces keep the first-session path on the shared campaign projection."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs exposes the starter-workspace seeding route so the signed-in first-session path reuses campaign data instead of inventing a second onboarding API.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs projects first-playable-session summaries, legal-runner detail, understandable-return detail, and primer-safe publication titles on the same campaign return path.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs checks landing, home, account, and starter-workspace API surfaces keep the first-session path on the shared campaign projection."
       ]
     },
     {
@@ -1495,9 +1495,9 @@
         "starter_build:follow_through"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml wires first-session workspace seeding to the campaign-spine starter endpoint and keeps first-session detail, build-path next steps, and claimed-device return on the signed-in Home view.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml keeps the selected first-session drawer, legal-runner and return detail, and install support on the shared account work route.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs promotes first-session work as the primary signed-in action when a linked install exists but shared campaign work has not been seeded yet."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml wires first-session workspace seeding to the campaign-spine starter endpoint and keeps first-session detail, build-path next steps, and claimed-device return on the signed-in Home view.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml keeps the selected first-session drawer, legal-runner and return detail, and install support on the shared account work route.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs promotes first-session work as the primary signed-in action when a linked install exists but shared campaign work has not been seeded yet."
       ]
     },
     {
@@ -1518,8 +1518,8 @@
         "translatorLanePosture"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the direct translator route on current screenshot-backed and runtime-backed proof.",
-        "repo://ArchonMegalon/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:translator as direct backing for the custom-data XML and translator workflow family."
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the direct translator route on current screenshot-backed and runtime-backed proof.",
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:translator as direct backing for the custom-data XML and translator workflow family."
       ]
     },
     {
@@ -1540,8 +1540,8 @@
         "xmlEditorLanePosture"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the XML amendment editor route on current screenshot-backed and runtime-backed proof.",
-        "repo://ArchonMegalon/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:xml_editor as direct backing for the custom-data XML and translator workflow family."
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the XML amendment editor route on current screenshot-backed and runtime-backed proof.",
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:xml_editor as direct backing for the custom-data XML and translator workflow family."
       ]
     },
     {
@@ -1562,8 +1562,8 @@
         "heroLabImportOracleLanePosture"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the Hero Lab importer route on current screenshot-backed and runtime-backed proof.",
-        "repo://ArchonMegalon/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:hero_lab_importer as direct backing for the legacy and adjacent import-oracle workflow family."
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the Hero Lab importer route on current screenshot-backed and runtime-backed proof.",
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:hero_lab_importer as direct backing for the legacy and adjacent import-oracle workflow family."
       ]
     },
     {
@@ -1583,8 +1583,8 @@
         "heroLabAdjacentSr6OracleReceipt"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the adjacent import-oracle workflow on current screenshot-backed and runtime-backed proof.",
-        "repo://ArchonMegalon/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites workflow:import_oracle as direct backing for the legacy and adjacent import-oracle workflow family."
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the adjacent import-oracle workflow on current screenshot-backed and runtime-backed proof.",
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites workflow:import_oracle as direct backing for the legacy and adjacent import-oracle workflow family."
       ]
     },
     {
@@ -1609,10 +1609,10 @@
         "artifact_shelf:v2"
       ],
       "evidence": [
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/ImportRouteParityProofGuardService.cs requires current local release-proof receipts before translator, XML amendment, Hero Lab, and adjacent import routes can clear the review-required lane.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Services/PublicReleaseManifestService.cs, PublicTrustPulseService.cs, and SignedInTrustStatusService.cs carry the review-required parity guard onto public release, support, and signed-in trust surfaces.",
-        "repo://ArchonMegalon/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs, DownloadsCompatibilityController.cs, CampaignSpineController.cs apply the same review-required lane to downloads, status, support, and publication routes.",
-        "repo://ArchonMegalon/chummer6-hub/scripts/verify_next90_m141_hub_import_route_review_required.py and tests/test_next90_m141_hub_import_route_review_required.py fail-close queue, registry, and Hub proof drift when route/support/publication surfaces claim parity without the direct import-route receipts."
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ImportRouteParityProofGuardService.cs requires current local release-proof receipts before translator, XML amendment, Hero Lab, and adjacent import routes can clear the review-required lane.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/PublicReleaseManifestService.cs, PublicTrustPulseService.cs, and SignedInTrustStatusService.cs carry the review-required parity guard onto public release, support, and signed-in trust surfaces.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs, DownloadsCompatibilityController.cs, CampaignSpineController.cs apply the same review-required lane to downloads, status, support, and publication routes.",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m141_hub_import_route_review_required.py and tests/test_next90_m141_hub_import_route_review_required.py fail-close queue, registry, and Hub proof drift when route/support/publication surfaces claim parity without the direct import-route receipts."
       ]
     },
     {

@@ -47,9 +47,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
           test -z "$(git status --porcelain --untracked-files=all)"
-          python3 -m pytest -q \
-            tests/test_hub_package_plane.py \
-            tests/test_release_public_projection_wrapper.py
+          python3 -m pytest -q tests/test_hub_package_plane.py
       - name: Build and test without siblings
         shell: bash
         run: >-

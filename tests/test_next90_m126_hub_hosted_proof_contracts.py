@@ -12,7 +12,6 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_next90_m126_hub_hosted_proof_contracts.py"
-QUEUE_STAGING = REPO_ROOT / ".codex-design" / "product" / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
 SOURCE_FILES = [
     "Chummer.Run.Api/Contracts/HostedProofContractContracts.cs",
     "Chummer.Run.Api/Services/Support/HostedProofContractService.cs",
@@ -43,8 +42,8 @@ class Next90M126HubHostedProofContractsTests(unittest.TestCase):
             self.copy_sources(temp_root)
             queue_path = temp_root / "fleet-queue.yaml"
             design_queue_path = temp_root / "design-queue.yaml"
-            shutil.copyfile(QUEUE_STAGING, queue_path)
-            shutil.copyfile(QUEUE_STAGING, design_queue_path)
+            shutil.copyfile("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml", queue_path)
+            shutil.copyfile("/docker/chummercomplete/chummer-design-m114/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml", design_queue_path)
             queue_payload = self.load_queue_payload(queue_path)
             for item in queue_payload["items"]:
                 if item.get("package_id") == "next90-m126-hub-define-hosted-proof-contracts-for-open-runs-shadowcaster":
@@ -75,9 +74,6 @@ class Next90M126HubHostedProofContractsTests(unittest.TestCase):
             target = temp_root / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
-        queue_target = temp_root / ".codex-design" / "product" / QUEUE_STAGING.name
-        queue_target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(QUEUE_STAGING, queue_target)
 
     def run_verifier(self, temp_root: Path, *, queue_path: Path | None = None, design_queue_path: Path | None = None) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()

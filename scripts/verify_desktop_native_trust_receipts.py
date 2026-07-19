@@ -15,22 +15,14 @@ import zlib
 from datetime import datetime
 from pathlib import Path
 
-try:
-    from scripts.materialize_hub_local_release_proof import _portable_public_value
-except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
-    from materialize_hub_local_release_proof import _portable_public_value
-
 
 PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
 LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
 CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "94dd7d42"
 CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Tighten M102 compressed base32/base85 helper proof guard"
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_FLAGSHIP_READINESS_PATH = REPO_ROOT / ".codex-studio" / "published" / "FLAGSHIP_PRODUCT_READINESS.generated.json"
-FALLBACK_FLAGSHIP_READINESS_PATH = Path(
-    str(os.environ.get("CHUMMER_FLEET_FLAGSHIP_READINESS_PATH") or DEFAULT_FLAGSHIP_READINESS_PATH)
-)
+DEFAULT_FLAGSHIP_READINESS_PATH = Path("/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
+FALLBACK_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
 DESKTOP_CLIENT_READINESS_KEYS = {
     "status",
     "scoped_status",
@@ -1229,10 +1221,9 @@ REQUIRED_RESOLVING_COMMITS = [
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
 DEFAULT_SERVED_PROOF_PATH = Path("Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json")
-DEFAULT_PRODUCT_EVIDENCE_ROOT = REPO_ROOT / ".codex-design" / "product"
-DEFAULT_QUEUE_STAGING_PATH = DEFAULT_PRODUCT_EVIDENCE_ROOT / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
-DEFAULT_DESIGN_QUEUE_STAGING_PATH = DEFAULT_QUEUE_STAGING_PATH
-DEFAULT_SUCCESSOR_REGISTRY_PATH = DEFAULT_PRODUCT_EVIDENCE_ROOT / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+DEFAULT_QUEUE_STAGING_PATH = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+DEFAULT_DESIGN_QUEUE_STAGING_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+DEFAULT_SUCCESSOR_REGISTRY_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
 ABSOLUTE_REPO_PREFIX = "/docker/chummercomplete/chummer6-hub/"
 MATERIALIZER_ARGS = [
     "https://chummer.run",
@@ -2121,7 +2112,7 @@ def _load_flagship_readiness_snapshot(errors: list[str]) -> dict | None:
     reason = effective_override_reason or raw_reason or "flagship product readiness checks did not publish a desktop-client reason."
     completion_audit_reason = effective_override_reason or raw_completion_audit_reason
 
-    snapshot = {
+    return {
         "status": str(readiness_payload.get("status") or "").strip() or "unknown",
         "scoped_status": str(readiness_payload.get("scoped_status") or "").strip() or "unknown",
         "generated_at": str(readiness_payload.get("generated_at") or "").strip(),
@@ -2132,9 +2123,8 @@ def _load_flagship_readiness_snapshot(errors: list[str]) -> dict | None:
         if isinstance(completion_audit, dict)
         else "unknown",
         "completion_audit_reason": completion_audit_reason,
-        "source_path": "evidence://fleet/FLAGSHIP_PRODUCT_READINESS.generated.json",
+        "source_path": str(readiness_path),
     }
-    return _portable_public_value(snapshot)
 
 
 def _verify_desktop_client_readiness_contract(errors: list[str], proof: dict, label: str) -> dict | None:

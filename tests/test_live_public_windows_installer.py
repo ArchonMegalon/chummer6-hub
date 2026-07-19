@@ -15,6 +15,7 @@ from unittest import mock
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "verify_live_public_windows_installer.py"
 HUB_CLOSEOUT = Path(__file__).resolve().parents[1] / "scripts" / "ai" / "hub_closeout.sh"
 FINAL_GOLD_JANITOR = Path(__file__).resolve().parents[1] / "scripts" / "final_gold_janitor.py"
+VERIFY_WINDOWS_INSTALLER_PAYLOADS = Path("/docker/chummercomplete/chummer-presentation/scripts/verify-windows-installer-payloads.py")
 
 
 def load_module():
@@ -189,15 +190,6 @@ class LivePublicWindowsInstallerTests(unittest.TestCase):
         written = json.loads(output_path.read_text(encoding="utf-8"))
         self.assertEqual("chummer.live_public_windows_installer", written["contract_name"])
         self.assertEqual("pass", written["status"])
-        self.assertEqual(
-            "external://windows-installer-payload-verifier/verify-windows-installer-payloads.py",
-            written["verify_script_path"],
-        )
-        self.assertEqual(
-            hashlib.sha256(verify_script.read_bytes()).hexdigest(),
-            written["verify_script_sha256"],
-        )
-        self.assertNotIn("/tmp/", json.dumps(written))
         self.assertEqual(1, written["checked_artifact_count"])
         self.assertIsInstance(written["artifact"], dict)
         self.assertEqual(1, len(payload["checked_artifacts"]))

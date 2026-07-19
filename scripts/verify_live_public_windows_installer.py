@@ -5,7 +5,6 @@ import argparse
 import hashlib
 import json
 import os
-import socket
 import subprocess
 import tempfile
 import time
@@ -21,20 +20,6 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED_ROOT = ROOT / ".codex-studio" / "published"
 OUTPUT_PATH = PUBLISHED_ROOT / "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json"
 DEFAULT_BASE_URL = "https://chummer.run"
-DEFAULT_FETCH_TIMEOUT_SECONDS = float(
-    os.environ.get("CHUMMER_LIVE_WINDOWS_INSTALLER_FETCH_TIMEOUT_SECONDS", "60")
-)
-DEFAULT_FETCH_ATTEMPTS = max(
-    1,
-    int(os.environ.get("CHUMMER_LIVE_WINDOWS_INSTALLER_FETCH_ATTEMPTS", "3")),
-)
-RETRYABLE_FETCH_REASONS = (
-    TimeoutError,
-    socket.timeout,
-    ConnectionAbortedError,
-    ConnectionResetError,
-    ConnectionRefusedError,
-)
 
 
 def resolve_default_verify_script() -> Path:
@@ -46,7 +31,12 @@ def resolve_default_verify_script() -> Path:
     candidates = []
     if raw_presentation:
         candidates.append(Path(raw_presentation).expanduser() / "scripts" / "verify-windows-installer-payloads.py")
-    candidates.append(ROOT / "scripts" / "verify-windows-installer-payloads.py")
+    candidates.extend(
+        [
+            ROOT.parent / "chummer-presentation" / "scripts" / "verify-windows-installer-payloads.py",
+            Path("/docker/chummercomplete/chummer-presentation/scripts/verify-windows-installer-payloads.py"),
+        ]
+    )
     for candidate in candidates:
         if candidate.is_file():
             return candidate
@@ -62,20 +52,6 @@ def now_iso() -> str:
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
-
-
-def portable_verify_script_reference(verify_script: Path) -> str:
-    resolved = verify_script.expanduser().resolve()
-    try:
-        relative = resolved.relative_to(ROOT.resolve())
-    except ValueError:
-        name = urllib.parse.quote(verify_script.name or "verify-script", safe="._-")
-        return f"external://windows-installer-payload-verifier/{name}"
-    return f"repo://ArchonMegalon/chummer6-hub/{relative.as_posix()}"
-
-
-def verify_script_sha256(verify_script: Path) -> str:
-    return sha256_bytes(verify_script.read_bytes()) if verify_script.is_file() else ""
 
 
 def request(url: str) -> urllib.request.Request:
@@ -150,8 +126,6 @@ def verify(base_url: str, verify_script: Path, output_path: Path | None = None) 
     manifest_url = normalize_url(base, "/downloads/releases.json")
     failures: list[str] = []
     checked_artifacts: list[dict[str, Any]] = []
-    verify_script_reference = portable_verify_script_reference(verify_script)
-    verifier_sha256 = verify_script_sha256(verify_script)
 
     try:
         manifest = fetch_json(manifest_url)
@@ -161,8 +135,7 @@ def verify(base_url: str, verify_script: Path, output_path: Path | None = None) 
             "generated_at_utc": now_iso(),
             "base_url": base,
             "manifest_url": manifest_url,
-            "verify_script_path": verify_script_reference,
-            "verify_script_sha256": verifier_sha256,
+            "verify_script_path": str(verify_script),
             "status": "fail",
             "verdict": "LIVE_PUBLIC_WINDOWS_INSTALLER_NOT_READY",
             "checked_artifacts": [],
@@ -181,7 +154,7 @@ def verify(base_url: str, verify_script: Path, output_path: Path | None = None) 
         failures.append("public downloads manifest does not expose any Windows bootstrap installer rows")
 
     if not verify_script.is_file():
-        failures.append(f"missing Windows installer payload verifier: {verify_script_reference}")
+        failures.append(f"missing Windows installer payload verifier: {verify_script}")
 
     with tempfile.TemporaryDirectory(prefix="chummer-live-public-windows-installer-") as temp_root:
         temp_root_path = Path(temp_root)
@@ -307,8 +280,6 @@ def verify(base_url: str, verify_script: Path, output_path: Path | None = None) 
             )
             if result.returncode != 0:
                 stderr = (result.stderr or result.stdout or "").strip()
-                stderr = stderr.replace(str(temp_root_path), "evidence://live-windows-installer/workspace")
-                stderr = stderr.replace(str(verify_script), verify_script_reference)
                 failures.append(f"live public Windows installer payload gate failed: {stderr}")
 
     payload = {
@@ -316,8 +287,7 @@ def verify(base_url: str, verify_script: Path, output_path: Path | None = None) 
         "generated_at_utc": now_iso(),
         "base_url": base,
         "manifest_url": manifest_url,
-        "verify_script_path": verify_script_reference,
-        "verify_script_sha256": verifier_sha256,
+        "verify_script_path": str(verify_script),
         "status": "pass" if not failures else "fail",
         "verdict": "LIVE_PUBLIC_WINDOWS_INSTALLER_READY" if not failures else "LIVE_PUBLIC_WINDOWS_INSTALLER_NOT_READY",
         "checked_artifact_count": len(checked_artifacts),
