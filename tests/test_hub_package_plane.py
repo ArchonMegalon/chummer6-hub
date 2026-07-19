@@ -17,7 +17,12 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT_PATH = ROOT / "scripts" / "ai" / "bootstrap-hub-package-feed.py"
 LOCK_PATH = ROOT / "eng" / "package-plane.lock.json"
-PACKAGE_VERSION = "0.0.0-packageplane.20260718.2"
+PACKAGE_VERSION = "0.1.0-preview"
+OWNER_PACKAGE_VERSIONS = {
+    "Chummer.Engine.Contracts": "5.225.0",
+    "Chummer.Hub.Registry.Contracts": "0.1.0-preview",
+    "Chummer.Run.Registry": "0.1.0-preview",
+}
 CONTRACT_PROJECTS = (
     "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj",
     "Chummer.Control.Contracts/Chummer.Control.Contracts.csproj",
@@ -41,6 +46,11 @@ LOCKED_PROJECTS = (
     "Chummer.Run.Api",
     "Chummer.Run.Api.Tests",
 )
+OWNER_VERSION_PROPERTIES = {
+    "Chummer.Engine.Contracts": "ChummerEngineContractsPackageVersion",
+    "Chummer.Hub.Registry.Contracts": "ChummerHubRegistryContractsPackageVersion",
+    "Chummer.Run.Registry": "ChummerRunRegistryPackageVersion",
+}
 
 
 def load_module():
@@ -66,6 +76,7 @@ def test_lock_pins_exact_owner_commits_and_package_version() -> None:
         "Chummer.Run.Registry",
     ]
     assert all(len(spec.commit) == 40 for spec in lock.packages)
+    assert {spec.package_id: spec.version for spec in lock.packages} == OWNER_PACKAGE_VERSIONS
     assert all(spec.nupkg_sha256 and spec.nupkg_size_bytes > 0 for spec in lock.packages)
     assert lock.dotnet_install_url == "https://dot.net/v1/dotnet-install.sh"
     assert len(lock.dotnet_install_sha256) == 64
@@ -75,7 +86,7 @@ def test_lock_rejects_unknown_fields_or_authority_substitution() -> None:
     module = load_module()
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
     payload["unbound"] = True
-    with pytest.raises(module.PackagePlaneError, match="exact v2 fields"):
+    with pytest.raises(module.PackagePlaneError, match="exact v3 fields"):
         module.validate_lock_payload(payload)
 
     payload = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
@@ -102,6 +113,34 @@ def test_repository_sdk_policy_disables_roll_forward() -> None:
             "rollForward": "disable",
         }
     }
+
+
+def test_owner_dependency_versions_are_independent_from_hub_package_version() -> None:
+    props = ElementTree.fromstring(
+        (ROOT / "Directory.Build.props").read_text(encoding="utf-8-sig")
+    )
+    for property_name in OWNER_VERSION_PROPERTIES.values():
+        elements = props.findall(f".//{property_name}")
+        assert len(elements) == 1, property_name
+        package_id = next(
+            key for key, value in OWNER_VERSION_PROPERTIES.items() if value == property_name
+        )
+        assert (elements[0].text or "").strip() == OWNER_PACKAGE_VERSIONS[package_id]
+        assert elements[0].get("Condition") == f"'$({property_name})' == ''"
+
+    for relative in PACKAGE_PLANE_PROJECTS:
+        project = ElementTree.fromstring(
+            (ROOT / relative).read_text(encoding="utf-8-sig")
+        )
+        for reference in project.findall(".//PackageReference"):
+            package_id = reference.get("Include", "")
+            expected_property = OWNER_VERSION_PROPERTIES.get(package_id)
+            if expected_property is None:
+                continue
+            assert reference.get("Version") == f"$({expected_property})", (
+                relative,
+                package_id,
+            )
 
 
 def test_package_plane_projects_enforce_content_hash_locks() -> None:
@@ -200,6 +239,7 @@ def test_exact_head_checkout_validator_rejects_dirty_tree(tmp_path: Path) -> Non
     subprocess.run(["git", "remote", "add", "origin", repository], cwd=checkout, check=True)
     spec = module.PackageSpec(
         "Chummer.Engine.Contracts",
+        PACKAGE_VERSION,
         repository,
         commit,
         "source",
@@ -223,6 +263,8 @@ def test_owner_build_properties_pin_revision_and_normalize_paths(tmp_path: Path)
     package_root = tmp_path / "packages"
     properties = module.package_build_properties(lock, spec, checkout, package_root)
     assert f"-p:RepositoryCommit={spec.commit}" in properties
+    assert f"-p:PackageVersion={spec.version}" in properties
+    assert f"-p:Version={spec.version}" in properties
     assert f"-p:SourceRevisionId={spec.commit}" in properties
     assert "-p:RepositoryBranch=" in properties
     assert "-p:ContinuousIntegrationBuild=true" in properties
@@ -242,6 +284,7 @@ def _write_fake_engine_package(module, feed: Path, assembly: bytes) -> tuple[obj
     package_id = "Chummer.Engine.Contracts"
     spec = module.PackageSpec(
         package_id,
+        version,
         repository,
         commit,
         "core",
@@ -292,8 +335,8 @@ def test_package_canonicalization_is_byte_reproducible(tmp_path: Path) -> None:
     second.mkdir()
     first_spec, _ = _write_fake_engine_package(module, first, b"same assembly")
     second_spec, _ = _write_fake_engine_package(module, second, b"same assembly")
-    first_path = module.validate_package(first, first_spec, PACKAGE_VERSION)
-    second_path = module.validate_package(second, second_spec, PACKAGE_VERSION)
+    first_path = module.validate_package(first, first_spec)
+    second_path = module.validate_package(second, second_spec)
     assert first_path.read_bytes() == second_path.read_bytes()
 
 
@@ -305,7 +348,7 @@ def test_inventory_rejects_metadata_valid_package_byte_replacement(tmp_path: Pat
     authority = module.load_lock(LOCK_PATH)
     lock = replace(authority, packages=(spec,))
     lock_sha = "2" * 64
-    package = module.validate_package(feed, spec, PACKAGE_VERSION)
+    package = module.validate_package(feed, spec)
     inventory = module._inventory_payload(lock, feed, lock_sha)
     (feed / module.INVENTORY_FILE_NAME).write_text(
         json.dumps(inventory, indent=2) + "\n", encoding="utf-8"
@@ -333,7 +376,7 @@ def test_inventory_rejects_metadata_valid_package_byte_replacement(tmp_path: Pat
     _write_fake_engine_package(module, feed, b"metadata-valid-malicious-bytes")
     assert hashlib.sha256(package.read_bytes()).hexdigest() != original_digest
     with pytest.raises(module.PackagePlaneError, match="locked package byte authority mismatch"):
-        module.validate_package(feed, spec, PACKAGE_VERSION)
+        module.validate_package(feed, spec)
     with pytest.raises(module.PackagePlaneError, match="locked package byte authority mismatch"):
         module.validate_feed_inventory(feed, lock, lock_sha)
 

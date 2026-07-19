@@ -24,9 +24,9 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(RunBrowserSurfaceProxyTimeoutApiOnly)' != 'true' and '$(ChummerUseLocalCompatibilityTree)' != 'true'">
-    <PackageReference Include="Chummer.Engine.Contracts" Version="$(ChummerPackagePlaneVersion)" />
-    <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerPackagePlaneVersion)" />
-    <PackageReference Include="Chummer.Run.Registry" Version="$(ChummerPackagePlaneVersion)">
+    <PackageReference Include="Chummer.Engine.Contracts" Version="$(ChummerEngineContractsPackageVersion)" />
+    <PackageReference Include="Chummer.Hub.Registry.Contracts" Version="$(ChummerHubRegistryContractsPackageVersion)" />
+    <PackageReference Include="Chummer.Run.Registry" Version="$(ChummerRunRegistryPackageVersion)">
       <ExcludeAssets>contentFiles</ExcludeAssets>
     </PackageReference>
   </ItemGroup>
