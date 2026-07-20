@@ -674,7 +674,7 @@ public sealed class PublicReleaseTruthProjectionTests
         };
     }
 
-    private static AuthorityEnvelope RebindDecision(AuthorityEnvelope authority, ReadOnlyMemory<byte> decisionBytes)
+    internal static AuthorityEnvelope RebindDecision(AuthorityEnvelope authority, ReadOnlyMemory<byte> decisionBytes)
     {
         string decisionSha256 = Digest(decisionBytes);
         JsonObject snapshot = JsonNode.Parse(
@@ -694,13 +694,14 @@ public sealed class PublicReleaseTruthProjectionTests
         };
     }
 
-    private static AuthorityEnvelope BuildAuthorityEnvelope(
+    internal static AuthorityEnvelope BuildAuthorityEnvelope(
         PublicReleaseManifestDto manifest,
         string releaseDecisionStatus,
         IReadOnlyDictionary<string, string>? primaryHeads = null,
-        string releaseDecisionPath = PublicReleaseAuthorityEnvelopeProjection.ReleaseDecisionPath)
+        string releaseDecisionPath = PublicReleaseAuthorityEnvelopeProjection.ReleaseDecisionPath,
+        ReadOnlyMemory<byte>? manifestBytesOverride = null)
     {
-        ReadOnlyMemory<byte> manifestBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+        ReadOnlyMemory<byte> manifestBytes = manifestBytesOverride ?? Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         {
             contractName = "Chummer.Hub.Registry.Contracts",
             version = manifest.Version,
@@ -861,8 +862,8 @@ public sealed class PublicReleaseTruthProjectionTests
             ["candidateDecisionStatus"] = ready ? "review_required" : string.Empty,
             ["candidateDecisionSha256"] = ready ? new string('b', 64) : string.Empty,
             ["manifestGeneratedAt"] = "2026-07-18T11:59:00Z",
-            ["scorecardSha256"] = new string('c', 64),
-            ["convergenceSha256"] = new string('d', 64),
+            ["scorecardSha256"] = ready ? new string('c', 64) : string.Empty,
+            ["convergenceSha256"] = ready ? new string('d', 64) : string.Empty,
             ["blockingFindings"] = ready
                 ? new JsonArray()
                 : new JsonArray(new JsonObject
@@ -1132,7 +1133,7 @@ public sealed class PublicReleaseTruthProjectionTests
             new ReleaseShelfInventoryEntry(relativePath, Digest(bytes), bytes.Length));
     }
 
-    private sealed record AuthorityEnvelope(
+    internal sealed record AuthorityEnvelope(
         ReadOnlyMemory<byte> CurrentBytes,
         ReadOnlyMemory<byte> SnapshotBytes,
         ReadOnlyMemory<byte> DecisionBytes,

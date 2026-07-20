@@ -67,6 +67,80 @@ public sealed class ReleaseUploadRequestGateMiddlewareTests
     }
 
     [Fact]
+    public async Task AuthorityAdvanceIsAuthenticatedByTheReleaseMutationGate()
+    {
+        using Fixture fixture = new();
+        CountingStream anonymousBody = fixture.PrepareRequest(
+            "/api/internal/releases/generations/generation-a/authority-advances",
+            contentLength: 16);
+
+        await fixture.InvokeAsync();
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, fixture.Context.Response.StatusCode);
+        Assert.Equal(0, anonymousBody.ReadCount);
+        Assert.False(fixture.NextCalled);
+
+        fixture.Reset();
+        CountingStream authenticatedBody = fixture.PrepareRequest(
+            "/api/internal/releases/generations/generation-a/authority-advances",
+            contentLength: 16,
+            authenticated: true);
+
+        await fixture.InvokeAsync();
+
+        Assert.Equal(StatusCodes.Status200OK, fixture.Context.Response.StatusCode);
+        Assert.Equal(0, authenticatedBody.ReadCount);
+        Assert.True(fixture.NextCalled);
+        Assert.NotNull(ReleaseUploadRequestGateMiddleware.RequireAuthorization(fixture.Context));
+    }
+
+    [Fact]
+    public async Task AuthorityAdvanceRequiresKnownBoundedLengthBeforeBodyRead()
+    {
+        using Fixture fixture = new();
+        CountingStream unknownBody = fixture.PrepareRequest(
+            "/api/internal/releases/generations/generation-a/authority-advances",
+            contentLength: null,
+            authenticated: true);
+
+        await fixture.InvokeAsync();
+
+        Assert.Equal(StatusCodes.Status411LengthRequired, fixture.Context.Response.StatusCode);
+        Assert.Equal(0, unknownBody.ReadCount);
+        Assert.False(fixture.NextCalled);
+
+        fixture.Reset();
+        CountingStream oversizedBody = fixture.PrepareRequest(
+            "/api/internal/releases/generations/generation-a/authority-advances",
+            contentLength: ReleaseAuthorityRevisionStore.MaximumAdvanceRequestBodyBytes + 1,
+            authenticated: true);
+
+        await fixture.InvokeAsync();
+
+        Assert.Equal(StatusCodes.Status413PayloadTooLarge, fixture.Context.Response.StatusCode);
+        Assert.Equal(0, oversizedBody.ReadCount);
+        Assert.False(fixture.NextCalled);
+    }
+
+    [Fact]
+    public async Task AuthorityAdvanceUsesAuthenticatedAdmissionLease()
+    {
+        using Fixture fixture = new(maxAdmissions: 1);
+        using ReleaseUploadAdmissionLease held = Assert.IsType<ReleaseUploadAdmissionLease>(
+            fixture.Admission.TryAcquire(fixture.InternalAuthorizationBinding));
+        CountingStream body = fixture.PrepareRequest(
+            "/api/internal/releases/generations/generation-a/authority-advances",
+            contentLength: 16,
+            authenticated: true);
+
+        await fixture.InvokeAsync();
+
+        Assert.Equal(StatusCodes.Status429TooManyRequests, fixture.Context.Response.StatusCode);
+        Assert.Equal(0, body.ReadCount);
+        Assert.False(fixture.NextCalled);
+    }
+
+    [Fact]
     public async Task DisabledDirectBundleIsRejectedBeforeLengthCheckOrBodyRead()
     {
         using Fixture fixture = new();

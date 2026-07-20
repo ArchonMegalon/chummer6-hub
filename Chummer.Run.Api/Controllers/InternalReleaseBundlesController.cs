@@ -10,6 +10,9 @@ namespace Chummer.Run.Api.Controllers;
 [ApiController]
 public sealed class InternalReleaseBundlesController : ControllerBase
 {
+    internal const long MaxReleaseAuthorityAdvanceRequestBodyBytes =
+        ReleaseAuthorityRevisionStore.MaximumAdvanceRequestBodyBytes;
+
     public const string ExactIncomingDesktopScopeHeader =
         "X-Chummer-Release-Exact-Incoming-Scope";
 
@@ -23,6 +26,7 @@ public sealed class InternalReleaseBundlesController : ControllerBase
     private readonly InstallLinkingService _installLinking;
     private readonly PublicCanonicalOriginPolicy _publicOrigin;
     private readonly ILogger<InternalReleaseBundlesController> _logger;
+    private readonly ReleaseAuthorityRevisionStore? _releaseAuthorityRevisions;
 
     public InternalReleaseBundlesController(
         ReleaseBundlePromotionService promotionService,
@@ -35,7 +39,8 @@ public sealed class InternalReleaseBundlesController : ControllerBase
         PublicCanonicalOriginPolicy? publicOrigin = null,
         ILogger<InternalReleaseBundlesController>? logger = null,
         ReleaseUploadQuotaOptions? uploadOptions = null,
-        ReleaseShelfGenerationStore? releaseShelfStore = null)
+        ReleaseShelfGenerationStore? releaseShelfStore = null,
+        ReleaseAuthorityRevisionStore? releaseAuthorityRevisions = null)
     {
         _promotionService = promotionService;
         _uploadSessions = uploadSessions;
@@ -47,6 +52,91 @@ public sealed class InternalReleaseBundlesController : ControllerBase
         _installLinking = installLinking;
         _publicOrigin = publicOrigin ?? PublicCanonicalOriginPolicy.CreateUnitTestDefault(configuration);
         _logger = logger ?? NullLogger<InternalReleaseBundlesController>.Instance;
+        _releaseAuthorityRevisions = releaseAuthorityRevisions;
+    }
+
+    [HttpPost("/api/internal/releases/generations/{generationId}/authority-advances")]
+    [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(MaxReleaseAuthorityAdvanceRequestBodyBytes)]
+    [ProducesResponseType<ReleaseAuthorityRevisionAdvanceResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<ReleaseAuthorityRevisionAdvanceResult>> AdvanceReleaseAuthority(
+        [FromRoute] string generationId,
+        [FromBody] ReleaseAuthorityRevisionAdvanceRequest? request,
+        CancellationToken cancellationToken)
+    {
+        ReleaseUploadAuthorizationContext? authorization = RequirePrevalidatedAuthorization(
+            out ActionResult? denied);
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        if (authorization!.UploadTicketClaims is not null)
+        {
+            ApplyCredentialResponseNoStoreHeaders(Response.Headers);
+        }
+
+        if (_releaseAuthorityRevisions is null)
+        {
+            return BuildProblem(
+                StatusCodes.Status503ServiceUnavailable,
+                "Release authority advance unavailable",
+                "release authority revision storage is unavailable.",
+                "https://chummer.run/problems/release-authority/unavailable");
+        }
+
+        if (request is null
+            || string.IsNullOrWhiteSpace(generationId)
+            || !string.Equals(request.GenerationId, generationId, StringComparison.Ordinal))
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Release authority advance rejected",
+                "the route generationId and request generationId must be present and match exactly.",
+                "https://chummer.run/problems/release-authority/invalid-generation");
+        }
+
+        try
+        {
+            ReleaseAuthorityRevisionAdvanceResult result =
+                await _releaseAuthorityRevisions.AdvancePreviewReadyAsync(
+                    request,
+                    cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception exception) when (exception is ReleaseAuthorityRevisionConcurrencyException
+                                          or ReleaseShelfMutationConcurrencyException)
+        {
+            return BuildProblem(
+                StatusCodes.Status409Conflict,
+                "Release authority advance conflicted",
+                exception.Message,
+                "https://chummer.run/problems/release-authority/conflict");
+        }
+        catch (Exception exception) when (exception is InvalidDataException
+                                          or JsonException
+                                          or NotSupportedException
+                                          or ArgumentException)
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Release authority advance rejected",
+                exception.Message,
+                "https://chummer.run/problems/release-authority/rejected");
+        }
+        catch (Exception exception) when (exception is IOException
+                                          or UnauthorizedAccessException)
+        {
+            LogSessionInfrastructureFailure(exception);
+            return BuildProblem(
+                StatusCodes.Status503ServiceUnavailable,
+                "Release authority advance unavailable",
+                "release authority revision storage is unavailable.",
+                "https://chummer.run/problems/release-authority/unavailable");
+        }
     }
 
     [HttpPost("/api/internal/releases/bundles")]

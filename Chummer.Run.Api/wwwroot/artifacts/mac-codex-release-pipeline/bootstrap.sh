@@ -2956,6 +2956,177 @@ write_release_upload_curl_config() {
     | python3 -c 'import sys; token = sys.stdin.read(); escaped = token.replace("\\\\", "\\\\\\\\").replace("\"", "\\\\\""); sys.stdout.write(f"header = \"Authorization: Bearer {escaped}\"\n")'
 }
 
+capture_registry_control_key_value() {
+  local output_value_variable="${1:-}"
+  local output_source_variable="${2:-}"
+  local primary_value="${CHUMMER_REGISTRY_CONTROL_API_KEY:-}"
+  local legacy_value="${REGISTRY_CONTROL_API_KEY:-}"
+  local captured_value=""
+  local captured_source=""
+  export -n primary_value legacy_value captured_value captured_source 2>/dev/null || true
+  [[ -n "$output_value_variable" && -n "$output_source_variable" ]] || return 1
+
+  if [[ -n "$primary_value" && -n "$legacy_value" && "$primary_value" != "$legacy_value" ]]; then
+    captured_source="CHUMMER_REGISTRY_CONTROL_API_KEY+REGISTRY_CONTROL_API_KEY"
+    printf -v "$output_value_variable" '%s' ""
+    printf -v "$output_source_variable" '%s' "$captured_source"
+    unset CHUMMER_REGISTRY_CONTROL_API_KEY REGISTRY_CONTROL_API_KEY
+    return 2
+  fi
+  if [[ -n "$primary_value" ]]; then
+    captured_value="$primary_value"
+    captured_source="CHUMMER_REGISTRY_CONTROL_API_KEY"
+  elif [[ -n "$legacy_value" ]]; then
+    captured_value="$legacy_value"
+    captured_source="REGISTRY_CONTROL_API_KEY"
+  fi
+  printf -v "$output_value_variable" '%s' "$captured_value"
+  printf -v "$output_source_variable" '%s' "$captured_source"
+  export -n "$output_value_variable" "$output_source_variable" 2>/dev/null || true
+  unset CHUMMER_REGISTRY_CONTROL_API_KEY REGISTRY_CONTROL_API_KEY
+}
+
+ensure_registry_control_key() {
+  local control_key="${1:-}"
+  export -n control_key 2>/dev/null || true
+  [[ -n "$control_key" ]] \
+    || die "set CHUMMER_REGISTRY_CONTROL_API_KEY for Registry authority publication"
+  (( ${#control_key} <= 8192 )) \
+    && [[ "$control_key" != *$'\n'* && "$control_key" != *$'\r'* ]] \
+    || die "Registry control authorization must be one value of at most 8192 bytes"
+}
+
+write_registry_control_curl_config() {
+  local control_key="${1:-}"
+  export -n control_key 2>/dev/null || true
+  ensure_registry_control_key "$control_key"
+  printf '%s' "$control_key" \
+    | python3 -c 'import sys; key = sys.stdin.read(); escaped = key.replace("\\\\", "\\\\\\\\").replace("\"", "\\\\\""); sys.stdout.write(f"header = \"X-Chummer-Registry-Key: {escaped}\"\n")'
+}
+
+resolve_registry_release_authority_urls() {
+  local current_url="$1"
+  local publish_url="$2"
+  python3 - "$current_url" "$publish_url" <<'PY'
+from __future__ import annotations
+
+import sys
+from urllib.parse import urlsplit, urlunsplit
+
+expected_paths = (
+    "/api/v1/registry/release-authority/current",
+    "/api/v1/registry/release-authority/publish",
+)
+resolved = []
+authorities = []
+for value, expected_path in zip(sys.argv[1:3], expected_paths):
+    parsed = urlsplit(value.strip())
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or parsed.path != expected_path
+    ):
+        raise SystemExit("Registry release-authority endpoints must be explicit HTTPS current/publish API URLs")
+    try:
+        authority = (parsed.hostname.lower(), parsed.port)
+    except ValueError as error:
+        raise SystemExit("Registry release-authority endpoint has an invalid port") from error
+    authorities.append(authority)
+    resolved.append(urlunsplit(("https", parsed.netloc, parsed.path, "", "")))
+if authorities[0] != authorities[1]:
+    raise SystemExit("Registry release-authority current and publish endpoints must share one origin")
+print("|".join(resolved))
+PY
+}
+
+fetch_bounded_https_json() {
+  local output_path="$1"
+  local request_url="$2"
+  local max_response_bytes="$3"
+  local timeout_seconds="${4:-30}"
+  local http_status=""
+  if ! http_status="$(curl -q -sS \
+      --proto '=https' \
+      --tlsv1.2 \
+      --max-redirs 0 \
+      --connect-timeout 10 \
+      --max-time "$timeout_seconds" \
+      --max-filesize "$max_response_bytes" \
+      --header 'Accept: application/json' \
+      --header 'Cache-Control: no-cache' \
+      --output "$output_path" \
+      --write-out '%{http_code}' \
+      "$request_url")"; then
+    return 1
+  fi
+  chmod 600 "$output_path" 2>/dev/null || true
+  printf '%s\n' "$http_status"
+}
+
+post_registry_authority_request() {
+  local output_path="$1"
+  local request_url="$2"
+  local request_path="$3"
+  local control_key="${4:-}"
+  local max_response_bytes="${5:-16777216}"
+  local timeout_seconds="${6:-60}"
+  local http_status=""
+  export -n control_key 2>/dev/null || true
+  if ! http_status="$(write_registry_control_curl_config "$control_key" \
+      | curl -q --config - -sS \
+        --proto '=https' \
+        --tlsv1.2 \
+        --max-redirs 0 \
+        --connect-timeout 10 \
+        --max-time "$timeout_seconds" \
+        --max-filesize "$max_response_bytes" \
+        --header 'Accept: application/json' \
+        --header 'Content-Type: application/json' \
+        --request POST \
+        --data-binary "@$request_path" \
+        --output "$output_path" \
+        --write-out '%{http_code}' \
+        "$request_url")"; then
+    return 1
+  fi
+  chmod 600 "$output_path" 2>/dev/null || true
+  printf '%s\n' "$http_status"
+}
+
+post_hub_authority_advance_request() {
+  local output_path="$1"
+  local request_url="$2"
+  local request_path="$3"
+  local release_upload_auth_value="${4:-}"
+  local max_response_bytes="${5:-1048576}"
+  local timeout_seconds="${6:-60}"
+  local http_status=""
+  export -n release_upload_auth_value 2>/dev/null || true
+  if ! http_status="$(write_release_upload_curl_config "$release_upload_auth_value" \
+      | curl -q --config - -sS \
+        --proto '=https' \
+        --tlsv1.2 \
+        --max-redirs 0 \
+        --connect-timeout 10 \
+        --max-time "$timeout_seconds" \
+        --max-filesize "$max_response_bytes" \
+        --header 'Accept: application/json' \
+        --header 'Content-Type: application/json' \
+        --request POST \
+        --data-binary "@$request_path" \
+        --output "$output_path" \
+        --write-out '%{http_code}' \
+        "$request_url")"; then
+    return 1
+  fi
+  chmod 600 "$output_path" 2>/dev/null || true
+  printf '%s\n' "$http_status"
+}
+
 validate_publish_mode() {
   local publish_mode="$1"
   local sessions_url="$2"
@@ -2997,12 +3168,19 @@ is_true() {
 
 MAC_RELEASE_STAGE_ONLY=0
 MAC_RELEASE_STAGE_OUTPUT_DIR=""
+MAC_RELEASE_AUTHORITY_RESUME=0
+MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT=""
+MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT_SHA256=""
+MAC_RELEASE_AUTHORITY_RESUME_WORKSPACE=""
 
 parse_mac_release_stage_only_args() {
   local env_mode="${CHUMMER_MAC_RELEASE_STAGE_ONLY:-}"
   local env_output="${CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR:-}"
   local flag_mode=0
   local flag_output=""
+  local resume_checkpoint=""
+  local resume_checkpoint_sha256=""
+  local resume_workspace=""
   local value=""
 
   if [[ -n "$env_mode" ]]; then
@@ -3033,8 +3211,41 @@ parse_mac_release_stage_only_args() {
         flag_output="${1#--stage-output-dir=}"
         shift
         ;;
-      *)
+      --resume-authority-checkpoint)
+        (( $# >= 2 )) || die "--resume-authority-checkpoint requires a path"
+        [[ -z "$resume_checkpoint" ]] || die "--resume-authority-checkpoint may be supplied only once"
+        resume_checkpoint="$2"
+        shift 2
+        ;;
+      --resume-authority-checkpoint=*)
+        [[ -z "$resume_checkpoint" ]] || die "--resume-authority-checkpoint may be supplied only once"
+        resume_checkpoint="${1#--resume-authority-checkpoint=}"
         shift
+        ;;
+      --resume-authority-checkpoint-sha256)
+        (( $# >= 2 )) || die "--resume-authority-checkpoint-sha256 requires a digest"
+        [[ -z "$resume_checkpoint_sha256" ]] || die "--resume-authority-checkpoint-sha256 may be supplied only once"
+        resume_checkpoint_sha256="$2"
+        shift 2
+        ;;
+      --resume-authority-checkpoint-sha256=*)
+        [[ -z "$resume_checkpoint_sha256" ]] || die "--resume-authority-checkpoint-sha256 may be supplied only once"
+        resume_checkpoint_sha256="${1#--resume-authority-checkpoint-sha256=}"
+        shift
+        ;;
+      --resume-authority-workspace)
+        (( $# >= 2 )) || die "--resume-authority-workspace requires a path"
+        [[ -z "$resume_workspace" ]] || die "--resume-authority-workspace may be supplied only once"
+        resume_workspace="$2"
+        shift 2
+        ;;
+      --resume-authority-workspace=*)
+        [[ -z "$resume_workspace" ]] || die "--resume-authority-workspace may be supplied only once"
+        resume_workspace="${1#--resume-authority-workspace=}"
+        shift
+        ;;
+      *)
+        die "unsupported bootstrap argument: $1"
         ;;
     esac
   done
@@ -3049,6 +3260,28 @@ parse_mac_release_stage_only_args() {
     die "--stage-output-dir conflicts with CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR"
   fi
   MAC_RELEASE_STAGE_OUTPUT_DIR="${flag_output:-$env_output}"
+
+  if [[ -n "$resume_checkpoint" || -n "$resume_checkpoint_sha256" || -n "$resume_workspace" ]]; then
+    [[ -n "$resume_checkpoint" && -n "$resume_checkpoint_sha256" && -n "$resume_workspace" ]] \
+      || die "authority resume requires --resume-authority-checkpoint, --resume-authority-checkpoint-sha256, and --resume-authority-workspace together"
+    (( MAC_RELEASE_STAGE_ONLY == 0 && flag_mode == 0 )) \
+      || die "authority resume cannot be combined with stage-only mode"
+    [[ -z "$MAC_RELEASE_STAGE_OUTPUT_DIR" ]] \
+      || die "authority resume cannot be combined with a stage-only output directory"
+    [[ "$resume_checkpoint" == /* && "$resume_workspace" == /* ]] \
+      || die "authority resume checkpoint and workspace must be absolute paths"
+    [[ "$resume_checkpoint_sha256" =~ ^[0-9a-f]{64}$ ]] \
+      || die "authority resume checkpoint SHA-256 must be 64 lowercase hexadecimal characters"
+    MAC_RELEASE_AUTHORITY_RESUME=1
+    MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT="$resume_checkpoint"
+    MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT_SHA256="$resume_checkpoint_sha256"
+    MAC_RELEASE_AUTHORITY_RESUME_WORKSPACE="$resume_workspace"
+  else
+    MAC_RELEASE_AUTHORITY_RESUME=0
+    MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT=""
+    MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT_SHA256=""
+    MAC_RELEASE_AUTHORITY_RESUME_WORKSPACE=""
+  fi
 
   if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
     [[ -z "$MAC_RELEASE_STAGE_OUTPUT_DIR" ]] \
@@ -3314,6 +3547,7 @@ stamp_startup_smoke_receipt_artifact_identity() {
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import pathlib
 import re
@@ -5100,6 +5334,176 @@ PY
   printf 'release_stage_only_path=%s\n' "$output_path"
 }
 
+resume_release_authority_transaction() {
+  local workspace="$1"
+  local checkpoint_path="$2"
+  local checkpoint_sha256="$3"
+  local release_upload_auth_value="${4:-}"
+  export -n release_upload_auth_value 2>/dev/null || true
+  ensure_release_upload_token "$release_upload_auth_value"
+  require_cmd curl
+  require_cmd jq
+
+  local checkpoint_tool="$workspace/.c/hub/scripts/release_authority_transaction_checkpoint.py"
+  [[ -f "$checkpoint_tool" && ! -L "$checkpoint_tool" ]] \
+    || die "authority resume checkpoint tool is missing or unsafe: $checkpoint_tool"
+  local resolution_path="$workspace/.authority-resume-resolution-${BASHPID}-${RANDOM}.json"
+  [[ ! -e "$resolution_path" && ! -L "$resolution_path" ]] \
+    || die "authority resume could not reserve a private resolution path"
+  bootstrap_tmp_paths+=("$resolution_path")
+  command "$RELEASE_PYTHON_BIN" "$checkpoint_tool" resolve \
+    --workspace "$workspace" \
+    --checkpoint "$checkpoint_path" \
+    --expected-checkpoint-sha256 "$checkpoint_sha256" \
+    --output "$resolution_path" \
+    >/dev/null \
+    || die "authority resume checkpoint or referenced transaction bytes failed validation"
+
+  local generation_id release_version registry_current_url hub_authority_url live_base_url
+  local expected_manifest_sha256 expected_snapshot_sha256 expected_decision_sha256
+  local evidence_dir request_path registry_inspector response_verifier live_convergence_verifier
+  local timeout_seconds convergence_attempts convergence_retry_seconds
+  generation_id="$(jq -r '.generationId // empty' "$resolution_path")"
+  release_version="$(jq -r '.releaseVersion // empty' "$resolution_path")"
+  registry_current_url="$(jq -r '.registryCurrentUrl // empty' "$resolution_path")"
+  hub_authority_url="$(jq -r '.hubAuthorityAdvanceUrl // empty' "$resolution_path")"
+  live_base_url="$(jq -r '.liveConvergenceBaseUrl // empty' "$resolution_path")"
+  expected_manifest_sha256="$(jq -r '.expectedManifestSha256 // empty' "$resolution_path")"
+  expected_snapshot_sha256="$(jq -r '.expectedRegistrySnapshotSha256 // empty' "$resolution_path")"
+  expected_decision_sha256="$(jq -r '.expectedRegistryDecisionSha256 // empty' "$resolution_path")"
+  evidence_dir="$(jq -r '.evidenceDirectory // empty' "$resolution_path")"
+  request_path="$(jq -r '.files.request // empty' "$resolution_path")"
+  registry_inspector="$(jq -r '.files.registryInspector // empty' "$resolution_path")"
+  response_verifier="$(jq -r '.files.responseVerifier // empty' "$resolution_path")"
+  live_convergence_verifier="$(jq -r '.files.liveConvergenceVerifier // empty' "$resolution_path")"
+  timeout_seconds="$(jq -r '.convergencePolicy.timeoutSeconds // empty' "$resolution_path")"
+  convergence_attempts="$(jq -r '.convergencePolicy.attempts // empty' "$resolution_path")"
+  convergence_retry_seconds="$(jq -r '.convergencePolicy.retrySeconds // empty' "$resolution_path")"
+  [[ "$generation_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ \
+      && -n "$release_version" \
+      && "$expected_manifest_sha256" =~ ^[0-9a-f]{64}$ \
+      && "$expected_snapshot_sha256" =~ ^[0-9a-f]{64}$ \
+      && "$expected_decision_sha256" =~ ^[0-9a-f]{64}$ \
+      && -d "$evidence_dir" \
+      && -f "$request_path" \
+      && -f "$registry_inspector" \
+      && -f "$response_verifier" \
+      && -f "$live_convergence_verifier" ]] \
+    || die "authority resume resolution omitted a required canonical transaction binding"
+
+  local suffix
+  suffix="$(date -u +%Y%m%d-%H%M%S)-${BASHPID}"
+  local registry_response="$evidence_dir/.registry-current-resume-response-$suffix.json"
+  local registry_inspection="$evidence_dir/.registry-current-resume-inspection-$suffix.json"
+  local hub_response="$evidence_dir/.hub-authority-resume-response-$suffix.json"
+  local response_receipt="$evidence_dir/HUB_AUTHORITY_ADVANCE_RESUME_RESPONSE.$suffix.generated.json"
+  local generation_receipt="$evidence_dir/LIVE_RELEASE_GENERATION_PREVIEW_RESUME_CONVERGENCE.$suffix.generated.json"
+  local current_receipt="$evidence_dir/LIVE_RELEASE_PREVIEW_RESUME_CONVERGENCE.$suffix.generated.json"
+  local reserved_path=""
+  for reserved_path in \
+    "$registry_response" "$registry_inspection" "$hub_response" \
+    "$response_receipt" "$generation_receipt" "$current_receipt"; do
+    [[ ! -e "$reserved_path" && ! -L "$reserved_path" ]] \
+      || die "authority resume output path already exists: $reserved_path"
+  done
+  bootstrap_tmp_paths+=("$registry_response" "$registry_inspection" "$hub_response")
+
+  log "resume mode: verifying Registry CURRENT equals the checkpointed preview successor"
+  local registry_status=""
+  registry_status="$(fetch_bounded_https_json \
+    "$registry_response" \
+    "$registry_current_url" \
+    16777216 \
+    30)" \
+    || die "authority resume could not read Registry CURRENT"
+  [[ "$registry_status" == "200" ]] \
+    || die "authority resume requires the recorded preview successor in Registry CURRENT; observed HTTP $registry_status"
+  command "$RELEASE_PYTHON_BIN" "$registry_inspector" \
+    --response "$registry_response" \
+    --output "$registry_inspection" \
+    >/dev/null \
+    || die "authority resume Registry CURRENT response failed strict inspection"
+  [[ "$(jq -r '.releaseVersion // empty' "$registry_inspection")" == "$release_version" \
+      && "$(jq -r '.releaseDecisionStatus // empty' "$registry_inspection")" == "preview_ready" \
+      && "$(jq -r '.manifestSha256 // empty' "$registry_inspection")" == "$expected_manifest_sha256" \
+      && "$(jq -r '.snapshotSha256 // empty' "$registry_inspection")" == "$expected_snapshot_sha256" \
+      && "$(jq -r '.decisionSha256 // empty' "$registry_inspection")" == "$expected_decision_sha256" ]] \
+    || die "authority resume Registry CURRENT differs from the exact checkpointed preview successor; no mutation attempted"
+
+  log "resume mode: replaying the exact Hub authority request idempotently"
+  local hub_status=""
+  local hub_transport_failed=0
+  hub_status="$(post_hub_authority_advance_request \
+    "$hub_response" \
+    "$hub_authority_url" \
+    "$request_path" \
+    "$release_upload_auth_value")" \
+    || hub_transport_failed=1
+  release_upload_auth_value=""
+  (( hub_transport_failed == 0 )) \
+    || die "authority resume Hub request failed; retain the checkpoint and retry with a fresh release-upload credential"
+  [[ "$hub_status" == "200" ]] \
+    || die "authority resume Hub request returned HTTP $hub_status; retain the checkpoint for reconciliation"
+
+  command "$RELEASE_PYTHON_BIN" "$response_verifier" \
+    --response "$hub_response" \
+    --request "$request_path" \
+    --generation-id "$generation_id" \
+    --release-version "$release_version" \
+    --predecessor-current "$(jq -r '.files.predecessorCurrent' "$resolution_path")" \
+    --predecessor-snapshot "$(jq -r '.files.predecessorSnapshot' "$resolution_path")" \
+    --predecessor-decision "$(jq -r '.files.predecessorDecision' "$resolution_path")" \
+    --successor-current "$(jq -r '.files.successorCurrent' "$resolution_path")" \
+    --successor-snapshot "$(jq -r '.files.successorSnapshot' "$resolution_path")" \
+    --successor-decision "$(jq -r '.files.successorDecision' "$resolution_path")" \
+    --scorecard "$(jq -r '.files.scorecard' "$resolution_path")" \
+    --convergence "$(jq -r '.files.convergence' "$resolution_path")" \
+    --output "$response_receipt" \
+    >/dev/null \
+    || die "authority resume Hub response did not bind the exact checkpointed request"
+
+  local attempt=0
+  local generation_converged=0
+  for ((attempt = 1; attempt <= convergence_attempts; attempt++)); do
+    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
+      --base-url "$live_base_url" \
+      --generation-id "$generation_id" \
+      --expected-release-version "$release_version" \
+      --expected-manifest-sha256 "$expected_manifest_sha256" \
+      --expected-release-decision-sha256 "$expected_decision_sha256" \
+      --timeout "$timeout_seconds" \
+      > "$generation_receipt"; then
+      generation_converged=1
+      break
+    fi
+    (( attempt == convergence_attempts )) || sleep "$convergence_retry_seconds"
+  done
+  (( generation_converged == 1 )) \
+    || die "authority resume generation projection did not converge; retain the checkpoint"
+
+  local current_converged=0
+  for ((attempt = 1; attempt <= convergence_attempts; attempt++)); do
+    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
+      --base-url "$live_base_url" \
+      --expected-release-version "$release_version" \
+      --expected-manifest-sha256 "$expected_manifest_sha256" \
+      --expected-release-decision-sha256 "$expected_decision_sha256" \
+      --timeout "$timeout_seconds" \
+      > "$current_receipt"; then
+      current_converged=1
+      break
+    fi
+    (( attempt == convergence_attempts )) || sleep "$convergence_retry_seconds"
+  done
+  (( current_converged == 1 )) \
+    || die "authority resume CURRENT routes did not converge; retain the checkpoint"
+
+  rm -f "$request_path" "$checkpoint_path"
+  log "authority resume completed without build, upload, or Registry mutation; private checkpoint removed after both convergence checks"
+  log "authority resume response receipt: $response_receipt"
+  log "authority resume CURRENT convergence: $current_receipt"
+}
+
 main() {
   bootstrap_tmp_paths=()
   trap cleanup_bootstrap_tmp_paths EXIT
@@ -5118,13 +5522,84 @@ main() {
   local release_upload_auth_value=""
   local release_upload_auth_source=""
   capture_release_upload_auth_value release_upload_auth_value release_upload_auth_source
+  local registry_control_key_value=""
+  local registry_control_key_source=""
+  local registry_control_capture_status=0
+  capture_registry_control_key_value \
+    registry_control_key_value \
+    registry_control_key_source \
+    || registry_control_capture_status=$?
+  (( registry_control_capture_status != 2 )) \
+    || die "CHUMMER_REGISTRY_CONTROL_API_KEY and REGISTRY_CONTROL_API_KEY disagree"
 
   parse_mac_release_stage_only_args "$@"
+  if (( MAC_RELEASE_AUTHORITY_RESUME == 1 )); then
+    [[ -z "$registry_control_key_source" ]] \
+      || die "authority resume rejects Registry publication credential $registry_control_key_source"
+    (( exact_incoming_scope_declared == 0 )) \
+      || die "authority resume rejects publish-only setting CHUMMER_RELEASE_EXACT_INCOMING_TUPLES"
+    local resume_incompatible_setting=""
+    for resume_incompatible_setting in \
+      CHUMMER_MAC_RELEASE_STAGE_ONLY \
+      CHUMMER_MAC_RELEASE_STAGE_OUTPUT_DIR \
+      CHUMMER_RELEASE_PUBLISH_MODE \
+      CHUMMER_RELEASE_UPLOAD_SESSIONS_URL \
+      CHUMMER_RELEASE_UPLOAD_URL \
+      CHUMMER_REGISTRY_RELEASE_AUTHORITY_CURRENT_URL \
+      CHUMMER_REGISTRY_RELEASE_AUTHORITY_PUBLISH_URL \
+      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH \
+      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS \
+      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS \
+      CHUMMER_APP_SIGN_IDENTITY \
+      CHUMMER_NOTARY_PROFILE; do
+      [[ -z "${!resume_incompatible_setting:-}" ]] \
+        || die "authority resume rejects build/publication setting $resume_incompatible_setting"
+    done
+    if [[ -z "$release_upload_auth_value" ]]; then
+      prompt_for_release_upload_ticket release_upload_auth_value \
+        || die "authority resume requires a fresh CHUMMER_RELEASE_UPLOAD_TICKET or CHUMMER_RELEASE_UPLOAD_TOKEN"
+    fi
+    ensure_release_upload_token "$release_upload_auth_value"
+    RELEASE_PYTHON_BIN="$(resolve_release_python)" \
+      || die "authority resume requires Python 3.11 or newer; set CHUMMER_RELEASE_PYTHON to a reviewed interpreter"
+    python3() {
+      command "$RELEASE_PYTHON_BIN" "$@"
+    }
+    resume_release_authority_transaction \
+      "$MAC_RELEASE_AUTHORITY_RESUME_WORKSPACE" \
+      "$MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT" \
+      "$MAC_RELEASE_AUTHORITY_RESUME_CHECKPOINT_SHA256" \
+      "$release_upload_auth_value"
+    release_upload_auth_value=""
+    return 0
+  fi
+  local retired_scorecard_setting=""
+  for retired_scorecard_setting in \
+    CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_PATH \
+    CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_EXPECTED_SHA256; do
+    [[ -z "${!retired_scorecard_setting:-}" ]] \
+      || die "$retired_scorecard_setting is retired because a launch-time scorecard digest cannot bind post-convergence evidence; use CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH"
+  done
   if (( MAC_RELEASE_STAGE_ONLY == 1 )) && [[ -n "$release_upload_auth_source" ]]; then
     die "stage-only mode rejects publish-only setting $release_upload_auth_source"
   fi
   if (( MAC_RELEASE_STAGE_ONLY == 1 && exact_incoming_scope_declared == 1 )); then
     die "stage-only mode rejects publish-only setting CHUMMER_RELEASE_EXACT_INCOMING_TUPLES"
+  fi
+  if (( MAC_RELEASE_STAGE_ONLY == 1 )) && [[ -n "$registry_control_key_source" ]]; then
+    die "stage-only mode rejects Registry publication credential $registry_control_key_source"
+  fi
+  if (( MAC_RELEASE_STAGE_ONLY == 1 )); then
+    local registry_publish_setting=""
+    for registry_publish_setting in \
+      CHUMMER_REGISTRY_RELEASE_AUTHORITY_CURRENT_URL \
+      CHUMMER_REGISTRY_RELEASE_AUTHORITY_PUBLISH_URL \
+      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH \
+      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS \
+      CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS; do
+      [[ -z "${!registry_publish_setting:-}" ]] \
+        || die "stage-only mode rejects Registry publication setting $registry_publish_setting"
+    done
   fi
 
   local publish_mode
@@ -5144,6 +5619,9 @@ main() {
     else
       release_upload_auth_value=""
     fi
+    [[ "$publish_mode" == "http" ]] \
+      || die "same-generation release-authority closure requires staged HTTP publication"
+    ensure_registry_control_key "$registry_control_key_value"
   fi
 
   require_all_reviewed_commit_pins
@@ -5209,6 +5687,30 @@ main() {
   local verify_url="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-https://chummer.run/downloads/RELEASE_CHANNEL.generated.json}"
   local require_compatibility_projection="${CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION:-0}"
   local sessions_url="${CHUMMER_RELEASE_UPLOAD_SESSIONS_URL:-https://chummer.run/api/internal/releases/upload-sessions}"
+  local registry_authority_current_url="${CHUMMER_REGISTRY_RELEASE_AUTHORITY_CURRENT_URL:-}"
+  local registry_authority_publish_url="${CHUMMER_REGISTRY_RELEASE_AUTHORITY_PUBLISH_URL:-}"
+  local scorecard_handoff_request_path="${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH:-}"
+  local scorecard_handoff_wait_seconds="${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS:-900}"
+  local scorecard_handoff_poll_seconds="${CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS:-15}"
+  if (( MAC_RELEASE_STAGE_ONLY == 0 )); then
+    [[ -n "$registry_authority_current_url" ]] \
+      || die "set CHUMMER_REGISTRY_RELEASE_AUTHORITY_CURRENT_URL to the explicit Registry current authority endpoint"
+    [[ -n "$registry_authority_publish_url" ]] \
+      || die "set CHUMMER_REGISTRY_RELEASE_AUTHORITY_PUBLISH_URL to the explicit Registry publish authority endpoint"
+    IFS='|' read -r registry_authority_current_url registry_authority_publish_url \
+      < <(resolve_registry_release_authority_urls \
+        "$registry_authority_current_url" \
+        "$registry_authority_publish_url") \
+      || die "Registry release-authority endpoint pair is invalid"
+    [[ -z "$scorecard_handoff_request_path" || "$scorecard_handoff_request_path" == /* ]] \
+      || die "CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH must be an absolute path beneath the caller-owned run workspace"
+    [[ "$scorecard_handoff_wait_seconds" =~ ^[0-9]{1,4}$ ]] \
+      && (( 10#$scorecard_handoff_wait_seconds <= 3600 )) \
+      || die "CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_WAIT_SECONDS must be between 0 and 3600"
+    [[ "$scorecard_handoff_poll_seconds" =~ ^[0-9]{1,2}$ ]] \
+      && (( 10#$scorecard_handoff_poll_seconds >= 1 && 10#$scorecard_handoff_poll_seconds <= 30 )) \
+      || die "CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_POLL_SECONDS must be between 1 and 30"
+  fi
   local materializer_skip_startup_smoke_filter="${CHUMMER_MATERIALIZE_SKIP_STARTUP_SMOKE_FILTER:-0}"
   local materializer_retry_without_filter="${CHUMMER_MATERIALIZE_RETRY_WITHOUT_STARTUP_SMOKE_FILTER_ON_ZERO:-}"
   if [[ -z "$materializer_retry_without_filter" ]]; then
@@ -5905,6 +6407,7 @@ main() {
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import re
 import sys
@@ -6157,6 +6660,436 @@ PY
   (( current_converged == 1 )) \
     || die "CURRENT release-facing routes did not converge after upload. Receipt: $live_convergence_receipt"
   log "live release-facing route convergence passed: $live_convergence_receipt"
+
+  local registry_publish_request_materializer="$registry_alias/scripts/materialize_release_authority_publish_request.py"
+  local registry_publish_response_verifier="$registry_alias/scripts/verify_release_authority_publish_response.py"
+  local registry_current_inspector="$hub_alias/scripts/inspect_registry_release_authority_current.py"
+  [[ -f "$registry_publish_request_materializer" && ! -L "$registry_publish_request_materializer" ]] \
+    || die "Registry authority publish-request materializer is missing or unsafe: $registry_publish_request_materializer"
+  [[ -f "$registry_publish_response_verifier" && ! -L "$registry_publish_response_verifier" ]] \
+    || die "Registry authority publish-response verifier is missing or unsafe: $registry_publish_response_verifier"
+  [[ -f "$registry_current_inspector" && ! -L "$registry_current_inspector" ]] \
+    || die "Registry current authority inspector is missing or unsafe: $registry_current_inspector"
+
+  local registry_current_response="$release_evidence_dir/.registry-current-response.json"
+  local registry_current_cas_receipt="$release_evidence_dir/REGISTRY_AUTHORITY_CURRENT_CAS.generated.json"
+  local registry_current_http_status=""
+  log "reading the exact Registry CURRENT authority CAS state"
+  registry_current_http_status="$(fetch_bounded_https_json \
+    "$registry_current_response" \
+    "$registry_authority_current_url" \
+    16777216 \
+    30)" \
+    || die "Registry CURRENT authority request failed before publication"
+  case "$registry_current_http_status" in
+    200)
+      command "$RELEASE_PYTHON_BIN" "$registry_current_inspector" \
+        --response "$registry_current_response" \
+        --output "$registry_current_cas_receipt" \
+        >/dev/null
+      ;;
+    404)
+      rm -f "$registry_current_response"
+      command "$RELEASE_PYTHON_BIN" "$registry_current_inspector" \
+        --absent \
+        --output "$registry_current_cas_receipt" \
+        >/dev/null
+      ;;
+    *)
+      die "Registry CURRENT authority request returned HTTP $registry_current_http_status"
+      ;;
+  esac
+  rm -f "$registry_current_response"
+  local registry_current_decision_status
+  local registry_current_release_version
+  local registry_expected_current_snapshot_sha256
+  registry_current_decision_status="$(jq -r '.releaseDecisionStatus // empty' "$registry_current_cas_receipt")"
+  registry_current_release_version="$(jq -r '.releaseVersion // empty' "$registry_current_cas_receipt")"
+  registry_expected_current_snapshot_sha256="$(jq -r '.snapshotSha256 // empty' "$registry_current_cas_receipt")"
+  case "$registry_current_decision_status" in
+    preview_ready|stable_ready)
+      if [[ "$registry_current_release_version" == "$release_version" ]]; then
+        die "Registry CURRENT authority for this exact release is already $registry_current_decision_status; use the digest-pinned authority resume path instead of regressing it to a review seed"
+      fi
+      log "Registry CURRENT $registry_current_release_version is $registry_current_decision_status; beginning the explicitly new release $release_version from a review-required seed"
+      ;;
+    ""|review_required)
+      ;;
+    *)
+      die "Registry CURRENT authority returned an unsupported decision status"
+      ;;
+  esac
+  [[ "$registry_expected_current_snapshot_sha256" == "none" \
+      || "$registry_expected_current_snapshot_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "Registry CURRENT authority did not expose a canonical CAS digest"
+
+  local registry_review_publish_request="$release_evidence_dir/.registry-review-publish-request.json"
+  local registry_review_publish_response="$release_evidence_dir/.registry-review-publish-response.json"
+  local registry_review_publish_status=""
+  command "$RELEASE_PYTHON_BIN" "$registry_publish_request_materializer" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --current "$release_evidence_dir/CURRENT.json" \
+    --snapshot "$release_evidence_dir/SNAPSHOT.json" \
+    --decision "$release_evidence_dir/RELEASE_DECISION.json" \
+    --expected-current-snapshot-sha256 "$registry_expected_current_snapshot_sha256" \
+    --output "$registry_review_publish_request" \
+    > "$release_evidence_dir/REGISTRY_REVIEW_SEED_PUBLISH_REQUEST.generated.json"
+  log "publishing the exact review seed to Registry with CURRENT compare-and-swap"
+  registry_review_publish_status="$(post_registry_authority_request \
+    "$registry_review_publish_response" \
+    "$registry_authority_publish_url" \
+    "$registry_review_publish_request" \
+    "$registry_control_key_value")" \
+    || die "Registry review-seed publication request failed"
+  [[ "$registry_review_publish_status" == "200" ]] \
+    || die "Registry review-seed publication returned HTTP $registry_review_publish_status"
+  command "$RELEASE_PYTHON_BIN" "$registry_publish_response_verifier" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --current "$release_evidence_dir/CURRENT.json" \
+    --snapshot "$release_evidence_dir/SNAPSHOT.json" \
+    --decision "$release_evidence_dir/RELEASE_DECISION.json" \
+    --response "$registry_review_publish_response" \
+    --output "$release_evidence_dir/REGISTRY_REVIEW_SEED_PUBLISH_RESPONSE.generated.json" \
+    >/dev/null
+
+  local review_seed_live_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_REVIEW_SEED_CONVERGENCE.generated.json"
+  local review_seed_decision_sha256
+  review_seed_decision_sha256="$(jq -r '.decisionSha256 // empty' "$release_evidence_dir/CURRENT.json")"
+  [[ "$review_seed_decision_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "review seed CURRENT.json does not expose a canonical decision digest"
+  [[ "$review_seed_decision_sha256" == "$expected_release_decision_sha256" ]] \
+    || die "review seed decision digest changed before post-Registry convergence"
+  log "verifying all CURRENT release-facing routes converge after Registry accepted the review seed"
+  local review_seed_current_converged=0
+  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
+    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
+      --base-url "$live_convergence_base_url" \
+      --expected-release-version "$release_version" \
+      --expected-manifest-sha256 "$expected_manifest_sha256" \
+      --expected-release-decision-sha256 "$review_seed_decision_sha256" \
+      --timeout "$live_convergence_timeout" \
+      > "$review_seed_live_convergence_receipt"; then
+      review_seed_current_converged=1
+      break
+    fi
+    if (( convergence_attempt < live_convergence_attempts )); then
+      log "post-Registry review-seed CURRENT convergence is not visible yet (attempt ${convergence_attempt}/${live_convergence_attempts}); retrying"
+      sleep "$live_convergence_retry_seconds"
+    fi
+  done
+  (( review_seed_current_converged == 1 )) \
+    || die "CURRENT release-facing routes did not converge after Registry accepted the review seed. Receipt: $review_seed_live_convergence_receipt"
+  log "post-Registry review-seed CURRENT convergence passed: $review_seed_live_convergence_receipt"
+
+  local scorecard_handoff_resolver="$hub_alias/scripts/resolve_release_scorecard_handoff.py"
+  local scorecard_handoff_materializer="$hub_alias/scripts/materialize_release_scorecard_handoff.py"
+  local scorecard_handoff_path="$release_evidence_dir/CAMPAIGN_OPERABILITY_SCORECARD.generated.json"
+  local scorecard_handoff_receipt="$release_evidence_dir/CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF.generated.json"
+  local scorecard_handoff_resolution="$release_evidence_dir/CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_RESOLUTION.generated.json"
+  local scorecard_source_path=""
+  local scorecard_expected_sha256=""
+  [[ -f "$scorecard_handoff_resolver" && ! -L "$scorecard_handoff_resolver" ]] \
+    || die "release scorecard handoff resolver is missing or unsafe: $scorecard_handoff_resolver"
+  [[ -f "$scorecard_handoff_materializer" && ! -L "$scorecard_handoff_materializer" ]] \
+    || die "release scorecard handoff materializer is missing or unsafe: $scorecard_handoff_materializer"
+  [[ ! -e "$scorecard_handoff_path" && ! -L "$scorecard_handoff_path" ]] \
+    || die "release scorecard handoff destination already exists"
+  [[ ! -e "$scorecard_handoff_receipt" && ! -L "$scorecard_handoff_receipt" ]] \
+    || die "release scorecard handoff receipt already exists"
+  if [[ -n "$scorecard_handoff_request_path" ]]; then
+    [[ ! -e "$scorecard_handoff_resolution" && ! -L "$scorecard_handoff_resolution" ]] \
+      || die "release scorecard handoff resolution already exists"
+    log "waiting up to ${scorecard_handoff_wait_seconds}s for the caller-owned post-convergence scorecard handoff at $scorecard_handoff_request_path"
+    command "$RELEASE_PYTHON_BIN" "$scorecard_handoff_resolver" \
+      --handoff "$scorecard_handoff_request_path" \
+      --allowed-root "$work_root" \
+      --convergence "$review_seed_live_convergence_receipt" \
+      --expected-release-version "$release_version" \
+      --timeout-seconds "$scorecard_handoff_wait_seconds" \
+      --poll-seconds "$scorecard_handoff_poll_seconds" \
+      --output "$scorecard_handoff_resolution" \
+      >/dev/null
+    scorecard_source_path="$(jq -r '.scorecardPath // empty' "$scorecard_handoff_resolution")"
+    scorecard_expected_sha256="$(jq -r '.scorecardSha256 // empty' "$scorecard_handoff_resolution")"
+  elif [[ -r /dev/tty && -w /dev/tty ]]; then
+    printf '\nRegistry accepted the review seed and CURRENT routes converged.\n' >/dev/tty
+    printf 'Generate the 36-cell preview scorecard from this convergence receipt:\n  %s\n' "$review_seed_live_convergence_receipt" >/dev/tty
+    printf 'Absolute scorecard path beneath %s: ' "$work_root" >/dev/tty
+    IFS= read -r scorecard_source_path </dev/tty \
+      || die "unable to read the post-convergence scorecard path from the controlling terminal"
+    printf 'Exact lowercase scorecard SHA-256: ' >/dev/tty
+    IFS= read -r scorecard_expected_sha256 </dev/tty \
+      || die "unable to read the post-convergence scorecard digest from the controlling terminal"
+  else
+    log "non-interactive scorecard handoff schema: {\"contractName\":\"chummer.release-scorecard-handoff-request/v1\",\"releaseVersion\":\"$release_version\",\"convergenceSha256\":\"<sha256 of $review_seed_live_convergence_receipt>\",\"scorecardPath\":\"<absolute path beneath $work_root>\",\"scorecardSha256\":\"<64 lowercase hex>\"}"
+    log "create that JSON as a caller-owned mode-0600 single-link file, set CHUMMER_CAMPAIGN_OPERABILITY_SCORECARD_HANDOFF_PATH to its future path before launch, and let the resolver wait for it after convergence"
+    log "resolver: $RELEASE_PYTHON_BIN $scorecard_handoff_resolver --handoff <handoff-path> --allowed-root $work_root --convergence $review_seed_live_convergence_receipt --expected-release-version $release_version --timeout-seconds 900 --poll-seconds 15 --output <resolution-path>"
+    die "post-convergence scorecard handoff is required in non-interactive release mode"
+  fi
+  [[ "$scorecard_source_path" == /* ]] \
+    || die "post-convergence scorecard path must be absolute"
+  [[ "$scorecard_expected_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "post-convergence scorecard SHA-256 must be 64 lowercase hexadecimal characters"
+  log "accepting the digest-pinned campaign-operability scorecard only after the published review seed converged"
+  command "$RELEASE_PYTHON_BIN" "$scorecard_handoff_materializer" \
+    --source "$scorecard_source_path" \
+    --expected-sha256 "$scorecard_expected_sha256" \
+    --allowed-root "$work_root" \
+    --convergence "$review_seed_live_convergence_receipt" \
+    --expected-release-version "$release_version" \
+    --output "$scorecard_handoff_path" \
+    --receipt "$scorecard_handoff_receipt" \
+    >/dev/null
+
+  local preview_authority_envelope_dir="$release_evidence_dir/preview-authority"
+  [[ ! -e "$preview_authority_envelope_dir" && ! -L "$preview_authority_envelope_dir" ]] \
+    || die "preview authority successor destination already exists"
+  local preview_authority_generated_at
+  preview_authority_generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  log "materializing the scorecard-v2-backed preview-ready Registry authority successor"
+  command "$RELEASE_PYTHON_BIN" "$release_authority_materializer" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --output-dir "$preview_authority_envelope_dir" \
+    --registry-commit "$release_authority_registry_commit" \
+    --decision-status preview_ready \
+    --support-owner "$release_authority_support_owner" \
+    --generated-at "$preview_authority_generated_at" \
+    --next-action "Close the scorecard's retained flagship gaps before any stable or gold claim." \
+    --scorecard "$scorecard_handoff_path" \
+    --convergence "$review_seed_live_convergence_receipt" \
+    --predecessor-current "$release_evidence_dir/CURRENT.json" \
+    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
+    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
+    > "$release_evidence_dir/PREVIEW_AUTHORITY_MATERIALIZATION.generated.json"
+  command "$RELEASE_PYTHON_BIN" "$release_authority_verifier" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --current "$preview_authority_envelope_dir/CURRENT.json" \
+    --snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
+    --decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
+    --scorecard "$scorecard_handoff_path" \
+    --convergence "$review_seed_live_convergence_receipt" \
+    --predecessor-current "$release_evidence_dir/CURRENT.json" \
+    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
+    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
+    > "$release_evidence_dir/PREVIEW_AUTHORITY_VERIFICATION.generated.json"
+
+  local registry_preview_publish_request="$release_evidence_dir/.registry-preview-publish-request.json"
+  local registry_preview_publish_response="$release_evidence_dir/.registry-preview-publish-response.json"
+  local registry_preview_publish_status=""
+  local review_seed_snapshot_sha256
+  review_seed_snapshot_sha256="$(jq -r '.snapshotSha256 // empty' "$release_evidence_dir/CURRENT.json")"
+  [[ "$review_seed_snapshot_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "review seed CURRENT.json is missing its exact snapshot digest"
+  command "$RELEASE_PYTHON_BIN" "$registry_publish_request_materializer" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --current "$preview_authority_envelope_dir/CURRENT.json" \
+    --snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
+    --decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
+    --scorecard "$scorecard_handoff_path" \
+    --convergence "$review_seed_live_convergence_receipt" \
+    --predecessor-current "$release_evidence_dir/CURRENT.json" \
+    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
+    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
+    --expected-current-snapshot-sha256 "$review_seed_snapshot_sha256" \
+    --output "$registry_preview_publish_request" \
+    > "$release_evidence_dir/REGISTRY_PREVIEW_PUBLISH_REQUEST.generated.json"
+
+  # The Hub half of the cross-service transition must be completely replayable
+  # before Registry is allowed to advance. These owner-only files deliberately
+  # survive every failure until the Hub response and both preview convergence
+  # checks have passed.
+  local shelf_current_path="$release_evidence_dir/.release-shelf-current.json"
+  local shelf_current_http_status=""
+  shelf_current_http_status="$(fetch_bounded_https_json \
+    "$shelf_current_path" \
+    "$live_convergence_base_url/downloads/current.json" \
+    131072 \
+    30)" \
+    || die "live release-shelf CURRENT request failed before authority transaction checkpoint"
+  [[ "$shelf_current_http_status" == "200" ]] \
+    || die "live release-shelf CURRENT request returned HTTP $shelf_current_http_status"
+
+  local hub_authority_advance_materializer="$hub_alias/scripts/materialize_release_authority_advance_request.py"
+  local hub_authority_advance_response_verifier="$hub_alias/scripts/verify_release_authority_advance_response.py"
+  local hub_authority_checkpoint_tool="$hub_repo/scripts/release_authority_transaction_checkpoint.py"
+  local hub_authority_advance_request="$release_evidence_dir/.hub-authority-advance-request.json"
+  local hub_authority_advance_response="$release_evidence_dir/.hub-authority-advance-response.json"
+  local hub_authority_checkpoint="$release_evidence_dir/.release-authority-transaction-checkpoint.json"
+  local hub_authority_advance_url="$live_convergence_base_url/api/internal/releases/generations/$release_generation_id/authority-advances"
+  [[ -f "$hub_authority_advance_materializer" && ! -L "$hub_authority_advance_materializer" ]] \
+    || die "Hub authority advance request materializer is missing or unsafe: $hub_authority_advance_materializer"
+  [[ -f "$hub_authority_advance_response_verifier" && ! -L "$hub_authority_advance_response_verifier" ]] \
+    || die "Hub authority advance response verifier is missing or unsafe: $hub_authority_advance_response_verifier"
+  [[ -f "$hub_authority_checkpoint_tool" && ! -L "$hub_authority_checkpoint_tool" ]] \
+    || die "Hub authority transaction checkpoint tool is missing or unsafe: $hub_authority_checkpoint_tool"
+  [[ ! -e "$hub_authority_advance_request" && ! -L "$hub_authority_advance_request" ]] \
+    || die "Hub authority advance request destination already exists"
+  [[ ! -e "$hub_authority_checkpoint" && ! -L "$hub_authority_checkpoint" ]] \
+    || die "Hub authority transaction checkpoint destination already exists"
+  command "$RELEASE_PYTHON_BIN" "$hub_authority_advance_materializer" \
+    --generation-id "$release_generation_id" \
+    --shelf-current "$shelf_current_path" \
+    --predecessor-current "$release_evidence_dir/CURRENT.json" \
+    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
+    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
+    --successor-current "$preview_authority_envelope_dir/CURRENT.json" \
+    --successor-snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
+    --successor-decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
+    --scorecard "$scorecard_handoff_path" \
+    --convergence "$review_seed_live_convergence_receipt" \
+    --output "$hub_authority_advance_request" \
+    > "$release_evidence_dir/HUB_AUTHORITY_ADVANCE_REQUEST.generated.json"
+  [[ "$live_convergence_timeout" =~ ^[0-9]+$ ]] \
+    && (( live_convergence_timeout >= 1 && live_convergence_timeout <= 120 )) \
+    || die "CHUMMER_LIVE_RELEASE_CONVERGENCE_TIMEOUT_SECONDS must be an integer from 1 through 120"
+  local hub_authority_checkpoint_creation=""
+  hub_authority_checkpoint_creation="$(command "$RELEASE_PYTHON_BIN" "$hub_authority_checkpoint_tool" create \
+    --workspace "$work_root" \
+    --generation-id "$release_generation_id" \
+    --release-version "$release_version" \
+    --registry-current-url "$registry_authority_current_url" \
+    --hub-authority-advance-url "$hub_authority_advance_url" \
+    --live-convergence-base-url "$live_convergence_base_url" \
+    --expected-manifest-sha256 "$expected_manifest_sha256" \
+    --request "$hub_authority_advance_request" \
+    --predecessor-current "$release_evidence_dir/CURRENT.json" \
+    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
+    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
+    --successor-current "$preview_authority_envelope_dir/CURRENT.json" \
+    --successor-snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
+    --successor-decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
+    --scorecard "$scorecard_handoff_path" \
+    --convergence "$review_seed_live_convergence_receipt" \
+    --response-verifier "$hub_authority_advance_response_verifier" \
+    --registry-inspector "$registry_current_inspector" \
+    --live-convergence-verifier "$live_convergence_verifier" \
+    --evidence-directory "$release_evidence_dir" \
+    --convergence-timeout-seconds "$live_convergence_timeout" \
+    --convergence-attempts "$live_convergence_attempts" \
+    --convergence-retry-seconds "$live_convergence_retry_seconds" \
+    --output "$hub_authority_checkpoint")" \
+    || die "could not persist the Hub authority transaction checkpoint before Registry publication"
+  local hub_authority_checkpoint_sha256
+  hub_authority_checkpoint_sha256="$(printf '%s' "$hub_authority_checkpoint_creation" | jq -r '.checkpointSha256 // empty')"
+  [[ "$hub_authority_checkpoint_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "Hub authority transaction checkpoint did not expose its exact digest"
+  log "durable authority recovery checkpoint created before Registry CAS: $hub_authority_checkpoint"
+  log "authority recovery checkpoint SHA-256: $hub_authority_checkpoint_sha256"
+  log "resume command: $executed_bootstrap_path --resume-authority-workspace $work_root --resume-authority-checkpoint $hub_authority_checkpoint --resume-authority-checkpoint-sha256 $hub_authority_checkpoint_sha256"
+
+  log "publishing the exact preview-ready successor to Registry with predecessor compare-and-swap"
+  registry_preview_publish_status="$(post_registry_authority_request \
+    "$registry_preview_publish_response" \
+    "$registry_authority_publish_url" \
+    "$registry_preview_publish_request" \
+    "$registry_control_key_value")" \
+    || die "Registry preview-successor publication request failed"
+  registry_control_key_value=""
+  [[ "$registry_preview_publish_status" == "200" ]] \
+    || die "Registry preview-successor publication returned HTTP $registry_preview_publish_status"
+  command "$RELEASE_PYTHON_BIN" "$registry_publish_response_verifier" \
+    --manifest "$dist_dir/RELEASE_CHANNEL.generated.json" \
+    --current "$preview_authority_envelope_dir/CURRENT.json" \
+    --snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
+    --decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
+    --scorecard "$scorecard_handoff_path" \
+    --convergence "$review_seed_live_convergence_receipt" \
+    --predecessor-current "$release_evidence_dir/CURRENT.json" \
+    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
+    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
+    --response "$registry_preview_publish_response" \
+    --output "$release_evidence_dir/REGISTRY_PREVIEW_PUBLISH_RESPONSE.generated.json" \
+    >/dev/null
+  rm -f \
+    "$registry_review_publish_request" \
+    "$registry_review_publish_response" \
+    "$registry_preview_publish_request" \
+    "$registry_preview_publish_response"
+
+  local hub_authority_advance_http_status=""
+  local hub_authority_advance_transport_failed=0
+  log "advancing the sealed Hub generation to the exact Registry-published preview authority"
+  hub_authority_advance_http_status="$(post_hub_authority_advance_request \
+    "$hub_authority_advance_response" \
+    "$hub_authority_advance_url" \
+    "$hub_authority_advance_request" \
+    "$release_upload_auth_value")" \
+    || hub_authority_advance_transport_failed=1
+  release_upload_auth_value=""
+  (( hub_authority_advance_transport_failed == 0 )) \
+    || die "Hub same-generation authority advance request failed"
+  [[ "$hub_authority_advance_http_status" == "200" ]] \
+    || die "Hub same-generation authority advance returned HTTP $hub_authority_advance_http_status"
+  command "$RELEASE_PYTHON_BIN" "$hub_authority_advance_response_verifier" \
+    --response "$hub_authority_advance_response" \
+    --request "$hub_authority_advance_request" \
+    --generation-id "$release_generation_id" \
+    --release-version "$release_version" \
+    --predecessor-current "$release_evidence_dir/CURRENT.json" \
+    --predecessor-snapshot "$release_evidence_dir/SNAPSHOT.json" \
+    --predecessor-decision "$release_evidence_dir/RELEASE_DECISION.json" \
+    --successor-current "$preview_authority_envelope_dir/CURRENT.json" \
+    --successor-snapshot "$preview_authority_envelope_dir/SNAPSHOT.json" \
+    --successor-decision "$preview_authority_envelope_dir/RELEASE_DECISION.json" \
+    --scorecard "$scorecard_handoff_path" \
+    --convergence "$review_seed_live_convergence_receipt" \
+    --output "$release_evidence_dir/HUB_AUTHORITY_ADVANCE_RESPONSE.generated.json" \
+    >/dev/null
+  rm -f \
+    "$shelf_current_path" \
+    "$hub_authority_advance_response"
+
+  local preview_generation_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_GENERATION_PREVIEW_CONVERGENCE.generated.json"
+  local preview_live_convergence_receipt="$release_evidence_dir/LIVE_RELEASE_PREVIEW_CONVERGENCE.generated.json"
+  expected_release_decision_sha256="$(jq -r '.decisionSha256 // empty' "$preview_authority_envelope_dir/CURRENT.json")"
+  [[ "$expected_release_decision_sha256" =~ ^[0-9a-f]{64}$ ]] \
+    || die "preview successor CURRENT.json does not expose a canonical decision digest"
+
+  log "verifying immutable generation $release_generation_id converges on preview-ready authority"
+  local preview_generation_converged=0
+  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
+    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
+      --base-url "$live_convergence_base_url" \
+      --generation-id "$release_generation_id" \
+      --expected-release-version "$release_version" \
+      --expected-manifest-sha256 "$expected_manifest_sha256" \
+      --expected-release-decision-sha256 "$expected_release_decision_sha256" \
+      --timeout "$live_convergence_timeout" \
+      > "$preview_generation_convergence_receipt"; then
+      preview_generation_converged=1
+      break
+    fi
+    if (( convergence_attempt < live_convergence_attempts )); then
+      log "preview-ready generation authority is not visible yet (attempt ${convergence_attempt}/${live_convergence_attempts}); retrying"
+      sleep "$live_convergence_retry_seconds"
+    fi
+  done
+  (( preview_generation_converged == 1 )) \
+    || die "immutable release generation did not converge on preview-ready authority. Receipt: $preview_generation_convergence_receipt"
+
+  log "verifying all CURRENT release-facing routes converge on preview-ready authority"
+  local preview_current_converged=0
+  for ((convergence_attempt = 1; convergence_attempt <= live_convergence_attempts; convergence_attempt++)); do
+    if command "$RELEASE_PYTHON_BIN" "$live_convergence_verifier" \
+      --base-url "$live_convergence_base_url" \
+      --expected-release-version "$release_version" \
+      --expected-manifest-sha256 "$expected_manifest_sha256" \
+      --expected-release-decision-sha256 "$expected_release_decision_sha256" \
+      --timeout "$live_convergence_timeout" \
+      > "$preview_live_convergence_receipt"; then
+      preview_current_converged=1
+      break
+    fi
+    if (( convergence_attempt < live_convergence_attempts )); then
+      log "preview-ready CURRENT convergence is not visible yet (attempt ${convergence_attempt}/${live_convergence_attempts}); retrying"
+      sleep "$live_convergence_retry_seconds"
+    fi
+  done
+  (( preview_current_converged == 1 )) \
+    || die "CURRENT release-facing routes did not converge on preview-ready authority. Receipt: $preview_live_convergence_receipt"
+  log "preview-ready generation and CURRENT convergence passed: $preview_live_convergence_receipt"
+  rm -f "$hub_authority_advance_request" "$hub_authority_checkpoint"
+  log "removed the private authority request and recovery checkpoint only after Hub response and both preview convergence checks passed"
 
   if [[ -f "$response_path" ]]; then
     chmod 600 "$response_path" 2>/dev/null || true

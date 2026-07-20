@@ -594,14 +594,17 @@ public sealed class ReleaseUploadRequestGateMiddleware
         }
 
         bool hasMultipartBody = HasMultipartBody(route);
+        bool hasAuthorityJsonBody = route == ReleaseUploadRoute.AuthorityAdvance;
         if (!hasMultipartBody
+            && !hasAuthorityJsonBody
             && route is not ReleaseUploadRoute.Complete and not ReleaseUploadRoute.Reconcile)
         {
             await _next(context);
             return;
         }
 
-        if (hasMultipartBody && context.Request.ContentLength is null)
+        if ((hasMultipartBody || hasAuthorityJsonBody)
+            && context.Request.ContentLength is null)
         {
             await WriteProblemAsync(
                 context,
@@ -612,27 +615,33 @@ public sealed class ReleaseUploadRequestGateMiddleware
             return;
         }
 
-        if (hasMultipartBody
+        long maximumBodyBytes = hasAuthorityJsonBody
+            ? ReleaseAuthorityRevisionStore.MaximumAdvanceRequestBodyBytes
+            : options.MaxRequestBytes;
+        if ((hasMultipartBody || hasAuthorityJsonBody)
             && (context.Request.ContentLength <= 0
-                || context.Request.ContentLength > options.MaxRequestBytes))
+                || context.Request.ContentLength > maximumBodyBytes))
         {
             await WriteProblemAsync(
                 context,
                 StatusCodes.Status413PayloadTooLarge,
                 "Release upload body too large",
-                $"release upload request bodies must be between 1 and {options.MaxRequestBytes} bytes.",
+                $"release upload request bodies must be between 1 and {maximumBodyBytes} bytes.",
                 "https://chummer.run/problems/release-bundle/payload-too-large");
             return;
         }
 
-        if (hasMultipartBody)
+        if (hasMultipartBody || hasAuthorityJsonBody)
         {
             IHttpMaxRequestBodySizeFeature? bodySize = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
             if (bodySize is { IsReadOnly: false })
             {
-                bodySize.MaxRequestBodySize = options.MaxRequestBytes;
+                bodySize.MaxRequestBodySize = maximumBodyBytes;
             }
+        }
 
+        if (hasMultipartBody)
+        {
             context.Features.Set<IFormFeature>(new FormFeature(context.Request, new FormOptions
             {
                 MultipartBodyLengthLimit = options.MaxRequestBytes,
@@ -706,6 +715,24 @@ public sealed class ReleaseUploadRequestGateMiddleware
             return true;
         }
 
+        const string generationPrefix = "/api/internal/releases/generations/";
+        if (path.StartsWith(generationPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            string[] generationSuffix = path[generationPrefix.Length..]
+                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (generationSuffix.Length == 2
+                && generationSuffix[0].Length > 0
+                && generationSuffix[1].Equals(
+                    "authority-advances",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                route = ReleaseUploadRoute.AuthorityAdvance;
+                return true;
+            }
+
+            return false;
+        }
+
         const string prefix = "/api/internal/releases/upload-sessions/";
         if (!path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         {
@@ -763,7 +790,8 @@ public sealed class ReleaseUploadRequestGateMiddleware
         File,
         Chunk,
         Complete,
-        Reconcile
+        Reconcile,
+        AuthorityAdvance
     }
 }
 

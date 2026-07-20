@@ -196,6 +196,22 @@ internal static class PublicReleaseAuthorityEnvelopeProjection
             return null;
         }
 
+        ReleaseAuthorityEnvelopeBytes? revision =
+            ReleaseAuthorityRevisionStore.TryResolveCommittedRevision(shelf);
+        if (revision is not null)
+        {
+            PublicReleaseTruthProjectionDto revisedProjection = Project(
+                revision.CurrentBytes,
+                revision.SnapshotBytes,
+                revision.DecisionBytes,
+                manifest,
+                immutableManifestSha256,
+                immutableManifestBytes);
+            authoritySnapshotSha256 = Convert.ToHexStringLower(
+                SHA256.HashData(revision.SnapshotBytes));
+            return revisedProjection;
+        }
+
         bool hasCurrent = HasExactInventoryPath(shelf, CurrentInventoryPath);
         bool hasSnapshot = HasExactInventoryPath(shelf, SnapshotInventoryPath);
         RejectNoncanonicalInventoryPath(shelf, CurrentInventoryPath, hasCurrent);

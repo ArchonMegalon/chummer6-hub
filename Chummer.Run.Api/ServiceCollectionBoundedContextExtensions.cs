@@ -64,6 +64,7 @@ internal static class ServiceCollectionBoundedContextExtensions
             provider.GetRequiredService<IConfiguration>(),
             provider.GetRequiredService<ReleaseShelfGenerationStore>()));
         services.AddSingleton<ArtifactDeliveryPolicy>();
+        services.AddSingleton<ReleaseAuthorityRevisionStore>();
         services.AddSingleton<IReleaseTruthProjection, PublicReleaseTruthProjectionService>();
         services.AddSingleton<WindowsProofManifestValidator>();
         services.AddSingleton<WindowsProofGenerationStore>();

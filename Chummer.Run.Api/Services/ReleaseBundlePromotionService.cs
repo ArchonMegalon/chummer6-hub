@@ -108,7 +108,7 @@ public sealed class ReleaseBundlePromotionService
     private const string LayoutMarkerContents = "chummer.release-shelf-layout/v1\n";
     private const string CurrentPointerSchema = "chummer.release-shelf.current/v1";
     private const string ActivationCandidateSchema = "chummer.release-shelf.activation-candidate/v1";
-    private const string PromotionLockName = ".release-shelf-promotion.lock";
+    private const string PromotionLockName = ReleaseShelfPromotionLock.FileName;
     private const string ActivationIntentName = ".release-shelf-activation-intent.json";
     private const string ActivationJournalDirectoryName = ".release-shelf-activation-journal";
     private const string ActivationJournalIntentName = "intent.json";
@@ -409,6 +409,7 @@ public sealed class ReleaseBundlePromotionService
         if (!snapshot.IsLegacy)
         {
             using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+            ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
             EnsureServerWriterPolicy(downloadsRoot);
             return null;
         }
@@ -497,6 +498,7 @@ public sealed class ReleaseBundlePromotionService
         string downloadsRoot = ResolveDownloadsRoot();
         EnsureDownloadsRootWritable(downloadsRoot);
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
         string activePath = Path.Combine(downloadsRoot, ActivationIntentName);
         ReleaseActivationJournalDocument? active = File.Exists(activePath)
@@ -874,6 +876,7 @@ public sealed class ReleaseBundlePromotionService
         string downloadsRoot = ResolveDownloadsRoot();
         EnsureDownloadsRootWritable(downloadsRoot);
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
         AcknowledgeActivationCompletionUnderLock(downloadsRoot, intent);
     }
@@ -894,6 +897,7 @@ public sealed class ReleaseBundlePromotionService
         string downloadsRoot = ResolveDownloadsRoot();
         EnsureDownloadsRootWritable(downloadsRoot);
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
         EnsureNoUnresolvedActivationIntent(downloadsRoot);
         ReleaseShelfSnapshot activeShelf = new ReleaseShelfGenerationStore(_configuration).Capture();
@@ -1077,6 +1081,7 @@ public sealed class ReleaseBundlePromotionService
         IReadOnlyList<string> promotedArtifactIds = prepared.PromotedArtifactIds;
 
         using FileStream promotionLock = AcquirePromotionLock(downloadsRoot);
+        ReleaseAuthorityRevisionStore.EnsureNoUnresolvedAuthorityMutation(downloadsRoot);
         EnsureServerWriterPolicy(downloadsRoot);
         EnsureNoUnresolvedActivationIntent(downloadsRoot);
         ReleaseShelfSnapshot activeShelf = new ReleaseShelfGenerationStore(_configuration).Capture();
@@ -1433,42 +1438,7 @@ public sealed class ReleaseBundlePromotionService
     }
 
     private static FileStream AcquirePromotionLock(string downloadsRoot)
-    {
-        string lockPath = Path.Combine(downloadsRoot, PromotionLockName);
-        try
-        {
-            var options = new FileStreamOptions
-            {
-                Mode = FileMode.OpenOrCreate,
-                Access = FileAccess.ReadWrite,
-                Share = FileShare.None
-            };
-            if (!OperatingSystem.IsWindows())
-            {
-                options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-            }
-
-            FileStream promotionLock = new(lockPath, options);
-            try
-            {
-                if (!OperatingSystem.IsWindows())
-                {
-                    File.SetUnixFileMode(lockPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-                }
-
-                return promotionLock;
-            }
-            catch
-            {
-                promotionLock.Dispose();
-                throw;
-            }
-        }
-        catch (IOException ex)
-        {
-            throw new InvalidOperationException("another release bundle promotion is already in progress.", ex);
-        }
-    }
+        => ReleaseShelfPromotionLock.Acquire(downloadsRoot);
 
     private static void EnsureServerWriterPolicy(string downloadsRoot)
     {
