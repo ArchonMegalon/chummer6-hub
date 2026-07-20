@@ -20,7 +20,8 @@ public sealed record ReleaseUploadSession(
     bool Poisoned = false,
     string? PoisonReason = null,
     DateTimeOffset? CompletedAtUtc = null,
-    DateTimeOffset? ActivationAcknowledgedAtUtc = null);
+    DateTimeOffset? ActivationAcknowledgedAtUtc = null,
+    ReleaseUploadCandidateSessionBinding? CandidateImportBinding = null);
 
 public sealed record ReleaseUploadChunkResult(
     string RelativePath,
@@ -103,7 +104,8 @@ public sealed class ReleaseBundleUploadSessionService
     public ReleaseUploadSession CreateSession(
         string authorizationBinding,
         bool singleUseAuthorization,
-        DateTimeOffset? authorizationExpiresAtUtc = null)
+        DateTimeOffset? authorizationExpiresAtUtc = null,
+        ReleaseUploadCandidateSessionBinding? candidateImportBinding = null)
     {
         string sessionsRoot = ResolveSessionsRoot(requireConfigured: singleUseAuthorization);
         authorizationBinding = NormalizeAuthorizationBinding(authorizationBinding);
@@ -111,6 +113,15 @@ public sealed class ReleaseBundleUploadSessionService
             && (authorizationExpiresAtUtc is null || authorizationExpiresAtUtc <= DateTimeOffset.UtcNow))
         {
             throw new InvalidDataException("release upload authorization expiry is required and must be in the future.");
+        }
+        if (candidateImportBinding is not null)
+        {
+            ValidateCandidateImportBinding(candidateImportBinding);
+            if (!singleUseAuthorization)
+            {
+                throw new InvalidDataException(
+                    "candidate import authority must be a single-use authorization.");
+            }
         }
 
         using FileStream quotaLock = AcquireQuotaLock();
@@ -124,6 +135,11 @@ public sealed class ReleaseBundleUploadSessionService
             ReleaseUploadSession? existing = FindSessionForAuthorization(authorizationBinding);
             if (existing is not null)
             {
+                if (existing.CandidateImportBinding != candidateImportBinding)
+                {
+                    throw new InvalidOperationException(
+                        "release upload authorization candidate binding changed.");
+                }
                 if (existing.Completed)
                 {
                     throw new InvalidOperationException("release upload authorization has already been consumed.");
@@ -172,7 +188,8 @@ public sealed class ReleaseBundleUploadSessionService
                 BundleRoot: bundleRoot,
                 AuthorizationBinding: authorizationBinding,
                 SingleUseAuthorization: singleUseAuthorization,
-                AuthorizationExpiresAtUtc: authorizationExpiresAtUtc);
+                AuthorizationExpiresAtUtc: authorizationExpiresAtUtc,
+                CandidateImportBinding: candidateImportBinding);
             PersistMetadata(sessionRoot, session);
             return session;
         }
@@ -1517,6 +1534,15 @@ public sealed class ReleaseBundleUploadSessionService
             throw new InvalidDataException("upload session metadata is invalid.");
         }
 
+        if (session.CandidateImportBinding is not null)
+        {
+            ValidateCandidateImportBinding(session.CandidateImportBinding);
+            if (!session.SingleUseAuthorization || session.AuthorizationExpiresAtUtc is null)
+            {
+                throw new InvalidDataException("upload session candidate binding is invalid.");
+            }
+        }
+
         if (session.ActivationIntent is not null)
         {
             ValidateActivationIntent(session.ActivationIntent);
@@ -1530,6 +1556,24 @@ public sealed class ReleaseBundleUploadSessionService
 
         return authorizationBinding;
     }
+
+    private static void ValidateCandidateImportBinding(
+        ReleaseUploadCandidateSessionBinding binding)
+    {
+        if (!IsBareSha256(binding.SnapshotSha256)
+            || !IsBareSha256(binding.AuthoritySha256)
+            || !IsBareSha256(binding.BundleIdentitySha256)
+            || !IsBareSha256(binding.CanonicalManifestSha256)
+            || !IsBareSha256(binding.InventorySha256))
+        {
+            throw new InvalidDataException("upload session candidate binding is invalid.");
+        }
+    }
+
+    private static bool IsBareSha256(string? value)
+        => value is { Length: 64 }
+           && value.All(static character => character is >= '0' and <= '9'
+               or >= 'a' and <= 'f');
 
     private void CleanupCompletedPayload(string sessionRoot, string sessionId)
     {
@@ -2168,6 +2212,8 @@ public sealed class ReleaseBundleUploadSessionService
         }
 
         public string BundleRoot => _session.BundleRoot;
+        public ReleaseUploadCandidateSessionBinding? CandidateImportBinding
+            => _session.CandidateImportBinding;
         public ReleaseActivationIntent? ActivationIntent => _session.ActivationIntent;
         public ReleaseBundlePromotionResult? CompletedResult
             => _session.Completed ? _session.CompletionResult : null;

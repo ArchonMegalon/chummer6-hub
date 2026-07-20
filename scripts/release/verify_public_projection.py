@@ -6,7 +6,8 @@ from __future__ import annotations
 import ctypes
 import errno
 import argparse
-from datetime import datetime, timezone
+import base64
+from datetime import datetime, timedelta, timezone
 import fcntl
 import hashlib
 import hmac
@@ -34,10 +35,13 @@ SNAPSHOT_CONTRACT = "chummer.public_projection_snapshot/v1"
 CURRENT_CONTRACT = "chummer.public_projection_current/v1"
 PROJECTION_STATUS_PASS = "pass"
 PROJECTION_STATUS_REVIEW_REQUIRED = "review_required"
+PROJECTION_STATUS_CANDIDATE_IMPORT_READY = "candidate_import_ready"
 PROJECTION_STAGE_RELEASE_UPLOAD_READY = "release_upload_ready"
 PROJECTION_STAGE_CODE_DEPLOY_REVIEW_REQUIRED = "code_deploy_review_required"
+PROJECTION_STAGE_CANDIDATE_IMPORT_READY = "candidate_import_ready"
 PROJECTION_PURPOSE_RELEASE_UPLOAD = "release-upload"
 PROJECTION_PURPOSE_CODE_DEPLOY = "code-deploy"
+PROJECTION_PURPOSE_CANDIDATE_IMPORT = "candidate-import"
 SNAPSHOT_MANIFEST_NAME = "PUBLIC_PROJECTION_SNAPSHOT.generated.json"
 CURRENT_POINTER_NAME = "CURRENT.json"
 PUBLICATION_LOCK_NAME = ".PUBLIC_PROJECTION.lock"
@@ -50,6 +54,8 @@ SNAPSHOT_OUTPUT_NAMES = (
     "RELEASE_CHANNEL.generated.json",
     "FLAGSHIP_PRODUCT_READINESS.generated.json",
 )
+CANDIDATE_IMPORT_AUTHORITY_NAME = "RELEASE_UPLOAD_CANDIDATE_AUTHORITY.generated.json"
+CANDIDATE_SNAPSHOT_OUTPUT_NAMES = (*SNAPSHOT_OUTPUT_NAMES, CANDIDATE_IMPORT_AUTHORITY_NAME)
 
 
 class ProjectionBlocked(RuntimeError):
@@ -78,6 +84,7 @@ class ProjectionSnapshot:
     projection_stage: str = PROJECTION_STAGE_RELEASE_UPLOAD_READY
     code_deployment_authority: bool = True
     release_upload_authority: bool = True
+    candidate_import_authority: bool = False
     release_gate_findings: tuple[Mapping[str, str], ...] = ()
 
 
@@ -256,12 +263,22 @@ def _canonical_json_bytes(payload: Mapping[str, object]) -> bytes:
     ).encode("utf-8")
 
 
-def _projection_authority(status: str) -> tuple[str, bool, bool]:
+def _projection_authority(status: str) -> tuple[str, bool, bool, bool]:
     if status == PROJECTION_STATUS_PASS:
-        return PROJECTION_STAGE_RELEASE_UPLOAD_READY, True, True
+        return PROJECTION_STAGE_RELEASE_UPLOAD_READY, True, True, False
     if status == PROJECTION_STATUS_REVIEW_REQUIRED:
-        return PROJECTION_STAGE_CODE_DEPLOY_REVIEW_REQUIRED, True, False
+        return PROJECTION_STAGE_CODE_DEPLOY_REVIEW_REQUIRED, True, False, False
+    if status == PROJECTION_STATUS_CANDIDATE_IMPORT_READY:
+        return PROJECTION_STAGE_CANDIDATE_IMPORT_READY, False, False, True
     raise ProjectionBlocked("public projection status is invalid")
+
+
+def _projection_output_names(status: str) -> tuple[str, ...]:
+    return (
+        CANDIDATE_SNAPSHOT_OUTPUT_NAMES
+        if status == PROJECTION_STATUS_CANDIDATE_IMPORT_READY
+        else SNAPSHOT_OUTPUT_NAMES
+    )
 
 
 def _validate_projection_authority(
@@ -269,17 +286,28 @@ def _validate_projection_authority(
     *,
     status: str,
     label: str,
-) -> tuple[str, bool, bool]:
-    stage, code_deployment_authority, release_upload_authority = (
+) -> tuple[str, bool, bool, bool]:
+    (
+        stage,
+        code_deployment_authority,
+        release_upload_authority,
+        candidate_import_authority,
+    ) = (
         _projection_authority(status)
     )
     if (
         payload.get("projectionStage") != stage
         or payload.get("codeDeploymentAuthority") is not code_deployment_authority
         or payload.get("releaseUploadAuthority") is not release_upload_authority
+        or payload.get("candidateImportAuthority") is not candidate_import_authority
     ):
         raise ProjectionBlocked(f"{label} authority posture drifted")
-    return stage, code_deployment_authority, release_upload_authority
+    return (
+        stage,
+        code_deployment_authority,
+        release_upload_authority,
+        candidate_import_authority,
+    )
 
 
 def _review_gate_finding(
@@ -371,6 +399,25 @@ def _validate_review_gate_findings(value: object) -> list[dict[str, str]]:
     return findings
 
 
+def _candidate_import_gate_findings() -> list[dict[str, str]]:
+    return [
+        {
+            "gate": "live release convergence after candidate import",
+            "status": "postdeploy_required",
+            "reason": "candidate bytes require live verification before release upload authority can be restored",
+        }
+    ]
+
+
+def _validate_candidate_import_gate_findings(value: object) -> list[dict[str, str]]:
+    expected = _candidate_import_gate_findings()
+    if value != expected:
+        raise ProjectionBlocked(
+            "candidate-import snapshot must retain the exact live-verification blocker"
+        )
+    return expected
+
+
 def _projection_release_gate_findings(
     payload: Mapping[str, object],
     *,
@@ -384,6 +431,8 @@ def _projection_release_gate_findings(
         return []
     if status == PROJECTION_STATUS_REVIEW_REQUIRED:
         return _validate_review_gate_findings(value)
+    if status == PROJECTION_STATUS_CANDIDATE_IMPORT_READY:
+        return _validate_candidate_import_gate_findings(value)
     raise ProjectionBlocked(f"{label} release gate status is invalid")
 
 
@@ -585,9 +634,12 @@ def _exclusive_snapshot_rename(source: Path, destination: Path) -> None:
         )
 
 
-def _snapshot_digest(output_digests: Mapping[str, str]) -> str:
+def _snapshot_digest(
+    output_digests: Mapping[str, str],
+    output_names: Sequence[str] = SNAPSHOT_OUTPUT_NAMES,
+) -> str:
     digest = hashlib.sha256()
-    for name in SNAPSHOT_OUTPUT_NAMES:
+    for name in output_names:
         digest.update(name.encode("utf-8"))
         digest.update(b"\0")
         digest.update(output_digests[name].encode("ascii"))
@@ -962,6 +1014,7 @@ def resolve_current_snapshot(
     if purpose not in {
         PROJECTION_PURPOSE_RELEASE_UPLOAD,
         PROJECTION_PURPOSE_CODE_DEPLOY,
+        PROJECTION_PURPOSE_CANDIDATE_IMPORT,
     }:
         raise ProjectionBlocked("public projection resolution purpose is invalid")
 
@@ -982,6 +1035,7 @@ def resolve_current_snapshot(
         projection_stage,
         code_deployment_authority,
         release_upload_authority,
+        candidate_import_authority,
     ) = _validate_projection_authority(
         current_payload,
         status=status,
@@ -1000,6 +1054,10 @@ def resolve_current_snapshot(
         raise ProjectionBlocked(
             "current public projection is not authorized for code deployment"
         )
+    if purpose == PROJECTION_PURPOSE_CANDIDATE_IMPORT and not candidate_import_authority:
+        raise ProjectionBlocked(
+            "current public projection is not authorized for candidate import"
+        )
     snapshot_id = str(current_payload.get("snapshotId") or "")
     snapshot_sha256 = str(current_payload.get("snapshotSha256") or "").lower()
     manifest_sha256 = str(current_payload.get("manifestSha256") or "").lower()
@@ -1007,9 +1065,8 @@ def resolve_current_snapshot(
         raise ProjectionBlocked("current public projection pointer snapshot id is invalid")
     if snapshot_id != f"public-projection-{snapshot_sha256}" or SHA256_RE.fullmatch(manifest_sha256) is None:
         raise ProjectionBlocked("current public projection pointer digest binding is invalid")
-    expected_pointer_outputs = {
-        name: f"{snapshot_id}/{name}" for name in SNAPSHOT_OUTPUT_NAMES
-    }
+    output_names = _projection_output_names(status)
+    expected_pointer_outputs = {name: f"{snapshot_id}/{name}" for name in output_names}
     if (
         current_payload.get("manifestRelativePath")
         != f"{snapshot_id}/{SNAPSHOT_MANIFEST_NAME}"
@@ -1043,6 +1100,401 @@ def resolve_current_snapshot(
     return snapshot
 
 
+def _candidate_embedded_bytes(value: object, *, label: str) -> bytes:
+    if not isinstance(value, dict) or set(value) != {
+        "path",
+        "sha256",
+        "sizeBytes",
+        "base64",
+    }:
+        raise ProjectionBlocked(f"{label} custody binding drifted")
+    digest = str(value.get("sha256") or "")
+    size = value.get("sizeBytes")
+    encoded = value.get("base64")
+    if (
+        SHA256_RE.fullmatch(digest) is None
+        or isinstance(size, bool)
+        or not isinstance(size, int)
+        or size < 1
+        or not isinstance(encoded, str)
+    ):
+        raise ProjectionBlocked(f"{label} custody binding is invalid")
+    try:
+        payload = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError) as exc:
+        raise ProjectionBlocked(f"{label} custody bytes are invalid") from exc
+    if len(payload) != size or not hmac.compare_digest(
+        hashlib.sha256(payload).hexdigest(), digest
+    ):
+        raise ProjectionBlocked(f"{label} custody bytes drifted")
+    return payload
+
+
+def _validate_candidate_import_authority(payload: bytes) -> dict[str, object]:
+    authority = _strict_json_object(payload, label="candidate import authority")
+    if set(authority) != {
+        "contractName",
+        "contractVersion",
+        "status",
+        "generatedAtUtc",
+        "expiresAtUtc",
+        "candidate",
+        "custody",
+    } or (
+        authority.get("contractName")
+        != "chummer.release-upload.candidate-import-authority/v1"
+        or authority.get("contractVersion") != 1
+        or authority.get("status") != PROJECTION_STATUS_CANDIDATE_IMPORT_READY
+    ):
+        raise ProjectionBlocked("candidate import authority contract drifted")
+    try:
+        generated_at = datetime.fromisoformat(
+            str(authority.get("generatedAtUtc") or "").replace("Z", "+00:00")
+        )
+        expires_at = datetime.fromisoformat(
+            str(authority.get("expiresAtUtc") or "").replace("Z", "+00:00")
+        )
+    except ValueError as exc:
+        raise ProjectionBlocked("candidate import authority timestamps are invalid") from exc
+    now = datetime.now(timezone.utc)
+    if (
+        generated_at.utcoffset() != timezone.utc.utcoffset(generated_at)
+        or expires_at.utcoffset() != timezone.utc.utcoffset(expires_at)
+        or generated_at > now + timedelta(minutes=5)
+        or expires_at <= now
+        or expires_at > now + timedelta(hours=6, minutes=5)
+    ):
+        raise ProjectionBlocked("candidate import authority is expired or outside its bounded lifetime")
+
+    candidate = authority.get("candidate")
+    expected_candidate_keys = {
+        "version",
+        "canonicalManifestSha256",
+        "inventorySha256",
+        "fileCount",
+        "totalBytes",
+        "bundleIdentitySha256",
+    }
+    if not isinstance(candidate, dict) or set(candidate) != expected_candidate_keys:
+        raise ProjectionBlocked("candidate import identity drifted")
+    for name in (
+        "canonicalManifestSha256",
+        "inventorySha256",
+        "bundleIdentitySha256",
+    ):
+        if SHA256_RE.fullmatch(str(candidate.get(name) or "")) is None:
+            raise ProjectionBlocked("candidate import digest binding is invalid")
+    if (
+        not isinstance(candidate.get("version"), str)
+        or not candidate["version"]
+        or isinstance(candidate.get("fileCount"), bool)
+        or not isinstance(candidate.get("fileCount"), int)
+        or candidate["fileCount"] < 1
+        or isinstance(candidate.get("totalBytes"), bool)
+        or not isinstance(candidate.get("totalBytes"), int)
+        or candidate["totalBytes"] < 0
+    ):
+        raise ProjectionBlocked("candidate import summary is invalid")
+    identity_material = json.dumps(
+        {
+            key: candidate[key]
+            for key in (
+                "version",
+                "canonicalManifestSha256",
+                "inventorySha256",
+                "fileCount",
+                "totalBytes",
+            )
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if not hmac.compare_digest(
+        hashlib.sha256(identity_material).hexdigest(),
+        str(candidate["bundleIdentitySha256"]),
+    ):
+        raise ProjectionBlocked("candidate import bundle identity drifted")
+
+    custody = authority.get("custody")
+    if not isinstance(custody, dict) or set(custody) != {
+        "canonicalManifest",
+        "inventory",
+        "nativeWindowsFinalizedEvidence",
+    }:
+        raise ProjectionBlocked("candidate import custody property set drifted")
+    canonical_bytes = _candidate_embedded_bytes(
+        custody.get("canonicalManifest"), label="candidate canonical manifest"
+    )
+    if hashlib.sha256(canonical_bytes).hexdigest() != candidate["canonicalManifestSha256"]:
+        raise ProjectionBlocked("candidate canonical manifest custody digest drifted")
+    inventory_bytes = _candidate_embedded_bytes(
+        custody.get("inventory"), label="candidate upload inventory"
+    )
+    inventory = _strict_json_object(
+        inventory_bytes, label="candidate upload inventory custody"
+    )
+    rows = inventory.get("files")
+    if (
+        inventory.get("contractName")
+        != "chummer.release-upload.candidate-inventory/v1"
+        or inventory.get("contractVersion") != 1
+        or not isinstance(rows, list)
+        or len(rows) != candidate["fileCount"]
+    ):
+        raise ProjectionBlocked("candidate upload inventory custody contract drifted")
+    inventory_digest = hashlib.sha256()
+    total_bytes = 0
+    previous_path = ""
+    canonical_row_seen = False
+    for row in rows:
+        if not isinstance(row, dict) or set(row) != {"path", "sha256", "sizeBytes"}:
+            raise ProjectionBlocked("candidate upload inventory row drifted")
+        path = row.get("path")
+        digest = row.get("sha256")
+        size = row.get("sizeBytes")
+        if (
+            not isinstance(path, str)
+            or not path
+            or path <= previous_path
+            or SHA256_RE.fullmatch(str(digest or "")) is None
+            or isinstance(size, bool)
+            or not isinstance(size, int)
+            or size < 0
+        ):
+            raise ProjectionBlocked("candidate upload inventory row is invalid")
+        previous_path = path
+        encoded_path = path.encode("utf-8")
+        inventory_digest.update(len(encoded_path).to_bytes(8, "big"))
+        inventory_digest.update(encoded_path)
+        inventory_digest.update(size.to_bytes(8, "big"))
+        inventory_digest.update(bytes.fromhex(str(digest)))
+        total_bytes += size
+        if path == "RELEASE_CHANNEL.generated.json":
+            canonical_row_seen = digest == candidate["canonicalManifestSha256"]
+    if (
+        not canonical_row_seen
+        or total_bytes != candidate["totalBytes"]
+        or inventory_digest.hexdigest() != candidate["inventorySha256"]
+    ):
+        raise ProjectionBlocked("candidate upload inventory custody summary drifted")
+
+    native = custody.get("nativeWindowsFinalizedEvidence")
+    required_native = {
+        "status",
+        "captureGeneratedAtUtc",
+        "finalizationGeneratedAtUtc",
+        "reviewer",
+        "captureSource",
+        "finalizationSource",
+        "candidateContentInventorySha256",
+        "candidateContentInventory",
+        "files",
+    }
+    if (
+        not isinstance(native, dict)
+        or set(native) != required_native
+        or native.get("status") != "passed"
+        or not isinstance(native.get("reviewer"), str)
+        or not native["reviewer"]
+        or not isinstance(native.get("files"), list)
+        or len(native["files"]) < 8
+    ):
+        raise ProjectionBlocked("candidate native-Windows evidence custody drifted")
+    evidence_paths: set[str] = set()
+    for entry in native["files"]:
+        evidence_bytes = _candidate_embedded_bytes(
+            entry, label="candidate native-Windows evidence file"
+        )
+        path = str(entry.get("path") or "")
+        if not path or path in evidence_paths:
+            raise ProjectionBlocked("candidate native-Windows evidence path drifted")
+        evidence_paths.add(path)
+        _strict_json_object(evidence_bytes, label=f"candidate native-Windows {path}")
+    required_evidence_paths = {
+        "WINDOWS_NATIVE_CAPTURE.generated.json",
+        "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json",
+        "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json",
+        "WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json",
+        "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json",
+        "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json",
+        *{
+            f"startup-smoke/startup-smoke-{head}-win-x64.receipt.json"
+            for head in ("avalonia", "blazor-desktop")
+        },
+    }
+    if not required_evidence_paths.issubset(evidence_paths):
+        raise ProjectionBlocked("candidate native-Windows evidence custody is incomplete")
+    return authority
+
+
+def _publish_candidate_import_snapshot_locked(
+    snapshot_root: Path,
+    *,
+    authority_path: Path,
+    expected_authority_sha256: str,
+) -> ProjectionSnapshot:
+    source = resolve_current_snapshot(
+        snapshot_root, purpose=PROJECTION_PURPOSE_CODE_DEPLOY
+    )
+    authority_payload = _stable_read(
+        authority_path, label="candidate import authority"
+    )
+    actual_authority_sha256 = hashlib.sha256(authority_payload).hexdigest()
+    if (
+        SHA256_RE.fullmatch(expected_authority_sha256) is None
+        or not hmac.compare_digest(actual_authority_sha256, expected_authority_sha256)
+    ):
+        raise ProjectionBlocked(
+            "candidate import authority SHA256 does not match its immutable handoff"
+        )
+    _validate_candidate_import_authority(authority_payload)
+
+    snapshot_stage = Path(
+        tempfile.mkdtemp(prefix=".public-projection-candidate.", dir=snapshot_root)
+    )
+    pointer_stage: Path | None = None
+    try:
+        output_payloads: dict[str, bytes] = {}
+        output_digests: dict[str, str] = {}
+        for name in SNAPSHOT_OUTPUT_NAMES:
+            payload = _stable_read(source.outputs[name], label=f"source current {name}")
+            if not hmac.compare_digest(
+                hashlib.sha256(payload).hexdigest(), source.output_sha256[name]
+            ):
+                raise ProjectionBlocked("source current output changed during candidate staging")
+            _write_fsynced_file(
+                snapshot_stage / name,
+                payload,
+                mode=0o644,
+                label=f"candidate snapshot {name}",
+            )
+            output_payloads[name] = payload
+            output_digests[name] = source.output_sha256[name]
+        _write_fsynced_file(
+            snapshot_stage / CANDIDATE_IMPORT_AUTHORITY_NAME,
+            authority_payload,
+            mode=0o644,
+            label="candidate import authority output",
+        )
+        output_payloads[CANDIDATE_IMPORT_AUTHORITY_NAME] = authority_payload
+        output_digests[CANDIDATE_IMPORT_AUTHORITY_NAME] = actual_authority_sha256
+
+        snapshot_sha256 = _snapshot_digest(
+            output_digests, CANDIDATE_SNAPSHOT_OUTPUT_NAMES
+        )
+        snapshot_id = f"public-projection-{snapshot_sha256}"
+        source_manifest = _strict_json_object(
+            _stable_read(
+                source.snapshot_directory / SNAPSHOT_MANIFEST_NAME,
+                label="source current snapshot manifest",
+            ),
+            label="source current snapshot manifest",
+        )
+        findings = _candidate_import_gate_findings()
+        manifest = {
+            "contractName": SNAPSHOT_CONTRACT,
+            "status": PROJECTION_STATUS_CANDIDATE_IMPORT_READY,
+            "projectionStage": PROJECTION_STAGE_CANDIDATE_IMPORT_READY,
+            "codeDeploymentAuthority": False,
+            "releaseUploadAuthority": False,
+            "candidateImportAuthority": True,
+            "releaseGateFindings": findings,
+            "snapshotId": snapshot_id,
+            "snapshotSha256": snapshot_sha256,
+            "authorityInputs": source_manifest.get("authorityInputs"),
+            "outputs": {
+                name: {
+                    "relativePath": name,
+                    "sha256": output_digests[name],
+                    "sizeBytes": len(output_payloads[name]),
+                }
+                for name in CANDIDATE_SNAPSHOT_OUTPUT_NAMES
+            },
+        }
+        manifest_bytes = _canonical_json_bytes(manifest)
+        manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
+        _write_fsynced_file(
+            snapshot_stage / SNAPSHOT_MANIFEST_NAME,
+            manifest_bytes,
+            mode=0o644,
+            label="candidate public projection manifest",
+        )
+        snapshot_stage.chmod(0o555)
+        _fsync_directory(snapshot_stage, label="candidate public projection stage")
+        final_directory = snapshot_root / snapshot_id
+        pointer_payload = _canonical_json_bytes(
+            {
+                "contractName": CURRENT_CONTRACT,
+                "status": PROJECTION_STATUS_CANDIDATE_IMPORT_READY,
+                "projectionStage": PROJECTION_STAGE_CANDIDATE_IMPORT_READY,
+                "codeDeploymentAuthority": False,
+                "releaseUploadAuthority": False,
+                "candidateImportAuthority": True,
+                "releaseGateFindings": findings,
+                "snapshotId": snapshot_id,
+                "snapshotSha256": snapshot_sha256,
+                "manifestRelativePath": f"{snapshot_id}/{SNAPSHOT_MANIFEST_NAME}",
+                "manifestSha256": manifest_sha256,
+                "outputs": {
+                    name: f"{snapshot_id}/{name}"
+                    for name in CANDIDATE_SNAPSHOT_OUTPUT_NAMES
+                },
+            }
+        )
+        pointer_stage = _prepare_pointer_file(snapshot_root, pointer_payload)
+        result = ProjectionSnapshot(
+            current_pointer=snapshot_root / CURRENT_POINTER_NAME,
+            snapshot_directory=final_directory,
+            snapshot_id=snapshot_id,
+            snapshot_sha256=snapshot_sha256,
+            outputs={
+                name: final_directory / name for name in CANDIDATE_SNAPSHOT_OUTPUT_NAMES
+            },
+            output_sha256=output_digests,
+            status=PROJECTION_STATUS_CANDIDATE_IMPORT_READY,
+            projection_stage=PROJECTION_STAGE_CANDIDATE_IMPORT_READY,
+            code_deployment_authority=False,
+            release_upload_authority=False,
+            candidate_import_authority=True,
+            release_gate_findings=tuple(findings),
+        )
+        _validate_current_pointer_target(result.current_pointer)
+        _fsync_directory(snapshot_root, label="candidate projection precommit root")
+        _exclusive_snapshot_rename(snapshot_stage, final_directory)
+        snapshot_stage = None
+        _fsync_directory(snapshot_root, label="candidate projection snapshot commit root")
+        _commit_current_pointer(
+            pointer_stage=pointer_stage,
+            current_pointer=result.current_pointer,
+            snapshot_root=snapshot_root,
+            result=result,
+        )
+        pointer_stage = None
+        return result
+    finally:
+        if snapshot_stage is not None:
+            _remove_private_stage(snapshot_stage)
+        if pointer_stage is not None:
+            pointer_stage.unlink(missing_ok=True)
+
+
+def publish_candidate_import_snapshot(
+    snapshot_root: Path,
+    *,
+    authority_path: Path,
+    expected_authority_sha256: str,
+) -> ProjectionSnapshot:
+    lock_descriptor = _acquire_publication_lock(snapshot_root)
+    try:
+        return _publish_candidate_import_snapshot_locked(
+            snapshot_root,
+            authority_path=authority_path,
+            expected_authority_sha256=expected_authority_sha256,
+        )
+    finally:
+        _release_publication_lock(lock_descriptor)
+
+
 def _run_projection_locked(
     source_environment: Mapping[str, str],
     snapshot_root: Path,
@@ -1065,6 +1517,7 @@ def _run_projection_locked(
         projection_stage,
         code_deployment_authority,
         release_upload_authority,
+        candidate_import_authority,
     ) = _projection_authority(projection_status)
     current_pointer = snapshot_root / CURRENT_POINTER_NAME
     _validate_current_pointer_target(current_pointer)
@@ -1338,6 +1791,7 @@ def _run_projection_locked(
             "projectionStage": projection_stage,
             "codeDeploymentAuthority": code_deployment_authority,
             "releaseUploadAuthority": release_upload_authority,
+            "candidateImportAuthority": candidate_import_authority,
             "releaseGateFindings": release_gate_findings,
             "snapshotId": snapshot_id,
             "snapshotSha256": snapshot_sha256,
@@ -1372,6 +1826,7 @@ def _run_projection_locked(
                 "projectionStage": projection_stage,
                 "codeDeploymentAuthority": code_deployment_authority,
                 "releaseUploadAuthority": release_upload_authority,
+                "candidateImportAuthority": candidate_import_authority,
                 "releaseGateFindings": release_gate_findings,
                 "snapshotId": snapshot_id,
                 "snapshotSha256": snapshot_sha256,
@@ -1397,6 +1852,7 @@ def _run_projection_locked(
             projection_stage=projection_stage,
             code_deployment_authority=code_deployment_authority,
             release_upload_authority=release_upload_authority,
+            candidate_import_authority=candidate_import_authority,
             release_gate_findings=tuple(release_gate_findings),
         )
         _remove_private_stage(authority_stage)
@@ -1481,7 +1937,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-name",
-        choices=SNAPSHOT_OUTPUT_NAMES,
+        choices=CANDIDATE_SNAPSHOT_OUTPUT_NAMES,
         action="append",
         default=[],
         help="Include an authenticated output path and digest in resolve output; repeat for multiple outputs.",
@@ -1491,6 +1947,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         choices=(
             PROJECTION_PURPOSE_RELEASE_UPLOAD,
             PROJECTION_PURPOSE_CODE_DEPLOY,
+            PROJECTION_PURPOSE_CANDIDATE_IMPORT,
         ),
         default=PROJECTION_PURPOSE_RELEASE_UPLOAD,
         help="Require CURRENT authority for release upload or bounded code deployment.",
@@ -1499,6 +1956,15 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--code-deploy-stage",
         action="store_true",
         help="Publish a review-required snapshot that permits code deployment but not release upload.",
+    )
+    parser.add_argument(
+        "--candidate-import-authority",
+        type=Path,
+        help="Publish an exact candidate-import authority on top of authenticated CURRENT.",
+    )
+    parser.add_argument(
+        "--candidate-import-authority-sha256",
+        help="Immutable SHA-256 handoff for --candidate-import-authority.",
     )
     return parser.parse_args(argv)
 
@@ -1520,6 +1986,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
+    if bool(args.candidate_import_authority) != bool(
+        args.candidate_import_authority_sha256
+    ):
+        print(
+            "public projection blocked: candidate-import authority path and SHA256 are both required",
+            file=sys.stderr,
+        )
+        return 2
+    if args.candidate_import_authority is not None and (
+        args.resolve_current is not None or args.code_deploy_stage
+    ):
+        print(
+            "public projection blocked: candidate-import publication is a distinct transaction",
+            file=sys.stderr,
+        )
+        return 2
     try:
         if args.resolve_current is not None:
             snapshot = resolve_current_snapshot(
@@ -1532,6 +2014,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "projectionStage": snapshot.projection_stage,
                 "codeDeploymentAuthority": snapshot.code_deployment_authority,
                 "releaseUploadAuthority": snapshot.release_upload_authority,
+                "candidateImportAuthority": snapshot.candidate_import_authority,
                 "releaseGateFindings": list(snapshot.release_gate_findings),
                 "snapshotId": snapshot.snapshot_id,
                 "snapshotSha256": snapshot.snapshot_sha256,
@@ -1541,6 +2024,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if len(set(args.output_name)) != len(args.output_name):
                     raise ProjectionBlocked(
                         "public projection output name was requested more than once"
+                    )
+                if any(name not in snapshot.outputs for name in args.output_name):
+                    raise ProjectionBlocked(
+                        "requested output is outside the authenticated CURRENT inventory"
                     )
                 selected_outputs = {
                     name: {
@@ -1555,7 +2042,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                     payload["output"] = selected_outputs[args.output_name[0]]
             print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
             return 0
-        snapshot = run_projection(code_deploy_stage=args.code_deploy_stage)
+        if args.candidate_import_authority is not None:
+            snapshot = publish_candidate_import_snapshot(
+                _snapshot_root(os.environ),
+                authority_path=args.candidate_import_authority,
+                expected_authority_sha256=str(
+                    args.candidate_import_authority_sha256
+                ).lower(),
+            )
+        else:
+            snapshot = run_projection(code_deploy_stage=args.code_deploy_stage)
     except ProjectionCommitReconcileRequired as exc:
         payload = {
             "contractName": "chummer.public_projection_commit_reconcile/v1",

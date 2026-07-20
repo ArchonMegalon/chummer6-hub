@@ -85,7 +85,8 @@ public sealed class InternalReleaseBundlesController : ControllerBase
             ReleaseUploadSession session = _uploadSessions.CreateSession(
                 authorization!.AuthorizationBinding,
                 authorization.SingleUseAuthorization,
-                authorization.UploadTicketClaims?.ExpiresAtUtc);
+                authorization.AuthorizationExpiresAtUtc,
+                authorization.CandidateImportAuthority?.SessionBinding);
             return Ok(new ReleaseUploadSessionCreatedResponse(
                 SessionId: session.SessionId,
                 ExpiresAtUtc: session.ExpiresAtUtc,
@@ -413,6 +414,12 @@ public sealed class InternalReleaseBundlesController : ControllerBase
         {
             using ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease completion =
                 _uploadSessions.BeginCompletion(sessionId, authorization!.AuthorizationBinding);
+            if (completion.CandidateImportBinding
+                != authorization.CandidateImportAuthority?.SessionBinding)
+            {
+                throw new InvalidDataException(
+                    "upload session candidate authority does not match its exact creator binding.");
+            }
             if (completion.CompletedResult is not null)
             {
                 ReleaseBundlePromotionResult completedResult = completion.CompletedResult;
@@ -482,6 +489,13 @@ public sealed class InternalReleaseBundlesController : ControllerBase
                 }
 
                 return Ok(reconciledResponse);
+            }
+
+            if (authorization.CandidateImportAuthority is not null)
+            {
+                ReleaseUploadCandidateBundleValidator.Validate(
+                    completion.BundleRoot,
+                    authorization.CandidateImportAuthority);
             }
 
             await _promotionService.ValidateDirectoryAsync(
@@ -588,12 +602,12 @@ public sealed class InternalReleaseBundlesController : ControllerBase
             return denied;
         }
 
-        if (authorization!.UploadTicketClaims is not null)
+        if (!authorization!.AllowsPrivilegedReconciliation)
         {
             return BuildProblem(
                 StatusCodes.Status403Forbidden,
                 "Privileged release reconciliation required",
-                "an expiring release upload ticket cannot invoke operator reconciliation.",
+                "candidate-import and expiring release upload authorities cannot invoke operator reconciliation.",
                 "https://chummer.run/problems/release-bundle/reconciliation-forbidden");
         }
 

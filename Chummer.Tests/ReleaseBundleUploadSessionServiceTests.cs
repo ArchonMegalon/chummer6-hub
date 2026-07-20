@@ -211,6 +211,59 @@ public sealed class ReleaseBundleUploadSessionServiceTests
     }
 
     [Fact]
+    public void CandidateImportAuthorizationIsOneShotAndCannotCrossCandidateBindings()
+    {
+        using Fixture fixture = new();
+        DateTimeOffset authorizationExpiry = DateTimeOffset.UtcNow.AddHours(2);
+        var candidate = new ReleaseUploadCandidateSessionBinding(
+            SnapshotSha256: new string('1', 64),
+            AuthoritySha256: new string('2', 64),
+            BundleIdentitySha256: new string('3', 64),
+            CanonicalManifestSha256: new string('4', 64),
+            InventorySha256: new string('5', 64));
+        ReleaseUploadSession created = fixture.Service.CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry,
+            candidate);
+        ReleaseUploadSession durableRetry = fixture.Service.CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry,
+            candidate);
+        Assert.Equal(created.SessionId, durableRetry.SessionId);
+        Assert.Equal(candidate, durableRetry.CandidateImportBinding);
+
+        ReleaseUploadCandidateSessionBinding differentCandidate = candidate with
+        {
+            BundleIdentitySha256 = new string('6', 64)
+        };
+        InvalidOperationException crossCandidate = Assert.Throws<InvalidOperationException>(() =>
+            fixture.Service.CreateSession(
+                AuthorizationA,
+                singleUseAuthorization: true,
+                authorizationExpiry,
+                differentCandidate));
+        Assert.Contains("candidate binding changed", crossCandidate.Message, StringComparison.OrdinalIgnoreCase);
+
+        ReleaseBundlePromotionResult result = BuildPromotionResult();
+        using (ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease completion =
+               fixture.Service.BeginCompletion(created.SessionId, AuthorizationA))
+        {
+            completion.RecordActivationIntent(BuildActivationIntent(result));
+            completion.MarkCompleted(result);
+        }
+
+        InvalidOperationException consumed = Assert.Throws<InvalidOperationException>(() =>
+            fixture.Service.CreateSession(
+                AuthorizationA,
+                singleUseAuthorization: true,
+                authorizationExpiry,
+                candidate));
+        Assert.Contains("already been consumed", consumed.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task CompletedSessionRejectsFurtherWrites()
     {
         using Fixture fixture = new();

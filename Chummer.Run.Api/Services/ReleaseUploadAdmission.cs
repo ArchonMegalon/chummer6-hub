@@ -213,7 +213,10 @@ public sealed record ReleaseUploadAuthorizationContext(
     string AuthorizationBinding,
     bool SingleUseAuthorization,
     string Method,
-    string Path)
+    string Path,
+    DateTimeOffset? AuthorizationExpiresAtUtc = null,
+    ReleaseUploadCandidateAuthority? CandidateImportAuthority = null,
+    bool AllowsPrivilegedReconciliation = false)
 {
     internal static readonly object HttpContextItemKey = new();
 
@@ -224,15 +227,35 @@ public sealed record ReleaseUploadAuthorizationContext(
 
 public sealed class ReleaseUploadAuthorizationEvaluator
 {
+    public const string CandidateManifestSha256Header =
+        "X-Chummer-Candidate-Manifest-Sha256";
+    public const string CandidateInventorySha256Header =
+        "X-Chummer-Candidate-Inventory-Sha256";
+    public const string CandidateBundleIdentitySha256Header =
+        "X-Chummer-Candidate-Bundle-Identity-Sha256";
+
     private readonly IConfiguration _configuration;
     private readonly ReleaseUploadTicketService _releaseUploadTickets;
+    private readonly ReleaseUploadSnapshotAuthorityService _snapshotAuthority;
 
     public ReleaseUploadAuthorizationEvaluator(
         IConfiguration configuration,
         ReleaseUploadTicketService releaseUploadTickets)
+        : this(
+            configuration,
+            releaseUploadTickets,
+            new ReleaseUploadSnapshotAuthorityService(configuration))
+    {
+    }
+
+    public ReleaseUploadAuthorizationEvaluator(
+        IConfiguration configuration,
+        ReleaseUploadTicketService releaseUploadTickets,
+        ReleaseUploadSnapshotAuthorityService snapshotAuthority)
     {
         _configuration = configuration;
         _releaseUploadTickets = releaseUploadTickets;
+        _snapshotAuthority = snapshotAuthority;
     }
 
     public ReleaseUploadAuthorizationContext? Evaluate(HttpRequest request)
@@ -250,30 +273,112 @@ public sealed class ReleaseUploadAuthorizationEvaluator
             return null;
         }
 
+        ReleaseUploadTicketClaims? ticketClaims = null;
+        string? credentialBinding = null;
         string expectedToken = (_configuration["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
         if (!string.IsNullOrWhiteSpace(expectedToken) && FixedTimeEquals(providedToken, expectedToken))
         {
-            return new ReleaseUploadAuthorizationContext(
-                UploadTicketClaims: null,
-                AuthorizationBinding: HashAuthorizationBinding($"internal:{providedToken}"),
-                SingleUseAuthorization: false,
-                request.Method,
-                request.Path.Value ?? string.Empty);
+            credentialBinding = $"internal:{providedToken}";
+        }
+        else if (_releaseUploadTickets.TryValidate(
+                     providedToken,
+                     out ReleaseUploadTicketClaims? validatedTicket)
+                 && validatedTicket is not null)
+        {
+            ticketClaims = validatedTicket;
+            credentialBinding = $"ticket:{ticketClaims.TicketId}";
+        }
+        if (credentialBinding is null)
+        {
+            return null;
         }
 
-        if (_releaseUploadTickets.TryValidate(providedToken, out ReleaseUploadTicketClaims? ticketClaims)
-            && ticketClaims is not null)
+        ReleaseUploadSnapshotAuthority authority = _snapshotAuthority.Load();
+        if (!authority.IsValid
+            || string.IsNullOrWhiteSpace(authority.SnapshotSha256))
+        {
+            return null;
+        }
+
+        if (authority.ReleaseUploadAuthority)
         {
             return new ReleaseUploadAuthorizationContext(
-                UploadTicketClaims: ticketClaims,
-                AuthorizationBinding: HashAuthorizationBinding($"ticket:{ticketClaims.TicketId}"),
-                SingleUseAuthorization: true,
+                ticketClaims,
+                HashAuthorizationBinding(
+                    $"{credentialBinding}|snapshot:{authority.SnapshotSha256}|release-upload"),
+                SingleUseAuthorization: ticketClaims is not null,
                 request.Method,
-                request.Path.Value ?? string.Empty);
+                request.Path.Value ?? string.Empty,
+                AuthorizationExpiresAtUtc: ticketClaims?.ExpiresAtUtc,
+                CandidateImportAuthority: null,
+                AllowsPrivilegedReconciliation: ticketClaims is null);
         }
 
-        return null;
+        ReleaseUploadCandidateAuthority? candidate = authority.Candidate;
+        if (!authority.CandidateImportAuthority
+            || candidate is null
+            || !TryReadCandidateRequest(request, out CandidateRequest? requested)
+            || requested is null
+            || !FixedTimeEquals(
+                requested.ManifestSha256,
+                candidate.Candidate.CanonicalManifestSha256)
+            || !FixedTimeEquals(
+                requested.InventorySha256,
+                candidate.Candidate.InventorySha256)
+            || !FixedTimeEquals(
+                requested.BundleIdentitySha256,
+                candidate.Candidate.BundleIdentitySha256))
+        {
+            return null;
+        }
+        DateTimeOffset expiresAt = ticketClaims is not null
+                                   && ticketClaims.ExpiresAtUtc < candidate.ExpiresAtUtc
+            ? ticketClaims.ExpiresAtUtc
+            : candidate.ExpiresAtUtc;
+        return new ReleaseUploadAuthorizationContext(
+            ticketClaims,
+            HashAuthorizationBinding(
+                $"{credentialBinding}|snapshot:{authority.SnapshotSha256}|candidate:{candidate.Candidate.BundleIdentitySha256}"),
+            SingleUseAuthorization: true,
+            request.Method,
+            request.Path.Value ?? string.Empty,
+            AuthorizationExpiresAtUtc: expiresAt,
+            CandidateImportAuthority: candidate,
+            AllowsPrivilegedReconciliation: false);
     }
+
+    private static bool TryReadCandidateRequest(
+        HttpRequest request,
+        out CandidateRequest? candidate)
+    {
+        candidate = null;
+        string[] names =
+        [
+            CandidateManifestSha256Header,
+            CandidateInventorySha256Header,
+            CandidateBundleIdentitySha256Header
+        ];
+        if (names.Any(name => request.Headers[name].Count != 1))
+        {
+            return false;
+        }
+        string manifest = request.Headers[CandidateManifestSha256Header].ToString();
+        string inventory = request.Headers[CandidateInventorySha256Header].ToString();
+        string identity = request.Headers[CandidateBundleIdentitySha256Header].ToString();
+        if (!IsLowercaseSha256(manifest)
+            || !IsLowercaseSha256(inventory)
+            || !IsLowercaseSha256(identity))
+        {
+            return false;
+        }
+        candidate = new CandidateRequest(manifest, inventory, identity);
+        return true;
+    }
+
+    private static bool IsLowercaseSha256(string value)
+        => value.Length == 64
+           && value.All(static character => character is >= '0' and <= '9'
+               or >= 'a' and <= 'f');
 
     private static bool FixedTimeEquals(string left, string right)
     {
@@ -284,6 +389,11 @@ public sealed class ReleaseUploadAuthorizationEvaluator
 
     private static string HashAuthorizationBinding(string value)
         => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
+    private sealed record CandidateRequest(
+        string ManifestSha256,
+        string InventorySha256,
+        string BundleIdentitySha256);
 }
 
 public sealed class ReleaseUploadAdmissionService

@@ -1048,16 +1048,36 @@ if (( upload_file_count == 0 )); then
 fi
 
 candidate_summary="$tmp_root/upload-candidate-summary.json"
+candidate_inventory="$tmp_root/upload-candidate-inventory.json"
 candidate_summary_command=(
   python3 "$UPLOAD_ATTEMPT_RECEIPT_HELPER" summarize
   --bundle-root "$BUNDLE_DIR"
   --canonical-manifest "$CANONICAL_MANIFEST_PATH"
   --output "$candidate_summary"
+  --inventory-output "$candidate_inventory"
 )
 while IFS= read -r -d '' file_path; do
   candidate_summary_command+=(--file "$file_path")
 done < <(array_values_nul upload_files)
 "${candidate_summary_command[@]}"
+
+candidate_manifest_sha256="$(resolve_json_field "$candidate_summary" canonicalManifestSha256)"
+candidate_inventory_sha256="$(resolve_json_field "$candidate_summary" inventorySha256)"
+candidate_bundle_identity_sha256="$(resolve_json_field "$candidate_summary" bundleIdentitySha256)"
+for candidate_digest in \
+  "$candidate_manifest_sha256" \
+  "$candidate_inventory_sha256" \
+  "$candidate_bundle_identity_sha256"; do
+  [[ "$candidate_digest" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "Candidate summary contains an invalid digest binding." >&2
+    exit 1
+  }
+done
+request_common+=(
+  -H "X-Chummer-Candidate-Manifest-Sha256: $candidate_manifest_sha256"
+  -H "X-Chummer-Candidate-Inventory-Sha256: $candidate_inventory_sha256"
+  -H "X-Chummer-Candidate-Bundle-Identity-Sha256: $candidate_bundle_identity_sha256"
+)
 
 echo "Publishing ${upload_file_count} bundle files from $BUNDLE_DIR"
 

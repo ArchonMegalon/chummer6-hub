@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 
 
 SCHEMA_VERSION = "chummer.release-upload-handoff/v1"
+CANDIDATE_INVENTORY_SCHEMA_VERSION = "chummer.release-upload.candidate-inventory/v1"
 MAX_RECEIPT_BYTES = 64 * 1024
 VALID_STATES = {
     "created",
@@ -240,6 +241,20 @@ def summarize(args: argparse.Namespace) -> int:
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     atomic_write_json(output, candidate)
+    if args.inventory_output:
+        inventory_output = Path(args.inventory_output)
+        inventory_output.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        atomic_write_json(
+            inventory_output,
+            {
+                "contractName": CANDIDATE_INVENTORY_SCHEMA_VERSION,
+                "contractVersion": 1,
+                "files": [
+                    {"path": relative, "sha256": digest, "sizeBytes": size_bytes}
+                    for relative, size_bytes, digest in rows
+                ],
+            },
+        )
     return 0
 
 
@@ -345,6 +360,7 @@ def build_parser() -> argparse.ArgumentParser:
     summary_parser.add_argument("--bundle-root", required=True)
     summary_parser.add_argument("--canonical-manifest", required=True)
     summary_parser.add_argument("--output", required=True)
+    summary_parser.add_argument("--inventory-output")
     summary_parser.add_argument("--file", action="append", default=[], required=True)
     summary_parser.set_defaults(handler=summarize)
 

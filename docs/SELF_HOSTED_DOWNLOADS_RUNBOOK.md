@@ -329,6 +329,31 @@ unset approved_runtime_proof_sha256
    and the live verifier passes may the full projection advance `CURRENT.json` to `status=pass`,
    `projectionStage=release_upload_ready`, and `releaseUploadAuthority=true`. Until then,
    `/downloads/release-upload` and its command endpoint remain unavailable.
+
+   The candidate-import transaction is intentionally one shot:
+
+   1. Materialize the upload summary and `CANDIDATE_UPLOAD_INVENTORY.generated.json` from the exact
+      files that the HTTP client will stage. Do not add, remove, or rewrite a bundle byte afterward.
+   2. Run `scripts/release/materialize_candidate_import_authority.py` with that bundle, its exact
+      `RELEASE_CHANNEL.generated.json`, the summary and inventory, and the finalized native-Windows
+      evidence root. The materializer requires fresh capture and human-finalization provenance for
+      both desktop heads and exact EXE, payload, candidate-inventory, and visual-proof bindings. Wine,
+      stale evidence, a changed reviewer boundary, or any byte mismatch fails closed.
+   3. Independently hand off the resulting authority file's lowercase SHA-256, then publish it with
+      `scripts/release/verify_public_projection.py --candidate-import-authority <authority> --candidate-import-authority-sha256 <approved-sha256>`.
+      This advances `CURRENT` only to `status=candidate_import_ready`, with
+      `candidateImportAuthority=true`, `codeDeploymentAuthority=false`, and
+      `releaseUploadAuthority=false`.
+   4. Use the normal staged HTTP client against that exact bundle. It supplies the authority-bound
+      manifest, inventory, and bundle-identity headers on create, file, chunk, and complete requests.
+      A Fleet credential proves caller identity but does not bypass `CURRENT`; candidate sessions are
+      single-use even for Fleet, cannot invoke reconciliation, and reject a second session after a
+      durable completion. Only an exact retry of the same completed session may replay its durable
+      completion result.
+   5. Run live convergence against the promoted bytes and publish a new full-pass projection before
+      treating upload authority as restored. Candidate import by itself is never release readiness,
+      never advances a stable/current release pointer, and never authorizes another candidate.
+
    - Do not use raw `docker compose ... up -d --build chummer-portal` for release publication. The guarded wrapper source-gates the audited checkout, builds `chummer-run-api:local` from explicit contexts, runs the volume initializer, starts a uniquely named blue/green candidate with `--no-build`, and postdeploy-gates its exact image id before durably committing the candidate authority. The exact old portal is retained for rollback until that commit.
    - Before upgrading the guarded deploy source across this journal-schema change, verify that `/docker/chummercomplete/.state/public-edge-deploy-receipts/active-overlay-transaction.json` is absent. If a legacy journal exists, recover it with the exact audited source version that created it; do not delete, rewrite, or pass it to the new recovery path, which deliberately fails closed and retains incompatible journals.
    - If a durable transaction journal exists, the wrapper reconciles it and exits without starting a new deploy. Rerun the deploy only after that recovery succeeds. To request idempotent reconciliation explicitly, repeat the authority-file checks above and use the same clean launcher, source-authority inputs, and explicit proof authority (release-receipt inputs are not required for recovery):
