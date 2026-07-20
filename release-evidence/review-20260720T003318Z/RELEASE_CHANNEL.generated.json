@@ -1,0 +1,836 @@
+{
+  "generated_at": "2026-07-20T00:39:35Z",
+  "generatedAt": "2026-07-20T00:39:35Z",
+  "schemaVersion": 1,
+  "product": "chummer6",
+  "contract_name": "Chummer.Hub.Registry.Contracts",
+  "contractName": "Chummer.Hub.Registry.Contracts",
+  "registry_commit": "b2640893285d9431c45a3dc84e68897c0382344f",
+  "registryCommit": "b2640893285d9431c45a3dc84e68897c0382344f",
+  "channelId": "preview",
+  "channel": "preview",
+  "version": "run-20260712-174412",
+  "releaseVersion": "run-20260712-174412",
+  "publishedAt": "2026-07-20T00:39:35Z",
+  "status": "published",
+  "artifactSource": "ui_desktop_bundle",
+  "message": null,
+  "rolloutState": "coverage_incomplete",
+  "rolloutReason": "Current shelf is published, but promotion stays blocked because required desktop tuple coverage is incomplete (platforms: macos; pairs: avalonia:macos; tuples: avalonia:osx-arm64:macos).",
+  "supportabilityState": "review_required",
+  "supportabilitySummary": "Treat the current release as review-required because required desktop tuple coverage is incomplete (platforms: macos; pairs: avalonia:macos; tuples: avalonia:osx-arm64:macos).",
+  "knownIssueSummary": "Known issue: required desktop tuple coverage is incomplete (platforms: macos; pairs: avalonia:macos; tuples: avalonia:osx-arm64:macos).",
+  "fixAvailabilitySummary": "Do not send fixed notices until required desktop tuple coverage is complete for the promoted shelf.",
+  "releaseProof": {
+    "status": "passed",
+    "generatedAt": "2026-07-17T22:36:23Z",
+    "baseUrl": "https://chummer.run",
+    "journeysPassed": [
+      "install_claim_restore_continue",
+      "build_explain_publish",
+      "campaign_session_recover_recap",
+      "report_cluster_release_notify",
+      "organize_community_and_close_loop"
+    ],
+    "proofRoutes": [
+      "/downloads/install/avalonia-linux-x64-installer",
+      "/home/access",
+      "/home/work",
+      "/account/access",
+      "/account/work",
+      "/account/support",
+      "/contact",
+      "/downloads",
+      "/downloads/install/avalonia-osx-arm64-installer",
+      "/downloads/install/avalonia-win-x64-installer",
+      "/downloads/install/blazor-desktop-osx-arm64-installer"
+    ],
+    "uiLocalizationReleaseGate": {
+      "status": "pass",
+      "generatedAt": "2026-07-17T22:24:10Z",
+      "defaultKeyCount": 438,
+      "explicitFallbackRuntime": "pass",
+      "signoffSmokeRunnerStatus": "pass",
+      "shippingLocales": [
+        "en-us",
+        "de-de",
+        "fr-fr",
+        "ja-jp",
+        "pt-br",
+        "zh-cn"
+      ],
+      "localeSummary": [
+        {
+          "locale": "en-us",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 438,
+          "minimumOverrideCount": 438,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        },
+        {
+          "locale": "de-de",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 438,
+          "minimumOverrideCount": 40,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        },
+        {
+          "locale": "fr-fr",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 438,
+          "minimumOverrideCount": 40,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        },
+        {
+          "locale": "ja-jp",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 438,
+          "minimumOverrideCount": 40,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        },
+        {
+          "locale": "pt-br",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 438,
+          "minimumOverrideCount": 40,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        },
+        {
+          "locale": "zh-cn",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 438,
+          "minimumOverrideCount": 40,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        }
+      ],
+      "acceptanceGates": [
+        "pseudo_localization",
+        "missing_key_fail_fast",
+        "top_surface_overflow_checks",
+        "locale_smoke_first_launch",
+        "locale_smoke_settings",
+        "locale_smoke_explain",
+        "locale_smoke_updater",
+        "locale_smoke_support",
+        "non_english_generated_artifact_smoke"
+      ],
+      "domainCoverage": {
+        "app_chrome": "pass",
+        "data_rules_names": "pass",
+        "explain_receipts": "pass",
+        "generated_artifacts": "pass",
+        "install_update_support": "pass"
+      },
+      "localeDomainCoverage": {
+        "de-de": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        },
+        "en-us": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        },
+        "fr-fr": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        },
+        "ja-jp": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        },
+        "pt-br": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        },
+        "zh-cn": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        }
+      },
+      "blockingFindings": [],
+      "blockingFindingsCount": 0,
+      "translationBacklogFindings": [],
+      "translationBacklogFindingsCount": 0
+    },
+    "flagshipReadiness": {
+      "contractName": "chummer.flagship_product_readiness_gate.v1",
+      "generatedAt": "2026-07-17T23:59:49Z",
+      "status": "fail",
+      "coverageGapKeys": [
+        "desktop_client",
+        "fleet_and_operator_loop"
+      ],
+      "launchBlockers": [
+        "Campaign OS local proof is not valid executed v3 evidence (candidate_source_build_inputs_current_mismatch).",
+        "Hosted Build V002 operator decision gate receipt is missing, malformed, or internally inconsistent.",
+        "Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified.",
+        "Portal release channel Windows installer binding disagrees with authoritative release channel",
+        "Windows installer visual audit source digest does not match promoted installer",
+        "promoted Windows installer artifact file is missing",
+        "release channel channel is preview, not a flagship stable lane",
+        "release channel rollout is promoted_preview, not public_stable",
+        "release channel supportability is not gold_supported",
+        "supervisor completion status is 'fail'",
+        "windows installer gold proof artifact is still missing: [redacted-path]",
+        "windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca: [redacted-path]",
+        "workspace portal release channel artifact chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json disagrees with authoritative registry receipt (local status=published, channel=preview, version=run-20260715-140426, supportability=review_required, rollout=public_release_review_required; authoritative status=published, channel=preview, version=run-20260712-174412, supportability=preview_supported, rollout=promoted_preview)"
+      ],
+      "desktopClientReady": false,
+      "reason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is promoted_preview, not public_stable, workspace portal release channel artifact chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json disagrees with authoritative registry receipt (local status=published, channel=preview, version=run-20260715-140426, supportability=review_required, rollout=public_release_review_required; authoritative status=published, channel=preview, version=run-20260712-174412, supportability=preview_supported, rollout=promoted_preview), Windows installer visual audit source digest does not match promoted installer, Portal release channel Windows installer binding disagrees with authoritative release channel, promoted Windows installer artifact file is missing, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca: [redacted-path], windows installer gold proof artifact is still missing: [redacted-path], supervisor completion status is 'fail', Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decision gate receipt is missing, malformed, or internally inconsistent., Campaign OS local proof is not valid executed v3 evidence (candidate_source_build_inputs_current_mismatch). Coverage gaps: fleet_and_operator_loop, desktop_client.",
+      "sourceSha256": "sha256:33a4e0911e5abf8bd1698f82e2725cd95ff168bcff17717ab8a368a8c54b14bf",
+      "snapshotSha256": "sha256:089958c5b37e2a72d555d10deed3ea92736160ef8f7bb8a4269b66e9b3dbd23f"
+    }
+  },
+  "artifacts": [
+    {
+      "artifactId": "avalonia-linux-x64-installer",
+      "head": "avalonia",
+      "rid": "linux-x64",
+      "platform": "linux",
+      "arch": "x64",
+      "kind": "installer",
+      "fileName": "chummer-avalonia-linux-x64-installer.deb",
+      "downloadUrl": "https://chummer.run/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+      "sha256": "c310febe74ea2250f90bde60309bb2a290b443b29691c41de6343d6fde2a85fa",
+      "sizeBytes": 39118902,
+      "platformLabel": "Avalonia Desktop Linux X64 Installer",
+      "updateFeedUrl": null,
+      "embeddedRuntimeBundleHeadId": null,
+      "compatibilityState": "compatible",
+      "installAccessClass": "open_public",
+      "compatibilityReason": null,
+      "channelId": "preview",
+      "channel": "preview",
+      "version": "run-20260712-174412",
+      "releaseVersion": "run-20260712-174412",
+      "generated_at": "2026-07-20T00:39:35Z",
+      "generatedAt": "2026-07-20T00:39:35Z",
+      "id": "avalonia-linux-x64-installer"
+    },
+    {
+      "artifactId": "avalonia-win-x64-installer",
+      "head": "avalonia",
+      "rid": "win-x64",
+      "platform": "windows",
+      "arch": "x64",
+      "kind": "installer",
+      "fileName": "chummer-avalonia-win-x64-installer.exe",
+      "downloadUrl": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-installer.exe",
+      "sha256": "d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca",
+      "sizeBytes": 2734299,
+      "platformLabel": "Avalonia Desktop Windows X64 Installer",
+      "updateFeedUrl": null,
+      "embeddedRuntimeBundleHeadId": null,
+      "compatibilityState": "compatible",
+      "installAccessClass": "open_public",
+      "compatibilityReason": null,
+      "installerMode": "bootstrap",
+      "payloadAcquisitionMode": "download",
+      "payloadFileName": "chummer-avalonia-win-x64-payload.zip",
+      "payloadDownloadUrl": "https://chummer.run/downloads/files/chummer-avalonia-win-x64-payload.zip",
+      "payloadSha256": "abd4f5d4745573cb6a7c62afd0d5145f79f120addefca6e15c4207c97125226b",
+      "payloadSizeBytes": 51113721,
+      "channelId": "preview",
+      "channel": "preview",
+      "version": "run-20260712-174412",
+      "releaseVersion": "run-20260712-174412",
+      "generated_at": "2026-07-20T00:39:35Z",
+      "generatedAt": "2026-07-20T00:39:35Z",
+      "id": "avalonia-win-x64-installer"
+    }
+  ],
+  "desktopTupleCoverage": {
+    "requiredDesktopPlatforms": [
+      "linux",
+      "windows",
+      "macos"
+    ],
+    "requiredDesktopHeads": [
+      "avalonia"
+    ],
+    "promotedInstallerTuples": [
+      {
+        "tupleId": "avalonia:linux:linux-x64",
+        "head": "avalonia",
+        "platform": "linux",
+        "rid": "linux-x64",
+        "arch": "x64",
+        "kind": "installer",
+        "artifactId": "avalonia-linux-x64-installer"
+      },
+      {
+        "tupleId": "avalonia:windows:win-x64",
+        "head": "avalonia",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "kind": "installer",
+        "artifactId": "avalonia-win-x64-installer"
+      }
+    ],
+    "promotedPlatformHeads": {
+      "linux": [
+        "avalonia"
+      ],
+      "windows": [
+        "avalonia"
+      ],
+      "macos": []
+    },
+    "requiredDesktopPlatformHeadRidTuples": [
+      "avalonia:linux-x64:linux",
+      "avalonia:osx-arm64:macos",
+      "avalonia:win-x64:windows"
+    ],
+    "promotedPlatformHeadRidTuples": [
+      "avalonia:linux-x64:linux",
+      "avalonia:win-x64:windows"
+    ],
+    "missingRequiredPlatforms": [
+      "macos"
+    ],
+    "missingRequiredHeads": [],
+    "missingRequiredPlatformHeadPairs": [
+      "avalonia:macos"
+    ],
+    "missingRequiredPlatformHeadRidTuples": [
+      "avalonia:osx-arm64:macos"
+    ],
+    "externalProofRequests": [
+      {
+        "tupleId": "avalonia:osx-arm64:macos",
+        "channelId": "preview",
+        "head": "avalonia",
+        "platform": "macos",
+        "rid": "osx-arm64",
+        "requiredHost": "macos",
+        "requiredProofs": [
+          "promoted_installer_artifact",
+          "startup_smoke_receipt"
+        ],
+        "expectedArtifactId": "avalonia-osx-arm64-installer",
+        "expectedInstallerFileName": "chummer-avalonia-osx-arm64-installer.dmg",
+        "expectedInstallerRelativePath": "files/chummer-avalonia-osx-arm64-installer.dmg",
+        "expectedInstallerSha256": "",
+        "expectedPublicInstallRoute": "/downloads/install/avalonia-osx-arm64-installer",
+        "expectedStartupSmokeReceiptPath": "startup-smoke/startup-smoke-avalonia-osx-arm64.receipt.json",
+        "startupSmokeReceiptContract": {
+          "statusAnyOf": [
+            "pass",
+            "passed",
+            "ready"
+          ],
+          "readyCheckpoint": "pre_ui_event_loop",
+          "headId": "avalonia",
+          "platform": "macos",
+          "rid": "osx-arm64",
+          "hostClassContains": "macos"
+        },
+        "proofCaptureCommands": [
+          "REPO_ROOT=\"${CHUMMER_UI_REPO_ROOT:-/docker/chummercomplete/chummer6-ui}\" && export REPO_ROOT && INSTALLER_PATH=\"$REPO_ROOT/Docker/Downloads/files/chummer-avalonia-osx-arm64-installer.dmg\" && EXPECTED_INSTALLER_SHA256='' && EXPECTED_INSTALLER_MAGIC='' && export INSTALLER_PATH EXPECTED_INSTALLER_SHA256 EXPECTED_INSTALLER_MAGIC && cd \"$REPO_ROOT\" && mkdir -p \"$(dirname \"$INSTALLER_PATH\")\" && python3 -c 'import hashlib, os, pathlib; p=pathlib.Path(os.environ['\"'\"'INSTALLER_PATH'\"'\"']); expected=os.environ['\"'\"'EXPECTED_INSTALLER_SHA256'\"'\"']; import sys; sys.exit(0) if (not p.is_file()) else None; digest=hashlib.sha256(p.read_bytes()).hexdigest().lower(); sys.exit(0) if digest==expected else print(f'\"'\"'installer-preflight-sha256-mismatch:{p}:digest={digest}:expected={expected}'\"'\"') or p.unlink()' && if [ ! -s \"$INSTALLER_PATH\" ]; then if [ -z \"${CHUMMER_EXTERNAL_PROOF_AUTH_HEADER:-}\" ] && [ -z \"${CHUMMER_EXTERNAL_PROOF_COOKIE_HEADER:-}\" ] && [ -z \"${CHUMMER_EXTERNAL_PROOF_COOKIE_JAR:-}\" ] && [ \"${CHUMMER_EXTERNAL_PROOF_ALLOW_GUEST_DOWNLOAD:-0}\" != \"1\" ]; then echo 'external-proof-auth-missing: set CHUMMER_EXTERNAL_PROOF_AUTH_HEADER, CHUMMER_EXTERNAL_PROOF_COOKIE_HEADER, or CHUMMER_EXTERNAL_PROOF_COOKIE_JAR (or set CHUMMER_EXTERNAL_PROOF_ALLOW_GUEST_DOWNLOAD=1 to bypass)' >&2; exit 1; fi; set -- curl -fL --retry 3 --retry-delay 2; if [ -n \"${CHUMMER_EXTERNAL_PROOF_AUTH_HEADER:-}\" ]; then set -- \"$@\" -H \"${CHUMMER_EXTERNAL_PROOF_AUTH_HEADER:-}\"; fi; if [ -n \"${CHUMMER_EXTERNAL_PROOF_COOKIE_HEADER:-}\" ]; then set -- \"$@\" -H \"Cookie: ${CHUMMER_EXTERNAL_PROOF_COOKIE_HEADER:-}\"; fi; if [ -n \"${CHUMMER_EXTERNAL_PROOF_COOKIE_JAR:-}\" ]; then set -- \"$@\" --cookie \"${CHUMMER_EXTERNAL_PROOF_COOKIE_JAR:-}\"; fi; set -- \"$@\" \"${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}/downloads/install/avalonia-osx-arm64-installer\" -o \"$INSTALLER_PATH\"; \"$@\"; fi; python3 -c 'import os, pathlib, sys; p=pathlib.Path(os.environ['\"'\"'INSTALLER_PATH'\"'\"']); expected_magic=os.environ['\"'\"'EXPECTED_INSTALLER_MAGIC'\"'\"']; sys.exit(f'\"'\"'installer-download-missing:{p}'\"'\"') if (not p.is_file()) else None; probe=p.read_bytes()[:8192]; probe_text=probe.decode('\"'\"'latin-1'\"'\"', errors='\"'\"'ignore'\"'\"').lower(); auth_header_set=bool(str(os.environ.get('\"'\"'CHUMMER_EXTERNAL_PROOF_AUTH_HEADER'\"'\"','\"'\"''\"'\"')).strip()); cookie_header_set=bool(str(os.environ.get('\"'\"'CHUMMER_EXTERNAL_PROOF_COOKIE_HEADER'\"'\"','\"'\"''\"'\"')).strip()); cookie_jar_set=bool(str(os.environ.get('\"'\"'CHUMMER_EXTERNAL_PROOF_COOKIE_JAR'\"'\"','\"'\"''\"'\"')).strip()); html_like=('\"'\"'<!doctype html'\"'\"' in probe_text) or ('\"'\"'<html'\"'\"' in probe_text) or ('\"'\"'<head'\"'\"' in probe_text); sys.exit(f'\"'\"'installer-download-html-response:{p}:auth_header_set={auth_header_set}:cookie_header_set={cookie_header_set}:cookie_jar_set={cookie_jar_set}:hint=signed-in-download-route-required-or-missing-auth'\"'\"') if html_like else None; sys.exit(0) if (not expected_magic or probe.startswith(expected_magic.encode('\"'\"'latin-1'\"'\"'))) else sys.exit(f'\"'\"'installer-download-signature-mismatch:{p}:expected_magic={expected_magic}:auth_header_set={auth_header_set}:cookie_header_set={cookie_header_set}:cookie_jar_set={cookie_jar_set}:hint=unexpected-binary-format-or-route-response'\"'\"')'; python3 -c 'import hashlib, os, pathlib, sys; p=pathlib.Path(os.environ['\"'\"'INSTALLER_PATH'\"'\"']); expected=os.environ['\"'\"'EXPECTED_INSTALLER_SHA256'\"'\"']; sys.exit(f'\"'\"'installer-download-missing:{p}'\"'\"') if (not p.is_file()) else None; digest=hashlib.sha256(p.read_bytes()).hexdigest().lower(); auth_header_set=bool(str(os.environ.get('\"'\"'CHUMMER_EXTERNAL_PROOF_AUTH_HEADER'\"'\"','\"'\"''\"'\"')).strip()); cookie_header_set=bool(str(os.environ.get('\"'\"'CHUMMER_EXTERNAL_PROOF_COOKIE_HEADER'\"'\"','\"'\"''\"'\"')).strip()); cookie_jar_set=bool(str(os.environ.get('\"'\"'CHUMMER_EXTERNAL_PROOF_COOKIE_JAR'\"'\"','\"'\"''\"'\"')).strip()); sys.exit(0) if digest==expected else sys.exit(f'\"'\"'installer-postdownload-sha256-mismatch:{p}:digest={digest}:expected={expected}:auth_header_set={auth_header_set}:cookie_header_set={cookie_header_set}:cookie_jar_set={cookie_jar_set}:hint=signed-in-download-route-required-or-bytes-drift'\"'\"')'",
+          "REPO_ROOT=\"${CHUMMER_UI_REPO_ROOT:-/docker/chummercomplete/chummer6-ui}\" && export REPO_ROOT && INSTALLER_PATH=\"$REPO_ROOT/Docker/Downloads/files/chummer-avalonia-osx-arm64-installer.dmg\" && STARTUP_SMOKE_DIR=\"$REPO_ROOT/Docker/Downloads/startup-smoke\" && cd \"$REPO_ROOT\" && CHUMMER_DESKTOP_STARTUP_SMOKE_HOST_CLASS=macos-host CHUMMER_DESKTOP_STARTUP_SMOKE_OPERATING_SYSTEM=macOS ./scripts/run-desktop-startup-smoke.sh \"$INSTALLER_PATH\" avalonia osx-arm64 Chummer.Avalonia \"$STARTUP_SMOKE_DIR\" run-20260712-174412",
+          "REPO_ROOT=\"${CHUMMER_UI_REPO_ROOT:-/docker/chummercomplete/chummer6-ui}\" && export REPO_ROOT && cd \"$REPO_ROOT\" && ./scripts/generate-releases-manifest.sh"
+        ]
+      }
+    ],
+    "desktopRouteTruth": [
+      {
+        "tupleId": "avalonia:linux:linux-x64",
+        "head": "avalonia",
+        "platform": "linux",
+        "rid": "linux-x64",
+        "arch": "x64",
+        "artifactId": "avalonia-linux-x64-installer",
+        "routeRole": "primary",
+        "routeRoleReasonCode": "primary_flagship_head",
+        "routeRoleReason": "Avalonia Desktop route avalonia:linux:linux-x64 is the flagship desktop route for linux/linux-x64 and must carry independent startup verification before promotion.",
+        "promotionState": "promoted",
+        "promotionReasonCode": "installer_smoke_and_release_proof_passed",
+        "promotionReason": "Primary-route Avalonia Desktop tuple avalonia:linux:linux-x64 for linux/linux-x64 is promoted because the flagship head is present on the registry shelf and passed independent startup verification and release verification gates for this channel.",
+        "parityPosture": "flagship_primary",
+        "updateEligibility": "eligible",
+        "updateEligibilityReason": "Primary-route Avalonia Desktop tuple avalonia:linux:linux-x64 is promoted for linux/linux-x64.",
+        "rollbackState": "manual_recovery_required",
+        "rollbackReasonCode": "fallback_missing_artifact_or_startup_smoke_proof",
+        "rollbackReason": "Fallback route blazor-desktop:linux:linux-x64 is not promoted for linux/linux-x64 because matching artifact bytes and fresh startup verification are still required; primary route avalonia:linux:linux-x64 therefore requires manual recovery.",
+        "revokeState": "not_revoked",
+        "revokeSource": "none",
+        "revokeReasonCode": "no_registry_revoke_marker",
+        "revokeReason": "No registry revoke marker is active for avalonia:linux:linux-x64.",
+        "installPosture": "installer_first",
+        "installPostureReason": "Promoted installer media avalonia-linux-x64-installer is present for Avalonia Desktop tuple avalonia:linux:linux-x64 on linux/linux-x64.",
+        "publicInstallRoute": "/downloads/install/avalonia-linux-x64-installer"
+      },
+      {
+        "tupleId": "blazor-desktop:linux:linux-x64",
+        "head": "blazor-desktop",
+        "platform": "linux",
+        "rid": "linux-x64",
+        "arch": "x64",
+        "artifactId": "",
+        "routeRole": "fallback",
+        "routeRoleReasonCode": "fallback_recovery_head",
+        "routeRoleReason": "Blazor Desktop route blazor-desktop:linux:linux-x64 is retained as an explicit fallback route for linux/linux-x64; it cannot satisfy the primary-route promise.",
+        "promotionState": "proof_required",
+        "promotionReasonCode": "missing_artifact_or_startup_smoke_proof",
+        "promotionReason": "Fallback Blazor Desktop tuple blazor-desktop:linux:linux-x64 for linux/linux-x64 is retained for recovery/manual routing on linux/linux-x64 but is not promoted until matching artifact bytes and fresh startup verification are present.",
+        "parityPosture": "explicit_fallback",
+        "updateEligibility": "blocked_missing_proof",
+        "updateEligibilityReason": "Fallback route blazor-desktop:linux:linux-x64 is not update-eligible until promoted.",
+        "rollbackState": "fallback_not_promoted",
+        "rollbackReasonCode": "fallback_missing_artifact_or_startup_smoke_proof",
+        "rollbackReason": "Fallback route blazor-desktop:linux:linux-x64 needs artifact and startup verification before rollback use.",
+        "revokeState": "not_revoked",
+        "revokeSource": "none",
+        "revokeReasonCode": "no_registry_revoke_marker",
+        "revokeReason": "No registry revoke marker is active for blazor-desktop:linux:linux-x64.",
+        "installPosture": "proof_capture_required",
+        "installPostureReason": "Do not present blazor-desktop:linux:linux-x64 as installable until the missing tuple proof is captured.",
+        "publicInstallRoute": "/downloads/install/blazor-desktop-linux-x64-installer"
+      },
+      {
+        "tupleId": "avalonia:windows:win-x64",
+        "head": "avalonia",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "artifactId": "avalonia-win-x64-installer",
+        "routeRole": "primary",
+        "routeRoleReasonCode": "primary_flagship_head",
+        "routeRoleReason": "Avalonia Desktop route avalonia:windows:win-x64 is the flagship desktop route for windows/win-x64 and must carry independent startup verification before promotion.",
+        "promotionState": "promoted",
+        "promotionReasonCode": "installer_smoke_and_release_proof_passed",
+        "promotionReason": "Primary-route Avalonia Desktop tuple avalonia:windows:win-x64 for windows/win-x64 is promoted because the flagship head is present on the registry shelf and passed independent startup verification and release verification gates for this channel.",
+        "parityPosture": "flagship_primary",
+        "updateEligibility": "eligible",
+        "updateEligibilityReason": "Primary-route Avalonia Desktop tuple avalonia:windows:win-x64 is promoted for windows/win-x64.",
+        "rollbackState": "manual_recovery_required",
+        "rollbackReasonCode": "fallback_missing_artifact_or_startup_smoke_proof",
+        "rollbackReason": "Fallback route blazor-desktop:windows:win-x64 is not promoted for windows/win-x64 because matching artifact bytes and fresh startup verification are still required; primary route avalonia:windows:win-x64 therefore requires manual recovery.",
+        "revokeState": "not_revoked",
+        "revokeSource": "none",
+        "revokeReasonCode": "no_registry_revoke_marker",
+        "revokeReason": "No registry revoke marker is active for avalonia:windows:win-x64.",
+        "installPosture": "installer_first",
+        "installPostureReason": "Promoted installer media avalonia-win-x64-installer is present for Avalonia Desktop tuple avalonia:windows:win-x64 on windows/win-x64.",
+        "publicInstallRoute": "/downloads/install/avalonia-win-x64-installer"
+      },
+      {
+        "tupleId": "blazor-desktop:windows:win-x64",
+        "head": "blazor-desktop",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "artifactId": "",
+        "routeRole": "fallback",
+        "routeRoleReasonCode": "fallback_recovery_head",
+        "routeRoleReason": "Blazor Desktop route blazor-desktop:windows:win-x64 is retained as an explicit fallback route for windows/win-x64; it cannot satisfy the primary-route promise.",
+        "promotionState": "proof_required",
+        "promotionReasonCode": "missing_artifact_or_startup_smoke_proof",
+        "promotionReason": "Fallback Blazor Desktop tuple blazor-desktop:windows:win-x64 for windows/win-x64 is retained for recovery/manual routing on windows/win-x64 but is not promoted until matching artifact bytes and fresh startup verification are present.",
+        "parityPosture": "explicit_fallback",
+        "updateEligibility": "blocked_missing_proof",
+        "updateEligibilityReason": "Fallback route blazor-desktop:windows:win-x64 is not update-eligible until promoted.",
+        "rollbackState": "fallback_not_promoted",
+        "rollbackReasonCode": "fallback_missing_artifact_or_startup_smoke_proof",
+        "rollbackReason": "Fallback route blazor-desktop:windows:win-x64 needs artifact and startup verification before rollback use.",
+        "revokeState": "not_revoked",
+        "revokeSource": "none",
+        "revokeReasonCode": "no_registry_revoke_marker",
+        "revokeReason": "No registry revoke marker is active for blazor-desktop:windows:win-x64.",
+        "installPosture": "proof_capture_required",
+        "installPostureReason": "Do not present blazor-desktop:windows:win-x64 as installable until the missing tuple proof is captured.",
+        "publicInstallRoute": "/downloads/install/blazor-desktop-win-x64-installer"
+      },
+      {
+        "tupleId": "avalonia:macos:osx-arm64",
+        "head": "avalonia",
+        "platform": "macos",
+        "rid": "osx-arm64",
+        "arch": "arm64",
+        "artifactId": "",
+        "routeRole": "primary",
+        "routeRoleReasonCode": "primary_flagship_head",
+        "routeRoleReason": "Avalonia Desktop route avalonia:macos:osx-arm64 is the flagship desktop route for macos/osx-arm64 and must carry independent startup verification before promotion.",
+        "promotionState": "proof_required",
+        "promotionReasonCode": "missing_artifact_or_startup_smoke_proof",
+        "promotionReason": "Primary-route Avalonia Desktop tuple avalonia:macos:osx-arm64 for macos/osx-arm64 is not promoted until the flagship head has matching artifact bytes and fresh startup verification for this channel.",
+        "parityPosture": "flagship_primary",
+        "updateEligibility": "blocked_missing_proof",
+        "updateEligibilityReason": "Primary-route updates are blocked until avalonia:macos:osx-arm64 is promoted.",
+        "rollbackState": "manual_recovery_required",
+        "rollbackReasonCode": "fallback_missing_artifact_or_startup_smoke_proof",
+        "rollbackReason": "Fallback route blazor-desktop:macos:osx-arm64 is not promoted for macos/osx-arm64 because matching artifact bytes and fresh startup verification are still required; primary route avalonia:macos:osx-arm64 therefore requires manual recovery.",
+        "revokeState": "not_revoked",
+        "revokeSource": "none",
+        "revokeReasonCode": "no_registry_revoke_marker",
+        "revokeReason": "No registry revoke marker is active for avalonia:macos:osx-arm64.",
+        "installPosture": "proof_capture_required",
+        "installPostureReason": "Do not present avalonia:macos:osx-arm64 as installable until the missing tuple proof is captured.",
+        "publicInstallRoute": "/downloads/install/avalonia-osx-arm64-installer"
+      },
+      {
+        "tupleId": "blazor-desktop:macos:osx-arm64",
+        "head": "blazor-desktop",
+        "platform": "macos",
+        "rid": "osx-arm64",
+        "arch": "arm64",
+        "artifactId": "",
+        "routeRole": "fallback",
+        "routeRoleReasonCode": "fallback_recovery_head",
+        "routeRoleReason": "Blazor Desktop route blazor-desktop:macos:osx-arm64 is retained as an explicit fallback route for macos/osx-arm64; it cannot satisfy the primary-route promise.",
+        "promotionState": "proof_required",
+        "promotionReasonCode": "missing_artifact_or_startup_smoke_proof",
+        "promotionReason": "Fallback Blazor Desktop tuple blazor-desktop:macos:osx-arm64 for macos/osx-arm64 is retained for recovery/manual routing on macos/osx-arm64 but is not promoted until matching artifact bytes and fresh startup verification are present.",
+        "parityPosture": "explicit_fallback",
+        "updateEligibility": "blocked_missing_proof",
+        "updateEligibilityReason": "Fallback route blazor-desktop:macos:osx-arm64 is not update-eligible until promoted.",
+        "rollbackState": "fallback_not_promoted",
+        "rollbackReasonCode": "fallback_missing_artifact_or_startup_smoke_proof",
+        "rollbackReason": "Fallback route blazor-desktop:macos:osx-arm64 needs artifact and startup verification before rollback use.",
+        "revokeState": "not_revoked",
+        "revokeSource": "none",
+        "revokeReasonCode": "no_registry_revoke_marker",
+        "revokeReason": "No registry revoke marker is active for blazor-desktop:macos:osx-arm64.",
+        "installPosture": "proof_capture_required",
+        "installPostureReason": "Do not present blazor-desktop:macos:osx-arm64 as installable until the missing tuple proof is captured.",
+        "publicInstallRoute": "/downloads/install/blazor-desktop-osx-arm64-installer"
+      }
+    ],
+    "complete": false
+  },
+  "runtimeBundleHeads": [],
+  "installAwareArtifactRegistry": [
+    {
+      "registryId": "concierge:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "artifactId": "avalonia-linux-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260712-174412",
+      "tupleId": "avalonia:linux:linux-x64",
+      "head": "avalonia",
+      "platform": "linux",
+      "rid": "linux-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "installedBuildSelector": "preview/run-20260712-174412/avalonia/linux/x64",
+      "currentForInstalledBuild": true,
+      "channelRationale": "Published preview channel keeps primary-route avalonia:linux:linux-x64 current for installed build selector preview/run-20260712-174412/avalonia/linux/x64.",
+      "correctnessReason": "Offer avalonia-linux-x64-installer to installed build selector preview/run-20260712-174412/avalonia/linux/x64 because tuple avalonia:linux:linux-x64 is currently promoted for this channel.",
+      "recoveryProofRefs": [
+        "/downloads/install/avalonia-linux-x64-installer",
+        "startup-smoke/startup-smoke-avalonia-linux-x64.receipt.json",
+        "desktopTupleCoverage.desktopRouteTruth[avalonia:linux:linux-x64]"
+      ],
+      "conciergeAssetRefs": {
+        "releaseExplainerPacket": "concierge/release/preview/run-20260712-174412/avalonia-linux-x64-installer",
+        "supportClosurePacket": "concierge/support/preview/run-20260712-174412/avalonia-linux-x64-installer",
+        "publicTrustWrapper": "/downloads/install/avalonia-linux-x64-installer"
+      }
+    },
+    {
+      "registryId": "concierge:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "artifactId": "avalonia-win-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260712-174412",
+      "tupleId": "avalonia:windows:win-x64",
+      "head": "avalonia",
+      "platform": "windows",
+      "rid": "win-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "installedBuildSelector": "preview/run-20260712-174412/avalonia/windows/x64",
+      "currentForInstalledBuild": true,
+      "channelRationale": "Published preview channel keeps primary-route avalonia:windows:win-x64 current for installed build selector preview/run-20260712-174412/avalonia/windows/x64.",
+      "correctnessReason": "Offer avalonia-win-x64-installer to installed build selector preview/run-20260712-174412/avalonia/windows/x64 because tuple avalonia:windows:win-x64 is currently promoted for this channel.",
+      "recoveryProofRefs": [
+        "/downloads/install/avalonia-win-x64-installer",
+        "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+        "desktopTupleCoverage.desktopRouteTruth[avalonia:windows:win-x64]"
+      ],
+      "conciergeAssetRefs": {
+        "releaseExplainerPacket": "concierge/release/preview/run-20260712-174412/avalonia-win-x64-installer",
+        "supportClosurePacket": "concierge/support/preview/run-20260712-174412/avalonia-win-x64-installer",
+        "publicTrustWrapper": "/downloads/install/avalonia-win-x64-installer"
+      }
+    }
+  ],
+  "desktopSurfaceRefs": [
+    {
+      "registryId": "desktop-surface:preview:run-20260712-174412:avalonia:linux:linux-x64",
+      "artifactId": "avalonia-linux-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260712-174412",
+      "tupleId": "avalonia:linux:linux-x64",
+      "head": "avalonia",
+      "platform": "linux",
+      "rid": "linux-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "installAccessClass": "open_public",
+      "desktopChannelRef": "desktop-channel:preview:run-20260712-174412:avalonia:linux:linux-x64",
+      "installGuidanceRef": "install-guidance:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "participationReceiptRef": "participation-receipt:preview:run-20260712-174412:avalonia:linux:linux-x64",
+      "rewardPublicationRef": "reward-publication:binding:preview:run-20260712-174412:avalonia:linux:linux-x64",
+      "publicationBindingId": "binding:preview:run-20260712-174412:avalonia:linux:linux-x64",
+      "publicInstallRoute": "/downloads/install/avalonia-linux-x64-installer",
+      "rationale": "preview keeps avalonia:linux:linux-x64 guest-readable so desktop channel, install guidance, participation, and reward refs stay governed without exposing provider internals."
+    },
+    {
+      "registryId": "desktop-surface:preview:run-20260712-174412:avalonia:windows:win-x64",
+      "artifactId": "avalonia-win-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260712-174412",
+      "tupleId": "avalonia:windows:win-x64",
+      "head": "avalonia",
+      "platform": "windows",
+      "rid": "win-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "installAccessClass": "open_public",
+      "desktopChannelRef": "desktop-channel:preview:run-20260712-174412:avalonia:windows:win-x64",
+      "installGuidanceRef": "install-guidance:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "participationReceiptRef": "participation-receipt:preview:run-20260712-174412:avalonia:windows:win-x64",
+      "rewardPublicationRef": "reward-publication:binding:preview:run-20260712-174412:avalonia:windows:win-x64",
+      "publicationBindingId": "binding:preview:run-20260712-174412:avalonia:windows:win-x64",
+      "publicInstallRoute": "/downloads/install/avalonia-win-x64-installer",
+      "rationale": "preview keeps avalonia:windows:win-x64 guest-readable so desktop channel, install guidance, participation, and reward refs stay governed without exposing provider internals."
+    }
+  ],
+  "artifactIdentityRegistry": [
+    {
+      "registryId": "artifact-identity:preview:run-20260712-174412:avalonia:linux:linux-x64",
+      "artifactFamilyId": "artifact-family:avalonia:linux:linux-x64",
+      "artifactId": "avalonia-linux-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260712-174412",
+      "tupleId": "avalonia:linux:linux-x64",
+      "head": "avalonia",
+      "platform": "linux",
+      "rid": "linux-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "previewRef": "registry-preview:avalonia-linux-x64-installer:avalonia:linux:linux-x64",
+      "captionRef": "registry-caption:preview:run-20260712-174412:avalonia:linux:linux-x64",
+      "packetRef": "registry-packet:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "localeRef": "registry-locale:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "retentionRef": "registry-retention:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "publicationBindingId": "binding:preview:run-20260712-174412:avalonia:linux:linux-x64",
+      "signedInShelfRef": "shelf:signed-in:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "publicShelfRef": "shelf:public:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "publicInstallRoute": "/downloads/install/avalonia-linux-x64-installer",
+      "retentionState": "temporary",
+      "publicationState": "preview"
+    },
+    {
+      "registryId": "artifact-identity:preview:run-20260712-174412:avalonia:windows:win-x64",
+      "artifactFamilyId": "artifact-family:avalonia:windows:win-x64",
+      "artifactId": "avalonia-win-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260712-174412",
+      "tupleId": "avalonia:windows:win-x64",
+      "head": "avalonia",
+      "platform": "windows",
+      "rid": "win-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "previewRef": "registry-preview:avalonia-win-x64-installer:avalonia:windows:win-x64",
+      "captionRef": "registry-caption:preview:run-20260712-174412:avalonia:windows:win-x64",
+      "packetRef": "registry-packet:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "localeRef": "registry-locale:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "retentionRef": "registry-retention:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "publicationBindingId": "binding:preview:run-20260712-174412:avalonia:windows:win-x64",
+      "signedInShelfRef": "shelf:signed-in:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "publicShelfRef": "shelf:public:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "publicInstallRoute": "/downloads/install/avalonia-win-x64-installer",
+      "retentionState": "temporary",
+      "publicationState": "preview"
+    }
+  ],
+  "artifactPublicationBindings": [
+    {
+      "bindingId": "binding:preview:run-20260712-174412:avalonia:linux:linux-x64",
+      "artifactFamilyId": "artifact-family:avalonia:linux:linux-x64",
+      "artifactId": "avalonia-linux-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260712-174412",
+      "tupleId": "avalonia:linux:linux-x64",
+      "head": "avalonia",
+      "platform": "linux",
+      "rid": "linux-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "publicationScope": "signed-in-and-public",
+      "publicationState": "preview",
+      "signedInShelfRef": "shelf:signed-in:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "publicShelfRef": "shelf:public:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "previewRef": "registry-preview:avalonia-linux-x64-installer:avalonia:linux:linux-x64",
+      "captionRef": "registry-caption:preview:run-20260712-174412:avalonia:linux:linux-x64",
+      "packetRef": "registry-packet:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "localeRef": "registry-locale:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "retentionRef": "registry-retention:preview:run-20260712-174412:avalonia-linux-x64-installer",
+      "publicInstallRoute": "/downloads/install/avalonia-linux-x64-installer",
+      "retentionState": "temporary",
+      "rationale": "preview keeps tuple avalonia:linux:linux-x64 in preview because proof receipts are stale or incomplete, so signed-in and public shelves keep governed refs without overstating current output readiness."
+    },
+    {
+      "bindingId": "binding:preview:run-20260712-174412:avalonia:windows:win-x64",
+      "artifactFamilyId": "artifact-family:avalonia:windows:win-x64",
+      "artifactId": "avalonia-win-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260712-174412",
+      "tupleId": "avalonia:windows:win-x64",
+      "head": "avalonia",
+      "platform": "windows",
+      "rid": "win-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "publicationScope": "signed-in-and-public",
+      "publicationState": "preview",
+      "signedInShelfRef": "shelf:signed-in:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "publicShelfRef": "shelf:public:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "previewRef": "registry-preview:avalonia-win-x64-installer:avalonia:windows:win-x64",
+      "captionRef": "registry-caption:preview:run-20260712-174412:avalonia:windows:win-x64",
+      "packetRef": "registry-packet:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "localeRef": "registry-locale:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "retentionRef": "registry-retention:preview:run-20260712-174412:avalonia-win-x64-installer",
+      "publicInstallRoute": "/downloads/install/avalonia-win-x64-installer",
+      "retentionState": "temporary",
+      "rationale": "preview keeps tuple avalonia:windows:win-x64 in preview because proof receipts are stale or incomplete, so signed-in and public shelves keep governed refs without overstating current output readiness."
+    }
+  ],
+  "publicTrustMetrics": {
+    "releaseChannel": {
+      "channelId": "preview",
+      "posture": "blocked",
+      "publicationStatus": "published",
+      "rolloutState": "coverage_incomplete",
+      "supportabilityState": "review_required",
+      "recommendedRouteCount": 0,
+      "fallbackRecoveryRouteCount": 0,
+      "blockedRouteCount": 3,
+      "revokedRouteCount": 0,
+      "summary": "Channel preview is blocked with 0 recommended primary routes, 0 promoted fallback recovery routes, 3 blocked routes, and 0 active revocations."
+    },
+    "adoptionHealth": {
+      "status": "blocked",
+      "primaryPromotedCount": 0,
+      "publicInstallCount": 0,
+      "accountLinkedInstallCount": 0,
+      "fallbackRecoveryCount": 0,
+      "blockedRouteCount": 3,
+      "revokedRouteCount": 0,
+      "summary": "0 primary routes are promoted; 0 are guest-readable, 0 require account-linked install handoff, 0 fallback recovery routes are promoted, and 3 routes are still blocked on proof."
+    },
+    "proofFreshness": {
+      "status": "stale",
+      "releaseProofGeneratedAt": "2026-07-17T22:36:23Z",
+      "releaseProofAgeSeconds": 180192,
+      "releaseProofMaxAgeSeconds": 604800,
+      "uiLocalizationGeneratedAt": "2026-07-17T22:24:10Z",
+      "uiLocalizationAgeSeconds": 180925,
+      "uiLocalizationMaxAgeSeconds": 604800,
+      "flagshipReadinessGeneratedAt": "2026-07-17T23:59:49Z",
+      "flagshipReadinessAgeSeconds": 175186,
+      "flagshipReadinessMaxAgeSeconds": 604800,
+      "flagshipReadinessStatus": "fail",
+      "flagshipReadinessCoverageGapKeys": [
+        "desktop_client",
+        "fleet_and_operator_loop"
+      ],
+      "flagshipDesktopClientReady": false,
+      "flagshipReadinessReason": "Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is promoted_preview, not public_stable, workspace portal release channel artifact chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json disagrees with authoritative registry receipt (local status=published, channel=preview, version=run-20260715-140426, supportability=review_required, rollout=public_release_review_required; authoritative status=published, channel=preview, version=run-20260712-174412, supportability=preview_supported, rollout=promoted_preview), Windows installer visual audit source digest does not match promoted installer, Portal release channel Windows installer binding disagrees with authoritative release channel, promoted Windows installer artifact file is missing, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca: [redacted-path], windows installer gold proof artifact is still missing: [redacted-path], supervisor completion status is 'fail', Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decision gate receipt is missing, malformed, or internally inconsistent., Campaign OS local proof is not valid executed v3 evidence (candidate_source_build_inputs_current_mismatch). Coverage gaps: fleet_and_operator_loop, desktop_client.",
+      "summary": "Release proof age is 180192s (max 604800s) and UI localization gate age is 180925s (max 604800s); flagship desktop readiness age is 175186s (max 604800s) and desktop readiness is blocked: Launch-critical nested blockers or coverage gaps remain; raw materializer status is not sufficient for a flagship launch claim. Launch blockers: release channel channel is preview, not a flagship stable lane, release channel supportability is not gold_supported, release channel rollout is promoted_preview, not public_stable, workspace portal release channel artifact chummer.run-services/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json disagrees with authoritative registry receipt (local status=published, channel=preview, version=run-20260715-140426, supportability=review_required, rollout=public_release_review_required; authoritative status=published, channel=preview, version=run-20260712-174412, supportability=preview_supported, rollout=promoted_preview), Windows installer visual audit source digest does not match promoted installer, Portal release channel Windows installer binding disagrees with authoritative release channel, promoted Windows installer artifact file is missing, windows installer visual audit source still targets 80655fd79a096cd7714910d7b38f7741eea01f82ada96dc6a2a097951997d91a instead of promoted digest d0857d0a6e5c958f34117051669373444b785f683e701c3e0ae428abef36e8ca: [redacted-path], windows installer gold proof artifact is still missing: [redacted-path], supervisor completion status is 'fail', Hosted Build backup and point-in-time-recovery retention, tombstone or lineage retention, deletion replay, and whole-account erasure are not launch-approved or production-verified., Hosted Build V002 operator decision gate receipt is missing, malformed, or internally inconsistent., Campaign OS local proof is not valid executed v3 evidence (candidate_source_build_inputs_current_mismatch). Coverage gaps: fleet_and_operator_loop, desktop_client.."
+    },
+    "revocationFacts": {
+      "status": "clear",
+      "channelRevoked": false,
+      "activeRevocationCount": 0,
+      "activeRevocations": [],
+      "summary": "No channel or route revocations are active on channel preview."
+    }
+  },
+  "registryBoundaryCoverage": {
+    "status": "closed",
+    "owner": "chummer6-hub-registry",
+    "channelId": "preview",
+    "releaseVersion": "run-20260712-174412",
+    "persistence": {
+      "contractName": "Chummer.Hub.Registry.Contracts",
+      "artifactCount": 2,
+      "runtimeBundleHeadCount": 0,
+      "registryProjectionCount": 8,
+      "summary": "Registry persistence owns 2 published artifacts, 0 runtime bundle heads, and 8 governed projection rows for preview/run-20260712-174412."
+    },
+    "releaseChannel": {
+      "publicationStatus": "published",
+      "rolloutState": "coverage_incomplete",
+      "supportabilityState": "review_required",
+      "desktopTupleComplete": false,
+      "promotedInstallerTupleCount": 2,
+      "desktopRouteTruthCount": 6,
+      "publicTrustPosture": "blocked",
+      "summary": "Release-channel truth for preview/run-20260712-174412 keeps 2 promoted installer tuples and 6 explicit desktop route-truth rows under coverage_incomplete rollout posture."
+    },
+    "artifactLineage": {
+      "artifactIdentityCount": 2,
+      "publicationBindingCount": 2,
+      "exchangeLineageCount": 0,
+      "publishedArtifactCount": 0,
+      "retainedArtifactCount": 0,
+      "summary": "Artifact-lineage truth covers 2 artifact identity rows, 2 publication bindings, and 0 exchange-lineage rows."
+    },
+    "publication": {
+      "publishedBindingCount": 0,
+      "retainedBindingCount": 0,
+      "signedInAndPublicBindingCount": 2,
+      "currentRetentionCount": 0,
+      "summary": "Publication boundary keeps 0 published bindings, 0 retained bindings, and 2 signed-in/public shared shelf refs."
+    },
+    "entitlement": {
+      "installAwareArtifactCount": 2,
+      "desktopSurfaceRefCount": 2,
+      "openPublicSurfaceCount": 2,
+      "accountRequiredSurfaceCount": 0,
+      "summary": "Entitlement and install-hand-off truth spans 2 install-aware registry rows, 2 desktop surface refs, 2 guest-readable surfaces, and 0 account-required surfaces."
+    },
+    "compatibility": {
+      "compatibleArtifactCount": 2,
+      "compatibleRuntimeBundleHeadCount": 0,
+      "compatibleExchangeArtifactCount": 0,
+      "unknownArtifactCount": 0,
+      "unknownRuntimeBundleHeadCount": 0,
+      "summary": "Compatibility boundary tracks 2 compatible artifacts, 0 compatible runtime bundle heads, and 0 compatible exchange-lineage rows while 0 artifact rows and 0 runtime bundle heads remain unknown."
+    },
+    "summary": "Registry boundary coverage is closed for preview/run-20260712-174412 across persistence, release-channel, artifact-lineage, publication, entitlement, and compatibility surfaces."
+  }
+}
