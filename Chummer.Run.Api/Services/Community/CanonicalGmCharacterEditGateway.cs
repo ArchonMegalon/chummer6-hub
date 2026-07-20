@@ -1,12 +1,14 @@
 namespace Chummer.Run.Api.Services.Community;
 
 /// <summary>
-/// Package-plane command passed to the adapter for Core's
-/// chummer.delegated-gm-character-edit/v1 service. Hub owns the current
-/// campaign grant; the adapter must make Core re-authorize that grant and must
-/// not implement character patching itself.
+/// Hub-private routing context for a future adapter over Core's
+/// chummer.delegated-gm-character-edit/v1 package contract. These transport
+/// envelopes are deliberately not copies of Chummer.Contracts.Workspaces.
+/// The production adapter must consume the pinned Core package types, ask a
+/// store-backed Core authorizer to re-check the current Hub grant, and map the
+/// exact Core result into this bounded Hub transport seam.
 /// </summary>
-public sealed record CanonicalGmCharacterEditCommand(
+public sealed record CoreDelegatedGmEditTransportContext(
     string CampaignId,
     string ActorUserId,
     string CampaignOwnerUserId,
@@ -17,30 +19,61 @@ public sealed record CanonicalGmCharacterEditCommand(
     string DelegationId,
     string AuthorityReceiptId,
     long AuthorityRevision,
-    DateTimeOffset AuthorityGrantedAtUtc,
+    DateTimeOffset AuthorityGrantedAtUtc);
+
+public sealed record CoreDelegatedGmEditTransportReadCommand(
+    CoreDelegatedGmEditTransportContext Context);
+
+public sealed record CoreDelegatedGmEditTransportCommand(
+    CoreDelegatedGmEditTransportContext Context,
     long ExpectedRevision,
     string IdempotencyKey,
     string Reason,
     string RunnerHandle,
     string DisplayName);
 
-public enum CanonicalGmCharacterEditPatchOperationKind
+/// <summary>
+/// Privacy-bounded canonical readback. A real adapter obtains these values from
+/// Core after authorization; it must never echo Hub request values as proof.
+/// </summary>
+public sealed record CoreDelegatedGmEditTransportProfile(
+    long Revision,
+    string RunnerHandle,
+    string DisplayName);
+
+public enum CoreDelegatedGmEditTransportReadOutcome
+{
+    Available = 0,
+    Denied = 1,
+    Forbidden = 2,
+    Invalid = 3,
+    Missing = 4,
+    Corrupt = 5,
+    Unavailable = 6
+}
+
+public sealed record CoreDelegatedGmEditTransportReadResult(
+    CoreDelegatedGmEditTransportReadOutcome Outcome,
+    CoreDelegatedGmEditTransportProfile? Profile = null,
+    string? ErrorCode = null);
+
+public enum CoreDelegatedGmEditTransportPatchOperationKind
 {
     Replace = 0
 }
 
 /// <summary>
-/// Exact package-plane projection of Core's privacy-safe delegated-edit audit
-/// operation. Hub verifies these digests before changing its read projection;
-/// the adapter must not synthesize them from the request.
+/// Privacy-safe transport projection of one Core receipt operation. The real
+/// adapter maps the package-owned receipt; Hub never synthesizes this receipt
+/// from the mutation request.
 /// </summary>
-public sealed record CanonicalGmCharacterEditAuditOperation(
-    CanonicalGmCharacterEditPatchOperationKind Operation,
+public sealed record CoreDelegatedGmEditTransportAuditOperation(
+    CoreDelegatedGmEditTransportPatchOperationKind Operation,
     string Path,
     string ValueSha256,
     int ValueLength);
 
-public enum CanonicalGmCharacterEditOutcome
+public enum CoreDelegatedGmEditTransportOutcome
 {
     Applied = 0,
     Replayed = 1,
@@ -53,12 +86,7 @@ public enum CanonicalGmCharacterEditOutcome
     Unavailable = 8
 }
 
-/// <summary>
-/// The minimal Core receipt projection Hub needs to reconcile its campaign
-/// sheet. Values are returned by the typed Core package adapter after Core has
-/// atomically committed or replayed the canonical character edit.
-/// </summary>
-public sealed record CanonicalGmCharacterEditReceipt(
+public sealed record CoreDelegatedGmEditTransportReceipt(
     string Contract,
     string ReceiptId,
     string CampaignId,
@@ -77,40 +105,52 @@ public sealed record CanonicalGmCharacterEditReceipt(
     long PreviousRevision,
     long NewRevision,
     DateTimeOffset AppliedAtUtc,
-    IReadOnlyList<CanonicalGmCharacterEditAuditOperation> Operations);
+    IReadOnlyList<CoreDelegatedGmEditTransportAuditOperation> Operations);
 
-public sealed record CanonicalGmCharacterEditResult(
-    CanonicalGmCharacterEditOutcome Outcome,
-    CanonicalGmCharacterEditReceipt? Receipt = null,
-    // Mandatory for Applied/Replayed. The package adapter must read the
-    // canonical workspace after execution so Hub never projects an old replay
-    // receipt over a character that has since advanced again.
-    long? CurrentRevision = null,
+public sealed record CoreDelegatedGmEditTransportResult(
+    CoreDelegatedGmEditTransportOutcome Outcome,
+    CoreDelegatedGmEditTransportReceipt? Receipt = null,
+    // Mandatory for Applied, Replayed, and Conflict. This is an
+    // authoritative read after execution/replay, so Hub can reconcile without
+    // overwriting a later character-owner edit.
+    CoreDelegatedGmEditTransportProfile? CurrentProfile = null,
     string? ErrorCode = null);
 
 /// <summary>
-/// Typed seam for Core's delegated canonical character-edit service. A release
-/// implementation must come from the pinned Core package plane and re-check
-/// Hub's current authority through its Core authorizer. Test implementations
-/// may emulate Core's atomic idempotency ledger, but production Hub code must
-/// never duplicate the canonical patch logic.
+/// Hub-private seam for the future pinned Core adapter. Readback is mandatory:
+/// Hub-derived revisions are only a projection and may never veto a Core
+/// idempotent replay or overwrite a newer owner edit.
 /// </summary>
 public interface ICanonicalGmCharacterEditGateway
 {
-    CanonicalGmCharacterEditResult Execute(CanonicalGmCharacterEditCommand command);
+    CoreDelegatedGmEditTransportReadResult ReadCurrentProfile(
+        CoreDelegatedGmEditTransportReadCommand command);
+
+    CoreDelegatedGmEditTransportResult Execute(
+        CoreDelegatedGmEditTransportCommand command);
 }
 
 /// <summary>
-/// Safe release default until the Core package containing the delegated-edit
-/// adapter is pinned. It deliberately cannot mutate either Core or Hub state.
+/// Safe release default until the exact Core package plus authoritative
+/// readback adapter is pinned. It deliberately cannot mutate Core or Hub.
 /// </summary>
 public sealed class UnavailableCoreDelegatedGmCharacterEditGateway : ICanonicalGmCharacterEditGateway
 {
-    public CanonicalGmCharacterEditResult Execute(CanonicalGmCharacterEditCommand command)
+    public CoreDelegatedGmEditTransportReadResult ReadCurrentProfile(
+        CoreDelegatedGmEditTransportReadCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
-        return new CanonicalGmCharacterEditResult(
-            CanonicalGmCharacterEditOutcome.Unavailable,
+        return new CoreDelegatedGmEditTransportReadResult(
+            CoreDelegatedGmEditTransportReadOutcome.Unavailable,
+            ErrorCode: "core_delegated_edit_package_unavailable");
+    }
+
+    public CoreDelegatedGmEditTransportResult Execute(
+        CoreDelegatedGmEditTransportCommand command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        return new CoreDelegatedGmEditTransportResult(
+            CoreDelegatedGmEditTransportOutcome.Unavailable,
             ErrorCode: "core_delegated_edit_package_unavailable");
     }
 }

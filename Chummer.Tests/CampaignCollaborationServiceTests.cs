@@ -374,15 +374,15 @@ public sealed class CampaignCollaborationServiceTests
         Assert.Equal(1, fixture.CanonicalEdits.ApplyCount);
         Assert.Equal(1, fixture.CanonicalEdits.CallCount);
         Assert.StartsWith("gm-edit-", receipt.ReceiptId, StringComparison.Ordinal);
-        CanonicalGmCharacterEditCommand canonicalCommand = Assert.Single(fixture.CanonicalEdits.Commands);
-        Assert.Equal(campaign.CampaignId, canonicalCommand.CampaignId);
-        Assert.Equal(fixture.Gm.UserId, canonicalCommand.ActorUserId);
-        Assert.Equal(player.UserId, canonicalCommand.CharacterOwnerUserId);
-        Assert.Equal(joined.Binding.AuthoritativeCharacterId, canonicalCommand.AuthoritativeCharacterId);
+        CoreDelegatedGmEditTransportCommand canonicalCommand = Assert.Single(fixture.CanonicalEdits.Commands);
+        Assert.Equal(campaign.CampaignId, canonicalCommand.Context.CampaignId);
+        Assert.Equal(fixture.Gm.UserId, canonicalCommand.Context.ActorUserId);
+        Assert.Equal(player.UserId, canonicalCommand.Context.CharacterOwnerUserId);
+        Assert.Equal(joined.Binding.AuthoritativeCharacterId, canonicalCommand.Context.AuthoritativeCharacterId);
         Assert.Equal("Razor-2", canonicalCommand.RunnerHandle);
         Assert.Equal("Alex Razor", canonicalCommand.DisplayName);
         Assert.DoesNotContain(
-            typeof(CanonicalGmCharacterEditCommand).GetProperties(),
+            typeof(CoreDelegatedGmEditTransportCommand).GetProperties(),
             property => property.Name is "Status" or "Sections" or "Balance" or "Quota");
         Assert.Equal("Razor-2", fixture.Store.DossiersById[joined.DossierId].RunnerHandle);
         CampaignPlayerSafeSheetProjection persistedProjection = fixture.Service.GetSharedSheet(
@@ -393,14 +393,14 @@ public sealed class CampaignCollaborationServiceTests
             Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
                 persistedProjection,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)))).ToLowerInvariant());
-        Assert.Equal(2, fixture.Store.CampaignCharacterBindings.Count);
+        Assert.Single(fixture.Store.CampaignCharacterBindings);
         Assert.Single(fixture.Service.GetSharedSheetAuditForTests(joined.DossierId));
         Assert.Throws<CampaignIdempotencyConflictException>(() => fixture.Service.UpdateSharedSheet(
             fixture.Gm,
             campaign.CampaignId,
             joined.DossierId,
             request with { RunnerHandle = "Different" }));
-        Assert.Throws<CampaignRevisionConflictException>(() => fixture.Service.UpdateSharedSheet(
+        Assert.Throws<CampaignCanonicalEditConflictException>(() => fixture.Service.UpdateSharedSheet(
             fixture.Gm,
             campaign.CampaignId,
             joined.DossierId,
@@ -449,14 +449,15 @@ public sealed class CampaignCollaborationServiceTests
     }
 
     [Fact]
-    public void StaleRevisionFailsBeforeCanonicalEdit()
+    public void StaleRevisionIsDecidedByCanonicalCoreWithoutApplyingAnEdit()
     {
         using var fixture = new CampaignFixture();
         CampaignCollaborationProjection campaign = fixture.CreateCampaign();
         HubUserDto player = fixture.CreateUser("subject.player", "Player");
         CampaignInviteRedemptionProjection joined = fixture.Join(campaign, player, "Razor", "Alex Razor");
 
-        Assert.Throws<CampaignRevisionConflictException>(() => fixture.Service.UpdateSharedSheet(
+        CampaignCanonicalEditConflictException conflict = Assert.Throws<CampaignCanonicalEditConflictException>(() =>
+            fixture.Service.UpdateSharedSheet(
             fixture.Gm,
             campaign.CampaignId,
             joined.DossierId,
@@ -468,7 +469,55 @@ public sealed class CampaignCollaborationServiceTests
                 "active",
                 "Stale command.")));
 
-        Assert.Equal(0, fixture.CanonicalEdits.CallCount);
+        Assert.Equal(1, conflict.CurrentRevision);
+        Assert.Equal(1, fixture.CanonicalEdits.ReadCount);
+        Assert.Equal(1, fixture.CanonicalEdits.CallCount);
+        Assert.Equal(0, fixture.CanonicalEdits.ApplyCount);
+        Assert.Empty(fixture.Service.GetSharedSheetAuditForTests(joined.DossierId));
+    }
+
+    [Fact]
+    public void CanonicalConflictSynchronizesLaterOwnerProfileWithoutRewritingConsent()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection campaign = fixture.CreateCampaign();
+        HubUserDto player = fixture.CreateUser("subject.player", "Player");
+        CampaignInviteRedemptionProjection joined = fixture.Join(campaign, player, "Razor", "Alex Razor");
+        CampaignCharacterBindingState consentBefore = Assert.Single(fixture.Store.CampaignCharacterBindings);
+        CoreDelegatedGmEditTransportProfile ownerProfile = fixture.CanonicalEdits.ApplyOwnerEdit(
+            player.UserId,
+            joined.Binding.AuthoritativeCharacterId,
+            "Owner Razor",
+            "Owner Alex");
+
+        CampaignCanonicalEditConflictException conflict = Assert.Throws<CampaignCanonicalEditConflictException>(() =>
+            fixture.Service.UpdateSharedSheet(
+                fixture.Gm,
+                campaign.CampaignId,
+                joined.DossierId,
+                new CampaignSharedSheetUpdateRequest(
+                    1,
+                    "owner-won-race",
+                    "GM Razor",
+                    "GM Alex",
+                    "active",
+                    "Do not overwrite the owner's later edit.")));
+
+        CampaignPlayerSafeSheetProjection current = fixture.Service.GetSharedSheet(
+            fixture.Gm,
+            campaign.CampaignId,
+            joined.DossierId);
+        CampaignCharacterBindingState consentAfter = Assert.Single(fixture.Store.CampaignCharacterBindings);
+        Assert.Equal(ownerProfile.Revision, conflict.CurrentRevision);
+        Assert.Equal(ownerProfile.Revision, current.Revision);
+        Assert.Equal("Owner Razor", current.RunnerHandle);
+        Assert.Equal("Owner Alex", current.DisplayName);
+        Assert.Equal(consentBefore.BindingId, consentAfter.BindingId);
+        Assert.Equal(consentBefore.BindingVersionId, consentAfter.BindingVersionId);
+        Assert.Equal(consentBefore.BindingRevision, consentAfter.BindingRevision);
+        Assert.Equal(consentBefore.RecordedAtUtc, consentAfter.RecordedAtUtc);
+        Assert.Equal(1, fixture.CanonicalEdits.CallCount);
+        Assert.Equal(0, fixture.CanonicalEdits.ApplyCount);
         Assert.Empty(fixture.Service.GetSharedSheetAuditForTests(joined.DossierId));
     }
 
@@ -536,7 +585,7 @@ public sealed class CampaignCollaborationServiceTests
         HubUserDto player = fixture.CreateUser("subject.player", "Player");
         CampaignInviteRedemptionProjection joined = fixture.Join(campaign, player, "Razor", "Alex Razor");
         int bindingCount = fixture.Store.CampaignCharacterBindings.Count;
-        fixture.CanonicalEdits.ForcedOutcome = CanonicalGmCharacterEditOutcome.Unavailable;
+        fixture.CanonicalEdits.ForcedOutcome = CoreDelegatedGmEditTransportOutcome.Unavailable;
 
         Assert.Throws<CampaignCanonicalEditUnavailableException>(() => fixture.Service.UpdateSharedSheet(
             fixture.Gm,
@@ -628,6 +677,131 @@ public sealed class CampaignCollaborationServiceTests
         Assert.Equal("Razor Recovered", fixture.Store.DossiersById[joined.DossierId].RunnerHandle);
         Assert.Single(fixture.Service.GetSharedSheetAuditForTests(joined.DossierId));
         Assert.Single(fixture.Store.CampaignSheetEditsByIdempotencyKey);
+    }
+
+    [Fact]
+    public void ReplayAfterLaterOwnerEditReconcilesCurrentProfileWithoutRollingItBack()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection campaign = fixture.CreateCampaign();
+        HubUserDto player = fixture.CreateUser("subject.player", "Player");
+        CampaignInviteRedemptionProjection joined = fixture.Join(campaign, player, "Razor", "Alex Razor");
+        var edit = new CampaignSharedSheetUpdateRequest(
+            1,
+            "persist-owner-recovery",
+            "GM Razor",
+            "GM Alex",
+            "active",
+            "Recover a committed GM edit without replacing a later owner edit.");
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = static () =>
+            throw new IOException("injected sheet persistence failure");
+
+        Assert.Throws<IOException>(() => fixture.Service.UpdateSharedSheet(
+            fixture.Gm,
+            campaign.CampaignId,
+            joined.DossierId,
+            edit));
+        fixture.Store.CampaignCollaborationPersistenceFaultInjector = null;
+        CoreDelegatedGmEditTransportProfile ownerProfile = fixture.CanonicalEdits.ApplyOwnerEdit(
+            player.UserId,
+            joined.Binding.AuthoritativeCharacterId,
+            "Owner Razor",
+            "Owner Alex");
+
+        CampaignSharedSheetEditReceipt recovered = fixture.Service.UpdateSharedSheet(
+            fixture.Gm,
+            campaign.CampaignId,
+            joined.DossierId,
+            edit);
+        CampaignPlayerSafeSheetProjection current = fixture.Service.GetSharedSheet(
+            fixture.Gm,
+            campaign.CampaignId,
+            joined.DossierId);
+
+        Assert.Equal(2, recovered.Revision);
+        Assert.Equal(ownerProfile.Revision, recovered.CurrentRevision);
+        Assert.Equal(3, current.Revision);
+        Assert.Equal("Owner Razor", current.RunnerHandle);
+        Assert.Equal("Owner Alex", current.DisplayName);
+        Assert.Equal(2, fixture.CanonicalEdits.CallCount);
+        Assert.Equal(1, fixture.CanonicalEdits.ApplyCount);
+        Assert.Equal(
+            recovered.AfterSha256,
+            Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(
+                current,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)))).ToLowerInvariant());
+        Assert.Single(fixture.Service.GetSharedSheetAuditForTests(joined.DossierId));
+        Assert.Single(fixture.Store.CampaignSheetEditsByIdempotencyKey);
+    }
+
+    [Fact]
+    public void CanonicalEditSynchronizesEveryCampaignWithoutChangingOwnerConsentVersions()
+    {
+        using var fixture = new CampaignFixture();
+        CampaignCollaborationProjection firstCampaign = fixture.CreateCampaign("First");
+        HubUserDto secondGm = fixture.CreateUser("subject.gm-two", "Second GM");
+        CampaignCollaborationProjection secondCampaign = fixture.Service.CreateCampaign(
+            secondGm,
+            new CreateCampaignCollaborationRequest("Second"));
+        HubUserDto player = fixture.CreateUser("subject.player", "Player");
+        RunnerDossierProjection character = fixture.CreateCharacter(player, "Razor", "Alex Razor");
+        CampaignInviteSecretProjection firstInvite = fixture.Service.CreateInvite(
+            fixture.Gm,
+            firstCampaign.CampaignId,
+            new(60, 1));
+        CampaignInviteRedemptionProjection firstJoined = fixture.Service.RedeemInvite(
+            player,
+            firstInvite.InviteId,
+            fixture.LinkRequest(firstInvite, character, "join-first-consent"));
+        CampaignInviteSecretProjection secondInvite = fixture.Service.CreateInvite(
+            secondGm,
+            secondCampaign.CampaignId,
+            new(60, 1));
+        _ = fixture.Service.RedeemInvite(
+            player,
+            secondInvite.InviteId,
+            fixture.LinkRequest(secondInvite, character, "join-second-consent"));
+        var before = fixture.Store.CampaignCharacterBindings
+            .Where(binding => string.Equals(binding.DossierId, character.DossierId, StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(binding => binding.CampaignId, StringComparer.OrdinalIgnoreCase);
+
+        CampaignSharedSheetEditReceipt receipt = fixture.Service.UpdateSharedSheet(
+            fixture.Gm,
+            firstCampaign.CampaignId,
+            firstJoined.DossierId,
+            new CampaignSharedSheetUpdateRequest(
+                1,
+                "cross-campaign-profile-sync",
+                "Razor Shared",
+                "Alex Shared",
+                "active",
+                "Synchronize canonical profile without rewriting consent."));
+
+        var after = fixture.Store.CampaignCharacterBindings
+            .Where(binding => string.Equals(binding.DossierId, character.DossierId, StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(binding => binding.CampaignId, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(before.Count, after.Count);
+        Assert.Equal(2, receipt.CurrentRevision);
+        foreach ((string campaignId, CampaignCharacterBindingState beforeBinding) in before)
+        {
+            CampaignCharacterBindingState afterBinding = after[campaignId];
+            Assert.Equal(beforeBinding.BindingId, afterBinding.BindingId);
+            Assert.Equal(beforeBinding.BindingVersionId, afterBinding.BindingVersionId);
+            Assert.Equal(beforeBinding.BindingRevision, afterBinding.BindingRevision);
+            Assert.Equal(beforeBinding.GmAuthorityRole, afterBinding.GmAuthorityRole);
+            Assert.Equal(beforeBinding.GrantedByUserId, afterBinding.GrantedByUserId);
+            Assert.Equal(beforeBinding.GrantedAtUtc, afterBinding.GrantedAtUtc);
+            Assert.Equal(beforeBinding.RecordedAtUtc, afterBinding.RecordedAtUtc);
+            Assert.Equal(2, afterBinding.CurrentRevision);
+        }
+
+        CampaignPlayerSafeSheetProjection secondSheet = fixture.Service.GetSharedSheet(
+            secondGm,
+            secondCampaign.CampaignId,
+            character.DossierId);
+        Assert.Equal(2, secondSheet.Revision);
+        Assert.Equal("Razor Shared", secondSheet.RunnerHandle);
+        Assert.Equal("Alex Shared", secondSheet.DisplayName);
     }
 
     [Fact]
@@ -1095,6 +1269,11 @@ public sealed class CampaignCollaborationServiceTests
                     CreatedAtUtc: Clock.GetUtcNow(),
                     UpdatedAtUtc: Clock.GetUtcNow());
                 Store.DossiersById[dossierId] = dossier;
+                CanonicalEdits.RegisterCharacter(
+                    owner.UserId,
+                    dossierId,
+                    handle,
+                    displayName);
                 Store.PersistLocked();
                 return dossier;
             }
@@ -1137,7 +1316,9 @@ public sealed class CampaignCollaborationServiceTests
     {
         private const string Contract = "chummer.delegated-gm-character-edit/v1";
         private readonly TimeProvider _clock;
-        private readonly Dictionary<string, (string RequestSha256, CanonicalGmCharacterEditReceipt Receipt)> _ledger =
+        private readonly Dictionary<string, (string RequestSha256, CoreDelegatedGmEditTransportReceipt Receipt)> _ledger =
+            new(StringComparer.Ordinal);
+        private readonly Dictionary<string, CoreDelegatedGmEditTransportProfile> _profiles =
             new(StringComparer.Ordinal);
 
         public RecordingCanonicalGmCharacterEditGateway(TimeProvider clock)
@@ -1146,15 +1327,60 @@ public sealed class CampaignCollaborationServiceTests
         }
 
         public int CallCount { get; private set; }
+        public int ReadCount { get; private set; }
         public int ApplyCount { get; private set; }
-        public CanonicalGmCharacterEditOutcome? ForcedOutcome { get; set; }
+        public CoreDelegatedGmEditTransportOutcome? ForcedOutcome { get; set; }
         public Exception? ExceptionToThrow { get; set; }
-        public Func<CanonicalGmCharacterEditReceipt, CanonicalGmCharacterEditReceipt>? ReceiptMutator { get; set; }
-        public IReadOnlyList<CanonicalGmCharacterEditCommand> Commands => _commands;
+        public Func<CoreDelegatedGmEditTransportReceipt, CoreDelegatedGmEditTransportReceipt>? ReceiptMutator { get; set; }
+        public IReadOnlyList<CoreDelegatedGmEditTransportCommand> Commands => _commands;
 
-        private readonly List<CanonicalGmCharacterEditCommand> _commands = new();
+        private readonly List<CoreDelegatedGmEditTransportCommand> _commands = new();
 
-        public CanonicalGmCharacterEditResult Execute(CanonicalGmCharacterEditCommand command)
+        public void RegisterCharacter(
+            string characterOwnerUserId,
+            string authoritativeCharacterId,
+            string runnerHandle,
+            string displayName,
+            long revision = 1)
+        {
+            _profiles[ProfileKey(characterOwnerUserId, authoritativeCharacterId)] = new(
+                revision,
+                runnerHandle,
+                displayName);
+        }
+
+        public CoreDelegatedGmEditTransportProfile ApplyOwnerEdit(
+            string characterOwnerUserId,
+            string authoritativeCharacterId,
+            string runnerHandle,
+            string displayName)
+        {
+            string key = ProfileKey(characterOwnerUserId, authoritativeCharacterId);
+            CoreDelegatedGmEditTransportProfile current = _profiles[key];
+            var next = new CoreDelegatedGmEditTransportProfile(
+                current.Revision + 1,
+                runnerHandle,
+                displayName);
+            _profiles[key] = next;
+            return next;
+        }
+
+        public CoreDelegatedGmEditTransportReadResult ReadCurrentProfile(
+            CoreDelegatedGmEditTransportReadCommand command)
+        {
+            ReadCount++;
+            CoreDelegatedGmEditTransportContext context = command.Context;
+            return _profiles.TryGetValue(
+                ProfileKey(context.CharacterOwnerUserId, context.AuthoritativeCharacterId),
+                out CoreDelegatedGmEditTransportProfile? profile)
+                    ? new CoreDelegatedGmEditTransportReadResult(
+                        CoreDelegatedGmEditTransportReadOutcome.Available,
+                        profile)
+                    : new CoreDelegatedGmEditTransportReadResult(
+                        CoreDelegatedGmEditTransportReadOutcome.Missing);
+        }
+
+        public CoreDelegatedGmEditTransportResult Execute(CoreDelegatedGmEditTransportCommand command)
         {
             CallCount++;
             _commands.Add(command);
@@ -1163,31 +1389,50 @@ public sealed class CampaignCollaborationServiceTests
                 throw ExceptionToThrow;
             }
 
-            if (ForcedOutcome is CanonicalGmCharacterEditOutcome forced)
+            if (ForcedOutcome is CoreDelegatedGmEditTransportOutcome forced)
             {
-                return new CanonicalGmCharacterEditResult(forced);
+                return new CoreDelegatedGmEditTransportResult(forced);
             }
 
-            string ledgerKey = $"{command.CharacterOwnerUserId}\0{command.AuthoritativeCharacterId}\0{command.IdempotencyKey}";
+            CoreDelegatedGmEditTransportContext context = command.Context;
+            string profileKey = ProfileKey(
+                context.CharacterOwnerUserId,
+                context.AuthoritativeCharacterId);
+            if (!_profiles.TryGetValue(profileKey, out CoreDelegatedGmEditTransportProfile? currentProfile))
+            {
+                return new CoreDelegatedGmEditTransportResult(
+                    CoreDelegatedGmEditTransportOutcome.Missing);
+            }
+
+            string ledgerKey = $"{profileKey}\0{command.IdempotencyKey}";
             string requestSha256 = Digest(command);
             if (_ledger.TryGetValue(ledgerKey, out var replay))
             {
                 if (!string.Equals(replay.RequestSha256, requestSha256, StringComparison.Ordinal))
                 {
-                    return new CanonicalGmCharacterEditResult(CanonicalGmCharacterEditOutcome.Conflict);
+                    return new CoreDelegatedGmEditTransportResult(
+                        CoreDelegatedGmEditTransportOutcome.Conflict,
+                        CurrentProfile: currentProfile);
                 }
 
-                return new CanonicalGmCharacterEditResult(
-                    CanonicalGmCharacterEditOutcome.Replayed,
+                return new CoreDelegatedGmEditTransportResult(
+                    CoreDelegatedGmEditTransportOutcome.Replayed,
                     replay.Receipt,
-                    replay.Receipt.NewRevision);
+                    currentProfile);
+            }
+
+            if (currentProfile.Revision != command.ExpectedRevision)
+            {
+                return new CoreDelegatedGmEditTransportResult(
+                    CoreDelegatedGmEditTransportOutcome.Conflict,
+                    CurrentProfile: currentProfile);
             }
 
             ApplyCount++;
             string idempotencyKeySha256 = Convert.ToHexString(
                     SHA256.HashData(Encoding.UTF8.GetBytes(command.IdempotencyKey)))
                 .ToLowerInvariant();
-            CanonicalGmCharacterEditAuditOperation[] operations =
+            CoreDelegatedGmEditTransportAuditOperation[] operations =
             [
                 AuditOperation("/profile/alias", command.RunnerHandle),
                 AuditOperation("/profile/name", command.DisplayName)
@@ -1195,22 +1440,22 @@ public sealed class CampaignCollaborationServiceTests
             string receiptSeed = string.Join(
                 "\n",
                 requestSha256,
-                command.DelegationId,
-                command.AuthorityReceiptId,
+                context.DelegationId,
+                context.AuthorityReceiptId,
                 idempotencyKeySha256);
-            var receipt = new CanonicalGmCharacterEditReceipt(
+            var receipt = new CoreDelegatedGmEditTransportReceipt(
                 Contract: Contract,
                 ReceiptId: $"gm-edit-{Sha256(receiptSeed)[..24]}",
-                CampaignId: command.CampaignId,
-                DelegationId: command.DelegationId,
-                GrantedByCampaignOwnerId: command.CampaignOwnerUserId,
-                GrantedByCharacterOwnerId: command.CharacterOwnerUserId,
-                AuthorityReceiptId: command.AuthorityReceiptId,
-                AuthorityRevision: command.AuthorityRevision,
-                ActorId: command.ActorUserId,
+                CampaignId: context.CampaignId,
+                DelegationId: context.DelegationId,
+                GrantedByCampaignOwnerId: context.CampaignOwnerUserId,
+                GrantedByCharacterOwnerId: context.CharacterOwnerUserId,
+                AuthorityReceiptId: context.AuthorityReceiptId,
+                AuthorityRevision: context.AuthorityRevision,
+                ActorId: context.ActorUserId,
                 ActorRole: "game-master",
-                CharacterOwnerId: command.CharacterOwnerUserId.Trim().ToLowerInvariant(),
-                AuthoritativeCharacterId: command.AuthoritativeCharacterId,
+                CharacterOwnerId: context.CharacterOwnerUserId.Trim().ToLowerInvariant(),
+                AuthoritativeCharacterId: context.AuthoritativeCharacterId,
                 Reason: command.Reason,
                 IdempotencyKeySha256: idempotencyKeySha256,
                 CommandSha256: requestSha256,
@@ -1218,29 +1463,34 @@ public sealed class CampaignCollaborationServiceTests
                 NewRevision: command.ExpectedRevision + 1,
                 AppliedAtUtc: _clock.GetUtcNow(),
                 Operations: operations);
+            currentProfile = new CoreDelegatedGmEditTransportProfile(
+                receipt.NewRevision,
+                command.RunnerHandle,
+                command.DisplayName);
+            _profiles[profileKey] = currentProfile;
             receipt = ReceiptMutator?.Invoke(receipt) ?? receipt;
             _ledger[ledgerKey] = (requestSha256, receipt);
-            return new CanonicalGmCharacterEditResult(
-                CanonicalGmCharacterEditOutcome.Applied,
+            return new CoreDelegatedGmEditTransportResult(
+                CoreDelegatedGmEditTransportOutcome.Applied,
                 receipt,
-                receipt.NewRevision);
+                currentProfile);
         }
 
-        private static CanonicalGmCharacterEditAuditOperation AuditOperation(string path, string value)
+        private static CoreDelegatedGmEditTransportAuditOperation AuditOperation(string path, string value)
             => new(
-                CanonicalGmCharacterEditPatchOperationKind.Replace,
+                CoreDelegatedGmEditTransportPatchOperationKind.Replace,
                 path,
                 Sha256(value),
                 value.Length);
 
-        private static string Digest(CanonicalGmCharacterEditCommand command)
+        private static string Digest(CoreDelegatedGmEditTransportCommand command)
         {
             StringBuilder builder = new();
             Append(builder, Contract);
-            Append(builder, command.CampaignId);
-            Append(builder, command.ActorUserId);
-            Append(builder, command.CharacterOwnerUserId.Trim().ToLowerInvariant());
-            Append(builder, command.AuthoritativeCharacterId);
+            Append(builder, command.Context.CampaignId);
+            Append(builder, command.Context.ActorUserId);
+            Append(builder, command.Context.CharacterOwnerUserId.Trim().ToLowerInvariant());
+            Append(builder, command.Context.AuthoritativeCharacterId);
             Append(builder, command.ExpectedRevision.ToString(System.Globalization.CultureInfo.InvariantCulture));
             Append(builder, command.Reason);
             Append(builder, "0");
@@ -1261,6 +1511,9 @@ public sealed class CampaignCollaborationServiceTests
         private static string Sha256(string value)
             => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)))
                 .ToLowerInvariant();
+
+        private static string ProfileKey(string characterOwnerUserId, string authoritativeCharacterId)
+            => $"{characterOwnerUserId.Trim().ToLowerInvariant()}\0{authoritativeCharacterId}";
     }
 
     private sealed class RecordingAntiforgery : IAntiforgery

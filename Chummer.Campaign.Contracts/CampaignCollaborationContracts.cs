@@ -91,7 +91,11 @@ public sealed record CampaignSharedSheetEditReceipt(
     string EditedByUserId,
     string BeforeSha256,
     string AfterSha256,
-    DateTimeOffset EditedAtUtc);
+    DateTimeOffset EditedAtUtc,
+    // Revision is the exact canonical revision created by this GM command.
+    // CurrentRevision may be newer when Core replays the command after a later
+    // character-owner edit; clients must reload instead of rolling it back.
+    long? CurrentRevision = null);
 
 public sealed record CampaignGmAuthorityUpdateRequest(
     long ExpectedBindingRevision,
