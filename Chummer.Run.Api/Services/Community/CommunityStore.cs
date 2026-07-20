@@ -81,6 +81,16 @@ public sealed class CommunityStore
     public List<OpenRunScheduleReceiptProjection> OpenRunSchedules { get; } = new();
     public List<OpenRunMeetingHandoffProjection> OpenRunMeetingHandoffs { get; } = new();
     public List<OpenRunCloseoutProjection> OpenRunCloseouts { get; } = new();
+    internal Dictionary<string, CampaignCollaborationInviteState> CampaignCollaborationInvitesById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    internal Dictionary<string, string> CampaignInviteIdByCodeLookupSha256 { get; } = new(StringComparer.Ordinal);
+    internal List<CampaignCharacterBindingState> CampaignCharacterBindings { get; } = new();
+    internal List<CampaignSharedSheetAuditState> CampaignSharedSheetAudit { get; } = new();
+    internal Dictionary<string, CampaignRunsiteState> CampaignRunsitesByRunId { get; } = new(StringComparer.OrdinalIgnoreCase);
+    internal Dictionary<string, CampaignRedemptionIdempotencyState> CampaignRedemptionsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, CampaignSheetEditIdempotencyState> CampaignSheetEditsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
+    internal List<CampaignGmAuthorityAuditState> CampaignGmAuthorityAudit { get; } = new();
+    internal Dictionary<string, CampaignGmAuthorityIdempotencyState> CampaignGmAuthorityCommandsByIdempotencyKey { get; } = new(StringComparer.Ordinal);
+    internal Action? CampaignCollaborationPersistenceFaultInjector { get; set; }
     public Dictionary<string, PlaySessionBinding> PlaySessionsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, PlaySessionParticipant> PlayParticipantsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, PlaySessionInvite> PlayInvitesById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -89,6 +99,110 @@ public sealed class CommunityStore
     public DateTimeOffset PlayAuthorizationTimeHighWaterUtc { get; internal set; } = DateTimeOffset.UnixEpoch;
     public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public BlackLedgerFactionOnboardingState? BlackLedgerFactionOnboardingState { get; set; }
+
+    internal T ExecuteCampaignCollaborationTransactionLocked<T>(Func<T> mutation)
+    {
+        ArgumentNullException.ThrowIfNull(mutation);
+        if (!System.Threading.Monitor.IsEntered(Gate))
+        {
+            throw new InvalidOperationException("Campaign collaboration transactions require the community-store lock.");
+        }
+
+        CampaignCollaborationTransactionSnapshot before = CaptureCampaignCollaborationTransactionLocked();
+        try
+        {
+            T result = mutation();
+            CampaignCollaborationPersistenceFaultInjector?.Invoke();
+            PersistLocked();
+            return result;
+        }
+        catch
+        {
+            RestoreCampaignCollaborationTransactionLocked(before);
+            throw;
+        }
+    }
+
+    private CampaignCollaborationTransactionSnapshot CaptureCampaignCollaborationTransactionLocked()
+        => new(
+            UsersById.Values.ToArray(),
+            GroupsById.Values.ToArray(),
+            DossiersById.Values.ToArray(),
+            CrewsById.Values.ToArray(),
+            CampaignSpinesById.Values.ToArray(),
+            RunsById.Values.ToArray(),
+            CampaignCollaborationInvitesById.Values.ToArray(),
+            CampaignInviteIdByCodeLookupSha256.ToArray(),
+            CampaignCharacterBindings.ToArray(),
+            CampaignSharedSheetAudit.ToArray(),
+            CampaignRunsitesByRunId.ToArray(),
+            CampaignRedemptionsByIdempotencyKey.ToArray(),
+            CampaignSheetEditsByIdempotencyKey.ToArray(),
+            CampaignGmAuthorityAudit.ToArray(),
+            CampaignGmAuthorityCommandsByIdempotencyKey.ToArray());
+
+    private void RestoreCampaignCollaborationTransactionLocked(CampaignCollaborationTransactionSnapshot snapshot)
+    {
+        ReplaceDictionary(UsersById, snapshot.Users, static item => item.UserId);
+        UserIdBySubjectId.Clear();
+        foreach (HubUserDto user in snapshot.Users)
+        {
+            foreach (string subject in new[] { user.SubjectId }.Concat(user.LinkedPrincipals ?? Array.Empty<string>()))
+            {
+                string? normalized = AccountService.NormalizeOptional(subject);
+                if (normalized is not null)
+                {
+                    UserIdBySubjectId[normalized] = user.UserId;
+                }
+            }
+        }
+
+        ReplaceDictionary(GroupsById, snapshot.Groups, static item => item.GroupId);
+        ReplaceDictionary(DossiersById, snapshot.Dossiers, static item => item.DossierId);
+        ReplaceDictionary(CrewsById, snapshot.Crews, static item => item.CrewId);
+        ReplaceDictionary(CampaignSpinesById, snapshot.Campaigns, static item => item.CampaignId);
+        ReplaceDictionary(RunsById, snapshot.Runs, static item => item.RunId);
+        ReplaceDictionary(CampaignCollaborationInvitesById, snapshot.Invites, static item => item.InviteId);
+        ReplaceDictionary(CampaignInviteIdByCodeLookupSha256, snapshot.InviteCodeIndex);
+        ReplaceList(CampaignCharacterBindings, snapshot.CharacterBindings);
+        ReplaceList(CampaignSharedSheetAudit, snapshot.SheetAudit);
+        ReplaceDictionary(CampaignRunsitesByRunId, snapshot.Runsites);
+        ReplaceDictionary(CampaignRedemptionsByIdempotencyKey, snapshot.Redemptions);
+        ReplaceDictionary(CampaignSheetEditsByIdempotencyKey, snapshot.SheetEdits);
+        ReplaceList(CampaignGmAuthorityAudit, snapshot.GmAuthorityAudit);
+        ReplaceDictionary(CampaignGmAuthorityCommandsByIdempotencyKey, snapshot.GmAuthorityCommands);
+    }
+
+    private static void ReplaceDictionary<TKey, TValue>(
+        Dictionary<TKey, TValue> target,
+        IEnumerable<TValue> values,
+        Func<TValue, TKey> keySelector)
+        where TKey : notnull
+    {
+        target.Clear();
+        foreach (TValue value in values)
+        {
+            target[keySelector(value)] = value;
+        }
+    }
+
+    private static void ReplaceDictionary<TKey, TValue>(
+        Dictionary<TKey, TValue> target,
+        IEnumerable<KeyValuePair<TKey, TValue>> values)
+        where TKey : notnull
+    {
+        target.Clear();
+        foreach ((TKey key, TValue value) in values)
+        {
+            target[key] = value;
+        }
+    }
+
+    private static void ReplaceList<T>(List<T> target, IEnumerable<T> values)
+    {
+        target.Clear();
+        target.AddRange(values);
+    }
 
     public void PersistLocked()
     {
@@ -208,7 +322,48 @@ public sealed class CommunityStore
             PlayInvites: PlayInvitesById.Values.OrderBy(static item => item.InviteId, StringComparer.OrdinalIgnoreCase).ToArray(),
             PlayExchanges: PlayExchangesById.Values.OrderBy(static item => item.ExchangeId, StringComparer.OrdinalIgnoreCase).ToArray(),
             PlayGrants: PlayGrantsById.Values.OrderBy(static item => item.GrantId, StringComparer.OrdinalIgnoreCase).ToArray(),
-            PlayAuthorizationTimeHighWaterUtc: PlayAuthorizationTimeHighWaterUtc);
+            PlayAuthorizationTimeHighWaterUtc: PlayAuthorizationTimeHighWaterUtc,
+            CampaignCollaborationInvites: CampaignCollaborationInvitesById.Values
+                .OrderBy(static item => item.InviteId, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            CampaignCharacterBindings: CampaignCharacterBindings
+                .OrderBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static item => item.DossierId, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static item => item.BindingRevision)
+                .ToArray(),
+            CampaignSharedSheetAudit: CampaignSharedSheetAudit
+                .OrderBy(static item => item.EditedAtUtc)
+                .ThenBy(static item => item.ReceiptId, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            CampaignRunsites: CampaignRunsitesByRunId.Values
+                .OrderBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static item => item.RunId, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            CampaignRedemptions: CampaignRedemptionsByIdempotencyKey.Values
+                .OrderBy(static item => item.Key, StringComparer.Ordinal)
+                .ToArray(),
+            CampaignSheetEdits: CampaignSheetEditsByIdempotencyKey.Values
+                .OrderBy(static item => item.Key, StringComparer.Ordinal)
+                .ToArray(),
+            CampaignGmAuthorityAudit: CampaignGmAuthorityAudit
+                .OrderBy(static item => item.ChangedAtUtc)
+                .ThenBy(static item => item.ReceiptId, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            CampaignGmAuthorityCommands: CampaignGmAuthorityCommandsByIdempotencyKey.Values
+                .OrderBy(static item => item.Key, StringComparer.Ordinal)
+                .ToArray());
+
+        CampaignCollaborationStateValidator.ValidateSnapshot(
+            snapshot.CampaignCollaborationInvites ?? Array.Empty<CampaignCollaborationInviteState>(),
+            snapshot.CampaignCharacterBindings ?? Array.Empty<CampaignCharacterBindingState>(),
+            snapshot.CampaignSharedSheetAudit ?? Array.Empty<CampaignSharedSheetAuditState>(),
+            snapshot.CampaignRunsites ?? Array.Empty<CampaignRunsiteState>(),
+            snapshot.CampaignRedemptions ?? Array.Empty<CampaignRedemptionIdempotencyState>(),
+            snapshot.CampaignSheetEdits ?? Array.Empty<CampaignSheetEditIdempotencyState>(),
+            snapshot.CampaignGmAuthorityAudit ?? Array.Empty<CampaignGmAuthorityAuditState>(),
+            snapshot.CampaignGmAuthorityCommands ?? Array.Empty<CampaignGmAuthorityIdempotencyState>(),
+            snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>(),
+            snapshot.CampaignSpines ?? Array.Empty<CampaignProjection>());
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var tempPath = $"{_storagePath}.tmp";
@@ -283,6 +438,17 @@ public sealed class CommunityStore
             snapshot.PlayExchanges ?? Array.Empty<PlaySessionExchange>(),
             snapshot.PlayGrants ?? Array.Empty<PlaySessionGrant>());
         PlaySessionAuthorizationValidator.ValidateTimeHighWater(snapshot.PlayAuthorizationTimeHighWaterUtc);
+        CampaignCollaborationStateValidator.ValidateSnapshot(
+            snapshot.CampaignCollaborationInvites ?? Array.Empty<CampaignCollaborationInviteState>(),
+            snapshot.CampaignCharacterBindings ?? Array.Empty<CampaignCharacterBindingState>(),
+            snapshot.CampaignSharedSheetAudit ?? Array.Empty<CampaignSharedSheetAuditState>(),
+            snapshot.CampaignRunsites ?? Array.Empty<CampaignRunsiteState>(),
+            snapshot.CampaignRedemptions ?? Array.Empty<CampaignRedemptionIdempotencyState>(),
+            snapshot.CampaignSheetEdits ?? Array.Empty<CampaignSheetEditIdempotencyState>(),
+            snapshot.CampaignGmAuthorityAudit ?? Array.Empty<CampaignGmAuthorityAuditState>(),
+            snapshot.CampaignGmAuthorityCommands ?? Array.Empty<CampaignGmAuthorityIdempotencyState>(),
+            snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>(),
+            snapshot.CampaignSpines ?? Array.Empty<CampaignProjection>());
 
         UsersById.Clear();
         UserIdBySubjectId.Clear();
@@ -336,6 +502,15 @@ public sealed class CommunityStore
         OpenRunSchedules.Clear();
         OpenRunMeetingHandoffs.Clear();
         OpenRunCloseouts.Clear();
+        CampaignCollaborationInvitesById.Clear();
+        CampaignInviteIdByCodeLookupSha256.Clear();
+        CampaignCharacterBindings.Clear();
+        CampaignSharedSheetAudit.Clear();
+        CampaignRunsitesByRunId.Clear();
+        CampaignRedemptionsByIdempotencyKey.Clear();
+        CampaignSheetEditsByIdempotencyKey.Clear();
+        CampaignGmAuthorityAudit.Clear();
+        CampaignGmAuthorityCommandsByIdempotencyKey.Clear();
         PlaySessionsById.Clear();
         PlayParticipantsById.Clear();
         PlayInvitesById.Clear();
@@ -449,6 +624,38 @@ public sealed class CommunityStore
         OpenRunSchedules.AddRange(snapshot.OpenRunSchedules ?? Array.Empty<OpenRunScheduleReceiptProjection>());
         OpenRunMeetingHandoffs.AddRange(snapshot.OpenRunMeetingHandoffs ?? Array.Empty<OpenRunMeetingHandoffProjection>());
         OpenRunCloseouts.AddRange(snapshot.OpenRunCloseouts ?? Array.Empty<OpenRunCloseoutProjection>());
+
+        foreach (CampaignCollaborationInviteState invite in snapshot.CampaignCollaborationInvites ?? Array.Empty<CampaignCollaborationInviteState>())
+        {
+            CampaignCollaborationInvitesById[invite.InviteId] = invite;
+            if (!CampaignInviteIdByCodeLookupSha256.TryAdd(invite.ShortCodeLookupSha256, invite.InviteId))
+            {
+                throw new InvalidDataException("Campaign invite snapshot contains a duplicate code lookup key.");
+            }
+        }
+
+        CampaignCharacterBindings.AddRange(snapshot.CampaignCharacterBindings ?? Array.Empty<CampaignCharacterBindingState>());
+        CampaignSharedSheetAudit.AddRange(snapshot.CampaignSharedSheetAudit ?? Array.Empty<CampaignSharedSheetAuditState>());
+        foreach (CampaignRunsiteState runsite in snapshot.CampaignRunsites ?? Array.Empty<CampaignRunsiteState>())
+        {
+            CampaignRunsitesByRunId[$"{runsite.CampaignId}:{runsite.RunId}"] = runsite;
+        }
+
+        foreach (CampaignRedemptionIdempotencyState redemption in snapshot.CampaignRedemptions ?? Array.Empty<CampaignRedemptionIdempotencyState>())
+        {
+            CampaignRedemptionsByIdempotencyKey[redemption.Key] = redemption;
+        }
+
+        foreach (CampaignSheetEditIdempotencyState edit in snapshot.CampaignSheetEdits ?? Array.Empty<CampaignSheetEditIdempotencyState>())
+        {
+            CampaignSheetEditsByIdempotencyKey[edit.Key] = edit;
+        }
+
+        CampaignGmAuthorityAudit.AddRange(snapshot.CampaignGmAuthorityAudit ?? Array.Empty<CampaignGmAuthorityAuditState>());
+        foreach (CampaignGmAuthorityIdempotencyState command in snapshot.CampaignGmAuthorityCommands ?? Array.Empty<CampaignGmAuthorityIdempotencyState>())
+        {
+            CampaignGmAuthorityCommandsByIdempotencyKey[command.Key] = command;
+        }
 
         foreach (var session in snapshot.PlaySessions ?? Array.Empty<PlaySessionBinding>())
         {
@@ -611,7 +818,32 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<PlaySessionInvite>? PlayInvites = null,
     IReadOnlyList<PlaySessionExchange>? PlayExchanges = null,
     IReadOnlyList<PlaySessionGrant>? PlayGrants = null,
-    DateTimeOffset? PlayAuthorizationTimeHighWaterUtc = null);
+    DateTimeOffset? PlayAuthorizationTimeHighWaterUtc = null,
+    IReadOnlyList<CampaignCollaborationInviteState>? CampaignCollaborationInvites = null,
+    IReadOnlyList<CampaignCharacterBindingState>? CampaignCharacterBindings = null,
+    IReadOnlyList<CampaignSharedSheetAuditState>? CampaignSharedSheetAudit = null,
+    IReadOnlyList<CampaignRunsiteState>? CampaignRunsites = null,
+    IReadOnlyList<CampaignRedemptionIdempotencyState>? CampaignRedemptions = null,
+    IReadOnlyList<CampaignSheetEditIdempotencyState>? CampaignSheetEdits = null,
+    IReadOnlyList<CampaignGmAuthorityAuditState>? CampaignGmAuthorityAudit = null,
+    IReadOnlyList<CampaignGmAuthorityIdempotencyState>? CampaignGmAuthorityCommands = null);
+
+internal sealed record CampaignCollaborationTransactionSnapshot(
+    IReadOnlyList<HubUserDto> Users,
+    IReadOnlyList<GroupDto> Groups,
+    IReadOnlyList<RunnerDossierProjection> Dossiers,
+    IReadOnlyList<CrewProjection> Crews,
+    IReadOnlyList<CampaignProjection> Campaigns,
+    IReadOnlyList<RunProjection> Runs,
+    IReadOnlyList<CampaignCollaborationInviteState> Invites,
+    IReadOnlyList<KeyValuePair<string, string>> InviteCodeIndex,
+    IReadOnlyList<CampaignCharacterBindingState> CharacterBindings,
+    IReadOnlyList<CampaignSharedSheetAuditState> SheetAudit,
+    IReadOnlyList<KeyValuePair<string, CampaignRunsiteState>> Runsites,
+    IReadOnlyList<KeyValuePair<string, CampaignRedemptionIdempotencyState>> Redemptions,
+    IReadOnlyList<KeyValuePair<string, CampaignSheetEditIdempotencyState>> SheetEdits,
+    IReadOnlyList<CampaignGmAuthorityAuditState> GmAuthorityAudit,
+    IReadOnlyList<KeyValuePair<string, CampaignGmAuthorityIdempotencyState>> GmAuthorityCommands);
 
 public sealed record ImportantWorkItemProjection(
     string ItemId,

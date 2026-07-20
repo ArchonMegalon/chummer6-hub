@@ -146,6 +146,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<CreatorPublicationRegistryBridge>();
         services.AddSingleton<PublicCreatorPublicationDiscoveryService>();
         services.AddSingleton<CampaignSpineService>();
+        services.AddSingleton<CampaignCollaborationService>();
         services.AddSingleton<GmSessionVenueStore>();
         services.AddSingleton<IGmSessionVenueAdapter, BeHumanGmSessionVenueAdapter>();
         services.AddSingleton<GmSessionVenueService>();
