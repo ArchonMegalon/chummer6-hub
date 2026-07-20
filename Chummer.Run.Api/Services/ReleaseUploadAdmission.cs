@@ -338,7 +338,7 @@ public sealed class ReleaseUploadAuthorizationEvaluator
         return new ReleaseUploadAuthorizationContext(
             ticketClaims,
             HashAuthorizationBinding(
-                $"{credentialBinding}|snapshot:{authority.SnapshotSha256}|candidate:{candidate.Candidate.BundleIdentitySha256}"),
+                $"candidate-authority:{candidate.AuthoritySha256}|bundle:{candidate.Candidate.BundleIdentitySha256}"),
             SingleUseAuthorization: true,
             request.Method,
             request.Path.Value ?? string.Empty,

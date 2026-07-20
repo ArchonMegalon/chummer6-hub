@@ -5,6 +5,7 @@ using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -66,6 +67,64 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     }
 
     [Fact]
+    public void CandidateAuthorityIsGloballyOneShotAcrossFleetAndRotatedTickets()
+    {
+        using var fixture = new SnapshotFixture();
+        fixture.Publish("candidate_import_ready");
+        ReleaseUploadCandidateAuthority candidate = Assert.IsType<ReleaseUploadCandidateAuthority>(
+            fixture.Authority.Load().Candidate);
+        ReleaseUploadAuthorizationContext fleet = Assert.IsType<ReleaseUploadAuthorizationContext>(
+            fixture.Evaluate(candidate.Candidate));
+        ReleaseUploadTicketIssueResult firstTicket = fixture.IssueTicket("first-operator");
+        ReleaseUploadTicketIssueResult secondTicket = fixture.IssueTicket("second-operator");
+        ReleaseUploadAuthorizationContext first = Assert.IsType<ReleaseUploadAuthorizationContext>(
+            fixture.Evaluate(candidate.Candidate, firstTicket.Ticket));
+        ReleaseUploadAuthorizationContext second = Assert.IsType<ReleaseUploadAuthorizationContext>(
+            fixture.Evaluate(candidate.Candidate, secondTicket.Ticket));
+
+        Assert.Equal(fleet.AuthorizationBinding, first.AuthorizationBinding);
+        Assert.Equal(fleet.AuthorizationBinding, second.AuthorizationBinding);
+        ReleaseUploadSession created = fixture.UploadSessions.CreateSession(
+            fleet.AuthorizationBinding,
+            fleet.SingleUseAuthorization,
+            fleet.AuthorizationExpiresAtUtc,
+            fleet.CandidateImportAuthority?.SessionBinding);
+        Assert.Equal(
+            created.SessionId,
+            fixture.UploadSessions.CreateSession(
+                first.AuthorizationBinding,
+                first.SingleUseAuthorization,
+                first.AuthorizationExpiresAtUtc,
+                first.CandidateImportAuthority?.SessionBinding).SessionId);
+        Assert.Equal(
+            created.SessionId,
+            fixture.UploadSessions.CreateSession(
+                second.AuthorizationBinding,
+                second.SingleUseAuthorization,
+                second.AuthorizationExpiresAtUtc,
+                second.CandidateImportAuthority?.SessionBinding).SessionId);
+
+        ReleaseBundlePromotionResult result = BuildPromotionResult();
+        using (ReleaseBundleUploadSessionService.ReleaseUploadSessionCompletionLease completion =
+               fixture.UploadSessions.BeginCompletion(created.SessionId, fleet.AuthorizationBinding))
+        {
+            completion.RecordActivationIntent(BuildActivationIntent(result));
+            completion.MarkCompleted(result);
+        }
+
+        foreach (ReleaseUploadAuthorizationContext replay in new[] { fleet, first, second })
+        {
+            InvalidOperationException consumed = Assert.Throws<InvalidOperationException>(() =>
+                fixture.UploadSessions.CreateSession(
+                    replay.AuthorizationBinding,
+                    replay.SingleUseAuthorization,
+                    replay.AuthorizationExpiresAtUtc,
+                    replay.CandidateImportAuthority?.SessionBinding));
+            Assert.Contains("already been consumed", consumed.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
     public void CandidateBundleValidatorRejectsAnyExtraOrChangedStagedByte()
     {
         using var fixture = new SnapshotFixture();
@@ -109,7 +168,10 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 {
                     [PublicProjectionSnapshotService.SnapshotRootConfigurationKey] = _root,
                     [PublicProjectionSnapshotService.SnapshotRequiredConfigurationKey] = "true",
-                    ["FLEET_INTERNAL_API_TOKEN"] = "fleet-test-token"
+                    ["FLEET_INTERNAL_API_TOKEN"] = "fleet-test-token",
+                    ["CHUMMER_RELEASE_UPLOAD_SESSION_ROOT"] = Path.Combine(_root, "sessions"),
+                    ["CHUMMER_RELEASE_UPLOAD_MIN_FREE_BYTES"] = "0",
+                    ["CHUMMER_RELEASE_UPLOAD_MIN_FREE_FRACTION"] = "0"
                 })
                 .Build();
             _protection = DataProtectionProvider.Create(
@@ -120,20 +182,25 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 Configuration,
                 Tickets,
                 Authority);
+            UploadSessions = new ReleaseBundleUploadSessionService(
+                Configuration,
+                NullLogger<ReleaseBundleUploadSessionService>.Instance);
         }
 
         public IConfiguration Configuration { get; }
         public ReleaseUploadTicketService Tickets { get; }
         public ReleaseUploadSnapshotAuthorityService Authority { get; }
         public ReleaseUploadAuthorizationEvaluator Evaluator { get; }
+        public ReleaseBundleUploadSessionService UploadSessions { get; }
 
         public ReleaseUploadAuthorizationContext? Evaluate(
-            ReleaseUploadCandidateIdentity? candidate = null)
+            ReleaseUploadCandidateIdentity? candidate = null,
+            string bearer = "fleet-test-token")
         {
             var context = new DefaultHttpContext();
             context.Request.Method = HttpMethods.Post;
             context.Request.Path = "/api/internal/releases/upload-sessions";
-            context.Request.Headers.Authorization = "Bearer fleet-test-token";
+            context.Request.Headers.Authorization = $"Bearer {bearer}";
             if (candidate is not null)
             {
                 context.Request.Headers[
@@ -148,6 +215,14 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             }
             return Evaluator.Evaluate(context.Request);
         }
+
+        public ReleaseUploadTicketIssueResult IssueTicket(string subjectId)
+            => Tickets.Issue(new AuthenticatedHubSubject(
+                SubjectId: subjectId,
+                DisplayName: subjectId,
+                Email: $"{subjectId}@example.com",
+                Roles: ["operator"],
+                AccessToken: "identity-token"));
 
         public void Publish(string status)
         {
@@ -388,5 +463,37 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 Directory.Delete(_root, recursive: true);
             }
         }
+    }
+
+    private static ReleaseBundlePromotionResult BuildPromotionResult()
+        => new(
+            Version: "run-candidate",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.UtcNow,
+            PromotedArtifactIds: [],
+            DownloadsUrl: "https://chummer.run/downloads/",
+            InstallDispatchUrls: [],
+            DirectFileUrls: [],
+            GenerationId: "candidate-generation",
+            ActivationReceiptId: "candidate-activation",
+            InventoryDigest: "sha256:" + new string('a', 64));
+
+    private static ReleaseActivationIntent BuildActivationIntent(ReleaseBundlePromotionResult result)
+    {
+        byte[] pointer = "candidate-pointer"u8.ToArray();
+        return new ReleaseActivationIntent(
+            Operation: "promotion",
+            PreviousGenerationId: null,
+            PreviousPointerSha256: null,
+            GenerationId: result.GenerationId!,
+            ActivationReceiptId: result.ActivationReceiptId!,
+            ReleaseVersion: result.Version,
+            Channel: result.Channel,
+            PublishedAt: result.PublishedAt,
+            InventoryDigest: result.InventoryDigest!,
+            PointerSha256: "sha256:" + Convert.ToHexStringLower(SHA256.HashData(pointer)),
+            PreparedAtUtc: DateTimeOffset.UtcNow,
+            PreviousPointerBase64: null,
+            TargetPointerBase64: Convert.ToBase64String(pointer));
     }
 }
