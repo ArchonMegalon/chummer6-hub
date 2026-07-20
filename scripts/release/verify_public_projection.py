@@ -935,6 +935,7 @@ def resolve_snapshot_generation(
     if purpose not in {
         PROJECTION_PURPOSE_RELEASE_UPLOAD,
         PROJECTION_PURPOSE_CODE_DEPLOY,
+        PROJECTION_PURPOSE_CANDIDATE_IMPORT,
     }:
         raise ProjectionBlocked("public projection resolution purpose is invalid")
     if (
@@ -972,6 +973,7 @@ def resolve_snapshot_generation(
         projection_stage,
         code_deployment_authority,
         release_upload_authority,
+        candidate_import_authority,
     ) = _validate_projection_authority(
         manifest,
         status=status,
@@ -990,17 +992,22 @@ def resolve_snapshot_generation(
         raise ProjectionBlocked(
             "public projection generation is not authorized for code deployment"
         )
+    if purpose == PROJECTION_PURPOSE_CANDIDATE_IMPORT and not candidate_import_authority:
+        raise ProjectionBlocked(
+            "public projection generation is not authorized for candidate import"
+        )
+    output_names = _projection_output_names(status)
     manifest_outputs = manifest.get("outputs")
     if (
         not isinstance(manifest_outputs, dict)
-        or set(manifest_outputs) != set(SNAPSHOT_OUTPUT_NAMES)
+        or set(manifest_outputs) != set(output_names)
     ):
         raise ProjectionBlocked("public projection snapshot output inventory drifted")
 
     outputs: dict[str, Path] = {}
     output_digests: dict[str, str] = {}
     output_payloads: dict[str, bytes] = {}
-    for name in SNAPSHOT_OUTPUT_NAMES:
+    for name in output_names:
         entry = manifest_outputs.get(name)
         if not isinstance(entry, dict) or entry.get("relativePath") != name:
             raise ProjectionBlocked("public projection snapshot output path drifted")
@@ -1019,7 +1026,9 @@ def resolve_snapshot_generation(
         outputs[name] = output_path
         output_digests[name] = expected_digest
         output_payloads[name] = output_payload
-    if not hmac.compare_digest(_snapshot_digest(output_digests), snapshot_sha256):
+    if not hmac.compare_digest(
+        _snapshot_digest(output_digests, output_names), snapshot_sha256
+    ):
         raise ProjectionBlocked("public projection snapshot aggregate digest drifted")
     if output_payloads[SNAPSHOT_OUTPUT_NAMES[0]] != output_payloads[SNAPSHOT_OUTPUT_NAMES[1]]:
         raise ProjectionBlocked("public local and served Hub proofs disagree")
@@ -1035,6 +1044,7 @@ def resolve_snapshot_generation(
         projection_stage=projection_stage,
         code_deployment_authority=code_deployment_authority,
         release_upload_authority=release_upload_authority,
+        candidate_import_authority=candidate_import_authority,
         release_gate_findings=tuple(release_gate_findings),
     )
 
@@ -1121,6 +1131,7 @@ def resolve_current_snapshot(
         or snapshot.projection_stage != projection_stage
         or snapshot.code_deployment_authority is not code_deployment_authority
         or snapshot.release_upload_authority is not release_upload_authority
+        or snapshot.candidate_import_authority is not candidate_import_authority
         or snapshot.release_gate_findings != tuple(release_gate_findings)
     ):
         raise ProjectionBlocked(
