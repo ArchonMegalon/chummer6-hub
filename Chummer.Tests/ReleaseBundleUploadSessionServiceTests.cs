@@ -431,11 +431,52 @@ public sealed class ReleaseBundleUploadSessionServiceTests
                 CompletionResult = result,
                 ActivationIntent = intent,
                 CompletedAtUtc = DateTimeOffset.UtcNow.AddDays(-9),
-                ActivationAcknowledgedAtUtc = DateTimeOffset.UtcNow.AddDays(-8)
+                ActivationAcknowledgedAtUtc = DateTimeOffset.UtcNow.AddDays(-8),
+                AuthorizationExpiresAtUtc = DateTimeOffset.UtcNow.AddDays(-8)
             });
 
         fixture.Service.PurgeExpiredSessions();
 
+        Assert.False(Directory.Exists(Path.Combine(fixture.SessionsRoot, session.SessionId)));
+    }
+
+    [Fact]
+    public void SingleUseCompletionTombstoneSurvivesShortRetentionUntilAuthorizationExpiry()
+    {
+        using Fixture fixture = new(completedReceiptRetentionSeconds: 1);
+        DateTimeOffset authorizationExpiry = DateTimeOffset.UtcNow.AddMinutes(30);
+        ReleaseUploadSession session = fixture.Service.CreateSession(
+            AuthorizationA,
+            singleUseAuthorization: true,
+            authorizationExpiry);
+        ReleaseBundlePromotionResult result = BuildPromotionResult();
+        ReleaseActivationIntent intent = BuildActivationIntent(result);
+        ReleaseUploadSession completed = session with
+        {
+            ExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(-2),
+            AuthorizationExpiresAtUtc = authorizationExpiry,
+            Completed = true,
+            CompletionResult = result,
+            ActivationIntent = intent,
+            CompletedAtUtc = DateTimeOffset.UtcNow.AddHours(-1),
+            ActivationAcknowledgedAtUtc = DateTimeOffset.UtcNow.AddHours(-1)
+        };
+        fixture.WriteSessionMetadata(session.SessionId, completed);
+
+        fixture.Service.PurgeExpiredSessions();
+
+        Assert.True(Directory.Exists(Path.Combine(fixture.SessionsRoot, session.SessionId)));
+        InvalidOperationException replay = Assert.Throws<InvalidOperationException>(() =>
+            fixture.CreateService().CreateSession(
+                AuthorizationA,
+                singleUseAuthorization: true,
+                authorizationExpiry));
+        Assert.Contains("already been consumed", replay.Message, StringComparison.OrdinalIgnoreCase);
+
+        fixture.WriteSessionMetadata(
+            session.SessionId,
+            completed with { AuthorizationExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(-1) });
+        fixture.Service.PurgeExpiredSessions();
         Assert.False(Directory.Exists(Path.Combine(fixture.SessionsRoot, session.SessionId)));
     }
 
@@ -653,17 +694,24 @@ public sealed class ReleaseBundleUploadSessionServiceTests
         private readonly string _root;
         private readonly IConfiguration _configuration;
 
-        public Fixture()
+        public Fixture(int? completedReceiptRetentionSeconds = null)
         {
             _root = Path.Combine(Path.GetTempPath(), "release-upload-session-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_root);
+            var values = new Dictionary<string, string?>
+            {
+                ["CHUMMER_RELEASE_UPLOAD_SESSION_ROOT"] = Path.Combine(_root, "sessions"),
+                ["CHUMMER_RELEASE_UPLOAD_MIN_FREE_BYTES"] = "0",
+                ["CHUMMER_RELEASE_UPLOAD_MIN_FREE_FRACTION"] = "0"
+            };
+            if (completedReceiptRetentionSeconds is not null)
+            {
+                values["CHUMMER_RELEASE_UPLOAD_COMPLETED_RECEIPT_RETENTION_SECONDS"] =
+                    completedReceiptRetentionSeconds.Value.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture);
+            }
             _configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["CHUMMER_RELEASE_UPLOAD_SESSION_ROOT"] = Path.Combine(_root, "sessions"),
-                    ["CHUMMER_RELEASE_UPLOAD_MIN_FREE_BYTES"] = "0",
-                    ["CHUMMER_RELEASE_UPLOAD_MIN_FREE_FRACTION"] = "0"
-                })
+                .AddInMemoryCollection(values)
                 .Build();
             Service = CreateService();
         }

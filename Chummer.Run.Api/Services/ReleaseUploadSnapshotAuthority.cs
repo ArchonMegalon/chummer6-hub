@@ -97,6 +97,18 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     private static readonly Regex ReviewerPattern = new(
         "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,38})$",
         RegexOptions.CultureInvariant);
+    private static readonly Regex GitHubLoginPattern = new(
+        "^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?|github-actions\\[bot\\])$",
+        RegexOptions.CultureInvariant);
+    private static readonly Regex PositiveIntegerPattern = new(
+        "^[1-9][0-9]*$",
+        RegexOptions.CultureInvariant);
+    private static readonly Regex GitHubTimestampPattern = new(
+        "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+        RegexOptions.CultureInvariant);
+    private static readonly Regex ExportRunnerLabelPattern = new(
+        "^chummer-preview-nightly-export-[a-z0-9]{12,64}$",
+        RegexOptions.CultureInvariant);
     private static readonly string[] BaseOutputNames =
     [
         "HUB_LOCAL_RELEASE_PROOF.generated.json",
@@ -124,6 +136,8 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         ".github/workflows/windows-native-evidence-capture.yml";
     private const string FinalizationWorkflow =
         ".github/workflows/windows-native-evidence-finalize.yml";
+    private const string ProducerWorkflow =
+        ".github/workflows/preview-nightly-candidate-export.yml";
     private const string UiRepository = "ArchonMegalon/chummer6-ui";
     private const string UiRef = "refs/heads/main";
     private const string WindowsRid = "win-x64";
@@ -655,15 +669,12 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             {
                 throw new InvalidDataException("candidate native-Windows capture receipt drifted");
             }
-            JsonElement captureCandidate = RequireObject(capture, "candidate");
-            RequireExactString(
-                captureCandidate,
-                "manifestSha256",
-                candidate.CanonicalManifestSha256);
-            RequireExactString(
-                captureCandidate,
-                "contentInventorySha256",
-                Sha256(provenanceDocument.Bytes));
+            JsonElement captureCandidate = ValidateCaptureCandidateBinding(
+                RequireObject(capture, "candidate"),
+                captureSource,
+                documents,
+                candidate.CanonicalManifestSha256,
+                summaryCaptureAt);
 
             CandidateEvidenceDocument captureInventoryDocument =
                 documents[CaptureInventoryFileName];
@@ -742,12 +753,11 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             }
 
             JsonElement export = documents[CandidateProvenanceExportFileName].Root;
-            RequireExactString(
+            ValidateCandidateExportReceipt(
                 export,
-                "contractName",
-                "chummer6-ui.preview-nightly-candidate-export");
-            RequireExactInt32(export, "contractVersion", 1);
-            RequireExactString(export, "status", "exported");
+                captureCandidate,
+                candidate.CanonicalManifestSha256,
+                scope);
 
             foreach (string head in scope.Heads)
             {
@@ -912,6 +922,20 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             throw new InvalidDataException("candidate requiredDesktopHeads is empty");
         }
         JsonElement artifactsElement = RequireArray(canonical, "artifacts");
+        foreach (JsonElement artifact in artifactsElement.EnumerateArray())
+        {
+            if (artifact.ValueKind == JsonValueKind.Object
+                && HasExactString(artifact, "platform", "windows")
+                && (!artifact.TryGetProperty("head", out JsonElement artifactHead)
+                    || artifactHead.ValueKind != JsonValueKind.String
+                    || artifactHead.GetString() is not { } head
+                    || !headSet.Contains(head)))
+            {
+                throw new InvalidDataException(
+                    "candidate release manifest contains a Windows artifact outside "
+                    + "requiredDesktopHeads");
+            }
+        }
         var candidateByPath = candidateInventory.ToDictionary(static row => row.Path, StringComparer.Ordinal);
         var artifacts = new Dictionary<string, CandidateHeadArtifacts>(StringComparer.Ordinal);
         foreach (string head in heads)
@@ -981,6 +1005,282 @@ public sealed class ReleaseUploadSnapshotAuthorityService
                 $"candidate {head} {role} manifest bytes differ from upload inventory");
         }
         return new CandidateArtifact(path, fileName, digest, size);
+    }
+
+    private static JsonElement ValidateCaptureCandidateBinding(
+        JsonElement captureCandidate,
+        JsonElement captureSource,
+        IReadOnlyDictionary<string, CandidateEvidenceDocument> documents,
+        string canonicalManifestSha256,
+        DateTimeOffset captureGeneratedAt)
+    {
+        var required = new HashSet<string>(
+            [
+                "actor",
+                "artifactCreatedAt",
+                "artifactExpiresAt",
+                "artifactId",
+                "artifactName",
+                "artifactSha256",
+                "authenticatedApiSha256",
+                "contentInventory",
+                "contentInventorySha256",
+                "exportReceipt",
+                "exportReceiptSha256",
+                "handoffSha256",
+                "manifestPath",
+                "manifestSha256",
+                "ref",
+                "repository",
+                "runAttempt",
+                "runId",
+                "sha",
+                "workflow"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(captureCandidate, required))
+        {
+            throw new InvalidDataException("candidate capture binding property set drifted");
+        }
+        RequireExactString(captureCandidate, "repository", UiRepository);
+        RequireExactString(captureCandidate, "workflow", ProducerWorkflow);
+        RequireExactString(captureCandidate, "ref", UiRef);
+        if (!CommitPattern.IsMatch(RequireString(captureCandidate, "sha"))
+            || !GitHubLoginPattern.IsMatch(RequireString(captureCandidate, "actor")))
+        {
+            throw new InvalidDataException("candidate capture producer provenance drifted");
+        }
+        string runId = RequirePositiveGitHubIntegerString(captureCandidate, "runId");
+        string runAttempt = RequirePositiveGitHubIntegerString(captureCandidate, "runAttempt");
+        _ = RequirePositiveGitHubIntegerString(captureCandidate, "artifactId");
+        RequireExactString(
+            captureCandidate,
+            "artifactName",
+            $"preview-nightly-candidate-{runId}-{runAttempt}");
+        foreach (string property in new[]
+                 {
+                     "artifactSha256",
+                     "authenticatedApiSha256",
+                     "contentInventorySha256",
+                     "exportReceiptSha256",
+                     "handoffSha256",
+                     "manifestSha256"
+                 })
+        {
+            _ = RequireSha256(captureCandidate, property);
+        }
+        RequireExactString(
+            captureCandidate,
+            "manifestPath",
+            "RELEASE_CHANNEL.generated.json");
+        RequireExactString(
+            captureCandidate,
+            "manifestSha256",
+            canonicalManifestSha256);
+        DateTimeOffset createdAt = RequireGitHubTimestamp(
+            captureCandidate,
+            "artifactCreatedAt");
+        DateTimeOffset expiresAt = RequireGitHubTimestamp(
+            captureCandidate,
+            "artifactExpiresAt");
+        if (createdAt >= expiresAt
+            || createdAt > captureGeneratedAt.AddMinutes(5)
+            || expiresAt <= captureGeneratedAt)
+        {
+            throw new InvalidDataException("candidate capture artifact lifetime drifted");
+        }
+        foreach (string property in new[] { "repository", "ref", "sha" })
+        {
+            if (!string.Equals(
+                    RequireString(captureCandidate, property),
+                    RequireString(captureSource, property),
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "candidate capture revision differs from capture source");
+            }
+        }
+
+        ValidateCaptureDocumentBinding(
+            captureCandidate,
+            "contentInventory",
+            "contentInventorySha256",
+            CandidateProvenanceInventoryFileName,
+            documents);
+        ValidateCaptureDocumentBinding(
+            captureCandidate,
+            "exportReceipt",
+            "exportReceiptSha256",
+            CandidateProvenanceExportFileName,
+            documents);
+        return captureCandidate;
+    }
+
+    private static void ValidateCaptureDocumentBinding(
+        JsonElement captureCandidate,
+        string property,
+        string digestProperty,
+        string expectedPath,
+        IReadOnlyDictionary<string, CandidateEvidenceDocument> documents)
+    {
+        JsonElement binding = RequireObject(captureCandidate, property);
+        if (!ExactPropertySet(
+                binding,
+                new HashSet<string>(["path", "sha256", "sizeBytes"], StringComparer.Ordinal))
+            || !documents.TryGetValue(expectedPath, out CandidateEvidenceDocument? document))
+        {
+            throw new InvalidDataException($"candidate capture {property} custody drifted");
+        }
+        RequireExactString(binding, "path", expectedPath);
+        RequireExactString(binding, "sha256", document.Sha256);
+        RequireExactString(captureCandidate, digestProperty, document.Sha256);
+        if (document.SizeBytes <= 0
+            || RequireNonNegativeInt64(binding, "sizeBytes") != document.SizeBytes)
+        {
+            throw new InvalidDataException($"candidate capture {property} custody drifted");
+        }
+    }
+
+    private static void ValidateCandidateExportReceipt(
+        JsonElement export,
+        JsonElement captureCandidate,
+        string canonicalManifestSha256,
+        CandidateWindowsScope scope)
+    {
+        var required = new HashSet<string>(
+            [
+                "candidateManifest",
+                "contentInventory",
+                "contractName",
+                "contractVersion",
+                "heads",
+                "release",
+                "source",
+                "status"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(export, required))
+        {
+            throw new InvalidDataException("candidate export receipt property set drifted");
+        }
+        RequireExactString(
+            export,
+            "contractName",
+            "chummer6-ui.preview-nightly-candidate-export");
+        RequireExactInt32(export, "contractVersion", 1);
+        RequireExactString(export, "status", "exported");
+
+        JsonElement release = RequireObject(export, "release");
+        if (!ExactPropertySet(
+                release,
+                new HashSet<string>(["channel", "version"], StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("candidate export release binding drifted");
+        }
+        RequireExactString(release, "channel", scope.Channel);
+        RequireExactString(release, "version", scope.Version);
+
+        JsonElement manifest = RequireObject(export, "candidateManifest");
+        JsonElement inventory = RequireObject(export, "contentInventory");
+        var documentBindingKeys = new HashSet<string>(["path", "sha256"], StringComparer.Ordinal);
+        if (!ExactPropertySet(manifest, documentBindingKeys)
+            || !ExactPropertySet(inventory, documentBindingKeys))
+        {
+            throw new InvalidDataException("candidate export document binding drifted");
+        }
+        RequireExactString(manifest, "path", "RELEASE_CHANNEL.generated.json");
+        RequireExactString(manifest, "sha256", canonicalManifestSha256);
+        RequireExactString(
+            inventory,
+            "path",
+            "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json");
+        RequireExactString(
+            inventory,
+            "sha256",
+            RequireSha256(captureCandidate, "contentInventorySha256"));
+
+        JsonElement source = RequireObject(export, "source");
+        var sourceKeys = new HashSet<string>(
+            [
+                "actor",
+                "artifactName",
+                "ref",
+                "repository",
+                "runAttempt",
+                "runId",
+                "runnerLabel",
+                "sha",
+                "workflow"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(source, sourceKeys))
+        {
+            throw new InvalidDataException("candidate export source property set drifted");
+        }
+        foreach (string property in sourceKeys.Where(static name => name != "runnerLabel"))
+        {
+            if (!string.Equals(
+                    RequireString(source, property),
+                    RequireString(captureCandidate, property),
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "candidate export source differs from capture authority");
+            }
+        }
+        if (!ExportRunnerLabelPattern.IsMatch(RequireString(source, "runnerLabel")))
+        {
+            throw new InvalidDataException("candidate export runner label drifted");
+        }
+
+        JsonElement heads = RequireArray(export, "heads");
+        if (heads.GetArrayLength() != scope.Heads.Count)
+        {
+            throw new InvalidDataException("candidate export required-head scope drifted");
+        }
+        int index = 0;
+        foreach (JsonElement head in heads.EnumerateArray())
+        {
+            string expectedHead = scope.Heads[index++];
+            if (!ExactPropertySet(
+                    head,
+                    new HashSet<string>(
+                        ["headId", "rid", "installer", "payload"],
+                        StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException("candidate export head binding drifted");
+            }
+            RequireExactString(head, "headId", expectedHead);
+            RequireExactString(head, "rid", WindowsRid);
+            CandidateHeadArtifacts artifacts = scope.Artifacts[expectedHead];
+            ValidateExportArtifactBinding(
+                RequireObject(head, "installer"),
+                artifacts.Installer);
+            ValidateExportArtifactBinding(
+                RequireObject(head, "payload"),
+                artifacts.Payload);
+        }
+    }
+
+    private static void ValidateExportArtifactBinding(
+        JsonElement binding,
+        CandidateArtifact artifact)
+    {
+        if (!ExactPropertySet(
+                binding,
+                new HashSet<string>(
+                    ["relativePath", "fileName", "sha256", "sizeBytes"],
+                    StringComparer.Ordinal)))
+        {
+            throw new InvalidDataException("candidate export artifact property set drifted");
+        }
+        RequireExactString(binding, "relativePath", artifact.Path);
+        RequireExactString(binding, "fileName", artifact.FileName);
+        RequireExactString(binding, "sha256", artifact.Sha256);
+        if (RequireNonNegativeInt64(binding, "sizeBytes") != artifact.SizeBytes)
+        {
+            throw new InvalidDataException("candidate export artifact size drifted");
+        }
     }
 
     private static IReadOnlyList<ReleaseUploadCandidateInventoryRow> ParseEvidenceInventoryRows(
@@ -1375,6 +1675,25 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             ? parsed
             : throw new InvalidDataException($"release upload {property} is invalid");
 
+    private static string RequirePositiveGitHubIntegerString(
+        JsonElement parent,
+        string property)
+    {
+        string value = RequireString(parent, property);
+        if (!PositiveIntegerPattern.IsMatch(value)
+            || !long.TryParse(
+                value,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out long parsed)
+            || parsed > 9_007_199_254_740_991L)
+        {
+            throw new InvalidDataException(
+                $"release upload {property} is not an exact positive GitHub integer string");
+        }
+        return value;
+    }
+
     private static void RequireExactInt32(JsonElement parent, string property, int expected)
     {
         if (!parent.TryGetProperty(property, out JsonElement value)
@@ -1395,6 +1714,27 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             || parsed.Offset != TimeSpan.Zero)
         {
             throw new InvalidDataException($"release upload {property} is invalid");
+        }
+        return parsed;
+    }
+
+    private static DateTimeOffset RequireGitHubTimestamp(
+        JsonElement parent,
+        string property)
+    {
+        string value = RequireString(parent, property);
+        if (!GitHubTimestampPattern.IsMatch(value)
+            || !DateTimeOffset.TryParseExact(
+                value,
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal
+                | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                out DateTimeOffset parsed)
+            || parsed.Offset != TimeSpan.Zero)
+        {
+            throw new InvalidDataException(
+                $"release upload {property} is not an exact UTC GitHub timestamp");
         }
         return parsed;
     }

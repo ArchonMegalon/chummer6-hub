@@ -1850,7 +1850,17 @@ public sealed class ReleaseBundleUploadSessionService
 
         if (session.Completed)
         {
-            return session.ActivationAcknowledgedAtUtc!.Value.Add(_options.CompletedReceiptRetention);
+            DateTimeOffset retentionExpiry =
+                session.ActivationAcknowledgedAtUtc!.Value.Add(
+                    _options.CompletedReceiptRetention);
+            if (session.SingleUseAuthorization
+                && session.AuthorizationExpiresAtUtc is { } authorizationExpiry
+                && authorizationExpiry > retentionExpiry)
+            {
+                return authorizationExpiry;
+            }
+
+            return retentionExpiry;
         }
 
         return session.ExpiresAtUtc;

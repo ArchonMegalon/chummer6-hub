@@ -31,6 +31,7 @@ FINALIZED_INVENTORY_CONTRACT = "chummer6-ui.preview-nightly-native-windows-final
 VISUAL_PROOF_CONTRACT = "chummer6-ui.windows_installer_visual_proof"
 NATIVE_HOST_CONTRACT = "chummer6-ui.native_windows_host_evidence"
 CANDIDATE_CONTENT_INVENTORY_CONTRACT = "chummer6-ui.preview-nightly-candidate-content-inventory"
+CANDIDATE_EXPORT_CONTRACT = "chummer6-ui.preview-nightly-candidate-export"
 CAPTURE_FILE = "WINDOWS_NATIVE_CAPTURE.generated.json"
 CAPTURE_INVENTORY_FILE = "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json"
 FINALIZATION_FILE = "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json"
@@ -43,12 +44,21 @@ CANDIDATE_PROVENANCE_EXPORT = (
 )
 CAPTURE_WORKFLOW = ".github/workflows/windows-native-evidence-capture.yml"
 FINALIZE_WORKFLOW = ".github/workflows/windows-native-evidence-finalize.yml"
+PRODUCER_WORKFLOW = ".github/workflows/preview-nightly-candidate-export.yml"
 UI_REPOSITORY = "ArchonMegalon/chummer6-ui"
 PRODUCER_REF = "refs/heads/main"
 RID = "win-x64"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 REVIEWER_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,38})$")
+GITHUB_LOGIN_RE = re.compile(
+    r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?|github-actions\[bot\])$"
+)
+POSITIVE_INTEGER_RE = re.compile(r"^[1-9][0-9]*$")
+GITHUB_TIMESTAMP_RE = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+)
+EXPORT_RUNNER_LABEL_RE = re.compile(r"^chummer-preview-nightly-export-[a-z0-9]{12,64}$")
 VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,159}$")
 HEAD_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 MAX_JSON_BYTES = 32 * 1024 * 1024
@@ -300,6 +310,16 @@ def _canonical_windows_scope(
     artifacts_value = manifest.get("artifacts")
     if not isinstance(artifacts_value, list) or not artifacts_value:
         _fail("candidate release manifest has no artifacts")
+    for artifact in artifacts_value:
+        if (
+            isinstance(artifact, dict)
+            and artifact.get("platform") == "windows"
+            and artifact.get("head") not in heads
+        ):
+            _fail(
+                "candidate release manifest contains a Windows artifact outside "
+                "requiredDesktopHeads"
+            )
     candidate_by_path = {row["path"]: row for row in candidate_rows}
     scope_by_head: dict[str, dict[str, Any]] = {}
     for head in heads:
@@ -400,14 +420,249 @@ def _source(value: object, *, label: str, workflow: str) -> dict[str, Any]:
     return value
 
 
+def _github_positive_integer(value: object, *, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or POSITIVE_INTEGER_RE.fullmatch(value) is None
+        or int(value) > 9_007_199_254_740_991
+    ):
+        _fail(f"{label} must be an exact positive GitHub integer string")
+    return value
+
+
+def _github_timestamp(value: object, *, label: str) -> datetime:
+    if not isinstance(value, str) or GITHUB_TIMESTAMP_RE.fullmatch(value) is None:
+        _fail(f"{label} must be an exact UTC GitHub timestamp")
+    try:
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError as exc:
+        raise CandidateAuthorityBlocked(f"{label} is invalid") from exc
+
+
+def _capture_document_binding(
+    value: object,
+    *,
+    label: str,
+    expected_path: str,
+    expected_sha256: str,
+    expected_size: int,
+) -> None:
+    if not isinstance(value, dict) or set(value) != {"path", "sha256", "sizeBytes"}:
+        _fail(f"{label} property set drifted")
+    if (
+        value.get("path") != expected_path
+        or _sha256(value.get("sha256"), label=f"{label} sha256") != expected_sha256
+        or _positive_int(value.get("sizeBytes"), label=f"{label} sizeBytes")
+        != expected_size
+    ):
+        _fail(f"{label} differs from preserved provenance")
+
+
+def _expected_export_heads(scope: dict[str, Any]) -> list[dict[str, Any]]:
+    def binding(artifact: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "relativePath": artifact["path"],
+            "fileName": artifact["fileName"],
+            "sha256": artifact["sha256"],
+            "sizeBytes": artifact["sizeBytes"],
+        }
+
+    return [
+        {
+            "headId": head,
+            "rid": RID,
+            "installer": binding(scope["artifacts"][head]["installer"]),
+            "payload": binding(scope["artifacts"][head]["payload"]),
+        }
+        for head in scope["heads"]
+    ]
+
+
+def _validate_capture_candidate_binding(
+    value: object,
+    *,
+    canonical_manifest_sha256: str,
+    capture_source: dict[str, Any],
+    provenance_bytes: bytes,
+    export_bytes: bytes,
+    capture_generated_at: datetime,
+) -> dict[str, Any]:
+    required = {
+        "actor",
+        "artifactCreatedAt",
+        "artifactExpiresAt",
+        "artifactId",
+        "artifactName",
+        "artifactSha256",
+        "authenticatedApiSha256",
+        "contentInventory",
+        "contentInventorySha256",
+        "exportReceipt",
+        "exportReceiptSha256",
+        "handoffSha256",
+        "manifestPath",
+        "manifestSha256",
+        "ref",
+        "repository",
+        "runAttempt",
+        "runId",
+        "sha",
+        "workflow",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        _fail("native-Windows capture candidate binding property set drifted")
+    if (
+        value.get("repository") != UI_REPOSITORY
+        or value.get("workflow") != PRODUCER_WORKFLOW
+        or value.get("ref") != PRODUCER_REF
+        or not isinstance(value.get("sha"), str)
+        or COMMIT_RE.fullmatch(value["sha"]) is None
+        or not isinstance(value.get("actor"), str)
+        or GITHUB_LOGIN_RE.fullmatch(value["actor"]) is None
+    ):
+        _fail("native-Windows capture candidate producer provenance drifted")
+    for name in ("runId", "runAttempt", "artifactId"):
+        _github_positive_integer(value.get(name), label=f"capture candidate {name}")
+    if value.get("artifactName") != (
+        f"preview-nightly-candidate-{value['runId']}-{value['runAttempt']}"
+    ):
+        _fail("native-Windows capture candidate artifact name drifted")
+    for name in (
+        "artifactSha256",
+        "authenticatedApiSha256",
+        "contentInventorySha256",
+        "exportReceiptSha256",
+        "handoffSha256",
+        "manifestSha256",
+    ):
+        _sha256(value.get(name), label=f"capture candidate {name}")
+    provenance_sha256 = hashlib.sha256(provenance_bytes).hexdigest()
+    export_sha256 = hashlib.sha256(export_bytes).hexdigest()
+    if (
+        value.get("manifestPath") != "RELEASE_CHANNEL.generated.json"
+        or value.get("manifestSha256") != canonical_manifest_sha256
+        or value.get("contentInventorySha256") != provenance_sha256
+        or value.get("exportReceiptSha256") != export_sha256
+    ):
+        _fail("native-Windows capture candidate digest chain drifted")
+    created_at = _github_timestamp(
+        value.get("artifactCreatedAt"), label="capture candidate artifactCreatedAt"
+    )
+    expires_at = _github_timestamp(
+        value.get("artifactExpiresAt"), label="capture candidate artifactExpiresAt"
+    )
+    if (
+        created_at >= expires_at
+        or created_at > capture_generated_at + timedelta(minutes=5)
+        or expires_at <= capture_generated_at
+    ):
+        _fail("native-Windows capture candidate artifact lifetime drifted")
+    if any(
+        value.get(name) != capture_source.get(name)
+        for name in ("repository", "ref", "sha")
+    ):
+        _fail("native-Windows capture candidate revision differs from capture source")
+    _capture_document_binding(
+        value.get("contentInventory"),
+        label="capture candidate contentInventory",
+        expected_path=CANDIDATE_PROVENANCE_INVENTORY,
+        expected_sha256=provenance_sha256,
+        expected_size=len(provenance_bytes),
+    )
+    _capture_document_binding(
+        value.get("exportReceipt"),
+        label="capture candidate exportReceipt",
+        expected_path=CANDIDATE_PROVENANCE_EXPORT,
+        expected_sha256=export_sha256,
+        expected_size=len(export_bytes),
+    )
+    return value
+
+
+def _validate_candidate_export_receipt(
+    receipt: dict[str, Any],
+    *,
+    candidate_binding: dict[str, Any],
+    canonical_manifest_sha256: str,
+    scope: dict[str, Any],
+) -> None:
+    required = {
+        "candidateManifest",
+        "contentInventory",
+        "contractName",
+        "contractVersion",
+        "heads",
+        "release",
+        "source",
+        "status",
+    }
+    if not isinstance(receipt, dict) or set(receipt) != required:
+        _fail("native-Windows candidate export receipt property set drifted")
+    if (
+        receipt.get("contractName") != CANDIDATE_EXPORT_CONTRACT
+        or receipt.get("contractVersion") != 1
+        or receipt.get("status") != "exported"
+        or receipt.get("release")
+        != {"channel": scope["channel"], "version": scope["version"]}
+        or receipt.get("candidateManifest")
+        != {
+            "path": "RELEASE_CHANNEL.generated.json",
+            "sha256": canonical_manifest_sha256,
+        }
+        or receipt.get("contentInventory")
+        != {
+            "path": CANDIDATE_PROVENANCE_INVENTORY.rsplit("/", 1)[-1],
+            "sha256": candidate_binding["contentInventorySha256"],
+        }
+    ):
+        _fail("native-Windows candidate export release or byte binding drifted")
+    if receipt.get("heads") != _expected_export_heads(scope):
+        _fail("native-Windows candidate export required-head scope drifted")
+    source_value = receipt.get("source")
+    required_source = {
+        "actor",
+        "artifactName",
+        "ref",
+        "repository",
+        "runAttempt",
+        "runId",
+        "runnerLabel",
+        "sha",
+        "workflow",
+    }
+    if not isinstance(source_value, dict) or set(source_value) != required_source:
+        _fail("native-Windows candidate export source property set drifted")
+    for name in (
+        "actor",
+        "artifactName",
+        "ref",
+        "repository",
+        "runAttempt",
+        "runId",
+        "sha",
+        "workflow",
+    ):
+        if source_value.get(name) != candidate_binding[name] or not isinstance(
+            source_value.get(name), str
+        ):
+            _fail("native-Windows candidate export source differs from capture authority")
+    if (
+        not isinstance(source_value.get("runnerLabel"), str)
+        or EXPORT_RUNNER_LABEL_RE.fullmatch(source_value["runnerLabel"]) is None
+    ):
+        _fail("native-Windows candidate export runner label drifted")
+
+
 def _validate_candidate_provenance(
     root: Path,
     *,
     bundle_root: Path,
     canonical_manifest_sha256: str,
     scope: dict[str, Any],
-) -> dict[str, Any]:
-    inventory, _ = _strict_json(
+) -> tuple[dict[str, Any], bytes]:
+    inventory, inventory_bytes = _strict_json(
         root / CANDIDATE_PROVENANCE_INVENTORY,
         label="native-Windows candidate provenance inventory",
     )
@@ -439,7 +694,7 @@ def _validate_candidate_provenance(
         _plain_file(path, label=f"native-Windows candidate byte {row['path']}")
         if row["sha256"] != _sha256_file(path) or row["sizeBytes"] != path.stat().st_size:
             _fail("native-Windows proof candidate bytes differ from the upload candidate")
-    return inventory
+    return inventory, inventory_bytes
 
 
 def _validate_native_evidence(
@@ -532,21 +787,30 @@ def _validate_native_evidence(
         or VERSION_RE.fullmatch(version) is None
     ):
         _fail("native-Windows capture release identity is invalid")
-    candidate_binding = capture.get("candidate")
-    if (
-        not isinstance(candidate_binding, dict)
-        or candidate_binding.get("manifestSha256") != canonical_manifest_sha256
-    ):
-        _fail("native-Windows capture does not bind the candidate manifest")
-    provenance_inventory = _validate_candidate_provenance(
+    provenance_inventory, provenance_bytes = _validate_candidate_provenance(
         root,
         bundle_root=bundle_root,
         canonical_manifest_sha256=canonical_manifest_sha256,
         scope=scope,
     )
-    provenance_path = root / CANDIDATE_PROVENANCE_INVENTORY
-    if candidate_binding.get("contentInventorySha256") != _sha256_file(provenance_path):
-        _fail("native-Windows capture candidate inventory digest drifted")
+    export_receipt, export_bytes = _strict_json(
+        root / CANDIDATE_PROVENANCE_EXPORT,
+        label="native-Windows candidate export receipt",
+    )
+    candidate_binding = _validate_capture_candidate_binding(
+        capture.get("candidate"),
+        canonical_manifest_sha256=canonical_manifest_sha256,
+        capture_source=capture_source,
+        provenance_bytes=provenance_bytes,
+        export_bytes=export_bytes,
+        capture_generated_at=captured_at,
+    )
+    _validate_candidate_export_receipt(
+        export_receipt,
+        candidate_binding=candidate_binding,
+        canonical_manifest_sha256=canonical_manifest_sha256,
+        scope=scope,
+    )
 
     capture_inventory, capture_inventory_bytes = _strict_json(
         root / CAPTURE_INVENTORY_FILE, label="native-Windows capture inventory"
@@ -571,6 +835,8 @@ def _validate_native_evidence(
         (CAPTURE_INVENTORY_FILE, capture_inventory_bytes),
         (FINALIZATION_FILE, finalization_bytes),
         (FINALIZED_INVENTORY_FILE, finalized_inventory_bytes),
+        (CANDIDATE_PROVENANCE_INVENTORY, provenance_bytes),
+        (CANDIDATE_PROVENANCE_EXPORT, export_bytes),
     ]
     for row in proof_rows:
         if not isinstance(row, dict) or set(row) != {"headId", "path", "sha256"}:
@@ -682,19 +948,6 @@ def _validate_native_evidence(
             _fail(f"{head} visual proof is not an exact finalized human pass")
         custody.append((startup_relative, startup_bytes))
 
-    for relative in (CANDIDATE_PROVENANCE_INVENTORY, CANDIDATE_PROVENANCE_EXPORT):
-        evidence_document, evidence_bytes = _strict_json(
-            root / relative, label=f"native-Windows {relative}"
-        )
-        if relative == CANDIDATE_PROVENANCE_EXPORT and (
-            evidence_document.get("contractName")
-            != "chummer6-ui.preview-nightly-candidate-export"
-            or evidence_document.get("contractVersion") != 1
-            or evidence_document.get("status") != "exported"
-        ):
-            _fail("native-Windows candidate export receipt drifted")
-        custody.append((relative, evidence_bytes))
-
     evidence_summary = {
         "status": "passed",
         "captureGeneratedAtUtc": captured_at.isoformat().replace("+00:00", "Z"),
@@ -702,7 +955,7 @@ def _validate_native_evidence(
         "reviewer": reviewer,
         "captureSource": capture_source,
         "finalizationSource": finalization_source,
-        "candidateContentInventorySha256": _sha256_file(provenance_path),
+        "candidateContentInventorySha256": hashlib.sha256(provenance_bytes).hexdigest(),
         "candidateContentInventory": provenance_inventory,
     }
     oldest = min(captured_at, finalized_at)

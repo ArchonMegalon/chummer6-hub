@@ -152,6 +152,9 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     [InlineData("artifact_digest")]
     [InlineData("scope_widen")]
     [InlineData("scope_narrow")]
+    [InlineData("candidate_artifact_name")]
+    [InlineData("export_source")]
+    [InlineData("export_heads")]
     public void RuntimeRejectsFreshlyRehashedSemanticEvidenceTamper(string tamper)
     {
         using var fixture = new SnapshotFixture();
@@ -166,6 +169,21 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         Assert.Null(rejected.Candidate);
     }
 
+    [Fact]
+    public void RuntimeRejectsWindowsArtifactsOutsideRequiredDesktopHeads()
+    {
+        using var fixture = new SnapshotFixture();
+        fixture.Publish(
+            "candidate_import_ready",
+            SnapshotFixture.BuildCandidateAuthority(
+                includeUndeclaredWindowsArtifacts: true));
+
+        ReleaseUploadSnapshotAuthority rejected = fixture.Authority.Load();
+
+        Assert.False(rejected.IsValid);
+        Assert.Null(rejected.Candidate);
+    }
+
     private static byte[] TamperCandidateAuthority(byte[] payload, string tamper)
     {
         JsonObject authority = JsonNode.Parse(payload)?.AsObject()
@@ -176,6 +194,8 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         const string startupPath = "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json";
         const string visualPath =
             "WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-win-x64.generated.json";
+        const string exportPath =
+            "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json";
 
         switch (tamper)
         {
@@ -257,6 +277,28 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 RewriteEmbedded(authority, finalizationPath, finalization);
                 break;
             }
+            case "candidate_artifact_name":
+            {
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                capture["candidate"]!["artifactName"] =
+                    "preview-nightly-candidate-99999-1";
+                RewriteEmbedded(authority, capturePath, capture);
+                break;
+            }
+            case "export_source":
+            {
+                JsonObject export = ReadEmbedded(authority, exportPath);
+                export["source"]!["actor"] = "different-producer";
+                RewriteEmbedded(authority, exportPath, export);
+                break;
+            }
+            case "export_heads":
+            {
+                JsonObject export = ReadEmbedded(authority, exportPath);
+                export["heads"]![0]!["installer"]!["sha256"] = new string('f', 64);
+                RewriteEmbedded(authority, exportPath, export);
+                break;
+            }
             default:
                 throw new ArgumentOutOfRangeException(nameof(tamper));
         }
@@ -306,6 +348,32 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 static entry => entry["path"]!.GetValue<string>(),
                 StringComparer.Ordinal);
 
+        JsonObject capture = ReadEmbedded(authority, capturePath);
+        if (capture["candidate"] is JsonObject captureCandidate)
+        {
+            foreach ((string property, string path) in new[]
+                     {
+                         (
+                             "contentInventory",
+                             "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json"),
+                         (
+                             "exportReceipt",
+                             "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json")
+                     })
+            {
+                JsonObject entry = entries[path];
+                captureCandidate[property] = new JsonObject
+                {
+                    ["path"] = path,
+                    ["sha256"] = entry["sha256"]!.GetValue<string>(),
+                    ["sizeBytes"] = entry["sizeBytes"]!.GetValue<long>()
+                };
+                captureCandidate[$"{property}Sha256"] =
+                    entry["sha256"]!.GetValue<string>();
+            }
+            RewriteEmbedded(authority, capturePath, capture);
+        }
+
         JsonObject captureInventory = ReadEmbedded(authority, captureInventoryPath);
         captureInventory["captureManifestSha256"] = entries[capturePath]["sha256"]!.GetValue<string>();
         RewriteEmbedded(authority, captureInventoryPath, captureInventory);
@@ -338,6 +406,8 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
     {
         private static readonly byte[] InstallerBytes = "MZ-avalonia-installer"u8.ToArray();
         private static readonly byte[] PayloadBytes = "PK-avalonia-payload"u8.ToArray();
+        private static readonly byte[] BlazorInstallerBytes = "MZ-blazor-installer"u8.ToArray();
+        private static readonly byte[] BlazorPayloadBytes = "PK-blazor-payload"u8.ToArray();
         private static readonly string[] BaseOutputNames =
         [
             "HUB_LOCAL_RELEASE_PROOF.generated.json",
@@ -540,10 +610,67 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             return root;
         }
 
-        public static byte[] BuildCandidateAuthority()
+        public static byte[] BuildCandidateAuthority(
+            bool includeUndeclaredWindowsArtifacts = false)
         {
             string installerSha = Sha256(InstallerBytes);
             string payloadSha = Sha256(PayloadBytes);
+            string blazorInstallerSha = Sha256(BlazorInstallerBytes);
+            string blazorPayloadSha = Sha256(BlazorPayloadBytes);
+            var manifestArtifacts = new List<object>
+            {
+                new
+                {
+                    artifactId = "avalonia-win-x64-installer",
+                    head = "avalonia",
+                    platform = "windows",
+                    rid = "win-x64",
+                    arch = "x64",
+                    kind = "installer",
+                    fileName = "chummer-avalonia-win-x64-installer.exe",
+                    sha256 = installerSha,
+                    sizeBytes = InstallerBytes.LongLength
+                },
+                new
+                {
+                    artifactId = "avalonia-win-x64-payload",
+                    head = "avalonia",
+                    platform = "windows",
+                    rid = "win-x64",
+                    arch = "x64",
+                    kind = "archive",
+                    fileName = "chummer-avalonia-win-x64-payload.zip",
+                    sha256 = payloadSha,
+                    sizeBytes = PayloadBytes.LongLength
+                }
+            };
+            if (includeUndeclaredWindowsArtifacts)
+            {
+                manifestArtifacts.Add(new
+                {
+                    artifactId = "blazor-desktop-win-x64-installer",
+                    head = "blazor-desktop",
+                    platform = "windows",
+                    rid = "win-x64",
+                    arch = "x64",
+                    kind = "installer",
+                    fileName = "chummer-blazor-desktop-win-x64-installer.exe",
+                    sha256 = blazorInstallerSha,
+                    sizeBytes = BlazorInstallerBytes.LongLength
+                });
+                manifestArtifacts.Add(new
+                {
+                    artifactId = "blazor-desktop-win-x64-payload",
+                    head = "blazor-desktop",
+                    platform = "windows",
+                    rid = "win-x64",
+                    arch = "x64",
+                    kind = "archive",
+                    fileName = "chummer-blazor-desktop-win-x64-payload.zip",
+                    sha256 = blazorPayloadSha,
+                    sizeBytes = BlazorPayloadBytes.LongLength
+                });
+            }
             byte[] canonical = JsonSerializer.SerializeToUtf8Bytes(new
             {
                 contractName = "Chummer.Hub.Registry.Contracts",
@@ -551,40 +678,14 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 releaseVersion = "run-candidate",
                 channel = "preview",
                 channelId = "preview",
-                artifacts = new object[]
-                {
-                    new
-                    {
-                        artifactId = "avalonia-win-x64-installer",
-                        head = "avalonia",
-                        platform = "windows",
-                        rid = "win-x64",
-                        arch = "x64",
-                        kind = "installer",
-                        fileName = "chummer-avalonia-win-x64-installer.exe",
-                        sha256 = installerSha,
-                        sizeBytes = InstallerBytes.LongLength
-                    },
-                    new
-                    {
-                        artifactId = "avalonia-win-x64-payload",
-                        head = "avalonia",
-                        platform = "windows",
-                        rid = "win-x64",
-                        arch = "x64",
-                        kind = "archive",
-                        fileName = "chummer-avalonia-win-x64-payload.zip",
-                        sha256 = payloadSha,
-                        sizeBytes = PayloadBytes.LongLength
-                    }
-                },
+                artifacts = manifestArtifacts,
                 desktopTupleCoverage = new
                 {
                     requiredDesktopHeads = new[] { "avalonia" }
                 }
             });
             string canonicalSha = Sha256(canonical);
-            var rows = new ReleaseUploadCandidateInventoryRow[]
+            var rows = new List<ReleaseUploadCandidateInventoryRow>
             {
                 new ReleaseUploadCandidateInventoryRow(
                     "RELEASE_CHANNEL.generated.json",
@@ -599,13 +700,25 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                     PayloadBytes.LongLength,
                     payloadSha)
             };
+            if (includeUndeclaredWindowsArtifacts)
+            {
+                rows.Add(new ReleaseUploadCandidateInventoryRow(
+                    "files/chummer-blazor-desktop-win-x64-installer.exe",
+                    BlazorInstallerBytes.LongLength,
+                    blazorInstallerSha));
+                rows.Add(new ReleaseUploadCandidateInventoryRow(
+                    "files/chummer-blazor-desktop-win-x64-payload.zip",
+                    BlazorPayloadBytes.LongLength,
+                    blazorPayloadSha));
+                rows.Sort(static (left, right) => string.CompareOrdinal(left.Path, right.Path));
+            }
             string inventorySha =
                 ReleaseUploadSnapshotAuthorityService.ComputeInventoryDigest(rows);
             var candidate = new ReleaseUploadCandidateIdentity(
                 "run-candidate",
                 canonicalSha,
                 inventorySha,
-                rows.Length,
+                rows.Count,
                 rows.Sum(static row => row.SizeBytes),
                 string.Empty);
             candidate = candidate with
@@ -665,29 +778,6 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 },
                 files = provenanceRows
             });
-            byte[] capture = JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                contractName = "chummer6-ui.preview-nightly-native-windows-capture",
-                contractVersion = 1,
-                status = "captured",
-                captureMode = "interactive",
-                generatedAt = now,
-                version = "run-candidate",
-                channelId = "preview",
-                source = captureSource,
-                candidate = new
-                {
-                    manifestSha256 = canonicalSha,
-                    contentInventorySha256 = Sha256(provenance)
-                }
-            });
-            byte[] captureInventory = JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                contractName = "chummer6-ui.preview-nightly-native-windows-capture-inventory",
-                contractVersion = 1,
-                captureManifestSha256 = Sha256(capture),
-                files = Array.Empty<object>()
-            });
             byte[] startup = JsonSerializer.SerializeToUtf8Bytes(new
             {
                 status = "pass",
@@ -717,6 +807,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             });
             byte[] progressScreenshot = "png-progress"u8.ToArray();
             byte[] completionScreenshot = "png-completion"u8.ToArray();
+            byte[] progressLog = "Install complete\n"u8.ToArray();
             const string visualPath =
                 "WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-win-x64.generated.json";
             byte[] visual = JsonSerializer.SerializeToUtf8Bytes(new
@@ -760,11 +851,168 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 clippingReview = new { status = "passed", reviewer = "accountable-reviewer" },
                 finalizationBinding = finalizationSource
             });
+            var producerSource = new Dictionary<string, object?>
+            {
+                ["repository"] = "ArchonMegalon/chummer6-ui",
+                ["workflow"] = ".github/workflows/preview-nightly-candidate-export.yml",
+                ["runId"] = "900",
+                ["runAttempt"] = "1",
+                ["ref"] = "refs/heads/main",
+                ["sha"] = new string('a', 40),
+                ["actor"] = "candidate-producer",
+                ["artifactName"] = "preview-nightly-candidate-900-1"
+            };
+            var exportHead = new
+            {
+                headId = "avalonia",
+                rid = "win-x64",
+                installer = new
+                {
+                    relativePath = "files/chummer-avalonia-win-x64-installer.exe",
+                    fileName = "chummer-avalonia-win-x64-installer.exe",
+                    sha256 = installerSha,
+                    sizeBytes = InstallerBytes.LongLength
+                },
+                payload = new
+                {
+                    relativePath = "files/chummer-avalonia-win-x64-payload.zip",
+                    fileName = "chummer-avalonia-win-x64-payload.zip",
+                    sha256 = payloadSha,
+                    sizeBytes = PayloadBytes.LongLength
+                }
+            };
+            var exportSource = new Dictionary<string, object?>(producerSource)
+            {
+                ["runnerLabel"] = "chummer-preview-nightly-export-abcdefghijkl"
+            };
             byte[] export = JsonSerializer.SerializeToUtf8Bytes(new
             {
                 contractName = "chummer6-ui.preview-nightly-candidate-export",
                 contractVersion = 1,
-                status = "exported"
+                status = "exported",
+                release = new { channel = "preview", version = "run-candidate" },
+                candidateManifest = new
+                {
+                    path = "RELEASE_CHANNEL.generated.json",
+                    sha256 = canonicalSha
+                },
+                contentInventory = new
+                {
+                    path = "PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json",
+                    sha256 = Sha256(provenance)
+                },
+                source = exportSource,
+                heads = new[] { exportHead }
+            });
+            string artifactCreatedAt = now.AddMinutes(-1).ToString(
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                System.Globalization.CultureInfo.InvariantCulture);
+            string artifactExpiresAt = now.AddDays(14).ToString(
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                System.Globalization.CultureInfo.InvariantCulture);
+            const string artifactId = "503";
+            string artifactSha = new('d', 64);
+            var handoff = new Dictionary<string, object?>(producerSource)
+            {
+                ["contractName"] = "chummer6-ui.preview-nightly-candidate-handoff",
+                ["contractVersion"] = 1,
+                ["artifactId"] = artifactId,
+                ["artifactSha256"] = artifactSha,
+                ["contentInventorySha256"] = Sha256(provenance)
+            };
+            var authenticatedApi = new Dictionary<string, object?>(producerSource)
+            {
+                ["contractName"] = "chummer6-ui.preview-nightly-candidate-authenticated-api",
+                ["contractVersion"] = 1,
+                ["artifactId"] = artifactId,
+                ["artifactSha256"] = artifactSha,
+                ["artifactCreatedAt"] = artifactCreatedAt,
+                ["artifactExpiresAt"] = artifactExpiresAt,
+                ["event"] = "workflow_dispatch",
+                ["status"] = "completed",
+                ["conclusion"] = "success"
+            };
+            var captureCandidate = new Dictionary<string, object?>(producerSource)
+            {
+                ["artifactId"] = artifactId,
+                ["artifactSha256"] = artifactSha,
+                ["artifactCreatedAt"] = artifactCreatedAt,
+                ["artifactExpiresAt"] = artifactExpiresAt,
+                ["manifestPath"] = "RELEASE_CHANNEL.generated.json",
+                ["manifestSha256"] = canonicalSha,
+                ["contentInventorySha256"] = Sha256(provenance),
+                ["exportReceiptSha256"] = Sha256(export),
+                ["handoffSha256"] = Sha256(JsonSerializer.SerializeToUtf8Bytes(handoff)),
+                ["authenticatedApiSha256"] = Sha256(
+                    JsonSerializer.SerializeToUtf8Bytes(authenticatedApi)),
+                ["contentInventory"] = new
+                {
+                    path = CandidateProvenanceInventoryPath,
+                    sha256 = Sha256(provenance),
+                    sizeBytes = provenance.LongLength
+                },
+                ["exportReceipt"] = new
+                {
+                    path = CandidateProvenanceExportPath,
+                    sha256 = Sha256(export),
+                    sizeBytes = export.LongLength
+                }
+            };
+            var captureHead = new
+            {
+                exportHead.headId,
+                exportHead.rid,
+                exportHead.installer,
+                exportHead.payload,
+                receipt = new
+                {
+                    path = "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+                    sha256 = Sha256(startup)
+                },
+                progressLog = new
+                {
+                    path = "startup-smoke/windows-installer-progress-avalonia-win-x64.log",
+                    sha256 = Sha256(progressLog)
+                },
+                screenshots = new object[]
+                {
+                    new
+                    {
+                        role = "progress",
+                        path = "screenshots/avalonia-progress.png",
+                        sha256 = Sha256(progressScreenshot),
+                        width = 1280,
+                        height = 720
+                    },
+                    new
+                    {
+                        role = "completion",
+                        path = "screenshots/avalonia-completion.png",
+                        sha256 = Sha256(completionScreenshot),
+                        width = 1280,
+                        height = 720
+                    }
+                }
+            };
+            byte[] capture = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer6-ui.preview-nightly-native-windows-capture",
+                contractVersion = 1,
+                status = "captured",
+                captureMode = "interactive",
+                generatedAt = now,
+                version = "run-candidate",
+                channelId = "preview",
+                source = captureSource,
+                candidate = captureCandidate,
+                heads = new[] { captureHead }
+            });
+            byte[] captureInventory = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer6-ui.preview-nightly-native-windows-capture-inventory",
+                contractVersion = 1,
+                captureManifestSha256 = Sha256(capture),
+                files = Array.Empty<object>()
             });
             byte[] finalization = JsonSerializer.SerializeToUtf8Bytes(new
             {
@@ -798,7 +1046,10 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 .Concat(
                 [
                     (Path: "screenshots/avalonia-completion.png", Bytes: completionScreenshot),
-                    (Path: "screenshots/avalonia-progress.png", Bytes: progressScreenshot)
+                    (Path: "screenshots/avalonia-progress.png", Bytes: progressScreenshot),
+                    (
+                        Path: "startup-smoke/windows-installer-progress-avalonia-win-x64.log",
+                        Bytes: progressLog)
                 ])
                 .OrderBy(static subject => subject.Path, StringComparer.Ordinal)
                 .Select(subject => (object)new

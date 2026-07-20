@@ -68,12 +68,23 @@ CANDIDATE_PROVENANCE_EXPORT_FILE = (
 )
 CANDIDATE_CAPTURE_WORKFLOW = ".github/workflows/windows-native-evidence-capture.yml"
 CANDIDATE_FINALIZE_WORKFLOW = ".github/workflows/windows-native-evidence-finalize.yml"
+CANDIDATE_PRODUCER_WORKFLOW = ".github/workflows/preview-nightly-candidate-export.yml"
 CANDIDATE_UI_REPOSITORY = "ArchonMegalon/chummer6-ui"
 CANDIDATE_UI_REF = "refs/heads/main"
 CANDIDATE_RID = "win-x64"
 CANDIDATE_HEAD_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 CANDIDATE_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 CANDIDATE_REVIEWER_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,38})$")
+CANDIDATE_GITHUB_LOGIN_RE = re.compile(
+    r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?|github-actions\[bot\])$"
+)
+CANDIDATE_POSITIVE_INTEGER_RE = re.compile(r"^[1-9][0-9]*$")
+CANDIDATE_GITHUB_TIMESTAMP_RE = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+)
+CANDIDATE_EXPORT_RUNNER_LABEL_RE = re.compile(
+    r"^chummer-preview-nightly-export-[a-z0-9]{12,64}$"
+)
 CANDIDATE_PROOF_MAX_AGE = timedelta(hours=24)
 
 
@@ -1281,6 +1292,16 @@ def _candidate_windows_scope(
     artifacts_value = canonical.get("artifacts")
     if not isinstance(artifacts_value, list) or not artifacts_value:
         raise ProjectionBlocked("candidate release manifest has no artifacts")
+    for artifact in artifacts_value:
+        if (
+            isinstance(artifact, dict)
+            and artifact.get("platform") == "windows"
+            and artifact.get("head") not in heads
+        ):
+            raise ProjectionBlocked(
+                "candidate release manifest contains a Windows artifact outside "
+                "requiredDesktopHeads"
+            )
     candidate_by_path = {str(row["path"]): row for row in candidate_rows}
     artifacts: dict[str, dict[str, dict[str, object]]] = {}
     for head in heads:
@@ -1332,6 +1353,223 @@ def _candidate_windows_scope(
                 "fileName": file_name,
             }
     return {"version": version, "channel": channel, "heads": heads, "artifacts": artifacts}
+
+
+def _candidate_positive_github_integer(value: object, *, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or CANDIDATE_POSITIVE_INTEGER_RE.fullmatch(value) is None
+        or int(value) > 9_007_199_254_740_991
+    ):
+        raise ProjectionBlocked(f"{label} must be an exact positive GitHub integer string")
+    return value
+
+
+def _candidate_github_timestamp(value: object, *, label: str) -> datetime:
+    if (
+        not isinstance(value, str)
+        or CANDIDATE_GITHUB_TIMESTAMP_RE.fullmatch(value) is None
+    ):
+        raise ProjectionBlocked(f"{label} must be an exact UTC GitHub timestamp")
+    try:
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError as exc:
+        raise ProjectionBlocked(f"{label} is invalid") from exc
+
+
+def _candidate_expected_export_heads(scope: dict[str, object]) -> list[dict[str, object]]:
+    artifacts = scope["artifacts"]
+
+    def binding(artifact: dict[str, object]) -> dict[str, object]:
+        return {
+            "relativePath": artifact["path"],
+            "fileName": artifact["fileName"],
+            "sha256": artifact["sha256"],
+            "sizeBytes": artifact["sizeBytes"],
+        }
+
+    return [
+        {
+            "headId": head,
+            "rid": CANDIDATE_RID,
+            "installer": binding(artifacts[head]["installer"]),
+            "payload": binding(artifacts[head]["payload"]),
+        }
+        for head in scope["heads"]
+    ]
+
+
+def _validate_capture_candidate_binding(
+    value: object,
+    *,
+    documents: dict[str, tuple[dict[str, object], bytes, dict[str, object]]],
+    canonical_manifest_sha256: str,
+    capture_source: dict[str, object],
+    capture_generated_at: datetime,
+) -> dict[str, object]:
+    required = {
+        "actor",
+        "artifactCreatedAt",
+        "artifactExpiresAt",
+        "artifactId",
+        "artifactName",
+        "artifactSha256",
+        "authenticatedApiSha256",
+        "contentInventory",
+        "contentInventorySha256",
+        "exportReceipt",
+        "exportReceiptSha256",
+        "handoffSha256",
+        "manifestPath",
+        "manifestSha256",
+        "ref",
+        "repository",
+        "runAttempt",
+        "runId",
+        "sha",
+        "workflow",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise ProjectionBlocked("candidate capture binding property set drifted")
+    if (
+        value.get("repository") != CANDIDATE_UI_REPOSITORY
+        or value.get("workflow") != CANDIDATE_PRODUCER_WORKFLOW
+        or value.get("ref") != CANDIDATE_UI_REF
+        or CANDIDATE_COMMIT_RE.fullmatch(str(value.get("sha") or "")) is None
+        or CANDIDATE_GITHUB_LOGIN_RE.fullmatch(str(value.get("actor") or "")) is None
+    ):
+        raise ProjectionBlocked("candidate capture producer provenance drifted")
+    for name in ("runId", "runAttempt", "artifactId"):
+        _candidate_positive_github_integer(value.get(name), label=f"candidate capture {name}")
+    if value.get("artifactName") != (
+        f"preview-nightly-candidate-{value['runId']}-{value['runAttempt']}"
+    ):
+        raise ProjectionBlocked("candidate capture artifact name drifted")
+    for name in (
+        "artifactSha256",
+        "authenticatedApiSha256",
+        "contentInventorySha256",
+        "exportReceiptSha256",
+        "handoffSha256",
+        "manifestSha256",
+    ):
+        if SHA256_RE.fullmatch(str(value.get(name) or "")) is None:
+            raise ProjectionBlocked(f"candidate capture {name} is invalid")
+    if (
+        value.get("manifestPath") != "RELEASE_CHANNEL.generated.json"
+        or value.get("manifestSha256") != canonical_manifest_sha256
+    ):
+        raise ProjectionBlocked("candidate capture manifest binding drifted")
+    created_at = _candidate_github_timestamp(
+        value.get("artifactCreatedAt"), label="candidate capture artifactCreatedAt"
+    )
+    expires_at = _candidate_github_timestamp(
+        value.get("artifactExpiresAt"), label="candidate capture artifactExpiresAt"
+    )
+    if (
+        created_at >= expires_at
+        or created_at > capture_generated_at + timedelta(minutes=5)
+        or expires_at <= capture_generated_at
+    ):
+        raise ProjectionBlocked("candidate capture artifact lifetime drifted")
+    if any(
+        value.get(name) != capture_source.get(name)
+        for name in ("repository", "ref", "sha")
+    ):
+        raise ProjectionBlocked("candidate capture revision differs from capture source")
+
+    for name, path, digest_name in (
+        ("contentInventory", CANDIDATE_PROVENANCE_INVENTORY_FILE, "contentInventorySha256"),
+        ("exportReceipt", CANDIDATE_PROVENANCE_EXPORT_FILE, "exportReceiptSha256"),
+    ):
+        binding = value.get(name)
+        if not isinstance(binding, dict) or set(binding) != {"path", "sha256", "sizeBytes"}:
+            raise ProjectionBlocked(f"candidate capture {name} property set drifted")
+        _document, payload, entry = documents[path]
+        expected_sha256 = hashlib.sha256(payload).hexdigest()
+        if (
+            binding
+            != {"path": path, "sha256": expected_sha256, "sizeBytes": len(payload)}
+            or value.get(digest_name) != expected_sha256
+            or entry.get("sha256") != expected_sha256
+            or entry.get("sizeBytes") != len(payload)
+        ):
+            raise ProjectionBlocked(f"candidate capture {name} custody drifted")
+    return value
+
+
+def _validate_candidate_export_receipt(
+    receipt: dict[str, object],
+    *,
+    candidate_binding: dict[str, object],
+    canonical_manifest_sha256: str,
+    scope: dict[str, object],
+) -> None:
+    required = {
+        "candidateManifest",
+        "contentInventory",
+        "contractName",
+        "contractVersion",
+        "heads",
+        "release",
+        "source",
+        "status",
+    }
+    if not isinstance(receipt, dict) or set(receipt) != required:
+        raise ProjectionBlocked("candidate export receipt property set drifted")
+    if (
+        receipt.get("contractName") != "chummer6-ui.preview-nightly-candidate-export"
+        or receipt.get("contractVersion") != 1
+        or receipt.get("status") != "exported"
+        or receipt.get("release")
+        != {"channel": scope["channel"], "version": scope["version"]}
+        or receipt.get("candidateManifest")
+        != {
+            "path": "RELEASE_CHANNEL.generated.json",
+            "sha256": canonical_manifest_sha256,
+        }
+        or receipt.get("contentInventory")
+        != {
+            "path": CANDIDATE_PROVENANCE_INVENTORY_FILE.rsplit("/", 1)[-1],
+            "sha256": candidate_binding["contentInventorySha256"],
+        }
+    ):
+        raise ProjectionBlocked("candidate export release or byte binding drifted")
+    if receipt.get("heads") != _candidate_expected_export_heads(scope):
+        raise ProjectionBlocked("candidate export required-head scope drifted")
+    source = receipt.get("source")
+    required_source = {
+        "actor",
+        "artifactName",
+        "ref",
+        "repository",
+        "runAttempt",
+        "runId",
+        "runnerLabel",
+        "sha",
+        "workflow",
+    }
+    if not isinstance(source, dict) or set(source) != required_source:
+        raise ProjectionBlocked("candidate export source property set drifted")
+    for name in (
+        "actor",
+        "artifactName",
+        "ref",
+        "repository",
+        "runAttempt",
+        "runId",
+        "sha",
+        "workflow",
+    ):
+        if source.get(name) != candidate_binding[name] or not isinstance(source.get(name), str):
+            raise ProjectionBlocked("candidate export source differs from capture authority")
+    if (
+        not isinstance(source.get("runnerLabel"), str)
+        or CANDIDATE_EXPORT_RUNNER_LABEL_RE.fullmatch(source["runnerLabel"]) is None
+    ):
+        raise ProjectionBlocked("candidate export runner label drifted")
 
 
 def _validate_candidate_native_evidence(
@@ -1493,14 +1731,16 @@ def _validate_candidate_native_evidence(
         or capture.get("version") != scope["version"]
         or capture.get("channelId") != scope["channel"]
         or capture.get("source") != capture_source
-        or capture.get("candidate")
-        != {
-            "manifestSha256": candidate["canonicalManifestSha256"],
-            "contentInventorySha256": hashlib.sha256(provenance_bytes).hexdigest(),
-        }
         or capture_at != summary_capture_at
     ):
         raise ProjectionBlocked("candidate native-Windows capture receipt drifted")
+    capture_candidate = _validate_capture_candidate_binding(
+        capture.get("candidate"),
+        documents=documents,
+        canonical_manifest_sha256=str(candidate["canonicalManifestSha256"]),
+        capture_source=capture_source,
+        capture_generated_at=capture_at,
+    )
 
     capture_inventory, capture_inventory_bytes, _ = documents[CANDIDATE_CAPTURE_INVENTORY_FILE]
     if (
@@ -1559,12 +1799,12 @@ def _validate_candidate_native_evidence(
         raise ProjectionBlocked("candidate native-Windows evidence file scope drifted")
 
     export, _, _ = documents[CANDIDATE_PROVENANCE_EXPORT_FILE]
-    if (
-        export.get("contractName") != "chummer6-ui.preview-nightly-candidate-export"
-        or export.get("contractVersion") != 1
-        or export.get("status") != "exported"
-    ):
-        raise ProjectionBlocked("candidate native-Windows export receipt drifted")
+    _validate_candidate_export_receipt(
+        export,
+        candidate_binding=capture_candidate,
+        canonical_manifest_sha256=str(candidate["canonicalManifestSha256"]),
+        scope=scope,
+    )
 
     for head in heads:
         installer = artifacts[head]["installer"]

@@ -55,6 +55,34 @@ def refresh_rehashed_evidence_bindings(authority: dict[str, object]) -> None:
     native = authority["custody"]["nativeWindowsFinalizedEvidence"]
     entries = {entry["path"]: entry for entry in native["files"]}
 
+    capture = json.loads(
+        base64.b64decode(entries["WINDOWS_NATIVE_CAPTURE.generated.json"]["base64"])
+    )
+    candidate = capture.get("candidate")
+    if isinstance(candidate, dict):
+        for name, path in (
+            (
+                "contentInventory",
+                "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json",
+            ),
+            (
+                "exportReceipt",
+                "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json",
+            ),
+        ):
+            entry = entries[path]
+            candidate[name] = {
+                "path": path,
+                "sha256": entry["sha256"],
+                "sizeBytes": entry["sizeBytes"],
+            }
+            candidate[f"{name}Sha256"] = entry["sha256"]
+        rewrite_embedded_document(
+            authority,
+            "WINDOWS_NATIVE_CAPTURE.generated.json",
+            lambda _: capture,
+        )
+
     capture_inventory = json.loads(
         base64.b64decode(entries["WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json"]["base64"])
     )
@@ -128,6 +156,40 @@ def refresh_finalized_inventory(root: Path) -> None:
             "files": rows,
         },
     )
+
+
+def refresh_directory_evidence_bindings(root: Path) -> None:
+    capture_path = root / "WINDOWS_NATIVE_CAPTURE.generated.json"
+    capture = json.loads(capture_path.read_text())
+    for name, relative in (
+        (
+            "contentInventory",
+            "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json",
+        ),
+        (
+            "exportReceipt",
+            "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json",
+        ),
+    ):
+        document = root / relative
+        capture["candidate"][name] = {
+            "path": relative,
+            "sha256": sha(document),
+            "sizeBytes": document.stat().st_size,
+        }
+        capture["candidate"][f"{name}Sha256"] = sha(document)
+    write_json(capture_path, capture)
+
+    capture_inventory_path = root / "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json"
+    capture_inventory = json.loads(capture_inventory_path.read_text())
+    capture_inventory["captureManifestSha256"] = sha(capture_path)
+    write_json(capture_inventory_path, capture_inventory)
+
+    finalization_path = root / "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json"
+    finalization = json.loads(finalization_path.read_text())
+    finalization["captureInventorySha256"] = sha(capture_inventory_path)
+    write_json(finalization_path, finalization)
+    refresh_finalized_inventory(root)
 
 
 def candidate_fixture(
@@ -244,12 +306,58 @@ def candidate_fixture(
             "files": provenance_rows,
         },
     )
+    producer_source = source(
+        ".github/workflows/preview-nightly-candidate-export.yml",
+        "candidate-producer",
+        "preview-nightly-candidate-12345-1",
+    )
+    export_heads = []
+    for head in evidence_heads:
+        installer = files / f"chummer-{head}-win-x64-installer.exe"
+        payload = files / f"chummer-{head}-win-x64-payload.zip"
+        export_heads.append(
+            {
+                "headId": head,
+                "rid": "win-x64",
+                "installer": {
+                    "relativePath": f"files/{installer.name}",
+                    "fileName": installer.name,
+                    "sha256": sha(installer),
+                    "sizeBytes": installer.stat().st_size,
+                },
+                "payload": {
+                    "relativePath": f"files/{payload.name}",
+                    "fileName": payload.name,
+                    "sha256": sha(payload),
+                    "sizeBytes": payload.stat().st_size,
+                },
+            }
+        )
+    export_receipt = (
+        finalized
+        / "candidate-provenance"
+        / "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
+    )
     write_json(
-        finalized / "candidate-provenance" / "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json",
+        export_receipt,
         {
             "contractName": "chummer6-ui.preview-nightly-candidate-export",
             "contractVersion": 1,
             "status": "exported",
+            "release": {"channel": "preview", "version": "run-candidate"},
+            "candidateManifest": {
+                "path": canonical.name,
+                "sha256": sha(canonical),
+            },
+            "contentInventory": {
+                "path": provenance.name,
+                "sha256": sha(provenance),
+            },
+            "source": {
+                **producer_source,
+                "runnerLabel": "chummer-preview-nightly-export-abcdefghijkl",
+            },
+            "heads": export_heads,
         },
     )
 
@@ -263,36 +371,8 @@ def candidate_fixture(
         "accountable-reviewer",
         "windows-native-evidence-finalized-12345-1",
     )
-    capture = finalized / "WINDOWS_NATIVE_CAPTURE.generated.json"
-    write_json(
-        capture,
-        {
-            "contractName": "chummer6-ui.preview-nightly-native-windows-capture",
-            "contractVersion": 1,
-            "status": "captured",
-            "captureMode": "interactive",
-            "generatedAt": timestamp,
-            "version": "run-candidate",
-            "channelId": "preview",
-            "source": capture_source,
-            "candidate": {
-                "manifestSha256": sha(canonical),
-                "contentInventorySha256": sha(provenance),
-            },
-        },
-    )
-    capture_inventory = finalized / "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json"
-    write_json(
-        capture_inventory,
-        {
-            "contractName": "chummer6-ui.preview-nightly-native-windows-capture-inventory",
-            "contractVersion": 1,
-            "captureManifestSha256": sha(capture),
-            "files": [],
-        },
-    )
-
     proof_bindings = []
+    capture_heads = []
     for index, head in enumerate(evidence_heads, start=1):
         installer = files / f"chummer-{head}-win-x64-installer.exe"
         payload = files / f"chummer-{head}-win-x64-payload.zip"
@@ -327,12 +407,13 @@ def candidate_fixture(
         )
         screenshots = []
         for role in ("progress", "completion"):
-            relative = f"screenshots/{head}-{role}.png"
+            relative = f"screenshots/windows-installer-{head}-win-x64-{role}.png"
             shot = finalized / relative
             shot.parent.mkdir(parents=True, exist_ok=True)
             shot.write_bytes(b"png" + bytes([index, 1 if role == "progress" else 2]))
             screenshots.append({"role": role, "path": relative, "sha256": sha(shot)})
-        progress = finalized / f"startup-smoke/{head}-progress.log"
+        progress_relative = f"startup-smoke/windows-installer-progress-{head}-win-x64.log"
+        progress = finalized / progress_relative
         progress.write_text("Install complete\n", encoding="utf-8")
         proof_relative = f"WINDOWS_INSTALLER_VISUAL_PROOF-{head}-win-x64.generated.json"
         proof = finalized / proof_relative
@@ -376,6 +457,78 @@ def candidate_fixture(
         proof_bindings.append(
             {"headId": head, "path": proof_relative, "sha256": sha(proof)}
         )
+        export_head = next(row for row in export_heads if row["headId"] == head)
+        capture_heads.append(
+            {
+                **export_head,
+                "receipt": {
+                    "path": startup_relative,
+                    "sha256": sha(finalized / startup_relative),
+                },
+                "progressLog": {
+                    "path": progress_relative,
+                    "sha256": sha(progress),
+                },
+                "screenshots": [
+                    {**screenshot, "width": 1280, "height": 720}
+                    for screenshot in screenshots
+                ],
+            }
+        )
+
+    candidate_binding = {
+        **producer_source,
+        "artifactId": "503",
+        "artifactSha256": "d" * 64,
+        "artifactCreatedAt": (now - timedelta(minutes=1))
+        .replace(microsecond=0)
+        .strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "artifactExpiresAt": (now + timedelta(days=14))
+        .replace(microsecond=0)
+        .strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "manifestPath": canonical.name,
+        "manifestSha256": sha(canonical),
+        "contentInventorySha256": sha(provenance),
+        "exportReceiptSha256": sha(export_receipt),
+        "handoffSha256": "b" * 64,
+        "authenticatedApiSha256": "c" * 64,
+        "contentInventory": {
+            "path": provenance.relative_to(finalized).as_posix(),
+            "sha256": sha(provenance),
+            "sizeBytes": provenance.stat().st_size,
+        },
+        "exportReceipt": {
+            "path": export_receipt.relative_to(finalized).as_posix(),
+            "sha256": sha(export_receipt),
+            "sizeBytes": export_receipt.stat().st_size,
+        },
+    }
+    capture = finalized / "WINDOWS_NATIVE_CAPTURE.generated.json"
+    write_json(
+        capture,
+        {
+            "contractName": "chummer6-ui.preview-nightly-native-windows-capture",
+            "contractVersion": 1,
+            "status": "captured",
+            "captureMode": "interactive",
+            "generatedAt": timestamp,
+            "version": "run-candidate",
+            "channelId": "preview",
+            "source": capture_source,
+            "candidate": candidate_binding,
+            "heads": capture_heads,
+        },
+    )
+    capture_inventory = finalized / "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json"
+    write_json(
+        capture_inventory,
+        {
+            "contractName": "chummer6-ui.preview-nightly-native-windows-capture-inventory",
+            "contractVersion": 1,
+            "captureManifestSha256": sha(capture),
+            "files": [],
+        },
+    )
 
     write_json(
         finalized / "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json",
@@ -414,8 +567,14 @@ def run_materializer(
         artifact_heads=artifact_heads,
         evidence_heads=evidence_heads,
     )
+    return invoke_materializer(fixture, tmp_path / "candidate-authority.json")
+
+
+def invoke_materializer(
+    fixture: tuple[Path, Path, Path, Path, Path],
+    output: Path,
+) -> tuple[subprocess.CompletedProcess[str], Path, tuple[Path, Path, Path, Path, Path]]:
     bundle, canonical, summary, inventory, finalized = fixture
-    output = tmp_path / "candidate-authority.json"
     completed = subprocess.run(
         [
             sys.executable,
@@ -523,6 +682,18 @@ def test_fresh_native_finalization_materializes_exact_custody(tmp_path: Path) ->
     evidence = authority["custody"]["nativeWindowsFinalizedEvidence"]
     assert evidence["reviewer"] == "accountable-reviewer"
     assert len(evidence["files"]) >= 8
+    capture_entry = next(
+        row
+        for row in evidence["files"]
+        if row["path"] == "WINDOWS_NATIVE_CAPTURE.generated.json"
+    )
+    capture = json.loads(base64.b64decode(capture_entry["base64"]))
+    assert capture["candidate"]["workflow"] == (
+        ".github/workflows/preview-nightly-candidate-export.yml"
+    )
+    assert capture["candidate"]["exportReceipt"]["path"].startswith(
+        "candidate-provenance/"
+    )
     assert output.stat().st_mode & 0o777 == 0o600
     assert authority["candidate"]["canonicalManifestSha256"] == sha(fixture[1])
 
@@ -577,6 +748,66 @@ def test_manifest_and_native_evidence_head_scope_cannot_widen_or_narrow(
     assert not output.exists()
 
 
+def test_materializer_rejects_windows_artifact_head_outside_required_scope(
+    tmp_path: Path,
+) -> None:
+    completed, output, _ = run_materializer(
+        tmp_path,
+        required_heads=("avalonia",),
+        artifact_heads=("avalonia", "blazor-desktop"),
+        evidence_heads=("avalonia",),
+    )
+
+    assert completed.returncode != 0
+    assert "outside requiredDesktopHeads" in completed.stderr
+    assert not output.exists()
+
+
+def test_materializer_rejects_fully_rehashed_exporter_source_tamper(
+    tmp_path: Path,
+) -> None:
+    fixture = candidate_fixture(tmp_path)
+    finalized = fixture[-1]
+    export_path = (
+        finalized
+        / "candidate-provenance"
+        / "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
+    )
+    export = json.loads(export_path.read_text())
+    export["source"]["actor"] = "different-producer"
+    write_json(export_path, export)
+    refresh_directory_evidence_bindings(finalized)
+
+    completed, output, _ = invoke_materializer(
+        fixture,
+        tmp_path / "candidate-authority.json",
+    )
+
+    assert completed.returncode != 0
+    assert "source differs from capture authority" in completed.stderr
+    assert not output.exists()
+
+
+def test_projection_scope_parser_rejects_windows_artifact_head_widening(
+    tmp_path: Path,
+) -> None:
+    bundle, canonical_path, summary_path, inventory_path, _ = candidate_fixture(
+        tmp_path,
+        required_heads=("avalonia",),
+        artifact_heads=("avalonia", "blazor-desktop"),
+        evidence_heads=("avalonia",),
+    )
+    del bundle
+    module = load_projection()
+
+    with pytest.raises(module.ProjectionBlocked, match="outside requiredDesktopHeads"):
+        module._candidate_windows_scope(
+            json.loads(canonical_path.read_text()),
+            json.loads(inventory_path.read_text())["files"],
+            json.loads(summary_path.read_text()),
+        )
+
+
 def test_candidate_snapshot_is_mutually_bounded_and_cannot_be_reissued(
     tmp_path: Path,
 ) -> None:
@@ -626,6 +857,9 @@ def test_candidate_snapshot_is_mutually_bounded_and_cannot_be_reissued(
         "not_native",
         "wine_runner",
         "artifact_digest",
+        "candidate_artifact_name",
+        "export_source",
+        "export_heads",
     ],
 )
 def test_projection_rejects_freshly_rehashed_semantic_evidence_tamper(
@@ -638,6 +872,10 @@ def test_projection_rejects_freshly_rehashed_semantic_evidence_tamper(
     native = authority["custody"]["nativeWindowsFinalizedEvidence"]
     startup_path = "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json"
     proof_path = "WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-win-x64.generated.json"
+    export_path = (
+        "candidate-provenance/"
+        "PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json"
+    )
 
     if tamper == "empty_capture":
         rewrite_embedded_document(authority, "WINDOWS_NATIVE_CAPTURE.generated.json", lambda _: {})
@@ -692,11 +930,49 @@ def test_projection_rejects_freshly_rehashed_semantic_evidence_tamper(
                 "nativeHostEvidence": {**value["nativeHostEvidence"], "runner": "wine64"},
             },
         )
-    else:
+    elif tamper == "artifact_digest":
         rewrite_embedded_document(
             authority,
             proof_path,
             lambda value: {**value, "artifactDigest": "sha256:" + "f" * 64},
+        )
+    elif tamper == "candidate_artifact_name":
+        rewrite_embedded_document(
+            authority,
+            "WINDOWS_NATIVE_CAPTURE.generated.json",
+            lambda value: {
+                **value,
+                "candidate": {
+                    **value["candidate"],
+                    "artifactName": "preview-nightly-candidate-99999-1",
+                },
+            },
+        )
+    elif tamper == "export_source":
+        rewrite_embedded_document(
+            authority,
+            export_path,
+            lambda value: {
+                **value,
+                "source": {**value["source"], "actor": "different-producer"},
+            },
+        )
+    else:
+        rewrite_embedded_document(
+            authority,
+            export_path,
+            lambda value: {
+                **value,
+                "heads": [
+                    {
+                        **value["heads"][0],
+                        "installer": {
+                            **value["heads"][0]["installer"],
+                            "sha256": "f" * 64,
+                        },
+                    }
+                ],
+            },
         )
 
     refresh_rehashed_evidence_bindings(authority)
