@@ -11,7 +11,6 @@ using Chummer.Run.Contracts.PublicSurface;
 namespace Chummer.Run.Api.Services;
 
 [JsonConverter(typeof(ReleaseAuthorityRevisionAdvanceRequestJsonConverter))]
-[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
 public sealed record ReleaseAuthorityRevisionAdvanceRequest(
     string GenerationId,
     string ExpectedShelfPointerSha256,
@@ -269,6 +268,12 @@ public sealed class ReleaseAuthorityRevisionStore
         "responsiveness",
         "design_authorship"
     ];
+    private static readonly HashSet<string> PositiveEvidenceSourceStatuses = new(
+        [
+            "available", "clear", "complete", "completed", "current", "healthy",
+            "ok", "pass", "passed", "published", "ready", "success", "succeeded"
+        ],
+        StringComparer.Ordinal);
     private static readonly string[] LocalPathMarkers =
     [
         "/tmp/", "/var/tmp/", "/docker/", "/workspace/", "/Users/", "/home/"
@@ -1195,7 +1200,10 @@ public sealed class ReleaseAuthorityRevisionStore
                 "Review predecessor and preview successor disagree on manifest chronology.");
         }
 
-        DateTimeOffset scorecardGeneratedAt = ValidateScorecardBytes(request.ScorecardBytes);
+        (DateTimeOffset scorecardGeneratedAt,
+            DateTimeOffset earliestEvidenceGeneratedAt,
+            DateTimeOffset latestEvidenceGeneratedAt) = ValidateScorecardBytes(
+            request.ScorecardBytes);
         DateTimeOffset convergenceGeneratedAt = ValidateConvergenceBytes(
             request.ConvergenceBytes,
             predecessor,
@@ -1207,12 +1215,18 @@ public sealed class ReleaseAuthorityRevisionStore
             manifestGeneratedAt,
             predecessorGeneratedAt,
             scorecardGeneratedAt,
+            earliestEvidenceGeneratedAt,
+            latestEvidenceGeneratedAt,
             convergenceGeneratedAt,
             observedAtUtc,
             enforceObservedFreshness);
     }
 
-    private static DateTimeOffset ValidateScorecardBytes(ReadOnlyMemory<byte> bytes)
+    private static (
+        DateTimeOffset GeneratedAtUtc,
+        DateTimeOffset EarliestEvidenceGeneratedAt,
+        DateTimeOffset LatestEvidenceGeneratedAt) ValidateScorecardBytes(
+        ReadOnlyMemory<byte> bytes)
     {
         using JsonDocument document = ParseStrictJson(bytes, "campaign-operability scorecard");
         JsonElement scorecard = document.RootElement;
@@ -1242,6 +1256,8 @@ public sealed class ReleaseAuthorityRevisionStore
         DateTimeOffset generatedAtUtc = ParseCanonicalUtcSeconds(
             RequireString(scorecard, "generated_at_utc", 128),
             "scorecard generated_at_utc");
+        DateTimeOffset earliestEvidenceGeneratedAt = DateTimeOffset.MaxValue;
+        DateTimeOffset latestEvidenceGeneratedAt = DateTimeOffset.MinValue;
         ValidatePortableEvidencePath(
             RequireString(scorecard, "rubric_path", 2048),
             "scorecard rubric_path");
@@ -1374,13 +1390,10 @@ public sealed class ReleaseAuthorityRevisionStore
                     RequireString(evidence, "path", 2048),
                     "campaign-operability evidence path");
                 string sourceStatus = RequireCanonicalToken(evidence, "source_status");
-                if (IsUnresolvedToken(sourceStatus)
-                    || TokenComponent.Matches(sourceStatus)
-                        .Select(static match => match.Value)
-                        .Any(IsSentinelToken))
+                if (!PositiveEvidenceSourceStatuses.Contains(sourceStatus))
                 {
                     throw new InvalidDataException(
-                        "Campaign-operability evidence source_status is unresolved.");
+                        "Campaign-operability evidence source_status is not an allowed positive posture.");
                 }
                 if (evidence.TryGetProperty("source_verdict", out _))
                 {
@@ -1389,15 +1402,25 @@ public sealed class ReleaseAuthorityRevisionStore
                         "source_verdict",
                         256,
                         allowEmpty: true);
-                    if (sourceVerdict.Length != 0 && IsUnresolvedToken(sourceVerdict))
+                    if (sourceVerdict.Length != 0
+                        && (IsUnresolvedToken(sourceVerdict)
+                            || ContainsNegativeReleasePosture(sourceVerdict)))
                     {
                         throw new InvalidDataException(
-                            "Campaign-operability evidence source_verdict is unresolved.");
+                            "Campaign-operability evidence source_verdict is unresolved or negative.");
                     }
                 }
-                _ = ParseUtc(
+                DateTimeOffset evidenceGeneratedAt = ParseCanonicalUtcSeconds(
                     RequireString(evidence, "generated_at", 128),
                     "campaign-operability evidence generated_at");
+                if (evidenceGeneratedAt < earliestEvidenceGeneratedAt)
+                {
+                    earliestEvidenceGeneratedAt = evidenceGeneratedAt;
+                }
+                if (evidenceGeneratedAt > latestEvidenceGeneratedAt)
+                {
+                    latestEvidenceGeneratedAt = evidenceGeneratedAt;
+                }
                 int evidenceScore = RequireBoundedInt(evidence, "score", 0, 3);
                 if (evidenceScore is not (2 or 3))
                 {
@@ -1557,7 +1580,10 @@ public sealed class ReleaseAuthorityRevisionStore
             throw new InvalidDataException(
                 "Campaign-operability whole-product stable gaps contradict its cells.");
         }
-        return generatedAtUtc;
+        return (
+            generatedAtUtc,
+            earliestEvidenceGeneratedAt,
+            latestEvidenceGeneratedAt);
     }
 
     private static DateTimeOffset ValidateConvergenceBytes(
@@ -1737,6 +1763,8 @@ public sealed class ReleaseAuthorityRevisionStore
         DateTimeOffset manifestGeneratedAt,
         DateTimeOffset predecessorGeneratedAt,
         DateTimeOffset scorecardGeneratedAt,
+        DateTimeOffset earliestEvidenceGeneratedAt,
+        DateTimeOffset latestEvidenceGeneratedAt,
         DateTimeOffset convergenceGeneratedAt,
         DateTimeOffset observedAtUtc,
         bool enforceObservedFreshness)
@@ -1749,6 +1777,30 @@ public sealed class ReleaseAuthorityRevisionStore
         DateTimeOffset proofFloor = predecessorGeneratedAt > manifestGeneratedAt
             ? predecessorGeneratedAt
             : manifestGeneratedAt;
+        if (earliestEvidenceGeneratedAt < proofFloor)
+        {
+            throw new InvalidDataException(
+                "Campaign-operability evidence generated_at must not predate the manifest or review predecessor.");
+        }
+        if (latestEvidenceGeneratedAt > scorecardGeneratedAt + SuccessorProofFutureSkew
+            || latestEvidenceGeneratedAt > successorGeneratedAt + SuccessorProofFutureSkew)
+        {
+            throw new InvalidDataException(
+                "Campaign-operability evidence generated_at exceeds the fixed five-minute proof clock-skew allowance.");
+        }
+        if (scorecardGeneratedAt - earliestEvidenceGeneratedAt > SuccessorProofMaximumAge
+            || successorGeneratedAt - earliestEvidenceGeneratedAt > SuccessorProofMaximumAge)
+        {
+            throw new InvalidDataException(
+                "Campaign-operability evidence generated_at exceeds the fixed 24-hour proof age budget.");
+        }
+        if (enforceObservedFreshness
+            && (latestEvidenceGeneratedAt > observedAtUtc + SuccessorProofFutureSkew
+                || observedAtUtc - earliestEvidenceGeneratedAt > SuccessorProofMaximumAge))
+        {
+            throw new InvalidDataException(
+                "Campaign-operability evidence generated_at is outside the live 24-hour authority window.");
+        }
         if (successorGeneratedAt < proofFloor)
         {
             throw new InvalidDataException(
@@ -2080,6 +2132,23 @@ public sealed class ReleaseAuthorityRevisionStore
 
     private static bool IsSentinelToken(string value)
         => value is "unknown" or "missing" or "invalid";
+
+    private static bool ContainsNegativeReleasePosture(string value)
+    {
+        string normalized = value.Trim().ToLowerInvariant();
+        if (normalized.Contains("review_required", StringComparison.Ordinal)
+            || normalized.Contains("not_ready", StringComparison.Ordinal)
+            || normalized.Contains("needs_review", StringComparison.Ordinal))
+        {
+            return true;
+        }
+        return TokenComponent.Matches(normalized)
+            .Select(static match => match.Value)
+            .Any(static token => token is
+                "blocked" or "blocker" or "error" or "errored" or "expired"
+                or "fail" or "failed" or "failure" or "pending" or "rejected"
+                or "stale" or "unavailable" or "unhealthy");
+    }
 
     private static void ValidatePortableEvidencePath(string path, string label)
     {

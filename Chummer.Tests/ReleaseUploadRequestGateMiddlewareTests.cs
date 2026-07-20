@@ -1,5 +1,4 @@
 using Chummer.Run.Api.Services;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -92,6 +91,51 @@ public sealed class ReleaseUploadRequestGateMiddlewareTests
         Assert.Equal(0, authenticatedBody.ReadCount);
         Assert.True(fixture.NextCalled);
         Assert.NotNull(ReleaseUploadRequestGateMiddleware.RequireAuthorization(fixture.Context));
+    }
+
+    [Fact]
+    public async Task CandidateImportAuthorityCannotAdvanceReleaseAuthorityBeforeBodyRead()
+    {
+        using var snapshot = new ReleaseUploadSnapshotAuthorityTests.SnapshotFixture();
+        snapshot.Publish("candidate_import_ready");
+        ReleaseUploadCandidateAuthority candidate = Assert.IsType<ReleaseUploadCandidateAuthority>(
+            snapshot.Authority.Load().Candidate);
+        ReleaseUploadQuotaOptions options = ReleaseUploadQuotaOptions.FromConfiguration(
+            snapshot.Configuration);
+        var admission = new ReleaseUploadAdmissionService(snapshot.Configuration, options);
+        bool nextCalled = false;
+        var middleware = new ReleaseUploadRequestGateMiddleware(context =>
+        {
+            nextCalled = true;
+            context.Response.StatusCode = StatusCodes.Status200OK;
+            return Task.CompletedTask;
+        });
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path =
+            "/api/internal/releases/generations/generation-a/authority-advances";
+        context.Request.ContentType = "application/json";
+        context.Request.ContentLength = 16;
+        context.Request.Headers.Authorization = "Bearer fleet-test-token";
+        context.Request.Headers[
+            ReleaseUploadAuthorizationEvaluator.CandidateManifestSha256Header] =
+            candidate.Candidate.CanonicalManifestSha256;
+        context.Request.Headers[
+            ReleaseUploadAuthorizationEvaluator.CandidateInventorySha256Header] =
+            candidate.Candidate.InventorySha256;
+        context.Request.Headers[
+            ReleaseUploadAuthorizationEvaluator.CandidateBundleIdentitySha256Header] =
+            candidate.Candidate.BundleIdentitySha256;
+        using var body = new CountingStream(new byte[256]);
+        context.Request.Body = body;
+
+        await middleware.InvokeAsync(context, snapshot.Evaluator, admission, options);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, context.Response.StatusCode);
+        Assert.Equal(0, body.ReadCount);
+        Assert.False(nextCalled);
+        Assert.Null(ReleaseUploadRequestGateMiddleware.RequireAuthorization(context));
     }
 
     [Fact]
@@ -264,8 +308,9 @@ public sealed class ReleaseUploadRequestGateMiddlewareTests
 
     private sealed class Fixture : IDisposable
     {
-        private const string InternalToken = "middleware-internal-token";
+        private const string InternalToken = "fleet-test-token";
         private readonly string _root;
+        private readonly ReleaseUploadSnapshotAuthorityTests.SnapshotFixture _snapshot;
         private readonly IConfiguration _configuration;
         private readonly ReleaseUploadAuthorizationEvaluator _authorization;
         private readonly ReleaseUploadRequestGateMiddleware _middleware;
@@ -303,10 +348,9 @@ public sealed class ReleaseUploadRequestGateMiddlewareTests
                 CompletedReceiptRetention = TimeSpan.FromMinutes(1)
             };
             Options.Validate();
-            var tickets = new ReleaseUploadTicketService(
-                DataProtectionProvider.Create(Path.Combine(_root, "keys")),
-                _configuration);
-            _authorization = new ReleaseUploadAuthorizationEvaluator(_configuration, tickets);
+            _snapshot = new ReleaseUploadSnapshotAuthorityTests.SnapshotFixture();
+            _snapshot.Publish("pass");
+            _authorization = _snapshot.Evaluator;
             Admission = new ReleaseUploadAdmissionService(_configuration, Options);
             _middleware = new ReleaseUploadRequestGateMiddleware(async context =>
             {
@@ -369,6 +413,7 @@ public sealed class ReleaseUploadRequestGateMiddlewareTests
         public void Dispose()
         {
             Context.Response.Body.Dispose();
+            _snapshot.Dispose();
             if (Directory.Exists(_root))
             {
                 Directory.Delete(_root, recursive: true);

@@ -50,6 +50,12 @@
     <Compile Include="..\Chummer.Tests\PublicProjectionSnapshotServiceTests.cs" Link="PublicProjectionSnapshotServiceTests.cs" />
     <Compile Include="..\Chummer.Tests\PublicProjectionProofRequestPathPolicyTests.cs" Link="PublicProjectionProofRequestPathPolicyTests.cs" />
     <Compile Include="..\Chummer.Tests\ReleaseUploadAuthorityHandoffCompatibilityTests.cs" Link="ReleaseUploadAuthorityHandoffCompatibilityTests.cs" />
+    <Compile Include="..\Chummer.Tests\PublicReleaseTruthProjectionTests.cs" Link="PublicReleaseTruthProjectionTests.cs" />
+    <Compile Include="..\Chummer.Tests\ReleaseShelfGenerationStoreTests.cs" Link="ReleaseShelfGenerationStoreTests.cs" />
+    <Compile Include="..\Chummer.Tests\ReleaseAuthorityRevisionStoreTests.cs" Link="ReleaseAuthorityRevisionStoreTests.cs" />
+    <Compile Include="..\Chummer.Tests\ReleaseUploadRequestGateMiddlewareTests.cs" Link="ReleaseUploadRequestGateMiddlewareTests.cs" />
+    <Compile Include="..\Chummer.Tests\ReleaseUploadSnapshotAuthorityTests.cs" Link="ReleaseUploadSnapshotAuthorityTests.cs" />
+    <Compile Include="ReleaseAuthorityEndpointContractTests.cs" />
   </ItemGroup>
 
 </Project>

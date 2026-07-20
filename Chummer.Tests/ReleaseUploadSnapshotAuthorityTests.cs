@@ -777,7 +777,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         RewriteEmbedded(authority, finalizedInventoryPath, finalizedInventory);
     }
 
-    private sealed class SnapshotFixture : IDisposable
+    internal sealed class SnapshotFixture : IDisposable
     {
         private static readonly byte[] InstallerBytes = "MZ-avalonia-installer"u8.ToArray();
         private static readonly byte[] PayloadBytes = "PK-avalonia-payload"u8.ToArray();

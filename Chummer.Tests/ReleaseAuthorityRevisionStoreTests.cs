@@ -269,8 +269,12 @@ public sealed class ReleaseAuthorityRevisionStoreTests
     [InlineData("stable_alias_lie")]
     [InlineData("top_gap_drift")]
     [InlineData("unresolved_source_status")]
+    [InlineData("blocked_source_status")]
     [InlineData("missing_generated_at")]
+    [InlineData("stale_evidence_row")]
+    [InlineData("future_evidence_row")]
     [InlineData("unresolved_source_verdict")]
+    [InlineData("review_required_source_verdict")]
     [InlineData("nonportable_evidence_path")]
     [InlineData("nonportable_policy_path")]
     [InlineData("score_three_preview_state")]
@@ -402,11 +406,23 @@ public sealed class ReleaseAuthorityRevisionStoreTests
             case "unresolved_source_status":
                 firstRow["source_status"] = "missing_or_blocked";
                 break;
+            case "blocked_source_status":
+                firstRow["source_status"] = "fail";
+                break;
             case "missing_generated_at":
                 firstRow["generated_at"] = string.Empty;
                 break;
+            case "stale_evidence_row":
+                firstRow["generated_at"] = "2026-07-19T19:00:00Z";
+                break;
+            case "future_evidence_row":
+                firstRow["generated_at"] = "2026-07-20T20:14:00Z";
+                break;
             case "unresolved_source_verdict":
                 firstRow["source_verdict"] = "unknown";
+                break;
+            case "review_required_source_verdict":
+                firstRow["source_verdict"] = "PUBLIC_RELEASE_REVIEW_REQUIRED";
                 break;
             case "nonportable_evidence_path":
                 firstRow["path"] = "/tmp/hand-shaped.json";

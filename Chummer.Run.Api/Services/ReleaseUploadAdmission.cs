@@ -580,6 +580,18 @@ public sealed class ReleaseUploadRequestGateMiddleware
             return;
         }
 
+        if (route == ReleaseUploadRoute.AuthorityAdvance
+            && authorization.CandidateImportAuthority is not null)
+        {
+            await WriteProblemAsync(
+                context,
+                StatusCodes.Status403Forbidden,
+                "Full release promotion authority required",
+                "candidate-import authority cannot advance release authority.",
+                "https://chummer.run/problems/release-authority/full-authority-required");
+            return;
+        }
+
         context.Items[ReleaseUploadAuthorizationContext.HttpContextItemKey] = authorization;
 
         if (route == ReleaseUploadRoute.DirectBundle)
