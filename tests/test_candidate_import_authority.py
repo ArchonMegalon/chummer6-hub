@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timedelta, timezone
 import hashlib
 import importlib.util
@@ -15,7 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SUMMARY = REPO_ROOT / "scripts" / "release" / "release_upload_attempt_receipt.py"
 MATERIALIZER = REPO_ROOT / "scripts" / "release" / "materialize_candidate_import_authority.py"
 PROJECTION = REPO_ROOT / "scripts" / "release" / "verify_public_projection.py"
-HEADS = ("avalonia", "blazor-desktop")
+DEFAULT_HEADS = ("avalonia",)
 
 
 def write_json(path: Path, value: object) -> bytes:
@@ -27,6 +28,72 @@ def write_json(path: Path, value: object) -> bytes:
 
 def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def rewrite_embedded_document(
+    authority: dict[str, object],
+    path: str,
+    mutate,
+) -> None:
+    native = authority["custody"]["nativeWindowsFinalizedEvidence"]
+    entry = next(item for item in native["files"] if item["path"] == path)
+    document = json.loads(base64.b64decode(entry["base64"]))
+    replacement = mutate(document)
+    payload = (json.dumps(replacement, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    entry["base64"] = base64.b64encode(payload).decode()
+    entry["sha256"] = hashlib.sha256(payload).hexdigest()
+    entry["sizeBytes"] = len(payload)
+
+
+def write_rehashed_authority(path: Path, authority: dict[str, object]) -> None:
+    path.write_bytes(
+        (json.dumps(authority, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    )
+
+
+def refresh_rehashed_evidence_bindings(authority: dict[str, object]) -> None:
+    native = authority["custody"]["nativeWindowsFinalizedEvidence"]
+    entries = {entry["path"]: entry for entry in native["files"]}
+
+    capture_inventory = json.loads(
+        base64.b64decode(entries["WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json"]["base64"])
+    )
+    capture_inventory["captureManifestSha256"] = entries[
+        "WINDOWS_NATIVE_CAPTURE.generated.json"
+    ]["sha256"]
+    rewrite_embedded_document(
+        authority,
+        "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json",
+        lambda _: capture_inventory,
+    )
+
+    finalization = json.loads(
+        base64.b64decode(entries["WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json"]["base64"])
+    )
+    finalization["captureInventorySha256"] = entries[
+        "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json"
+    ]["sha256"]
+    for proof in finalization["proofs"]:
+        proof["sha256"] = entries[proof["path"]]["sha256"]
+    rewrite_embedded_document(
+        authority,
+        "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json",
+        lambda _: finalization,
+    )
+
+    finalized_inventory = json.loads(
+        base64.b64decode(entries["WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json"]["base64"])
+    )
+    for row in finalized_inventory["files"]:
+        entry = entries.get(row["path"])
+        if entry is not None:
+            row["sha256"] = entry["sha256"]
+            row["sizeBytes"] = entry["sizeBytes"]
+    rewrite_embedded_document(
+        authority,
+        "WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json",
+        lambda _: finalized_inventory,
+    )
 
 
 def source(workflow: str, actor: str, artifact: str) -> dict[str, str]:
@@ -68,13 +135,56 @@ def candidate_fixture(
     *,
     generated_at: datetime | None = None,
     runner: str = "powershell.exe",
+    required_heads: tuple[str, ...] = DEFAULT_HEADS,
+    artifact_heads: tuple[str, ...] | None = None,
+    evidence_heads: tuple[str, ...] | None = None,
 ) -> tuple[Path, Path, Path, Path, Path]:
+    artifact_heads = artifact_heads or required_heads
+    evidence_heads = evidence_heads or required_heads
     now = generated_at or datetime.now(timezone.utc)
     timestamp = now.isoformat().replace("+00:00", "Z")
     bundle = tmp_path / "bundle"
     files = bundle / "files"
     files.mkdir(parents=True)
     canonical = bundle / "RELEASE_CHANNEL.generated.json"
+    all_byte_heads = tuple(dict.fromkeys((*artifact_heads, *evidence_heads)))
+    for index, head in enumerate(all_byte_heads, start=1):
+        (files / f"chummer-{head}-win-x64-installer.exe").write_bytes(
+            b"MZ" + bytes([index]) * 16
+        )
+        (files / f"chummer-{head}-win-x64-payload.zip").write_bytes(
+            b"PK" + bytes([index + 10]) * 24
+        )
+    artifacts = []
+    for head in artifact_heads:
+        installer = files / f"chummer-{head}-win-x64-installer.exe"
+        payload = files / f"chummer-{head}-win-x64-payload.zip"
+        artifacts.extend(
+            [
+                {
+                    "artifactId": f"{head}-win-x64-installer",
+                    "head": head,
+                    "platform": "windows",
+                    "rid": "win-x64",
+                    "arch": "x64",
+                    "kind": "installer",
+                    "fileName": installer.name,
+                    "sha256": sha(installer),
+                    "sizeBytes": installer.stat().st_size,
+                },
+                {
+                    "artifactId": f"{head}-win-x64-payload",
+                    "head": head,
+                    "platform": "windows",
+                    "rid": "win-x64",
+                    "arch": "x64",
+                    "kind": "archive",
+                    "fileName": payload.name,
+                    "sha256": sha(payload),
+                    "sizeBytes": payload.stat().st_size,
+                },
+            ]
+        )
     write_json(
         canonical,
         {
@@ -83,15 +193,12 @@ def candidate_fixture(
             "releaseVersion": "run-candidate",
             "channel": "preview",
             "channelId": "preview",
+            "artifacts": artifacts,
+            "desktopTupleCoverage": {
+                "requiredDesktopHeads": list(required_heads),
+            },
         },
     )
-    for index, head in enumerate(HEADS, start=1):
-        (files / f"chummer-{head}-win-x64-installer.exe").write_bytes(
-            b"MZ" + bytes([index]) * 16
-        )
-        (files / f"chummer-{head}-win-x64-payload.zip").write_bytes(
-            b"PK" + bytes([index + 10]) * 24
-        )
 
     summary = tmp_path / "candidate-summary.json"
     inventory = tmp_path / "candidate-inventory.json"
@@ -186,7 +293,7 @@ def candidate_fixture(
     )
 
     proof_bindings = []
-    for index, head in enumerate(HEADS, start=1):
+    for index, head in enumerate(evidence_heads, start=1):
         installer = files / f"chummer-{head}-win-x64-installer.exe"
         payload = files / f"chummer-{head}-win-x64-payload.zip"
         startup_relative = f"startup-smoke/startup-smoke-{head}-win-x64.receipt.json"
@@ -295,9 +402,17 @@ def run_materializer(
     *,
     generated_at: datetime | None = None,
     runner: str = "powershell.exe",
+    required_heads: tuple[str, ...] = DEFAULT_HEADS,
+    artifact_heads: tuple[str, ...] | None = None,
+    evidence_heads: tuple[str, ...] | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], Path, tuple[Path, Path, Path, Path, Path]]:
     fixture = candidate_fixture(
-        tmp_path, generated_at=generated_at, runner=runner
+        tmp_path,
+        generated_at=generated_at,
+        runner=runner,
+        required_heads=required_heads,
+        artifact_heads=artifact_heads,
+        evidence_heads=evidence_heads,
     )
     bundle, canonical, summary, inventory, finalized = fixture
     output = tmp_path / "candidate-authority.json"
@@ -403,7 +518,7 @@ def test_fresh_native_finalization_materializes_exact_custody(tmp_path: Path) ->
     assert completed.returncode == 0, completed.stderr
     authority = json.loads(output.read_text())
     assert authority["status"] == "candidate_import_ready"
-    assert authority["candidate"]["fileCount"] == 5
+    assert authority["candidate"]["fileCount"] == 3
     assert authority["custody"]["canonicalManifest"]["base64"]
     evidence = authority["custody"]["nativeWindowsFinalizedEvidence"]
     assert evidence["reviewer"] == "accountable-reviewer"
@@ -430,6 +545,35 @@ def test_stale_or_wine_windows_evidence_cannot_authorize_candidate_import(
     )
     assert completed.returncode != 0
     assert expected in completed.stderr
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(
+    ("required_heads", "artifact_heads", "evidence_heads"),
+    [
+        (("avalonia",), ("avalonia",), ("avalonia", "blazor-desktop")),
+        (
+            ("avalonia", "blazor-desktop"),
+            ("avalonia", "blazor-desktop"),
+            ("avalonia",),
+        ),
+    ],
+)
+def test_manifest_and_native_evidence_head_scope_cannot_widen_or_narrow(
+    tmp_path: Path,
+    required_heads: tuple[str, ...],
+    artifact_heads: tuple[str, ...],
+    evidence_heads: tuple[str, ...],
+) -> None:
+    completed, output, _ = run_materializer(
+        tmp_path,
+        required_heads=required_heads,
+        artifact_heads=artifact_heads,
+        evidence_heads=evidence_heads,
+    )
+
+    assert completed.returncode != 0
+    assert "required-head" in completed.stderr
     assert not output.exists()
 
 
@@ -469,4 +613,103 @@ def test_candidate_snapshot_is_mutually_bounded_and_cannot_be_reissued(
             snapshot_root,
             authority_path=authority_path,
             expected_authority_sha256=authority_sha,
+        )
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "empty_capture",
+        "capture_actor",
+        "capture_workflow",
+        "stale_capture",
+        "not_native",
+        "wine_runner",
+        "artifact_digest",
+    ],
+)
+def test_projection_rejects_freshly_rehashed_semantic_evidence_tamper(
+    tmp_path: Path,
+    tamper: str,
+) -> None:
+    completed, authority_path, _ = run_materializer(tmp_path / "candidate")
+    assert completed.returncode == 0, completed.stderr
+    authority = json.loads(authority_path.read_text())
+    native = authority["custody"]["nativeWindowsFinalizedEvidence"]
+    startup_path = "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json"
+    proof_path = "WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-win-x64.generated.json"
+
+    if tamper == "empty_capture":
+        rewrite_embedded_document(authority, "WINDOWS_NATIVE_CAPTURE.generated.json", lambda _: {})
+    elif tamper == "capture_actor":
+        native["captureSource"]["actor"] = "untrusted-capture-actor"
+        rewrite_embedded_document(
+            authority,
+            "WINDOWS_NATIVE_CAPTURE.generated.json",
+            lambda value: {**value, "source": native["captureSource"]},
+        )
+        rewrite_embedded_document(
+            authority,
+            "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json",
+            lambda value: {**value, "captureSource": native["captureSource"]},
+        )
+    elif tamper == "capture_workflow":
+        native["captureSource"]["workflow"] = ".github/workflows/untrusted.yml"
+        rewrite_embedded_document(
+            authority,
+            "WINDOWS_NATIVE_CAPTURE.generated.json",
+            lambda value: {**value, "source": native["captureSource"]},
+        )
+        rewrite_embedded_document(
+            authority,
+            "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json",
+            lambda value: {**value, "captureSource": native["captureSource"]},
+        )
+    elif tamper == "stale_capture":
+        stale = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat().replace("+00:00", "Z")
+        native["captureGeneratedAtUtc"] = stale
+        rewrite_embedded_document(
+            authority,
+            "WINDOWS_NATIVE_CAPTURE.generated.json",
+            lambda value: {**value, "generatedAt": stale},
+        )
+    elif tamper == "not_native":
+        rewrite_embedded_document(
+            authority,
+            startup_path,
+            lambda value: {
+                **value,
+                "executionEnvironment": "compatibility_layer",
+                "nativeHostEvidence": {**value["nativeHostEvidence"], "isNativeWindows": False},
+            },
+        )
+    elif tamper == "wine_runner":
+        rewrite_embedded_document(
+            authority,
+            startup_path,
+            lambda value: {
+                **value,
+                "nativeHostEvidence": {**value["nativeHostEvidence"], "runner": "wine64"},
+            },
+        )
+    else:
+        rewrite_embedded_document(
+            authority,
+            proof_path,
+            lambda value: {**value, "artifactDigest": "sha256:" + "f" * 64},
+        )
+
+    refresh_rehashed_evidence_bindings(authority)
+    tampered = tmp_path / "tampered-authority.json"
+    write_rehashed_authority(tampered, authority)
+    module = load_projection()
+    snapshot_root = tmp_path / "snapshots"
+    snapshot_root.mkdir(mode=0o700)
+    publish_review_snapshot(module, snapshot_root)
+
+    with pytest.raises(module.ProjectionBlocked):
+        module.publish_candidate_import_snapshot(
+            snapshot_root,
+            authority_path=tampered,
+            expected_authority_sha256=sha(tampered),
         )

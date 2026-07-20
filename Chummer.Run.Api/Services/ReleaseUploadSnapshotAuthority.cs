@@ -88,6 +88,15 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     private static readonly Regex VersionPattern = new(
         "^[A-Za-z0-9][A-Za-z0-9._+-]{0,159}$",
         RegexOptions.CultureInvariant);
+    private static readonly Regex HeadPattern = new(
+        "^[a-z0-9][a-z0-9-]{0,63}$",
+        RegexOptions.CultureInvariant);
+    private static readonly Regex CommitPattern = new(
+        "^[0-9a-f]{40}$",
+        RegexOptions.CultureInvariant);
+    private static readonly Regex ReviewerPattern = new(
+        "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,38})$",
+        RegexOptions.CultureInvariant);
     private static readonly string[] BaseOutputNames =
     [
         "HUB_LOCAL_RELEASE_PROOF.generated.json",
@@ -100,18 +109,25 @@ public sealed class ReleaseUploadSnapshotAuthorityService
     ];
     private static readonly string[] CandidateOutputNames =
         [.. BaseOutputNames, CandidateAuthorityFileName];
-    private static readonly HashSet<string> RequiredEvidencePaths = new(
-        [
-            "WINDOWS_NATIVE_CAPTURE.generated.json",
-            "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json",
-            "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json",
-            "WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json",
-            "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json",
-            "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json",
-            "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
-            "startup-smoke/startup-smoke-blazor-desktop-win-x64.receipt.json"
-        ],
-        StringComparer.Ordinal);
+    private const string CaptureFileName = "WINDOWS_NATIVE_CAPTURE.generated.json";
+    private const string CaptureInventoryFileName =
+        "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json";
+    private const string FinalizationFileName =
+        "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json";
+    private const string FinalizedInventoryFileName =
+        "WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json";
+    private const string CandidateProvenanceInventoryFileName =
+        "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json";
+    private const string CandidateProvenanceExportFileName =
+        "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json";
+    private const string CaptureWorkflow =
+        ".github/workflows/windows-native-evidence-capture.yml";
+    private const string FinalizationWorkflow =
+        ".github/workflows/windows-native-evidence-finalize.yml";
+    private const string UiRepository = "ArchonMegalon/chummer6-ui";
+    private const string UiRef = "refs/heads/main";
+    private const string WindowsRid = "win-x64";
+    private static readonly TimeSpan MaximumNativeProofAge = TimeSpan.FromHours(24);
 
     private readonly IConfiguration _configuration;
 
@@ -357,8 +373,11 @@ public sealed class ReleaseUploadSnapshotAuthorityService
         DateTimeOffset expiresAt = RequireUtcTimestamp(root, "expiresAtUtc");
         DateTimeOffset now = DateTimeOffset.UtcNow;
         if (generatedAt > now.AddMinutes(5)
+            || generatedAt < now.AddHours(-6).AddMinutes(-5)
             || expiresAt <= now
-            || expiresAt > now.AddHours(6).AddMinutes(5))
+            || expiresAt > now.AddHours(6).AddMinutes(5)
+            || expiresAt <= generatedAt
+            || expiresAt > generatedAt.AddHours(6))
         {
             throw new InvalidDataException("candidate import authority is expired or future-dated");
         }
@@ -419,44 +438,15 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             throw new InvalidDataException("candidate upload inventory summary drifted");
         }
 
-        JsonElement native = RequireObject(custody, "nativeWindowsFinalizedEvidence");
-        RequireExactString(native, "status", "passed");
-        string reviewer = RequireString(native, "reviewer");
-        JsonElement captureSource = RequireObject(native, "captureSource");
-        JsonElement finalizationSource = RequireObject(native, "finalizationSource");
-        RequireExactString(captureSource, "actor", "github-actions[bot]");
-        RequireExactString(
-            captureSource,
-            "workflow",
-            ".github/workflows/windows-native-evidence-capture.yml");
-        RequireExactString(finalizationSource, "actor", reviewer);
-        RequireExactString(
-            finalizationSource,
-            "workflow",
-            ".github/workflows/windows-native-evidence-finalize.yml");
-        if (!native.TryGetProperty("files", out JsonElement files)
-            || files.ValueKind != JsonValueKind.Array
-            || files.GetArrayLength() < RequiredEvidencePaths.Count)
-        {
-            throw new InvalidDataException("candidate native-Windows custody is incomplete");
-        }
-        var paths = new HashSet<string>(StringComparer.Ordinal);
-        foreach (JsonElement entry in files.EnumerateArray())
-        {
-            string path = RequireString(entry, "path");
-            if (!paths.Add(path))
-            {
-                throw new InvalidDataException("candidate native-Windows custody path is duplicated");
-            }
-            byte[] evidenceBytes = DecodeEmbedded(entry, $"candidate native-Windows {path}");
-            using JsonDocument _ = ParseStrictObject(
-                evidenceBytes,
-                $"candidate native-Windows {path}");
-        }
-        if (!RequiredEvidencePaths.IsSubsetOf(paths))
-        {
-            throw new InvalidDataException("candidate native-Windows custody is incomplete");
-        }
+        using JsonDocument canonicalDocument = ParseStrictObject(
+            canonicalManifest,
+            "candidate canonical release manifest");
+        ValidateCandidateNativeEvidence(
+            RequireObject(custody, "nativeWindowsFinalizedEvidence"),
+            canonicalDocument.RootElement,
+            candidate,
+            inventory,
+            now);
 
         return new ReleaseUploadCandidateAuthority(
             snapshotId,
@@ -467,6 +457,686 @@ public sealed class ReleaseUploadSnapshotAuthorityService
             canonicalManifest,
             inventory);
     }
+
+    private static void ValidateCandidateNativeEvidence(
+        JsonElement native,
+        JsonElement canonical,
+        ReleaseUploadCandidateIdentity candidate,
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> candidateInventory,
+        DateTimeOffset now)
+    {
+        var requiredNative = new HashSet<string>(
+            [
+                "status",
+                "captureGeneratedAtUtc",
+                "finalizationGeneratedAtUtc",
+                "reviewer",
+                "captureSource",
+                "finalizationSource",
+                "candidateContentInventorySha256",
+                "candidateContentInventory",
+                "files"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(native, requiredNative))
+        {
+            throw new InvalidDataException("candidate native-Windows custody property set drifted");
+        }
+        RequireExactString(native, "status", "passed");
+        string reviewer = RequireString(native, "reviewer");
+        if (!ReviewerPattern.IsMatch(reviewer))
+        {
+            throw new InvalidDataException("candidate native-Windows reviewer is invalid");
+        }
+        DateTimeOffset summaryCaptureAt = RequireFreshUtcTimestamp(
+            native,
+            "captureGeneratedAtUtc",
+            now);
+        DateTimeOffset summaryFinalizationAt = RequireFreshUtcTimestamp(
+            native,
+            "finalizationGeneratedAtUtc",
+            now);
+        JsonElement captureSource = RequireObject(native, "captureSource");
+        JsonElement finalizationSource = RequireObject(native, "finalizationSource");
+        ValidateEvidenceSource(captureSource, "candidate capture source", CaptureWorkflow);
+        ValidateEvidenceSource(
+            finalizationSource,
+            "candidate finalization source",
+            FinalizationWorkflow);
+        if (!string.Equals(
+                RequireString(captureSource, "actor"),
+                "github-actions[bot]",
+                StringComparison.Ordinal)
+            || !string.Equals(
+                RequireString(finalizationSource, "actor"),
+                reviewer,
+                StringComparison.Ordinal)
+            || string.Equals(reviewer, RequireString(captureSource, "actor"), StringComparison.Ordinal)
+            || !string.Equals(
+                RequireString(captureSource, "sha"),
+                RequireString(finalizationSource, "sha"),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("candidate protected reviewer provenance drifted");
+        }
+
+        JsonElement files = RequireArray(native, "files");
+        var documents = new Dictionary<string, CandidateEvidenceDocument>(StringComparer.Ordinal);
+        try
+        {
+            foreach (JsonElement entry in files.EnumerateArray())
+            {
+                string path = RequireString(entry, "path");
+                if (!IsCanonicalRelativePath(path) || documents.ContainsKey(path))
+                {
+                    throw new InvalidDataException("candidate native-Windows evidence path drifted");
+                }
+                byte[] bytes = DecodeEmbedded(entry, $"candidate native-Windows {path}");
+                documents.Add(
+                    path,
+                    new CandidateEvidenceDocument(
+                        ParseStrictObject(bytes, $"candidate native-Windows {path}"),
+                        bytes,
+                        RequireSha256(entry, "sha256"),
+                        RequireNonNegativeInt64(entry, "sizeBytes")));
+            }
+
+            CandidateWindowsScope scope = ParseCandidateWindowsScope(
+                canonical,
+                candidate,
+                candidateInventory);
+            var fixedPaths = new HashSet<string>(
+                [
+                    CaptureFileName,
+                    CaptureInventoryFileName,
+                    FinalizationFileName,
+                    FinalizedInventoryFileName,
+                    CandidateProvenanceInventoryFileName,
+                    CandidateProvenanceExportFileName,
+                    .. scope.Heads.Select(
+                        head => $"startup-smoke/startup-smoke-{head}-{WindowsRid}.receipt.json")
+                ],
+                StringComparer.Ordinal);
+            if (!fixedPaths.IsSubsetOf(documents.Keys))
+            {
+                throw new InvalidDataException("candidate native-Windows custody is incomplete");
+            }
+
+            JsonElement finalizedInventory = documents[FinalizedInventoryFileName].Root;
+            RequireExactString(
+                finalizedInventory,
+                "contractName",
+                "chummer6-ui.preview-nightly-native-windows-finalized-inventory");
+            RequireExactInt32(finalizedInventory, "contractVersion", 1);
+            IReadOnlyList<ReleaseUploadCandidateInventoryRow> finalizedRows =
+                ParseEvidenceInventoryRows(
+                    RequireArray(finalizedInventory, "files"),
+                    "candidate finalized native-Windows inventory",
+                    allowEmpty: false);
+            var finalizedByPath = finalizedRows.ToDictionary(static row => row.Path, StringComparer.Ordinal);
+            foreach ((string path, CandidateEvidenceDocument evidence) in documents)
+            {
+                if (string.Equals(path, FinalizedInventoryFileName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+                if (!finalizedByPath.TryGetValue(path, out ReleaseUploadCandidateInventoryRow? row)
+                    || row != new ReleaseUploadCandidateInventoryRow(
+                        path,
+                        evidence.SizeBytes,
+                        evidence.Sha256))
+                {
+                    throw new InvalidDataException(
+                        "candidate embedded evidence disagrees with finalized inventory");
+                }
+            }
+
+            CandidateEvidenceDocument provenanceDocument =
+                documents[CandidateProvenanceInventoryFileName];
+            JsonElement provenance = provenanceDocument.Root;
+            RequireExactString(
+                provenance,
+                "contractName",
+                "chummer6-ui.preview-nightly-candidate-content-inventory");
+            RequireExactInt32(provenance, "contractVersion", 1);
+            JsonElement release = RequireObject(provenance, "release");
+            RequireExactString(release, "channel", scope.Channel);
+            RequireExactString(release, "version", scope.Version);
+            JsonElement manifest = RequireObject(provenance, "manifest");
+            RequireExactString(manifest, "path", "RELEASE_CHANNEL.generated.json");
+            RequireExactString(manifest, "sha256", candidate.CanonicalManifestSha256);
+            IReadOnlyList<ReleaseUploadCandidateInventoryRow> provenanceRows =
+                ParseEvidenceInventoryRows(
+                    RequireArray(provenance, "files"),
+                    "candidate native-Windows content inventory",
+                    allowEmpty: false);
+            string[] expectedContentPaths =
+            [
+                "RELEASE_CHANNEL.generated.json",
+                .. scope.Heads.SelectMany(head => new[]
+                {
+                    scope.Artifacts[head].Installer.Path,
+                    scope.Artifacts[head].Payload.Path
+                }).Order(StringComparer.Ordinal)
+            ];
+            if (!provenanceRows.Select(static row => row.Path).SequenceEqual(expectedContentPaths)
+                || !JsonSemanticEquals(
+                    provenance,
+                    RequireObject(native, "candidateContentInventory"))
+                || !string.Equals(
+                    Sha256(provenanceDocument.Bytes),
+                    RequireSha256(native, "candidateContentInventorySha256"),
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "candidate native-Windows content inventory binding drifted");
+            }
+            var candidateByPath = candidateInventory.ToDictionary(static row => row.Path, StringComparer.Ordinal);
+            if (provenanceRows.Any(row =>
+                    !candidateByPath.TryGetValue(row.Path, out ReleaseUploadCandidateInventoryRow? exact)
+                    || exact != row))
+            {
+                throw new InvalidDataException("candidate native-Windows content bytes drifted");
+            }
+
+            CandidateEvidenceDocument captureDocument = documents[CaptureFileName];
+            JsonElement capture = captureDocument.Root;
+            RequireExactString(
+                capture,
+                "contractName",
+                "chummer6-ui.preview-nightly-native-windows-capture");
+            RequireExactInt32(capture, "contractVersion", 1);
+            RequireExactString(capture, "status", "captured");
+            RequireExactString(capture, "captureMode", "interactive");
+            RequireExactString(capture, "version", scope.Version);
+            RequireExactString(capture, "channelId", scope.Channel);
+            if (!JsonSemanticEquals(RequireObject(capture, "source"), captureSource)
+                || RequireFreshUtcTimestamp(capture, "generatedAt", now) != summaryCaptureAt)
+            {
+                throw new InvalidDataException("candidate native-Windows capture receipt drifted");
+            }
+            JsonElement captureCandidate = RequireObject(capture, "candidate");
+            RequireExactString(
+                captureCandidate,
+                "manifestSha256",
+                candidate.CanonicalManifestSha256);
+            RequireExactString(
+                captureCandidate,
+                "contentInventorySha256",
+                Sha256(provenanceDocument.Bytes));
+
+            CandidateEvidenceDocument captureInventoryDocument =
+                documents[CaptureInventoryFileName];
+            JsonElement captureInventory = captureInventoryDocument.Root;
+            RequireExactString(
+                captureInventory,
+                "contractName",
+                "chummer6-ui.preview-nightly-native-windows-capture-inventory");
+            RequireExactInt32(captureInventory, "contractVersion", 1);
+            RequireExactString(
+                captureInventory,
+                "captureManifestSha256",
+                Sha256(captureDocument.Bytes));
+            _ = ParseEvidenceInventoryRows(
+                RequireArray(captureInventory, "files"),
+                "candidate native-Windows capture inventory",
+                allowEmpty: true);
+
+            JsonElement finalization = documents[FinalizationFileName].Root;
+            RequireExactString(
+                finalization,
+                "contractName",
+                "chummer6-ui.preview-nightly-native-windows-finalization");
+            RequireExactInt32(finalization, "contractVersion", 1);
+            RequireExactString(finalization, "status", "passed");
+            RequireBoolean(finalization, "humanReviewConfirmed", expected: true);
+            RequireBoolean(finalization, "reviewerWasCaptureActor", expected: false);
+            RequireExactString(finalization, "reviewer", reviewer);
+            RequireExactString(
+                finalization,
+                "captureInventorySha256",
+                Sha256(captureInventoryDocument.Bytes));
+            if (!JsonSemanticEquals(RequireObject(finalization, "captureSource"), captureSource)
+                || !JsonSemanticEquals(
+                    RequireObject(finalization, "finalizationSource"),
+                    finalizationSource)
+                || RequireFreshUtcTimestamp(finalization, "generatedAt", now)
+                   != summaryFinalizationAt)
+            {
+                throw new InvalidDataException("candidate native-Windows finalization receipt drifted");
+            }
+            JsonElement proofs = RequireArray(finalization, "proofs");
+            if (proofs.GetArrayLength() != scope.Heads.Count)
+            {
+                throw new InvalidDataException("candidate visual proof head scope drifted");
+            }
+            var proofsByHead = new Dictionary<string, CandidateVisualProof>(StringComparer.Ordinal);
+            foreach (JsonElement row in proofs.EnumerateArray())
+            {
+                if (!ExactPropertySet(
+                        row,
+                        new HashSet<string>(["headId", "path", "sha256"], StringComparer.Ordinal)))
+                {
+                    throw new InvalidDataException("candidate visual proof binding drifted");
+                }
+                string head = RequireString(row, "headId");
+                string path = RequireString(row, "path");
+                if (!scope.Heads.Contains(head, StringComparer.Ordinal)
+                    || !IsCanonicalRelativePath(path)
+                    || !documents.TryGetValue(path, out CandidateEvidenceDocument? proofDocument)
+                    || !proofsByHead.TryAdd(
+                        head,
+                        new CandidateVisualProof(path, proofDocument.Root, proofDocument.Bytes))
+                    || !string.Equals(
+                        RequireSha256(row, "sha256"),
+                        Sha256(proofDocument.Bytes),
+                        StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException("candidate visual proof head or digest drifted");
+                }
+            }
+            fixedPaths.UnionWith(proofsByHead.Values.Select(static proof => proof.Path));
+            if (!fixedPaths.SetEquals(documents.Keys))
+            {
+                throw new InvalidDataException("candidate native-Windows evidence file scope drifted");
+            }
+
+            JsonElement export = documents[CandidateProvenanceExportFileName].Root;
+            RequireExactString(
+                export,
+                "contractName",
+                "chummer6-ui.preview-nightly-candidate-export");
+            RequireExactInt32(export, "contractVersion", 1);
+            RequireExactString(export, "status", "exported");
+
+            foreach (string head in scope.Heads)
+            {
+                CandidateHeadArtifacts headArtifacts = scope.Artifacts[head];
+                string startupPath =
+                    $"startup-smoke/startup-smoke-{head}-{WindowsRid}.receipt.json";
+                JsonElement startup = documents[startupPath].Root;
+                RequireExactString(startup, "status", "pass");
+                RequireExactString(startup, "readyCheckpoint", "pre_ui_event_loop");
+                RequireExactString(startup, "executionEnvironment", "native_windows");
+                RequireExactString(startup, "headId", head);
+                RequireExactString(startup, "platform", "windows");
+                RequireExactString(startup, "rid", WindowsRid);
+                RequireExactString(startup, "releaseVersion", scope.Version);
+                RequireExactString(startup, "channelId", scope.Channel);
+                RequireExactString(
+                    startup,
+                    "artifactFileName",
+                    headArtifacts.Installer.FileName);
+                RequireExactString(
+                    startup,
+                    "artifactDigest",
+                    $"sha256:{headArtifacts.Installer.Sha256}");
+                RequireExactString(startup, "bootstrapPayloadAcquisitionMode", "download");
+                RequireExactString(
+                    startup,
+                    "bootstrapPayloadFileName",
+                    headArtifacts.Payload.FileName);
+                RequireExactString(
+                    startup,
+                    "bootstrapPayloadSha256",
+                    headArtifacts.Payload.Sha256);
+                if (RequireNonNegativeInt64(startup, "bootstrapPayloadSizeBytes")
+                    != headArtifacts.Payload.SizeBytes)
+                {
+                    throw new InvalidDataException("candidate startup payload size drifted");
+                }
+                JsonElement nativeHost = RequireObject(startup, "nativeHostEvidence");
+                RequireExactString(
+                    nativeHost,
+                    "contractName",
+                    "chummer6-ui.native_windows_host_evidence");
+                RequireExactString(nativeHost, "status", "verified");
+                RequireBoolean(nativeHost, "isNativeWindows", expected: true);
+                RequireExactString(nativeHost, "hostPlatform", "windows");
+                if (RequireString(nativeHost, "runner").Contains(
+                        "wine",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException("candidate startup runner is not native Windows");
+                }
+
+                JsonElement proof = proofsByHead[head].Root;
+                RequireExactString(
+                    proof,
+                    "contractName",
+                    "chummer6-ui.windows_installer_visual_proof");
+                RequireExactInt32(proof, "contractVersion", 1);
+                RequireExactString(proof, "status", "passed");
+                RequireExactString(proof, "headId", head);
+                RequireExactString(proof, "platform", "windows");
+                RequireExactString(proof, "rid", WindowsRid);
+                RequireExactString(proof, "releaseVersion", scope.Version);
+                RequireExactString(proof, "channelId", scope.Channel);
+                RequireExactString(
+                    proof,
+                    "artifactFileName",
+                    headArtifacts.Installer.FileName);
+                RequireExactString(
+                    proof,
+                    "artifactDigest",
+                    $"sha256:{headArtifacts.Installer.Sha256}");
+                _ = RequireFreshUtcTimestamp(proof, "generatedAt", now);
+                JsonElement checks = RequireObject(proof, "checks");
+                RequireExactString(checks, "capture_mode", "interactive");
+                RequireBoolean(checks, "human_review_confirmed", expected: true);
+                ValidatePassedReview(proof, "readabilityReview", reviewer);
+                ValidatePassedReview(proof, "contrastReview", reviewer);
+                ValidatePassedReview(proof, "clippingReview", reviewer);
+                if (!JsonSemanticEquals(
+                        RequireObject(proof, "finalizationBinding"),
+                        finalizationSource))
+                {
+                    throw new InvalidDataException("candidate visual finalization binding drifted");
+                }
+                JsonElement screenshots = RequireArray(proof, "screenshots");
+                if (screenshots.GetArrayLength() != 2)
+                {
+                    throw new InvalidDataException("candidate visual screenshot set drifted");
+                }
+                var roles = new HashSet<string>(StringComparer.Ordinal);
+                foreach (JsonElement screenshot in screenshots.EnumerateArray())
+                {
+                    if (!ExactPropertySet(
+                            screenshot,
+                            new HashSet<string>(["role", "path", "sha256"], StringComparer.Ordinal)))
+                    {
+                        throw new InvalidDataException("candidate visual screenshot binding drifted");
+                    }
+                    string role = RequireString(screenshot, "role");
+                    string path = RequireString(screenshot, "path");
+                    string digest = RequireSha256(screenshot, "sha256");
+                    if (role is not "progress" and not "completion"
+                        || !roles.Add(role)
+                        || !IsCanonicalRelativePath(path)
+                        || !finalizedByPath.TryGetValue(
+                            path,
+                            out ReleaseUploadCandidateInventoryRow? screenshotRow)
+                        || !string.Equals(screenshotRow.Sha256, digest, StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException("candidate visual screenshot proof drifted");
+                    }
+                }
+            }
+        }
+        finally
+        {
+            foreach (CandidateEvidenceDocument document in documents.Values)
+            {
+                document.Dispose();
+            }
+        }
+    }
+
+    private static CandidateWindowsScope ParseCandidateWindowsScope(
+        JsonElement canonical,
+        ReleaseUploadCandidateIdentity candidate,
+        IReadOnlyList<ReleaseUploadCandidateInventoryRow> candidateInventory)
+    {
+        string version = RequireMatchingAlias(
+            canonical,
+            "version",
+            "releaseVersion",
+            "candidate release version");
+        string channel = RequireMatchingAlias(
+            canonical,
+            "channelId",
+            "channel",
+            "candidate release channel");
+        if (!string.Equals(version, candidate.Version, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("candidate release version differs from its identity");
+        }
+        JsonElement headsElement = RequireArray(
+            RequireObject(canonical, "desktopTupleCoverage"),
+            "requiredDesktopHeads");
+        var heads = new List<string>();
+        var headSet = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonElement headElement in headsElement.EnumerateArray())
+        {
+            if (headElement.ValueKind != JsonValueKind.String
+                || headElement.GetString() is not { } head
+                || !HeadPattern.IsMatch(head)
+                || !headSet.Add(head))
+            {
+                throw new InvalidDataException("candidate requiredDesktopHeads is invalid");
+            }
+            heads.Add(head);
+        }
+        if (heads.Count == 0)
+        {
+            throw new InvalidDataException("candidate requiredDesktopHeads is empty");
+        }
+        JsonElement artifactsElement = RequireArray(canonical, "artifacts");
+        var candidateByPath = candidateInventory.ToDictionary(static row => row.Path, StringComparer.Ordinal);
+        var artifacts = new Dictionary<string, CandidateHeadArtifacts>(StringComparer.Ordinal);
+        foreach (string head in heads)
+        {
+            JsonElement[] matching = artifactsElement.EnumerateArray()
+                .Where(artifact =>
+                    artifact.ValueKind == JsonValueKind.Object
+                    && HasExactString(artifact, "head", head)
+                    && HasExactString(artifact, "platform", "windows")
+                    && HasExactString(artifact, "rid", WindowsRid))
+                .ToArray();
+            JsonElement[] installers = matching
+                .Where(artifact => HasExactString(artifact, "kind", "installer"))
+                .ToArray();
+            JsonElement[] payloads = matching
+                .Where(artifact =>
+                    artifact.TryGetProperty("kind", out JsonElement kind)
+                    && kind.ValueKind == JsonValueKind.String
+                    && kind.GetString() is "archive" or "payload"
+                    && artifact.TryGetProperty("fileName", out JsonElement fileName)
+                    && fileName.ValueKind == JsonValueKind.String
+                    && fileName.GetString()!.EndsWith("-payload.zip", StringComparison.Ordinal))
+                .ToArray();
+            if (installers.Length != 1 || payloads.Length != 1)
+            {
+                throw new InvalidDataException(
+                    $"candidate manifest must name one Windows installer and payload for {head}");
+            }
+            artifacts.Add(
+                head,
+                new CandidateHeadArtifacts(
+                    ParseCandidateArtifact(
+                        installers[0],
+                        head,
+                        "installer",
+                        candidateByPath),
+                    ParseCandidateArtifact(
+                        payloads[0],
+                        head,
+                        "payload",
+                        candidateByPath)));
+        }
+        return new CandidateWindowsScope(version, channel, heads, artifacts);
+    }
+
+    private static CandidateArtifact ParseCandidateArtifact(
+        JsonElement artifact,
+        string head,
+        string role,
+        IReadOnlyDictionary<string, ReleaseUploadCandidateInventoryRow> candidateByPath)
+    {
+        string fileName = RequireString(artifact, "fileName");
+        string digest = RequireSha256(artifact, "sha256");
+        long size = RequireNonNegativeInt64(artifact, "sizeBytes");
+        if (fileName.Contains('/')
+            || fileName.Contains('\\')
+            || size <= 0
+            || role == "installer" && !fileName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException($"candidate {head} {role} metadata is invalid");
+        }
+        string path = $"files/{fileName}";
+        if (!candidateByPath.TryGetValue(path, out ReleaseUploadCandidateInventoryRow? row)
+            || row != new ReleaseUploadCandidateInventoryRow(path, size, digest))
+        {
+            throw new InvalidDataException(
+                $"candidate {head} {role} manifest bytes differ from upload inventory");
+        }
+        return new CandidateArtifact(path, fileName, digest, size);
+    }
+
+    private static IReadOnlyList<ReleaseUploadCandidateInventoryRow> ParseEvidenceInventoryRows(
+        JsonElement files,
+        string label,
+        bool allowEmpty)
+    {
+        if (files.ValueKind != JsonValueKind.Array
+            || !allowEmpty && files.GetArrayLength() == 0)
+        {
+            throw new InvalidDataException($"{label} is invalid");
+        }
+        var rows = new List<ReleaseUploadCandidateInventoryRow>();
+        string? previous = null;
+        foreach (JsonElement row in files.EnumerateArray())
+        {
+            if (!ExactPropertySet(
+                    row,
+                    new HashSet<string>(["path", "sha256", "sizeBytes"], StringComparer.Ordinal)))
+            {
+                throw new InvalidDataException($"{label} row drifted");
+            }
+            string path = RequireString(row, "path");
+            if (!IsCanonicalRelativePath(path)
+                || previous is not null && string.CompareOrdinal(previous, path) >= 0)
+            {
+                throw new InvalidDataException($"{label} path drifted");
+            }
+            rows.Add(new ReleaseUploadCandidateInventoryRow(
+                path,
+                RequireNonNegativeInt64(row, "sizeBytes"),
+                RequireSha256(row, "sha256")));
+            previous = path;
+        }
+        return rows;
+    }
+
+    private static void ValidateEvidenceSource(
+        JsonElement source,
+        string label,
+        string workflow)
+    {
+        var required = new HashSet<string>(
+            [
+                "repository",
+                "workflow",
+                "runId",
+                "runAttempt",
+                "ref",
+                "sha",
+                "actor",
+                "artifactName"
+            ],
+            StringComparer.Ordinal);
+        if (!ExactPropertySet(source, required))
+        {
+            throw new InvalidDataException($"{label} property set drifted");
+        }
+        RequireExactString(source, "repository", UiRepository);
+        RequireExactString(source, "workflow", workflow);
+        RequireExactString(source, "ref", UiRef);
+        if (!CommitPattern.IsMatch(RequireString(source, "sha")))
+        {
+            throw new InvalidDataException($"{label} revision drifted");
+        }
+        foreach (string field in new[] { "runId", "runAttempt", "actor", "artifactName" })
+        {
+            _ = RequireString(source, field);
+        }
+    }
+
+    private static void ValidatePassedReview(JsonElement proof, string name, string reviewer)
+    {
+        JsonElement review = RequireObject(proof, name);
+        RequireExactString(review, "status", "passed");
+        RequireExactString(review, "reviewer", reviewer);
+    }
+
+    private static DateTimeOffset RequireFreshUtcTimestamp(
+        JsonElement parent,
+        string property,
+        DateTimeOffset now)
+    {
+        DateTimeOffset parsed = RequireUtcTimestamp(parent, property);
+        if (parsed > now.AddMinutes(5) || now - parsed > MaximumNativeProofAge)
+        {
+            throw new InvalidDataException($"release upload {property} is stale or future-dated");
+        }
+        return parsed;
+    }
+
+    private static string RequireMatchingAlias(
+        JsonElement parent,
+        string first,
+        string second,
+        string label)
+    {
+        string? firstValue = parent.TryGetProperty(first, out JsonElement firstElement)
+                             && firstElement.ValueKind == JsonValueKind.String
+            ? firstElement.GetString()
+            : null;
+        string? secondValue = parent.TryGetProperty(second, out JsonElement secondElement)
+                              && secondElement.ValueKind == JsonValueKind.String
+            ? secondElement.GetString()
+            : null;
+        if (firstValue is not null
+            && secondValue is not null
+            && !string.Equals(firstValue, secondValue, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException($"{label} aliases disagree");
+        }
+        return firstValue ?? secondValue
+            ?? throw new InvalidDataException($"{label} is missing");
+    }
+
+    private static bool HasExactString(JsonElement parent, string property, string expected)
+        => parent.TryGetProperty(property, out JsonElement value)
+           && value.ValueKind == JsonValueKind.String
+           && string.Equals(value.GetString(), expected, StringComparison.Ordinal);
+
+    private static bool JsonSemanticEquals(JsonElement left, JsonElement right)
+    {
+        if (left.ValueKind != right.ValueKind)
+        {
+            return false;
+        }
+        return left.ValueKind switch
+        {
+            JsonValueKind.Object =>
+                left.EnumerateObject().Count() == right.EnumerateObject().Count()
+                && left.EnumerateObject().All(property =>
+                    right.TryGetProperty(property.Name, out JsonElement other)
+                    && JsonSemanticEquals(property.Value, other)),
+            JsonValueKind.Array => left.EnumerateArray()
+                .Zip(right.EnumerateArray())
+                .All(pair => JsonSemanticEquals(pair.First, pair.Second))
+                && left.GetArrayLength() == right.GetArrayLength(),
+            JsonValueKind.String => string.Equals(
+                left.GetString(),
+                right.GetString(),
+                StringComparison.Ordinal),
+            JsonValueKind.Number => string.Equals(
+                left.GetRawText(),
+                right.GetRawText(),
+                StringComparison.Ordinal),
+            JsonValueKind.True or JsonValueKind.False => left.GetBoolean() == right.GetBoolean(),
+            JsonValueKind.Null => true,
+            _ => false
+        };
+    }
+
+    private static JsonElement RequireArray(JsonElement parent, string property)
+        => parent.TryGetProperty(property, out JsonElement value)
+           && value.ValueKind == JsonValueKind.Array
+            ? value
+            : throw new InvalidDataException($"release upload {property} is invalid");
 
     private static IReadOnlyList<ReleaseUploadCandidateInventoryRow> ParseCandidateInventory(
         byte[] payload)
@@ -755,6 +1425,51 @@ public sealed class ReleaseUploadSnapshotAuthorityService
 
     private static bool ParseBoolean(string? value)
         => value?.Trim().ToLowerInvariant() is "1" or "true" or "yes" or "on";
+
+    private sealed record CandidateArtifact(
+        string Path,
+        string FileName,
+        string Sha256,
+        long SizeBytes);
+
+    private sealed record CandidateHeadArtifacts(
+        CandidateArtifact Installer,
+        CandidateArtifact Payload);
+
+    private sealed record CandidateWindowsScope(
+        string Version,
+        string Channel,
+        IReadOnlyList<string> Heads,
+        IReadOnlyDictionary<string, CandidateHeadArtifacts> Artifacts);
+
+    private sealed record CandidateVisualProof(
+        string Path,
+        JsonElement Root,
+        byte[] Bytes);
+
+    private sealed class CandidateEvidenceDocument : IDisposable
+    {
+        private readonly JsonDocument _document;
+
+        public CandidateEvidenceDocument(
+            JsonDocument document,
+            byte[] bytes,
+            string sha256,
+            long sizeBytes)
+        {
+            _document = document;
+            Bytes = bytes;
+            Sha256 = sha256;
+            SizeBytes = sizeBytes;
+        }
+
+        public JsonElement Root => _document.RootElement;
+        public byte[] Bytes { get; }
+        public string Sha256 { get; }
+        public long SizeBytes { get; }
+
+        public void Dispose() => _document.Dispose();
+    }
 
     private sealed record AuthorityPosture(
         string Status,

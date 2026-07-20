@@ -336,8 +336,10 @@ unset approved_runtime_proof_sha256
       files that the HTTP client will stage. Do not add, remove, or rewrite a bundle byte afterward.
    2. Run `scripts/release/materialize_candidate_import_authority.py` with that bundle, its exact
       `RELEASE_CHANNEL.generated.json`, the summary and inventory, and the finalized native-Windows
-      evidence root. The materializer requires fresh capture and human-finalization provenance for
-      both desktop heads and exact EXE, payload, candidate-inventory, and visual-proof bindings. Wine,
+      evidence root. The materializer derives the exact Windows proof scope from the canonical
+      `desktopTupleCoverage.requiredDesktopHeads` and requires fresh capture and human-finalization
+      provenance plus exact EXE, payload, candidate-inventory, and visual-proof bindings for that
+      set only. A fallback head is not added unless canonical release truth requires it. Wine,
       stale evidence, a changed reviewer boundary, or any byte mismatch fails closed.
    3. Independently hand off the resulting authority file's lowercase SHA-256, then publish it with
       `scripts/release/verify_public_projection.py --candidate-import-authority <authority> --candidate-import-authority-sha256 <approved-sha256>`.

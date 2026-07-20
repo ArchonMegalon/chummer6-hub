@@ -45,12 +45,12 @@ CAPTURE_WORKFLOW = ".github/workflows/windows-native-evidence-capture.yml"
 FINALIZE_WORKFLOW = ".github/workflows/windows-native-evidence-finalize.yml"
 UI_REPOSITORY = "ArchonMegalon/chummer6-ui"
 PRODUCER_REF = "refs/heads/main"
-HEADS = ("avalonia", "blazor-desktop")
 RID = "win-x64"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 REVIEWER_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,38})$")
 VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,159}$")
+HEAD_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 MAX_JSON_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_FILES = 512
 MAX_AUTHORITY_LIFETIME_SECONDS = 6 * 60 * 60
@@ -266,6 +266,96 @@ def _validate_bundle_inventory(
     return rows
 
 
+def _matching_alias(value: dict[str, Any], first: str, second: str, *, label: str) -> str:
+    first_value = value.get(first)
+    second_value = value.get(second)
+    if first_value is not None and second_value is not None and first_value != second_value:
+        _fail(f"{label} aliases disagree")
+    selected = first_value if first_value is not None else second_value
+    if not isinstance(selected, str) or not selected:
+        _fail(f"{label} is missing")
+    return selected
+
+
+def _canonical_windows_scope(
+    manifest: dict[str, Any],
+    candidate_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    version = _matching_alias(
+        manifest, "version", "releaseVersion", label="candidate release version"
+    )
+    channel = _matching_alias(
+        manifest, "channelId", "channel", label="candidate release channel"
+    )
+    coverage = manifest.get("desktopTupleCoverage")
+    heads_value = coverage.get("requiredDesktopHeads") if isinstance(coverage, dict) else None
+    if (
+        not isinstance(heads_value, list)
+        or not heads_value
+        or any(not isinstance(head, str) or HEAD_RE.fullmatch(head) is None for head in heads_value)
+        or len(set(heads_value)) != len(heads_value)
+    ):
+        _fail("candidate requiredDesktopHeads is invalid")
+    heads = tuple(heads_value)
+    artifacts_value = manifest.get("artifacts")
+    if not isinstance(artifacts_value, list) or not artifacts_value:
+        _fail("candidate release manifest has no artifacts")
+    candidate_by_path = {row["path"]: row for row in candidate_rows}
+    scope_by_head: dict[str, dict[str, Any]] = {}
+    for head in heads:
+        matching = [
+            artifact
+            for artifact in artifacts_value
+            if isinstance(artifact, dict)
+            and artifact.get("head") == head
+            and artifact.get("platform") == "windows"
+            and artifact.get("rid") == RID
+        ]
+        installers = [artifact for artifact in matching if artifact.get("kind") == "installer"]
+        payloads = [
+            artifact
+            for artifact in matching
+            if artifact.get("kind") in {"archive", "payload"}
+            and str(artifact.get("fileName") or "").endswith("-payload.zip")
+        ]
+        if len(installers) != 1 or len(payloads) != 1:
+            _fail(f"candidate manifest must name one Windows installer and payload for {head}")
+        scope_by_head[head] = {}
+        for role, artifact in (("installer", installers[0]), ("payload", payloads[0])):
+            file_name = artifact.get("fileName")
+            digest = artifact.get("sha256")
+            size = artifact.get("sizeBytes")
+            if (
+                not isinstance(file_name, str)
+                or not file_name
+                or "/" in file_name
+                or "\\" in file_name
+                or SHA256_RE.fullmatch(str(digest or "")) is None
+                or isinstance(size, bool)
+                or not isinstance(size, int)
+                or size < 1
+                or role == "installer"
+                and not file_name.lower().endswith(".exe")
+            ):
+                _fail(f"candidate {head} {role} artifact metadata is invalid")
+            path = f"files/{file_name}"
+            candidate_row = candidate_by_path.get(path)
+            if candidate_row != {"path": path, "sha256": digest, "sizeBytes": size}:
+                _fail(f"candidate {head} {role} manifest bytes differ from upload inventory")
+            scope_by_head[head][role] = {
+                "path": path,
+                "fileName": file_name,
+                "sha256": digest,
+                "sizeBytes": size,
+            }
+    return {
+        "version": version,
+        "channel": channel,
+        "heads": heads,
+        "artifacts": scope_by_head,
+    }
+
+
 def _exact_tree_rows(root: Path, *, exclude: set[str]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for path in sorted(root.rglob("*")):
@@ -315,8 +405,7 @@ def _validate_candidate_provenance(
     *,
     bundle_root: Path,
     canonical_manifest_sha256: str,
-    version: str,
-    channel: str,
+    scope: dict[str, Any],
 ) -> dict[str, Any]:
     inventory, _ = _strict_json(
         root / CANDIDATE_PROVENANCE_INVENTORY,
@@ -325,7 +414,8 @@ def _validate_candidate_provenance(
     if (
         inventory.get("contractName") != CANDIDATE_CONTENT_INVENTORY_CONTRACT
         or inventory.get("contractVersion") != 1
-        or inventory.get("release") != {"channel": channel, "version": version}
+        or inventory.get("release")
+        != {"channel": scope["channel"], "version": scope["version"]}
         or inventory.get("manifest")
         != {"path": "RELEASE_CHANNEL.generated.json", "sha256": canonical_manifest_sha256}
     ):
@@ -333,17 +423,17 @@ def _validate_candidate_provenance(
     required_paths = [
         "RELEASE_CHANNEL.generated.json",
         *[
-            path
-            for head in HEADS
-            for path in (
-                f"files/chummer-{head}-{RID}-installer.exe",
-                f"files/chummer-{head}-{RID}-payload.zip",
+            artifact["path"]
+            for head in scope["heads"]
+            for artifact in (
+                scope["artifacts"][head]["installer"],
+                scope["artifacts"][head]["payload"],
             )
         ],
     ]
     rows = _inventory_rows(inventory.get("files"), label="native-Windows candidate content inventory")
     if [row["path"] for row in rows] != sorted(required_paths):
-        _fail("native-Windows proof does not bind the exact two-head candidate content set")
+        _fail("native-Windows proof does not bind the exact required-head candidate content set")
     for row in rows:
         path = bundle_root / row["path"]
         _plain_file(path, label=f"native-Windows candidate byte {row['path']}")
@@ -357,6 +447,7 @@ def _validate_native_evidence(
     *,
     bundle_root: Path,
     canonical_manifest_sha256: str,
+    scope: dict[str, Any],
     now: datetime,
     max_age: timedelta,
 ) -> tuple[dict[str, Any], datetime, list[tuple[str, bytes]]]:
@@ -376,6 +467,7 @@ def _validate_native_evidence(
     )
     if finalized_rows != _exact_tree_rows(root, exclude={FINALIZED_INVENTORY_FILE}):
         _fail("finalized native-Windows inventory does not match its exact artifact tree")
+    finalized_by_path = {row["path"]: row for row in finalized_rows}
 
     finalization, finalization_bytes = _strict_json(
         root / FINALIZATION_FILE, label="native-Windows finalization receipt"
@@ -434,7 +526,11 @@ def _validate_native_evidence(
     )
     version = str(capture.get("version") or "")
     channel = str(capture.get("channelId") or "")
-    if VERSION_RE.fullmatch(version) is None or not channel:
+    if (
+        version != scope["version"]
+        or channel != scope["channel"]
+        or VERSION_RE.fullmatch(version) is None
+    ):
         _fail("native-Windows capture release identity is invalid")
     candidate_binding = capture.get("candidate")
     if (
@@ -446,8 +542,7 @@ def _validate_native_evidence(
         root,
         bundle_root=bundle_root,
         canonical_manifest_sha256=canonical_manifest_sha256,
-        version=version,
-        channel=channel,
+        scope=scope,
     )
     provenance_path = root / CANDIDATE_PROVENANCE_INVENTORY
     if candidate_binding.get("contentInventorySha256") != _sha256_file(provenance_path):
@@ -461,14 +556,15 @@ def _validate_native_evidence(
         or capture_inventory.get("contractVersion") != 1
         or capture_inventory.get("captureManifestSha256")
         != hashlib.sha256(capture_bytes).hexdigest()
+        or not isinstance(capture_inventory.get("files"), list)
     ):
         _fail("native-Windows capture inventory binding drifted")
     if finalization.get("captureInventorySha256") != hashlib.sha256(capture_inventory_bytes).hexdigest():
         _fail("native-Windows finalization capture inventory binding drifted")
 
     proof_rows = finalization.get("proofs")
-    if not isinstance(proof_rows, list) or len(proof_rows) != len(HEADS):
-        _fail("native-Windows finalization must bind exactly two visual proofs")
+    if not isinstance(proof_rows, list) or len(proof_rows) != len(scope["heads"]):
+        _fail("native-Windows finalization must bind every required-head visual proof exactly once")
     proof_by_head: dict[str, tuple[str, bytes, dict[str, Any]]] = {}
     custody: list[tuple[str, bytes]] = [
         (CAPTURE_FILE, capture_bytes),
@@ -480,25 +576,40 @@ def _validate_native_evidence(
         if not isinstance(row, dict) or set(row) != {"headId", "path", "sha256"}:
             _fail("native-Windows finalization proof binding drifted")
         head = row.get("headId")
-        if head not in HEADS or head in proof_by_head:
+        if head not in scope["heads"] or head in proof_by_head:
             _fail("native-Windows finalization proof head drifted")
         relative = _validate_relative_path(row.get("path"), label="native-Windows visual proof path")
         proof, proof_bytes = _strict_json(root / relative, label=f"{head} visual proof")
         if row.get("sha256") != hashlib.sha256(proof_bytes).hexdigest():
             _fail("native-Windows visual proof digest drifted")
+        finalized_row = finalized_by_path.get(relative)
+        if finalized_row != {
+            "path": relative,
+            "sha256": row["sha256"],
+            "sizeBytes": len(proof_bytes),
+        }:
+            _fail("native-Windows visual proof finalized inventory binding drifted")
         proof_by_head[head] = (relative, proof_bytes, proof)
         custody.append((relative, proof_bytes))
 
-    for head in HEADS:
+    for head in scope["heads"]:
         relative, _proof_bytes, proof = proof_by_head[head]
-        installer_name = f"chummer-{head}-{RID}-installer.exe"
-        payload_name = f"chummer-{head}-{RID}-payload.zip"
-        installer = bundle_root / "files" / installer_name
-        payload = bundle_root / "files" / payload_name
+        installer_artifact = scope["artifacts"][head]["installer"]
+        payload_artifact = scope["artifacts"][head]["payload"]
+        installer_name = installer_artifact["fileName"]
+        payload_name = payload_artifact["fileName"]
+        installer = bundle_root / installer_artifact["path"]
+        payload = bundle_root / payload_artifact["path"]
         startup_relative = f"startup-smoke/startup-smoke-{head}-{RID}.receipt.json"
         startup, startup_bytes = _strict_json(
             root / startup_relative, label=f"{head} native startup receipt"
         )
+        if finalized_by_path.get(startup_relative) != {
+            "path": startup_relative,
+            "sha256": hashlib.sha256(startup_bytes).hexdigest(),
+            "sizeBytes": len(startup_bytes),
+        }:
+            _fail(f"{head} startup proof finalized inventory binding drifted")
         native = startup.get("nativeHostEvidence")
         if (
             startup.get("status") != "pass"
@@ -509,11 +620,11 @@ def _validate_native_evidence(
             or startup.get("releaseVersion") != version
             or startup.get("channelId") != channel
             or startup.get("artifactFileName") != installer_name
-            or startup.get("artifactDigest") != f"sha256:{_sha256_file(installer)}"
+            or startup.get("artifactDigest") != f"sha256:{installer_artifact['sha256']}"
             or startup.get("bootstrapPayloadAcquisitionMode") != "download"
             or startup.get("bootstrapPayloadFileName") != payload_name
-            or startup.get("bootstrapPayloadSha256") != _sha256_file(payload)
-            or startup.get("bootstrapPayloadSizeBytes") != payload.stat().st_size
+            or startup.get("bootstrapPayloadSha256") != payload_artifact["sha256"]
+            or startup.get("bootstrapPayloadSizeBytes") != payload_artifact["sizeBytes"]
             or not isinstance(native, dict)
             or native.get("contractName") != NATIVE_HOST_CONTRACT
             or native.get("status") != "verified"
@@ -522,6 +633,32 @@ def _validate_native_evidence(
             or "wine" in str(native.get("runner") or "").lower()
         ):
             _fail(f"{head} startup proof is not exact native-Windows evidence")
+        _fresh_timestamp(
+            proof.get("generatedAt"),
+            label=f"{head} visual proof generatedAt",
+            now=now,
+            max_age=max_age,
+        )
+        screenshots = proof.get("screenshots")
+        if not isinstance(screenshots, list) or len(screenshots) != 2:
+            _fail(f"{head} visual proof screenshot set drifted")
+        screenshot_roles: set[str] = set()
+        for screenshot in screenshots:
+            if not isinstance(screenshot, dict) or set(screenshot) != {"role", "path", "sha256"}:
+                _fail(f"{head} visual proof screenshot binding drifted")
+            role = screenshot.get("role")
+            path = _validate_relative_path(
+                screenshot.get("path"), label=f"{head} visual proof screenshot path"
+            )
+            digest = _sha256(
+                screenshot.get("sha256"), label=f"{head} visual proof screenshot digest"
+            )
+            if role not in {"progress", "completion"} or role in screenshot_roles:
+                _fail(f"{head} visual proof screenshot role drifted")
+            screenshot_roles.add(role)
+            finalized_row = finalized_by_path.get(path)
+            if finalized_row is None or finalized_row["sha256"] != digest:
+                _fail(f"{head} visual proof screenshot finalized inventory binding drifted")
         if (
             proof.get("contractName") != VISUAL_PROOF_CONTRACT
             or proof.get("status") != "passed"
@@ -531,7 +668,7 @@ def _validate_native_evidence(
             or proof.get("releaseVersion") != version
             or proof.get("channelId") != channel
             or proof.get("artifactFileName") != installer_name
-            or proof.get("artifactDigest") != f"sha256:{_sha256_file(installer)}"
+            or proof.get("artifactDigest") != f"sha256:{installer_artifact['sha256']}"
             or proof.get("checks")
             != {"capture_mode": "interactive", "human_review_confirmed": True}
             or proof.get("readabilityReview")
@@ -546,7 +683,16 @@ def _validate_native_evidence(
         custody.append((startup_relative, startup_bytes))
 
     for relative in (CANDIDATE_PROVENANCE_INVENTORY, CANDIDATE_PROVENANCE_EXPORT):
-        _, evidence_bytes = _strict_json(root / relative, label=f"native-Windows {relative}")
+        evidence_document, evidence_bytes = _strict_json(
+            root / relative, label=f"native-Windows {relative}"
+        )
+        if relative == CANDIDATE_PROVENANCE_EXPORT and (
+            evidence_document.get("contractName")
+            != "chummer6-ui.preview-nightly-candidate-export"
+            or evidence_document.get("contractVersion") != 1
+            or evidence_document.get("status") != "exported"
+        ):
+            _fail("native-Windows candidate export receipt drifted")
         custody.append((relative, evidence_bytes))
 
     evidence_summary = {
@@ -604,16 +750,21 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
     inventory, inventory_bytes = _strict_json(
         Path(args.candidate_inventory), label="candidate upload inventory"
     )
-    _validate_bundle_inventory(bundle_root, inventory, candidate)
+    candidate_rows = _validate_bundle_inventory(bundle_root, inventory, candidate)
     canonical_manifest = _plain_file(
         Path(args.canonical_manifest), label="candidate canonical manifest", maximum_bytes=MAX_JSON_BYTES
     )
-    canonical_bytes = canonical_manifest.read_bytes()
+    canonical, canonical_bytes = _strict_json(
+        canonical_manifest, label="candidate canonical manifest"
+    )
     canonical_digest = hashlib.sha256(canonical_bytes).hexdigest()
     if canonical_digest != candidate["canonicalManifestSha256"]:
         _fail("candidate canonical manifest digest differs from its summary")
     if canonical_manifest.resolve() != (bundle_root / "RELEASE_CHANNEL.generated.json").resolve():
         _fail("candidate canonical manifest must be the upload tree RELEASE_CHANNEL.generated.json")
+    scope = _canonical_windows_scope(canonical, candidate_rows)
+    if scope["version"] != candidate["version"]:
+        _fail("candidate release version differs from its upload summary")
 
     now = _timestamp(args.now, label="materialization time") if args.now else datetime.now(timezone.utc)
     max_age_seconds = _positive_int(args.max_proof_age_seconds, label="max proof age seconds")
@@ -625,6 +776,7 @@ def materialize(args: argparse.Namespace) -> dict[str, Any]:
         Path(args.windows_finalized_root).resolve(strict=True),
         bundle_root=bundle_root,
         canonical_manifest_sha256=canonical_digest,
+        scope=scope,
         now=now,
         max_age=max_age,
     )

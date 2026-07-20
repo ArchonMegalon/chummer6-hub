@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -141,8 +142,202 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
         Assert.Contains("exact candidate authority inventory", rejected.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("empty_capture")]
+    [InlineData("capture_actor")]
+    [InlineData("capture_workflow")]
+    [InlineData("stale_capture")]
+    [InlineData("not_native")]
+    [InlineData("wine_runner")]
+    [InlineData("artifact_digest")]
+    [InlineData("scope_widen")]
+    [InlineData("scope_narrow")]
+    public void RuntimeRejectsFreshlyRehashedSemanticEvidenceTamper(string tamper)
+    {
+        using var fixture = new SnapshotFixture();
+        byte[] authority = TamperCandidateAuthority(
+            SnapshotFixture.BuildCandidateAuthority(),
+            tamper);
+
+        fixture.Publish("candidate_import_ready", authority);
+
+        ReleaseUploadSnapshotAuthority rejected = fixture.Authority.Load();
+        Assert.False(rejected.IsValid);
+        Assert.Null(rejected.Candidate);
+    }
+
+    private static byte[] TamperCandidateAuthority(byte[] payload, string tamper)
+    {
+        JsonObject authority = JsonNode.Parse(payload)?.AsObject()
+            ?? throw new InvalidDataException("candidate fixture authority is invalid");
+        JsonObject native = authority["custody"]!["nativeWindowsFinalizedEvidence"]!.AsObject();
+        const string capturePath = "WINDOWS_NATIVE_CAPTURE.generated.json";
+        const string finalizationPath = "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json";
+        const string startupPath = "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json";
+        const string visualPath =
+            "WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-win-x64.generated.json";
+
+        switch (tamper)
+        {
+            case "empty_capture":
+                RewriteEmbedded(authority, capturePath, new JsonObject());
+                break;
+            case "capture_actor":
+            {
+                JsonObject source = native["captureSource"]!.AsObject();
+                source["actor"] = "untrusted-capture-actor";
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                capture["source"] = source.DeepClone();
+                RewriteEmbedded(authority, capturePath, capture);
+                JsonObject finalization = ReadEmbedded(authority, finalizationPath);
+                finalization["captureSource"] = source.DeepClone();
+                RewriteEmbedded(authority, finalizationPath, finalization);
+                break;
+            }
+            case "capture_workflow":
+            {
+                JsonObject source = native["captureSource"]!.AsObject();
+                source["workflow"] = ".github/workflows/untrusted.yml";
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                capture["source"] = source.DeepClone();
+                RewriteEmbedded(authority, capturePath, capture);
+                JsonObject finalization = ReadEmbedded(authority, finalizationPath);
+                finalization["captureSource"] = source.DeepClone();
+                RewriteEmbedded(authority, finalizationPath, finalization);
+                break;
+            }
+            case "stale_capture":
+            {
+                string stale = DateTimeOffset.UtcNow.AddDays(-2).ToString("O");
+                native["captureGeneratedAtUtc"] = stale;
+                JsonObject capture = ReadEmbedded(authority, capturePath);
+                capture["generatedAt"] = stale;
+                RewriteEmbedded(authority, capturePath, capture);
+                break;
+            }
+            case "not_native":
+            {
+                JsonObject startup = ReadEmbedded(authority, startupPath);
+                startup["executionEnvironment"] = "compatibility_layer";
+                startup["nativeHostEvidence"]!["isNativeWindows"] = false;
+                RewriteEmbedded(authority, startupPath, startup);
+                break;
+            }
+            case "wine_runner":
+            {
+                JsonObject startup = ReadEmbedded(authority, startupPath);
+                startup["nativeHostEvidence"]!["runner"] = "wine64";
+                RewriteEmbedded(authority, startupPath, startup);
+                break;
+            }
+            case "artifact_digest":
+            {
+                JsonObject visual = ReadEmbedded(authority, visualPath);
+                visual["artifactDigest"] = "sha256:" + new string('f', 64);
+                RewriteEmbedded(authority, visualPath, visual);
+                break;
+            }
+            case "scope_widen":
+            {
+                JsonObject finalization = ReadEmbedded(authority, finalizationPath);
+                JsonObject existing = finalization["proofs"]![0]!.AsObject();
+                finalization["proofs"]!.AsArray().Add(new JsonObject
+                {
+                    ["headId"] = "blazor-desktop",
+                    ["path"] = existing["path"]!.GetValue<string>(),
+                    ["sha256"] = existing["sha256"]!.GetValue<string>()
+                });
+                RewriteEmbedded(authority, finalizationPath, finalization);
+                break;
+            }
+            case "scope_narrow":
+            {
+                JsonObject finalization = ReadEmbedded(authority, finalizationPath);
+                finalization["proofs"] = new JsonArray();
+                RewriteEmbedded(authority, finalizationPath, finalization);
+                break;
+            }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(tamper));
+        }
+
+        RefreshEvidenceBindings(authority);
+        return JsonSerializer.SerializeToUtf8Bytes(authority);
+    }
+
+    private static JsonObject ReadEmbedded(JsonObject authority, string path)
+    {
+        JsonObject entry = FindEmbedded(authority, path);
+        byte[] bytes = Convert.FromBase64String(entry["base64"]!.GetValue<string>());
+        return JsonNode.Parse(bytes)?.AsObject()
+            ?? throw new InvalidDataException("embedded candidate fixture is invalid");
+    }
+
+    private static void RewriteEmbedded(JsonObject authority, string path, JsonObject document)
+    {
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(document);
+        JsonObject entry = FindEmbedded(authority, path);
+        entry["base64"] = Convert.ToBase64String(bytes);
+        entry["sha256"] = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        entry["sizeBytes"] = bytes.LongLength;
+    }
+
+    private static JsonObject FindEmbedded(JsonObject authority, string path)
+    {
+        JsonArray files = authority["custody"]!["nativeWindowsFinalizedEvidence"]!["files"]!.AsArray();
+        return files
+            .Select(static node => node!.AsObject())
+            .Single(entry => string.Equals(
+                entry["path"]!.GetValue<string>(),
+                path,
+                StringComparison.Ordinal));
+    }
+
+    private static void RefreshEvidenceBindings(JsonObject authority)
+    {
+        const string capturePath = "WINDOWS_NATIVE_CAPTURE.generated.json";
+        const string captureInventoryPath = "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json";
+        const string finalizationPath = "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json";
+        const string finalizedInventoryPath = "WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json";
+        JsonArray files = authority["custody"]!["nativeWindowsFinalizedEvidence"]!["files"]!.AsArray();
+        var entries = files
+            .Select(static node => node!.AsObject())
+            .ToDictionary(
+                static entry => entry["path"]!.GetValue<string>(),
+                StringComparer.Ordinal);
+
+        JsonObject captureInventory = ReadEmbedded(authority, captureInventoryPath);
+        captureInventory["captureManifestSha256"] = entries[capturePath]["sha256"]!.GetValue<string>();
+        RewriteEmbedded(authority, captureInventoryPath, captureInventory);
+
+        JsonObject finalization = ReadEmbedded(authority, finalizationPath);
+        finalization["captureInventorySha256"] =
+            entries[captureInventoryPath]["sha256"]!.GetValue<string>();
+        foreach (JsonNode? node in finalization["proofs"]!.AsArray())
+        {
+            JsonObject proof = node!.AsObject();
+            proof["sha256"] = entries[proof["path"]!.GetValue<string>()]["sha256"]!.GetValue<string>();
+        }
+        RewriteEmbedded(authority, finalizationPath, finalization);
+
+        JsonObject finalizedInventory = ReadEmbedded(authority, finalizedInventoryPath);
+        foreach (JsonNode? node in finalizedInventory["files"]!.AsArray())
+        {
+            JsonObject row = node!.AsObject();
+            string path = row["path"]!.GetValue<string>();
+            if (entries.TryGetValue(path, out JsonObject? entry))
+            {
+                row["sha256"] = entry["sha256"]!.GetValue<string>();
+                row["sizeBytes"] = entry["sizeBytes"]!.GetValue<long>();
+            }
+        }
+        RewriteEmbedded(authority, finalizedInventoryPath, finalizedInventory);
+    }
+
     private sealed class SnapshotFixture : IDisposable
     {
+        private static readonly byte[] InstallerBytes = "MZ-avalonia-installer"u8.ToArray();
+        private static readonly byte[] PayloadBytes = "PK-avalonia-payload"u8.ToArray();
         private static readonly string[] BaseOutputNames =
         [
             "HUB_LOCAL_RELEASE_PROOF.generated.json",
@@ -224,7 +419,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 Roles: ["operator"],
                 AccessToken: "identity-token"));
 
-        public void Publish(string status)
+        public void Publish(string status, byte[]? candidateAuthority = null)
         {
             byte[] local = "{\"status\":\"projection\"}\n"u8.ToArray();
             var payloads = BaseOutputNames.ToDictionary(
@@ -236,7 +431,7 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             if (status == "candidate_import_ready")
             {
                 payloads[ReleaseUploadSnapshotAuthorityService.CandidateAuthorityFileName] =
-                    BuildCandidateAuthority();
+                    candidateAuthority ?? BuildCandidateAuthority();
             }
             string[] outputNames = payloads.Keys.ToArray();
             var digests = payloads.ToDictionary(
@@ -333,21 +528,76 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
             {
                 string path = Path.Combine(root, row.Path.Replace('/', Path.DirectorySeparatorChar));
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                File.WriteAllBytes(path, authority.CanonicalManifestBytes);
+                byte[] bytes = row.Path switch
+                {
+                    "RELEASE_CHANNEL.generated.json" => authority.CanonicalManifestBytes,
+                    "files/chummer-avalonia-win-x64-installer.exe" => InstallerBytes,
+                    "files/chummer-avalonia-win-x64-payload.zip" => PayloadBytes,
+                    _ => throw new InvalidDataException("unexpected candidate fixture path")
+                };
+                File.WriteAllBytes(path, bytes);
             }
             return root;
         }
 
-        private static byte[] BuildCandidateAuthority()
+        public static byte[] BuildCandidateAuthority()
         {
-            byte[] canonical = "{\"version\":\"run-candidate\"}\n"u8.ToArray();
+            string installerSha = Sha256(InstallerBytes);
+            string payloadSha = Sha256(PayloadBytes);
+            byte[] canonical = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "Chummer.Hub.Registry.Contracts",
+                version = "run-candidate",
+                releaseVersion = "run-candidate",
+                channel = "preview",
+                channelId = "preview",
+                artifacts = new object[]
+                {
+                    new
+                    {
+                        artifactId = "avalonia-win-x64-installer",
+                        head = "avalonia",
+                        platform = "windows",
+                        rid = "win-x64",
+                        arch = "x64",
+                        kind = "installer",
+                        fileName = "chummer-avalonia-win-x64-installer.exe",
+                        sha256 = installerSha,
+                        sizeBytes = InstallerBytes.LongLength
+                    },
+                    new
+                    {
+                        artifactId = "avalonia-win-x64-payload",
+                        head = "avalonia",
+                        platform = "windows",
+                        rid = "win-x64",
+                        arch = "x64",
+                        kind = "archive",
+                        fileName = "chummer-avalonia-win-x64-payload.zip",
+                        sha256 = payloadSha,
+                        sizeBytes = PayloadBytes.LongLength
+                    }
+                },
+                desktopTupleCoverage = new
+                {
+                    requiredDesktopHeads = new[] { "avalonia" }
+                }
+            });
             string canonicalSha = Sha256(canonical);
-            var rows = new[]
+            var rows = new ReleaseUploadCandidateInventoryRow[]
             {
                 new ReleaseUploadCandidateInventoryRow(
                     "RELEASE_CHANNEL.generated.json",
                     canonical.LongLength,
-                    canonicalSha)
+                    canonicalSha),
+                new ReleaseUploadCandidateInventoryRow(
+                    "files/chummer-avalonia-win-x64-installer.exe",
+                    InstallerBytes.LongLength,
+                    installerSha),
+                new ReleaseUploadCandidateInventoryRow(
+                    "files/chummer-avalonia-win-x64-payload.zip",
+                    PayloadBytes.LongLength,
+                    payloadSha)
             };
             string inventorySha =
                 ReleaseUploadSnapshotAuthorityService.ComputeInventoryDigest(rows);
@@ -355,8 +605,8 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                 "run-candidate",
                 canonicalSha,
                 inventorySha,
-                1,
-                canonical.LongLength,
+                rows.Length,
+                rows.Sum(static row => row.SizeBytes),
                 string.Empty);
             candidate = candidate with
             {
@@ -374,24 +624,205 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                     sizeBytes = row.SizeBytes
                 })
             });
-            string[] evidencePaths =
-            [
-                "WINDOWS_NATIVE_CAPTURE.generated.json",
-                "WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json",
-                "WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json",
-                "WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json",
-                "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json",
-                "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json",
-                "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
-                "startup-smoke/startup-smoke-blazor-desktop-win-x64.receipt.json"
-            ];
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            var captureSource = new Dictionary<string, object?>
+            {
+                ["repository"] = "ArchonMegalon/chummer6-ui",
+                ["workflow"] = ".github/workflows/windows-native-evidence-capture.yml",
+                ["runId"] = "12345",
+                ["runAttempt"] = "1",
+                ["ref"] = "refs/heads/main",
+                ["sha"] = new string('a', 40),
+                ["actor"] = "github-actions[bot]",
+                ["artifactName"] = "windows-native-evidence-12345-1"
+            };
+            var finalizationSource = new Dictionary<string, object?>
+            {
+                ["repository"] = "ArchonMegalon/chummer6-ui",
+                ["workflow"] = ".github/workflows/windows-native-evidence-finalize.yml",
+                ["runId"] = "12345",
+                ["runAttempt"] = "1",
+                ["ref"] = "refs/heads/main",
+                ["sha"] = new string('a', 40),
+                ["actor"] = "accountable-reviewer",
+                ["artifactName"] = "windows-native-evidence-finalized-12345-1"
+            };
+            object[] provenanceRows = rows.Select(row => (object)new
+            {
+                path = row.Path,
+                sha256 = row.Sha256,
+                sizeBytes = row.SizeBytes
+            }).ToArray();
+            byte[] provenance = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer6-ui.preview-nightly-candidate-content-inventory",
+                contractVersion = 1,
+                release = new { channel = "preview", version = "run-candidate" },
+                manifest = new
+                {
+                    path = "RELEASE_CHANNEL.generated.json",
+                    sha256 = canonicalSha
+                },
+                files = provenanceRows
+            });
+            byte[] capture = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer6-ui.preview-nightly-native-windows-capture",
+                contractVersion = 1,
+                status = "captured",
+                captureMode = "interactive",
+                generatedAt = now,
+                version = "run-candidate",
+                channelId = "preview",
+                source = captureSource,
+                candidate = new
+                {
+                    manifestSha256 = canonicalSha,
+                    contentInventorySha256 = Sha256(provenance)
+                }
+            });
+            byte[] captureInventory = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer6-ui.preview-nightly-native-windows-capture-inventory",
+                contractVersion = 1,
+                captureManifestSha256 = Sha256(capture),
+                files = Array.Empty<object>()
+            });
+            byte[] startup = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                status = "pass",
+                readyCheckpoint = "pre_ui_event_loop",
+                headId = "avalonia",
+                platform = "windows",
+                rid = "win-x64",
+                channelId = "preview",
+                releaseVersion = "run-candidate",
+                artifactFileName = "chummer-avalonia-win-x64-installer.exe",
+                artifactDigest = $"sha256:{installerSha}",
+                bootstrapPayloadAcquisitionMode = "download",
+                bootstrapPayloadFileName = "chummer-avalonia-win-x64-payload.zip",
+                bootstrapPayloadSha256 = payloadSha,
+                bootstrapPayloadSizeBytes = PayloadBytes.LongLength,
+                executionEnvironment = "native_windows",
+                nativeHostEvidence = new
+                {
+                    contractName = "chummer6-ui.native_windows_host_evidence",
+                    status = "verified",
+                    isNativeWindows = true,
+                    hostPlatform = "windows",
+                    hostKernel = "Windows_NT",
+                    runner = "powershell.exe",
+                    evidenceSource = "GitHub-hosted windows-latest"
+                }
+            });
+            byte[] progressScreenshot = "png-progress"u8.ToArray();
+            byte[] completionScreenshot = "png-completion"u8.ToArray();
+            const string visualPath =
+                "WINDOWS_INSTALLER_VISUAL_PROOF-avalonia-win-x64.generated.json";
+            byte[] visual = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer6-ui.windows_installer_visual_proof",
+                contractVersion = 1,
+                status = "passed",
+                generatedAt = now,
+                version = "run-candidate",
+                releaseVersion = "run-candidate",
+                channel = "preview",
+                channelId = "preview",
+                platform = "windows",
+                head = "avalonia",
+                headId = "avalonia",
+                rid = "win-x64",
+                artifactFileName = "chummer-avalonia-win-x64-installer.exe",
+                artifactDigest = $"sha256:{installerSha}",
+                screenshots = new object[]
+                {
+                    new
+                    {
+                        role = "progress",
+                        path = "screenshots/avalonia-progress.png",
+                        sha256 = Sha256(progressScreenshot)
+                    },
+                    new
+                    {
+                        role = "completion",
+                        path = "screenshots/avalonia-completion.png",
+                        sha256 = Sha256(completionScreenshot)
+                    }
+                },
+                checks = new
+                {
+                    capture_mode = "interactive",
+                    human_review_confirmed = true
+                },
+                readabilityReview = new { status = "passed", reviewer = "accountable-reviewer" },
+                contrastReview = new { status = "passed", reviewer = "accountable-reviewer" },
+                clippingReview = new { status = "passed", reviewer = "accountable-reviewer" },
+                finalizationBinding = finalizationSource
+            });
+            byte[] export = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer6-ui.preview-nightly-candidate-export",
+                contractVersion = 1,
+                status = "exported"
+            });
+            byte[] finalization = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer6-ui.preview-nightly-native-windows-finalization",
+                contractVersion = 1,
+                status = "passed",
+                generatedAt = now,
+                captureInventorySha256 = Sha256(captureInventory),
+                captureSource,
+                finalizationSource,
+                reviewer = "accountable-reviewer",
+                reviewerWasCaptureActor = false,
+                humanReviewConfirmed = true,
+                proofs = new object[]
+                {
+                    new { headId = "avalonia", path = visualPath, sha256 = Sha256(visual) }
+                }
+            });
+            var evidence = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+            {
+                ["WINDOWS_NATIVE_CAPTURE.generated.json"] = capture,
+                ["WINDOWS_NATIVE_CAPTURE_INVENTORY.generated.json"] = captureInventory,
+                ["WINDOWS_NATIVE_EVIDENCE_FINALIZATION.generated.json"] = finalization,
+                [CandidateProvenanceInventoryPath] = provenance,
+                [CandidateProvenanceExportPath] = export,
+                ["startup-smoke/startup-smoke-avalonia-win-x64.receipt.json"] = startup,
+                [visualPath] = visual
+            };
+            object[] finalizedRows = evidence
+                .Select(pair => (Path: pair.Key, Bytes: pair.Value))
+                .Concat(
+                [
+                    (Path: "screenshots/avalonia-completion.png", Bytes: completionScreenshot),
+                    (Path: "screenshots/avalonia-progress.png", Bytes: progressScreenshot)
+                ])
+                .OrderBy(static subject => subject.Path, StringComparer.Ordinal)
+                .Select(subject => (object)new
+                {
+                    path = subject.Path,
+                    sha256 = Sha256(subject.Bytes),
+                    sizeBytes = subject.Bytes.LongLength
+                })
+                .ToArray();
+            byte[] finalizedInventory = JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                contractName = "chummer6-ui.preview-nightly-native-windows-finalized-inventory",
+                contractVersion = 1,
+                files = finalizedRows
+            });
+            evidence["WINDOWS_NATIVE_FINALIZED_INVENTORY.generated.json"] = finalizedInventory;
+            using JsonDocument provenanceDocument = JsonDocument.Parse(provenance);
             return JsonSerializer.SerializeToUtf8Bytes(new
             {
                 contractName = "chummer.release-upload.candidate-import-authority/v1",
                 contractVersion = 1,
                 status = "candidate_import_ready",
-                generatedAtUtc = DateTimeOffset.UtcNow,
-                expiresAtUtc = DateTimeOffset.UtcNow.AddHours(2),
+                generatedAtUtc = now,
+                expiresAtUtc = now.AddHours(2),
                 candidate = new
                 {
                     version = candidate.Version,
@@ -408,26 +839,25 @@ public sealed class ReleaseUploadSnapshotAuthorityTests
                     nativeWindowsFinalizedEvidence = new
                     {
                         status = "passed",
-                        captureGeneratedAtUtc = DateTimeOffset.UtcNow,
-                        finalizationGeneratedAtUtc = DateTimeOffset.UtcNow,
+                        captureGeneratedAtUtc = now,
+                        finalizationGeneratedAtUtc = now,
                         reviewer = "accountable-reviewer",
-                        captureSource = new
-                        {
-                            actor = "github-actions[bot]",
-                            workflow = ".github/workflows/windows-native-evidence-capture.yml"
-                        },
-                        finalizationSource = new
-                        {
-                            actor = "accountable-reviewer",
-                            workflow = ".github/workflows/windows-native-evidence-finalize.yml"
-                        },
-                        candidateContentInventorySha256 = new string('a', 64),
-                        candidateContentInventory = new { },
-                        files = evidencePaths.Select(path => Embedded(path, "{}"u8.ToArray()))
+                        captureSource,
+                        finalizationSource,
+                        candidateContentInventorySha256 = Sha256(provenance),
+                        candidateContentInventory = provenanceDocument.RootElement.Clone(),
+                        files = evidence
+                            .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+                            .Select(pair => Embedded(pair.Key, pair.Value))
                     }
                 }
             });
         }
+
+        private const string CandidateProvenanceInventoryPath =
+            "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_CONTENT_INVENTORY.generated.json";
+        private const string CandidateProvenanceExportPath =
+            "candidate-provenance/PREVIEW_NIGHTLY_CANDIDATE_EXPORT.generated.json";
 
         private static object Embedded(string path, byte[] payload)
             => new
