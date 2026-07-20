@@ -754,18 +754,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         required=True,
     )
-    parser.add_argument(
-        "--runtime-proof-bind-source",
-        type=Path,
-        required=True,
-    )
     parser.add_argument("--published-port", type=int, required=True)
     parser.add_argument("--portal-image-tag", required=True)
     parser.add_argument("--tool-image-tag", required=True)
-    parser.add_argument(
-        "--expected-runtime-proof-bind-source-sha256",
-        required=True,
-    )
     return parser.parse_args(argv)
 
 
@@ -777,52 +768,6 @@ def main(argv: list[str] | None = None) -> int:
     projection_snapshot_root = transaction.overlay.normalized_absolute_path(
         args.public_projection_snapshot_root
     )
-    selected_runtime_proof = transaction.overlay.normalized_absolute_path(
-        args.runtime_proof_bind_source
-    )
-    expected_proof_sha256 = str(
-        args.expected_runtime_proof_bind_source_sha256
-    )
-    if re.fullmatch(r"[0-9a-f]{64}", expected_proof_sha256) is None:
-        payload = {
-            "contractName": CONTRACT_NAME,
-            "operation": "reconcile",
-            "status": "fail",
-            "exactPriorStateRestored": False,
-            "warning": "recovery proof authority SHA-256 is invalid",
-        }
-        atomic_write(output_path, payload)
-        print(json.dumps(payload, sort_keys=True))
-        return 70
-    try:
-        projection_module = _load_public_projection_module(source_root)
-        current_projection = projection_module.resolve_current_snapshot(
-            projection_snapshot_root
-        )
-        authenticated_runtime_proof = current_projection.outputs[
-            "HUB_LOCAL_RELEASE_PROOF.generated.json"
-        ]
-        authenticated_runtime_digest = current_projection.output_sha256[
-            "HUB_LOCAL_RELEASE_PROOF.generated.json"
-        ]
-        if (
-            selected_runtime_proof != authenticated_runtime_proof
-            or authenticated_runtime_digest != expected_proof_sha256
-        ):
-            raise RuntimeError(
-                "recovery runtime proof is not the authenticated CURRENT output"
-            )
-    except Exception:
-        payload = {
-            "contractName": CONTRACT_NAME,
-            "operation": "reconcile",
-            "status": "fail",
-            "exactPriorStateRestored": False,
-            "warning": "authenticated CURRENT public projection is unavailable",
-        }
-        atomic_write(output_path, payload)
-        print(json.dumps(payload, sort_keys=True))
-        return 70
     if not snapshot_path.exists() and not snapshot_path.is_symlink():
         payload = {
             "contractName": CONTRACT_NAME,
@@ -838,18 +783,46 @@ def main(argv: list[str] | None = None) -> int:
     try:
         snapshot = transaction.validated_deploy_snapshot(
             snapshot_path,
-            source_root=args.source_root,
+            source_root=source_root,
             active_root=args.active_root,
         )
+        prior = snapshot["runtimePriorState"]
+        deploy_authority = snapshot["deployOverlayAuthority"]
+        proof_bind_source = Path(deploy_authority["proofBindSourcePath"])
+        projection_module = _load_public_projection_module(source_root)
+        authenticated_projection = projection_module.resolve_snapshot_generation(
+            projection_snapshot_root,
+            snapshot_id=prior["publicProjectionSnapshotId"],
+            snapshot_sha256=prior["publicProjectionSnapshotSha256"],
+            manifest_sha256=prior["publicProjectionManifestSha256"],
+            purpose=projection_module.PROJECTION_PURPOSE_CODE_DEPLOY,
+        )
+        authenticated_runtime_proof = authenticated_projection.outputs[
+            "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        ]
+        authenticated_runtime_digest = authenticated_projection.output_sha256[
+            "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        ]
         if (
-            snapshot["runtimePriorState"][
-                "expectedRuntimeProofBindSourceSha256"
-            ]
-            != expected_proof_sha256
+            proof_bind_source != authenticated_runtime_proof
+            or authenticated_runtime_digest
+            != prior["expectedRuntimeProofBindSourceSha256"]
         ):
             raise RuntimeError(
-                "recovery proof authority does not match its durable journal"
+                "recovery runtime proof is not the journal-bound generation output"
             )
+    except Exception:
+        payload = {
+            "contractName": CONTRACT_NAME,
+            "operation": "reconcile",
+            "status": "fail",
+            "exactPriorStateRestored": False,
+            "warning": "journal-bound public projection generation is unavailable",
+        }
+        atomic_write(output_path, payload)
+        print(json.dumps(payload, sort_keys=True))
+        return 70
+    try:
         runtime = DockerRuntime(
             docker_config=args.docker_config_root,
             docker_context=args.docker_context,
@@ -863,15 +836,12 @@ def main(argv: list[str] | None = None) -> int:
             runtime_proof_bind_source=authenticated_runtime_proof,
             published_port=args.published_port,
         )
-        deploy_authority = snapshot["deployOverlayAuthority"]
-        prior = snapshot["runtimePriorState"]
-        proof_bind_source = Path(deploy_authority["proofBindSourcePath"])
         candidate_proof_snapshot = Path(
             deploy_authority["candidateProofBindSourceSnapshot"]
         )
         if proof_bind_source != authenticated_runtime_proof:
             raise RuntimeError(
-                "durable recovery journal does not bind authenticated CURRENT output"
+                "durable recovery journal does not bind its authenticated generation"
             )
 
         def proof_bind_source_matches_candidate() -> bool:
@@ -888,7 +858,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise RuntimeError("candidate proof evidence snapshot is unavailable")
             if not proof_bind_source_matches_candidate():
                 raise RuntimeError(
-                    "immutable authenticated CURRENT proof cannot be repaired in place"
+                    "immutable authenticated generation proof cannot be repaired in place"
                 )
 
         def prepare_prior_proof_bind() -> None:

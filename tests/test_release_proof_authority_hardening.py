@@ -530,7 +530,7 @@ class ReleaseProofAuthorityHardeningTests(unittest.TestCase):
                     f"late gate failure mutated {path}",
                 )
 
-    def test_success_publishes_five_output_snapshot_and_one_current_pointer(self) -> None:
+    def test_success_publishes_seven_output_snapshot_and_one_current_pointer(self) -> None:
         module = load_orchestrator()
         with tempfile.TemporaryDirectory(prefix="hub-proof-success-") as temp_dir:
             root = Path(temp_dir)
@@ -661,6 +661,146 @@ class ReleaseProofAuthorityHardeningTests(unittest.TestCase):
                 result.outputs["HUB_SERVED_RELEASE_PROOF.generated.json"].read_bytes(),
             )
             self.assertEqual([], list(root.glob(".public-projection-*")))
+
+    def test_code_deploy_stage_is_authenticated_but_cannot_authorize_release_upload(self) -> None:
+        module = load_orchestrator()
+        with tempfile.TemporaryDirectory(prefix="hub-proof-code-deploy-") as temp_dir:
+            root = Path(temp_dir)
+            environment, release_path, readiness_path = materializer_environment(
+                root,
+                release_payload(),
+                readiness_payload(),
+            )
+            fleet_queue = root / "fleet.yaml"
+            design_queue = root / "design.yaml"
+            registry = root / "registry.yaml"
+            fleet_queue.write_text(valid_queue_fixture(), encoding="utf-8")
+            design_queue.write_text(valid_queue_fixture(), encoding="utf-8")
+            registry.write_text("entries: []\n", encoding="utf-8")
+            environment.update(
+                {
+                    "CHUMMER_PUBLIC_PROJECTION_SNAPSHOT_ROOT": str(root),
+                    "CHUMMER_FLEET_QUEUE_STAGING_PATH": str(fleet_queue),
+                    "CHUMMER_FLEET_QUEUE_STAGING_EXPECTED_SHA256": hashlib.sha256(
+                        fleet_queue.read_bytes()
+                    ).hexdigest(),
+                    "CHUMMER_FLEET_QUEUE_STAGING_AUTHORITY": "fleet://queue/run-test",
+                    "CHUMMER_DESIGN_QUEUE_STAGING_PATH": str(design_queue),
+                    "CHUMMER_DESIGN_QUEUE_STAGING_EXPECTED_SHA256": hashlib.sha256(
+                        design_queue.read_bytes()
+                    ).hexdigest(),
+                    "CHUMMER_DESIGN_QUEUE_STAGING_AUTHORITY": "repo://design/run-test/queue",
+                    "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_PATH": str(registry),
+                    "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_EXPECTED_SHA256": hashlib.sha256(
+                        registry.read_bytes()
+                    ).hexdigest(),
+                    "CHUMMER_DESIGN_SUCCESSOR_REGISTRY_AUTHORITY": "repo://design/run-test/registry",
+                }
+            )
+
+            result = module.run_projection(
+                environment,
+                gate_commands=[
+                    (
+                        "real M125 materializing gate",
+                        (
+                            sys.executable,
+                            "scripts/verify_next90_m125_hub_public_signal_packets.py",
+                        ),
+                    ),
+                    (
+                        "real M126 materializing gate",
+                        (
+                            sys.executable,
+                            "scripts/verify_next90_m126_hub_hosted_proof_contracts.py",
+                        ),
+                    ),
+                ],
+                review_gate_commands=[
+                    (
+                        "M120 public launch health",
+                        (
+                            sys.executable,
+                            "-c",
+                            (
+                                "import sys; "
+                                "sys.stderr.write('source=/tmp/review token=secret-value\\n'); "
+                                "raise SystemExit(17)"
+                            ),
+                        ),
+                    ),
+                ],
+                code_deploy_stage=True,
+            )
+
+            self.assertEqual(module.PROJECTION_STATUS_REVIEW_REQUIRED, result.status)
+            self.assertEqual(
+                module.PROJECTION_STAGE_CODE_DEPLOY_REVIEW_REQUIRED,
+                result.projection_stage,
+            )
+            self.assertTrue(result.code_deployment_authority)
+            self.assertFalse(result.release_upload_authority)
+            self.assertEqual(
+                release_path.read_bytes(),
+                result.outputs["RELEASE_CHANNEL.generated.json"].read_bytes(),
+            )
+            self.assertEqual(
+                environment["CHUMMER_HUB_RELEASE_CHANNEL_EXPECTED_SHA256"],
+                result.output_sha256["RELEASE_CHANNEL.generated.json"],
+            )
+            self.assertEqual(
+                readiness_path.read_bytes(),
+                result.outputs["FLAGSHIP_PRODUCT_READINESS.generated.json"].read_bytes(),
+            )
+            self.assertEqual(
+                environment["CHUMMER_FLAGSHIP_PRODUCT_READINESS_EXPECTED_SHA256"],
+                result.output_sha256["FLAGSHIP_PRODUCT_READINESS.generated.json"],
+            )
+            windows_receipt = json.loads(
+                result.outputs["LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json"].read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual("review_required", windows_receipt["status"])
+            self.assertEqual(0, windows_receipt["checked_artifact_count"])
+            self.assertTrue(windows_receipt["code_deployment_authority"])
+            self.assertFalse(windows_receipt["release_upload_authority"])
+            self.assertEqual(
+                ["M120 public launch health", "live public Windows installer"],
+                [
+                    finding["gate"]
+                    for finding in windows_receipt["release_gate_findings"]
+                ],
+            )
+            self.assertEqual(
+                ["fail", "postdeploy_required"],
+                [
+                    finding["status"]
+                    for finding in windows_receipt["release_gate_findings"]
+                ],
+            )
+            self.assertNotIn(
+                "secret-value",
+                json.dumps(windows_receipt["release_gate_findings"]),
+            )
+            self.assertNotIn(
+                "/tmp/review",
+                json.dumps(windows_receipt["release_gate_findings"]),
+            )
+
+            with self.assertRaisesRegex(
+                module.ProjectionBlocked,
+                "not authorized for release upload",
+            ):
+                module.resolve_current_snapshot(root)
+
+            resolved = module.resolve_current_snapshot(
+                root,
+                purpose=module.PROJECTION_PURPOSE_CODE_DEPLOY,
+            )
+            self.assertEqual(result.snapshot_id, resolved.snapshot_id)
+            self.assertEqual(result.outputs, resolved.outputs)
+            self.assertFalse(resolved.release_upload_authority)
 
     def test_concurrent_publication_is_rejected_before_any_stage_is_created(self) -> None:
         module = load_orchestrator()

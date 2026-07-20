@@ -98,7 +98,27 @@ def write_public_projection_snapshot(
         "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
         "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
         "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+        "RELEASE_CHANNEL.generated.json",
+        "FLAGSHIP_PRODUCT_READINESS.generated.json",
     )
+    release_projection = json.loads(runtime_proof_text)["release_channel"]
+    release_channel_payload = (
+        json.dumps(
+            {
+                "status": "published",
+                "channelId": release_projection["channelId"],
+                "channel": release_projection["channel"],
+                "version": release_projection["version"],
+                "releaseVersion": release_projection["releaseVersion"],
+                "rolloutState": release_projection["rolloutState"],
+                "supportabilityState": release_projection["supportabilityState"],
+                "publishedAt": release_projection["publishedAt"],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("utf-8")
     root.mkdir(parents=True, exist_ok=True)
     payloads = {
         output_names[0]: runtime_proof_text.encode("utf-8"),
@@ -106,6 +126,8 @@ def write_public_projection_snapshot(
         output_names[2]: b'{"status":"pass"}\n',
         output_names[3]: b'{"status":"pass"}\n',
         output_names[4]: b'{"status":"pass"}\n',
+        output_names[5]: release_channel_payload,
+        output_names[6]: b'{"status":"fail"}\n',
     }
     digests = {
         name: hashlib.sha256(payloads[name]).hexdigest() for name in output_names
@@ -127,6 +149,9 @@ def write_public_projection_snapshot(
     manifest = {
         "contractName": "chummer.public_projection_snapshot/v1",
         "status": "pass",
+        "projectionStage": "release_upload_ready",
+        "codeDeploymentAuthority": True,
+        "releaseUploadAuthority": True,
         "snapshotId": snapshot_id,
         "snapshotSha256": snapshot_sha256,
         "authorityInputs": {},
@@ -148,6 +173,9 @@ def write_public_projection_snapshot(
     pointer = {
         "contractName": "chummer.public_projection_current/v1",
         "status": "pass",
+        "projectionStage": "release_upload_ready",
+        "codeDeploymentAuthority": True,
+        "releaseUploadAuthority": True,
         "snapshotId": snapshot_id,
         "snapshotSha256": snapshot_sha256,
         "manifestRelativePath": f"{snapshot_id}/{manifest_name}",
@@ -2955,16 +2983,23 @@ def test_deployment_preflight_argument_shapes_bind_exact_proof_and_receipt_pins(
     module.overlay_build_info_source_fingerprint_check = (
         lambda _source, _overlay: ([], {})
     )
-    module.resolve_current_snapshot = lambda selected_root: SimpleNamespace(
+    module.resolve_current_snapshot = lambda selected_root, *, purpose: SimpleNamespace(
         snapshot_id="public-projection-test",
         snapshot_sha256="3" * 64,
+        status="pass",
+        projection_stage="release_upload_ready",
+        code_deployment_authority=True,
+        release_upload_authority=True,
         outputs={
             "HUB_LOCAL_RELEASE_PROOF.generated.json": authenticated_proof,
         },
         output_sha256={
             "HUB_LOCAL_RELEASE_PROOF.generated.json": runtime_digest,
         },
-    ) if selected_root == snapshot_root else (_ for _ in ()).throw(
+    ) if (
+        selected_root == snapshot_root
+        and purpose == module.PROJECTION_PURPOSE_RELEASE_UPLOAD
+    ) else (_ for _ in ()).throw(
         AssertionError("unexpected projection snapshot root")
     )
 
@@ -3026,6 +3061,115 @@ def test_deployment_preflight_argument_shapes_bind_exact_proof_and_receipt_pins(
     assert proof_binding["releaseChannelReceiptExpectedSha256"] == receipt_digest
     assert proof_binding["releaseChannelReceiptActualSha256"] == receipt_digest
     assert receipt["overlayRoot"] == (str(overlay_root) if include_overlay else "")
+
+
+def test_code_deploy_preflight_records_review_required_authority(
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    snapshot_root = tmp_path / "public-projection"
+    snapshot_root.mkdir()
+    authenticated_proof = snapshot_root / "public-projection-test" / (
+        "HUB_LOCAL_RELEASE_PROOF.generated.json"
+    )
+    runtime_digest = "1" * 64
+    release_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_digest = "2" * 64
+    purposes: list[str] = []
+
+    module.source_marker_findings = lambda _source: ([], [])
+    module.execute_public_pwa_static_proof = lambda _source: {"status": "pass"}
+    module.source_requires_operational_mirror_check = lambda _source: False
+    module.operational_mirror_root_findings = lambda: ([], [])
+
+    def resolve_projection(selected_root: Path, *, purpose: str) -> SimpleNamespace:
+        assert selected_root == snapshot_root
+        purposes.append(purpose)
+        return SimpleNamespace(
+            snapshot_id="public-projection-test",
+            snapshot_sha256="3" * 64,
+            status="review_required",
+            projection_stage="code_deploy_review_required",
+            code_deployment_authority=True,
+            release_upload_authority=False,
+            release_gate_findings=(
+                {
+                    "gate": "live public Windows installer",
+                    "status": "postdeploy_required",
+                    "reason": "live Windows installer proof must pass after code deployment",
+                },
+            ),
+            outputs={
+                "HUB_LOCAL_RELEASE_PROOF.generated.json": authenticated_proof,
+            },
+            output_sha256={
+                "HUB_LOCAL_RELEASE_PROOF.generated.json": runtime_digest,
+            },
+        )
+
+    module.resolve_current_snapshot = resolve_projection
+    module.runtime_proof_bind_source_check = lambda *_args, **_kwargs: {
+        "status": "pass",
+        "failures": [],
+    }
+
+    receipt = module.verify(
+        [],
+        False,
+        source_root=source_root,
+        public_projection_snapshot_root=snapshot_root,
+        public_projection_purpose=module.PROJECTION_PURPOSE_CODE_DEPLOY,
+        runtime_proof_bind_source=authenticated_proof,
+        runtime_proof_bind_source_sha256=runtime_digest,
+        release_channel_receipt=release_receipt,
+        release_channel_receipt_sha256=release_digest,
+    )
+
+    assert receipt["status"] == "pass"
+    assert purposes == [module.PROJECTION_PURPOSE_CODE_DEPLOY]
+    assert receipt["publicProjectionSnapshot"] == {
+        "contractName": "chummer.public_projection_current/v1",
+        "status": "pass",
+        "purpose": "code-deploy",
+        "projectionStatus": "review_required",
+        "projectionStage": "code_deploy_review_required",
+        "codeDeploymentAuthority": True,
+        "releaseUploadAuthority": False,
+        "releaseGateFindings": [
+            {
+                "gate": "live public Windows installer",
+                "status": "postdeploy_required",
+                "reason": "live Windows installer proof must pass after code deployment",
+            }
+        ],
+        "snapshotRoot": str(snapshot_root),
+        "snapshotId": "public-projection-test",
+        "snapshotSha256": "3" * 64,
+        "runtimeProofPath": str(authenticated_proof),
+        "runtimeProofSha256": runtime_digest,
+    }
+
+
+def test_deploy_wires_one_snapshot_to_code_deploy_and_release_receipt() -> None:
+    deploy = (REPO_ROOT / "scripts/deploy_public_edge_portal.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "--purpose code-deploy" in deploy
+    assert "--output-name HUB_LOCAL_RELEASE_PROOF.generated.json" in deploy
+    assert "--output-name RELEASE_CHANNEL.generated.json" in deploy
+    assert "--public-projection-purpose code-deploy" in deploy
+    assert "--expect-code-deploy-review-required" in deploy
+    assert (
+        "new public edge deploy requires the bounded review-required code-deploy snapshot"
+        in deploy
+    )
+    assert (
+        "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/"
+        "RELEASE_CHANNEL.generated.json"
+    ) not in deploy
 
 
 def test_lock_only_cli_remains_available_without_runtime_proof_pins(

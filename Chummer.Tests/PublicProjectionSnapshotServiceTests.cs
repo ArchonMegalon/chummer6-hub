@@ -173,6 +173,39 @@ public sealed class PublicProjectionSnapshotServiceTests
     }
 
     [Fact]
+    public void ReviewRequiredSnapshotCannotAuthorizeReleaseUploadConsumers()
+    {
+        using var fixture = new PublicProjectionFixture();
+        fixture.PublishReviewRequiredSnapshot();
+
+        IConfiguration configuration = fixture.CreateConfiguration();
+        PublicProjectionOutputSnapshot projection =
+            new PublicProjectionSnapshotService(configuration).LoadHubLocalReleaseProof();
+
+        Assert.True(projection.IsConfigured);
+        Assert.False(projection.IsValid);
+        Assert.Equal(
+            "current public projection snapshot failed authentication",
+            projection.FailureReason);
+        Assert.Null(new LocalReleaseProofArtifactService(configuration).LoadSnapshot());
+    }
+
+    [Fact]
+    public void PassingSnapshotWithDisabledReleaseUploadAuthorityFailsClosed()
+    {
+        using var fixture = new PublicProjectionFixture();
+        fixture.PublishInvalidPassPostureSnapshot();
+
+        IConfiguration configuration = fixture.CreateConfiguration();
+        PublicProjectionOutputSnapshot projection =
+            new PublicProjectionSnapshotService(configuration).LoadHubLocalReleaseProof();
+
+        Assert.True(projection.IsConfigured);
+        Assert.False(projection.IsValid);
+        Assert.Null(new LocalReleaseProofArtifactService(configuration).LoadSnapshot());
+    }
+
+    [Fact]
     public void TamperedOutputFailsClosedForAllLocalProofLookups()
     {
         using var fixture = new PublicProjectionFixture();
@@ -231,7 +264,9 @@ public sealed class PublicProjectionSnapshotServiceTests
             "HUB_SERVED_RELEASE_PROOF.generated.json",
             "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
             "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
-            "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json"
+            "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+            "RELEASE_CHANNEL.generated.json",
+            "FLAGSHIP_PRODUCT_READINESS.generated.json"
         ];
 
         private readonly string _root;
@@ -267,6 +302,31 @@ public sealed class PublicProjectionSnapshotServiceTests
                 .Build();
 
         public void PublishValidSnapshot()
+            => PublishSnapshot(
+                status: "pass",
+                projectionStage: "release_upload_ready",
+                codeDeploymentAuthority: true,
+                releaseUploadAuthority: true);
+
+        public void PublishReviewRequiredSnapshot()
+            => PublishSnapshot(
+                status: "review_required",
+                projectionStage: "code_deploy_review_required",
+                codeDeploymentAuthority: true,
+                releaseUploadAuthority: false);
+
+        public void PublishInvalidPassPostureSnapshot()
+            => PublishSnapshot(
+                status: "pass",
+                projectionStage: "release_upload_ready",
+                codeDeploymentAuthority: true,
+                releaseUploadAuthority: false);
+
+        private void PublishSnapshot(
+            string status,
+            string projectionStage,
+            bool codeDeploymentAuthority,
+            bool releaseUploadAuthority)
         {
             byte[] localProof = JsonSerializer.SerializeToUtf8Bytes(new
             {
@@ -282,7 +342,9 @@ public sealed class PublicProjectionSnapshotServiceTests
                 [OutputNames[1]] = localProof,
                 [OutputNames[2]] = Encoding.UTF8.GetBytes("{\"status\":\"pass\"}\n"),
                 [OutputNames[3]] = Encoding.UTF8.GetBytes("{\"status\":\"pass\"}\n"),
-                [OutputNames[4]] = Encoding.UTF8.GetBytes("{\"status\":\"pass\"}\n")
+                [OutputNames[4]] = Encoding.UTF8.GetBytes("{\"status\":\"pass\"}\n"),
+                [OutputNames[5]] = Encoding.UTF8.GetBytes("{\"status\":\"review_required\"}\n"),
+                [OutputNames[6]] = Encoding.UTF8.GetBytes("{\"status\":\"fail\"}\n")
             };
             Dictionary<string, string> digests = payloads.ToDictionary(
                 static pair => pair.Key,
@@ -300,7 +362,10 @@ public sealed class PublicProjectionSnapshotServiceTests
             byte[] manifest = JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object?>
             {
                 ["contractName"] = "chummer.public_projection_snapshot/v1",
-                ["status"] = "pass",
+                ["status"] = status,
+                ["projectionStage"] = projectionStage,
+                ["codeDeploymentAuthority"] = codeDeploymentAuthority,
+                ["releaseUploadAuthority"] = releaseUploadAuthority,
                 ["snapshotId"] = _snapshotId,
                 ["snapshotSha256"] = aggregate,
                 ["authorityInputs"] = new Dictionary<string, object?>(),
@@ -322,7 +387,10 @@ public sealed class PublicProjectionSnapshotServiceTests
                 JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object?>
                 {
                     ["contractName"] = "chummer.public_projection_current/v1",
-                    ["status"] = "pass",
+                    ["status"] = status,
+                    ["projectionStage"] = projectionStage,
+                    ["codeDeploymentAuthority"] = codeDeploymentAuthority,
+                    ["releaseUploadAuthority"] = releaseUploadAuthority,
                     ["snapshotId"] = _snapshotId,
                     ["snapshotSha256"] = aggregate,
                     ["manifestRelativePath"] = $"{_snapshotId}/PUBLIC_PROJECTION_SNAPSHOT.generated.json",

@@ -30,6 +30,8 @@ try:
     )
     from scripts.verify_workspace_restore_receipts import check_local_release_proof
     from scripts.release.verify_public_projection import (
+        PROJECTION_PURPOSE_CODE_DEPLOY,
+        PROJECTION_PURPOSE_RELEASE_UPLOAD,
         ProjectionBlocked as PublicProjectionBlocked,
         resolve_current_snapshot,
     )
@@ -41,6 +43,8 @@ except ModuleNotFoundError:  # Direct `python3 scripts/...` execution.
     )
     from verify_workspace_restore_receipts import check_local_release_proof
     from release.verify_public_projection import (
+        PROJECTION_PURPOSE_CODE_DEPLOY,
+        PROJECTION_PURPOSE_RELEASE_UPLOAD,
         ProjectionBlocked as PublicProjectionBlocked,
         resolve_current_snapshot,
     )
@@ -4097,6 +4101,7 @@ def verify(
     overlay_root: Path | None = None,
     check_overlay_markers: bool = False,
     public_projection_snapshot_root: Path | None = None,
+    public_projection_purpose: str = PROJECTION_PURPOSE_RELEASE_UPLOAD,
     runtime_proof_bind_source: Path | None = None,
     runtime_proof_bind_source_sha256: str = "",
     release_channel_receipt: Path | None = None,
@@ -4183,11 +4188,15 @@ def verify(
             or PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT
         )
         try:
-            projection_snapshot = resolve_current_snapshot(selected_snapshot_root)
+            projection_snapshot = resolve_current_snapshot(
+                selected_snapshot_root,
+                purpose=public_projection_purpose,
+            )
         except (OSError, ValueError, PublicProjectionBlocked):
             public_projection_snapshot_receipt = {
                 "contractName": "chummer.public_projection_current/v1",
                 "status": "fail",
+                "purpose": public_projection_purpose,
                 "snapshotRoot": str(selected_snapshot_root),
                 "failure": "authenticated CURRENT public projection is unavailable",
             }
@@ -4208,6 +4217,19 @@ def verify(
             public_projection_snapshot_receipt = {
                 "contractName": "chummer.public_projection_current/v1",
                 "status": "pass",
+                "purpose": public_projection_purpose,
+                "projectionStatus": projection_snapshot.status,
+                "projectionStage": projection_snapshot.projection_stage,
+                "codeDeploymentAuthority": projection_snapshot.code_deployment_authority,
+                "releaseUploadAuthority": projection_snapshot.release_upload_authority,
+                "releaseGateFindings": [
+                    dict(finding)
+                    for finding in getattr(
+                        projection_snapshot,
+                        "release_gate_findings",
+                        (),
+                    )
+                ],
                 "snapshotRoot": str(selected_snapshot_root),
                 "snapshotId": projection_snapshot.snapshot_id,
                 "snapshotSha256": projection_snapshot.snapshot_sha256,
@@ -4333,6 +4355,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Root containing the authenticated atomic CURRENT public projection snapshot.",
     )
     parser.add_argument(
+        "--public-projection-purpose",
+        choices=(
+            PROJECTION_PURPOSE_RELEASE_UPLOAD,
+            PROJECTION_PURPOSE_CODE_DEPLOY,
+        ),
+        default=PROJECTION_PURPOSE_RELEASE_UPLOAD,
+        help="Authority purpose required from the authenticated CURRENT snapshot.",
+    )
+    parser.add_argument(
         "--runtime-proof-bind-source-sha256",
         default="",
         help="Independently supplied lowercase SHA-256 for the exact runtime proof bind source bytes.",
@@ -4392,6 +4423,7 @@ def main(argv: list[str] | None = None) -> int:
                 if args.public_projection_snapshot_root
                 else None
             ),
+            public_projection_purpose=args.public_projection_purpose,
             runtime_proof_bind_source_sha256=args.runtime_proof_bind_source_sha256,
             release_channel_receipt=(
                 Path(args.release_channel_receipt)

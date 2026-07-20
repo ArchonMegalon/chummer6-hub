@@ -34,7 +34,9 @@ public sealed class PublicProjectionSnapshotService
         HubServedReleaseProofFileName,
         "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
         "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
-        "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json"
+        "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+        "RELEASE_CHANNEL.generated.json",
+        "FLAGSHIP_PRODUCT_READINESS.generated.json"
     ];
     private static readonly HashSet<string> OutputNameSet = new(OutputNames, StringComparer.Ordinal);
 
@@ -95,6 +97,10 @@ public sealed class PublicProjectionSnapshotService
 
             RequireExactString(pointer, "contractName", CurrentContractName);
             RequireExactString(pointer, "status", "pass");
+            RequireExactString(pointer, "projectionStage", "release_upload_ready");
+            RequireExactBoolean(pointer, "codeDeploymentAuthority", expected: true);
+            RequireExactBoolean(pointer, "releaseUploadAuthority", expected: true);
+            RequireEmptyArrayWhenPresent(pointer, "releaseGateFindings");
             string snapshotId = RequireString(pointer, "snapshotId");
             string snapshotSha256 = RequireLowercaseSha256(pointer, "snapshotSha256");
             string manifestSha256 = RequireLowercaseSha256(pointer, "manifestSha256");
@@ -127,6 +133,10 @@ public sealed class PublicProjectionSnapshotService
             JsonElement manifest = manifestDocument.RootElement;
             RequireExactString(manifest, "contractName", SnapshotContractName);
             RequireExactString(manifest, "status", "pass");
+            RequireExactString(manifest, "projectionStage", "release_upload_ready");
+            RequireExactBoolean(manifest, "codeDeploymentAuthority", expected: true);
+            RequireExactBoolean(manifest, "releaseUploadAuthority", expected: true);
+            RequireEmptyArrayWhenPresent(manifest, "releaseGateFindings");
             RequireExactString(manifest, "snapshotId", snapshotId);
             RequireExactString(manifest, "snapshotSha256", snapshotSha256);
 
@@ -345,6 +355,34 @@ public sealed class PublicProjectionSnapshotService
     private static void RequireExactString(JsonElement parent, string propertyName, string expected)
     {
         if (!string.Equals(RequireString(parent, propertyName), expected, StringComparison.Ordinal))
+        {
+            throw new InvalidDataException($"public projection {propertyName} drifted");
+        }
+    }
+
+    private static void RequireExactBoolean(
+        JsonElement parent,
+        string propertyName,
+        bool expected)
+    {
+        if (!parent.TryGetProperty(propertyName, out JsonElement value)
+            || (value.ValueKind != JsonValueKind.True
+                && value.ValueKind != JsonValueKind.False)
+            || value.GetBoolean() != expected)
+        {
+            throw new InvalidDataException($"public projection {propertyName} drifted");
+        }
+    }
+
+    private static void RequireEmptyArrayWhenPresent(
+        JsonElement parent,
+        string propertyName)
+    {
+        if (!parent.TryGetProperty(propertyName, out JsonElement value))
+        {
+            return;
+        }
+        if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() != 0)
         {
             throw new InvalidDataException($"public projection {propertyName} drifted");
         }

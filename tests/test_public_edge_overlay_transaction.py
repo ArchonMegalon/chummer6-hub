@@ -51,6 +51,9 @@ def runtime_prior_state() -> dict[str, object]:
     return {
         "candidatePortalContainerName": CANDIDATE_PORTAL_NAME,
         "expectedRuntimeProofBindSourceSha256": CANDIDATE_PROOF_SHA256,
+        "publicProjectionManifestSha256": "5" * 64,
+        "publicProjectionSnapshotId": "public-projection-" + "7" * 64,
+        "publicProjectionSnapshotSha256": "7" * 64,
         "priorImageTagId": "sha256:" + "1" * 64,
         "priorToolImageTagId": "sha256:" + "2" * 64,
         "priorPortalContainerId": "a" * 64,
@@ -884,9 +887,18 @@ def test_deploy_script_orders_staging_activation_and_full_preflight() -> None:
         'RELEASE_CHANNEL_RECEIPT_INPUT="${CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT-}"'
         in script
     )
-    assert "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT must be externally supplied" in script
+    assert "--output-name RELEASE_CHANNEL.generated.json" in script
+    assert "authenticated CURRENT release channel is unavailable" in script
+    assert (
+        "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256 must be independently supplied"
+        in script
+    )
+    assert (
+        "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT must be externally supplied"
+        not in script
+    )
     assert script.count('--release-channel-receipt "$RELEASE_CHANNEL_RECEIPT"') == 7
-    assert script.count('--release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"') == 6
+    assert script.count('--release-channel-receipt-sha256 "$RELEASE_CHANNEL_RECEIPT_SHA256"') == 7
     assert "public_edge_deploy_recovery.py" in script
     assert "run_deploy_recovery" in script
     assert 'DEPLOY_OPERATION="${1:-deploy}"' in script

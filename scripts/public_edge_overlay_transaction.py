@@ -61,6 +61,9 @@ CONTAINER_ID_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 RUNTIME_PRIOR_STATE_FIELDS = {
     "candidatePortalContainerName",
     "expectedRuntimeProofBindSourceSha256",
+    "publicProjectionManifestSha256",
+    "publicProjectionSnapshotId",
+    "publicProjectionSnapshotSha256",
     "priorImageTagId",
     "priorToolImageTagId",
     "priorPortalContainerId",
@@ -97,6 +100,21 @@ def validate_runtime_prior_state(value: object) -> dict[str, Any]:
     ):
         raise RuntimeError(
             "overlay transaction expected runtime proof bind-source SHA-256 is invalid"
+        )
+    snapshot_id = state["publicProjectionSnapshotId"]
+    snapshot_sha256 = state["publicProjectionSnapshotSha256"]
+    manifest_sha256 = state["publicProjectionManifestSha256"]
+    if (
+        not isinstance(snapshot_id, str)
+        or re.fullmatch(r"public-projection-[0-9a-f]{64}", snapshot_id) is None
+        or not isinstance(snapshot_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", snapshot_sha256) is None
+        or snapshot_id != f"public-projection-{snapshot_sha256}"
+        or not isinstance(manifest_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", manifest_sha256) is None
+    ):
+        raise RuntimeError(
+            "overlay transaction public projection generation identity is invalid"
         )
     candidate_name = state["candidatePortalContainerName"]
     if (
@@ -185,6 +203,9 @@ def active_runtime_authority_payload(
     synthetic_state = {
         "candidatePortalContainerName": "authority-validation-placeholder",
         "expectedRuntimeProofBindSourceSha256": "0" * 64,
+        "publicProjectionManifestSha256": "0" * 64,
+        "publicProjectionSnapshotId": "public-projection-" + "0" * 64,
+        "publicProjectionSnapshotSha256": "0" * 64,
         "priorImageTagId": "",
         "priorToolImageTagId": "",
         "priorPortalContainerId": portal_container_id,
@@ -1097,6 +1118,18 @@ def parse_args() -> argparse.Namespace:
         "--expected-runtime-proof-bind-source-sha256",
         required=True,
     )
+    snapshot_parser.add_argument(
+        "--public-projection-snapshot-id",
+        required=True,
+    )
+    snapshot_parser.add_argument(
+        "--public-projection-snapshot-sha256",
+        required=True,
+    )
+    snapshot_parser.add_argument(
+        "--public-projection-manifest-sha256",
+        required=True,
+    )
     snapshot_parser.add_argument("--candidate-portal-container-name", required=True)
     snapshot_parser.add_argument("--prior-tool-image-tag-id", default="")
     snapshot_parser.add_argument("--prior-portal-container-id", default="")
@@ -1154,6 +1187,15 @@ def main() -> int:
                     ),
                     "expectedRuntimeProofBindSourceSha256": (
                         args.expected_runtime_proof_bind_source_sha256
+                    ),
+                    "publicProjectionManifestSha256": (
+                        args.public_projection_manifest_sha256
+                    ),
+                    "publicProjectionSnapshotId": (
+                        args.public_projection_snapshot_id
+                    ),
+                    "publicProjectionSnapshotSha256": (
+                        args.public_projection_snapshot_sha256
                     ),
                     "priorImageTagId": args.prior_image_tag_id,
                     "priorToolImageTagId": args.prior_tool_image_tag_id,

@@ -35,6 +35,8 @@ def write_public_projection_snapshot(root: Path, proof_bytes: bytes) -> Path:
         "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
         "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
         "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+        "RELEASE_CHANNEL.generated.json",
+        "FLAGSHIP_PRODUCT_READINESS.generated.json",
     )
     payloads = {
         output_names[0]: proof_bytes,
@@ -42,6 +44,8 @@ def write_public_projection_snapshot(root: Path, proof_bytes: bytes) -> Path:
         output_names[2]: b"m125\n",
         output_names[3]: b"m126\n",
         output_names[4]: b"windows\n",
+        output_names[5]: b'{"status":"test"}\n',
+        output_names[6]: b'{"status":"fail"}\n',
     }
     digests = {
         name: hashlib.sha256(payloads[name]).hexdigest() for name in output_names
@@ -59,9 +63,20 @@ def write_public_projection_snapshot(root: Path, proof_bytes: bytes) -> Path:
     for name, payload in payloads.items():
         (snapshot / name).write_bytes(payload)
     manifest_name = "PUBLIC_PROJECTION_SNAPSHOT.generated.json"
+    release_gate_findings = [
+        {
+            "gate": "live public Windows installer",
+            "status": "postdeploy_required",
+            "reason": "live Windows installer proof must pass after code deployment",
+        }
+    ]
     manifest = {
         "contractName": "chummer.public_projection_snapshot/v1",
-        "status": "pass",
+        "status": "review_required",
+        "projectionStage": "code_deploy_review_required",
+        "codeDeploymentAuthority": True,
+        "releaseUploadAuthority": False,
+        "releaseGateFindings": release_gate_findings,
         "snapshotId": snapshot_id,
         "snapshotSha256": snapshot_sha256,
         "authorityInputs": {},
@@ -80,7 +95,11 @@ def write_public_projection_snapshot(root: Path, proof_bytes: bytes) -> Path:
     (snapshot / manifest_name).write_bytes(manifest_bytes)
     current = {
         "contractName": "chummer.public_projection_current/v1",
-        "status": "pass",
+        "status": "review_required",
+        "projectionStage": "code_deploy_review_required",
+        "codeDeploymentAuthority": True,
+        "releaseUploadAuthority": False,
+        "releaseGateFindings": release_gate_findings,
         "snapshotId": snapshot_id,
         "snapshotSha256": snapshot_sha256,
         "manifestRelativePath": f"{snapshot_id}/{manifest_name}",
@@ -160,13 +179,12 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         encoding="utf-8",
     )
     trusted_docker.chmod(0o755)
-    release_channel_receipt = tmp_path / "RELEASE_CHANNEL.generated.json"
-    release_channel_receipt.write_text('{"status":"test"}\n', encoding="utf-8")
     projection_snapshot_root = tmp_path / "public-projection"
     runtime_proof = write_public_projection_snapshot(
         projection_snapshot_root,
         b'{"status":"test"}\n',
     )
+    release_channel_receipt = runtime_proof.parent / "RELEASE_CHANNEL.generated.json"
     fake_event_log = tmp_path / "fake-runtime-events.log"
     fake_auto_remove_state = tmp_path / "fake-candidate-auto-remove.state"
     fake_prior_portal_running_state = tmp_path / "fake-prior-portal-running.state"
@@ -189,9 +207,6 @@ def fake_rendered_compose_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     ).replace(
         'DEPLOY_LOCK_ROOT="/docker/chummercomplete/.state"',
         f'DEPLOY_LOCK_ROOT="{tmp_path / "lock-state"}"',
-    ).replace(
-        'CANONICAL_RELEASE_CHANNEL_RECEIPT="/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json"',
-        f'CANONICAL_RELEASE_CHANNEL_RECEIPT="{release_channel_receipt}"',
     ).replace(
         'CANONICAL_PUBLIC_PROJECTION_SNAPSHOT_ROOT="/docker/chummercomplete/chummer.run-services/.codex-studio/published"',
         f'CANONICAL_PUBLIC_PROJECTION_SNAPSHOT_ROOT="{projection_snapshot_root}"',
@@ -312,8 +327,20 @@ def make_fake_authority_source(tmp_path: Path) -> Path:
     )
     (source / "scripts" / "verify_public_edge_postdeploy_gate.py").write_text(
         "import json, os, pathlib, sys\n"
+        "args = sys.argv[1:]\n"
         "pathlib.Path(os.environ['FAKE_POSTDEPLOY_LOG']).write_text("
-        "json.dumps(sys.argv[1:]), encoding='utf-8')\n"
+        "json.dumps(args), encoding='utf-8')\n"
+        "output = pathlib.Path(args[args.index('--output') + 1])\n"
+        "output.parent.mkdir(parents=True, exist_ok=True)\n"
+        "output.write_text(json.dumps({"
+        "'contractName':'chummer.public_edge_postdeploy_gate.v1',"
+        "'status':'pass','projectionPurpose':'code-deploy',"
+        "'projectionStatus':'review_required',"
+        "'projectionStage':'code_deploy_review_required',"
+        "'codeDeploymentAuthority':True,'releaseUploadAuthority':False,"
+        "'releaseReady':False,"
+        "'codeDeployReviewRequiredAuthoritySatisfied':True"
+        "}), encoding='utf-8')\n"
         "raise SystemExit(int(os.environ.get('FAKE_POSTDEPLOY_EXIT', '0')))\n",
         encoding="utf-8",
     )
@@ -689,6 +716,78 @@ def test_guarded_deploy_rejects_tampered_current_before_docker(
     assert result.returncode == 2
     assert "authenticated CURRENT public projection is unavailable" in result.stderr
     assert not docker_log.exists()
+
+
+def test_guarded_recovery_uses_durable_journal_without_reading_current(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = make_fake_authority_source(tmp_path)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    write_fake_transaction_python(fake_bin / "python3")
+    write_fake_blue_green_docker(fake_bin / "docker")
+    journal = (
+        tmp_path
+        / "lock-state"
+        / "public-edge-deploy-receipts"
+        / "active-overlay-transaction.json"
+    )
+    journal.parent.mkdir(parents=True)
+    journal.write_text('{"phase":"prepared"}\n', encoding="utf-8")
+    projection_root = Path(
+        os.environ["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"]
+    )
+    (projection_root / "CURRENT.json").write_text("{}\n", encoding="utf-8")
+    advanced_current = (projection_root / "CURRENT.json").read_bytes()
+    python_log = tmp_path / "python.log"
+    trusted_python_log = tmp_path / "trusted-python.log"
+    monkeypatch.delenv(
+        "CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256",
+        raising=False,
+    )
+    monkeypatch.delenv(
+        "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256",
+        raising=False,
+    )
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "FAKE_DOCKER_LOG": str(tmp_path / "docker.log"),
+            "FAKE_PYTHON_LOG": str(python_log),
+            "FAKE_TRUSTED_PYTHON_LOG": str(trusted_python_log),
+            "CHUMMER_RUN_SERVICES_SOURCE": str(source),
+            "CHUMMER_PUBLIC_EDGE_COMPOSE_FILE": str(
+                source / "docker-compose.public-edge.yml"
+            ),
+            "CHUMMER_PUBLIC_EDGE_EXPECTED_HEAD": "0" * 40,
+            "CHUMMER_PUBLIC_EDGE_REQUIRE_UPSTREAM": "1",
+        }
+    )
+
+    result = subprocess.run(
+        ["/usr/bin/bash", "--noprofile", "--norc", str(DEPLOY), "recover"],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "public_edge_deploy_recovery_complete"
+    assert not journal.exists()
+    assert (projection_root / "CURRENT.json").read_bytes() == advanced_current
+    trusted_calls = trusted_python_log.read_text(encoding="utf-8").splitlines()
+    assert not any("verify_public_projection.py" in call for call in trusted_calls)
+    recovery_call = next(
+        call
+        for call in python_log.read_text(encoding="utf-8").splitlines()
+        if "public_edge_deploy_recovery.py" in call
+    )
+    assert "--runtime-proof-bind-source" not in recovery_call
+    assert "--expected-runtime-proof-bind-source-sha256" not in recovery_call
 
 
 @pytest.mark.parametrize(
@@ -1168,6 +1267,9 @@ def test_guarded_deploy_uses_orchestrated_postdeploy_closure_and_no_legacy_flags
         env["CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT_SHA256"],
         "--public-projection-snapshot-root",
         env["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"],
+        "--public-projection-purpose",
+        "code-deploy",
+        "--expect-code-deploy-review-required",
         "--runtime-proof-bind-source-sha256",
         env["CHUMMER_PUBLIC_EDGE_RUNTIME_PROOF_BIND_SOURCE_SHA256"],
         "--overlay-root",
@@ -1401,6 +1503,24 @@ def test_guarded_deploy_build_failure_journals_exact_prior_tag_for_recovery(
         if "public_edge_overlay_transaction.py snapshot" in command
     )
     assert f"--prior-image-tag-id {PRIOR_PORTAL_IMAGE_ID}" in snapshot_command
+    current = json.loads(
+        (
+            Path(env["CHUMMER_PUBLIC_EDGE_PROJECTION_SNAPSHOT_ROOT"])
+            / "CURRENT.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert (
+        f"--public-projection-snapshot-id {current['snapshotId']}"
+        in snapshot_command
+    )
+    assert (
+        f"--public-projection-snapshot-sha256 {current['snapshotSha256']}"
+        in snapshot_command
+    )
+    assert (
+        f"--public-projection-manifest-sha256 {current['manifestSha256']}"
+        in snapshot_command
+    )
     assert any("public_edge_deploy_recovery.py" in command for command in python_commands)
 
 
@@ -1562,7 +1682,7 @@ def test_guarded_deploy_rejects_unreviewed_compose_override_before_docker(
         (
             "CHUMMER_PUBLIC_EDGE_RELEASE_CHANNEL_RECEIPT",
             "file",
-            "non-canonical release-channel receipt",
+            "release-channel receipt override is not the authenticated CURRENT output",
         ),
     ),
 )

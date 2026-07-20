@@ -4854,6 +4854,17 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
         help="Authenticated CURRENT public projection root used by strict preflight.",
     )
     parser.add_argument(
+        "--public-projection-purpose",
+        choices=("release-upload", "code-deploy"),
+        default="release-upload",
+        help="Authority purpose required from CURRENT during strict preflight.",
+    )
+    parser.add_argument(
+        "--expect-code-deploy-review-required",
+        action="store_true",
+        help="Require a code-deploy-only review-required CURRENT and report release readiness false.",
+    )
+    parser.add_argument(
         "--runtime-proof-bind-source-sha256",
         default="",
         help="Independent lowercase SHA-256 for the CURRENT Hub runtime proof output.",
@@ -4878,6 +4889,13 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.skip_preflight and args.strict_preflight:
         parser.error("--strict-preflight cannot be combined with --skip-preflight")
+    if (
+        args.expect_code_deploy_review_required
+        and args.public_projection_purpose != "code-deploy"
+    ):
+        parser.error(
+            "--expect-code-deploy-review-required requires --public-projection-purpose code-deploy"
+        )
     if not args.skip_preflight:
         if not args.public_projection_snapshot_root:
             parser.error(
@@ -4937,6 +4955,8 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
                 str(overlay_root),
                 "--public-projection-snapshot-root",
                 args.public_projection_snapshot_root,
+                "--public-projection-purpose",
+                args.public_projection_purpose,
                 "--runtime-proof-bind-source-sha256",
                 args.runtime_proof_bind_source_sha256,
                 "--release-channel-receipt",
@@ -5262,6 +5282,46 @@ def orchestrated_main(argv: list[str] | None = None) -> int:
         and args.skip_release_version_match is False
         and args.strict_preflight is True
     )
+    projection_authority = (
+        preflight.get("publicProjectionSnapshot")
+        if isinstance(preflight.get("publicProjectionSnapshot"), dict)
+        else {}
+    )
+    result["projectionPurpose"] = projection_authority.get("purpose")
+    result["projectionStatus"] = projection_authority.get("projectionStatus")
+    result["projectionStage"] = projection_authority.get("projectionStage")
+    result["codeDeploymentAuthority"] = projection_authority.get(
+        "codeDeploymentAuthority"
+    )
+    result["releaseUploadAuthority"] = projection_authority.get(
+        "releaseUploadAuthority"
+    )
+    result["releaseGateFindings"] = projection_authority.get(
+        "releaseGateFindings"
+    )
+    result["releaseReady"] = bool(
+        projection_authority.get("projectionStatus") == "pass"
+        and projection_authority.get("releaseUploadAuthority") is True
+    )
+    if args.expect_code_deploy_review_required:
+        expected_review_authority = (
+            projection_authority.get("status") == "pass"
+            and projection_authority.get("purpose") == "code-deploy"
+            and projection_authority.get("projectionStatus") == "review_required"
+            and projection_authority.get("projectionStage")
+            == "code_deploy_review_required"
+            and projection_authority.get("codeDeploymentAuthority") is True
+            and projection_authority.get("releaseUploadAuthority") is False
+        )
+        result["codeDeployReviewRequiredAuthoritySatisfied"] = (
+            expected_review_authority
+        )
+        result["releaseReady"] = False
+        if not expected_review_authority:
+            result["failures"].append(
+                "postdeploy expected a code-deploy-only review-required CURRENT"
+            )
+            result["status"] = "fail"
     result["expectedFullDeploymentDigestSha256"] = (
         expected_full_deployment_digest_sha256
     )

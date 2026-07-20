@@ -999,6 +999,105 @@ def passing_receipts():
     )
 
 
+def test_review_required_code_deploy_postdeploy_passes_without_claiming_release_ready(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    module = load_module()
+    (
+        preflight,
+        downloads,
+        pwa_static,
+        mobile_ledger,
+        ready_mobile_handoff,
+        participate_iframe_shell,
+    ) = passing_receipts()
+    preflight["publicProjectionSnapshot"] = {
+        "contractName": "chummer.public_projection_current/v1",
+        "status": "pass",
+        "purpose": "code-deploy",
+        "projectionStatus": "review_required",
+        "projectionStage": "code_deploy_review_required",
+        "codeDeploymentAuthority": True,
+        "releaseUploadAuthority": False,
+    }
+    release_channel = tmp_path / "RELEASE_CHANNEL.generated.json"
+    release_channel.write_text(
+        json.dumps(
+            {
+                "status": "published",
+                "channel": "public_stable",
+                "version": "run-20260630",
+                "supportabilityState": "gold_supported",
+                "rolloutState": "public_stable",
+            }
+        ),
+        encoding="utf-8",
+    )
+    output = tmp_path / "PUBLIC_EDGE_POSTDEPLOY_GATE.generated.json"
+    commands: list[list[str]] = []
+
+    def fake_run_child(command, output_path, allow_failure=False):  # noqa: ANN001
+        commands.append(command)
+        command_text = " ".join(command)
+        if "check_public_edge_deploy_preflight.py" in command_text:
+            return preflight
+        if "verify_downloads_version_marker.py" in command_text:
+            return downloads
+        if "verify_public_pwa_static_assets.py" in command_text:
+            return pwa_static
+        if "verify_mobile_pwa_ledger_boundary.py" in command_text:
+            return mobile_ledger
+        if "verify_ready_mobile_handoff_contract.py" in command_text:
+            return ready_mobile_handoff
+        if "verify_participate_iframe_shell.py" in command_text:
+            return participate_iframe_shell
+        if "verify_chummer_online_launch.py" in command_text:
+            return passing_online_launch_receipt()
+        raise AssertionError(f"unexpected child command: {command_text}")
+
+    monkeypatch.setattr(module, "run_child", fake_run_child)
+    monkeypatch.setattr(
+        module,
+        "probe_role_alias_routes",
+        lambda base_url, timeout_seconds: passing_role_alias_routes(),
+    )
+
+    exit_code = module.main(
+        [
+            "--base-url",
+            "https://chummer.run",
+            "--release-channel-receipt",
+            str(release_channel),
+            "--public-projection-purpose",
+            "code-deploy",
+            "--expect-code-deploy-review-required",
+            *authenticated_preflight_args(),
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 0
+    preflight_command = next(
+        command
+        for command in commands
+        if any("check_public_edge_deploy_preflight.py" in item for item in command)
+    )
+    assert preflight_command[
+        preflight_command.index("--public-projection-purpose") + 1
+    ] == "code-deploy"
+    receipt = json.loads(output.read_text(encoding="utf-8"))
+    assert receipt["status"] == "pass"
+    assert receipt["projectionPurpose"] == "code-deploy"
+    assert receipt["projectionStatus"] == "review_required"
+    assert receipt["projectionStage"] == "code_deploy_review_required"
+    assert receipt["codeDeploymentAuthority"] is True
+    assert receipt["releaseUploadAuthority"] is False
+    assert receipt["releaseReady"] is False
+    assert receipt["codeDeployReviewRequiredAuthoritySatisfied"] is True
+
+
 def test_ready_handoff_producer_is_accepted_by_postdeploy_consumers(monkeypatch) -> None:
     postdeploy = load_module()
     producer = load_ready_handoff_module()

@@ -30,20 +30,24 @@ CANDIDATE_PROOF_SHA256 = hashlib.sha256(CANDIDATE_PROOF_BYTES).hexdigest()
 PRIOR_PROOF_SHA256 = hashlib.sha256(PRIOR_PROOF_BYTES).hexdigest()
 
 
-def write_public_projection_snapshot(root: Path) -> Path:
+def write_public_projection_snapshot(root: Path, *, variant: bytes = b"") -> Path:
     output_names = (
         "HUB_LOCAL_RELEASE_PROOF.generated.json",
         "HUB_SERVED_RELEASE_PROOF.generated.json",
         "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
         "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
         "LIVE_PUBLIC_WINDOWS_INSTALLER.generated.json",
+        "RELEASE_CHANNEL.generated.json",
+        "FLAGSHIP_PRODUCT_READINESS.generated.json",
     )
     payloads = {
         output_names[0]: CANDIDATE_PROOF_BYTES,
         output_names[1]: CANDIDATE_PROOF_BYTES,
-        output_names[2]: b"m125\n",
+        output_names[2]: b"m125\n" + variant,
         output_names[3]: b"m126\n",
         output_names[4]: b"windows\n",
+        output_names[5]: b"release-channel\n",
+        output_names[6]: b"flagship-readiness\n",
     }
     digests = {
         name: hashlib.sha256(payloads[name]).hexdigest() for name in output_names
@@ -64,6 +68,9 @@ def write_public_projection_snapshot(root: Path) -> Path:
     manifest = {
         "contractName": "chummer.public_projection_snapshot/v1",
         "status": "pass",
+        "projectionStage": "release_upload_ready",
+        "codeDeploymentAuthority": True,
+        "releaseUploadAuthority": True,
         "snapshotId": snapshot_id,
         "snapshotSha256": snapshot_sha256,
         "authorityInputs": {},
@@ -83,6 +90,9 @@ def write_public_projection_snapshot(root: Path) -> Path:
     current = {
         "contractName": "chummer.public_projection_current/v1",
         "status": "pass",
+        "projectionStage": "release_upload_ready",
+        "codeDeploymentAuthority": True,
+        "releaseUploadAuthority": True,
         "snapshotId": snapshot_id,
         "snapshotSha256": snapshot_sha256,
         "manifestRelativePath": f"{snapshot_id}/{manifest_name}",
@@ -94,6 +104,15 @@ def write_public_projection_snapshot(root: Path) -> Path:
         encoding="utf-8",
     )
     return snapshot / output_names[0]
+
+
+def public_projection_identity(root: Path) -> dict[str, str]:
+    current = json.loads((root / "CURRENT.json").read_text(encoding="utf-8"))
+    return {
+        "publicProjectionManifestSha256": current["manifestSha256"],
+        "publicProjectionSnapshotId": current["snapshotId"],
+        "publicProjectionSnapshotSha256": current["snapshotSha256"],
+    }
 
 
 def load_module():
@@ -228,11 +247,18 @@ def prior_state(
     portal_running: bool = True,
     tunnel_existed: bool = True,
     tunnel_running: bool = True,
+    projection_identity: dict[str, str] | None = None,
 ) -> dict[str, object]:
     mounted_digest = PRIOR_PROOF_SHA256 if portal_existed and portal_running else ""
+    generation = projection_identity or {
+        "publicProjectionManifestSha256": "0" * 64,
+        "publicProjectionSnapshotId": "public-projection-" + "0" * 64,
+        "publicProjectionSnapshotSha256": "0" * 64,
+    }
     return {
         "candidatePortalContainerName": CANDIDATE_PORTAL_NAME,
         "expectedRuntimeProofBindSourceSha256": CANDIDATE_PROOF_SHA256,
+        **generation,
         "priorImageTagId": PRIOR_PORTAL_IMAGE,
         "priorToolImageTagId": PRIOR_TOOL_IMAGE,
         "priorPortalContainerId": PRIOR_PORTAL if portal_existed else "",
@@ -277,8 +303,6 @@ def run_reconcile(module, runtime: FakeRuntime, state: dict[str, object], overla
 
 
 def recovery_argv(tmp_path: Path, source_root: Path, active_root: Path) -> list[str]:
-    journal = json.loads((tmp_path / "journal.json").read_text(encoding="utf-8"))
-    proof_bind_source = journal["deployOverlayAuthority"]["proofBindSourcePath"]
     return [
         "--source-root",
         str(source_root),
@@ -312,16 +336,12 @@ def recovery_argv(tmp_path: Path, source_root: Path, active_root: Path) -> list[
         str(tmp_path),
         "--public-projection-snapshot-root",
         str(tmp_path / "public-projection"),
-        "--runtime-proof-bind-source",
-        str(proof_bind_source),
         "--published-port",
         "8091",
         "--portal-image-tag",
         PORTAL_TAG,
         "--tool-image-tag",
         TOOL_TAG,
-        "--expected-runtime-proof-bind-source-sha256",
-        CANDIDATE_PROOF_SHA256,
     ]
 
 
@@ -330,9 +350,9 @@ def write_deploy_journal(module, tmp_path: Path) -> tuple[Path, Path, Path]:
     active_root = tmp_path / "active" / "app"
     staging_root = tmp_path / "staging" / "app"
     backup_root = tmp_path / "backups"
-    proof_bind_source = write_public_projection_snapshot(
-        tmp_path / "public-projection"
-    )
+    projection_root = tmp_path / "public-projection"
+    proof_bind_source = write_public_projection_snapshot(projection_root)
+    projection_generation = public_projection_identity(projection_root)
     candidate_snapshot = tmp_path / "candidate-proof.json"
     prior_authority_snapshot = tmp_path / "prior-authority-proof.json"
     prior_public_snapshot = tmp_path / "prior-public-proof.json"
@@ -357,7 +377,9 @@ def write_deploy_journal(module, tmp_path: Path) -> tuple[Path, Path, Path]:
         active_root=active_root,
         output=journal,
         shared_mutation_lock_token="f" * 64,
-        runtime_prior_state=prior_state(),
+        runtime_prior_state=prior_state(
+            projection_identity=projection_generation,
+        ),
         staging_root=staging_root,
         backup_root=backup_root,
         activation_receipt=tmp_path / "activation.json",
@@ -576,7 +598,7 @@ def test_recovery_command_retains_journal_when_prior_portal_identity_is_lost(
     assert journal.exists()
 
 
-def test_recovery_command_rejects_external_candidate_proof_authority_mismatch(
+def test_recovery_rejects_tampered_journal_generation_before_docker_or_journal_mutation(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -593,15 +615,31 @@ def test_recovery_command_rejects_external_candidate_proof_authority_mismatch(
     )
     source_root, active_root, journal = write_deploy_journal(module, tmp_path)
     argv = recovery_argv(tmp_path, source_root, active_root)
-    argv[argv.index("--expected-runtime-proof-bind-source-sha256") + 1] = "9" * 64
+    journal_payload = json.loads(journal.read_text(encoding="utf-8"))
+    snapshot_id = journal_payload["runtimePriorState"][
+        "publicProjectionSnapshotId"
+    ]
+    manifest = (
+        tmp_path
+        / "public-projection"
+        / snapshot_id
+        / "PUBLIC_PROJECTION_SNAPSHOT.generated.json"
+    )
+    manifest.write_text("{}\n", encoding="utf-8")
+    journal_before = journal.read_bytes()
+
+    def unexpected_docker(**_kwargs):
+        raise AssertionError("Docker recovery must not start after generation tamper")
+
+    monkeypatch.setattr(module, "DockerRuntime", unexpected_docker)
 
     status = module.main(argv)
     receipt = json.loads((tmp_path / "recovery.json").read_text(encoding="utf-8"))
 
     assert status == 70
     assert receipt["status"] == "fail"
-    assert "authenticated CURRENT" in receipt["warning"]
-    assert journal.exists()
+    assert "journal-bound public projection generation" in receipt["warning"]
+    assert journal.read_bytes() == journal_before
 
 
 def test_recovery_command_retains_journal_on_old_runtime_proof_mismatch(
@@ -634,7 +672,7 @@ def test_recovery_command_retains_journal_on_old_runtime_proof_mismatch(
     assert ("running", PRIOR_TUNNEL, False) in runtime.actions
 
 
-def test_recovery_rejects_tampered_current_before_docker_or_journal_mutation(
+def test_recovery_restores_s1_while_preserving_advanced_s2_current(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -651,19 +689,27 @@ def test_recovery_rejects_tampered_current_before_docker_or_journal_mutation(
     )
     source_root, active_root, journal = write_deploy_journal(module, tmp_path)
     argv = recovery_argv(tmp_path, source_root, active_root)
-    (tmp_path / "public-projection/CURRENT.json").write_text(
-        "{}\n",
-        encoding="utf-8",
+    projection_root = tmp_path / "public-projection"
+    journal_payload = json.loads(journal.read_text(encoding="utf-8"))
+    s1_snapshot_id = journal_payload["runtimePriorState"][
+        "publicProjectionSnapshotId"
+    ]
+    write_public_projection_snapshot(
+        projection_root,
+        variant=b"advanced-s2\n",
     )
+    advanced_current = (projection_root / "CURRENT.json").read_bytes()
+    s2_identity = public_projection_identity(projection_root)
+    assert s2_identity["publicProjectionSnapshotId"] != s1_snapshot_id
+    runtime = FakeRuntime()
+    monkeypatch.setattr(module, "DockerRuntime", lambda **_kwargs: runtime)
 
-    def unexpected_docker(**_kwargs):
-        raise AssertionError("Docker recovery must not start without CURRENT authority")
-
-    monkeypatch.setattr(module, "DockerRuntime", unexpected_docker)
     status = module.main(argv)
     receipt = json.loads((tmp_path / "recovery.json").read_text(encoding="utf-8"))
 
-    assert status == 70
-    assert receipt["status"] == "fail"
-    assert "authenticated CURRENT" in receipt["warning"]
-    assert journal.exists()
+    assert status == 0
+    assert receipt["status"] == "pass"
+    assert receipt["exactPriorStateRestored"] is True
+    assert not journal.exists()
+    assert (projection_root / "CURRENT.json").read_bytes() == advanced_current
+    assert public_projection_identity(projection_root) == s2_identity
