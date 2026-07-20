@@ -117,6 +117,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<SubscribrProviderWebhookService>();
         services.AddSingleton<RunsiteTourQuotaService>();
         services.AddSingleton<OriginDossierPublicationService>();
+        services.AddSingleton<OriginDossierFirstPartyDocumentService>();
         services.AddSingleton<OriginDossierProviderCreditReservationStore>();
         services.AddSingleton<OriginDossierProviderCreditReservationService>();
         services.AddSingleton<PayFunnelsBillingStore>();

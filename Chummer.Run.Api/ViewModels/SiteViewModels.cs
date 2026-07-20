@@ -1163,7 +1163,9 @@ public sealed record PublicHorizonCapabilityViewModel(
     bool QuotaTracked,
     string AllowanceWindowKind,
     string SourceRef,
-    string Visibility);
+    string Visibility,
+    bool ConfigurationEnabled,
+    string OperationalReadiness);
 
 public sealed record SharedArtifactSurfaceRoutesViewModel(
     string PublicCapabilityCatalogHref,

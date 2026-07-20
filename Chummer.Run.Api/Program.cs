@@ -6,6 +6,7 @@ using Chummer.Run.Api;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.KarmaForge;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
@@ -77,6 +78,7 @@ builder.Services
     .AddHubCampaignSpineContext()
     .AddHubControlAndSupportContext()
     .AddHubInstallAndOrchestrationAdapters(builder.Configuration, builder.Environment);
+builder.Services.AddSingleton<AliceDraftWorkflowService>();
 builder.Services.AddSingleton<HubDeepReadinessService>();
 builder.Services.AddSingleton<PortalDeploymentIdentityReadinessService>();
 builder.Services.AddSingleton<DesktopAnalyticsBridgeService>();

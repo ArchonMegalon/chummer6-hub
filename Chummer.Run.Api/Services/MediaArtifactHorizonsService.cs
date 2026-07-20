@@ -143,7 +143,7 @@ public sealed class MediaArtifactHorizonsService
             TourActionHref: "/runbook/primers/new-runner-primer/export",
             TourActionLabel: "Export Primer",
             TourActionOpenInNewTab: false,
-            DispatchTargetHref: "/media/horizons/runbook-press-90s-deepdive.mp4"),
+            DispatchTargetHref: "/runbook/primers/new-runner-primer/export"),
         new(
             "gm-first-night-primer",
             "GM first-night primer",
@@ -158,7 +158,7 @@ public sealed class MediaArtifactHorizonsService
             TourActionHref: "/runbook/primers/gm-first-night-primer/export",
             TourActionLabel: "Export Primer",
             TourActionOpenInNewTab: false,
-            DispatchTargetHref: "/media/horizons/runbook-press-90s-deepdive.mp4")
+            DispatchTargetHref: "/runbook/primers/gm-first-night-primer/export")
     ];
 
     private readonly IReadOnlyList<MediaArtifactDocument> _runsitePacks;
@@ -196,7 +196,9 @@ public sealed class MediaArtifactHorizonsService
                     TourActionLabel = tour.ActionLabel,
                     TourActionOpenInNewTab = false,
                     TourOpenInNewTab = false,
-                    DispatchTargetHref = tour.DispatchTargetHref
+                    DispatchTargetHref = tour.DispatchTargetHref,
+                    MapHref = $"/runsites/packs/{item.Id}/map",
+                    MapLabel = "Route Map"
                 };
             })
             .ToArray();
@@ -276,6 +278,14 @@ public sealed class MediaArtifactHorizonsService
             lines.Add(string.Empty);
         }
 
+        if (!string.IsNullOrWhiteSpace(document.MapLabel) && !string.IsNullOrWhiteSpace(document.MapHref))
+        {
+            lines.Add("## Route Map");
+            lines.Add(string.Empty);
+            lines.Add($"{document.MapLabel}: {document.MapHref}");
+            lines.Add(string.Empty);
+        }
+
         lines.Add("## Boundary");
         lines.Add(string.Empty);
         lines.Add(boundary);
@@ -305,6 +315,8 @@ public sealed class MediaArtifactHorizonsService
                 tour_action_href = document.TourActionHref,
                 tour_action_label = document.TourActionLabel,
                 tour_action_open_in_new_tab = document.TourActionOpenInNewTab,
+                map_href = document.MapHref,
+                map_label = document.MapLabel,
                 shared_artifacts = BuildSharedArtifactRoutes(surface),
                 artifact_capability = BuildPublicArtifactCapability(surface, document),
                 boundary,
@@ -312,6 +324,96 @@ public sealed class MediaArtifactHorizonsService
                 generated_at_utc = DateTimeOffset.UtcNow
             },
             new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+
+    public MediaArtifactTerminalDocument BuildRunsiteMap(MediaArtifactDocument document)
+    {
+        string destinationRoute = document.MapHref
+            ?? $"/runsites/packs/{Uri.EscapeDataString(document.Id)}/map";
+        string sourceRef = $"runsite:{document.Id}";
+        string title = EscapeSvgText(document.Label);
+        string style = EscapeSvgText(document.Style ?? "Runsite");
+        string escapedSourceRef = EscapeSvgText(sourceRef);
+        string escapedDestinationRoute = EscapeSvgText(destinationRoute);
+        string body = string.Join(
+            '\n',
+            [
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+                $"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1200 675\" role=\"img\" aria-labelledby=\"runsite-map-title runsite-map-description\" data-contract=\"chummer.runsite.route-map.v1\" data-artifact-kind=\"map\" data-source-ref=\"{escapedSourceRef}\" data-destination-route=\"{escapedDestinationRoute}\">",
+                $"  <title id=\"runsite-map-title\">{title} — route planning schematic</title>",
+                "  <desc id=\"runsite-map-description\">Entry, objective, and exit planning nodes. This is not a tactical map and is not to scale.</desc>",
+                "  <rect width=\"1200\" height=\"675\" fill=\"#0b1017\"/>",
+                "  <rect x=\"48\" y=\"48\" width=\"1104\" height=\"579\" rx=\"24\" fill=\"#111b26\" stroke=\"#3d566f\" stroke-width=\"3\"/>",
+                "  <text x=\"84\" y=\"105\" fill=\"#e9f2f8\" font-family=\"system-ui, sans-serif\" font-size=\"34\" font-weight=\"700\">RUNSITE ROUTE SCHEMATIC</text>",
+                $"  <text x=\"84\" y=\"140\" fill=\"#9fb5c7\" font-family=\"system-ui, sans-serif\" font-size=\"22\">{title} · {style}</text>",
+                "  <text x=\"1080\" y=\"108\" fill=\"#ffcc66\" font-family=\"system-ui, sans-serif\" font-size=\"18\" text-anchor=\"end\">NOT TO SCALE</text>",
+                "  <path d=\"M 210 345 C 350 250, 465 250, 600 345 S 850 440, 990 345\" fill=\"none\" stroke=\"#7ad7ff\" stroke-width=\"10\" stroke-linecap=\"round\" stroke-dasharray=\"18 14\"/>",
+                "  <g id=\"entry\" aria-label=\"Entry planning node\">",
+                "    <circle cx=\"210\" cy=\"345\" r=\"76\" fill=\"#153d36\" stroke=\"#65e6b4\" stroke-width=\"6\"/>",
+                "    <text x=\"210\" y=\"338\" fill=\"#d9fff0\" font-family=\"system-ui, sans-serif\" font-size=\"24\" font-weight=\"700\" text-anchor=\"middle\">ENTRY</text>",
+                "    <text x=\"210\" y=\"370\" fill=\"#a6d8c6\" font-family=\"system-ui, sans-serif\" font-size=\"17\" text-anchor=\"middle\">approach choice</text>",
+                "  </g>",
+                "  <g id=\"objective\" aria-label=\"Objective planning node\">",
+                "    <rect x=\"510\" y=\"255\" width=\"180\" height=\"180\" rx=\"30\" fill=\"#3d2f13\" stroke=\"#ffcc66\" stroke-width=\"6\"/>",
+                "    <text x=\"600\" y=\"338\" fill=\"#fff2c8\" font-family=\"system-ui, sans-serif\" font-size=\"24\" font-weight=\"700\" text-anchor=\"middle\">OBJECTIVE</text>",
+                "    <text x=\"600\" y=\"370\" fill=\"#dbc88d\" font-family=\"system-ui, sans-serif\" font-size=\"17\" text-anchor=\"middle\">mission focus</text>",
+                "  </g>",
+                "  <g id=\"exit\" aria-label=\"Exit planning node\">",
+                "    <circle cx=\"990\" cy=\"345\" r=\"76\" fill=\"#352349\" stroke=\"#c79cff\" stroke-width=\"6\"/>",
+                "    <text x=\"990\" y=\"338\" fill=\"#f0e4ff\" font-family=\"system-ui, sans-serif\" font-size=\"24\" font-weight=\"700\" text-anchor=\"middle\">EXIT</text>",
+                "    <text x=\"990\" y=\"370\" fill=\"#cab2e8\" font-family=\"system-ui, sans-serif\" font-size=\"17\" text-anchor=\"middle\">escape posture</text>",
+                "  </g>",
+                "  <rect x=\"84\" y=\"510\" width=\"1032\" height=\"82\" rx=\"14\" fill=\"#171e27\" stroke=\"#596b7a\" stroke-width=\"2\"/>",
+                "  <text x=\"600\" y=\"543\" fill=\"#ffcc66\" font-family=\"system-ui, sans-serif\" font-size=\"20\" font-weight=\"700\" text-anchor=\"middle\">PLANNING AID ONLY — NOT A TACTICAL MAP</text>",
+                "  <text x=\"600\" y=\"574\" fill=\"#b8c5d0\" font-family=\"system-ui, sans-serif\" font-size=\"17\" text-anchor=\"middle\">Distances, line of sight, security state, occupancy, and live positions are not authoritative.</text>",
+                "</svg>"
+            ]) + "\n";
+
+        return new MediaArtifactTerminalDocument(
+            Content: body,
+            ContentType: "image/svg+xml; charset=utf-8",
+            FileName: $"{document.Id}-route-map.svg",
+            ArtifactKind: "map",
+            DestinationRoute: destinationRoute,
+            SourceRef: sourceRef);
+    }
+
+    public MediaArtifactTerminalDocument BuildRunbookPrimerExport(MediaArtifactDocument document)
+    {
+        string destinationRoute = $"/runbook/primers/{Uri.EscapeDataString(document.Id)}/export";
+        string sourceRef = $"runbook-press:{document.Id}";
+        string body = string.Join(
+            '\n',
+            [
+                "---",
+                "contract_name: chummer.runbook_press.document_export.v1",
+                "artifact_kind: document_export",
+                "mime_type: text/markdown",
+                $"source_ref: {sourceRef}",
+                $"destination_route: {destinationRoute}",
+                "---",
+                string.Empty,
+                BuildDocumentMarkdown(
+                    document,
+                    "RUNBOOK PRESS",
+                    "Printable onboarding and prep packet only. This export does not claim a long-form publishing studio.").TrimEnd()
+            ]) + "\n";
+
+        return new MediaArtifactTerminalDocument(
+            Content: body,
+            ContentType: "text/markdown; charset=utf-8",
+            FileName: $"{document.Id}.md",
+            ArtifactKind: "document_export",
+            DestinationRoute: destinationRoute,
+            SourceRef: sourceRef);
+    }
+
+    private static string EscapeSvgText(string value)
+        => value
+            .Replace("&", "&amp;", StringComparison.Ordinal)
+            .Replace("<", "&lt;", StringComparison.Ordinal)
+            .Replace(">", "&gt;", StringComparison.Ordinal)
+            .Replace("\"", "&quot;", StringComparison.Ordinal)
+            .Replace("'", "&apos;", StringComparison.Ordinal);
 
     private JsonObject? BuildSharedArtifactRoutes(MediaArtifactSurfaceDefinition surface)
     {
@@ -504,8 +606,18 @@ public sealed record MediaArtifactDocument(
     string? TourActionHref = null,
     string? TourActionLabel = null,
     bool TourActionOpenInNewTab = false,
-    string? DispatchTargetHref = null);
+    string? DispatchTargetHref = null,
+    string? MapHref = null,
+    string? MapLabel = null);
 
 public sealed record MediaArtifactSurfaceDefinition(
     string HorizonId,
     string CapabilityId);
+
+public sealed record MediaArtifactTerminalDocument(
+    string Content,
+    string ContentType,
+    string FileName,
+    string ArtifactKind,
+    string DestinationRoute,
+    string SourceRef);
