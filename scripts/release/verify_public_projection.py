@@ -2341,6 +2341,7 @@ def _publish_candidate_import_snapshot_locked(
                 name: final_directory / name for name in CANDIDATE_SNAPSHOT_OUTPUT_NAMES
             },
             output_sha256=output_digests,
+            manifest_sha256=manifest_sha256,
             status=PROJECTION_STATUS_CANDIDATE_IMPORT_READY,
             projection_stage=PROJECTION_STAGE_CANDIDATE_IMPORT_READY,
             code_deployment_authority=False,

@@ -1194,6 +1194,7 @@ def test_candidate_snapshot_is_mutually_bounded_and_cannot_be_reissued(
     snapshot_root = tmp_path / "snapshots"
     snapshot_root.mkdir(mode=0o700)
     publish_review_snapshot(module, snapshot_root)
+    review_pointer = (snapshot_root / module.CURRENT_POINTER_NAME).read_bytes()
     authority_sha = sha(authority_path)
 
     result = module.publish_candidate_import_snapshot(
@@ -1206,6 +1207,10 @@ def test_candidate_snapshot_is_mutually_bounded_and_cannot_be_reissued(
     assert result.release_upload_authority is False
     assert result.code_deployment_authority is False
     assert set(result.outputs) == set(module.CANDIDATE_SNAPSHOT_OUTPUT_NAMES)
+    current = json.loads(
+        (snapshot_root / module.CURRENT_POINTER_NAME).read_text(encoding="utf-8")
+    )
+    assert result.manifest_sha256 == current["manifestSha256"]
     resolved = module.resolve_current_snapshot(
         snapshot_root, purpose=module.PROJECTION_PURPOSE_CANDIDATE_IMPORT
     )
@@ -1221,6 +1226,27 @@ def test_candidate_snapshot_is_mutually_bounded_and_cannot_be_reissued(
             snapshot_root,
             authority_path=authority_path,
             expected_authority_sha256=authority_sha,
+        )
+
+    (snapshot_root / module.CURRENT_POINTER_NAME).write_bytes(review_pointer)
+    advanced = module.resolve_current_snapshot(
+        snapshot_root, purpose=module.PROJECTION_PURPOSE_CODE_DEPLOY
+    )
+    assert advanced.snapshot_sha256 != result.snapshot_sha256
+    generation = module.resolve_snapshot_generation(
+        snapshot_root,
+        snapshot_id=result.snapshot_id,
+        snapshot_sha256=result.snapshot_sha256,
+        manifest_sha256=result.manifest_sha256,
+        purpose=module.PROJECTION_PURPOSE_CANDIDATE_IMPORT,
+    )
+    assert generation.snapshot_sha256 == result.snapshot_sha256
+    with pytest.raises(module.ProjectionBlocked, match="not authorized for release upload"):
+        module.resolve_snapshot_generation(
+            snapshot_root,
+            snapshot_id=result.snapshot_id,
+            snapshot_sha256=result.snapshot_sha256,
+            manifest_sha256=result.manifest_sha256,
         )
 
 
